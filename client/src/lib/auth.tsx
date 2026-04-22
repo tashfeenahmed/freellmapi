@@ -44,8 +44,13 @@ export function useLogin() {
   return useMutation({
     mutationFn: (vars: { username: string; password: string }) =>
       postAuthJson<{ user: AuthUser }>('/api/auth/login', vars),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: authKey.root });
+    onSuccess: (data) => {
+      // Write session to cache; do not invalidate immediately (refetch can run before the browser applies Set-Cookie from the login response and overwrite with `{ user: null }`).
+      queryClient.setQueryData<MeResponse>(authKey.me(), { user: data.user });
+      queryClient.setQueryData<AuthStatusResponse>(authKey.status(), {
+        setupRequired: false,
+        authenticated: true,
+      });
     },
   });
 }
@@ -56,8 +61,12 @@ export function useSetup() {
   return useMutation({
     mutationFn: (vars: { username: string; password: string; confirmPassword: string }) =>
       postAuthJson<{ user: AuthUser }>('/api/auth/setup', vars),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: authKey.root });
+    onSuccess: (data) => {
+      queryClient.setQueryData<MeResponse>(authKey.me(), { user: data.user });
+      queryClient.setQueryData<AuthStatusResponse>(authKey.status(), {
+        setupRequired: false,
+        authenticated: true,
+      });
       navigate('/playground', { replace: true });
     },
   });
@@ -69,6 +78,12 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
     onSuccess: () => {
+      queryClient.setQueryData<MeResponse>(authKey.me(), { user: null });
+      const status = queryClient.getQueryData<AuthStatusResponse>(authKey.status());
+      queryClient.setQueryData<AuthStatusResponse>(authKey.status(), {
+        setupRequired: status?.setupRequired ?? false,
+        authenticated: false,
+      });
       void queryClient.invalidateQueries({ queryKey: authKey.root });
       navigate('/login', { replace: true });
     },
