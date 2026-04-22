@@ -66,9 +66,46 @@ export interface FallbackEntry {
 
 // ---- OpenAI-Compatible Types ----
 
+export interface ChatToolCallFunction {
+  name: string;
+  arguments: string;
+}
+
+export interface ChatToolCall {
+  id: string;
+  type: 'function';
+  function: ChatToolCallFunction;
+}
+
+export interface ChatToolFunctionDefinition {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+  strict?: boolean;
+}
+
+export interface ChatToolDefinition {
+  type: 'function';
+  function: ChatToolFunctionDefinition;
+}
+
+export type ChatToolChoice =
+  | 'none'
+  | 'auto'
+  | 'required'
+  | {
+    type: 'function';
+    function: {
+      name: string;
+    };
+  };
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: ChatToolCall[];
 }
 
 export interface ChatCompletionRequest {
@@ -78,6 +115,9 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
   stream?: boolean;
   top_p?: number;
+  tools?: ChatToolDefinition[];
+  tool_choice?: ChatToolChoice;
+  parallel_tool_calls?: boolean;
 }
 
 export interface ChatCompletionChoice {
@@ -112,7 +152,11 @@ export interface ChatCompletionChunk {
   model: string;
   choices: {
     index: number;
-    delta: Partial<ChatMessage>;
+    delta: {
+      role?: 'assistant';
+      content?: string;
+      tool_calls?: ChatToolCall[];
+    };
     finish_reason: string | null;
   }[];
 }

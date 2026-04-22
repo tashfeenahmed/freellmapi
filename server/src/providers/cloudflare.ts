@@ -27,7 +27,7 @@ export class CloudflareProvider extends BaseProvider {
     options?: CompletionOptions,
   ): Promise<ChatCompletionResponse> {
     const { accountId, token } = this.parseKey(apiKey);
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelId}`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
 
     const res = await this.fetchWithTimeout(url, {
       method: 'POST',
@@ -36,38 +36,25 @@ export class CloudflareProvider extends BaseProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: modelId,
         messages,
-        max_tokens: options?.max_tokens,
         temperature: options?.temperature,
+        max_tokens: options?.max_tokens,
+        top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
       }),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const errors = (err as any).errors;
-      throw new Error(`Cloudflare API error ${res.status}: ${errors?.[0]?.message ?? res.statusText}`);
+      throw new Error(`Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
     }
 
-    const data = await res.json() as any;
-    const text = data.result?.response ?? '';
-
-    return {
-      id: this.makeId(),
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: modelId,
-      choices: [{
-        index: 0,
-        message: { role: 'assistant', content: text },
-        finish_reason: 'stop',
-      }],
-      usage: {
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0,
-      },
-      _routed_via: { platform: 'cloudflare', model: modelId },
-    };
+    const data = await res.json() as ChatCompletionResponse;
+    data._routed_via = { platform: 'cloudflare', model: modelId };
+    return data;
   }
 
   async *streamChatCompletion(
@@ -77,7 +64,7 @@ export class CloudflareProvider extends BaseProvider {
     options?: CompletionOptions,
   ): AsyncGenerator<ChatCompletionChunk> {
     const { accountId, token } = this.parseKey(apiKey);
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelId}`;
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
 
     const res = await this.fetchWithTimeout(url, {
       method: 'POST',
@@ -86,23 +73,27 @@ export class CloudflareProvider extends BaseProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: modelId,
         messages,
-        max_tokens: options?.max_tokens,
         temperature: options?.temperature,
+        max_tokens: options?.max_tokens,
+        top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
       }),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cloudflare API error ${res.status}: ${(err as any).errors?.[0]?.message ?? res.statusText}`);
+      throw new Error(`Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
     }
 
     const reader = res.body?.getReader();
     if (!reader) throw new Error('No response body');
 
     const decoder = new TextDecoder();
-    const id = this.makeId();
     let buffer = '';
 
     while (true) {
@@ -119,17 +110,10 @@ export class CloudflareProvider extends BaseProvider {
         const data = trimmed.slice(6);
         if (data === '[DONE]') return;
         try {
-          const parsed = JSON.parse(data);
-          if (parsed.response) {
-            yield {
-              id,
-              object: 'chat.completion.chunk',
-              created: Math.floor(Date.now() / 1000),
-              model: modelId,
-              choices: [{ index: 0, delta: { content: parsed.response }, finish_reason: null }],
-            };
-          }
-        } catch { /* skip */ }
+          yield JSON.parse(data) as ChatCompletionChunk;
+        } catch {
+          // Skip malformed chunks
+        }
       }
     }
   }

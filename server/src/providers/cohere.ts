@@ -5,16 +5,7 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
 
-const API_BASE = 'https://api.cohere.com/v2';
-
-interface CohereResponse {
-  id: string;
-  message?: { content?: { type: string; text: string }[] };
-  finish_reason?: string;
-  usage?: {
-    tokens?: { input_tokens?: number; output_tokens?: number };
-  };
-}
+const API_BASE = 'https://api.cohere.ai/compatibility/v1';
 
 export class CohereProvider extends BaseProvider {
   readonly platform = 'cohere' as const;
@@ -26,51 +17,33 @@ export class CohereProvider extends BaseProvider {
     modelId: string,
     options?: CompletionOptions,
   ): Promise<ChatCompletionResponse> {
-    const cohereMessages = messages.map(m => ({
-      role: m.role === 'system' ? 'system' as const : m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-      content: m.content,
-    }));
+    const body: Record<string, unknown> = {
+      model: modelId,
+      messages,
+      temperature: options?.temperature,
+      max_tokens: options?.max_tokens,
+      top_p: options?.top_p,
+      tools: options?.tools,
+      tool_choice: options?.tool_choice,
+    };
 
-    const res = await this.fetchWithTimeout(`${API_BASE}/chat`, {
+    const res = await this.fetchWithTimeout(`${API_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: modelId,
-        messages: cohereMessages,
-        temperature: options?.temperature,
-        max_tokens: options?.max_tokens,
-        p: options?.top_p,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cohere API error ${res.status}: ${(err as any).message ?? res.statusText}`);
+      throw new Error(`Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
-    const data = await res.json() as CohereResponse;
-    const text = data.message?.content?.[0]?.text ?? '';
-
-    return {
-      id: data.id ?? this.makeId(),
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: modelId,
-      choices: [{
-        index: 0,
-        message: { role: 'assistant', content: text },
-        finish_reason: data.finish_reason ?? 'stop',
-      }],
-      usage: {
-        prompt_tokens: data.usage?.tokens?.input_tokens ?? 0,
-        completion_tokens: data.usage?.tokens?.output_tokens ?? 0,
-        total_tokens: (data.usage?.tokens?.input_tokens ?? 0) + (data.usage?.tokens?.output_tokens ?? 0),
-      },
-      _routed_via: { platform: 'cohere', model: modelId },
-    };
+    const data = await res.json() as ChatCompletionResponse;
+    data._routed_via = { platform: 'cohere', model: modelId };
+    return data;
   }
 
   async *streamChatCompletion(
@@ -79,36 +52,35 @@ export class CohereProvider extends BaseProvider {
     modelId: string,
     options?: CompletionOptions,
   ): AsyncGenerator<ChatCompletionChunk> {
-    const cohereMessages = messages.map(m => ({
-      role: m.role === 'system' ? 'system' as const : m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-      content: m.content,
-    }));
+    const body: Record<string, unknown> = {
+      model: modelId,
+      messages,
+      temperature: options?.temperature,
+      max_tokens: options?.max_tokens,
+      top_p: options?.top_p,
+      tools: options?.tools,
+      tool_choice: options?.tool_choice,
+      stream: true,
+    };
 
-    const res = await this.fetchWithTimeout(`${API_BASE}/chat`, {
+    const res = await this.fetchWithTimeout(`${API_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: modelId,
-        messages: cohereMessages,
-        temperature: options?.temperature,
-        max_tokens: options?.max_tokens,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cohere API error ${res.status}: ${(err as any).message ?? res.statusText}`);
+      throw new Error(`Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
     const reader = res.body?.getReader();
     if (!reader) throw new Error('No response body');
 
     const decoder = new TextDecoder();
-    const id = this.makeId();
     let buffer = '';
 
     while (true) {
@@ -121,31 +93,13 @@ export class CohereProvider extends BaseProvider {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
+        if (data === '[DONE]') return;
         try {
-          const event = JSON.parse(trimmed);
-          if (event.type === 'content-delta') {
-            const text = event.delta?.message?.content?.text ?? '';
-            if (text) {
-              yield {
-                id,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: modelId,
-                choices: [{ index: 0, delta: { content: text }, finish_reason: null }],
-              };
-            }
-          } else if (event.type === 'message-end') {
-            yield {
-              id,
-              object: 'chat.completion.chunk',
-              created: Math.floor(Date.now() / 1000),
-              model: modelId,
-              choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-            };
-          }
+          yield JSON.parse(data) as ChatCompletionChunk;
         } catch {
-          // Skip malformed lines
+          // Skip malformed chunks
         }
       }
     }

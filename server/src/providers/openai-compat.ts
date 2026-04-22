@@ -52,6 +52,9 @@ export class OpenAICompatProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
       }),
     });
 
@@ -84,6 +87,9 @@ export class OpenAICompatProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
       }),
     });

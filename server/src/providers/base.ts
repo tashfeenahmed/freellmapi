@@ -2,6 +2,8 @@ import type {
   ChatMessage,
   ChatCompletionResponse,
   ChatCompletionChunk,
+  ChatToolDefinition,
+  ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
 
@@ -10,6 +12,9 @@ export interface CompletionOptions {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  tools?: ChatToolDefinition[];
+  tool_choice?: ChatToolChoice;
+  parallel_tool_calls?: boolean;
 }
 
 export abstract class BaseProvider {

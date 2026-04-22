@@ -68,10 +68,10 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://models.inference.ai.azure.com',
 }));
 
-// Cohere - unique API format
+// Cohere - OpenAI-compatible via Cohere compatibility endpoint
 register(new CohereProvider());
 
-// Cloudflare Workers AI - unique API format (key = "account_id:token")
+// Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
 register(new CloudflareProvider());
 
 // Hugging Face - OpenAI-compatible per-model endpoint

@@ -30,6 +30,9 @@ export class HuggingFaceProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
       }),
     });
 
@@ -60,6 +63,10 @@ export class HuggingFaceProvider extends BaseProvider {
         messages,
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
+        top_p: options?.top_p,
+        tools: options?.tools,
+        tool_choice: options?.tool_choice,
+        parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
       }),
     });

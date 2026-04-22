@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
@@ -13,16 +14,16 @@ export const proxyRouter = Router();
 const stickySessionMap = new Map<string, { modelDbId: number; lastUsed: number }>();
 const STICKY_TTL_MS = 30 * 60 * 1000; // 30 min session TTL
 
-function getSessionKey(messages: { role: string; content: string }[]): string {
+function getSessionKey(messages: ChatMessage[]): string {
   // Use the first user message as session identifier
   // Hermes sends the full conversation each time, so first user msg is stable
   const firstUser = messages.find(m => m.role === 'user');
-  if (!firstUser) return '';
+  if (!firstUser || typeof firstUser.content !== 'string') return '';
   // Hash: first 100 chars of first user message + message count
   return `${firstUser.content.slice(0, 100)}:${messages.length > 2 ? 'multi' : 'single'}`;
 }
 
-function getStickyModel(messages: { role: string; content: string }[]): number | undefined {
+function getStickyModel(messages: ChatMessage[]): number | undefined {
   // Only apply sticky for multi-turn (has assistant messages = continuation)
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
@@ -40,7 +41,7 @@ function getStickyModel(messages: { role: string; content: string }[]): number |
   return entry.modelDbId;
 }
 
-function setStickyModel(messages: { role: string; content: string }[], modelDbId: number) {
+function setStickyModel(messages: ChatMessage[], modelDbId: number) {
   const key = getSessionKey(messages);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
@@ -73,16 +74,82 @@ proxyRouter.get('/models', (_req: Request, res: Response) => {
 
 const MAX_RETRIES = 20;
 
+const toolCallSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('function'),
+  function: z.object({
+    name: z.string().min(1),
+    arguments: z.string(),
+  }),
+});
+
+const systemMessageSchema = z.object({
+  role: z.literal('system'),
+  content: z.string(),
+  name: z.string().optional(),
+});
+
+const userMessageSchema = z.object({
+  role: z.literal('user'),
+  content: z.string(),
+  name: z.string().optional(),
+});
+
+const assistantMessageSchema = z.object({
+  role: z.literal('assistant'),
+  content: z.string().nullable().optional(),
+  name: z.string().optional(),
+  tool_calls: z.array(toolCallSchema).optional(),
+}).refine((msg) => {
+  const hasContent = typeof msg.content === 'string' && msg.content.length > 0;
+  const hasToolCalls = (msg.tool_calls?.length ?? 0) > 0;
+  return hasContent || hasToolCalls;
+}, {
+  message: 'assistant messages must include non-empty content or tool_calls',
+});
+
+const toolMessageSchema = z.object({
+  role: z.literal('tool'),
+  content: z.string(),
+  tool_call_id: z.string().min(1),
+  name: z.string().optional(),
+});
+
+const toolDefinitionSchema = z.object({
+  type: z.literal('function'),
+  function: z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
+    strict: z.boolean().optional(),
+  }),
+});
+
+const toolChoiceSchema = z.union([
+  z.enum(['none', 'auto', 'required']),
+  z.object({
+    type: z.literal('function'),
+    function: z.object({
+      name: z.string().min(1),
+    }),
+  }),
+]);
+
 const chatCompletionSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(['system', 'user', 'assistant']),
-    content: z.string(),
-  })).min(1),
+  messages: z.array(z.union([
+    systemMessageSchema,
+    userMessageSchema,
+    assistantMessageSchema,
+    toolMessageSchema,
+  ])).min(1),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   max_tokens: z.number().int().positive().optional(),
   top_p: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
+  tools: z.array(toolDefinitionSchema).optional(),
+  tool_choice: toolChoiceSchema.optional(),
+  parallel_tool_calls: z.boolean().optional(),
 });
 
 function isRetryableError(err: any): boolean {
@@ -124,8 +191,37 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { messages, temperature, max_tokens, top_p, stream } = parsed.data;
-  const estimatedInputTokens = messages.reduce((sum, m) => sum + Math.ceil(m.content.length / 4), 0);
+  const { temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
+  const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
+    if (m.role === 'assistant') {
+      return {
+        role: 'assistant',
+        content: m.content ?? null,
+        ...(m.name ? { name: m.name } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+      };
+    }
+
+    if (m.role === 'tool') {
+      return {
+        role: 'tool',
+        content: m.content,
+        tool_call_id: m.tool_call_id,
+        ...(m.name ? { name: m.name } : {}),
+      };
+    }
+
+    return {
+      role: m.role,
+      content: m.content,
+      ...(m.name ? { name: m.name } : {}),
+    };
+  });
+
+  const estimatedInputTokens = messages.reduce((sum, m) => {
+    if (typeof m.content !== 'string') return sum;
+    return sum + Math.ceil(m.content.length / 4);
+  }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
   // Sticky session: prefer the same model for multi-turn conversations
@@ -170,7 +266,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let totalOutputTokens = 0;
         const gen = route.provider.streamChatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
 
         for await (const chunk of gen) {
@@ -190,7 +286,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
 
         const totalTokens = result.usage?.total_tokens ?? 0;

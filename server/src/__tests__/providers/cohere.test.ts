@@ -13,23 +13,45 @@ describe('CohereProvider', () => {
     expect(provider.name).toBe('Cohere');
   });
 
-  it('should translate response to OpenAI format', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        id: 'cohere-123',
-        message: { content: [{ type: 'text', text: 'Hello from Cohere!' }] },
-        finish_reason: 'COMPLETE',
-        usage: { tokens: { input_tokens: 10, output_tokens: 5 } },
-      }),
-    } as any);
+  it('should call compatibility API and return OpenAI response', async () => {
+    let capturedUrl = '';
+    let capturedBody: any = null;
+    vi.spyOn(global, 'fetch').mockImplementationOnce(async (url, init) => {
+      capturedUrl = String(url);
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'cohere-123',
+          object: 'chat.completion',
+          created: 123,
+          model: 'command-a-03-2025',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'Hello from Cohere!' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        }),
+      } as any;
+    });
 
     const result = await provider.chatCompletion(
       'test-key',
       [{ role: 'user', content: 'Hi' }],
       'command-r-plus-08-2024',
+      {
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'get_weather',
+            parameters: {
+              type: 'object',
+              properties: { city: { type: 'string' } },
+            },
+          },
+        }],
+      },
     );
 
+    expect(capturedUrl).toContain('/compatibility/v1/chat/completions');
+    expect(capturedBody.tools).toHaveLength(1);
     expect(result.object).toBe('chat.completion');
     expect(result.choices[0].message.content).toBe('Hello from Cohere!');
     expect(result.usage.prompt_tokens).toBe(10);

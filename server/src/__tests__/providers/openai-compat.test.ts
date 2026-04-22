@@ -21,10 +21,12 @@ describe('OpenAICompatProvider', () => {
   it('should call API with correct URL and headers', async () => {
     let capturedUrl = '';
     let capturedHeaders: Record<string, string> = {};
+    let capturedBody: any = null;
 
     vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
       capturedUrl = url as string;
       capturedHeaders = (init as any).headers;
+      capturedBody = JSON.parse((init as any).body);
       return {
         ok: true,
         json: () => Promise.resolve({
@@ -43,6 +45,51 @@ describe('OpenAICompatProvider', () => {
     expect(capturedUrl).toBe('https://api.test.com/v1/chat/completions');
     expect(capturedHeaders['Authorization']).toBe('Bearer my-key');
     expect(capturedHeaders['X-Custom']).toBe('test');
+    expect(capturedBody.messages[0].role).toBe('user');
+  });
+
+  it('should pass tool-calling params through untouched', async () => {
+    let capturedBody: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'test-id',
+          object: 'chat.completion',
+          created: 123,
+          model: 'test-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: null, tool_calls: [] }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'my-key',
+      [{ role: 'user', content: 'what is weather?' }],
+      'test-model',
+      {
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'get_weather',
+            description: 'Get weather',
+            parameters: {
+              type: 'object',
+              properties: { city: { type: 'string' } },
+              required: ['city'],
+            },
+          },
+        }],
+        tool_choice: 'required',
+        parallel_tool_calls: true,
+      },
+    );
+
+    expect(capturedBody.tools).toHaveLength(1);
+    expect(capturedBody.tool_choice).toBe('required');
+    expect(capturedBody.parallel_tool_calls).toBe(true);
   });
 
   it('should throw on error response', async () => {
