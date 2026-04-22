@@ -1,10 +1,13 @@
+import './loadEnv.js';
 import { createApp } from './app.js';
 import { initDb } from './db/index.js';
+import { validateSessionPasswordOrExit } from './lib/validateEnv.js';
 import { startHealthChecker } from './services/health.js';
 
 const PORT = process.env.PORT ?? 3001;
 
 async function main() {
+  validateSessionPasswordOrExit();
   initDb();
   const app = createApp();
 

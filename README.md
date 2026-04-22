@@ -107,12 +107,14 @@ npm install
 # Generate an encryption key for at-rest key storage
 cp .env.example .env
 echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
+# Secret for the dashboard session cookie (same length requirement as ENCRYPTION_KEY)
+echo "SESSION_PASSWORD=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
 
 # Start server + dashboard together
 npm run dev
 ```
 
-Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+On first launch, open <http://localhost:5173> and complete the **Create super-admin** step (or sign in on later visits). Then add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at. The admin dashboard is protected with an iron-session cookie; `/v1` continues to use the unified Bearer key only.
 
 For a production build:
 

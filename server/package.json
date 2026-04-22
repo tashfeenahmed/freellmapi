@@ -12,11 +12,15 @@
   },
   "dependencies": {
     "@freellmapi/shared": "*",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.44.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
+    "iron-session": "^8.0.4",
     "zod": "^3.24.4"
   },
   "devDependencies": {

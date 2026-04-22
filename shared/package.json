@@ -2,6 +2,17 @@
   "name": "@freellmapi/shared",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "./types.ts",
-  "types": "./types.ts"
+  "types": "./types.ts",
+  "exports": {
+    ".": "./types.ts",
+    "./types": "./types.ts",
+    "./types.js": "./types.ts",
+    "./validate-username": "./validate-username.ts",
+    "./validate-username.js": "./validate-username.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.4"
+  }
 }

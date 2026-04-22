@@ -102,6 +102,17 @@ function createTables(db: Database.Database) {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
@@ -342,36 +353,36 @@ function migrateModelsV3Ranks(db: Database.Database) {
   const setRank = db.prepare(`UPDATE models SET intelligence_rank = ? WHERE platform = ? AND model_id = ?`);
   const ranks: Array<[number, string, string]> = [
     // #1-10 frontier coders / agents
-    [1,  'openrouter',  'minimax/minimax-m2.5:free'],                     // SWE-V ~80%, TB2 ~57%
-    [2,  'openrouter',  'qwen/qwen3-coder:free'],                         // SWE-V ~70%
-    [3,  'openrouter',  'qwen/qwen3-next-80b-a3b-instruct:free'],         // SWE-V ~70.6%
-    [4,  'moonshot',    'kimi-latest'],                                   // K2: SWE-V ~71%
-    [5,  'cerebras',    'qwen-3-235b-a22b-instruct-2507'],                // SWE-V ~65-72%
-    [6,  'google',      'gemini-2.5-pro'],                                // SWE-V 63.8%, Aider 83%
-    [7,  'openrouter',  'z-ai/glm-4.5-air:free'],                         // ~58% SWE-V (distill of 4.5)
-    [8,  'openrouter',  'openai/gpt-oss-120b:free'],                      // SWE-V 62.4%
-    [9,  'openrouter',  'nvidia/nemotron-3-super-120b-a12b:free'],        // SWE-V 53.7%
-    [10, 'minimax',     'MiniMax-M1'],                                    // M1 predecessor, ~45-55%
+    [1, 'openrouter', 'minimax/minimax-m2.5:free'],                     // SWE-V ~80%, TB2 ~57%
+    [2, 'openrouter', 'qwen/qwen3-coder:free'],                         // SWE-V ~70%
+    [3, 'openrouter', 'qwen/qwen3-next-80b-a3b-instruct:free'],         // SWE-V ~70.6%
+    [4, 'moonshot', 'kimi-latest'],                                   // K2: SWE-V ~71%
+    [5, 'cerebras', 'qwen-3-235b-a22b-instruct-2507'],                // SWE-V ~65-72%
+    [6, 'google', 'gemini-2.5-pro'],                                // SWE-V 63.8%, Aider 83%
+    [7, 'openrouter', 'z-ai/glm-4.5-air:free'],                         // ~58% SWE-V (distill of 4.5)
+    [8, 'openrouter', 'openai/gpt-oss-120b:free'],                      // SWE-V 62.4%
+    [9, 'openrouter', 'nvidia/nemotron-3-super-120b-a12b:free'],        // SWE-V 53.7%
+    [10, 'minimax', 'MiniMax-M1'],                                    // M1 predecessor, ~45-55%
     // #11-15 mid-tier specialists
-    [11, 'mistral',     'codestral-latest'],                              // HumanEval 86.6%
-    [12, 'mistral',     'mistral-large-latest'],
-    [13, 'mistral',     'magistral-medium-latest'],                       // reasoning, not code-tuned
-    [14, 'google',      'gemini-2.5-flash'],
-    [15, 'zhipu',       'glm-4.5-flash'],
+    [11, 'mistral', 'codestral-latest'],                              // HumanEval 86.6%
+    [12, 'mistral', 'mistral-large-latest'],
+    [13, 'mistral', 'magistral-medium-latest'],                       // reasoning, not code-tuned
+    [14, 'google', 'gemini-2.5-flash'],
+    [15, 'zhipu', 'glm-4.5-flash'],
     // #16 Llama 3.3 70B — identical weights across providers (tie)
-    [16, 'groq',        'llama-3.3-70b-versatile'],
-    [16, 'sambanova',   'Meta-Llama-3.3-70B-Instruct'],
-    [16, 'openrouter',  'meta-llama/llama-3.3-70b-instruct:free'],
+    [16, 'groq', 'llama-3.3-70b-versatile'],
+    [16, 'sambanova', 'Meta-Llama-3.3-70B-Instruct'],
+    [16, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free'],
     [16, 'huggingface', 'accounts/fireworks/models/llama-v3p3-70b-instruct'],
     // #17-23 weaker
-    [17, 'openrouter',  'nousresearch/hermes-3-llama-3.1-405b:free'],     // L3.1 base with tool-use tune
-    [18, 'groq',        'meta-llama/llama-4-scout-17b-16e-instruct'],     // multimodal focus
-    [19, 'openrouter',  'google/gemma-4-31b-it:free'],
-    [20, 'google',      'gemini-2.5-flash-lite'],
-    [21, 'github',      'gpt-4o'],                                        // Aug 2024, SWE-V ~33%
-    [22, 'nvidia',      'meta/llama-3.1-70b-instruct'],                   // older Llama 3.1 tune
-    [22, 'cloudflare',  '@cf/meta/llama-3.1-70b-instruct'],               // same base weights
-    [23, 'cohere',      'command-r-plus-08-2024'],                        // RAG-focused, weakest on code
+    [17, 'openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free'],     // L3.1 base with tool-use tune
+    [18, 'groq', 'meta-llama/llama-4-scout-17b-16e-instruct'],     // multimodal focus
+    [19, 'openrouter', 'google/gemma-4-31b-it:free'],
+    [20, 'google', 'gemini-2.5-flash-lite'],
+    [21, 'github', 'gpt-4o'],                                        // Aug 2024, SWE-V ~33%
+    [22, 'nvidia', 'meta/llama-3.1-70b-instruct'],                   // older Llama 3.1 tune
+    [22, 'cloudflare', '@cf/meta/llama-3.1-70b-instruct'],               // same base weights
+    [23, 'cohere', 'command-r-plus-08-2024'],                        // RAG-focused, weakest on code
   ];
   const apply = db.transaction(() => {
     for (const [rank, platform, modelId] of ranks) {
@@ -401,4 +412,37 @@ export function regenerateUnifiedKey(): string {
   const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
   return key;
+}
+
+/* --- Auth users (iron-session + bcrypt) --- */
+
+export type UserRow = {
+  id: number;
+  username: string;
+  password_hash: string;
+  role: string;
+  created_at: string;
+  last_login_at: string | null;
+};
+
+export function countUsers(): number {
+  const row = getDb().prepare('SELECT COUNT(*) as c FROM users').get() as { c: number };
+  return row.c;
+}
+
+export function getUserByUsername(username: string): UserRow | undefined {
+  return getDb()
+    .prepare('SELECT id, username, password_hash, role, created_at, last_login_at FROM users WHERE username = ?')
+    .get(username) as UserRow | undefined;
+}
+
+export function createUser(username: string, passwordHash: string, role = 'admin'): { id: number } {
+  const r = getDb()
+    .prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+    .run(username, passwordHash, role);
+  return { id: Number(r.lastInsertRowid) };
+}
+
+export function updateLastLogin(userId: number): void {
+  getDb().prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(userId);
 }
