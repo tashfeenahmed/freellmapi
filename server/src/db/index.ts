@@ -39,7 +39,6 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV2(db);
   migrateModelsV3Ranks(db);
   migrateModelsV4(db);
-  migrateModelsV5(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -542,35 +541,6 @@ function migrateModelsV4(db: Database.Database) {
     for (const [r, p, m] of ranks) setRank.run(r, p, m);
   });
   applyRanks();
-}
-
-/**
- * V5: Google moved all Pro-tier Gemini off the free tier on 2026-04-01 — disable
- * gemini-2.5-pro. Add Cerebras `zai-glm-4.7` (355B z.ai GLM preview, newly on
- * free tier but throttled to 10 RPM / 100 RPD due to high demand; context capped
- * at 8192 on free tier).
- */
-function migrateModelsV5(db: Database.Database) {
-  db.prepare(`UPDATE models SET enabled = 0 WHERE platform = 'google' AND model_id = 'gemini-2.5-pro'`).run();
-
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const apply = db.transaction(() => {
-    insert.run('cerebras', 'zai-glm-4.7', 'GLM-4.7 (Cerebras)', 7, 1, 'Frontier', 10, 100, null, null, '~3M', 8192);
-    const missing = db.prepare(`
-      SELECT m.id FROM models m
-      LEFT JOIN fallback_config f ON m.id = f.model_db_id
-      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
-    `).all() as { id: number }[];
-    if (missing.length > 0) {
-      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
-      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
-      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
-    }
-  });
-  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
