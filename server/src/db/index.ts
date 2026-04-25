@@ -40,6 +40,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV3Ranks(db);
   migrateModelsV4(db);
   migrateModelsV5(db);
+  migrateModelsV6(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -559,6 +560,93 @@ function migrateModelsV5(db: Database.Database) {
   `);
   const apply = db.transaction(() => {
     insert.run('cerebras', 'zai-glm-4.7', 'GLM-4.7 (Cerebras)', 7, 1, 'Frontier', 10, 100, null, null, '~3M', 8192);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V6: Live-probed against real free-tier keys on 2026-04-25.
+ *
+ * Corrections (Google free-tier RPD): the documented "250" / "1000" RPD numbers
+ * for gemini-2.5-flash and gemini-2.5-flash-lite are stale — both share a 20
+ * RPD per-model-per-project free pool now. Confirmed by the
+ * `generate_content_free_tier_requests` quota error, limit 20.
+ *
+ * Removals: arcee-ai/trinity-large-preview:free returns 404 "No endpoints found"
+ * — pulled from OpenRouter's free pool. (Other previously-suspected dead OR :free
+ * IDs are still live in /api/v1/models, so they stay.)
+ *
+ * Additions (all probe-verified to return 200 with content on the user's keys):
+ *   - 3 Cloudflare Workers AI reasoning models
+ *   - 3 Google preview models, including Pro (which returned a free-tier 429
+ *     against the same 20 RPD pool, confirming free-tier eligibility)
+ *   - 2 OpenRouter :free models with no expiration_date
+ */
+function migrateModelsV6(db: Database.Database) {
+  // 1) Remove confirmed-dead OR route
+  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
+  const deleteFallback = db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = ? AND model_id = ?
+    )
+  `);
+  const removals: Array<[string, string]> = [
+    ['openrouter', 'arcee-ai/trinity-large-preview:free'],
+  ];
+  const applyRemovals = db.transaction(() => {
+    for (const [p, m] of removals) {
+      deleteFallback.run(p, m);
+      deleteModel.run(p, m);
+    }
+  });
+  applyRemovals();
+
+  // 2) Correct stale Google free-tier RPD numbers
+  db.prepare(`
+    UPDATE models SET rpd_limit = 20, monthly_token_budget = '~3M'
+     WHERE platform = 'google' AND model_id = 'gemini-2.5-flash'
+  `).run();
+  db.prepare(`
+    UPDATE models SET rpd_limit = 20, monthly_token_budget = '~3M'
+     WHERE platform = 'google' AND model_id = 'gemini-2.5-flash-lite'
+  `).run();
+
+  // 3) Add live-probed models
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // Cloudflare Workers AI — 10K Neurons/day shared free pool. Reasoning traces
+    // burn output tokens fast, so per-call effective budget is small. Estimates
+    // assume 1K-in/500-out typical: kimi-k2.5 ≈ 50/day, qwen3-30b ≈ 200/day,
+    // r1-distill ≈ 5/day on the reasoning-heavy path.
+    ['cloudflare', '@cf/moonshotai/kimi-k2.5',                    'Kimi K2.5 (CF)',                  3,  11, 'Frontier', null, null, null, null, '~10-20M', 262144],
+    ['cloudflare', '@cf/qwen/qwen3-30b-a3b-fp8',                  'Qwen3 30B-A3B fp8 (CF)',          7,  11, 'Large',    null, null, null, null, '~18-45M', 131072],
+    ['cloudflare', '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', 'DeepSeek R1 Distill Qwen 32B (CF)', 9, 11, 'Large',  null, null, null, null, '~3-5M',   131072],
+
+    // Google preview tier — shares the 20 RPD per-model free pool. Pro confirmed
+    // free-tier-eligible by the `free_tier_requests` quota metric in 429 errors.
+    ['google',     'gemini-3.1-flash-lite-preview',               'Gemini 3.1 Flash-Lite Preview',   18, 3,  'Medium',   15, 20,  250000, null, '~3M',  1048576],
+    ['google',     'gemini-3-flash-preview',                       'Gemini 3 Flash Preview',          11, 5,  'Large',    10, 20,  250000, null, '~3M',  1048576],
+    ['google',     'gemini-3.1-pro-preview',                       'Gemini 3.1 Pro Preview',          1,  8,  'Frontier',  5, 20,  250000, null, '~3M',  1048576],
+
+    // OpenRouter :free pool — 20 RPM / 50 RPD (1000 once $10 credits bought).
+    ['openrouter', 'google/gemma-4-31b-it:free',                   'Gemma 4 31B (free)',             19, 9,  'Medium',   20, 200, null, null, '~6M', 262144],
+    ['openrouter', 'liquid/lfm-2.5-1.2b-instruct:free',            'Liquid LFM 2.5 1.2B (free)',     30, 10, 'Small',    20, 200, null, null, '~6M', 32768],
+  ];
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
     const missing = db.prepare(`
       SELECT m.id FROM models m
       LEFT JOIN fallback_config f ON m.id = f.model_db_id
