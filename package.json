@@ -14,5 +14,11 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "overrides": {
+    "vite": "^6.2.0"
+  },
+  "dependencies": {
+    "react-refresh": "^0.18.0"
   }
 }
