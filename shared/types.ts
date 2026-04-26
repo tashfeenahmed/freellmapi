@@ -14,7 +14,8 @@ export type Platform =
   | 'cloudflare'
   | 'zhipu'
   | 'moonshot'
-  | 'minimax';
+  | 'minimax'
+  | 'deepseek';
 
 export interface Model {
   id: number;
@@ -143,6 +144,7 @@ export interface ChatCompletionResponse {
     platform: Platform;
     model: string;
   };
+  system_fingerprint?: string;
 }
 
 export interface ChatCompletionChunk {
@@ -159,6 +161,7 @@ export interface ChatCompletionChunk {
     };
     finish_reason: string | null;
   }[];
+  system_fingerprint?: string;
 }
 
 // ---- Analytics Types ----

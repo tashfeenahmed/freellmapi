@@ -644,6 +644,10 @@ function migrateModelsV6(db: Database.Database) {
     // OpenRouter :free pool — 20 RPM / 50 RPD (1000 once $10 credits bought).
     ['openrouter', 'google/gemma-4-31b-it:free',                   'Gemma 4 31B (free)',             19, 9,  'Medium',   20, 200, null, null, '~6M', 262144],
     ['openrouter', 'liquid/lfm-2.5-1.2b-instruct:free',            'Liquid LFM 2.5 1.2B (free)',     30, 10, 'Small',    20, 200, null, null, '~6M', 32768],
+
+    // DeepSeek API — Freemium starting credits
+    ['deepseek',   'deepseek-chat',                                'DeepSeek V3 (DeepSeek)',         2,  7,  'Frontier', null, null, null, null, '~5M', 65536],
+    ['deepseek',   'deepseek-reasoner',                            'DeepSeek R1 (DeepSeek)',         1,  9,  'Frontier', null, null, null, null, '~5M', 65536],
   ];
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);

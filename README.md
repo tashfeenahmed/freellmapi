@@ -2,9 +2,9 @@
 
 # FreeLLMAPI
 
-**One OpenAI-compatible endpoint. Fourteen free LLM providers. ~1.3B+ tokens per month.**
+**One OpenAI-compatible endpoint. Fifteen free LLM providers. ~1.3B+ tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral, OpenRouter, GitHub Models, Hugging Face, Cohere, Cloudflare, Zhipu, Moonshot, and MiniMax behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral, OpenRouter, GitHub Models, Hugging Face, Cohere, Cloudflare, Zhipu, Moonshot, MiniMax, and DeepSeek behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
@@ -35,7 +35,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 
 Every serious AI lab now offers a free tier — a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **1.3 billion tokens per month** of working inference capacity, across dozens of models from small-and-fast to reasonably capable.
 
-The problem is that stacking them by hand is painful: fourteen different SDKs, fourteen different rate limits, fourteen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
+The problem is that stacking them by hand is painful: fifteen different SDKs, fifteen different rate limits, fifteen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
 
 ## Supported providers
 
@@ -61,7 +61,8 @@ The problem is that stacking them by hand is painful: fourteen different SDKs, f
 <tr>
 <td align="center"><a href="https://platform.moonshot.cn"><b>Moonshot</b><br/>Kimi</a></td>
 <td align="center"><a href="https://platform.minimax.io"><b>MiniMax</b><br/>abab / hailuo</a></td>
-<td align="center" colspan="2"><i>Adding another? See <a href="#contributing">Contributing</a>.</i></td>
+<td align="center"><a href="https://platform.deepseek.com"><b>DeepSeek</b><br/>V3 / R1</a></td>
+<td align="center"><i>Adding another? See <a href="#contributing">Contributing</a>.</i></td>
 </tr>
 </table>
 
