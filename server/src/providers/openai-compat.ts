@@ -17,6 +17,9 @@ export class OpenAICompatProvider extends BaseProvider {
   private readonly baseUrl: string;
   private readonly extraHeaders: Record<string, string>;
   private readonly validateUrl?: string;
+  /** Per-provider HTTP timeout override. Cloud APIs finish in ~15s; locally-hosted
+   * inference (llama.cpp / vLLM on CPU) can take 30-120s for long prompts. Default 15000. */
+  private readonly timeoutMs: number;
 
   constructor(opts: {
     platform: Platform;
@@ -24,6 +27,7 @@ export class OpenAICompatProvider extends BaseProvider {
     baseUrl: string;
     extraHeaders?: Record<string, string>;
     validateUrl?: string;
+    timeoutMs?: number;
   }) {
     super();
     this.platform = opts.platform;
@@ -31,6 +35,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.baseUrl = opts.baseUrl;
     this.extraHeaders = opts.extraHeaders ?? {};
     this.validateUrl = opts.validateUrl;
+    this.timeoutMs = opts.timeoutMs ?? 15000;
   }
 
   async chatCompletion(
@@ -56,7 +61,7 @@ export class OpenAICompatProvider extends BaseProvider {
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
       }),
-    });
+    }, this.timeoutMs);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -92,7 +97,7 @@ export class OpenAICompatProvider extends BaseProvider {
         parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
       }),
-    });
+    }, this.timeoutMs);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
