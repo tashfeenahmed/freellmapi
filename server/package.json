@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@freellmapi/shared": "*",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.44.2",
     "express": "^5.1.0",
