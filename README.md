@@ -297,6 +297,7 @@ PRs should include a test, keep the existing test suite green, and match the `.e
 Thanks to everyone who's helped improve FreeLLMAPI:
 
 - [@moaaz12-web](https://github.com/moaaz12-web) — tool-calling support across providers (#3)
+- [@lukasulc](https://github.com/lukasulc) — better-sqlite3 bump to fix npm install on Node 24+ (#12)
 
 ## Terms of Service review
 
