@@ -191,7 +191,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
+  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
   const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
     if (m.role === 'assistant') {
       return {
@@ -224,8 +224,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
-  // Sticky session: prefer the same model for multi-turn conversations
-  const preferredModel = getStickyModel(messages);
+  // Explicit `model` field pins routing; sticky-session is the fallback.
+  let preferredModel: number | undefined;
+  if (requestedModel) {
+    const row = getDb()
+      .prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1')
+      .get(requestedModel) as { id: number } | undefined;
+    if (row) preferredModel = row.id;
+  }
+  if (preferredModel === undefined) {
+    preferredModel = getStickyModel(messages);
+  }
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
