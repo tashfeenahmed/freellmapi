@@ -43,6 +43,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV6(db);
   migrateModelsV7(db);
   migrateModelsV8(db);
+  migrateModelsV9(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -758,6 +759,20 @@ function migrateModelsV8(db: Database.Database) {
     }
   });
   apply();
+}
+
+/**
+ * V9 (May 2026): disable cerebras/zai-glm-4.7. The model still appears in
+ * Cerebras's /v1/models listing but the chat-completions endpoint returns
+ * 404 "Model does not exist or you do not have access" for free-tier keys —
+ * matches their docs note about temporarily reducing free-tier access on
+ * zai-glm-4.7 due to high demand. Row kept (not deleted) so it can be
+ * re-enabled later without losing fallback_config history.
+ */
+function migrateModelsV9(db: Database.Database) {
+  db.prepare(
+    "UPDATE models SET enabled = 0 WHERE platform = 'cerebras' AND model_id = 'zai-glm-4.7'"
+  ).run();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
