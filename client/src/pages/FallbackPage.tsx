@@ -69,6 +69,7 @@ const platformColors: Record<string, string> = {
   zhipu:       '#06b6d4',
   moonshot:    '#4f46e5',
   minimax:     '#a855f7',
+  deepseek:    '#4d6bfe',
 }
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {

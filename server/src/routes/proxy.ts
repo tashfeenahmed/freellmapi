@@ -55,21 +55,33 @@ function setStickyModel(messages: ChatMessage[], modelDbId: number) {
   }
 }
 
-// OpenAI-compatible /models endpoint (used by Hermes for metadata)
+// OpenAI-compatible /models endpoint (used by Cursor, Hermes, etc.)
 proxyRouter.get('/models', (_req: Request, res: Response) => {
   const db = getDb();
   const models = db.prepare('SELECT platform, model_id, display_name, context_window FROM models WHERE enabled = 1 ORDER BY intelligence_rank').all() as any[];
-  res.json({
-    object: 'list',
-    data: models.map(m => ({
+
+  const now = Math.floor(Date.now() / 1000);
+  const modelList = [
+    // Virtual "auto" model — lets the router pick the best available
+    {
+      id: 'auto',
+      object: 'model' as const,
+      created: now,
+      owned_by: 'freellmapi',
+      name: 'Auto (best available)',
+      context_window: 131072,
+    },
+    ...models.map(m => ({
       id: m.model_id,
-      object: 'model',
-      created: 0,
+      object: 'model' as const,
+      created: now,
       owned_by: m.platform,
       name: m.display_name,
       context_window: m.context_window,
     })),
-  });
+  ];
+
+  res.json({ object: 'list', data: modelList });
 });
 
 const MAX_RETRIES = 20;
@@ -165,18 +177,25 @@ function isRetryableError(err: any): boolean {
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Authenticate with unified API key (skip for local requests)
+  // Authenticate with unified API key.
+  // Accept without auth from direct localhost, but always validate when
+  // a Bearer token is present (covers tunneled/ngrok/Cursor traffic).
   const authHeader = req.headers.authorization;
   const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-  if (authHeader && !isLocal) {
+  if (authHeader) {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const unifiedKey = getUnifiedApiKey();
     if (token !== unifiedKey) {
       res.status(401).json({
-        error: { message: 'Invalid API key', type: 'authentication_error' },
+        error: { message: 'Invalid API key', type: 'authentication_error', code: 'invalid_api_key' },
       });
       return;
     }
+  } else if (!isLocal) {
+    res.status(401).json({
+      error: { message: 'Missing Authorization header', type: 'authentication_error', code: 'invalid_api_key' },
+    });
+    return;
   }
 
   // Validate request
@@ -255,6 +274,18 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     recordRequest(route.platform, route.modelId, route.keyId);
 
     try {
+      // Set OpenAI-compatible rate limit headers so Cursor/clients
+      // know the proxy isn't rate-limited and won't throttle prematurely.
+      function setRateLimitHeaders(res: Response) {
+        const resetTime = Math.floor(Date.now() / 1000) + 60;
+        res.setHeader('x-ratelimit-limit-requests', '1000');
+        res.setHeader('x-ratelimit-limit-tokens', '1000000');
+        res.setHeader('x-ratelimit-remaining-requests', '999');
+        res.setHeader('x-ratelimit-remaining-tokens', '999000');
+        res.setHeader('x-ratelimit-reset-requests', new Date(resetTime * 1000).toISOString());
+        res.setHeader('x-ratelimit-reset-tokens', new Date(resetTime * 1000).toISOString());
+      }
+
       if (stream) {
         // Streaming - can't retry once we start writing
         res.setHeader('Content-Type', 'text/event-stream');
@@ -262,6 +293,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+        setRateLimitHeaders(res);
 
         let totalOutputTokens = 0;
         const gen = route.provider.streamChatCompletion(
@@ -270,6 +302,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         );
 
         for await (const chunk of gen) {
+          // Ensure system_fingerprint is present (Cursor expects this)
+          if (!chunk.system_fingerprint) {
+            (chunk as any).system_fingerprint = `fp_freellmapi_${route.platform}`;
+          }
           const text = chunk.choices[0]?.delta?.content ?? '';
           totalOutputTokens += Math.ceil(text.length / 4);
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
@@ -289,6 +325,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
 
+        // Ensure system_fingerprint is present (Cursor expects this)
+        if (!result.system_fingerprint) {
+          (result as any).system_fingerprint = `fp_freellmapi_${route.platform}`;
+        }
+
         const totalTokens = result.usage?.total_tokens ?? 0;
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
@@ -296,6 +337,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+        setRateLimitHeaders(res);
         res.json(result);
 
         logRequest(
@@ -332,11 +374,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
   }
 
-  // Exhausted all retries
+  // Exhausted all retries — send Retry-After so Cursor waits instead of
+  // permanently flagging the key as rate-limited.
+  res.setHeader('Retry-After', '30');
+  res.setHeader('x-ratelimit-limit-requests', '1000');
+  res.setHeader('x-ratelimit-remaining-requests', '0');
+  res.setHeader('x-ratelimit-reset-requests', new Date(Date.now() + 30000).toISOString());
   res.status(429).json({
     error: {
       message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`,
       type: 'rate_limit_error',
+      code: 'rate_limit_exceeded',
     },
   });
 });
