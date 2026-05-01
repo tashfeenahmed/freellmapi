@@ -42,6 +42,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV5(db);
   migrateModelsV6(db);
   migrateModelsV7(db);
+  migrateModelsV8(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -706,6 +707,42 @@ function migrateModelsV7(db: Database.Database) {
     ['openrouter', 'liquid/lfm-2.5-1.2b-thinking:free',                      'Liquid LFM 2.5 1.2B Thinking (free)',      30, 10, 'Small',    20, 200, null, null, '~6M', 32768],
     // Zhipu (Z.ai) — free pool. glm-4.7-flash quotas unpublished; mirror glm-4.5-flash row shape.
     ['zhipu',      'glm-4.7-flash',                                          'GLM-4.7 Flash',                            18, 4,  'Large',    null, null, null, 1000000, '~30M', 131072],
+  ];
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V8 (May 2026): 3-day delta. SambaNova's /v1/models added two free-tier models;
+ * Cloudflare's @cf catalog added two new text models. All four probe-verified 200
+ * with the user's keys. SambaNova's paid-only MiniMax-M2.5 explicitly returns 422
+ * "Couldn't find valid service tier", so the 200s on these rows confirm free-tier
+ * access. Cloudflare's @cf/* models share the 10K Neurons/day free pool.
+ */
+function migrateModelsV8(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // SambaNova free pool: 20 RPM / 20 RPD / 200K TPD shared across all free models.
+    ['sambanova',  'DeepSeek-V3.1-cb',                          'DeepSeek V3.1 (CB)',             5,  9,  'Frontier', 20, 20, null, 200000, '~3M',     131072],
+    ['sambanova',  'gemma-3-12b-it',                            'Gemma 3 12B (SambaNova)',        22, 9,  'Medium',   20, 20, null, 200000, '~3M',     131072],
+    // Cloudflare @cf — 10K Neurons/day shared pool.
+    ['cloudflare', '@cf/moonshotai/kimi-k2.6',                  'Kimi K2.6 (CF)',                 2,  11, 'Frontier', null, null, null, null, '~10-20M', 262144],
+    ['cloudflare', '@cf/ibm-granite/granite-4.0-h-micro',       'Granite 4.0 H Micro (CF)',       29, 11, 'Small',    null, null, null, null, '~5-10M',  131072],
   ];
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);
