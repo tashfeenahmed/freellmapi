@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FreeLLMAPI — One key for hundreds of millions of free LLM tokens</title>
+<meta name="description" content="A self-hosted proxy that routes one OpenAI-compatible API across 12 free-tier LLM providers — Gemini, OpenRouter, Cerebras, Groq, Mistral, GitHub Models, SambaNova, Cohere, Cloudflare, Hugging Face, Z.ai, and NVIDIA." />
+<link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ffffff'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%230a0a0a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #0a0a0a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --card: #ffffff;
+    --accent: #0a0a0a;
+    --accent-soft: #f0f0f0;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 24px 56px rgba(0, 0, 0, 0.10);
+    --radius-sm: 12px;
+    --radius: 20px;
+    --radius-lg: 28px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, 'Cascadia Code', monospace; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0; gap: 16px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 17px; color: var(--fg); text-decoration: none;
+  }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: var(--fg);
+    display: grid; place-items: center;
+    box-shadow: var(--shadow);
+  }
+  .brand-mark svg { width: 18px; height: 18px; display: block; }
+  .nav-links { display: flex; gap: 8px; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 14px;
+    padding: 8px 14px; border-radius: 999px; transition: all 0.15s;
+  }
+  .nav-links a:hover { background: var(--accent-soft); color: var(--fg); }
+
+  .hero { padding: 80px 0 48px; text-align: center; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px;
+    background: var(--card); color: var(--fg);
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+    border: 1px solid var(--border);
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--fg);
+    box-shadow: 0 0 0 4px rgba(10, 10, 10, 0.10);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px transparent; } }
+  h1 {
+    font-size: clamp(36px, 6vw, 64px);
+    line-height: 1.05; letter-spacing: -0.03em;
+    margin: 24px 0 20px; font-weight: 800;
+  }
+  h1 .gradient {
+    color: var(--muted);
+  }
+  .subtitle {
+    font-size: clamp(17px, 2vw, 20px); color: var(--muted);
+    max-width: 640px; margin: 0 auto 40px;
+  }
+  .cta-row { display: inline-flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 24px; border-radius: 999px;
+    font-size: 15px; font-weight: 600; text-decoration: none;
+    transition: all 0.2s; border: 1px solid transparent;
+  }
+  .btn-primary {
+    background: var(--fg); color: var(--bg);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+  .btn-secondary {
+    background: var(--card); color: var(--fg); border-color: var(--border);
+  }
+  .btn-secondary:hover { background: var(--accent-soft); border-color: var(--fg); }
+
+  /* Tokens stat block — the centerpiece */
+  .tokens-stat {
+    margin: 64px auto; max-width: 760px;
+    background: var(--fg); color: var(--bg);
+    border-radius: var(--radius-lg);
+    padding: 64px 32px; text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .tokens-label {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.25em; opacity: 0.6;
+  }
+  .tokens-number {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: clamp(72px, 14vw, 160px); font-weight: 700;
+    line-height: 1; margin: 22px 0 14px; letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .tokens-unit {
+    display: block;
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: clamp(13px, 1.4vw, 15px); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.4em; opacity: 0.6;
+    margin-top: 4px;
+  }
+  .tokens-sub { margin-top: 28px; opacity: 0.7; font-size: 14px; max-width: 520px; margin-left: auto; margin-right: auto; }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  .section-header { text-align: center; margin-bottom: 40px; }
+  .section-eyebrow {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    color: var(--muted); font-size: 12px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.25em;
+  }
+  h2 {
+    font-size: clamp(28px, 4vw, 40px); margin: 8px 0 12px;
+    font-weight: 700; letter-spacing: -0.02em;
+  }
+  .section-sub { color: var(--muted); max-width: 600px; margin: 0 auto; }
+
+  /* Provider grid */
+  .provider-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .provider-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+  }
+  .provider-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--fg);
+  }
+  .provider-name {
+    font-weight: 700; font-size: 16px; margin: 0 0 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .provider-icon {
+    width: 36px; height: 36px; border-radius: 10px; flex: none;
+    background: var(--accent-soft); border: 1px solid var(--border);
+    display: grid; place-items: center;
+  }
+  .provider-icon img {
+    width: 60%; height: 60%; display: block;
+    filter: grayscale(100%) contrast(1.1);
+  }
+  /* Logos that ship their own brand background (e.g. Z.ai's dark rounded square) */
+  .provider-icon.bleed { background: none; border: none; padding: 0; }
+  .provider-icon.bleed img { width: 100%; height: 100%; border-radius: 10px; }
+  .provider-tokens {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    margin: 14px 0 8px;
+  }
+  .provider-tokens .num {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.03em;
+    color: var(--fg); font-variant-numeric: tabular-nums;
+  }
+  .provider-tokens .unit { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .provider-tokens .label { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .provider-models { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .provider-models b { color: var(--fg); font-weight: 600; }
+
+  /* How it works */
+  .steps {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .step {
+    background: var(--card); border-radius: var(--radius);
+    padding: 28px; border: 1px solid var(--border); box-shadow: var(--shadow);
+  }
+  .step-num {
+    display: inline-grid; place-items: center;
+    width: 36px; height: 36px; border-radius: 12px;
+    background: var(--fg); color: var(--bg);
+    font-weight: 800; margin-bottom: 14px;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+  .step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* Code block — terminal aesthetic */
+  .terminal {
+    max-width: 760px; margin: 0 auto;
+    background: var(--fg); color: #d4d4d4;
+    border-radius: var(--radius);
+    overflow: hidden; box-shadow: var(--shadow-lg);
+    border: 1px solid var(--fg);
+  }
+  .terminal-chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 18px;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .terminal-chrome .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+  }
+  .terminal-chrome .filename {
+    margin-left: 12px; color: rgba(255,255,255,0.55);
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    font-size: 12px; letter-spacing: 0.05em;
+  }
+  .terminal-body {
+    padding: 24px 28px;
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace;
+    font-size: 13.5px; line-height: 1.85;
+    overflow-x: auto;
+    margin: 0;
+  }
+  .terminal-body .prompt { color: #8fa9ff; user-select: none; margin-right: 10px; }
+  .terminal-body .c { color: rgba(255,255,255,0.4); font-style: italic; }
+  .terminal-body .k { color: #ffffff; font-weight: 600; }
+  .terminal-body .s { color: #c0c0c0; }
+  .terminal-body .blank { display: block; height: 0.4em; }
+
+  /* Footer */
+  footer {
+    margin-top: 64px; padding: 40px 0;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px;
+    text-align: center;
+  }
+  footer a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <a class="brand" href="#">
+        <span class="brand-mark">
+          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="16" cy="16" r="11" fill="#ffffff"/>
+            <circle cx="16" cy="16" r="4" fill="#0a0a0a"/>
+          </svg>
+        </span>
+        <span>FreeLLMAPI</span>
+      </a>
+      <div class="nav-links">
+        <a href="#providers">Providers</a>
+        <a href="#start">Quick start</a>
+        <a href="https://github.com/tashfeenahmed/freellmapi" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <span class="badge"><span class="badge-dot"></span> 60 free models · 12 providers · self-hosted</span>
+      <h1>One key.<br><span class="gradient">One billion</span> free tokens.<br>Every month.</h1>
+      <p class="subtitle">A self-hosted, OpenAI-compatible proxy that routes across every credible free-tier LLM provider. Bring your own keys; we just point requests at whichever provider still has budget left.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/tashfeenahmed/freellmapi" target="_blank" rel="noopener">View on GitHub →</a>
+        <a class="btn btn-secondary" href="#start">Quick start</a>
+      </div>
+    </header>
+
+    <div class="tokens-stat">
+      <div class="tokens-label">Aggregate monthly free budget</div>
+      <div class="tokens-number">1B</div>
+      <div class="tokens-unit">tokens · per month</div>
+      <div class="tokens-sub">Across 60 free-tier models on 12 providers. Mistral alone contributes ~1B; everything else is bonus.</div>
+    </div>
+
+    <section id="providers">
+      <div class="section-header">
+        <div class="section-eyebrow">The catalog</div>
+        <h2>Every free tier worth using</h2>
+        <p class="section-sub">Only providers with <strong>recurring</strong> free quotas, no credit card required, and a self-serve API.</p>
+      </div>
+      <div class="provider-grid">
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/google.svg" alt="" /></span>Google Gemini</div>
+          <div class="provider-tokens"><span class="num">~3M</span><span class="unit">/mo</span><span class="label">per model</span></div>
+          <div class="provider-models">Gemini 2.5 Flash · Flash-Lite · 3.1 Pro/Flash previews. <b>20 RPD per model</b>.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/openrouter.svg" alt="" /></span>OpenRouter</div>
+          <div class="provider-tokens"><span class="num">~6M</span><span class="unit">/mo</span><span class="label">per model</span></div>
+          <div class="provider-models">19 <code>:free</code> models — DeepSeek, Kimi, Qwen, Llama, Gemma, Nemotron, Tencent HY3 …</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/cerebras.svg" alt="" /></span>Cerebras</div>
+          <div class="provider-tokens"><span class="num">~30M</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">Qwen3 235B · GPT-OSS 120B · Llama 3.1 8B. <b>1M TPD · 30 RPM</b>. Fastest tokens you'll ever see.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/groq.svg" alt="" /></span>Groq</div>
+          <div class="provider-tokens"><span class="num">~30M</span><span class="unit">/mo</span><span class="label">per model</span></div>
+          <div class="provider-models">Llama 3.3 70B · Llama 4 Scout · GPT-OSS 120B/20B · Qwen3 32B. <b>1000 RPD</b>.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/mistral.svg" alt="" /></span>Mistral La Plateforme</div>
+          <div class="provider-tokens"><span class="num">~1B</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">Mistral Large/Medium · Codestral · Devstral · Magistral. The biggest free pool of any provider.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/github.svg" alt="" /></span>GitHub Models</div>
+          <div class="provider-tokens"><span class="num">~18M</span><span class="unit">/mo</span><span class="label">est.</span></div>
+          <div class="provider-models">GPT-4.1 · GPT-4o. <b>50 RPD</b> on the free Copilot tier. Higher caps with paid Copilot.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/sambanova.jpg" alt="" /></span>SambaNova</div>
+          <div class="provider-tokens"><span class="num">~3M</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">DeepSeek V3.1/V3.2 · Llama 4 Maverick · Llama 3.3 70B · Gemma 3 12B · GPT-OSS 120B.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/cloudflare.svg" alt="" /></span>Cloudflare Workers AI</div>
+          <div class="provider-tokens"><span class="num">~20M</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">Kimi K2.5/K2.6 · Qwen3 30B · GLM-4.7 Flash · Llama 4 Scout · IBM Granite 4.0. <b>10K Neurons/day</b>.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/zai.svg" alt="" /></span>Z.ai (Zhipu)</div>
+          <div class="provider-tokens"><span class="num">~30M</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">GLM-4.5 Flash · GLM-4.7 Flash. Both <code>:free</code> — perpetually, no card.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/cohere.svg" alt="" /></span>Cohere</div>
+          <div class="provider-tokens"><span class="num">~1-2M</span><span class="unit">/mo</span><span class="label">shared</span></div>
+          <div class="provider-models">Command R+. Trial key: <b>1000 calls/month</b>, 20 RPM.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/huggingface.svg" alt="" /></span>Hugging Face</div>
+          <div class="provider-tokens"><span class="num">~1-3M</span><span class="unit">/mo</span><span class="label">est.</span></div>
+          <div class="provider-models">Llama 3.3 70B via Fireworks router. Modest credits but enough for sporadic use.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon"><img src="logos/nvidia.svg" alt="" /></span>NVIDIA NIM</div>
+          <div class="provider-tokens"><span class="num">credits</span><span class="unit"></span><span class="label">disabled</span></div>
+          <div class="provider-models">Llama 3.1 70B. Disabled by default — credit-based, not recurring.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="start">
+      <div class="section-header">
+        <div class="section-eyebrow">Three minutes to first token</div>
+        <h2>Quick start</h2>
+      </div>
+
+      <div class="steps" style="margin-bottom: 32px;">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Clone &amp; install</h3>
+          <p>Node 20+ required. <code>better-sqlite3</code> brings prebuilt binaries — no compile step.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Drop in your keys</h3>
+          <p>Sign up free at each provider, paste keys into the dashboard. No credit card needed for any of them.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Point your SDK</h3>
+          <p>Set <code>base_url</code> to your local proxy. Use any OpenAI-compatible client — Cursor, the SDK, curl, anything.</p>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-chrome">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="filename">~/freellmapi · zsh</span>
+        </div>
+        <pre class="terminal-body"><span class="c"># 1. clone, install, run</span>
+<span class="prompt">$</span><span class="k">git</span> clone https://github.com/tashfeenahmed/freellmapi.git
+<span class="prompt">$</span><span class="k">cd</span> freellmapi
+<span class="prompt">$</span>npm install <span class="k">&amp;&amp;</span> npm run dev
+<span class="blank"></span>
+<span class="c"># 2. open http://localhost:3001 — paste keys in the UI</span>
+<span class="blank"></span>
+<span class="c"># 3. call it like OpenAI</span>
+<span class="prompt">$</span><span class="k">curl</span> http://localhost:3001/v1/chat/completions \
+    -H <span class="s">"Content-Type: application/json"</span> \
+    -d <span class="s">'{"messages":[{"role":"user","content":"hi"}]}'</span></pre>
+      </div>
+    </section>
+
+    <footer>
+      <p>FreeLLMAPI — open source, self-hosted, single-user. <a href="https://github.com/tashfeenahmed/freellmapi" target="_blank" rel="noopener">github.com/tashfeenahmed/freellmapi</a></p>
+      <p style="margin-top: 6px; opacity: 0.7;">Built for personal use only. Each provider's ToS applies — don't expose this proxy publicly.</p>
+    </footer>
+  </div>
+</body>
+</html>
