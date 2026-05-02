@@ -225,15 +225,29 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
-  // Explicit `model` field pins routing; sticky-session is the fallback.
+  // Explicit `model` field pins routing. If the catalog has no enabled row
+  // matching the requested id, return 400 — silently auto-routing to a
+  // different model would be surprising to OpenAI-compatible clients.
+  // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
   if (requestedModel) {
-    const row = getDb()
-      .prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1')
-      .get(requestedModel) as { id: number } | undefined;
-    if (row) preferredModel = row.id;
-  }
-  if (preferredModel === undefined) {
+    const db = getDb();
+    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
+    if (enabled) {
+      preferredModel = enabled.id;
+    } else {
+      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
+      const reason = disabled ? 'is disabled' : 'is not in the catalog';
+      res.status(400).json({
+        error: {
+          message: `Model '${requestedModel}' ${reason}. Omit the 'model' field to auto-route, or call /v1/models for the available list.`,
+          type: 'invalid_request_error',
+          code: 'model_not_found',
+        },
+      });
+      return;
+    }
+  } else {
     preferredModel = getStickyModel(messages);
   }
 

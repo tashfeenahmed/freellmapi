@@ -151,4 +151,25 @@ describe('Full Integration Flow', () => {
     });
     expect(s2).toBe(400);
   });
+
+  it('Step 11: Explicit unknown model returns 400 (not silent fallthrough)', async () => {
+    const { status, body } = await req(app, 'POST', '/v1/chat/completions', {
+      model: 'definitely-not-a-real-model',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(status).toBe(400);
+    expect(body.error.code).toBe('model_not_found');
+    expect(body.error.message).toContain('not in the catalog');
+  });
+
+  it('Step 12: Explicit disabled model returns 400 with disabled reason', async () => {
+    // gemini-2.5-pro is disabled (V1 migration). Reuse it as a known-disabled fixture.
+    const { status, body } = await req(app, 'POST', '/v1/chat/completions', {
+      model: 'gemini-2.5-pro',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(status).toBe(400);
+    expect(body.error.code).toBe('model_not_found');
+    expect(body.error.message).toContain('is disabled');
+  });
 });

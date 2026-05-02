@@ -88,7 +88,7 @@ describe('Proxy tool-calling support', () => {
     });
 
     const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
-      model: 'auto',
+      // No `model` → auto-route via fallback chain.
       messages: [{ role: 'user', content: 'What is the weather in Karachi?' }],
       tools: [{
         type: 'function',
