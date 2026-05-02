@@ -11,7 +11,7 @@ export const keysRouter = Router();
 // (see migrateModelsV4 comment block).
 const PLATFORMS = [
   'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral',
-  'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu',
+  'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
 ] as const;
 
 const addKeySchema = z.object({

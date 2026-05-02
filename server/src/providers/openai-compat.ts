@@ -160,22 +160,28 @@ export class OpenAICompatProvider extends BaseProvider {
  */
 function normalizeChoices(data: ChatCompletionResponse): void {
   for (const choice of data.choices ?? []) {
-    const msg = choice.message as ChatMessage & { reasoning_content?: string; content: unknown };
+    const msg = choice.message as ChatMessage & {
+      reasoning_content?: string;
+      reasoning?: string;
+      content: unknown;
+    };
     // Flatten array content (Mistral magistral) → join text segments.
     if (Array.isArray(msg.content)) {
       msg.content = (msg.content as Array<{ text?: string; type?: string }>)
         .map(seg => (typeof seg === 'string' ? seg : (seg.text ?? '')))
         .join('');
     }
-    // Fold reasoning_content into content if content is empty AND there are no
+    // Fold reasoning into content if content is empty AND there are no
     // tool_calls. With tool_calls present, content=null is the correct OpenAI
     // shape; folding reasoning would confuse clients that branch on content.
+    // Field naming varies by provider: Z.ai uses `reasoning_content`, Ollama
+    // uses `reasoning`. Prefer `reasoning_content` when both are set.
     const hasToolCalls = Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0;
-    if (!hasToolCalls
-        && (msg.content === '' || msg.content == null)
-        && typeof msg.reasoning_content === 'string'
-        && msg.reasoning_content.length > 0) {
-      msg.content = msg.reasoning_content;
+    if (!hasToolCalls && (msg.content === '' || msg.content == null)) {
+      const fold = (typeof msg.reasoning_content === 'string' && msg.reasoning_content.length > 0)
+        ? msg.reasoning_content
+        : (typeof msg.reasoning === 'string' && msg.reasoning.length > 0 ? msg.reasoning : null);
+      if (fold !== null) msg.content = fold;
     }
   }
 }

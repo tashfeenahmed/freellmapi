@@ -44,6 +44,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV7(db);
   migrateModelsV8(db);
   migrateModelsV9(db);
+  migrateModelsV10(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -773,6 +774,53 @@ function migrateModelsV9(db: Database.Database) {
   db.prepare(
     "UPDATE models SET enabled = 0 WHERE platform = 'cerebras' AND model_id = 'zai-glm-4.7'"
   ).run();
+}
+
+/**
+ * V10 (May 2026): Ollama Cloud — first new platform since Z.ai/Zhipu in V7.
+ * Free plan: GPU-time-based quota (not per-token), 1 concurrent model,
+ * 5h session caps, no card required. /v1/models lists 39 SKUs but only 28
+ * respond on the Free tier — paid models return 403 with an explicit
+ * "this model requires a subscription" message.
+ *
+ * Curated to ~10 representative free models that either (a) aren't reachable
+ * elsewhere in the catalog or (b) provide a useful alternate route through
+ * Ollama's independent rate-limit pool. Probe-verified May 2 2026.
+ *
+ * Quota shape: GPU-time, not tokens. monthly_token_budget reflects rough
+ * Free-tier "session" capacity rather than a hard token cap.
+ */
+function migrateModelsV10(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['ollama', 'qwen3-coder:480b',     'Qwen3-Coder 480B (Ollama)',    2,  9, 'Frontier', null, null, null, null, 'session-based', 262144],
+    ['ollama', 'mistral-large-3:675b', 'Mistral Large 3 675B (Ollama)', 3,  9, 'Frontier', null, null, null, null, 'session-based', 131072],
+    ['ollama', 'deepseek-v3.2',        'DeepSeek V3.2 (Ollama)',        4,  9, 'Frontier', null, null, null, null, 'session-based', 131072],
+    ['ollama', 'cogito-2.1:671b',      'Cogito 2.1 671B (Ollama)',      4,  9, 'Frontier', null, null, null, null, 'session-based', 131072],
+    ['ollama', 'kimi-k2-thinking',     'Kimi K2 Thinking (Ollama)',     5,  9, 'Frontier', null, null, null, null, 'session-based', 131072],
+    ['ollama', 'glm-4.7',              'GLM-4.7 (Ollama)',              6,  9, 'Frontier', null, null, null, null, 'session-based', 131072],
+    ['ollama', 'gpt-oss:120b',         'GPT-OSS 120B (Ollama)',         6,  9, 'Large',    null, null, null, null, 'session-based', 131072],
+    ['ollama', 'devstral-2:123b',      'Devstral 2 123B (Ollama)',      8, 10, 'Large',    null, null, null, null, 'session-based', 131072],
+    ['ollama', 'gpt-oss:20b',          'GPT-OSS 20B (Ollama)',         18, 10, 'Medium',   null, null, null, null, 'session-based', 131072],
+    ['ollama', 'gemma4:31b',           'Gemma 4 31B (Ollama)',         22, 10, 'Medium',   null, null, null, null, 'session-based', 131072],
+  ];
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

@@ -66,6 +66,7 @@ const platformColors: Record<string, string> = {
   cohere:      '#d946ef',
   cloudflare:  '#f38020',
   zhipu:       '#06b6d4',
+  ollama:      '#000000',
 }
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {

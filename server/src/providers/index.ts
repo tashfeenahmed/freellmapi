@@ -86,6 +86,23 @@ register(new OpenAICompatProvider({
 // HF tool-call format issues; Moonshot moved to paid; MiniMax superseded by
 // the OpenRouter route (openrouter/minimax/minimax-m2.5:free).
 
+// Ollama Cloud — OpenAI-compatible. Free plan: 1 concurrent model, 5h session
+// caps, GPU-time-based quota (not per-token). Many catalog models on the
+// /v1/models list are subscription-only — Free returns 403 with an explicit
+// "this model requires a subscription" message. Catalog rows are filtered to
+// confirmed-Free entries.
+//
+// Frontier reasoning models (glm-4.7, kimi-k2-thinking, cogito-2.1:671b)
+// regularly take 30-90s on Ollama Cloud Free, so the timeout is bumped from
+// the default 15s. Ollama returns reasoning in `message.reasoning` (not
+// `reasoning_content`) — handled by normalizeChoices.
+register(new OpenAICompatProvider({
+  platform: 'ollama',
+  name: 'Ollama Cloud',
+  baseUrl: 'https://ollama.com/v1',
+  timeoutMs: 120000,
+}));
+
 export function getProvider(platform: Platform): BaseProvider | undefined {
   return providers.get(platform);
 }

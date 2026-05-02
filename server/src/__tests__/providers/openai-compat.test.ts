@@ -156,6 +156,42 @@ describe('OpenAICompatProvider', () => {
     expect(result.choices[0].message.content).toBe('part one part two');
   });
 
+  it('folds reasoning into content when content is empty (Ollama style — bare `reasoning` field)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'id', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: '', reasoning: 'ollama answer' },
+          finish_reason: 'stop',
+        }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as any);
+
+    const result = await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm');
+    expect(result.choices[0].message.content).toBe('ollama answer');
+  });
+
+  it('prefers reasoning_content over reasoning when both are present', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'id', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: '', reasoning_content: 'preferred', reasoning: 'fallback' },
+          finish_reason: 'stop',
+        }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as any);
+
+    const result = await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm');
+    expect(result.choices[0].message.content).toBe('preferred');
+  });
+
   it('does NOT fold reasoning_content when tool_calls are present', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,

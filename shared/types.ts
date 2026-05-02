@@ -15,7 +15,8 @@ export type Platform =
   | 'github'
   | 'cohere'
   | 'cloudflare'
-  | 'zhipu';
+  | 'zhipu'
+  | 'ollama';
 
 export interface Model {
   id: number;
