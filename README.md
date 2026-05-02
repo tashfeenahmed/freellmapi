@@ -2,9 +2,9 @@
 
 # FreeLLMAPI
 
-**One OpenAI-compatible endpoint. Fourteen free LLM providers. ~1.3B+ tokens per month.**
+**One OpenAI-compatible endpoint. Eleven free LLM providers. ~1B+ tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral, OpenRouter, GitHub Models, Hugging Face, Cohere, Cloudflare, Zhipu, Moonshot, and MiniMax behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, and Z.ai (Zhipu) behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
@@ -41,27 +41,22 @@ The problem is that stacking them by hand is painful: fourteen different SDKs, f
 
 <table>
 <tr>
-<td align="center" width="180"><a href="https://ai.google.dev"><b>Google</b><br/>Gemini 2.5 Pro / Flash</a></td>
-<td align="center" width="180"><a href="https://groq.com"><b>Groq</b><br/>Llama 4, Qwen, Kimi</a></td>
-<td align="center" width="180"><a href="https://cerebras.ai"><b>Cerebras</b><br/>Llama 3.3, Qwen</a></td>
-<td align="center" width="180"><a href="https://cloud.sambanova.ai"><b>SambaNova</b><br/>Llama 3.3 70B</a></td>
+<td align="center" width="180"><a href="https://ai.google.dev"><b>Google</b><br/>Gemini 2.5 Flash · 3.x previews</a></td>
+<td align="center" width="180"><a href="https://groq.com"><b>Groq</b><br/>Llama 3.3, Llama 4, GPT-OSS, Qwen3</a></td>
+<td align="center" width="180"><a href="https://cerebras.ai"><b>Cerebras</b><br/>Qwen3 235B</a></td>
+<td align="center" width="180"><a href="https://cloud.sambanova.ai"><b>SambaNova</b><br/>DeepSeek V3.x · Llama 4 · Gemma 3</a></td>
 </tr>
 <tr>
-<td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM catalog</a></td>
-<td align="center"><a href="https://mistral.ai"><b>Mistral</b><br/>La Plateforme</a></td>
-<td align="center"><a href="https://openrouter.ai"><b>OpenRouter</b><br/>Free-tier models</a></td>
-<td align="center"><a href="https://github.com/marketplace/models"><b>GitHub Models</b><br/>GPT-4o, Llama, Phi</a></td>
+<td align="center"><a href="https://mistral.ai"><b>Mistral</b><br/>Large 3 · Medium 3.5 · Codestral · Devstral</a></td>
+<td align="center"><a href="https://openrouter.ai"><b>OpenRouter</b><br/>19 free-tier models</a></td>
+<td align="center"><a href="https://github.com/marketplace/models"><b>GitHub Models</b><br/>GPT-4.1 · GPT-4o</a></td>
+<td align="center"><a href="https://developers.cloudflare.com/workers-ai"><b>Cloudflare</b><br/>Kimi K2 · GLM-4.7 · GPT-OSS · Granite 4</a></td>
 </tr>
 <tr>
-<td align="center"><a href="https://huggingface.co"><b>Hugging Face</b><br/>Inference Providers</a></td>
-<td align="center"><a href="https://cohere.com"><b>Cohere</b><br/>Command R+ (trial)</a></td>
-<td align="center"><a href="https://developers.cloudflare.com/workers-ai"><b>Cloudflare</b><br/>Workers AI</a></td>
-<td align="center"><a href="https://bigmodel.cn"><b>Zhipu</b><br/>GLM-4 series</a></td>
-</tr>
-<tr>
-<td align="center"><a href="https://platform.moonshot.cn"><b>Moonshot</b><br/>Kimi</a></td>
-<td align="center"><a href="https://platform.minimax.io"><b>MiniMax</b><br/>abab / hailuo</a></td>
-<td align="center" colspan="2"><i>Adding another? See <a href="#contributing">Contributing</a>.</i></td>
+<td align="center"><a href="https://cohere.com"><b>Cohere</b><br/>Command R+ · Command-A (trial)</a></td>
+<td align="center"><a href="https://docs.z.ai"><b>Z.ai (Zhipu)</b><br/>GLM-4.5 · GLM-4.7 Flash</a></td>
+<td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM (disabled by default)</a></td>
+<td align="center"><i>Adding another? See <a href="#contributing">Contributing</a>.</i></td>
 </tr>
 </table>
 
@@ -301,26 +296,27 @@ Thanks to everyone who's helped improve FreeLLMAPI:
 
 ## Terms of Service review
 
-A self-hosted, single-user, personal-use setup was reviewed against each provider's ToS (April 2026). Summary:
+A self-hosted, single-user, personal-use setup was re-reviewed against each provider's ToS (May 2026). Summary:
 
 | Provider | Verdict | Notes |
 |---|---|---|
-| Google Gemini | ✅ Likely OK | No adverse clause; proxy for personal use not prohibited. |
-| Groq | ✅ Likely OK | Explicitly permits integrating into a "Customer Application." |
-| Cerebras | ✅ Likely OK | Permitted; don't resell keys. |
+| Google Gemini | ⚠️ Caution | March 2026 ToS narrows scope to *"professional or business purposes, not for consumer use"* — a self-hosted developer proxy is still defensible, but the clause is new. |
+| Groq | ✅ Likely OK | GroqCloud Services Agreement permits Customer Application integration. |
+| Cerebras | ✅ Likely OK | Permitted; explicitly forbids selling/transferring API keys. |
 | Mistral | ✅ Likely OK | APIs allowed for personal/internal business use. |
-| OpenRouter | ✅ Likely OK | Private-use only; don't expose the proxy publicly. |
-| Hugging Face | ✅ Likely OK | BYO-key proxying is the documented pattern. |
-| Zhipu | ✅ Likely OK | Explicit "personal, non-commercial research" carve-out. |
-| Moonshot / Kimi | ✅ Likely OK | Competitive-products clause is broad but not aimed at single-user proxies. |
-| SambaNova | ⚠️ Ambiguous | Public terms are silent on APIs. |
-| MiniMax | ⚠️ Ambiguous | Public terms silent. |
-| Cloudflare Workers AI | ⚠️ Ambiguous | No adverse clause found. |
-| NVIDIA NIM | ⚠️ Caution | Free tier is "evaluation only, not production." |
-| GitHub Models | ⚠️ Caution | Free tier scoped to "experimentation." |
-| Cohere | ❌ Avoid | Trial ToS §14 explicitly forbids personal/household use. |
+| OpenRouter | ✅ Likely OK | April 2026 ToS sharpens the no-resale / no-competing-service clause; private single-user proxy still fine. |
+| SambaNova | ⚠️ Ambiguous | EULA §1.5(c) blocks resale and "service bureau" use; single-user with no third-party access is fine. |
+| Cloudflare Workers AI | ⚠️ Ambiguous | No anti-proxy clause; covered by general Self-Serve Subscription Agreement. |
+| NVIDIA NIM | ⚠️ Caution | Trial ToS §1.2 / §1.4: *"evaluation only, not production."* Disabled in default catalog. |
+| GitHub Models | ⚠️ Caution | Free tier explicitly scoped to *"experimentation"* and *"prototyping."* |
+| Cohere | ❌ Avoid | Terms §14 still forbids *"personal, family or household purposes."* |
+| Zhipu (open.bigmodel.cn) | ✅ Likely OK | Personal/non-commercial research carve-out still in the platform docs. |
+| Z.ai (api.z.ai) | ⚠️ Caution | New row — Singapore entity (distinct from Zhipu CN). §III.3(l) anti-traffic-redirect clause could plausibly be read against a proxy; no explicit personal-use carve-out. |
+| Ollama Cloud | ✅ Likely OK | New row — Free plan permits cloud-model access (1 concurrent, 5-hour session caps). No anti-proxy / anti-resale clauses found. *(Integration tracked in #14.)* |
 
 Rules of thumb that keep most providers happy: **one account per provider**, **no reselling**, **no sharing your endpoint with other humans**, **don't hammer a free tier as a paid production backend**. This is informational, not legal advice — read each provider's ToS and make your own call.
+
+Removed since the April 2026 review: Hugging Face, Moonshot, and MiniMax direct integrations were dropped from the catalog (HF — tool-call format issues; Moonshot — moved to paid only; MiniMax — superseded by the OpenRouter `minimax/minimax-m2.5:free` route).
 
 ## Disclaimer
 
