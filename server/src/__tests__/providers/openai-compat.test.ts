@@ -200,13 +200,17 @@ describe('OpenAICompatProvider', () => {
 });
 
 describe('OpenAICompatProvider - platform instances', () => {
+  // Mirrors the actual registrations in server/src/providers/index.ts.
+  // Update both when adding/removing a platform.
   const platforms = [
-    { platform: 'sambanova', name: 'SambaNova', baseUrl: 'https://api.sambanova.ai/v1' },
-    { platform: 'nvidia', name: 'NVIDIA NIM', baseUrl: 'https://integrate.api.nvidia.com/v1' },
-    { platform: 'mistral', name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1' },
-    { platform: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
-    { platform: 'github', name: 'GitHub Models', baseUrl: 'https://models.inference.ai.azure.com' },
-    { platform: 'fireworks', name: 'Fireworks AI', baseUrl: 'https://api.fireworks.ai/inference/v1' },
+    { platform: 'groq',       name: 'Groq',          baseUrl: 'https://api.groq.com/openai/v1' },
+    { platform: 'cerebras',   name: 'Cerebras',      baseUrl: 'https://api.cerebras.ai/v1' },
+    { platform: 'sambanova',  name: 'SambaNova',     baseUrl: 'https://api.sambanova.ai/v1' },
+    { platform: 'nvidia',     name: 'NVIDIA NIM',    baseUrl: 'https://integrate.api.nvidia.com/v1' },
+    { platform: 'mistral',    name: 'Mistral',       baseUrl: 'https://api.mistral.ai/v1' },
+    { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },
+    { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
+    { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
   ] as const;
 
   for (const p of platforms) {
