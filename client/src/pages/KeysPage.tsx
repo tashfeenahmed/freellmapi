@@ -17,12 +17,9 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'mistral', label: 'Mistral' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'github', label: 'GitHub Models' },
-  { value: 'huggingface', label: 'Hugging Face' },
   { value: 'cohere', label: 'Cohere' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
-  { value: 'moonshot', label: 'Moonshot (Kimi)' },
-  { value: 'minimax', label: 'MiniMax' },
 ]
 
 const statusDot: Record<string, string> = {

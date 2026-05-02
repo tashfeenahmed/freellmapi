@@ -165,13 +165,14 @@ function isRetryableError(err: any): boolean {
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Authenticate with unified API key (skip for local requests)
-  const authHeader = req.headers.authorization;
+  // Authenticate with unified API key. Local requests (127.0.0.1) skip the check
+  // since they came from the same machine running the server. Non-local requests
+  // MUST present a valid Bearer token — missing or wrong → 401.
   const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-  if (authHeader && !isLocal) {
-    const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!isLocal) {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
     const unifiedKey = getUnifiedApiKey();
-    if (token !== unifiedKey) {
+    if (!token || token !== unifiedKey) {
       res.status(401).json({
         error: { message: 'Invalid API key', type: 'authentication_error' },
       });
@@ -265,33 +266,57 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
     try {
       if (stream) {
-        // Streaming - can't retry once we start writing
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-        if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
-
+        // Lazy header set: pre-stream errors stay retryable (no headers sent yet);
+        // mid-stream errors emit an `error` SSE frame so the client sees a real signal
+        // instead of a silently truncated stream.
         let totalOutputTokens = 0;
-        const gen = route.provider.streamChatCompletion(
-          route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
-        );
+        let streamStarted = false;
+        try {
+          const gen = route.provider.streamChatCompletion(
+            route.apiKey, messages, route.modelId,
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+          );
 
-        for await (const chunk of gen) {
-          const text = chunk.choices[0]?.delta?.content ?? '';
-          totalOutputTokens += Math.ceil(text.length / 4);
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          for await (const chunk of gen) {
+            if (!streamStarted) {
+              res.setHeader('Content-Type', 'text/event-stream');
+              res.setHeader('Cache-Control', 'no-cache');
+              res.setHeader('Connection', 'keep-alive');
+              res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+              if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+              streamStarted = true;
+            }
+            const text = chunk.choices[0]?.delta?.content ?? '';
+            totalOutputTokens += Math.ceil(text.length / 4);
+            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          }
+
+          if (!streamStarted) {
+            // Upstream returned no chunks — emit minimal successful stream.
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+          }
+          res.write('data: [DONE]\n\n');
+          res.end();
+
+          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
+          recordSuccess(route.modelDbId);
+          setStickyModel(messages, route.modelDbId);
+          logRequest(route.platform, route.modelId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          return;
+        } catch (streamErr: any) {
+          if (streamStarted) {
+            // Mid-stream error — finish the SSE response cleanly instead of leaving
+            // the client hanging or letting Express's default handler take over.
+            const payload = { error: { message: `Provider error (${route.displayName}): ${streamErr.message}`, type: 'stream_error' } };
+            try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
+            try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+            logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
+            return;
+          }
+          // Pre-stream error — bubble to outer retry/502 handler.
+          throw streamErr;
         }
-
-        res.write('data: [DONE]\n\n');
-        res.end();
-
-        recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
-        recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId);
-        logRequest(route.platform, route.modelId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
-        return;
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,

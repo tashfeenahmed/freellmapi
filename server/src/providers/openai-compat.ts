@@ -69,6 +69,7 @@ export class OpenAICompatProvider extends BaseProvider {
     }
 
     const data = await res.json() as ChatCompletionResponse;
+    normalizeChoices(data);
     data._routed_via = { platform: this.platform, model: modelId };
     return data;
   }
@@ -133,19 +134,48 @@ export class OpenAICompatProvider extends BaseProvider {
   }
 
   async validateKey(apiKey: string): Promise<boolean> {
-    try {
-      const url = this.validateUrl ?? `${this.baseUrl}/models`;
-      const res = await this.fetchWithTimeout(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          ...this.extraHeaders,
-        },
-      }, 10000);
-      // 401/403 = bad key, anything else (200, 404, etc) = key is valid
-      return res.status !== 401 && res.status !== 403;
-    } catch {
-      return false;
+    // Note: transport errors (DNS / timeout / TLS) propagate to the caller.
+    // health.ts catches them and marks status='error' WITHOUT incrementing
+    // the consecutive-failure counter — only confirmed 401/403 disables a key.
+    const url = this.validateUrl ?? `${this.baseUrl}/models`;
+    const res = await this.fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        ...this.extraHeaders,
+      },
+    }, 10000);
+    return res.status !== 401 && res.status !== 403;
+  }
+}
+
+/**
+ * Some providers (Z.ai glm-4.5-flash, Cloudflare DeepSeek-R1-distill, others)
+ * return reasoning models' actual answer in `message.reasoning_content` with
+ * `message.content === ""`. Fold reasoning_content into content so OpenAI-
+ * compatible clients see a non-empty assistant message.
+ *
+ * Other providers (Mistral magistral-medium) return `message.content` as an
+ * array of text segments instead of a string. Flatten to string.
+ */
+function normalizeChoices(data: ChatCompletionResponse): void {
+  for (const choice of data.choices ?? []) {
+    const msg = choice.message as ChatMessage & { reasoning_content?: string; content: unknown };
+    // Flatten array content (Mistral magistral) → join text segments.
+    if (Array.isArray(msg.content)) {
+      msg.content = (msg.content as Array<{ text?: string; type?: string }>)
+        .map(seg => (typeof seg === 'string' ? seg : (seg.text ?? '')))
+        .join('');
+    }
+    // Fold reasoning_content into content if content is empty AND there are no
+    // tool_calls. With tool_calls present, content=null is the correct OpenAI
+    // shape; folding reasoning would confuse clients that branch on content.
+    const hasToolCalls = Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0;
+    if (!hasToolCalls
+        && (msg.content === '' || msg.content == null)
+        && typeof msg.reasoning_content === 'string'
+        && msg.reasoning_content.length > 0) {
+      msg.content = msg.reasoning_content;
     }
   }
 }

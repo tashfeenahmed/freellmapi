@@ -40,17 +40,12 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
 
     return status;
   } catch (err: any) {
-    console.error(`[Health] Key ${keyId} check error:`, err.message);
+    // Transport errors (DNS/timeout/TLS) — provider unreachable, not necessarily
+    // a bad key. Mark status='error' but do NOT increment failure counter — auto-
+    // disable is reserved for confirmed 401/403 (returned by validateKey as false).
+    console.error(`[Health] Key ${keyId} transport error:`, err.message);
     db.prepare("UPDATE api_keys SET status = ?, last_checked_at = datetime('now') WHERE id = ?")
       .run('error', keyId);
-
-    const count = (failureCount.get(keyId) ?? 0) + 1;
-    failureCount.set(keyId, count);
-
-    if (count >= CONSECUTIVE_FAILURES_TO_DISABLE) {
-      db.prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(keyId);
-    }
-
     return 'error';
   }
 }

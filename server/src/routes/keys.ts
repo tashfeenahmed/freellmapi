@@ -6,10 +6,12 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 
 export const keysRouter = Router();
 
+// Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
+// Hugging Face, Moonshot, and MiniMax direct integrations were dropped in V4
+// (see migrateModelsV4 comment block).
 const PLATFORMS = [
   'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral',
-  'openrouter', 'github', 'huggingface', 'cohere', 'cloudflare',
-  'zhipu', 'moonshot', 'minimax',
+  'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu',
 ] as const;
 
 const addKeySchema = z.object({

@@ -127,18 +127,17 @@ export class CloudflareProvider extends BaseProvider {
   }
 
   async validateKey(apiKey: string): Promise<boolean> {
-    try {
-      const { token } = this.parseKey(apiKey);
-      const res = await this.fetchWithTimeout(
-        'https://api.cloudflare.com/client/v4/user/tokens/verify',
-        { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } },
-        10000,
-      );
-      if (!res.ok) return false;
-      const data = await res.json() as any;
-      return data.success === true && data.result?.status === 'active';
-    } catch {
-      return false;
-    }
+    // Transport errors propagate — health.ts marks status='error' without
+    // counting toward auto-disable. Only confirmed bad/inactive tokens disable.
+    const { token } = this.parseKey(apiKey);
+    const res = await this.fetchWithTimeout(
+      'https://api.cloudflare.com/client/v4/user/tokens/verify',
+      { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } },
+      10000,
+    );
+    if (res.status === 401 || res.status === 403) return false;
+    if (!res.ok) return true; // unexpected non-2xx that isn't auth — don't disable
+    const data = await res.json() as any;
+    return data.success === true && data.result?.status === 'active';
   }
 }

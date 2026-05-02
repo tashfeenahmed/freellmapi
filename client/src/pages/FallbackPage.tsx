@@ -63,12 +63,9 @@ const platformColors: Record<string, string> = {
   mistral:     '#f59e0b',
   openrouter:  '#ec4899',
   github:      '#6e7b8b',
-  huggingface: '#ffd21e',
   cohere:      '#d946ef',
   cloudflare:  '#f38020',
   zhipu:       '#06b6d4',
-  moonshot:    '#4f46e5',
-  minimax:     '#a855f7',
 }
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {
