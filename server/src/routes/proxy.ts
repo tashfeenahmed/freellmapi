@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
@@ -15,12 +16,14 @@ const stickySessionMap = new Map<string, { modelDbId: number; lastUsed: number }
 const STICKY_TTL_MS = 30 * 60 * 1000; // 30 min session TTL
 
 function getSessionKey(messages: ChatMessage[]): string {
-  // Use the first user message as session identifier
-  // Hermes sends the full conversation each time, so first user msg is stable
+  // Use the first user message as session identifier — clients like Hermes
+  // re-send the full conversation each turn, so the first user message is
+  // stable across turns. Hash the FULL message (not a 100-char slice) so
+  // distinct conversations with identical openings don't collide.
   const firstUser = messages.find(m => m.role === 'user');
   if (!firstUser || typeof firstUser.content !== 'string') return '';
-  // Hash: first 100 chars of first user message + message count
-  return `${firstUser.content.slice(0, 100)}:${messages.length > 2 ? 'multi' : 'single'}`;
+  const hash = crypto.createHash('sha1').update(firstUser.content).digest('hex');
+  return `${hash}:${messages.length > 2 ? 'multi' : 'single'}`;
 }
 
 function getStickyModel(messages: ChatMessage[]): number | undefined {
@@ -219,6 +222,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     };
   });
 
+  // Token estimation is intentionally a heuristic (~4 chars per token). Used
+  // for routing decisions (skip a model whose budget is too small) and for
+  // streaming bookkeeping where the provider doesn't echo a final usage count.
+  // Non-streaming requests reconcile against the provider's real `usage` block
+  // (see line ~340). Streaming will drift from real consumption — accepted
+  // tradeoff because per-request usage isn't always returned mid-stream.
   const estimatedInputTokens = messages.reduce((sum, m) => {
     if (typeof m.content !== 'string') return sum;
     return sum + Math.ceil(m.content.length / 4);

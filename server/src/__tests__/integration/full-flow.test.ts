@@ -39,10 +39,12 @@ describe('Full Integration Flow', () => {
   it('Step 1: Verify models are seeded', async () => {
     const { status, body } = await req(app, 'GET', '/api/models');
     expect(status).toBe(200);
-    expect(body.length).toBeGreaterThanOrEqual(14);
+    // Tightened from >= 14 — current catalog post-V9 is 60+ rows; if a future
+    // migration accidentally drops a chunk we want to know.
+    expect(body.length).toBeGreaterThanOrEqual(50);
     expect(body[0]).toHaveProperty('modelId');
     expect(body[0]).toHaveProperty('hasProvider');
-    // All should have providers
+    // All should have providers (catches drift between catalog and providers/index.ts)
     for (const m of body) {
       expect(m.hasProvider).toBe(true);
     }
@@ -51,7 +53,7 @@ describe('Full Integration Flow', () => {
   it('Step 2: Verify fallback chain is populated', async () => {
     const { status, body } = await req(app, 'GET', '/api/fallback');
     expect(status).toBe(200);
-    expect(body.length).toBeGreaterThanOrEqual(14);
+    expect(body.length).toBeGreaterThanOrEqual(50);
     expect(body[0]).toHaveProperty('priority');
     expect(body[0]).toHaveProperty('enabled');
   });
