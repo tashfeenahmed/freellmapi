@@ -293,6 +293,8 @@ Thanks to everyone who's helped improve FreeLLMAPI:
 
 - [@moaaz12-web](https://github.com/moaaz12-web) — tool-calling support across providers (#3)
 - [@lukasulc](https://github.com/lukasulc) — better-sqlite3 bump to fix npm install on Node 24+ (#12)
+- [@VinhPhamAI](https://github.com/VinhPhamAI) — root `.env` PORT now propagates to server + Vite dev proxy + UI base URL (#27)
+- [@VinhPhamAI](https://github.com/VinhPhamAI) — root `.env` PORT now propagates to server + Vite dev proxy + UI base URL (#27)
 
 ## Terms of Service review
 
