@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     base: process.env.VITE_BASE ?? '/',
     envDir: path.resolve(__dirname, '..'),
+    define: {
+      __SERVER_PORT__: JSON.stringify(String(serverPort)),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
