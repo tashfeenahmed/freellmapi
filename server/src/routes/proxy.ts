@@ -84,6 +84,7 @@ const toolCallSchema = z.object({
     name: z.string().min(1),
     arguments: z.string(),
   }),
+  thought_signature: z.string().optional(),
 });
 
 const systemMessageSchema = z.object({
@@ -202,7 +203,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         role: 'assistant',
         content: m.content ?? null,
         ...(m.name ? { name: m.name } : {}),
-        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls.map(tc => ({
+          id: tc.id,
+          type: tc.type,
+          function: tc.function,
+          thought_signature: tc.thought_signature,
+        })) } : {}),
       };
     }
 

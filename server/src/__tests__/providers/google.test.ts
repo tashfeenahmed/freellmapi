@@ -171,4 +171,63 @@ describe('GoogleProvider', () => {
     expect(result.choices[0].message.tool_calls?.[0].function.name).toBe('get_weather');
     expect(result.choices[0].message.tool_calls?.[0].function.arguments).toBe('{"city":"Lahore"}');
   });
+
+  it('should preserve and pass through thought_signature', async () => {
+    let capturedBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{
+            content: {
+              parts: [{
+                thought_signature: 'sig_123',
+                functionCall: {
+                  id: 'call_123',
+                  name: 'get_weather',
+                  args: { city: 'London' },
+                },
+              }],
+            },
+            finishReason: 'STOP',
+          }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    // 1. Check extraction
+    const result = await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Weather?' }],
+      'gemini-2.5-pro',
+    );
+
+    expect(result.choices[0].message.tool_calls?.[0].thought_signature).toBe('sig_123');
+
+    // 2. Check injection in next turn
+    await provider.chatCompletion(
+      'test-key',
+      [
+        { role: 'user', content: 'Weather?' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            id: 'call_123',
+            type: 'function',
+            function: { name: 'get_weather', arguments: '{"city":"London"}' },
+            thought_signature: 'sig_123',
+          }],
+        },
+        { role: 'tool', tool_call_id: 'call_123', content: '{"temp": 20}' },
+      ],
+      'gemini-2.5-pro',
+    );
+
+    const assistantEntry = capturedBody.contents.find((c: any) => c.role === 'model');
+    expect(assistantEntry.parts[0].thought_signature).toBe('sig_123');
+    expect(assistantEntry.parts[0].functionCall.name).toBe('get_weather');
+  });
 });

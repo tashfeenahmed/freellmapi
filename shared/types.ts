@@ -76,6 +76,7 @@ export interface ChatToolCall {
   id: string;
   type: 'function';
   function: ChatToolCallFunction;
+  thought_signature?: string;
 }
 
 export interface ChatToolFunctionDefinition {
