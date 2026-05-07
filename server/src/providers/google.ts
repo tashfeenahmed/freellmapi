@@ -13,7 +13,7 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 interface GeminiPart {
   text?: string;
-  thought_signature?: string;
+  thoughtSignature?: string;
   functionCall?: {
     id?: string;
     name?: string;
@@ -125,7 +125,7 @@ function toGeminiContents(messages: ChatMessage[]) {
 
         for (const call of m.tool_calls ?? []) {
           parts.push({
-            thought_signature: call.thought_signature,
+            thoughtSignature: call.thought_signature,
             functionCall: {
               id: call.id,
               name: call.function.name,
@@ -191,7 +191,7 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
         name: part.functionCall.name,
         arguments: normalizeGeminiArgs(part.functionCall.args),
       },
-      thought_signature: part.thought_signature,
+      thought_signature: part.thoughtSignature,
     });
   }
 
