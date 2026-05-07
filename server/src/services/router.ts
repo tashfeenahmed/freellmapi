@@ -174,7 +174,15 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
     if (keys.length === 0) continue;
 
-    // Round-robin across keys
+    // Get limits once for this model
+    const limits = {
+      rpm: model.rpm_limit,
+      rpd: model.rpd_limit,
+      tpm: model.tpm_limit,
+      tpd: model.tpd_limit,
+    };
+
+    // Try all keys for this model before giving up on it
     const rrKey = `${model.platform}:${model.model_id}`;
     let idx = roundRobinIndex.get(rrKey) ?? 0;
 
@@ -188,18 +196,11 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       // Check cooldown (from previous 429s)
       if (isOnCooldown(model.platform, model.model_id, key.id)) continue;
 
-      const limits = {
-        rpm: model.rpm_limit,
-        rpd: model.rpd_limit,
-        tpm: model.tpm_limit,
-        tpd: model.tpd_limit,
-      };
-
       if (!canMakeRequest(model.platform, model.model_id, key.id, limits)) continue;
       if (!canUseTokens(model.platform, model.model_id, key.id, estimatedTokens, limits)) continue;
 
+      // We found a working key for this model!
       roundRobinIndex.set(rrKey, idx);
-
       const decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
 
       return {
@@ -213,7 +214,13 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       };
     }
 
+    // If we reach here, this specific model has NO available keys.
+    // Update round-robin index even if we failed so we don't get stuck.
     roundRobinIndex.set(rrKey, idx);
+    
+    // We don't explicitly penalize the model here because the fact that we 
+    // couldn't find a key means we will naturally move to the next model 
+    // in the `sortedChain` for THIS specific request.
   }
 
   const err = new Error('All models exhausted. Add more API keys or wait for rate limits to reset.') as any;
