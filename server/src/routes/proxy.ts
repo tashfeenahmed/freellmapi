@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown } from '../services/ratelimit.js';
-import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { getDb } from '../db/index.js';
 
 export const proxyRouter = Router();
 
@@ -169,21 +169,6 @@ function isRetryableError(err: any): boolean {
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Authenticate with unified API key. Local requests (127.0.0.1) skip the check
-  // since they came from the same machine running the server. Non-local requests
-  // MUST present a valid Bearer token — missing or wrong → 401.
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-  if (!isLocal) {
-    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-    const unifiedKey = getUnifiedApiKey();
-    if (!token || token !== unifiedKey) {
-      res.status(401).json({
-        error: { message: 'Invalid API key', type: 'authentication_error' },
-      });
-      return;
-    }
-  }
-
   // Validate request
   const parsed = chatCompletionSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -337,7 +322,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           if (streamStarted) {
             // Mid-stream error — finish the SSE response cleanly instead of leaving
             // the client hanging or letting Express's default handler take over.
-            const payload = { error: { message: `Provider error (${route.displayName}): ${streamErr.message}`, type: 'stream_error' } };
+            // Log the real error internally; send a generic message to the client.
+            console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
+            const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
             logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
@@ -385,9 +372,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
 
       // Non-retryable error (auth, 4xx, etc.): don't retry
+      // Log the full error internally but return a generic message to the client
+      // to avoid leaking upstream provider details or key fragments.
+      console.error(`[Proxy] Non-retryable error from ${route.displayName}:`, err.message);
       res.status(502).json({
         error: {
-          message: `Provider error (${route.displayName}): ${err.message}`,
+          message: `Provider error (${route.displayName}): request failed`,
           type: 'provider_error',
         },
       });

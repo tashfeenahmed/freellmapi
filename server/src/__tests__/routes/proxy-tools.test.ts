@@ -2,26 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
-
-async function request(app: Express, method: string, path: string, body?: any) {
-  const server = app.listen(0);
-  const addr = server.address() as any;
-  const url = `http://127.0.0.1:${addr.port}${path}`;
-
-  const res = await fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const data = await res.text();
-  server.close();
-
-  let json: any = null;
-  try { json = JSON.parse(data); } catch {}
-
-  return { status: res.status, body: json, headers: res.headers, raw: data };
-}
+import { authedRequest } from '../helpers.js';
 
 describe('Proxy tool-calling support', () => {
   let app: Express;
@@ -37,7 +18,7 @@ describe('Proxy tool-calling support', () => {
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM requests').run();
 
-    const addKey = await request(app, 'POST', '/api/keys', {
+    const addKey = await authedRequest(app, 'POST', '/api/keys', {
       platform: 'groq',
       key: 'gsk_proxy_tool_test',
       label: 'proxy-tools',
@@ -87,8 +68,7 @@ describe('Proxy tool-calling support', () => {
       return origFetch(url, init);
     });
 
-    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
-      // No `model` → auto-route via fallback chain.
+    const { status, body } = await authedRequest(app, 'POST', '/v1/chat/completions', {
       messages: [{ role: 'user', content: 'What is the weather in Karachi?' }],
       tools: [{
         type: 'function',
@@ -142,7 +122,7 @@ describe('Proxy tool-calling support', () => {
       return origFetch(url, init);
     });
 
-    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+    const { status, body } = await authedRequest(app, 'POST', '/v1/chat/completions', {
       messages: [
         { role: 'user', content: 'Weather in Karachi?' },
         {

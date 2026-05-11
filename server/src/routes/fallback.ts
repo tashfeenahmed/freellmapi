@@ -84,29 +84,23 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
 });
 
 // Sort presets
+const SORT_PRESETS: Record<string, string> = {
+  intelligence: 'm.intelligence_rank ASC',
+  speed: 'm.speed_rank ASC',
+  budget: "CASE m.monthly_token_budget WHEN '~120M' THEN 1 WHEN '~50-100M' THEN 2 WHEN '~30M' THEN 3 WHEN '~18-45M' THEN 4 WHEN '~18M' THEN 5 WHEN '~15M' THEN 6 WHEN '~12M' THEN 7 WHEN '~6M' THEN 8 WHEN '~5-10M' THEN 9 WHEN '~4M' THEN 10 ELSE 11 END ASC",
+};
+
 fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   const { preset } = req.params;
-  const db = getDb();
-
-  let orderBy: string;
-  switch (preset) {
-    case 'intelligence':
-      orderBy = 'm.intelligence_rank ASC';
-      break;
-    case 'speed':
-      orderBy = 'm.speed_rank ASC';
-      break;
-    case 'budget':
-      orderBy = "CASE m.monthly_token_budget WHEN '~120M' THEN 1 WHEN '~50-100M' THEN 2 WHEN '~30M' THEN 3 WHEN '~18-45M' THEN 4 WHEN '~18M' THEN 5 WHEN '~15M' THEN 6 WHEN '~12M' THEN 7 WHEN '~6M' THEN 8 WHEN '~5-10M' THEN 9 WHEN '~4M' THEN 10 ELSE 11 END ASC";
-      break;
-    default:
-      res.status(400).json({ error: { message: `Unknown preset: ${preset}. Use: intelligence, speed, budget` } });
-      return;
+  const orderBy = SORT_PRESETS[preset as keyof typeof SORT_PRESETS];
+  if (!orderBy) {
+    res.status(400).json({ error: { message: `Unknown preset: ${preset}. Use: intelligence, speed, budget` } });
+    return;
   }
 
-  const models = db.prepare(`
-    SELECT m.id FROM models m ORDER BY ${orderBy}
-  `).all() as { id: number }[];
+  const db = getDb();
+
+  const models = db.prepare(`SELECT m.id FROM models m ORDER BY ${orderBy}`).all() as { id: number }[];
 
   const update = db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
   const reorder = db.transaction(() => {

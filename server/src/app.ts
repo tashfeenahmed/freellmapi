@@ -11,6 +11,7 @@ import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requireApiKey } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,10 +25,21 @@ export function createApp() {
   // stay disabled unless someone serves the proxy over HTTPS publicly
   // (which is also not a supported deployment — see README).
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
-  app.use(cors());
+
+  // CORS: restrict to same-origin by default. The dashboard is served from
+  // the same origin, so wildcard is unnecessary and enables cross-origin
+  // abuse of the unauthenticated-style endpoints.
+  app.use(cors({ origin: true, credentials: true }));
+
   app.use(express.json({ limit: '1mb' }));
 
-  // API routes
+  // Public health check (no auth — used by load balancers / uptime monitors)
+  app.get('/api/ping', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // All API routes require the unified API key
+  app.use('/api', requireApiKey);
   app.use('/api/keys', keysRouter);
   app.use('/api/models', modelsRouter);
   app.use('/api/fallback', fallbackRouter);
@@ -35,13 +47,8 @@ export function createApp() {
   app.use('/api/health', healthRouter);
   app.use('/api/settings', settingsRouter);
 
-  // OpenAI-compatible proxy
-  app.use('/v1', proxyRouter);
-
-  // Health check
-  app.get('/api/ping', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
+  // OpenAI-compatible proxy — also requires API key (no more localhost bypass)
+  app.use('/v1', requireApiKey, proxyRouter);
 
   // Error handler (for API routes)
   app.use(errorHandler);
