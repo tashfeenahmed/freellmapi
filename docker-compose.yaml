@@ -1,10 +1,10 @@
 services:
   freellmapi:
     build: .
-    container_name: freellmapi
     restart: unless-stopped
+    init: true
     ports:
-      - "3018:3001"
+      - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -12,6 +12,12 @@ services:
       DATABASE_PATH: /app/data/freellmapi.sqlite
     volumes:
       - freellmapi_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3001/api/ping >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   freellmapi_data:
