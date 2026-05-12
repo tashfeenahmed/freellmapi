@@ -1,0 +1,17 @@
+services:
+  freellmapi:
+    build: .
+    container_name: freellmapi
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      DATABASE_PATH: /app/data/freellmapi.sqlite
+    volumes:
+      - freellmapi_data:/app/data
+
+volumes:
+  freellmapi_data:
