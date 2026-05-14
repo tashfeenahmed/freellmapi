@@ -20,6 +20,8 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'cohere', label: 'Cohere' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
+  { value: 'astraflow', label: 'Astraflow (UCloud — Global)' },
+  { value: 'astraflow_cn', label: 'Astraflow (UCloud — China)' },
 ]
 
 const statusDot: Record<string, string> = {

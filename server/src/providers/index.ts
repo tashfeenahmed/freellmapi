@@ -82,6 +82,20 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
 }));
 
+// Astraflow (UCloud) - OpenAI-compatible aggregation platform, 200+ models (global)
+register(new OpenAICompatProvider({
+  platform: 'astraflow',
+  name: 'Astraflow',
+  baseUrl: 'https://api-us-ca.umodelverse.ai/v1',
+}));
+
+// Astraflow (UCloud) - OpenAI-compatible aggregation platform, 200+ models (China)
+register(new OpenAICompatProvider({
+  platform: 'astraflow_cn',
+  name: 'Astraflow CN',
+  baseUrl: 'https://api.modelverse.cn/v1',
+}));
+
 // Hugging Face, Moonshot, MiniMax direct integrations were dropped in V4 —
 // HF tool-call format issues; Moonshot moved to paid; MiniMax superseded by
 // the OpenRouter route (openrouter/minimax/minimax-m2.5:free).
