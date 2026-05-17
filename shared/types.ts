@@ -15,7 +15,9 @@ export type Platform =
   | 'github'
   | 'cohere'
   | 'cloudflare'
-  | 'zhipu';
+  | 'zhipu'
+  | 'astraflow'
+  | 'astraflow_cn';
 
 export interface Model {
   id: number;
