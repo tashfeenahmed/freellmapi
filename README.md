@@ -294,7 +294,8 @@ Thanks to everyone who's helped improve FreeLLMAPI:
 - [@moaaz12-web](https://github.com/moaaz12-web) — tool-calling support across providers (#3)
 - [@lukasulc](https://github.com/lukasulc) — better-sqlite3 bump to fix npm install on Node 24+ (#12)
 - [@VinhPhamAI](https://github.com/VinhPhamAI) — root `.env` PORT now propagates to server + Vite dev proxy + UI base URL (#27)
-- [@deadc](https://github.com/deadc) — preserve Gemini `thoughtSignature` so multi-turn function calling stops 400-ing (#32)
+- [@deadc](https://github.com/deadc) — preserve Gemini `thoughtSignature` so multi-turn function calling stops 400-ing (#32); router model-first key-exhaustion tests + per-model `limits` hoist (#42)
+- [@zhangyu1324](https://github.com/zhangyu1324) — requested Ollama Cloud integration, now V10 catalog (#14 / #41)
 - [@jtbrennan-git](https://github.com/jtbrennan-git) — security review (#35) and Phase 1 hardening: parameterized analytics queries, sort-preset whitelist, timing-safe API key compare, mid-stream error sanitization
 
 ## Terms of Service review
