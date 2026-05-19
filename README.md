@@ -23,6 +23,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
+- [Docker](#docker)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -115,6 +116,32 @@ For a production build:
 npm run build
 node server/dist/index.js     # server + dashboard both served on :3001
 ```
+
+## Docker
+
+Run full app with Docker Compose:
+
+```bash
+cp .env.example .env
+echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
+docker compose up --build
+```
+
+App listens on `http://localhost:3001`. SQLite data persists in Docker volume `freellmapi_data`.
+Container runs as non-root, uses `init: true` for cleaner shutdown, and exposes a Compose healthcheck on `/api/ping`.
+
+If you prefer plain Docker:
+
+```bash
+docker build -t freellmapi .
+docker run --rm \
+  -p 3001:3001 \
+  -e ENCRYPTION_KEY=your-64-char-hex-key \
+  -v freellmapi_data:/app/data \
+  freellmapi
+```
+
+`ENCRYPTION_KEY` required. Use 32-byte hex value, same as `.env` setup above. Build context excludes `.env`, `node_modules`, git metadata, and local build output via `.dockerignore`.
 
 ## Using the API
 
