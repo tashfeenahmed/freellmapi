@@ -297,6 +297,7 @@ Thanks to everyone who's helped improve FreeLLMAPI:
 - [@deadc](https://github.com/deadc) — preserve Gemini `thoughtSignature` so multi-turn function calling stops 400-ing (#32); router model-first key-exhaustion tests + per-model `limits` hoist (#42)
 - [@zhangyu1324](https://github.com/zhangyu1324) — requested Ollama Cloud integration, now V10 catalog (#14 / #41)
 - [@jtbrennan-git](https://github.com/jtbrennan-git) — security review (#35) and Phase 1 hardening: parameterized analytics queries, sort-preset whitelist, timing-safe API key compare, mid-stream error sanitization
+- [@praveenkumarpranjal](https://github.com/praveenkumarpranjal) — guard Gemini SSE `JSON.parse` so a malformed frame no longer aborts the whole stream, plus first streaming tests for the Google provider (#47)
 
 ## Terms of Service review
 
