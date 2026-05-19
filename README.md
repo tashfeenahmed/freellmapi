@@ -23,6 +23,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
+- [Docker](#docker)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -92,29 +93,64 @@ PRs that add any of these are very welcome. See [Contributing](#contributing).
 
 ## Quick start
 
+**Recommended:** Docker Compose. It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
+
+**Prerequisites:** Docker, Docker Compose, OpenSSL.
+
+```bash
+git clone https://github.com/tashfeenahmed/freellmapi.git
+cd freellmapi
+
+# Generate an encryption key for at-rest key storage
+ENCRYPTION_KEY="$(openssl rand -hex 32)"
+printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
+
+docker compose up -d
+```
+
+Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+
+### Local development
+
 **Prerequisites:** Node.js 20+, npm.
 
 ```bash
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
 npm install
-
-# Generate an encryption key for at-rest key storage
 cp .env.example .env
-echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
-
-# Start server + dashboard together
+ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
+printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 npm run dev
 ```
 
-Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+The Vite dev UI runs on http://localhost:5173 and proxies API calls to the server on http://localhost:3001.
 
-For a production build:
+For a production build without Docker:
 
 ```bash
 npm run build
 node server/dist/index.js     # server + dashboard both served on :3001
 ```
+
+## Docker
+
+FreeLLMAPI publishes a single production image that contains the Express server and the built React dashboard:
+
+```bash
+docker pull ghcr.io/tashfeenahmed/freellmapi:latest
+```
+
+The included `docker-compose.yml` is the recommended install path:
+
+```bash
+docker compose up -d
+docker compose logs -f freellmapi
+```
+
+SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`. Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because provider keys are encrypted at rest.
+
+More Docker operations and examples live in [docker/README.md](./docker/README.md).
 
 ## Using the API
 
@@ -282,7 +318,7 @@ Contributors very welcome! Good first PRs:
 ```bash
 npm install
 npm run dev      # server on :3001, dashboard on :5173, both with HMR
-npm test         # vitest — 75 tests across providers, routes, router, ratelimit
+npm test         # vitest — 95 tests across providers, routes, router, ratelimit
 ```
 
 PRs should include a test, keep the existing test suite green, and match the `.editorconfig` / tsconfig defaults already in the repo. Issues and discussions are open.
