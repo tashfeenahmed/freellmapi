@@ -883,6 +883,20 @@ function migrateModelsV11(db: Database.Database) {
     ['nvidia',       'google/gemma-4-31b-it',                             'Gemma 4 31B (NV)',                  19, 9, 'Medium',   40, null, null, null, '~3M (credits)', 262144],
     ['nvidia',       'moonshotai/kimi-k2.6',                              'Kimi K2.6 (NV)',                     3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
 
+    // Cerebras — live-probed May 2026 with a free-tier key. Both 200 + content.
+    // gpt-oss-120b was removed in V2 ("requires special access, 404 on our
+    // key") but is reachable on the current free tier — re-add. llama3.1-8b
+    // is the fast small-model alternative (no hyphen, distinct from Groq's
+    // llama-3.1-8b-instant id). Free-pool limits match qwen-3-235b row.
+    ['cerebras',     'gpt-oss-120b',                              'GPT-OSS 120B (Cerebras)',        6,  1, 'Large',    30, 1000, 60000, 1000000, '~30M', 131072],
+    ['cerebras',     'llama3.1-8b',                               'Llama 3.1 8B (Cerebras)',       28,  1, 'Small',    30, 1000, 60000, 1000000, '~30M', 131072],
+
+    // Groq compound — agent system that internally routes through gpt-oss
+    // models and exposes the trace in usage metadata. Standard chat-completions
+    // shape works (200 + content). Same free-tier limits as other Groq rows.
+    ['groq',         'groq/compound',                             'Compound (Groq)',                6,  2, 'Large',    30, 1000, 8000, 200000, '~6M', 131072],
+    ['groq',         'groq/compound-mini',                        'Compound Mini (Groq)',          18,  2, 'Medium',   30, 1000, 8000, 200000, '~6M', 131072],
+
     // Kilo Gateway — 200 req/hr per IP anon. Most named :free routes have
     // transitioned to paid ("free period ended"); probe-confirmed live:
     ['kilo',         'nvidia/nemotron-3-super-120b-a12b:free',  'Nemotron 3 Super 120B (Kilo)',  22, 9,  'Frontier', null, null, null, null, '~2-3M (200/hr)', 262144],
