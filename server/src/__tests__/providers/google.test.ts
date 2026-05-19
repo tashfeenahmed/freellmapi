@@ -230,4 +230,83 @@ describe('GoogleProvider', () => {
     expect(assistantEntry.parts[0].thoughtSignature).toBe('sig_123');
     expect(assistantEntry.parts[0].functionCall.name).toBe('get_weather');
   });
+
+  // ── Streaming ──────────────────────────────────────────────────────────────
+  // Build a Response-shaped object backed by a ReadableStream so the provider's
+  // `res.body.getReader()` path executes for real (Node 20+ has both globally).
+  function sseResponse(frames: string[]): any {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const f of frames) controller.enqueue(encoder.encode(f));
+        controller.close();
+      },
+    });
+    return { ok: true, body: stream };
+  }
+
+  async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {
+    const out: T[] = [];
+    for await (const c of gen) out.push(c);
+    return out;
+  }
+
+  it('streams text deltas and emits a final stop chunk', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}\n\n',
+      'data: {"candidates":[{"content":{"parts":[{"text":"lo"}]}}]}\n\n',
+      'data: {"candidates":[{"content":{"parts":[]},"finishReason":"STOP"}]}\n\n',
+    ]));
+
+    const chunks = await collect(provider.streamChatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Hi' }],
+      'gemini-2.5-pro',
+    ));
+
+    const text = chunks.map(c => c.choices[0].delta.content ?? '').join('');
+    expect(text).toBe('Hello');
+    expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('stop');
+  });
+
+  it('skips a malformed SSE frame instead of aborting the whole stream', async () => {
+    // Regression: previously an unguarded JSON.parse would propagate, killing
+    // the stream after a single bad chunk. Other providers (openai-compat,
+    // cohere, cloudflare) already protect this path with try/catch.
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}\n\n',
+      'data: {oops not json\n\n',
+      'data: {"candidates":[{"content":{"parts":[{"text":"lo"}]}}]}\n\n',
+      'data: [DONE]\n\n',
+    ]));
+
+    const chunks = await collect(provider.streamChatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Hi' }],
+      'gemini-2.5-pro',
+    ));
+
+    const text = chunks.map(c => c.choices[0].delta.content ?? '').join('');
+    expect(text).toBe('Hello');
+    expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('stop');
+  });
+
+  it('streams functionCall parts as tool_calls with finish_reason=tool_calls', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"functionCall":{"id":"call_1","name":"get_weather","args":{"city":"Karachi"}}}]}}]}\n\n',
+      'data: {"candidates":[{"content":{"parts":[]},"finishReason":"STOP"}]}\n\n',
+    ]));
+
+    const chunks = await collect(provider.streamChatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Weather?' }],
+      'gemini-2.5-pro',
+    ));
+
+    const toolDeltas = chunks.flatMap(c => c.choices[0].delta.tool_calls ?? []);
+    expect(toolDeltas).toHaveLength(1);
+    expect(toolDeltas[0].function.name).toBe('get_weather');
+    expect(toolDeltas[0].function.arguments).toBe('{"city":"Karachi"}');
+    expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('tool_calls');
+  });
 });

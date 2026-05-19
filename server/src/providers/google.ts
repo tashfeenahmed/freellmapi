@@ -346,7 +346,15 @@ export class GoogleProvider extends BaseProvider {
           return;
         }
 
-        const chunk = JSON.parse(raw) as GeminiResponse;
+        // Skip malformed SSE frames instead of aborting the whole stream.
+        // Matches the defensive parse in openai-compat / cohere / cloudflare:
+        // a single corrupt chunk shouldn't take down the rest of the response.
+        let chunk: GeminiResponse;
+        try {
+          chunk = JSON.parse(raw) as GeminiResponse;
+        } catch {
+          continue;
+        }
         const candidate = chunk.candidates?.[0];
         const parts = candidate?.content?.parts ?? [];
 
