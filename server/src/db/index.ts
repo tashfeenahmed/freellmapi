@@ -865,6 +865,19 @@ function migrateModelsV11(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // NVIDIA NIM — live-probed May 2026 with a free-tier key. All 8 returned
+    // 200 + content. Limits are per-model: 40 RPM, shared 1k starter credits
+    // (never-expire) used for the rough budget estimate. The existing
+    // meta/llama-3.1-70b-instruct row stays (re-enabled above).
+    ['nvidia',       'meta/llama-3.3-70b-instruct',                       'Llama 3.3 70B (NV)',                17, 6, 'Large',    40, null, null, null, '~3M (credits)', 131072],
+    ['nvidia',       'meta/llama-4-maverick-17b-128e-instruct',           'Llama 4 Maverick (NV)',             11, 6, 'Large',    40, null, null, null, '~3M (credits)', 131072],
+    ['nvidia',       'deepseek-ai/deepseek-v4-pro',                       'DeepSeek V4 Pro (NV)',               3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
+    ['nvidia',       'mistralai/mistral-large-3-675b-instruct-2512',      'Mistral Large 3 675B (NV)',          3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
+    ['nvidia',       'minimaxai/minimax-m2.7',                            'MiniMax M2.7 (NV)',                  3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 196608],
+    ['nvidia',       'nvidia/nemotron-3-super-120b-a12b',                 'Nemotron 3 Super 120B (NV)',        22, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 262144],
+    ['nvidia',       'nvidia/nemotron-3-nano-30b-a3b',                    'Nemotron 3 Nano 30B (NV)',          22, 9, 'Medium',   40, null, null, null, '~3M (credits)', 262144],
+    ['nvidia',       'google/gemma-4-31b-it',                             'Gemma 4 31B (NV)',                  19, 9, 'Medium',   40, null, null, null, '~3M (credits)', 262144],
+
     // Kilo Gateway — 200 req/hr per IP anon. Most named :free routes have
     // transitioned to paid ("free period ended"); probe-confirmed live:
     ['kilo',         'nvidia/nemotron-3-super-120b-a12b:free',  'Nemotron 3 Super 120B (Kilo)',  22, 9,  'Frontier', null, null, null, null, '~2-3M (200/hr)', 262144],
