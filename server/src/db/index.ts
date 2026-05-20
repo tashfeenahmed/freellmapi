@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
+const DEFAULT_DB_PATH = process.env.VERCEL ? '/tmp/freeapi.db' : path.resolve(__dirname, '../../data/freeapi.db');
+const DB_PATH = process.env.FREEAPI_DB_PATH ?? DEFAULT_DB_PATH;
 
 let db: Database.Database;
 
