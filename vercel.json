@@ -2,10 +2,9 @@
   "version": 2,
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": "client/dist",
   "functions": {
     "api/index.js": {
-      "includeFiles": "server/dist/**",
+      "includeFiles": "server/dist/**,client/dist/**",
       "maxDuration": 60
     }
   },
@@ -20,7 +19,7 @@
     },
     {
       "source": "/:path*",
-      "destination": "/index.html"
+      "destination": "/api/index"
     }
   ]
 }

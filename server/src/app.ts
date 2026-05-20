@@ -11,6 +11,7 @@ import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authRouter, requireDashboardAuth } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,6 +27,9 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
+
+  app.use('/api/auth', authRouter);
+  app.use(requireDashboardAuth);
 
   // API routes
   app.use('/api/keys', keysRouter);

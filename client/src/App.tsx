@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
+import LoginPage from '@/pages/LoginPage'
 
 const queryClient = new QueryClient()
 
@@ -66,37 +68,60 @@ function Brand() {
   )
 }
 
+function LogoutButton() {
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    window.location.assign('/login')
+  }
+
+  return (
+    <Button variant="ghost" size="icon-sm" onClick={logout} aria-label="Log out" title="Log out">
+      <LogOut />
+    </Button>
+  )
+}
+
+function DashboardShell() {
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
+        <div className="max-w-6xl mx-auto px-6 flex items-center">
+          <Brand />
+          <nav className="flex items-center gap-6 ml-10">
+            <NavItem to="/playground">Playground</NavItem>
+            <NavItem to="/keys">Keys</NavItem>
+            <NavItem to="/fallback">Fallback</NavItem>
+            <NavItem to="/analytics">Analytics</NavItem>
+          </nav>
+          <div className="ml-auto flex items-center gap-1 py-2">
+            <DarkModeToggle />
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <Routes>
+          <Route path="/" element={<Navigate to="/playground" replace />} />
+          <Route path="/playground" element={<PlaygroundPage />} />
+          <Route path="/keys" element={<KeysPage />} />
+          <Route path="/fallback" element={<FallbackPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/test" element={<Navigate to="/playground" replace />} />
+          <Route path="/health" element={<Navigate to="/keys" replace />} />
+        </Routes>
+      </main>
+    </div>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
-            <div className="max-w-6xl mx-auto px-6 flex items-center">
-              <Brand />
-              <nav className="flex items-center gap-6 ml-10">
-                <NavItem to="/playground">Playground</NavItem>
-                <NavItem to="/keys">Keys</NavItem>
-                <NavItem to="/fallback">Fallback</NavItem>
-                <NavItem to="/analytics">Analytics</NavItem>
-              </nav>
-              <div className="ml-auto py-2">
-                <DarkModeToggle />
-              </div>
-            </div>
-          </header>
-          <main className="max-w-6xl mx-auto px-6 py-8">
-            <Routes>
-              <Route path="/" element={<Navigate to="/playground" replace />} />
-              <Route path="/playground" element={<PlaygroundPage />} />
-              <Route path="/keys" element={<KeysPage />} />
-              <Route path="/fallback" element={<FallbackPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/test" element={<Navigate to="/playground" replace />} />
-              <Route path="/health" element={<Navigate to="/keys" replace />} />
-            </Routes>
-          </main>
-        </div>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/*" element={<DashboardShell />} />
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   )
