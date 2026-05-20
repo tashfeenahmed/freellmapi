@@ -14,5 +14,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.6.0"
   }
 }
