@@ -20,11 +20,11 @@ describe('Router', () => {
     }
   });
 
-  it('should throw when no keys are configured', () => {
-    expect(() => routeRequest()).toThrow(/exhausted/i);
+  it('should throw when no keys are configured', async () => {
+    await expect(routeRequest()).rejects.toThrow(/exhausted/i);
   });
 
-  it('should route to highest priority model with available key', () => {
+  it('should route to highest priority model with available key', async () => {
     const db = getDb();
     const { encrypted, iv, authTag } = encrypt('test-groq-key');
     db.prepare(`
@@ -32,12 +32,12 @@ describe('Router', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run('groq', 'test', encrypted, iv, authTag, 'healthy', 1);
 
-    const result = routeRequest();
+    const result = await routeRequest();
     expect(result.platform).toBe('groq');
     expect(result.apiKey).toBe('test-groq-key');
   });
 
-  it('should prefer higher-priority model when keys exist for multiple platforms', () => {
+  it('should prefer higher-priority model when keys exist for multiple platforms', async () => {
     const db = getDb();
 
     const googleKey = encrypt('test-google-key');
@@ -55,11 +55,11 @@ describe('Router', () => {
     // Post-V6: Google's gemini-3.1-pro-preview (rank 1, free-tier-eligible per
     // probe on 2026-04-25) outranks Groq's best free-tier model openai/gpt-oss-120b
     // (rank 6). With keys for both platforms, Google wins.
-    const result = routeRequest();
+    const result = await routeRequest();
     expect(result.platform).toBe('google');
   });
 
-  it('should skip disabled keys', () => {
+  it('should skip disabled keys', async () => {
     const db = getDb();
 
     const googleKey = encrypt('test-google-key');
@@ -74,11 +74,11 @@ describe('Router', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run('groq', 'test', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
 
-    const result = routeRequest();
+    const result = await routeRequest();
     expect(result.platform).toBe('groq');
   });
 
-  it('should skip invalid keys', () => {
+  it('should skip invalid keys', async () => {
     const db = getDb();
 
     const invalidKey = encrypt('invalid-key');
@@ -93,7 +93,7 @@ describe('Router', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run('groq', 'test', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
 
-    const result = routeRequest();
+    const result = await routeRequest();
     expect(result.platform).toBe('groq');
   });
 });

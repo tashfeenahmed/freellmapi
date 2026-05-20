@@ -2,6 +2,7 @@ import { getDb } from '../db/index.js';
 import { getProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown } from './ratelimit.js';
+import { throttledRefresh } from '../lib/db-refresh.js';
 import type { BaseProvider } from '../providers/base.js';
 
 interface ModelRow {
@@ -131,7 +132,10 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
  * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
  * @param preferredModelDbId - try this model first (sticky session)
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number): RouteResult {
+export async function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number): Promise<RouteResult> {
+  // Trigger async DB refresh (fire-and-forget, won't block)
+  throttledRefresh().catch(() => {});
+
   const db = getDb();
 
   // Get fallback chain ordered by priority

@@ -12,3 +12,5 @@ server/data/
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh
+.vercel
+.env*.local

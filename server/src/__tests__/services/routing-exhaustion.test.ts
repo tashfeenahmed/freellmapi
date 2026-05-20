@@ -24,6 +24,11 @@ vi.mock('../../lib/crypto.js', async () => {
   };
 });
 
+// Mock db-refresh to avoid side effects during tests
+vi.mock('../../lib/db-refresh.js', () => ({
+  throttledRefresh: vi.fn(() => Promise.resolve({ refreshed: false, stale: false })),
+}));
+
 describe('Routing Key Exhaustion', () => {
   beforeEach(() => {
     initDb(':memory:');
@@ -47,16 +52,16 @@ describe('Routing Key Exhaustion', () => {
     vi.clearAllMocks();
   });
 
-  it('should skip exhausted Key B and use functional Key A for the same high-priority model', () => {
+  it('should skip exhausted Key B and use functional Key A for the same high-priority model', async () => {
     const db = getDb();
     const keys = db.prepare("SELECT id, label FROM api_keys").all();
-    const keyA = keys.find(k => k.label === 'Key A');
-    const keyB = keys.find(k => k.label === 'Key B');
+    const keyA = keys.find((k: any) => k.label === 'Key A');
+    const keyB = keys.find((k: any) => k.label === 'Key B');
 
     // Mock behavior:
     // Key B is exhausted (returns false for canMakeRequest)
     // Key A is functional (returns true)
-    (ratelimit.canMakeRequest as any).mockImplementation((platform, modelId, keyId) => {
+    (ratelimit.canMakeRequest as any).mockImplementation((_platform: string, _modelId: string, keyId: number) => {
       if (keyId === keyB.id) return false;
       if (keyId === keyA.id) return true;
       return true;
@@ -64,7 +69,7 @@ describe('Routing Key Exhaustion', () => {
     (ratelimit.canUseTokens as any).mockReturnValue(true);
 
     // Act: Route request
-    const result = routeRequest(100);
+    const result = await routeRequest(100);
 
     // Assert: It should have picked the Pro model despite Key B being exhausted
     expect(result.modelId).toBe('gemini-1.5-pro');
@@ -72,12 +77,12 @@ describe('Routing Key Exhaustion', () => {
     expect(ratelimit.canMakeRequest).toHaveBeenCalled();
   });
 
-  it('should throw 429 when every key on every model is exhausted', () => {
+  it('should throw 429 when every key on every model is exhausted', async () => {
     (ratelimit.canMakeRequest as any).mockReturnValue(false);
-    expect(() => routeRequest(100)).toThrow(/All models exhausted/);
+    await expect(routeRequest(100)).rejects.toThrow(/All models exhausted/);
   });
 
-  it('should fall back to Flash when Pro is exhausted but Flash has quota', () => {
+  it('should fall back to Flash when Pro is exhausted but Flash has quota', async () => {
     (ratelimit.canMakeRequest as any).mockImplementation((_platform: string, modelId: string) => {
       if (modelId === 'gemini-1.5-pro') return false;
       if (modelId === 'gemini-1.5-flash') return true;
@@ -85,7 +90,7 @@ describe('Routing Key Exhaustion', () => {
     });
     (ratelimit.canUseTokens as any).mockReturnValue(true);
 
-    const result = routeRequest(100);
+    const result = await routeRequest(100);
     expect(result.modelId).toBe('gemini-1.5-flash');
   });
 });

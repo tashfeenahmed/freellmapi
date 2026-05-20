@@ -17,7 +17,9 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.44.2",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
+    "swagger-ui-express": "^5.0.1",
     "zod": "^3.24.4"
   },
   "devDependencies": {
@@ -25,6 +27,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.3",
+    "@types/swagger-ui-express": "^4.1.8",
     "drizzle-kit": "^0.31.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",

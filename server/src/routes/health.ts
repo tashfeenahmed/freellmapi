@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getDb } from '../db/index.js';
+import { getDb, persistDbSnapshot } from '../db/index.js';
 import { checkKeyHealth, checkAllKeys } from '../services/health.js';
 import { hasProvider } from '../providers/index.js';
 
@@ -63,11 +63,13 @@ healthRouter.post('/check/:keyId', async (req: Request, res: Response) => {
   }
 
   const status = await checkKeyHealth(keyId);
+  await persistDbSnapshot('health-check-key');
   res.json({ keyId, status });
 });
 
 // Check all keys
 healthRouter.post('/check-all', async (_req: Request, res: Response) => {
   await checkAllKeys();
+  await persistDbSnapshot('health-check-all');
   res.json({ success: true });
 });

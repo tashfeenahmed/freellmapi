@@ -19,7 +19,8 @@ export type Platform =
   | 'ollama'
   | 'kilo'
   | 'pollinations'
-  | 'llm7';
+  | 'llm7'
+  | 'anthropic';
 
 export interface Model {
   id: number;
@@ -55,6 +56,47 @@ export interface ApiKeyCreate {
   platform: Platform;
   key: string;
   label?: string;
+}
+
+export interface ApiKeyImportInput {
+  platform: Platform;
+  key: string;
+  label?: string;
+  enabled?: boolean;
+}
+
+export interface ApiKeyImportResult {
+  inserted: number;
+  skipped: number;
+  replaced: number;
+  errors: Array<{ index: number; message: string }>;
+  keys: Array<{
+    id: number;
+    platform: Platform;
+    label: string;
+    maskedKey: string;
+    enabled: boolean;
+  }>;
+}
+
+export interface FreeLLMBackup {
+  format: 'freellmapi-backup';
+  version: number;
+  exportedAt: string;
+  unifiedApiKey: string;
+  unifiedApiKeyPinned: boolean;
+  providerKeys: Array<ApiKeyImportInput & {
+    status?: KeyStatus;
+    createdAt?: string;
+    lastCheckedAt?: string | null;
+  }>;
+  fallback: Array<{
+    platform: Platform;
+    modelId: string;
+    priority: number;
+    enabled: boolean;
+  }>;
+  warnings?: Array<{ id: number; message: string }>;
 }
 
 // ---- Fallback Config ----

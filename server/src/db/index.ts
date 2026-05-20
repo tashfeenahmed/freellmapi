@@ -4,11 +4,23 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import {
+  configureDbSnapshotPersistence,
+  dbSnapshotPersistenceEnabled,
+  downloadDbSnapshot,
+  markDbSnapshotEtag,
+  persistDbSnapshot,
+  restoreDbSnapshot,
+} from './persistence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
+const DEFAULT_DB_PATH = process.env.VERCEL ? '/tmp/freeapi.db' : path.resolve(__dirname, '../../data/freeapi.db');
+const DB_PATH = process.env.FREEAPI_DB_PATH ?? DEFAULT_DB_PATH;
 
 let db: Database.Database;
+let activeDbPath = DB_PATH;
+let activeDbIsMemory = false;
+let refreshQueue: Promise<boolean> = Promise.resolve(false);
 
 export function getDb(): Database.Database {
   if (!db) {
@@ -20,6 +32,8 @@ export function getDb(): Database.Database {
 export function initDb(dbPath?: string): Database.Database {
   const resolvedPath = dbPath ?? DB_PATH;
   const isMemory = resolvedPath === ':memory:';
+  activeDbPath = resolvedPath;
+  activeDbIsMemory = isMemory;
 
   if (!isMemory) {
     const dataDir = path.dirname(resolvedPath);
@@ -29,8 +43,16 @@ export function initDb(dbPath?: string): Database.Database {
   }
 
   db = new Database(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
+  const useSnapshotPersistence = dbSnapshotPersistenceEnabled(resolvedPath, isMemory);
+  if (!isMemory) db.pragma(useSnapshotPersistence ? 'journal_mode = DELETE' : 'journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  configureDbSnapshotPersistence(resolvedPath, isMemory, () => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // DELETE journal mode has no WAL to checkpoint.
+    }
+  });
 
   createTables(db);
   initEncryptionKey(db);
@@ -46,11 +68,42 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV9(db);
   migrateModelsV10(db);
   migrateModelsV11(db);
+  migrateModelsV12(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
 }
+
+export async function initDbFromPersistentSnapshot(dbPath?: string): Promise<Database.Database> {
+  const resolvedPath = dbPath ?? DB_PATH;
+  const isMemory = resolvedPath === ':memory:';
+
+  await restoreDbSnapshot(resolvedPath, isMemory);
+  const database = initDb(resolvedPath);
+  await persistDbSnapshot('init');
+  return database;
+}
+
+export async function refreshDbFromPersistentSnapshot(): Promise<boolean> {
+  if (!dbSnapshotPersistenceEnabled(activeDbPath, activeDbIsMemory)) return false;
+
+  refreshQueue = refreshQueue.catch(() => false).then(async () => {
+    const snapshot = await downloadDbSnapshot(activeDbPath, activeDbIsMemory);
+    if (!snapshot || snapshot === 'unchanged') return false;
+
+    db.close();
+    fs.renameSync(snapshot.tempPath, activeDbPath);
+    markDbSnapshotEtag(snapshot.etag);
+    initDb(activeDbPath);
+    console.log('[DB] Refreshed SQLite snapshot from Vercel Blob before request');
+    return true;
+  });
+
+  return refreshQueue;
+}
+
+export { persistDbSnapshot };
 
 function createTables(db: Database.Database) {
   db.exec(`
@@ -929,7 +982,65 @@ function migrateModelsV11(db: Database.Database) {
   apply();
 }
 
+function migrateModelsV12(db: Database.Database) {
+  // Add Claude models via the Anthropic Messages API.
+  // Anthropic uses a distinct non-OpenAI endpoint (/v1/messages) — routed via
+  // the AnthropicProvider registered in server/src/providers/index.ts.
+  //
+  // Rate limits: Anthropic's free tier is invite-only and very limited.
+  // Paid tier limits are generous (~50 RPM / 200k TPM for most tiers).
+  // We set null limits to indicate "provider-managed" — the AnthropicProvider
+  // will handle 429s via the standard retry mechanism.
+  //
+  // Claude model IDs match the official Anthropic API model strings:
+  //   claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20250501
+  //
+  // Intelligence / speed ranks are relative to the existing catalog:
+  //   Opus 4.7 — rank 1: top-tier frontier model, competitive with GPT-4.5
+  //   Sonnet 4.6 — rank 3: strong reasoning, similar to GPT-4o / Gemini 2.5
+  //   Haiku 4.5 — rank 8: fast, cheap, beats most mid-tier open models
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // Claude Opus 4.7 — flagship model. Context: 200k tokens.
+    // Pricing: ~$18 input / $54 output per 1M tokens (paid).
+    ['anthropic', 'claude-opus-4-7',       'Claude Opus 4.7',  1, 5, 'Frontier', null, null, null, null, '~$18/$54/M tokens',  200000],
+    // Claude Sonnet 4.6 — balanced reasoning + speed. Context: 200k tokens.
+    // Pricing: ~$3 input / $15 output per 1M tokens (paid).
+    ['anthropic', 'claude-sonnet-4-6',     'Claude Sonnet 4.6', 3, 4, 'Large',    null, null, null, null, '~$3/$15/M tokens',    200000],
+    // Claude Haiku 4.5 — fast, affordable. Context: 200k tokens.
+    // Pricing: ~$0.8 input / $4 output per 1M tokens (paid).
+    ['anthropic', 'claude-haiku-4-5-20250501', 'Claude Haiku 4.5', 8, 3, 'Medium', null, null, null, null, '~$0.80/$4/M tokens', 200000],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
 function ensureUnifiedKey(db: Database.Database) {
+  const configuredKey = getConfiguredUnifiedApiKey();
+  if (configuredKey) {
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('unified_api_key', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(configuredKey);
+    return;
+  }
+
   const existing = db.prepare("SELECT value FROM settings WHERE key = 'unified_api_key'").get() as { value: string } | undefined;
   if (!existing) {
     const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
@@ -938,15 +1049,41 @@ function ensureUnifiedKey(db: Database.Database) {
   }
 }
 
+function getConfiguredUnifiedApiKey(): string | undefined {
+  const value = process.env.FREEAPI_UNIFIED_API_KEY ?? process.env.FREELLM_UNIFIED_API_KEY;
+  return value && value.trim() ? value.trim() : undefined;
+}
+
+export function isUnifiedApiKeyPinned(): boolean {
+  return getConfiguredUnifiedApiKey() !== undefined;
+}
+
 export function getUnifiedApiKey(): string {
+  const configuredKey = getConfiguredUnifiedApiKey();
+  if (configuredKey) return configuredKey;
+
   const db = getDb();
   const row = db.prepare("SELECT value FROM settings WHERE key = 'unified_api_key'").get() as { value: string };
   return row.value;
 }
 
 export function regenerateUnifiedKey(): string {
+  const configuredKey = getConfiguredUnifiedApiKey();
+  if (configuredKey) return configuredKey;
+
   const db = getDb();
   const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
   return key;
+}
+
+export function setUnifiedApiKey(key: string): boolean {
+  if (getConfiguredUnifiedApiKey()) return false;
+
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('unified_api_key', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key);
+  return true;
 }

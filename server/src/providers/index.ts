@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { AnthropicProvider } from './anthropic.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -74,6 +75,9 @@ register(new CohereProvider());
 
 // Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
 register(new CloudflareProvider());
+
+// Anthropic - Claude models via Messages API (different from OpenAI format)
+register(new AnthropicProvider());
 
 // Zhipu (Z.ai / bigmodel.cn) - OpenAI-compatible
 register(new OpenAICompatProvider({
