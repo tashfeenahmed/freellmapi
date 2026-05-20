@@ -3,22 +3,21 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb, persistDbSnapshot } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { PLATFORMS } from '../lib/platforms.js';
+import { importModeSchema, importProviderKeys } from '../services/key-import.js';
 
 export const keysRouter = Router();
-
-// Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
-// Hugging Face, Moonshot, and MiniMax direct integrations were dropped in V4
-// (see migrateModelsV4 comment block).
-const PLATFORMS = [
-  'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral',
-  'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
-  'kilo', 'pollinations', 'llm7',
-] as const;
 
 const addKeySchema = z.object({
   platform: z.enum(PLATFORMS),
   key: z.string().min(1),
   label: z.string().optional(),
+});
+
+const importKeysSchema = z.object({
+  mode: importModeSchema.optional(),
+  dedupe: z.boolean().optional(),
+  keys: z.array(z.unknown()).min(1).max(2000),
 });
 
 // List all keys (masked)
@@ -75,6 +74,32 @@ keysRouter.post('/', async (req: Request, res: Response) => {
     status: 'unknown',
     enabled: true,
   });
+});
+
+// Import many keys at once
+keysRouter.post('/import', async (req: Request, res: Response) => {
+  const parsed = importKeysSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  const db = getDb();
+  const result = importProviderKeys(db, parsed.data.keys, {
+    mode: parsed.data.mode ?? 'append',
+    dedupe: parsed.data.dedupe,
+  });
+
+  if (result.inserted === 0 && result.replaced === 0 && result.errors.length > 0) {
+    res.status(400).json({ error: { message: 'No valid keys to import', details: result.errors }, result });
+    return;
+  }
+
+  if (result.inserted > 0 || result.replaced > 0) {
+    await persistDbSnapshot('api-key-bulk-import');
+  }
+
+  res.status(201).json(result);
 });
 
 // Delete a key

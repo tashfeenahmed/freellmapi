@@ -10,6 +10,7 @@ import { fallbackRouter } from './routes/fallback.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
+import { backupRouter } from './routes/backup.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter, requireDashboardAuth } from './auth.js';
 import { refreshDbFromPersistentSnapshot } from './db/index.js';
@@ -27,7 +28,7 @@ export function createApp() {
   // (which is also not a supported deployment — see README).
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
   app.use(cors());
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '5mb' }));
 
   app.use(async (req, _res, next) => {
     if (!req.path.startsWith('/api/') && !req.path.startsWith('/v1/')) {
@@ -53,6 +54,7 @@ export function createApp() {
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/health', healthRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/backup', backupRouter);
 
   // OpenAI-compatible proxy
   app.use('/v1', proxyRouter);

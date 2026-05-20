@@ -80,6 +80,46 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
+  it('POST /api/keys/import creates many keys and skips duplicates', async () => {
+    const { status, body } = await request(app, 'POST', '/api/keys/import', {
+      keys: [
+        { platform: 'groq', key: 'gsk_bulk_1', label: 'Bulk 1' },
+        { platform: 'google', key: 'AIza_bulk_2', label: 'Bulk 2' },
+        { platform: 'groq', key: 'gsk_bulk_1', label: 'Duplicate' },
+      ],
+    });
+
+    expect(status).toBe(201);
+    expect(body.inserted).toBe(2);
+    expect(body.skipped).toBe(1);
+
+    const { body: after } = await request(app, 'GET', '/api/keys');
+    expect(after).toHaveLength(2);
+  });
+
+  it('POST /api/keys/import replace mode clears existing keys first', async () => {
+    await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_existing',
+    });
+
+    const { status, body } = await request(app, 'POST', '/api/keys/import', {
+      mode: 'replace',
+      keys: [
+        { platform: 'google', key: 'AIza_replacement_1' },
+        { platform: 'openrouter', key: 'sk-or-replacement-2' },
+      ],
+    });
+
+    expect(status).toBe(201);
+    expect(body.inserted).toBe(2);
+    expect(body.replaced).toBe(1);
+
+    const { body: after } = await request(app, 'GET', '/api/keys');
+    expect(after).toHaveLength(2);
+    expect(after.map((key: any) => key.platform).sort()).toEqual(['google', 'openrouter']);
+  });
+
   it('DELETE /api/keys/:id removes a key', async () => {
     const { body: created } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',

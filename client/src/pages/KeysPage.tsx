@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/page-header'
-import type { ApiKey, Platform } from '../../../shared/types'
+import { Download, Upload } from 'lucide-react'
+import type { ApiKey, ApiKeyImportInput, ApiKeyImportResult, FreeLLMBackup, Platform } from '../../../shared/types'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'google', label: 'Google AI Studio' },
@@ -40,6 +42,156 @@ const statusLabel: Record<string, string> = {
   invalid: 'invalid',
   error: 'error',
   unknown: 'unchecked',
+}
+
+type ImportMode = 'append' | 'replace'
+
+interface BackupImportResult {
+  success: boolean
+  keys: ApiKeyImportResult
+  fallback: { updated: number; skipped: number; errors: { index: number; message: string }[] }
+  unifiedApiKey: { restored: boolean; skipped: boolean; reason?: string }
+}
+
+const platformValues = new Set<string>(PLATFORMS.map(p => p.value))
+
+function isPlatform(value: string): value is Platform {
+  return platformValues.has(value)
+}
+
+function parseCsvLine(line: string): string[] {
+  const values: string[] = []
+  let current = ''
+  let quoted = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') {
+        current += '"'
+        i += 1
+      } else {
+        quoted = !quoted
+      }
+      continue
+    }
+    if (char === ',' && !quoted) {
+      values.push(current.trim())
+      current = ''
+      continue
+    }
+    current += char
+  }
+
+  values.push(current.trim())
+  return values
+}
+
+function parseEnabled(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value
+  if (value === undefined || value === null || value === '') return undefined
+  const normalized = String(value).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'enabled', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'disabled', 'off'].includes(normalized)) return false
+  return undefined
+}
+
+function normalizeImportKey(raw: unknown): ApiKeyImportInput | null {
+  if (!raw || typeof raw !== 'object') return null
+  const entry = raw as Record<string, unknown>
+  const platform = String(entry.platform ?? '').trim()
+  const key = String(entry.key ?? entry.apiKey ?? entry.api_key ?? '').trim()
+  if (!isPlatform(platform) || !key) return null
+
+  const label = String(entry.label ?? entry.name ?? '').trim()
+  const enabled = parseEnabled(entry.enabled)
+  return {
+    platform,
+    key,
+    ...(label ? { label } : {}),
+    ...(enabled === undefined ? {} : { enabled }),
+  }
+}
+
+function parseTextImport(text: string): ApiKeyImportInput[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+
+  if (lines.length === 0) return []
+
+  const firstRow = parseCsvLine(lines[0]).map(value => value.toLowerCase())
+  const keyHeader = firstRow.findIndex(value => ['key', 'apikey', 'api_key'].includes(value))
+  const platformHeader = firstRow.indexOf('platform')
+  const hasHeader = platformHeader >= 0 && keyHeader >= 0
+
+  if (hasHeader) {
+    const labelHeader = firstRow.indexOf('label')
+    const enabledHeader = firstRow.indexOf('enabled')
+    return lines.slice(1).flatMap(line => {
+      const row = parseCsvLine(line)
+      const parsed = normalizeImportKey({
+        platform: row[platformHeader],
+        key: row[keyHeader],
+        label: labelHeader >= 0 ? row[labelHeader] : undefined,
+        enabled: enabledHeader >= 0 ? parseEnabled(row[enabledHeader]) : undefined,
+      })
+      return parsed ? [parsed] : []
+    })
+  }
+
+  return lines.flatMap(line => {
+    const eq = line.indexOf('=')
+    if (eq > 0) {
+      const platform = line.slice(0, eq).trim()
+      const key = line.slice(eq + 1).trim()
+      const parsed = normalizeImportKey({ platform, key })
+      if (parsed) return [parsed]
+    }
+
+    const [platform, key, label, enabled] = parseCsvLine(line)
+    const parsed = normalizeImportKey({ platform, key, label, enabled: parseEnabled(enabled) })
+    return parsed ? [parsed] : []
+  })
+}
+
+function buildImportRequest(text: string, mode: ImportMode): {
+  endpoint: '/api/keys/import' | '/api/backup/import'
+  body: unknown
+} {
+  const trimmed = text.trim()
+  if (!trimmed) throw new Error('No import data')
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) {
+      return { endpoint: '/api/keys/import', body: { mode, keys: parsed } }
+    }
+    if (parsed && typeof parsed === 'object') {
+      const backup = parsed as Record<string, unknown>
+      if (Array.isArray(backup.providerKeys) || Array.isArray(backup.fallback) || typeof backup.unifiedApiKey === 'string') {
+        return { endpoint: '/api/backup/import', body: { ...backup, mode } }
+      }
+      if (Array.isArray(backup.keys)) {
+        return { endpoint: '/api/keys/import', body: { mode, keys: backup.keys } }
+      }
+    }
+  } catch {
+    // Fall back to CSV/plain text parsing.
+  }
+
+  const keys = parseTextImport(trimmed)
+  if (keys.length === 0) throw new Error('No valid keys found')
+  return { endpoint: '/api/keys/import', body: { mode, keys } }
+}
+
+function keyImportSummary(result: ApiKeyImportResult): string {
+  const parts = [`${result.inserted} imported`]
+  if (result.skipped) parts.push(`${result.skipped} skipped`)
+  if (result.replaced) parts.push(`${result.replaced} replaced`)
+  if (result.errors.length) parts.push(`${result.errors.length} errors`)
+  return parts.join(', ')
 }
 
 interface HealthPlatform {
@@ -139,6 +291,9 @@ export default function KeysPage() {
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
+  const [bulkText, setBulkText] = useState('')
+  const [importMode, setImportMode] = useState<ImportMode>('append')
+  const [importMessage, setImportMessage] = useState('')
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -163,6 +318,35 @@ export default function KeysPage() {
       setAccountId('')
       setLabel('')
     },
+  })
+
+  const downloadBackup = useMutation({
+    mutationFn: () => apiFetch<FreeLLMBackup>('/api/backup/export'),
+    onSuccess: backup => {
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `freellmapi-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    },
+  })
+
+  const bulkImport = useMutation({
+    mutationFn: ({ endpoint, body }: { endpoint: '/api/keys/import' | '/api/backup/import'; body: unknown }) =>
+      apiFetch<ApiKeyImportResult | BackupImportResult>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: result => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      const keyResult = 'success' in result ? result.keys : result
+      const fallbackUpdated = 'success' in result && result.fallback.updated > 0
+        ? `, ${result.fallback.updated} fallback rules updated`
+        : ''
+      setImportMessage(`${keyImportSummary(keyResult)}${fallbackUpdated}`)
+    },
+    onError: error => setImportMessage((error as Error).message),
   })
 
   const deleteKey = useMutation({
@@ -199,6 +383,29 @@ export default function KeysPage() {
     addKey.mutate({ platform, key, label: label || undefined })
   }
 
+  const handleBulkImport = (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setImportMessage('')
+      bulkImport.mutate(buildImportRequest(bulkText, importMode))
+    } catch (error) {
+      setImportMessage((error as Error).message)
+    }
+  }
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      setBulkText(await file.text())
+      setImportMessage('')
+    } catch (error) {
+      setImportMessage((error as Error).message)
+    } finally {
+      event.target.value = ''
+    }
+  }
+
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
 
@@ -223,6 +430,59 @@ export default function KeysPage() {
 
       <div className="space-y-8">
         <UnifiedKeySection />
+
+        <section>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-medium">Backup and bulk import</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadBackup.mutate()}
+              disabled={downloadBackup.isPending}
+            >
+              <Download className="size-4" />
+              {downloadBackup.isPending ? 'Preparing' : 'Download backup'}
+            </Button>
+          </div>
+
+          <form onSubmit={handleBulkImport} className="rounded-lg border p-4 bg-card space-y-3">
+            <Textarea
+              value={bulkText}
+              onChange={event => setBulkText(event.target.value)}
+              placeholder={'platform,key,label\ngoogle,AIza...,personal\ngroq,gsk...,batch'}
+              className="min-h-[132px] font-mono text-xs"
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mode</Label>
+                <Select value={importMode} onValueChange={value => setImportMode(value as ImportMode)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="append">Append</SelectItem>
+                    <SelectItem value="replace">Replace keys</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">File</Label>
+                <Input
+                  type="file"
+                  accept=".json,.csv,.txt,application/json,text/csv,text/plain"
+                  onChange={handleImportFile}
+                  className="w-[260px]"
+                />
+              </div>
+              <div className="flex-1" />
+              {importMessage && <span className="text-xs text-muted-foreground">{importMessage}</span>}
+              <Button type="submit" size="sm" disabled={!bulkText.trim() || bulkImport.isPending}>
+                <Upload className="size-4" />
+                {bulkImport.isPending ? 'Importing' : 'Import'}
+              </Button>
+            </div>
+          </form>
+        </section>
 
         <section>
           <h2 className="text-sm font-medium mb-3">Add a provider key</h2>

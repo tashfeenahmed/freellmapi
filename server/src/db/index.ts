@@ -1026,3 +1026,14 @@ export function regenerateUnifiedKey(): string {
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
   return key;
 }
+
+export function setUnifiedApiKey(key: string): boolean {
+  if (getConfiguredUnifiedApiKey()) return false;
+
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES ('unified_api_key', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key);
+  return true;
+}
