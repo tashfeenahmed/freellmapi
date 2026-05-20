@@ -4,10 +4,16 @@ import { get, put } from '@vercel/blob';
 
 const DEFAULT_DB_BLOB_PATH = 'sqlite/freeapi.db';
 
+type DownloadedSnapshot = {
+  tempPath: string;
+  etag: string;
+};
+
 let activeDbPath: string | null = null;
 let activeDbIsMemory = true;
 let checkpoint: (() => void) | null = null;
 let persistQueue: Promise<boolean> = Promise.resolve(false);
+let currentSnapshotEtag: string | null = null;
 
 function dbBlobPath(): string {
   return process.env.FREEAPI_DB_BLOB_PATH ?? DEFAULT_DB_BLOB_PATH;
@@ -34,6 +40,10 @@ export function configureDbSnapshotPersistence(
   checkpoint = checkpointFn;
 }
 
+export function markDbSnapshotEtag(etag: string | null): void {
+  currentSnapshotEtag = etag;
+}
+
 async function writeStreamToFile(stream: ReadableStream<Uint8Array>, filePath: string): Promise<void> {
   const reader = stream.getReader();
   const writer = fs.createWriteStream(filePath);
@@ -54,19 +64,36 @@ async function writeStreamToFile(stream: ReadableStream<Uint8Array>, filePath: s
   }
 }
 
-export async function restoreDbSnapshot(dbPath: string, isMemory: boolean): Promise<boolean> {
-  if (!dbSnapshotPersistenceEnabled(dbPath, isMemory)) return false;
+export async function downloadDbSnapshot(
+  dbPath: string,
+  isMemory: boolean,
+): Promise<DownloadedSnapshot | 'unchanged' | null> {
+  if (!dbSnapshotPersistenceEnabled(dbPath, isMemory)) return null;
 
-  const result = await get(dbBlobPath(), { access: 'private', useCache: false });
-  if (!result) return false;
-  if (result.statusCode !== 200 || !result.stream) return false;
+  const result = await get(dbBlobPath(), {
+    access: 'private',
+    useCache: false,
+    ...(currentSnapshotEtag ? { ifNoneMatch: currentSnapshotEtag } : {}),
+  });
+  if (!result) return null;
+  if (result.statusCode === 304) return 'unchanged';
+  if (result.statusCode !== 200 || !result.stream) return null;
 
   const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
   const tempPath = `${dbPath}.restore-${process.pid}-${Date.now()}`;
   await writeStreamToFile(result.stream, tempPath);
+  return { tempPath, etag: result.blob.etag };
+}
+
+export async function restoreDbSnapshot(dbPath: string, isMemory: boolean): Promise<boolean> {
+  const snapshot = await downloadDbSnapshot(dbPath, isMemory);
+  if (!snapshot || snapshot === 'unchanged') return false;
+
+  const { tempPath, etag } = snapshot;
   fs.renameSync(tempPath, dbPath);
+  currentSnapshotEtag = etag;
 
   console.log(`[DB] Restored SQLite snapshot from Vercel Blob: ${dbBlobPath()}`);
   return true;
@@ -84,12 +111,14 @@ export async function persistDbSnapshot(reason = 'manual'): Promise<boolean> {
     fs.copyFileSync(activeDbPath, tempPath);
 
     try {
-      await put(dbBlobPath(), fs.createReadStream(tempPath), {
+      const uploaded = await put(dbBlobPath(), fs.createReadStream(tempPath), {
         access: 'private',
         allowOverwrite: true,
+        ...(currentSnapshotEtag ? { ifMatch: currentSnapshotEtag } : {}),
         contentType: 'application/vnd.sqlite3',
         cacheControlMaxAge: 60,
       });
+      currentSnapshotEtag = uploaded.etag;
       console.log(`[DB] Persisted SQLite snapshot to Vercel Blob (${reason})`);
       return true;
     } finally {

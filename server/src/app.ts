@@ -12,6 +12,7 @@ import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter, requireDashboardAuth } from './auth.js';
+import { refreshDbFromPersistentSnapshot } from './db/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,20 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
+
+  app.use(async (req, _res, next) => {
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/v1/')) {
+      next();
+      return;
+    }
+
+    try {
+      await refreshDbFromPersistentSnapshot();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   app.use('/api/auth', authRouter);
   app.use(requireDashboardAuth);

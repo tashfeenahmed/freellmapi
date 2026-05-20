@@ -7,6 +7,8 @@ import { initEncryptionKey } from '../lib/crypto.js';
 import {
   configureDbSnapshotPersistence,
   dbSnapshotPersistenceEnabled,
+  downloadDbSnapshot,
+  markDbSnapshotEtag,
   persistDbSnapshot,
   restoreDbSnapshot,
 } from './persistence.js';
@@ -16,6 +18,9 @@ const DEFAULT_DB_PATH = process.env.VERCEL ? '/tmp/freeapi.db' : path.resolve(__
 const DB_PATH = process.env.FREEAPI_DB_PATH ?? DEFAULT_DB_PATH;
 
 let db: Database.Database;
+let activeDbPath = DB_PATH;
+let activeDbIsMemory = false;
+let refreshQueue: Promise<boolean> = Promise.resolve(false);
 
 export function getDb(): Database.Database {
   if (!db) {
@@ -27,6 +32,8 @@ export function getDb(): Database.Database {
 export function initDb(dbPath?: string): Database.Database {
   const resolvedPath = dbPath ?? DB_PATH;
   const isMemory = resolvedPath === ':memory:';
+  activeDbPath = resolvedPath;
+  activeDbIsMemory = isMemory;
 
   if (!isMemory) {
     const dataDir = path.dirname(resolvedPath);
@@ -75,6 +82,24 @@ export async function initDbFromPersistentSnapshot(dbPath?: string): Promise<Dat
   const database = initDb(resolvedPath);
   await persistDbSnapshot('init');
   return database;
+}
+
+export async function refreshDbFromPersistentSnapshot(): Promise<boolean> {
+  if (!dbSnapshotPersistenceEnabled(activeDbPath, activeDbIsMemory)) return false;
+
+  refreshQueue = refreshQueue.catch(() => false).then(async () => {
+    const snapshot = await downloadDbSnapshot(activeDbPath, activeDbIsMemory);
+    if (!snapshot || snapshot === 'unchanged') return false;
+
+    db.close();
+    fs.renameSync(snapshot.tempPath, activeDbPath);
+    markDbSnapshotEtag(snapshot.etag);
+    initDb(activeDbPath);
+    console.log('[DB] Refreshed SQLite snapshot from Vercel Blob before request');
+    return true;
+  });
+
+  return refreshQueue;
 }
 
 export { persistDbSnapshot };
