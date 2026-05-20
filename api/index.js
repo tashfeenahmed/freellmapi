@@ -1,17 +1,20 @@
 import '../server/dist/env.js';
 import { createApp } from '../server/dist/app.js';
-import { initDb } from '../server/dist/db/index.js';
+import { initDbFromPersistentSnapshot } from '../server/dist/db/index.js';
 
-let app;
+let appPromise;
 
-function getApp() {
-  if (!app) {
-    initDb();
-    app = createApp();
+async function getApp() {
+  if (!appPromise) {
+    appPromise = (async () => {
+      await initDbFromPersistentSnapshot();
+      return createApp();
+    })();
   }
-  return app;
+  return appPromise;
 }
 
-export default function handler(req, res) {
-  return getApp()(req, res);
+export default async function handler(req, res) {
+  const app = await getApp();
+  return app(req, res);
 }

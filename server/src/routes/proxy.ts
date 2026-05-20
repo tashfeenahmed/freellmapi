@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown } from '../services/ratelimit.js';
-import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { getDb, getUnifiedApiKey, persistDbSnapshot } from '../db/index.js';
 
 export const proxyRouter = Router();
 
@@ -349,7 +349,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId);
-          logRequest(route.platform, route.modelId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          await logRequest(route.platform, route.modelId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
           return;
         } catch (streamErr: any) {
           if (streamStarted) {
@@ -361,7 +361,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
+            await logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
             return;
           }
           // Pre-stream error — bubble to outer retry/502 handler.
@@ -382,7 +382,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
         res.json(result);
 
-        logRequest(
+        await logRequest(
           route.platform, route.modelId, 'success',
           result.usage?.prompt_tokens ?? 0,
           result.usage?.completion_tokens ?? 0,
@@ -392,7 +392,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     } catch (err: any) {
       const latency = Date.now() - start;
-      logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, 0, latency, err.message);
+      await logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, 0, latency, err.message);
 
       if (isRetryableError(err)) {
         // Put this model+key on cooldown and try the next one
@@ -425,7 +425,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
 });
 
-function logRequest(
+async function logRequest(
   platform: string,
   modelId: string,
   status: string,
@@ -440,6 +440,7 @@ function logRequest(
       INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(platform, modelId, status, inputTokens, outputTokens, latencyMs, error);
+    await persistDbSnapshot('request-log');
   } catch (e) {
     console.error('Failed to log request:', e);
   }

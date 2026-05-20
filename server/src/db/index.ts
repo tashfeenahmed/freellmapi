@@ -4,6 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import {
+  configureDbSnapshotPersistence,
+  dbSnapshotPersistenceEnabled,
+  persistDbSnapshot,
+  restoreDbSnapshot,
+} from './persistence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DB_PATH = process.env.VERCEL ? '/tmp/freeapi.db' : path.resolve(__dirname, '../../data/freeapi.db');
@@ -30,8 +36,16 @@ export function initDb(dbPath?: string): Database.Database {
   }
 
   db = new Database(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
+  const useSnapshotPersistence = dbSnapshotPersistenceEnabled(resolvedPath, isMemory);
+  if (!isMemory) db.pragma(useSnapshotPersistence ? 'journal_mode = DELETE' : 'journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  configureDbSnapshotPersistence(resolvedPath, isMemory, () => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // DELETE journal mode has no WAL to checkpoint.
+    }
+  });
 
   createTables(db);
   initEncryptionKey(db);
@@ -52,6 +66,18 @@ export function initDb(dbPath?: string): Database.Database {
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
 }
+
+export async function initDbFromPersistentSnapshot(dbPath?: string): Promise<Database.Database> {
+  const resolvedPath = dbPath ?? DB_PATH;
+  const isMemory = resolvedPath === ':memory:';
+
+  await restoreDbSnapshot(resolvedPath, isMemory);
+  const database = initDb(resolvedPath);
+  await persistDbSnapshot('init');
+  return database;
+}
+
+export { persistDbSnapshot };
 
 function createTables(db: Database.Database) {
   db.exec(`

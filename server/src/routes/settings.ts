@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getUnifiedApiKey, isUnifiedApiKeyPinned, regenerateUnifiedKey } from '../db/index.js';
+import { getUnifiedApiKey, isUnifiedApiKeyPinned, persistDbSnapshot, regenerateUnifiedKey } from '../db/index.js';
 
 export const settingsRouter = Router();
 
@@ -10,7 +10,7 @@ settingsRouter.get('/api-key', (_req: Request, res: Response) => {
 });
 
 // Regenerate the unified API key
-settingsRouter.post('/api-key/regenerate', (_req: Request, res: Response) => {
+settingsRouter.post('/api-key/regenerate', async (_req: Request, res: Response) => {
   if (isUnifiedApiKeyPinned()) {
     res.status(409).json({
       error: { message: 'Unified API key is pinned by environment variable FREEAPI_UNIFIED_API_KEY.' },
@@ -19,5 +19,6 @@ settingsRouter.post('/api-key/regenerate', (_req: Request, res: Response) => {
   }
 
   const newKey = regenerateUnifiedKey();
+  await persistDbSnapshot('settings-regenerate-unified-key');
   res.json({ apiKey: newKey, pinned: false });
 });

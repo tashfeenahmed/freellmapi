@@ -16,6 +16,7 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
+    "@vercel/blob": "^2.4.0",
     "@vercel/functions": "^3.6.0"
   }
 }

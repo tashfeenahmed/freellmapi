@@ -13,3 +13,4 @@ server/data/
 deploy-pi.sh
 update-hermes.sh
 .vercel
+.env*.local

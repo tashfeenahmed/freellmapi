@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { getDb } from '../db/index.js';
+import { getDb, persistDbSnapshot } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 
 export const keysRouter = Router();
@@ -50,7 +50,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
 });
 
 // Add a key
-keysRouter.post('/', (req: Request, res: Response) => {
+keysRouter.post('/', async (req: Request, res: Response) => {
   const parsed = addKeySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
@@ -65,6 +65,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
     VALUES (?, ?, ?, ?, ?, 'unknown', 1)
   `).run(platform, label ?? '', encrypted, iv, authTag);
+  await persistDbSnapshot('api-key-add');
 
   res.status(201).json({
     id: result.lastInsertRowid,
@@ -77,7 +78,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
 });
 
 // Delete a key
-keysRouter.delete('/:id', (req: Request, res: Response) => {
+keysRouter.delete('/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: { message: 'Invalid key ID' } });
@@ -92,11 +93,12 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
     return;
   }
 
+  await persistDbSnapshot('api-key-delete');
   res.json({ success: true });
 });
 
 // Toggle enable/disable
-keysRouter.patch('/:id', (req: Request, res: Response) => {
+keysRouter.patch('/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: { message: 'Invalid key ID' } });
@@ -117,5 +119,6 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
+  await persistDbSnapshot('api-key-toggle');
   res.json({ success: true, enabled });
 });
