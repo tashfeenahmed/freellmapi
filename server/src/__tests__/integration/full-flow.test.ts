@@ -174,4 +174,12 @@ describe('Full Integration Flow', () => {
     expect(body.error.code).toBe('model_not_found');
     expect(body.error.message).toContain('is disabled');
   });
+
+  it('Step 13: Explicit model "auto" is accepted and routes via fallback strategy', async () => {
+    const { status } = await req(app, 'POST', '/v1/chat/completions', {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(status).not.toBe(400);
+  });
 });
