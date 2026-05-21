@@ -263,7 +263,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
-  if (requestedModel) {
+  if (requestedModel && requestedModel !== 'auto') {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
