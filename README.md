@@ -23,6 +23,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
+- [Troubleshooting](#troubleshooting)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -115,6 +116,52 @@ For a production build:
 npm run build
 node server/dist/index.js     # server + dashboard both served on :3001
 ```
+## Troubleshooting
+
+### `npm` not found
+
+Verify Node.js installation:
+
+```bash
+node -v
+npm -v
+```
+
+If commands fail, install Node.js and restart your terminal.
+
+### Dependency installation issues
+
+If `npm install` fails, try:
+
+Delete:
+
+```text
+node_modules
+package-lock.json
+```
+
+Then run:
+
+```bash
+npm install
+```
+
+### Development server issues
+
+Start the app using:
+
+```bash
+npm run dev
+```
+
+This starts:
+
+- Server: `http://localhost:3001`
+- Dashboard: `http://localhost:5173`
+
+### Port already in use
+
+If startup fails due to port conflicts, stop the running process or restart your machine.
 
 ## Using the API
 
