@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 
-async function request(app: Express, method: string, path: string, body?: any) {
+async function request(app: Express, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
   const server = app.listen(0);
   const addr = server.address() as any;
   const url = `http://127.0.0.1:${addr.port}${path}`;
 
   const res = await fetch(url, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -21,6 +21,10 @@ async function request(app: Express, method: string, path: string, body?: any) {
   try { json = JSON.parse(data); } catch {}
 
   return { status: res.status, body: json, headers: res.headers, raw: data };
+}
+
+function authHeaders() {
+  return { Authorization: `Bearer ${getUnifiedApiKey()}` };
 }
 
 describe('Proxy tool-calling support', () => {
@@ -103,7 +107,7 @@ describe('Proxy tool-calling support', () => {
         },
       }],
       tool_choice: 'required',
-    });
+    }, authHeaders());
 
     expect(status).toBe(200);
     expect(providerBody.tools).toHaveLength(1);
@@ -163,7 +167,7 @@ describe('Proxy tool-calling support', () => {
           content: '{"temp_c":30}',
         },
       ],
-    });
+    }, authHeaders());
 
     expect(status).toBe(200);
     expect(providerBody.messages[1].role).toBe('assistant');

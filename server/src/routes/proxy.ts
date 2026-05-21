@@ -182,24 +182,16 @@ function isRetryableError(err: any): boolean {
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Authenticate with unified API key. Local requests (127.0.0.1) skip the check
-  // since they came from the same machine running the server. Non-local requests
-  // MUST present a valid Bearer token — missing or wrong → 401.
-  //
-  // Note: req.ip is the actual TCP socket peer because we never set
-  // `trust proxy`, so X-Forwarded-For cannot spoof a localhost identity.
-  // If a future change enables `trust proxy`, this localhost bypass MUST be
-  // re-evaluated.
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-  if (!isLocal) {
-    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-    const unifiedKey = getUnifiedApiKey();
-    if (!token || !timingSafeStringEqual(token, unifiedKey)) {
-      res.status(401).json({
-        error: { message: 'Invalid API key', type: 'authentication_error' },
-      });
-      return;
-    }
+  // Authenticate with the unified API key for every proxy request, including
+  // loopback callers. Browser pages can reach localhost, so socket locality is
+  // not a reliable authorization boundary.
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({
+      error: { message: 'Invalid API key', type: 'authentication_error' },
+    });
+    return;
   }
 
   // Validate request
