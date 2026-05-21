@@ -229,6 +229,29 @@ export default function FallbackPage() {
     },
   })
 
+  const probeMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<{
+        kept: number
+        disabled: number
+        skipped: number
+        durationMs: number
+      }>('/api/models/probe', { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      setLocalEntries(null)
+      window.alert(
+        `Probe done in ${Math.round(data.durationMs / 1000)}s.\n`
+        + `Working: ${data.kept}\n`
+        + `Disabled: ${data.disabled} (timeout, rate limit, or slow)\n`
+        + `Skipped: ${data.skipped} (no API key)`,
+      )
+    },
+    onError: (err: Error) => {
+      window.alert(`Probe failed: ${err.message}`)
+    },
+  })
+
   const allEntries = localEntries ?? entries
   const displayEntries = allEntries.filter(e => e.keyCount > 0)
   const unconfiguredPlatforms = [...new Set(allEntries.filter(e => e.keyCount === 0).map(e => e.platform))]
@@ -279,6 +302,17 @@ export default function FallbackPage() {
         description="Drag to reorder. Requests try models top-to-bottom until one succeeds."
         actions={
           <>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => probeMutation.mutate()}
+              disabled={probeMutation.isPending}
+            >
+              {probeMutation.isPending ? 'Probing…' : 'Probe & keep working only'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => sortMutation.mutate('tiered')} disabled={sortMutation.isPending}>
+              Sort for Auto (tiered)
+            </Button>
             <Button variant="outline" size="sm" onClick={() => sortMutation.mutate('intelligence')} disabled={sortMutation.isPending}>
               Sort by intelligence
             </Button>

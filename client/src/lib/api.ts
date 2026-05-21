@@ -1,4 +1,6 @@
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+import { getAppBaseUrl } from './base-url';
+
+const BASE = getAppBaseUrl();
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
