@@ -9,6 +9,16 @@ import { getDb, getUnifiedApiKey } from '../db/index.js';
 
 export const proxyRouter = Router();
 
+// Virtual "auto" model. Clients like Hermes require a non-empty `model` field
+// on every request, but freellmapi's whole point is to pick the model itself.
+// Requesting this id means "let the router decide" — identical to omitting
+// `model` entirely.
+const AUTO_MODEL_ID = 'auto';
+
+function isAutoModel(modelId: string | undefined): boolean {
+  return modelId === AUTO_MODEL_ID;
+}
+
 // Constant-time string comparison for the unified API key. Plain `===` leaks
 // length and per-character timing, which a network attacker could in principle
 // use to recover the key one byte at a time.
@@ -77,14 +87,24 @@ proxyRouter.get('/models', (_req: Request, res: Response) => {
   const models = db.prepare('SELECT platform, model_id, display_name, context_window FROM models WHERE enabled = 1 ORDER BY intelligence_rank').all() as any[];
   res.json({
     object: 'list',
-    data: models.map(m => ({
-      id: m.model_id,
-      object: 'model',
-      created: 0,
-      owned_by: m.platform,
-      name: m.display_name,
-      context_window: m.context_window,
-    })),
+    data: [
+      {
+        id: AUTO_MODEL_ID,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: 'Auto (router picks the best available model)',
+        context_window: null,
+      },
+      ...models.map(m => ({
+        id: m.model_id,
+        object: 'model',
+        created: 0,
+        owned_by: m.platform,
+        name: m.display_name,
+        context_window: m.context_window,
+      })),
+    ],
   });
 });
 
@@ -255,7 +275,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
-  if (requestedModel) {
+  if (isAutoModel(requestedModel)) {
+    // Explicit "auto" → behave exactly like an omitted model field.
+    preferredModel = getStickyModel(messages);
+  } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
@@ -265,7 +288,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
       res.status(400).json({
         error: {
-          message: `Model '${requestedModel}' ${reason}. Omit the 'model' field to auto-route, or call /v1/models for the available list.`,
+          message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
           type: 'invalid_request_error',
           code: 'model_not_found',
         },
