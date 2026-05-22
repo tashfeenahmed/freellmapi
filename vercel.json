@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "runtime": "nodejs20.x",
       "maxDuration": 60
     }
