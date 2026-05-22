@@ -71,11 +71,38 @@ function toGeminiTools(tools?: ChatToolDefinition[]): Array<{ functionDeclaratio
   if (!tools || tools.length === 0) return undefined;
 
   return [{
-    functionDeclarations: tools.map(t => ({
-      name: t.function.name,
-      description: t.function.description,
-      parameters: t.function.parameters,
-    })),
+    functionDeclarations: tools.map(t => {
+      // Deep clone the parameters to avoid modifying the original
+      const parameters = JSON.parse(JSON.stringify(t.function.parameters));
+      // Remove additionalProperties from all levels of the schema
+      if (parameters?.properties) {
+        for (const key of Object.keys(parameters.properties)) {
+          const prop = parameters.properties[key];
+          if (prop?.additionalProperties !== undefined) {
+            delete prop.additionalProperties;
+          }
+          if (prop?.items?.additionalProperties !== undefined) {
+            delete prop.items.additionalProperties;
+          }
+          if (prop?.properties) {
+            for (const subKey of Object.keys(prop.properties)) {
+              const subProp = prop.properties[subKey];
+              if (subProp?.additionalProperties !== undefined) {
+                delete subProp.additionalProperties;
+              }
+            }
+          }
+        }
+      }
+      if (parameters?.additionalProperties !== undefined) {
+        delete parameters.additionalProperties;
+      }
+      return {
+        name: t.function.name,
+        description: t.function.description,
+        parameters,
+      };
+    }),
   }];
 }
 
