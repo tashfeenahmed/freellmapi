@@ -24,6 +24,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
 - [Using the API](#using-the-api)
+- [Dashboard Authentication](#dashboard-authentication)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Limitations](#limitations)
@@ -72,6 +73,7 @@ The problem is that stacking them by hand is painful: fourteen different SDKs, f
 - **Unified API key** — Clients authenticate to your proxy with a single `freellmapi-…` bearer token. You never expose upstream provider keys to your apps.
 - **Health checks** — Periodic probes mark keys as `healthy`, `rate_limited`, `invalid`, or `error` so the router skips dead ones automatically.
 - **Admin dashboard** — React + Vite UI to manage keys, reorder the fallback chain, inspect analytics, and run prompts in a playground. Dark mode included.
+- **Dashboard authentication** — Optional email + password login for dashboard protection when hosting on Vercel or public internet. HMAC-SHA256 signed HTTP-only cookies, 7-day sessions, stateless (serverless-compatible).
 - **Analytics** — Per-request logging with latency, token counts, success rate, and per-provider breakdowns.
 - **Deploys to a Raspberry Pi** — Runs happily on a Pi 4 under PM2 behind nginx. ~40 MB RSS at idle.
 
@@ -99,15 +101,20 @@ git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
 npm install
 
-# Generate an encryption key for at-rest key storage
+# Generate encryption and session keys
 cp .env.example .env
 echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
+echo "SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
+
+# Optional: update dashboard credentials in .env (default: admin@example.com / changeme)
+# DASHBOARD_EMAIL=your-email@example.com
+# DASHBOARD_PASSWORD=your-password
 
 # Start server + dashboard together
 npm run dev
 ```
 
-Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+Open http://localhost:5173 (the Vite dev UI). You'll be prompted to log in with your dashboard credentials (default: `admin@example.com` / `changeme`, edit in `.env`). Add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
 For a production build:
 
@@ -205,6 +212,30 @@ print(final.choices[0].message.content)
 Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, SambaNova, Mistral, OpenRouter, GitHub Models, HuggingFace, Cloudflare, Cohere compat) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
 
 Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served each call. If a request fell over between providers, you'll also see `X-Fallback-Attempts: N`.
+
+## Dashboard Authentication
+
+When hosting on Vercel or other public services, protect your dashboard with email + password login:
+
+**Setup:**
+```bash
+# In .env, set dashboard credentials
+DASHBOARD_EMAIL=admin@example.com
+DASHBOARD_PASSWORD=your-secure-password
+SESSION_SECRET=<64-char-hex-key>   # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**How it works:**
+- Login page appears before dashboard access
+- Session stored as HTTP-only, secure cookie (HMAC-SHA256 signed, 7-day expiry)
+- All `/api/*` routes require valid session (except `/api/auth` and `/api/ping`)
+- Logout clears session cookie
+- Stateless design — works on serverless (Vercel, Cloudflare, AWS Lambda)
+
+**API access unchanged:**
+- `/v1/chat/completions` still uses Bearer token auth (unchanged)
+- Client SDKs continue working exactly as before
+- Dashboard auth only protects the admin UI, not the API
 
 ## Screenshots
 
