@@ -189,14 +189,18 @@ const chatCompletionSchema = z.object({
   parallel_tool_calls: z.boolean().optional(),
 });
 
-function isRetryableError(err: any): boolean {
+export function isRetryableError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
     || msg.includes('503') || msg.includes('unavailable')
-    || msg.includes('500') || msg.includes('internal server error');
+    || msg.includes('500') || msg.includes('internal server error')
+    // 413: this model's payload limit is too small for the request, but another
+    // provider in the fallback chain may have a larger limit. Same reasoning as 503.
+    || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
+    || msg.includes('request entity too large') || msg.includes('content too large');
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
