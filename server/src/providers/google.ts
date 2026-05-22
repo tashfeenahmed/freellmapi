@@ -67,6 +67,49 @@ function toGeminiFinishReason(finishReason?: string): string {
   return 'stop';
 }
 
+// Thinking models include a thought_signature on function calls that must be
+// echoed back in subsequent turns. Clients often strip non-standard fields, so
+// we cache them server-side keyed by tool_call_id.
+const THOUGHT_SIG_CACHE_MAX = 500;
+const thoughtSignatureCache = new Map<string, string>();
+
+function cacheThoughtSignature(id: string, sig: string | undefined): void {
+  if (!sig) return;
+  if (thoughtSignatureCache.size >= THOUGHT_SIG_CACHE_MAX) {
+    thoughtSignatureCache.delete(thoughtSignatureCache.keys().next().value!);
+  }
+  thoughtSignatureCache.set(id, sig);
+}
+
+// Google Gemini accepts only a subset of JSON Schema (~OpenAPI 3.0).
+// Strip fields that opencode / other strict-JSON-Schema clients send but
+// Google rejects with 400 "Unknown name '<field>'".
+const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
+  '$schema', '$id', '$ref', '$defs', '$comment',
+  'definitions',
+  'exclusiveMinimum', 'exclusiveMaximum',
+  'patternProperties', 'unevaluatedProperties', 'unevaluatedItems',
+  'if', 'then', 'else',
+  'contentEncoding', 'contentMediaType', 'contentSchema',
+  'dependentRequired', 'dependentSchemas',
+  'additionalProperties',
+]);
+
+export function sanitizeForGemini(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(sanitizeForGemini);
+  }
+  if (schema && typeof schema === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.has(k)) continue;
+      out[k] = sanitizeForGemini(v);
+    }
+    return out;
+  }
+  return schema;
+}
+
 function toGeminiTools(tools?: ChatToolDefinition[]): Array<{ functionDeclarations: Array<Record<string, unknown>> }> | undefined {
   if (!tools || tools.length === 0) return undefined;
 
@@ -74,7 +117,7 @@ function toGeminiTools(tools?: ChatToolDefinition[]): Array<{ functionDeclaratio
     functionDeclarations: tools.map(t => ({
       name: t.function.name,
       description: t.function.description,
-      parameters: t.function.parameters,
+      parameters: sanitizeForGemini(t.function.parameters),
     })),
   }];
 }
@@ -124,8 +167,9 @@ function toGeminiContents(messages: ChatMessage[]) {
         }
 
         for (const call of m.tool_calls ?? []) {
+          const thoughtSignature = call.thought_signature ?? thoughtSignatureCache.get(call.id);
           parts.push({
-            thoughtSignature: call.thought_signature,
+            thoughtSignature,
             functionCall: {
               id: call.id,
               name: call.function.name,
@@ -184,6 +228,7 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
     if (!part.functionCall?.name) continue;
 
     const id = part.functionCall.id ?? `call_${Date.now()}_${fallbackIndex++}`;
+    cacheThoughtSignature(id, part.thoughtSignature);
     calls.push({
       id,
       type: 'function',
