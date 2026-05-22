@@ -22,10 +22,14 @@ export class CloudflareProvider extends BaseProvider {
 
   // Cloudflare's OpenAI-compat endpoint rejects `content: null` on assistant
   // messages that carry tool_calls, even though the OpenAI spec allows it.
+  // Also flatten ContentBlock[] arrays to plain strings since Cloudflare expects string | null.
   private normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
-    return messages.map(m =>
-      m.content === null ? { ...m, content: '' } : m,
-    );
+    return messages.map(m => ({
+      ...m,
+      content: Array.isArray(m.content)
+        ? m.content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('')
+        : (m.content ?? ''),
+    }));
   }
 
   async chatCompletion(

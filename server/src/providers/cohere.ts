@@ -11,6 +11,15 @@ export class CohereProvider extends BaseProvider {
   readonly platform = 'cohere' as const;
   readonly name = 'Cohere';
 
+  private normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
+    return messages.map(m => ({
+      ...m,
+      content: Array.isArray(m.content)
+        ? m.content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('')
+        : m.content,
+    }));
+  }
+
   async chatCompletion(
     apiKey: string,
     messages: ChatMessage[],
@@ -19,7 +28,7 @@ export class CohereProvider extends BaseProvider {
   ): Promise<ChatCompletionResponse> {
     const body: Record<string, unknown> = {
       model: modelId,
-      messages,
+      messages: this.normalizeMessages(messages),
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
@@ -54,7 +63,7 @@ export class CohereProvider extends BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk> {
     const body: Record<string, unknown> = {
       model: modelId,
-      messages,
+      messages: this.normalizeMessages(messages),
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,

@@ -106,9 +106,21 @@ export type ChatToolChoice =
     };
   };
 
+export interface ContentTextBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface ContentImageUrlBlock {
+  type: 'image_url';
+  image_url: { url: string; detail?: 'auto' | 'low' | 'high' };
+}
+
+export type ContentBlock = ContentTextBlock | ContentImageUrlBlock | { type: string; [key: string]: unknown };
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | ContentBlock[] | null;
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];

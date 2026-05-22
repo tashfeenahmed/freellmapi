@@ -120,25 +120,47 @@ const toolCallSchema = z.object({
   thought_signature: z.string().optional(),
 });
 
+const contentTextBlockSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+});
+
+const contentImageUrlBlockSchema = z.object({
+  type: z.literal('image_url'),
+  image_url: z.object({
+    url: z.string(),
+    detail: z.enum(['auto', 'low', 'high']).optional(),
+  }),
+});
+
+const contentBlockSchema = z.union([
+  contentTextBlockSchema,
+  contentImageUrlBlockSchema,
+  z.object({ type: z.string() }).passthrough(),
+]);
+
+const contentSchema = z.union([z.string(), z.array(contentBlockSchema)]);
+
 const systemMessageSchema = z.object({
   role: z.literal('system'),
-  content: z.string(),
+  content: contentSchema,
   name: z.string().optional(),
 });
 
 const userMessageSchema = z.object({
   role: z.literal('user'),
-  content: z.string(),
+  content: contentSchema,
   name: z.string().optional(),
 });
 
 const assistantMessageSchema = z.object({
   role: z.literal('assistant'),
-  content: z.string().nullable().optional(),
+  content: z.union([contentSchema, z.null()]).optional(),
   name: z.string().optional(),
   tool_calls: z.array(toolCallSchema).optional(),
 }).refine((msg) => {
-  const hasContent = typeof msg.content === 'string' && msg.content.length > 0;
+  const hasContent = (typeof msg.content === 'string' && msg.content.length > 0)
+    || (Array.isArray(msg.content) && msg.content.length > 0);
   const hasToolCalls = (msg.tool_calls?.length ?? 0) > 0;
   return hasContent || hasToolCalls;
 }, {
@@ -147,7 +169,7 @@ const assistantMessageSchema = z.object({
 
 const toolMessageSchema = z.object({
   role: z.literal('tool'),
-  content: z.string(),
+  content: contentSchema,
   tool_call_id: z.string().min(1),
   name: z.string().optional(),
 });
@@ -265,8 +287,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // (see line ~340). Streaming will drift from real consumption — accepted
   // tradeoff because per-request usage isn't always returned mid-stream.
   const estimatedInputTokens = messages.reduce((sum, m) => {
-    if (typeof m.content !== 'string') return sum;
-    return sum + Math.ceil(m.content.length / 4);
+    if (typeof m.content === 'string') return sum + Math.ceil(m.content.length / 4);
+    if (Array.isArray(m.content)) {
+      const text = m.content.filter((b: { type: string; text?: string }) => b.type === 'text').map((b: { type: string; text?: string }) => b.text ?? '').join('');
+      return sum + Math.ceil(text.length / 4);
+    }
+    return sum;
   }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
