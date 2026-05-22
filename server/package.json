@@ -13,6 +13,7 @@
   "dependencies": {
     "@freellmapi/shared": "*",
     "better-sqlite3": "^12.4.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.44.2",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.3",
