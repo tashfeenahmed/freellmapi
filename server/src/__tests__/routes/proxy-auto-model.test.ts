@@ -96,40 +96,6 @@ describe('Virtual "auto" model', () => {
     expect(body.choices[0].message.content).toBe('routed via auto');
   });
 
-  it('accepts the freellmapi-auto alias too', async () => {
-    const origFetch = global.fetch;
-
-    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
-      const urlStr = typeof url === 'string' ? url : url.toString();
-      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
-        return {
-          ok: true,
-          json: () => Promise.resolve({
-            id: 'chatcmpl-auto-alias',
-            object: 'chat.completion',
-            created: 123,
-            model: 'openai/gpt-oss-120b',
-            choices: [{
-              index: 0,
-              message: { role: 'assistant', content: 'aliased' },
-              finish_reason: 'stop',
-            }],
-            usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
-          }),
-        } as any;
-      }
-      return origFetch(url, init);
-    });
-
-    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
-      model: 'freellmapi-auto',
-      messages: [{ role: 'user', content: 'hello' }],
-    });
-
-    expect(status).toBe(200);
-    expect(body.choices[0].message.content).toBe('aliased');
-  });
-
   it('still rejects an unknown model with model_not_found', async () => {
     const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
       model: 'definitely-not-a-real-model',

@@ -11,13 +11,12 @@ export const proxyRouter = Router();
 
 // Virtual "auto" model. Clients like Hermes require a non-empty `model` field
 // on every request, but freellmapi's whole point is to pick the model itself.
-// Requesting this id (or the `freellmapi-auto` alias) means "let the router
-// decide" — identical to omitting `model` entirely.
+// Requesting this id means "let the router decide" — identical to omitting
+// `model` entirely.
 const AUTO_MODEL_ID = 'auto';
-const AUTO_MODEL_ALIASES = new Set([AUTO_MODEL_ID, 'freellmapi-auto']);
 
 function isAutoModel(modelId: string | undefined): boolean {
-  return modelId !== undefined && AUTO_MODEL_ALIASES.has(modelId);
+  return modelId === AUTO_MODEL_ID;
 }
 
 // Constant-time string comparison for the unified API key. Plain `===` leaks
