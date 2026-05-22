@@ -63,7 +63,7 @@ describe('Routing Key Exhaustion', () => {
 
     // Assert: It should have picked the Pro model despite Key B being exhausted
     expect(result.modelId).toBe('gemini-1.5-pro');
-    expect(result.keyId).toBe(keyA.id);
+    expect(result.keyId).toBe(keyA!.id);
     expect(spyCanMakeRequest).toHaveBeenCalled();
   });
 
