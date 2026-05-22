@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { keysRouter } from './routes/keys.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
@@ -53,15 +54,22 @@ export function createApp() {
 
   // Serve client static files (after API error handler)
   const clientDist = path.resolve(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
-  // SPA fallback — serve index.html for non-API routes
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/v1/')) {
-      next();
-      return;
-    }
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    // SPA fallback — serve index.html for non-API routes
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/v1/')) {
+        next();
+        return;
+      }
+      const indexPath = path.join(clientDist, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: 'Not found' });
+      }
+    });
+  }
 
   return app;
 }
