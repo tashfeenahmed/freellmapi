@@ -196,7 +196,8 @@ function isRetryableError(err: any): boolean {
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
     || msg.includes('503') || msg.includes('unavailable')
-    || msg.includes('500') || msg.includes('internal server error');
+    || msg.includes('500') || msg.includes('internal server error')
+    || msg.includes('404') || msg.includes('not found') || msg.includes('not_found');
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
@@ -413,10 +414,26 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
         skipKeys.add(skipId);
-        setCooldown(route.platform, route.modelId, route.keyId, 120_000);
-        recordRateLimitHit(route.modelDbId);
+
+        const msg = (err.message ?? '').toLowerCase();
+        const is404 = msg.includes('404') || msg.includes('not found') || msg.includes('not_found');
+
+        if (is404) {
+          // 404 = model unavailable/removed — longer cooldown and heavier penalty
+          // to avoid wasting future requests on a dead model
+          setCooldown(route.platform, route.modelId, route.keyId, 300_000);
+          // Penalize multiple times so the model sinks hard in priority
+          recordRateLimitHit(route.modelDbId);
+          recordRateLimitHit(route.modelDbId);
+          recordRateLimitHit(route.modelDbId);
+          console.log(`[Proxy] 404 from ${route.displayName}, penalizing heavily (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        } else {
+          setCooldown(route.platform, route.modelId, route.keyId, 120_000);
+          recordRateLimitHit(route.modelDbId);
+          console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        }
+
         lastError = err;
-        console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
       }
 
