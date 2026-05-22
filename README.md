@@ -289,15 +289,13 @@ PRs should include a test, keep the existing test suite green, and match the `.e
 
 ### Contributors
 
-Thanks to everyone who's helped improve FreeLLMAPI:
-
-- [@moaaz12-web](https://github.com/moaaz12-web) — tool-calling support across providers (#3)
-- [@lukasulc](https://github.com/lukasulc) — better-sqlite3 bump to fix npm install on Node 24+ (#12)
-- [@VinhPhamAI](https://github.com/VinhPhamAI) — root `.env` PORT now propagates to server + Vite dev proxy + UI base URL (#27)
-- [@deadc](https://github.com/deadc) — preserve Gemini `thoughtSignature` so multi-turn function calling stops 400-ing (#32); router model-first key-exhaustion tests + per-model `limits` hoist (#42)
-- [@zhangyu1324](https://github.com/zhangyu1324) — requested Ollama Cloud integration, now V10 catalog (#14 / #41)
-- [@jtbrennan-git](https://github.com/jtbrennan-git) — security review (#35) and Phase 1 hardening: parameterized analytics queries, sort-preset whitelist, timing-safe API key compare, mid-stream error sanitization
-- [@praveenkumarpranjal](https://github.com/praveenkumarpranjal) — guard Gemini SSE `JSON.parse` so a malformed frame no longer aborts the whole stream, plus first streaming tests for the Google provider (#47)
+<a href="https://github.com/moaaz12-web"><img src="https://images.weserv.nl/?url=github.com/moaaz12-web.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@moaaz12-web" /></a>
+<a href="https://github.com/lukasulc"><img src="https://images.weserv.nl/?url=github.com/lukasulc.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@lukasulc" /></a>
+<a href="https://github.com/VinhPhamAI"><img src="https://images.weserv.nl/?url=github.com/VinhPhamAI.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@VinhPhamAI" /></a>
+<a href="https://github.com/deadc"><img src="https://images.weserv.nl/?url=github.com/deadc.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@deadc" /></a>
+<a href="https://github.com/zhangyu1324"><img src="https://images.weserv.nl/?url=github.com/zhangyu1324.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@zhangyu1324" /></a>
+<a href="https://github.com/jtbrennan-git"><img src="https://images.weserv.nl/?url=github.com/jtbrennan-git.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@jtbrennan-git" /></a>
+<a href="https://github.com/praveenkumarpranjal"><img src="https://images.weserv.nl/?url=github.com/praveenkumarpranjal.png&w=80&h=80&fit=cover&mask=circle" width="80" alt="@praveenkumarpranjal" /></a>
 
 ## Terms of Service review
 
