@@ -48,6 +48,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV11(db);
   migrateModelsV12(db);
   migrateModelsV13(db);
+  migrateModelsV14(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1205,6 +1206,28 @@ function migrateModelsV13(db: Database.Database) {
     }
   });
   apply();
+}
+
+/**
+ * V14 (May 2026): Cerebras hard-deprecation 2026-05-27.
+ *
+ * Per inference-docs.cerebras.ai/models/overview, both
+ * `qwen-3-235b-a22b-instruct-2507` and `llama3.1-8b` hit a hard deprecation
+ * on 2026-05-27 with no announced free-tier replacement at the same
+ * parameter class. Disable both ahead of the cutover so the router stops
+ * sending traffic to them. Row kept (not deleted) so it can be re-enabled
+ * if Cerebras restores or renames either model — same pattern as V9's
+ * disable of `zai-glm-4.7`.
+ *
+ * Cerebras `gpt-oss-120b` is NOT in the deprecation list and stays enabled
+ * as the sole free-tier Cerebras route.
+ */
+function migrateModelsV14(db: Database.Database) {
+  db.prepare(`
+    UPDATE models SET enabled = 0
+     WHERE platform = 'cerebras'
+       AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
+  `).run();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

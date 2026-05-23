@@ -190,6 +190,24 @@ describe('Migration idempotency', () => {
     ]);
   });
 
+  it('V14: cerebras deprecation disables qwen-3-235b and llama3.1-8b but keeps gpt-oss-120b enabled', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const rows = db.prepare(`
+      SELECT model_id, enabled FROM models
+       WHERE platform = 'cerebras'
+         AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b', 'gpt-oss-120b')
+       ORDER BY model_id
+    `).all() as { model_id: string; enabled: number }[];
+
+    expect(rows).toEqual([
+      { model_id: 'gpt-oss-120b',                    enabled: 1 },
+      { model_id: 'llama3.1-8b',                     enabled: 0 },
+      { model_id: 'qwen-3-235b-a22b-instruct-2507',  enabled: 0 },
+    ]);
+  });
+
   it('all enabled catalog platforms have a registered provider', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');
