@@ -215,7 +215,11 @@ export function isRetryableError(err: any): boolean {
     // 413: this model's payload limit is too small for the request, but another
     // provider in the fallback chain may have a larger limit. Same reasoning as 503.
     || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
-    || msg.includes('request entity too large') || msg.includes('content too large');
+    || msg.includes('request entity too large') || msg.includes('content too large')
+    // 404: model deprecated/removed upstream (e.g. OpenRouter's "no endpoints found"
+    // for a model that's been pulled). Rotate to the next model in the chain —
+    // setCooldown + the health checker will avoid this model on subsequent requests.
+    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
