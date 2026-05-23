@@ -46,6 +46,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV9(db);
   migrateModelsV10(db);
   migrateModelsV11(db);
+  migrateModelsV12(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -913,6 +914,95 @@ function migrateModelsV11(db: Database.Database) {
     ['llm7',         'GLM-4.6V-Flash',                            'GLM-4.6V Flash (LLM7)',         15, 9,  'Large',    100, null, null, null, '~2-3M (100/hr)', 131072],
   ];
 
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V12 (May 2026): live-probed delta against OpenRouter's free pool.
+ *
+ * Removals (both confirmed 404 "no longer available as a free model" — moved
+ * to paid SKUs at the same id without the :free suffix):
+ *   - inclusionai/ling-2.6-1t:free
+ *   - tencent/hy3-preview:free
+ *
+ * Additions (probe-verified 200 + tool_calls with tool_choice=auto on the
+ * user's OR key; tool_choice=required is rejected by all three providers,
+ * but the router's tool requests use the OpenAI default of auto):
+ *   - arcee-ai/trinity-large-thinking:free  — Arcee's Trinity *Thinking*
+ *     successor to the trinity-large-preview:free row pulled in V6 (404 then).
+ *   - baidu/cobuddy:free                    — Baidu Qianfan coding/agent
+ *     model with native tool use + reasoning.
+ *   - openrouter/owl-alpha                  — OR-house agentic foundation
+ *     model. Zero-priced but no :free suffix, so it sits on a different rate
+ *     pool than the shared :free 20 RPM / 200 RPD bucket. 1M ctx.
+ *   - nousresearch/hermes-3-llama-3.1-405b:free — 405B route ranked in V3
+ *     but never inserted. Currently 429 on probe (upstream throttle), not
+ *     gone. No tools support listed; router falls past it on tool requests.
+ *
+ * Dropped from the add list:
+ *   - deepseek/deepseek-v4-flash:free — listed at $0 in /v1/models but the
+ *     Crucible provider returns 402 "Out of credits" — not actually free.
+ *
+ * Context-window corrections — OR raised these to match upstream provider
+ * caps; our seeded values were stale:
+ *   - nvidia/nemotron-3-super-120b-a12b:free  262144 → 1000000
+ *   - qwen/qwen3-coder:free                   262144 → 1048576
+ */
+function migrateModelsV12(db: Database.Database) {
+  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
+  const deleteFallback = db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = ? AND model_id = ?
+    )
+  `);
+  const removals: Array<[string, string]> = [
+    ['openrouter', 'inclusionai/ling-2.6-1t:free'],
+    ['openrouter', 'tencent/hy3-preview:free'],
+  ];
+  const applyRemovals = db.transaction(() => {
+    for (const [p, m] of removals) {
+      deleteFallback.run(p, m);
+      deleteModel.run(p, m);
+    }
+  });
+  applyRemovals();
+
+  // Context-window upgrades for existing rows.
+  db.prepare(`
+    UPDATE models SET context_window = 1000000
+     WHERE platform = 'openrouter' AND model_id = 'nvidia/nemotron-3-super-120b-a12b:free'
+  `).run();
+  db.prepare(`
+    UPDATE models SET context_window = 1048576
+     WHERE platform = 'openrouter' AND model_id = 'qwen/qwen3-coder:free'
+  `).run();
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  // :free pool quotas as elsewhere in catalog: 20 RPM / 200 RPD / ~6M tokens.
+  // openrouter/owl-alpha sits on the non-:free zero-priced pool — quotas
+  // unpublished; mirror :free numbers conservatively so it cools down on 429.
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['openrouter', 'arcee-ai/trinity-large-thinking:free',         'Trinity Large Thinking (free)',  5,  9, 'Frontier', 20, 200, null, null, '~6M', 262144],
+    ['openrouter', 'baidu/cobuddy:free',                           'CoBuddy (free)',                 6,  9, 'Large',    20, 200, null, null, '~6M', 131072],
+    ['openrouter', 'openrouter/owl-alpha',                         'Owl Alpha (OR-house)',           5,  9, 'Frontier', 20, 200, null, null, '~6M', 1048576],
+    ['openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free',    'Hermes 3 405B (free)',          17,  9, 'Large',    20, 200, null, null, '~6M', 131072],
+  ];
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);
     const missing = db.prepare(`

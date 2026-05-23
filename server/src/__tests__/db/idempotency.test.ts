@@ -3,9 +3,8 @@ import Database from 'better-sqlite3';
 import { initDb } from '../../db/index.js';
 
 /**
- * Migrations V1–V9 must be idempotent: running initDb twice on the same
- * physical database file should produce identical state. New migrations
- * (V10+) should be added to this test as they ship.
+ * All migrations must be idempotent: running initDb twice on the same
+ * physical database file should produce identical state.
  */
 describe('Migration idempotency', () => {
   it('initDb on a fresh in-memory DB then re-run produces identical row counts', () => {
@@ -72,6 +71,47 @@ describe('Migration idempotency', () => {
     `).all();
 
     expect(dups).toEqual([]);
+  });
+
+  it('V12: dead OR :free rows are absent and the four new rows are present', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const dead = db.prepare(`
+      SELECT model_id FROM models
+       WHERE platform = 'openrouter'
+         AND model_id IN ('inclusionai/ling-2.6-1t:free', 'tencent/hy3-preview:free')
+    `).all();
+    expect(dead).toEqual([]);
+
+    const live = db.prepare(`
+      SELECT model_id FROM models
+       WHERE platform = 'openrouter'
+         AND model_id IN (
+           'arcee-ai/trinity-large-thinking:free',
+           'baidu/cobuddy:free',
+           'openrouter/owl-alpha',
+           'nousresearch/hermes-3-llama-3.1-405b:free'
+         )
+       ORDER BY model_id
+    `).all() as { model_id: string }[];
+    expect(live.map(r => r.model_id)).toEqual([
+      'arcee-ai/trinity-large-thinking:free',
+      'baidu/cobuddy:free',
+      'nousresearch/hermes-3-llama-3.1-405b:free',
+      'openrouter/owl-alpha',
+    ]);
+
+    const widened = db.prepare(`
+      SELECT model_id, context_window FROM models
+       WHERE platform = 'openrouter'
+         AND model_id IN ('nvidia/nemotron-3-super-120b-a12b:free', 'qwen/qwen3-coder:free')
+       ORDER BY model_id
+    `).all() as { model_id: string; context_window: number }[];
+    expect(widened).toEqual([
+      { model_id: 'nvidia/nemotron-3-super-120b-a12b:free', context_window: 1000000 },
+      { model_id: 'qwen/qwen3-coder:free', context_window: 1048576 },
+    ]);
   });
 
   it('all enabled catalog platforms have a registered provider', async () => {
