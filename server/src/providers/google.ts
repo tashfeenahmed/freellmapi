@@ -8,6 +8,7 @@ import type {
   TokenUsage,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
+import { contentToString } from '../lib/content.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -128,11 +129,14 @@ function toGeminiToolConfig(toolChoice?: ChatToolChoice): { functionCallingConfi
   };
 }
 
-// Translate OpenAI messages to Gemini format
+// Translate OpenAI messages to Gemini format. Content may arrive as a string,
+// null, or the OpenAI multimodal array envelope — flatten to string first so
+// system/user/tool messages all surface as `parts: [{ text }]` for Gemini.
 function toGeminiContents(messages: ChatMessage[]) {
   const systemMessages = messages
-    .filter(m => m.role === 'system' && typeof m.content === 'string' && m.content.length > 0)
-    .map(m => m.content as string);
+    .filter(m => m.role === 'system')
+    .map(m => contentToString(m.content))
+    .filter(s => s.length > 0);
 
   const toolNameByCallId = new Map<string, string>();
   for (const m of messages) {
@@ -147,8 +151,9 @@ function toGeminiContents(messages: ChatMessage[]) {
       if (m.role === 'assistant') {
         const parts: GeminiPart[] = [];
 
-        if (typeof m.content === 'string' && m.content.length > 0) {
-          parts.push({ text: m.content });
+        const assistantText = contentToString(m.content);
+        if (assistantText.length > 0) {
+          parts.push({ text: assistantText });
         }
 
         for (const call of m.tool_calls ?? []) {
@@ -174,7 +179,7 @@ function toGeminiContents(messages: ChatMessage[]) {
         if (!toolCallId) return null;
 
         const toolName = m.name ?? toolNameByCallId.get(toolCallId) ?? 'tool';
-        const response = safeParseObject(typeof m.content === 'string' ? m.content : '');
+        const response = safeParseObject(contentToString(m.content));
 
         return {
           role: 'user',
@@ -190,7 +195,7 @@ function toGeminiContents(messages: ChatMessage[]) {
 
       return {
         role: 'user',
-        parts: [{ text: typeof m.content === 'string' ? m.content : '' }],
+        parts: [{ text: contentToString(m.content) }],
       };
     })
     .filter((entry): entry is { role: 'user' | 'model'; parts: GeminiPart[] } => entry !== null);

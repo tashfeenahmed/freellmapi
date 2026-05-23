@@ -106,9 +106,16 @@ export type ChatToolChoice =
     };
   };
 
+// OpenAI's multimodal envelope: clients like opencode / continue.dev send
+// content as an array of typed blocks even for text-only messages. We accept
+// it on the wire and flatten to string for providers that don't support it
+// (Cohere, Cloudflare). See server/src/lib/content.ts.
+export type ChatContentBlock = { type: string; text?: string; [key: string]: unknown };
+export type ChatContent = string | null | ChatContentBlock[];
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: ChatContent;
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];
