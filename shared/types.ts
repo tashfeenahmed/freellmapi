@@ -2,8 +2,9 @@
 
 // Active platforms — must match server/src/providers/index.ts and
 // server/src/routes/keys.ts PLATFORMS allowlist.
-// Hugging Face, Moonshot, and MiniMax direct integrations were dropped
-// in migrateModelsV4 (see server/src/db/index.ts).
+// Moonshot and MiniMax direct integrations were dropped in migrateModelsV4
+// (see server/src/db/index.ts). HuggingFace was dropped in V4 and re-added
+// in V13 via the router.huggingface.co Inference Providers meta-router.
 export type Platform =
   | 'google'
   | 'groq'
@@ -19,7 +20,8 @@ export type Platform =
   | 'ollama'
   | 'kilo'
   | 'pollinations'
-  | 'llm7';
+  | 'llm7'
+  | 'huggingface';
 
 export interface Model {
   id: number;

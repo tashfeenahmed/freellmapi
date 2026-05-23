@@ -114,6 +114,82 @@ describe('Migration idempotency', () => {
     ]);
   });
 
+  it('V13: cross-provider catalog refresh applies cleanly', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    // Disables — row kept but enabled=0.
+    const disabled = db.prepare(`
+      SELECT platform, model_id, enabled FROM models
+       WHERE (platform = 'google' AND model_id = 'gemini-3.1-pro-preview')
+          OR (platform = 'ollama' AND model_id IN ('kimi-k2-thinking', 'mistral-large-3:675b', 'deepseek-v3.2'))
+       ORDER BY platform, model_id
+    `).all() as { platform: string; model_id: string; enabled: number }[];
+    expect(disabled).toHaveLength(4);
+    for (const row of disabled) expect(row.enabled).toBe(0);
+
+    // Hard removals — row is gone entirely.
+    const removed = db.prepare(`
+      SELECT model_id FROM models
+       WHERE (platform = 'sambanova' AND model_id = 'DeepSeek-V3.1-cb')
+          OR (platform = 'cloudflare' AND model_id = '@cf/moonshotai/kimi-k2.5')
+    `).all();
+    expect(removed).toEqual([]);
+
+    // New rows present across providers (incl. new huggingface platform).
+    const additions = db.prepare(`
+      SELECT platform, model_id FROM models
+       WHERE (platform, model_id) IN (VALUES
+         ('groq',        'openai/gpt-oss-safeguard-20b'),
+         ('cloudflare',  '@cf/nvidia/nemotron-3-120b-a12b'),
+         ('cloudflare',  '@cf/google/gemma-4-26b-a4b-it'),
+         ('google',      'gemini-3.5-flash'),
+         ('nvidia',      'deepseek-ai/deepseek-v4-flash'),
+         ('nvidia',      'z-ai/glm-5.1'),
+         ('nvidia',      'qwen/qwen3-coder-480b-a35b-instruct'),
+         ('mistral',     'mistral-small-latest'),
+         ('mistral',     'ministral-8b-latest'),
+         ('cohere',      'command-a-reasoning-08-2025'),
+         ('cohere',      'command-r-08-2024'),
+         ('ollama',      'qwen3-coder-next'),
+         ('huggingface', 'deepseek-ai/DeepSeek-V4-Flash'),
+         ('huggingface', 'moonshotai/Kimi-K2.6'),
+         ('huggingface', 'Qwen/Qwen3-Coder-Next')
+       )
+    `).all();
+    expect(additions).toHaveLength(15);
+
+    // Spot-check critical limit/context updates.
+    const cerebrasLimits = db.prepare(`
+      SELECT rpm_limit, rpd_limit, tpm_limit, tpd_limit FROM models
+       WHERE platform = 'cerebras' AND model_id = 'qwen-3-235b-a22b-instruct-2507'
+    `).get() as { rpm_limit: number; rpd_limit: number; tpm_limit: number; tpd_limit: number };
+    expect(cerebrasLimits).toEqual({ rpm_limit: 5, rpd_limit: 2400, tpm_limit: 30000, tpd_limit: 1000000 });
+
+    const sambanovaCtx = (db.prepare(`
+      SELECT context_window FROM models WHERE platform = 'sambanova' AND model_id = 'DeepSeek-V3.2'
+    `).get() as { context_window: number }).context_window;
+    expect(sambanovaCtx).toBe(32768);
+
+    const cfFp8Ctx = (db.prepare(`
+      SELECT context_window FROM models WHERE platform = 'cloudflare' AND model_id = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+    `).get() as { context_window: number }).context_window;
+    expect(cfFp8Ctx).toBe(24000);
+
+    const mistralCtx = db.prepare(`
+      SELECT model_id, context_window FROM models
+       WHERE platform = 'mistral'
+         AND model_id IN ('codestral-latest', 'devstral-latest', 'magistral-medium-latest', 'mistral-large-latest')
+       ORDER BY model_id
+    `).all() as { model_id: string; context_window: number }[];
+    expect(mistralCtx).toEqual([
+      { model_id: 'codestral-latest',       context_window: 256000 },
+      { model_id: 'devstral-latest',        context_window: 262144 },
+      { model_id: 'magistral-medium-latest', context_window: 131072 },
+      { model_id: 'mistral-large-latest',   context_window: 262144 },
+    ]);
+  });
+
   it('all enabled catalog platforms have a registered provider', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');

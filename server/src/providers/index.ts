@@ -82,9 +82,19 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
 }));
 
-// Hugging Face, Moonshot, MiniMax direct integrations were dropped in V4 —
-// HF tool-call format issues; Moonshot moved to paid; MiniMax superseded by
-// the OpenRouter route (openrouter/minimax/minimax-m2.5:free).
+// Hugging Face Inference Providers router — re-added in V13. The V4 removal
+// reason ("tool-call format issues") was the legacy serverless route that
+// emitted tool calls as text; the new router.huggingface.co meta-router
+// uses each backend's native protocol then normalizes the response.
+// Recurring $0.10/mo router credit on the free tier, no card required.
+register(new OpenAICompatProvider({
+  platform: 'huggingface',
+  name: 'HuggingFace Router',
+  baseUrl: 'https://router.huggingface.co/v1',
+}));
+
+// Moonshot direct integration was dropped in V4 (paid-only); MiniMax direct
+// was dropped in V4 (superseded by the OpenRouter route).
 
 // Ollama Cloud — OpenAI-compatible. Free plan: 1 concurrent model, 5h session
 // caps, GPU-time-based quota (not per-token). Many catalog models on the
