@@ -95,6 +95,26 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// Toggle all keys for a platform
+keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
+  const platform = req.params.platform as string;
+  if (!(PLATFORMS as readonly string[]).includes(platform)) {
+    res.status(400).json({ error: { message: `Invalid platform '${platform}'` } });
+    return;
+  }
+
+  const { enabled } = req.body;
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ error: { message: 'enabled must be a boolean' } });
+    return;
+  }
+
+  const db = getDb();
+  const result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform);
+
+  res.json({ success: true, enabled, updatedKeys: result.changes });
+});
+
 // Toggle enable/disable
 keysRouter.patch('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
