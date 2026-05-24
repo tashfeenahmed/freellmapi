@@ -114,9 +114,21 @@ function createTables(db: Database.Database) {
       value TEXT NOT NULL
     );
 
+    -- Persisted rate-limit ledger. Keyed by "<platform>:<modelId>:<keyId>:<bucket>"
+    -- where bucket is rpm | rpd | tpm | tpd | cooldown. data is JSON-encoded
+    -- window state (timestamps[] for RPM/RPD; {ts,tokens}[] for TPM/TPD;
+    -- {expiry} for cooldown). Used by services/ratelimit.ts to survive
+    -- restarts so RPD/TPD counters don't silently reset to zero at e.g. 11pm.
+    CREATE TABLE IF NOT EXISTS rate_limit_state (
+      key        TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_state_updated_at ON rate_limit_state(updated_at);
   `);
 }
 
