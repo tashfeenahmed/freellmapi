@@ -21,7 +21,8 @@ export type Platform =
   | 'kilo'
   | 'pollinations'
   | 'llm7'
-  | 'huggingface';
+  | 'huggingface'
+  | 'opencode';
 
 export interface Model {
   id: number;

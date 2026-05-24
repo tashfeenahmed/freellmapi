@@ -143,6 +143,26 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.llm7.io/v1',
 }));
 
+// OpenCode Zen — OpenAI-compatible gateway from sst/opencode. The gateway is
+// pay-per-use overall, but a handful of models are explicitly Free during a
+// "limited time" promo (May 2026 catalog: deepseek-v4-flash-free,
+// nemotron-3-super-free, big-pickle).
+//
+// Auth: standard `Authorization: Bearer <key>` from opencode.ai/auth.
+// Note that even the free models require a billing card on file at signup.
+//
+// No published numerical RPM/RPD/TPM/TPD. Two observed failure modes:
+//   - "too many requests" (burst 429) — handled by ratelimit.ts 60s cooldown
+//   - "Free usage exceeded, retrying in 10h..." (daily soft-budget) — handled
+//     by router.ts dynamic priority penalty (sinks the model after a few 429s).
+// Catalog rows seed conservative rpm=20/rpd=200 (mirroring the OpenRouter
+// free shape) so the in-process limiter trips before the upstream burst cap.
+register(new OpenAICompatProvider({
+  platform: 'opencode',
+  name: 'OpenCode Zen',
+  baseUrl: 'https://opencode.ai/zen/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a

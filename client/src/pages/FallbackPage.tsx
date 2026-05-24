@@ -71,6 +71,7 @@ const platformColors: Record<string, string> = {
   pollinations: '#a855f7',
   llm7:        '#0ea5e9',
   huggingface: '#ff9d00',
+  opencode:    '#eab308',
 }
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {

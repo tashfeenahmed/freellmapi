@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1228,6 +1229,82 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): OpenCode Zen free-tier catalog seed.
+ *
+ * Adds the three models that are explicitly Free on the opencode.ai/zen
+ * gateway during its "limited time" promo:
+ *   - deepseek-v4-flash-free (DeepSeek V4 Flash Free)
+ *   - nemotron-3-super-free  (NVIDIA Nemotron 3 Super 120B, NVIDIA Trial ToS)
+ *   - big-pickle             (stealth model, OpenCode-hosted)
+ *
+ * Endpoint: https://opencode.ai/zen/v1/chat/completions (OpenAI-compatible).
+ * Auth: standard Bearer token from opencode.ai/auth.
+ *
+ * Rate limits:
+ *   OpenCode Zen does NOT publish numerical RPM/RPD/TPM/TPD for free models.
+ *   Two real-world failure modes:
+ *     1. Burst 429 ("too many requests") on agent loops — short-window cap.
+ *     2. Daily exhaustion ("Free usage exceeded ... retrying in 10h 37m") —
+ *        per-account soft budget that resets ~daily.
+ *   We seed conservative rpm=20/rpd=200 (mirrors the OpenRouter free shape,
+ *   the closest analog for "shared free pool with no published per-model
+ *   quota"). tpm/tpd are left null — opencode publishes no token cap, and
+ *   ratelimit.ts's 60s cooldown + router.ts's dynamic priority penalty
+ *   together drain traffic away from a model that starts returning 429s.
+ *
+ * ToS caveats (carried into README's ToS table):
+ *   - All three models are time-limited promos. Rows can be flipped to
+ *     enabled=0 in a later migration once a model exits the free tier.
+ *   - Big Pickle and DeepSeek V4 Flash Free explicitly retain prompts/
+ *     outputs to improve the model.
+ *   - Nemotron 3 Super Free is governed by NVIDIA's API Trial ToS:
+ *     evaluation only, no production / no sensitive data, NVIDIA logs
+ *     prompts and outputs.
+ *   - Even the free models require a billing card on file at signup.
+ *
+ * Idempotent: INSERT OR IGNORE keyed on UNIQUE(platform, model_id), so
+ * re-running on an already-seeded DB is a no-op.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // Big Pickle — stealth frontier model hosted by OpenCode. Class unknown
+    // but marketed as one of Zen's top-tier coding models; rank 2 alongside
+    // other frontier free routes.
+    ['opencode', 'big-pickle',             'Big Pickle (OpenCode Zen)',            2, 9, 'Frontier', 20, 200, null, null, 'promo, time-limited', 131072],
+    // DeepSeek V4 Flash Free — same model class as nvidia/deepseek-v4-flash
+    // (V13 rank 4) and huggingface/DeepSeek-V4-Flash (V13 rank 4).
+    ['opencode', 'deepseek-v4-flash-free', 'DeepSeek V4 Flash Free (OpenCode Zen)', 4, 8, 'Frontier', 20, 200, null, null, 'promo, time-limited', 131072],
+    // Nemotron 3 Super 120B Free — same model class as the OpenRouter V2 row
+    // 'nvidia/nemotron-3-super-120b-a12b:free' (rank 2). Slightly higher
+    // numeric rank here (3) because the NVIDIA Trial ToS makes it less
+    // attractive as a default top-of-chain pick.
+    ['opencode', 'nemotron-3-super-free',  'Nemotron 3 Super Free (OpenCode Zen)',  3, 9, 'Frontier', 20, 200, null, null, 'promo, time-limited', 262144],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+
+    // Ensure every newly inserted model has a fallback_config row.
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
