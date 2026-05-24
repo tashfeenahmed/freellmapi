@@ -16,7 +16,7 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `relative text-sm px-1 py-4 transition-colors ${
+        `relative text-xs md:text-sm px-0.5 md:px-1 py-4 transition-colors shrink-0 ${
           isActive
             ? 'text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-foreground'
             : 'text-muted-foreground hover:text-foreground'
@@ -88,19 +88,19 @@ function MainLayout() {
         }`}>
           {/* Brand logo only appears in header if sidebar is collapsed or we are on other pages */}
           <div className={`transition-all duration-350 overflow-hidden ${
-            sidebarOpen && isPlayground ? 'w-0 opacity-0 pointer-events-none md:mr-0' : 'w-[110px] opacity-100 mr-10'
+            sidebarOpen && isPlayground ? 'w-0 opacity-0 pointer-events-none md:mr-0' : 'w-fit opacity-100 mr-4 md:mr-10'
           }`}>
             <Brand />
           </div>
           
-          <nav className="flex items-center gap-6">
+          <nav className="flex items-center gap-3 md:gap-6 overflow-x-auto no-scrollbar py-1">
             <NavItem to="/playground">Playground</NavItem>
             <NavItem to="/keys">Keys</NavItem>
             <NavItem to="/fallback">Fallback</NavItem>
             <NavItem to="/analytics">Analytics</NavItem>
             <NavItem to="/docs">Docs</NavItem>
           </nav>
-          <div className="ml-auto py-2">
+          <div className="ml-auto py-2 shrink-0">
             <DarkModeToggle />
           </div>
         </div>

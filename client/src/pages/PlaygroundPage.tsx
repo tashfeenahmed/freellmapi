@@ -420,6 +420,8 @@ export default function PlaygroundPage({
     return () => window.removeEventListener('resize', handleResize)
   }, [sidebarOpen, setSidebarOpen])
 
+
+
   // Create unified models catalog (using real models only)
   const allModels = useRef<EnrichedModel[]>([])
   
@@ -766,7 +768,7 @@ export default function PlaygroundPage({
   const showEmptyState = messages.length === 0 && !loading
 
   return (
-    <div className="flex-1 flex h-[calc(100dvh-49px)] bg-white dark:bg-zinc-950 relative overflow-hidden text-zinc-950 dark:text-zinc-50 font-sans">
+    <div className="flex-1 flex h-[calc(100dvh-53px)] bg-white dark:bg-zinc-950 relative overflow-hidden text-zinc-950 dark:text-zinc-50 font-sans">
       
       {/* Mobile Drawer Backdrop overlay with smooth transition */}
       {sidebarOpen && (
@@ -831,11 +833,11 @@ export default function PlaygroundPage({
         </div>
 
         {showEmptyState ? (
-          <div className="flex-1 flex items-center justify-center px-4 sm:px-6 relative z-10">
-            <div className="w-full max-w-2xl mx-auto">
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-850 dark:text-zinc-100 mb-8 px-2 text-center">How can I help you?</h1>
+          <div className="flex-1 overflow-y-auto py-8 px-4 sm:px-6 relative z-10">
+            <div className="hidden sm:flex w-full max-w-2xl mx-auto min-h-full flex-col justify-center">
+              <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-zinc-850 dark:text-zinc-100 mb-8 px-2 text-center">How can I help you?</h1>
               
-              <div className="flex flex-wrap gap-2.5 mb-8 px-2">
+              <div className="flex flex-wrap justify-center gap-2.5 mb-8 px-2">
                 <button className="flex items-center gap-2 px-3.5 py-1.5 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 rounded-full text-[13px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shadow-sm">
                   <Sparkles className="size-3.5" /> Create
                 </button>
@@ -872,7 +874,7 @@ export default function PlaygroundPage({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-8 pb-36 bg-[#fafafa]/30 dark:bg-zinc-950/20">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-8 pb-6 bg-[#fafafa]/30 dark:bg-zinc-950/20">
             <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -932,9 +934,7 @@ export default function PlaygroundPage({
         )}
 
         {/* Premium Light-Themed Chat Card Layout */}
-        <div className={`fixed bottom-0 right-0 bg-gradient-to-t from-white via-white dark:from-zinc-950 dark:via-zinc-950 to-transparent p-4 sm:p-6 pt-10 z-20 transition-all duration-300 ${
-          sidebarOpen ? 'left-0 md:left-64' : 'left-0'
-        }`}>
+        <div className="w-full p-4 sm:p-6 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-900/60 shrink-0 z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.02)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.15)]">
           <div className="max-w-4xl mx-auto">
             
             {/* Outer Container Card */}
@@ -1017,7 +1017,7 @@ export default function PlaygroundPage({
 
                     {/* Highly Interactive Floating Model Selector Popover */}
                     {isModelSelectorOpen && (
-                      <div className="absolute bottom-full left-0 mb-3.5 w-[calc(100vw-32px)] sm:w-[420px] max-w-[420px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
+                      <div className="fixed bottom-24 left-4 right-4 sm:absolute sm:bottom-full sm:left-0 sm:right-auto sm:mb-3.5 sm:w-[420px] sm:max-w-[420px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
                         
                         {/* Search Input Bar with filter symbol */}
                         <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2 bg-white dark:bg-zinc-900">
@@ -1189,10 +1189,10 @@ export default function PlaygroundPage({
                   <button
                     type="button"
                     onClick={handleAttachClick}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-800 rounded-full text-xs font-semibold text-zinc-500 dark:text-zinc-400 transition-colors cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-800 rounded-full text-xs font-semibold text-zinc-500 dark:text-zinc-400 transition-colors cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
                   >
                     <Paperclip className="size-3.5 text-zinc-400 dark:text-zinc-500" />
-                    <span>Attach</span>
+                    <span className="hidden sm:inline">Attach</span>
                   </button>
 
                 </div>
