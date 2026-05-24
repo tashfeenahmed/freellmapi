@@ -219,7 +219,12 @@ export function isRetryableError(err: any): boolean {
     // 404: model deprecated/removed upstream (e.g. OpenRouter's "no endpoints found"
     // for a model that's been pulled). Rotate to the next model in the chain —
     // setCooldown + the health checker will avoid this model on subsequent requests.
-    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
+    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    // 400: one provider may reject parameters another accepts (e.g. max_tokens
+    // limits, unsupported params). The matching pattern is "api error 400"
+    // which comes from the OpenAI-compat provider's error formatting, not
+    // a bare "400" which is deliberately non-retryable for validation errors.
+    || msg.includes('api error 400');
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
