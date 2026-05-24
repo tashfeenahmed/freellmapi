@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "python3"]
+nixPkgs = ["nodejs_24", "python3"]
 
 [phases.install]
 cmds = ["npm ci --loglevel=error"]
