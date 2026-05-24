@@ -1266,7 +1266,9 @@ function migrateModelsV14(db: Database.Database) {
  *   - Even the free models require a billing card on file at signup.
  *
  * Idempotent: INSERT OR IGNORE keyed on UNIQUE(platform, model_id), so
- * re-running on an already-seeded DB is a no-op.
+ * re-running on an already-seeded DB is a no-op. The trailing UPDATE
+ * self-corrects DBs that ran an earlier draft of V15 with the
+ * non-parseable 'promo, time-limited' budget string.
  */
 function migrateModelsV15(db: Database.Database) {
   const insert = db.prepare(`
@@ -1274,23 +1276,37 @@ function migrateModelsV15(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
+  // monthly_token_budget mirrors NVIDIA's '~3M (credits)' shape so the
+  // parseBudget regex in routes/fallback.ts → /api/fallback/token-usage
+  // extracts a non-zero number and the dashboard's monthly token bar
+  // accounts for these rows. The "(promo)" suffix flags the time-limited
+  // nature without breaking the parser. ~3M is a conservative estimate
+  // matching the NVIDIA / HuggingFace tier of "credit-based, no published
+  // cap, daily soft-budget" providers.
   const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
     // Big Pickle — stealth frontier model hosted by OpenCode. Class unknown
     // but marketed as one of Zen's top-tier coding models; rank 2 alongside
     // other frontier free routes.
-    ['opencode', 'big-pickle',             'Big Pickle (OpenCode Zen)',            2, 9, 'Frontier', 20, 200, null, null, 'promo, time-limited', 131072],
+    ['opencode', 'big-pickle',             'Big Pickle (OpenCode Zen)',            2, 9, 'Frontier', 20, 200, null, null, '~3M (promo)', 131072],
     // DeepSeek V4 Flash Free — same model class as nvidia/deepseek-v4-flash
     // (V13 rank 4) and huggingface/DeepSeek-V4-Flash (V13 rank 4).
-    ['opencode', 'deepseek-v4-flash-free', 'DeepSeek V4 Flash Free (OpenCode Zen)', 4, 8, 'Frontier', 20, 200, null, null, 'promo, time-limited', 131072],
+    ['opencode', 'deepseek-v4-flash-free', 'DeepSeek V4 Flash Free (OpenCode Zen)', 4, 8, 'Frontier', 20, 200, null, null, '~3M (promo)', 131072],
     // Nemotron 3 Super 120B Free — same model class as the OpenRouter V2 row
     // 'nvidia/nemotron-3-super-120b-a12b:free' (rank 2). Slightly higher
     // numeric rank here (3) because the NVIDIA Trial ToS makes it less
     // attractive as a default top-of-chain pick.
-    ['opencode', 'nemotron-3-super-free',  'Nemotron 3 Super Free (OpenCode Zen)',  3, 9, 'Frontier', 20, 200, null, null, 'promo, time-limited', 262144],
+    ['opencode', 'nemotron-3-super-free',  'Nemotron 3 Super Free (OpenCode Zen)',  3, 9, 'Frontier', 20, 200, null, null, '~3M (promo)', 262144],
   ];
 
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);
+
+    // Self-correct DBs seeded with the earlier 'promo, time-limited' string,
+    // which parseBudget couldn't parse → contributed 0 to the budget bar.
+    db.prepare(`
+      UPDATE models SET monthly_token_budget = '~3M (promo)'
+       WHERE platform = 'opencode' AND monthly_token_budget = 'promo, time-limited'
+    `).run();
 
     // Ensure every newly inserted model has a fallback_config row.
     const missing = db.prepare(`
