@@ -10,6 +10,7 @@ import { fallbackRouter } from './routes/fallback.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
+import { conversationsRouter } from './routes/conversations.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,7 +46,7 @@ export function createApp() {
       callback(null, !origin || allowedCorsOrigins.has(origin));
     },
   }));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '50mb' }));
 
   // API routes
   app.use('/api/keys', keysRouter);
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/health', healthRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/conversations', conversationsRouter);
 
   // OpenAI-compatible proxy
   app.use('/v1', proxyRouter);

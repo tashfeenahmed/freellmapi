@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
+import DocsPage from '@/pages/DocsPage'
+import { Toaster } from 'sonner'
 
 const queryClient = new QueryClient()
 
@@ -66,37 +68,64 @@ function Brand() {
   )
 }
 
+function MainLayout() {
+  const location = useLocation()
+  const isPlayground = location.pathname.startsWith('/playground') || location.pathname === '/'
+  
+  // Shared sidebar state between header layout and Playground page
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768
+    }
+    return true
+  })
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b select-none">
+        <div className={`w-full px-6 flex items-center transition-all duration-300 ${
+          sidebarOpen && isPlayground ? 'md:pl-[272px]' : ''
+        }`}>
+          {/* Brand logo only appears in header if sidebar is collapsed or we are on other pages */}
+          <div className={`transition-all duration-350 overflow-hidden ${
+            sidebarOpen && isPlayground ? 'w-0 opacity-0 pointer-events-none md:mr-0' : 'w-[110px] opacity-100 mr-10'
+          }`}>
+            <Brand />
+          </div>
+          
+          <nav className="flex items-center gap-6">
+            <NavItem to="/playground">Playground</NavItem>
+            <NavItem to="/keys">Keys</NavItem>
+            <NavItem to="/fallback">Fallback</NavItem>
+            <NavItem to="/analytics">Analytics</NavItem>
+            <NavItem to="/docs">Docs</NavItem>
+          </nav>
+          <div className="ml-auto py-2">
+            <DarkModeToggle />
+          </div>
+        </div>
+      </header>
+      <Toaster richColors position="bottom-right" />
+      <Routes>
+        <Route path="/" element={<Navigate to="/playground" replace />} />
+        <Route path="/playground" element={<PlaygroundPage sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
+        <Route path="/playground/:chatId" element={<PlaygroundPage sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
+        <Route path="/keys" element={<div className="max-w-6xl mx-auto px-6 py-8 w-full"><KeysPage /></div>} />
+        <Route path="/fallback" element={<div className="max-w-6xl mx-auto px-6 py-8 w-full"><FallbackPage /></div>} />
+        <Route path="/analytics" element={<div className="max-w-6xl mx-auto px-6 py-8 w-full"><AnalyticsPage /></div>} />
+        <Route path="/docs" element={<div className="max-w-6xl mx-auto px-6 py-8 w-full"><DocsPage /></div>} />
+        <Route path="/test" element={<Navigate to="/playground" replace />} />
+        <Route path="/health" element={<Navigate to="/keys" replace />} />
+      </Routes>
+    </div>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
-            <div className="max-w-6xl mx-auto px-6 flex items-center">
-              <Brand />
-              <nav className="flex items-center gap-6 ml-10">
-                <NavItem to="/playground">Playground</NavItem>
-                <NavItem to="/keys">Keys</NavItem>
-                <NavItem to="/fallback">Fallback</NavItem>
-                <NavItem to="/analytics">Analytics</NavItem>
-              </nav>
-              <div className="ml-auto py-2">
-                <DarkModeToggle />
-              </div>
-            </div>
-          </header>
-          <main className="max-w-6xl mx-auto px-6 py-8">
-            <Routes>
-              <Route path="/" element={<Navigate to="/playground" replace />} />
-              <Route path="/playground" element={<PlaygroundPage />} />
-              <Route path="/keys" element={<KeysPage />} />
-              <Route path="/fallback" element={<FallbackPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/test" element={<Navigate to="/playground" replace />} />
-              <Route path="/health" element={<Navigate to="/keys" replace />} />
-            </Routes>
-          </main>
-        </div>
+        <MainLayout />
       </BrowserRouter>
     </QueryClientProvider>
   )
