@@ -92,12 +92,33 @@ function createTables(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       platform TEXT NOT NULL,
       model_id TEXT NOT NULL,
+      key_id INTEGER,
       status TEXT NOT NULL,
       input_tokens INTEGER NOT NULL DEFAULT 0,
       output_tokens INTEGER NOT NULL DEFAULT 0,
       latency_ms INTEGER NOT NULL DEFAULT 0,
       error TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limit_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('request', 'tokens')),
+      tokens INTEGER NOT NULL DEFAULT 0,
+      created_at_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limit_cooldowns (
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      expires_at_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (platform, model_id, key_id)
     );
 
     CREATE TABLE IF NOT EXISTS fallback_config (
@@ -115,8 +136,20 @@ function createTables(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup ON rate_limit_usage(platform, model_id, key_id, kind, created_at_ms);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_cooldowns_expires ON rate_limit_cooldowns(expires_at_ms);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
   `);
+
+  ensureRequestKeyIdColumn(db);
+}
+
+function ensureRequestKeyIdColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'key_id')) {
+    db.prepare('ALTER TABLE requests ADD COLUMN key_id INTEGER').run();
+  }
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_key_id ON requests(key_id)').run();
 }
 
 function seedModels(db: Database.Database) {
