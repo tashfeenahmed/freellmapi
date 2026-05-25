@@ -17,7 +17,14 @@
  * Path B auth — the token persisted here is used directly as
  * `Authorization: Bearer ...` on `api.githubcopilot.com`. No token
  * exchange / refresh is performed; the GitHub OAuth token is long-lived.
+ *
+ * `../env.js` MUST be the first import — it loads .env so
+ * `initEncryptionKey()` picks up the same ENCRYPTION_KEY the running
+ * server uses. Without it the script falls through to the DB-stored
+ * key, and any token it inserts will fail to decrypt at request time
+ * with "Unsupported state or unable to authenticate data".
  */
+import '../env.js';
 import { initDb, getDb } from '../db/index.js';
 import { encrypt, maskKey } from '../lib/crypto.js';
 import { runDeviceFlow } from '../lib/copilot-auth.js';
