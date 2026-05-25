@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { keysRouter } from './routes/keys.js';
+import { copilotFlowRouter } from './routes/copilot-flow.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
 import { fallbackRouter } from './routes/fallback.js';
@@ -48,6 +49,7 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   // API routes
+  app.use('/api/keys/copilot', copilotFlowRouter);
   app.use('/api/keys', keysRouter);
   app.use('/api/models', modelsRouter);
   app.use('/api/fallback', fallbackRouter);

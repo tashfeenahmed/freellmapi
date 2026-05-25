@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'mistral', label: 'Mistral' },
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'github', label: 'GitHub Models' },
+  { value: 'github-copilot', label: 'GitHub Copilot (device flow)' },
   { value: 'cohere', label: 'Cohere' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
@@ -183,6 +184,7 @@ export default function KeysPage() {
   })
 
   const needsAccountId = platform === 'cloudflare'
+  const isCopilotFlow = platform === 'github-copilot'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -190,6 +192,13 @@ export default function KeysPage() {
     if (needsAccountId && !accountId) return
     const key = needsAccountId ? `${accountId}:${apiKey}` : apiKey
     addKey.mutate({ platform, key, label: label || undefined })
+  }
+
+  const onCopilotDone = () => {
+    queryClient.invalidateQueries({ queryKey: ['keys'] })
+    queryClient.invalidateQueries({ queryKey: ['health'] })
+    queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    setPlatform('')
   }
 
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
@@ -244,31 +253,38 @@ export default function KeysPage() {
                 />
               </div>
             )}
-            <div className="space-y-1.5 flex-1 min-w-[240px]">
-              <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Label</Label>
-              <Input
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="optional"
-                className="w-[160px]"
-              />
-            </div>
-            <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
-              {addKey.isPending ? 'Adding…' : 'Add key'}
-            </Button>
+            {!isCopilotFlow && (
+              <>
+                <div className="space-y-1.5 flex-1 min-w-[240px]">
+                  <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
+                  <Input
+                    type="password"
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
+                    className="font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Label</Label>
+                  <Input
+                    value={label}
+                    onChange={e => setLabel(e.target.value)}
+                    placeholder="optional"
+                    className="w-[160px]"
+                  />
+                </div>
+                <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
+                  {addKey.isPending ? 'Adding…' : 'Add key'}
+                </Button>
+              </>
+            )}
           </form>
           {addKey.isError && (
             <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
+          )}
+          {isCopilotFlow && (
+            <CopilotDeviceFlow onDone={onCopilotDone} />
           )}
         </section>
 
@@ -325,6 +341,164 @@ export default function KeysPage() {
           )}
         </section>
       </div>
+    </div>
+  )
+}
+
+interface CopilotStartResp {
+  sessionId: string
+  userCode: string
+  verificationUri: string
+  interval: number
+  expiresIn: number
+}
+
+interface CopilotPollResp {
+  status: 'pending' | 'slow_down' | 'success' | 'error'
+  id?: number
+  masked?: string
+  message?: string
+}
+
+function CopilotDeviceFlow({ onDone }: { onDone: () => void }) {
+  // 'idle' = before Start, 'awaiting' = polling, 'success' / 'error' terminal.
+  const [phase, setPhase] = useState<'idle' | 'starting' | 'awaiting' | 'success' | 'error'>('idle')
+  const [session, setSession] = useState<CopilotStartResp | null>(null)
+  const [message, setMessage] = useState<string>('')
+  const [codeCopied, setCodeCopied] = useState(false)
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intervalMs = useRef(5000)
+
+  const clearTimer = () => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current)
+      pollTimer.current = null
+    }
+  }
+
+  // Stop polling on unmount so we don't leak a tab-background timer.
+  useEffect(() => () => clearTimer(), [])
+
+  const start = async () => {
+    setPhase('starting')
+    setMessage('')
+    try {
+      const resp = await apiFetch<CopilotStartResp>('/api/keys/copilot/start', { method: 'POST', body: '{}' })
+      setSession(resp)
+      intervalMs.current = (resp.interval + 1) * 1000
+      setPhase('awaiting')
+      // Kick off the polling loop on the next tick.
+      pollTimer.current = setTimeout(() => poll(resp.sessionId), intervalMs.current)
+    } catch (err: any) {
+      setPhase('error')
+      setMessage(err?.message ?? 'Failed to start')
+    }
+  }
+
+  const poll = async (sessionId: string) => {
+    let resp: CopilotPollResp
+    try {
+      resp = await apiFetch<CopilotPollResp>('/api/keys/copilot/poll', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId }),
+      })
+    } catch (err: any) {
+      setPhase('error')
+      setMessage(err?.message ?? 'Poll failed')
+      return
+    }
+
+    switch (resp.status) {
+      case 'pending':
+        pollTimer.current = setTimeout(() => poll(sessionId), intervalMs.current)
+        return
+      case 'slow_down':
+        // RFC 8628: server is telling us to back off — bump interval.
+        intervalMs.current += 5000
+        pollTimer.current = setTimeout(() => poll(sessionId), intervalMs.current)
+        return
+      case 'success':
+        setPhase('success')
+        setMessage(`Saved as ${resp.masked} (id ${resp.id}).`)
+        onDone()
+        return
+      case 'error':
+        setPhase('error')
+        setMessage(resp.message ?? 'Authorization failed')
+        return
+    }
+  }
+
+  const copyCode = () => {
+    if (!session) return
+    navigator.clipboard.writeText(session.userCode)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 1500)
+  }
+
+  const reset = () => {
+    clearTimer()
+    setSession(null)
+    setMessage('')
+    setPhase('idle')
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border bg-card p-4">
+      <div className="text-xs text-muted-foreground mb-3">
+        GitHub Copilot uses the OAuth device flow. Click Start, open the URL we show, and paste the code.
+        We never see your GitHub password — only the resulting access token, which is stored encrypted.
+      </div>
+
+      {phase === 'idle' && (
+        <Button size="sm" onClick={start}>Start GitHub login</Button>
+      )}
+
+      {phase === 'starting' && (
+        <p className="text-xs text-muted-foreground">Requesting a device code…</p>
+      )}
+
+      {phase === 'awaiting' && session && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 items-center text-xs">
+            <span className="text-muted-foreground">1. Open</span>
+            <a
+              href={session.verificationUri}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono underline underline-offset-2 hover:text-primary"
+            >
+              {session.verificationUri}
+            </a>
+            <span className="text-muted-foreground">2. Enter code</span>
+            <div className="flex items-center gap-2">
+              <code className="font-mono text-base tracking-wider bg-muted px-3 py-1.5 rounded-md select-all">
+                {session.userCode}
+              </code>
+              <Button variant="outline" size="sm" onClick={copyCode}>
+                {codeCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+            <span className="text-muted-foreground">3. Approve</span>
+            <span className="text-muted-foreground">Waiting for GitHub… polling every {Math.round(intervalMs.current / 1000)}s.</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
+        </div>
+      )}
+
+      {phase === 'success' && (
+        <div className="space-y-2">
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">Connected. {message}</p>
+          <Button variant="ghost" size="sm" onClick={reset}>Add another</Button>
+        </div>
+      )}
+
+      {phase === 'error' && (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">{message}</p>
+          <Button variant="ghost" size="sm" onClick={reset}>Try again</Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -58,11 +58,50 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
   return await res.json() as DeviceCodeResponse;
 }
 
+export type PollResult =
+  | { status: 'pending' }
+  | { status: 'slow_down' }
+  | { status: 'success'; accessToken: string }
+  | { status: 'error'; message: string };
+
 /**
- * Step 2: poll for the access token. Returns the `gho_...` token on
- * success; throws on flow expiry, access denial, or any non-pending
- * error. RFC 8628 says `slow_down` should bump the interval by 5s; we
- * also honor server-supplied intervals on every response.
+ * Step 2 (single shot): make one access-token POST. Caller decides
+ * cadence. Used by the dashboard device-flow endpoint, where the
+ * browser drives polling and we don't want to block the request
+ * thread with sleeps.
+ */
+export async function attemptTokenExchange(deviceCode: string): Promise<PollResult> {
+  const res = await fetch(ACCESS_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'freellmapi-copilot/0.1.0',
+    },
+    body: JSON.stringify({
+      client_id: OPENCODE_CLIENT_ID,
+      device_code: deviceCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
+  });
+  const data = await res.json() as AccessTokenResponse;
+  if (data.access_token) return { status: 'success', accessToken: data.access_token };
+  switch (data.error) {
+    case 'authorization_pending': return { status: 'pending' };
+    case 'slow_down': return { status: 'slow_down' };
+    case 'expired_token':
+      return { status: 'error', message: 'Device code expired before authorization. Restart the login.' };
+    case 'access_denied':
+      return { status: 'error', message: 'Authorization was denied in the browser.' };
+    default:
+      return { status: 'error', message: `OAuth error: ${data.error ?? 'unknown'} — ${data.error_description ?? ''}` };
+  }
+}
+
+/**
+ * Step 2 (loop): poll for the access token until it resolves. Used by
+ * the CLI script — the browser-driven flow uses `attemptTokenExchange`
+ * one call at a time instead.
  */
 export async function pollForAccessToken(
   deviceCode: string,
