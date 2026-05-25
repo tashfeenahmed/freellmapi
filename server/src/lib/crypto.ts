@@ -14,6 +14,7 @@ let cachedKey: Buffer | null = null;
  */
 const KEY_BYTES = 32;
 const KEY_HEX_LEN = KEY_BYTES * 2;
+const PLACEHOLDER_KEY = 'your-64-char-hex-key-here';
 
 function parseHexKey(value: string, source: 'env' | 'db'): Buffer {
   if (value.length !== KEY_HEX_LEN || !/^[0-9a-fA-F]+$/.test(value)) {
@@ -25,16 +26,31 @@ function parseHexKey(value: string, source: 'env' | 'db'): Buffer {
   return Buffer.from(value, 'hex');
 }
 
+function isDevFallbackAllowed(): boolean {
+  return process.env.DEV_MODE === 'true' && process.env.NODE_ENV !== 'production';
+}
+
+function missingKeyError(): Error {
+  return new Error(
+    'ENCRYPTION_KEY is required for API key encryption. ' +
+    `Set a ${KEY_HEX_LEN}-char hex key, or set DEV_MODE=true outside production to allow a local DB-stored fallback key.`,
+  );
+}
+
 /**
- * Initialize encryption key from env, DB, or generate a new one.
+ * Initialize encryption key from env or an explicit local-dev fallback.
  * Must be called after DB is initialized.
  */
 export function initEncryptionKey(db: Database.Database): void {
   // 1. Check env var
   const envKey = process.env.ENCRYPTION_KEY;
-  if (envKey && envKey !== 'your-64-char-hex-key-here') {
+  if (envKey && envKey !== PLACEHOLDER_KEY) {
     cachedKey = parseHexKey(envKey, 'env');
     return;
+  }
+
+  if (!isDevFallbackAllowed()) {
+    throw missingKeyError();
   }
 
   // 2. Check DB for persisted key

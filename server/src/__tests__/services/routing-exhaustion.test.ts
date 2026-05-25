@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { routeRequest } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
@@ -24,8 +24,26 @@ vi.mock('../../lib/crypto.js', async () => {
   };
 });
 
+const ORIGINAL_DEV_MODE = process.env.DEV_MODE;
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+function restoreEnv() {
+  if (ORIGINAL_DEV_MODE === undefined) {
+    delete process.env.DEV_MODE;
+  } else {
+    process.env.DEV_MODE = ORIGINAL_DEV_MODE;
+  }
+  if (ORIGINAL_NODE_ENV === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  }
+}
+
 describe('Routing Key Exhaustion', () => {
   beforeEach(() => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
     initDb(':memory:');
     const db = getDb();
     
@@ -45,6 +63,10 @@ describe('Routing Key Exhaustion', () => {
     db.prepare("INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled) VALUES ('google', 'Key B', 'enc', 'iv', 'tag', 'healthy', 1)").run();
 
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    restoreEnv();
   });
 
   it('should skip exhausted Key B and use functional Key A for the same high-priority model', () => {

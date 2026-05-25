@@ -107,6 +107,10 @@ echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).to
 npm run dev
 ```
 
+`ENCRYPTION_KEY` is required for startup. The server only falls back to a
+database-stored development key when `DEV_MODE=true` and `NODE_ENV` is not
+`production`; do not use that fallback with real provider keys.
+
 Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
 For a production build:
