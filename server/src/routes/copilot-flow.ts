@@ -119,7 +119,7 @@ copilotFlowRouter.post('/poll', async (req: Request, res: Response) => {
     let endpointBase: string | null = null;
     try {
       const ex = await exchangeToken(result.accessToken);
-      tier = mapSkuToTier(ex.sku, ex.rawToken);
+      tier = mapSkuToTier(ex.sku, ex.sessionToken);
       endpointBase = ex.endpointBase;
     } catch (err) {
       console.warn(`[copilot-flow] tier exchange failed: ${(err as Error).message}`);
@@ -143,4 +143,36 @@ copilotFlowRouter.post('/poll', async (req: Request, res: Response) => {
 
   // pending | slow_down | error — pass straight through.
   res.json(result);
+});
+
+const ALLOWED_TIERS = new Set<CopilotTier>([
+  'free', 'pro', 'pro+', 'student', 'business', 'enterprise', 'unknown',
+]);
+
+/**
+ * Manual tier override. Used when the auto-detection exchange failed
+ * (sku missing, 404, network blip, etc.) and the user picks their plan
+ * from a dropdown in the dashboard. Also reachable via the "Change
+ * plan" button on the keys table for any Copilot row.
+ */
+copilotFlowRouter.post('/set-tier', (req: Request, res: Response) => {
+  const keyId = Number(req.body?.keyId);
+  const tier = String(req.body?.tier ?? '') as CopilotTier;
+  if (!Number.isFinite(keyId) || keyId <= 0) {
+    res.status(400).json({ error: { message: 'keyId is required (positive integer)', type: 'invalid_request_error' } });
+    return;
+  }
+  if (!ALLOWED_TIERS.has(tier)) {
+    res.status(400).json({ error: { message: `tier must be one of: ${Array.from(ALLOWED_TIERS).join(', ')}`, type: 'invalid_request_error' } });
+    return;
+  }
+  const db = getDb();
+  const row = db.prepare(`SELECT id FROM api_keys WHERE id = ? AND platform = 'github-copilot'`).get(keyId);
+  if (!row) {
+    res.status(404).json({ error: { message: 'github-copilot key not found', type: 'not_found' } });
+    return;
+  }
+  db.prepare('UPDATE api_keys SET tier = ? WHERE id = ?').run(tier, keyId);
+  applyCopilotTier(db, tier);
+  res.json({ success: true, tier });
 });

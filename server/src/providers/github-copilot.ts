@@ -7,7 +7,7 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
 import { contentToString } from '../lib/content.js';
-import { getDb } from '../db/index.js';
+import { getSessionToken, invalidateSession } from '../services/copilot-session.js';
 
 /**
  * GitHub Copilot provider — Path B (opencode-style) auth.
@@ -37,22 +37,28 @@ import { getDb } from '../db/index.js';
 const COPILOT_DEFAULT_BASE_URL = 'https://api.githubcopilot.com';
 
 /**
- * Resolve the per-key endpoint base URL. Business / enterprise / GHE
- * accounts come back from `/copilot_internal/v2/token` with a host
- * other than api.githubcopilot.com; we persist that on api_keys.
- * Falls back to the individual hostname if the row hasn't been
- * tier-exchanged yet (NULL endpoint_base).
+ * Acquire a session token + endpoint base URL for a request. Wraps
+ * getSessionToken from the session cache and surfaces a clear error
+ * if the proxy didn't thread the keyId through (which would be a
+ * programming error, not a runtime condition).
  */
-function resolveEndpointBase(keyId: number | undefined): string {
-  if (!keyId) return COPILOT_DEFAULT_BASE_URL;
-  try {
-    const row = getDb()
-      .prepare('SELECT endpoint_base FROM api_keys WHERE id = ?')
-      .get(keyId) as { endpoint_base: string | null } | undefined;
-    return row?.endpoint_base?.replace(/\/+$/, '') || COPILOT_DEFAULT_BASE_URL;
-  } catch {
-    return COPILOT_DEFAULT_BASE_URL;
+async function acquireSession(keyId: number | undefined, githubToken: string): Promise<{ sessionToken: string; endpointBase: string; keyId: number | undefined }> {
+  if (!keyId) {
+    // No keyId — happens on validateKey/health-check paths. Do a direct
+    // one-shot exchange, no caching. Falls back to default base URL if
+    // the endpoints.api field is missing from the response.
+    const { sessionToken, endpointBase } = await directExchange(githubToken);
+    return { sessionToken, endpointBase, keyId: undefined };
   }
+  const got = await getSessionToken(keyId, githubToken);
+  return { ...got, keyId };
+}
+
+async function directExchange(githubToken: string): Promise<{ sessionToken: string; endpointBase: string }> {
+  // Lazy import to avoid a circular dependency with copilot-auth.
+  const { exchangeToken } = await import('../lib/copilot-auth.js');
+  const ex = await exchangeToken(githubToken);
+  return { sessionToken: ex.sessionToken, endpointBase: ex.endpointBase || COPILOT_DEFAULT_BASE_URL };
 }
 
 // Header constants from ericc-ch/copilot-api `src/lib/api-config.ts`. Bump
@@ -130,17 +136,23 @@ export class GitHubCopilotProvider extends BaseProvider {
   }
 
   async validateKey(apiKey: string): Promise<boolean> {
-    // /models is the cheapest no-side-effect endpoint that still requires
-    // the full magic-header set. A 401/403 here means the token won't
-    // work for inference either. We use the default endpoint here because
-    // validateKey is called without a keyId context (e.g. dashboard
-    // "Check key" button) — business/enterprise users may want to fix
-    // this in the dashboard layer later.
-    const res = await this.fetchWithTimeout(`${COPILOT_DEFAULT_BASE_URL}/models`, {
-      method: 'GET',
-      headers: buildHeaders(apiKey, []),
-    }, 10000);
-    return res.status !== 401 && res.status !== 403;
+    // Run a one-off Step-3 exchange. A successful exchange proves both
+    // that the gho_ token still has Copilot access AND that GitHub
+    // recognises it for the inference endpoints. Cheaper + more
+    // diagnostic than hitting /models directly.
+    try {
+      await directExchange(apiKey);
+      return true;
+    } catch (err) {
+      const msg = (err as Error).message ?? '';
+      if (msg.includes('(401)') || msg.includes('(403)')) return false;
+      // Network blip etc. — don't mark the key invalid on a transient.
+      // health.ts already swallows transport errors without flipping
+      // the status; propagating throws would respect that behaviour
+      // but the existing contract returns a boolean. Treat unknown
+      // failures as "not invalid" so we don't disable a good key.
+      return true;
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────
@@ -154,15 +166,20 @@ export class GitHubCopilotProvider extends BaseProvider {
     options: CompletionOptions | undefined,
     stream: boolean,
   ): Promise<ChatCompletionResponse> {
-    const baseUrl = resolveEndpointBase(options?.keyId);
+    const { sessionToken, endpointBase, keyId } = await acquireSession(options?.keyId, apiKey);
     const body = this.buildChatBody(messages, modelId, options, stream);
-    const res = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
+    const res = await this.fetchWithTimeout(`${endpointBase}/chat/completions`, {
       method: 'POST',
-      headers: buildHeaders(apiKey, messages),
+      headers: buildHeaders(sessionToken, messages),
       body: JSON.stringify(body),
     }, this.timeoutMs);
 
     if (!res.ok) {
+      // 401 likely means the cached session token raced ahead of GitHub's
+      // own clock or the refresh timer hasn't fired yet. Drop the cache so
+      // the next attempt re-exchanges, then bubble up — the router's
+      // retry loop will try again on a different model.
+      if (res.status === 401 && keyId !== undefined) invalidateSession(keyId);
       const err = await res.text().catch(() => '');
       throw new Error(`GitHub Copilot API error ${res.status}: ${err.slice(0, 500)}`);
     }
@@ -177,15 +194,16 @@ export class GitHubCopilotProvider extends BaseProvider {
     modelId: string,
     options: CompletionOptions | undefined,
   ): AsyncGenerator<ChatCompletionChunk> {
-    const baseUrl = resolveEndpointBase(options?.keyId);
+    const { sessionToken, endpointBase, keyId } = await acquireSession(options?.keyId, apiKey);
     const body = this.buildChatBody(messages, modelId, options, true);
-    const res = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
+    const res = await this.fetchWithTimeout(`${endpointBase}/chat/completions`, {
       method: 'POST',
-      headers: buildHeaders(apiKey, messages),
+      headers: buildHeaders(sessionToken, messages),
       body: JSON.stringify(body),
     }, this.timeoutMs);
 
     if (!res.ok) {
+      if (res.status === 401 && keyId !== undefined) invalidateSession(keyId);
       const err = await res.text().catch(() => '');
       throw new Error(`GitHub Copilot API error ${res.status}: ${err.slice(0, 500)}`);
     }
@@ -230,15 +248,16 @@ export class GitHubCopilotProvider extends BaseProvider {
     options: CompletionOptions | undefined,
     _stream: boolean,
   ): Promise<ChatCompletionResponse> {
-    const baseUrl = resolveEndpointBase(options?.keyId);
+    const { sessionToken, endpointBase, keyId } = await acquireSession(options?.keyId, apiKey);
     const body = this.buildResponsesBody(messages, modelId, options, false);
-    const res = await this.fetchWithTimeout(`${baseUrl}/responses`, {
+    const res = await this.fetchWithTimeout(`${endpointBase}/responses`, {
       method: 'POST',
-      headers: buildHeaders(apiKey, messages),
+      headers: buildHeaders(sessionToken, messages),
       body: JSON.stringify(body),
     }, this.timeoutMs);
 
     if (!res.ok) {
+      if (res.status === 401 && keyId !== undefined) invalidateSession(keyId);
       const err = await res.text().catch(() => '');
       throw new Error(`GitHub Copilot API error ${res.status}: ${err.slice(0, 500)}`);
     }
@@ -252,15 +271,16 @@ export class GitHubCopilotProvider extends BaseProvider {
     modelId: string,
     options: CompletionOptions | undefined,
   ): AsyncGenerator<ChatCompletionChunk> {
-    const baseUrl = resolveEndpointBase(options?.keyId);
+    const { sessionToken, endpointBase, keyId } = await acquireSession(options?.keyId, apiKey);
     const body = this.buildResponsesBody(messages, modelId, options, true);
-    const res = await this.fetchWithTimeout(`${baseUrl}/responses`, {
+    const res = await this.fetchWithTimeout(`${endpointBase}/responses`, {
       method: 'POST',
-      headers: buildHeaders(apiKey, messages),
+      headers: buildHeaders(sessionToken, messages),
       body: JSON.stringify(body),
     }, this.timeoutMs);
 
     if (!res.ok) {
+      if (res.status === 401 && keyId !== undefined) invalidateSession(keyId);
       const err = await res.text().catch(() => '');
       throw new Error(`GitHub Copilot API error ${res.status}: ${err.slice(0, 500)}`);
     }

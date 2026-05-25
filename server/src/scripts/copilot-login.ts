@@ -52,7 +52,7 @@ async function main() {
   let endpointBase: string | null = null;
   try {
     const ex = await exchangeToken(accessToken);
-    tier = mapSkuToTier(ex.sku, ex.rawToken);
+    tier = mapSkuToTier(ex.sku, ex.sessionToken);
     endpointBase = ex.endpointBase;
     console.log(`Plan detected: ${tier} (sku=${ex.sku || 'unknown'}, endpoint=${endpointBase})`);
   } catch (err) {

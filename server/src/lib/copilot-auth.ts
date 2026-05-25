@@ -1,21 +1,29 @@
 /**
- * GitHub Copilot — Path B (opencode-style) auth helper.
+ * GitHub Copilot — canonical Path A auth helper.
  *
- * Runs the GitHub OAuth device-code flow against opencode's registered
- * OAuth app, returning the long-lived `gho_...` access token. The token
- * is then used directly as `Authorization: Bearer ...` against
- * `api.githubcopilot.com` (no per-request token-exchange dance).
+ * Three-step flow:
+ *   1. Device-code request against VSCode's official OAuth client_id.
+ *   2. Poll for the long-lived `gho_...` OAuth access token.
+ *   3. Exchange that token at `/copilot_internal/v2/token` for a
+ *      short-lived ~30 min "session token" used as Bearer for
+ *      inference calls + a Copilot SKU + account-variant base URL.
  *
- * `exchangeToken()` is a ONE-SHOT call we make at login only — Path-A
- * Step 3 — so we can pull the user's plan SKU and account-variant
- * endpoint base URL. The short-lived session token it returns is
- * thrown away; we use the long-lived gho_ token on inference calls.
+ * Step 3 token expires; `services/copilot-session.ts` owns the cache
+ * + refresh scheduler (refreshes ~60s before expiry per the
+ * `refresh_in` hint GitHub returns).
+ *
+ * Why the VSCode client_id specifically: GitHub gates
+ * `/copilot_internal/v2/token` on the OAuth app's identity.
+ * opencode-app tokens 404 there, which is why opencode's Path B
+ * implementation can't pull plan info. The VSCode client_id is also
+ * the lowest-fingerprint choice (traffic identifies as real VSCode
+ * at the OAuth layer).
  */
 
-// opencode's registered OAuth client_id (Path B). Using this id makes
-// traffic identifiable as opencode at GitHub's edge, not as real VSCode —
-// the accepted fingerprint tradeoff for ~150 fewer lines of code.
-export const OPENCODE_CLIENT_ID = 'Ov23li8tweQw6odWQebz';
+// VSCode's official Copilot Chat OAuth client_id. Using this id is
+// what makes /copilot_internal/v2/token answer 200 instead of 404 —
+// GitHub gates that endpoint on the OAuth app's identity.
+export const VSCODE_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
 
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
@@ -50,7 +58,7 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
       'User-Agent': 'freellmapi-copilot/0.1.0',
     },
     body: JSON.stringify({
-      client_id: OPENCODE_CLIENT_ID,
+      client_id: VSCODE_CLIENT_ID,
       scope: 'read:user',
     }),
   });
@@ -82,7 +90,7 @@ export async function attemptTokenExchange(deviceCode: string): Promise<PollResu
       'User-Agent': 'freellmapi-copilot/0.1.0',
     },
     body: JSON.stringify({
-      client_id: OPENCODE_CLIENT_ID,
+      client_id: VSCODE_CLIENT_ID,
       device_code: deviceCode,
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
     }),
@@ -126,7 +134,7 @@ export async function pollForAccessToken(
         'User-Agent': 'freellmapi-copilot/0.1.0',
       },
       body: JSON.stringify({
-        client_id: OPENCODE_CLIENT_ID,
+        client_id: VSCODE_CLIENT_ID,
         device_code: deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
@@ -182,20 +190,24 @@ function sleep(ms: number): Promise<void> {
 const COPILOT_TOKEN_URL = 'https://api.github.com/copilot_internal/v2/token';
 
 export interface ExchangeResult {
-  /** The user's plan tier marker, parsed from the `sku=` field of the
-   *  short-lived session token (e.g. "copilot_individual",
-   *  "copilot_individual_pro_plus", "free", "copilot_student",
-   *  "copilot_business", "copilot_enterprise"). */
+  /** Short-lived (~30 min) session token used as Bearer on inference
+   *  calls. Semicolon-delimited key=value pairs including `sku=...`
+   *  and `exp=...`. Callers should not re-parse — `sku` is broken out
+   *  below and the cache layer handles expiry. */
+  sessionToken: string;
+  /** User's plan-tier marker parsed from the `sku=` field. */
   sku: string;
-  /** The full raw `token` field from the response — semicolon-delimited
-   *  key=value pairs. Kept so callers can inspect other fields like
-   *  `chat_enabled_for_student` without re-doing the exchange. */
-  rawToken: string;
   /** Account-variant base URL for inference calls. Individual / Student
    *  Pack accounts get https://api.githubcopilot.com; business and
-   *  enterprise accounts get the business/enterprise hostnames. */
+   *  enterprise accounts get business/enterprise hostnames. */
   endpointBase: string;
-  /** Wall-clock seconds when the exchange happened, for telemetry. */
+  /** Unix seconds when the session token expires (the `expires_at`
+   *  field from GitHub's response). */
+  expiresAt: number;
+  /** Seconds until refresh per GitHub's `refresh_in` hint. Cache layer
+   *  refreshes at (refreshIn - 60) * 1000 ms after the exchange. */
+  refreshIn: number;
+  /** Wall-clock seconds when this exchange happened. */
   exchangedAt: number;
 }
 
@@ -242,10 +254,17 @@ export async function exchangeToken(githubToken: string): Promise<ExchangeResult
   }
   const sku = extractTokenField(data.token, 'sku') ?? '';
   const endpointBase = (data.endpoints?.api ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
+  // expires_at sometimes missing in older fixtures — fall back to parsing
+  // the embedded `exp=` field of the session token itself.
+  const embeddedExp = parseInt(extractTokenField(data.token, 'exp') ?? '', 10);
+  const expiresAt = data.expires_at ?? (Number.isFinite(embeddedExp) ? embeddedExp : Math.floor(Date.now() / 1000) + 1500);
+  const refreshIn = data.refresh_in ?? Math.max(60, expiresAt - Math.floor(Date.now() / 1000) - 60);
   return {
+    sessionToken: data.token,
     sku,
-    rawToken: data.token,
     endpointBase,
+    expiresAt,
+    refreshIn,
     exchangedAt: Math.floor(Date.now() / 1000),
   };
 }

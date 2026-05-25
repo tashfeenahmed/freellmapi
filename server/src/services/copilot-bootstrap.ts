@@ -52,7 +52,7 @@ export async function backfillCopilotTiers(): Promise<void> {
     let endpointBase: string;
     try {
       const ex = await exchangeToken(token);
-      tier = mapSkuToTier(ex.sku, ex.rawToken);
+      tier = mapSkuToTier(ex.sku, ex.sessionToken);
       endpointBase = ex.endpointBase;
     } catch (err) {
       console.warn(`[copilot-bootstrap] exchange failed for api_keys.id=${row.id}: ${(err as Error).message}`);

@@ -320,29 +320,16 @@ export default function KeysPage() {
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
                       return (
-                        <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                          <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
-                          <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
-                          {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
-                          <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
-                          {k.platform === 'github-copilot' && (
-                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground tabular-nums">
-                              Plan: {formatTierLabel(k.tier)}
-                            </span>
-                          )}
-                          <div className="flex-1" />
-                          {lastChecked && (
-                            <span className="text-[11px] text-muted-foreground tabular-nums">
-                              {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                          <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
-                            Check
-                          </Button>
-                          <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={() => deleteKey.mutate(k.id)} disabled={deleteKey.isPending}>
-                            Remove
-                          </Button>
-                        </div>
+                        <CopilotKeyRow
+                          key={k.id}
+                          k={k}
+                          status={status}
+                          lastChecked={lastChecked}
+                          onCheck={() => checkKey.mutate(k.id)}
+                          onRemove={() => deleteKey.mutate(k.id)}
+                          checking={checkKey.isPending}
+                          removing={deleteKey.isPending}
+                        />
                       )
                     })}
                   </div>
@@ -352,6 +339,98 @@ export default function KeysPage() {
           )}
         </section>
       </div>
+    </div>
+  )
+}
+
+function CopilotKeyRow({
+  k,
+  status,
+  lastChecked,
+  onCheck,
+  onRemove,
+  checking,
+  removing,
+}: {
+  k: ApiKey
+  status: string
+  lastChecked: string | null | undefined
+  onCheck: () => void
+  onRemove: () => void
+  checking: boolean
+  removing: boolean
+}) {
+  const queryClient = useQueryClient()
+  const [editingTier, setEditingTier] = useState(false)
+  const [pickedTier, setPickedTier] = useState<string>(k.tier ?? 'pro')
+  const [saving, setSaving] = useState(false)
+
+  const isCopilot = k.platform === 'github-copilot'
+
+  const saveTier = async () => {
+    setSaving(true)
+    try {
+      await apiFetch('/api/keys/copilot/set-tier', {
+        method: 'POST',
+        body: JSON.stringify({ keyId: k.id, tier: pickedTier }),
+      })
+      setEditingTier(false)
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    } catch {
+      // Surface failure inline via the button's disabled state recovery;
+      // a richer error toast can land later.
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+      <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
+      <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
+      {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+      <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
+      {isCopilot && !editingTier && (
+        <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground tabular-nums">
+          Plan: {formatTierLabel(k.tier)}
+        </span>
+      )}
+      {isCopilot && editingTier && (
+        <div className="flex items-center gap-1.5">
+          <Select value={pickedTier} onValueChange={(v) => v && setPickedTier(v)}>
+            <SelectTrigger className="w-[140px] h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COPILOT_TIER_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="xs" onClick={saveTier} disabled={saving}>
+            {saving ? '…' : 'Save'}
+          </Button>
+          <Button variant="ghost" size="xs" onClick={() => setEditingTier(false)}>Cancel</Button>
+        </div>
+      )}
+      <div className="flex-1" />
+      {lastChecked && (
+        <span className="text-[11px] text-muted-foreground tabular-nums">
+          {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      )}
+      {isCopilot && !editingTier && (
+        <Button variant="ghost" size="xs" onClick={() => setEditingTier(true)}>
+          Change plan
+        </Button>
+      )}
+      <Button variant="ghost" size="xs" onClick={onCheck} disabled={checking}>
+        Check
+      </Button>
+      <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={onRemove} disabled={removing}>
+        Remove
+      </Button>
     </div>
   )
 }
@@ -369,14 +448,32 @@ interface CopilotPollResp {
   id?: number
   masked?: string
   message?: string
+  /** null when the Step-3 exchange failed (404/network/parse) — UI
+   *  drops into the manual plan-picker flow in that case. */
+  tier?: string | null
 }
 
+const COPILOT_TIER_OPTIONS = [
+  { value: 'free',       label: 'Free' },
+  { value: 'pro',        label: 'Pro' },
+  { value: 'pro+',       label: 'Pro+' },
+  { value: 'student',    label: 'Student' },
+  { value: 'business',   label: 'Business' },
+  { value: 'enterprise', label: 'Enterprise' },
+] as const
+
 function CopilotDeviceFlow({ onDone }: { onDone: () => void }) {
-  // 'idle' = before Start, 'awaiting' = polling, 'success' / 'error' terminal.
-  const [phase, setPhase] = useState<'idle' | 'starting' | 'awaiting' | 'success' | 'error'>('idle')
+  // 'idle' = before Start, 'awaiting' = polling, 'pick-tier' = exchange
+  // succeeded but auto-detection of plan failed and the user needs to
+  // pick manually, 'success'/'error' terminal.
+  const [phase, setPhase] = useState<'idle' | 'starting' | 'awaiting' | 'pick-tier' | 'success' | 'error'>('idle')
   const [session, setSession] = useState<CopilotStartResp | null>(null)
   const [message, setMessage] = useState<string>('')
   const [codeCopied, setCodeCopied] = useState(false)
+  const [savedKeyId, setSavedKeyId] = useState<number | null>(null)
+  const [savedMasked, setSavedMasked] = useState<string>('')
+  const [pickedTier, setPickedTier] = useState<string>('pro')
+  const [tierSaving, setTierSaving] = useState(false)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const intervalMs = useRef(5000)
 
@@ -429,14 +526,42 @@ function CopilotDeviceFlow({ onDone }: { onDone: () => void }) {
         pollTimer.current = setTimeout(() => poll(sessionId), intervalMs.current)
         return
       case 'success':
-        setPhase('success')
-        setMessage(`Saved as ${resp.masked} (id ${resp.id}).`)
-        onDone()
+        setSavedKeyId(resp.id ?? null)
+        setSavedMasked(resp.masked ?? '')
+        if (resp.tier) {
+          setPhase('success')
+          setMessage(`Saved as ${resp.masked} (id ${resp.id}). Plan auto-detected: ${formatTierLabel(resp.tier)}.`)
+          onDone()
+        } else {
+          // Step-3 exchange didn't return a usable sku. Fall back to a
+          // manual pick — the user knows which plan they have.
+          setPhase('pick-tier')
+          setMessage(`Saved as ${resp.masked} (id ${resp.id}). Plan auto-detection failed — please pick:`)
+        }
         return
       case 'error':
         setPhase('error')
         setMessage(resp.message ?? 'Authorization failed')
         return
+    }
+  }
+
+  const saveTier = async () => {
+    if (!savedKeyId) return
+    setTierSaving(true)
+    try {
+      await apiFetch('/api/keys/copilot/set-tier', {
+        method: 'POST',
+        body: JSON.stringify({ keyId: savedKeyId, tier: pickedTier }),
+      })
+      setPhase('success')
+      setMessage(`Saved as ${savedMasked} (id ${savedKeyId}). Plan: ${formatTierLabel(pickedTier)} (manual).`)
+      onDone()
+    } catch (err: any) {
+      setPhase('error')
+      setMessage(err?.message ?? 'Failed to save tier')
+    } finally {
+      setTierSaving(false)
     }
   }
 
@@ -518,6 +643,31 @@ function CopilotDeviceFlow({ onDone }: { onDone: () => void }) {
             <span className="text-muted-foreground">Waiting for GitHub… polling every {Math.round(intervalMs.current / 1000)}s.</span>
           </div>
           <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
+        </div>
+      )}
+
+      {phase === 'pick-tier' && (
+        <div className="space-y-3">
+          <p className="text-sm text-amber-700 dark:text-amber-300">{message}</p>
+          <div className="flex items-end gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Plan</Label>
+              <Select value={pickedTier} onValueChange={(v) => v && setPickedTier(v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COPILOT_TIER_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button size="sm" onClick={saveTier} disabled={tierSaving}>
+              {tierSaving ? 'Saving…' : 'Save plan'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={reset}>Skip</Button>
+          </div>
         </div>
       )}
 
