@@ -53,6 +53,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV16(db);
   migrateModelsV17(db);
   migrateModelsV18(db);
+  migrateModelsV19(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1399,6 +1400,49 @@ function migrateModelsV18(db: Database.Database) {
   if (!have.has('endpoint_base')) db.exec("ALTER TABLE api_keys ADD COLUMN endpoint_base TEXT");
 
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('copilot_priority_v18_applied', '1')").run();
+}
+
+/**
+ * V19 (May 2026): re-rank the Copilot trio.
+ *
+ * New order, per Sondre's preference after live testing:
+ *   #1 gpt-5.2-codex   (was #3 in V16)
+ *   #2 gpt-5.4-mini    (was #1 in V16)
+ *   #3 gpt-5-mini      (was #2 in V16)
+ *
+ * Flag-gated; safe to drop on a freshly-V16'd DB or one that's
+ * already V19'd. Two-step swap to keep priorities unique through the
+ * transition even though the column doesn't enforce that.
+ */
+function migrateModelsV19(db: Database.Database) {
+  const flag = db.prepare("SELECT value FROM settings WHERE key = 'copilot_priority_v19_applied'").get();
+  if (flag) return;
+
+  const rows = db.prepare(`
+    SELECT id, model_id FROM models
+     WHERE platform = 'github-copilot'
+       AND model_id IN ('gpt-5.2-codex', 'gpt-5.4-mini', 'gpt-5-mini')
+  `).all() as { id: number; model_id: string }[];
+  if (rows.length !== 3) return;
+  const idByModel = new Map(rows.map(r => [r.model_id, r.id]));
+
+  const apply = db.transaction(() => {
+    // Park the three rows at sentinel high priorities so the final
+    // assignment can't transiently collide with whatever they were at
+    // before (V16's 1/2/3, V17's reshuffled state, or a manual
+    // dashboard re-order).
+    const park = db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
+    park.run(100001, idByModel.get('gpt-5.2-codex')!);
+    park.run(100002, idByModel.get('gpt-5.4-mini')!);
+    park.run(100003, idByModel.get('gpt-5-mini')!);
+
+    park.run(1, idByModel.get('gpt-5.2-codex')!);
+    park.run(2, idByModel.get('gpt-5.4-mini')!);
+    park.run(3, idByModel.get('gpt-5-mini')!);
+
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('copilot_priority_v19_applied', '1')").run();
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

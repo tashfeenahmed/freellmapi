@@ -60,7 +60,7 @@ The problem is that stacking them by hand is painful: fourteen different SDKs, f
 <td align="center"><a href="https://huggingface.co/docs/inference-providers"><b>HuggingFace</b><br/>Router → DeepSeek V4 · Kimi K2.6 · Qwen3</a></td>
 </tr>
 <tr>
-<td align="center" colspan="4"><a href="https://docs.github.com/en/copilot"><b>GitHub Copilot</b><br/>gpt-5-mini · gpt-5.4-mini (400k ctx) · gpt-5.2-codex — device-flow login, plan-aware budgets, see <a href="#github-copilot-provider">setup notes below</a></a></td>
+<td align="center" colspan="4"><a href="https://docs.github.com/en/copilot"><b>GitHub Copilot</b><br/>gpt-5.2-codex · gpt-5.4-mini (400k ctx) · gpt-5-mini — device-flow login, plan-aware budgets, see <a href="#github-copilot-provider">setup notes below</a></a></td>
 </tr>
 </table>
 
@@ -78,22 +78,24 @@ No CLI step is required — the entire flow lives in the dashboard.
 
 ### Supported models
 
+Listed in fallback-chain order — `gpt-5.2-codex` is tried first.
+
 | Model           | Route               | Multiplier | Notes        |
 |-----------------|---------------------|------------|--------------|
-| `gpt-5-mini`    | `/chat/completions` | 0x         | Unmetered    |
-| `gpt-5.4-mini`  | `/responses`        | 0.33x      | 400k context |
 | `gpt-5.2-codex` | `/responses`        | 1x         | Codex-tuned  |
+| `gpt-5.4-mini`  | `/responses`        | 0.33x      | 400k context |
+| `gpt-5-mini`    | `/chat/completions` | 0x         | Unmetered    |
 
 ### Plan tiers and budgets
 
 Budgets are estimates derived from (premium requests per month) × ~13k tokens per request — a Claude-Code-shaped call with tool registry + a couple of tool turns. Real billing happens server-side against your Copilot quota; these numbers are for the dashboard's monthly-budget bar, not a hard cap.
 
-| Tier             | Quota              | gpt-5-mini  | gpt-5.4-mini | gpt-5.2-codex |
-|------------------|--------------------|-------------|--------------|---------------|
-| Free             | 50 reqs / mo       | ~999M (0x)  | disabled     | disabled      |
-| Pro / Student    | 300 reqs / mo      | ~999M       | ~12M         | ~4M           |
-| Pro+             | 1500 reqs / mo     | ~999M       | ~60M         | ~20M          |
-| Business / Ent.  | per-seat allotment | ~999M       | ~12M         | ~4M           |
+| Tier             | Quota              | gpt-5.2-codex | gpt-5.4-mini | gpt-5-mini  |
+|------------------|--------------------|---------------|--------------|-------------|
+| Free             | 50 reqs / mo       | disabled      | disabled     | ~999M (0x)  |
+| Pro / Student    | 300 reqs / mo      | ~4M           | ~12M         | ~999M       |
+| Pro+             | 1500 reqs / mo     | ~20M          | ~60M         | ~999M       |
+| Business / Ent.  | per-seat allotment | ~4M           | ~12M         | ~999M       |
 
 Hovering the budget label on the **Fallback chain** page shows tier-adjusted call-count math for each multiplier.
 
