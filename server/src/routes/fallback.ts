@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties } from '../services/router.js';
+import { getCopilotMultiplier } from '../services/copilot-tiers.js';
 
 export const fallbackRouter = Router();
 
@@ -50,6 +51,11 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       rpdLimit: r.rpd_limit,
       monthlyTokenBudget: r.monthly_token_budget,
       keyCount: keyCountMap.get(r.platform) ?? 0,
+      // Copilot-only — undefined elsewhere. Surfaces the static
+      // per-model premium-request multiplier (0x / 0.33x / 1x) so
+      // the dashboard can append it to the chain-row label and
+      // explain quota burn in a tooltip.
+      multiplier: r.platform === 'github-copilot' ? getCopilotMultiplier(r.model_id) ?? null : null,
     };
   }));
 });

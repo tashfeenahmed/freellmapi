@@ -39,6 +39,37 @@ interface FallbackEntry {
   rpdLimit: number | null
   monthlyTokenBudget: string
   keyCount: number
+  /** Copilot-only: premium-request multiplier ("0x", "0.33x", "1x").
+   *  Null for non-copilot platforms. */
+  multiplier: string | null
+}
+
+/** Per-tier monthly premium-request quota — for the multiplier tooltip
+ *  math. Mirrors getCopilotQuota in services/copilot-tiers.ts. */
+const COPILOT_QUOTA: Record<string, number | null> = {
+  free: 50,
+  pro: 300,
+  student: 300,
+  'pro+': 1500,
+  business: null,
+  enterprise: null,
+  unknown: null,
+}
+
+function multiplierTooltip(multiplier: string | null, tier: string | null | undefined): string {
+  if (!multiplier) return ''
+  const quota = tier ? COPILOT_QUOTA[tier] ?? null : null
+  if (multiplier === '0x') {
+    return 'Unmetered — does not count against your monthly Copilot quota.'
+  }
+  if (multiplier === '0.33x') {
+    const calls = quota !== null ? `~${quota * 3} calls/month` : 'quota varies by plan'
+    return `Counts as 1/3 of a premium request. ${quota !== null ? `At ${tier} tier (${quota}/mo quota): ${calls}.` : calls + '.'}`
+  }
+  if (multiplier === '1x') {
+    return `1 premium request per call. ${quota !== null ? `At ${tier} tier (${quota}/mo quota): ${quota} calls/month.` : 'Quota varies by plan.'}`
+  }
+  return `${multiplier} multiplier per call.`
 }
 
 function formatTokens(n: number): string {
@@ -196,9 +227,16 @@ function SortableModelRow({
           <span>Speed #{entry.speedRank}</span>
           {entry.rpmLimit && <span>{entry.rpmLimit} rpm</span>}
           {entry.rpdLimit && <span>{entry.rpdLimit} rpd</span>}
-          <span>
+          <span
+            title={entry.platform === 'github-copilot' ? multiplierTooltip(entry.multiplier, tier) : undefined}
+            className={entry.platform === 'github-copilot' && entry.multiplier ? 'cursor-help underline decoration-dotted underline-offset-4' : undefined}
+          >
             {/^[~\d]/.test(entry.monthlyTokenBudget)
-              ? `${entry.monthlyTokenBudget} tok/mo${entry.platform === 'github-copilot' && tier ? ` (${formatTierLabel(tier)} est.)` : ''}`
+              ? `${entry.monthlyTokenBudget} tok/mo${
+                  entry.platform === 'github-copilot' && tier
+                    ? ` (${formatTierLabel(tier)} est.${entry.multiplier ? `, ${entry.multiplier}` : ''})`
+                    : ''
+                }`
               : entry.monthlyTokenBudget}
           </span>
         </div>

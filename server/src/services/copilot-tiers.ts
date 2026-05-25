@@ -57,6 +57,39 @@ export function mapSkuToTier(sku: string, tokenField?: string): CopilotTier {
 }
 
 /**
+ * Per-model GitHub Copilot premium-request multiplier. Static per
+ * model — independent of tier. 0x = unmetered, 1x = one premium
+ * request per call, 0.33x = three calls per quota unit.
+ */
+export function getCopilotMultiplier(modelId: string): '0x' | '0.33x' | '1x' | undefined {
+  switch (modelId) {
+    case 'gpt-5-mini':    return '0x';
+    case 'gpt-5.4-mini':  return '0.33x';
+    case 'gpt-5.2-codex': return '1x';
+    default:              return undefined;
+  }
+}
+
+/**
+ * Monthly premium-request quota per tier — the number of "1x"
+ * requests the user gets each month. Used to surface "what does
+ * this multiplier mean for me" math in the dashboard tooltip.
+ * Returns null for tiers where the quota is opaque (business /
+ * enterprise share a per-seat allotment from a pool we can't see).
+ */
+export function getCopilotQuota(tier: CopilotTier): number | null {
+  switch (tier) {
+    case 'free':       return 50;
+    case 'pro':        return 300;
+    case 'student':    return 300;
+    case 'pro+':       return 1500;
+    case 'business':   return null;
+    case 'enterprise': return null;
+    case 'unknown':    return null;
+  }
+}
+
+/**
  * Token budget string ("~12M", "" if disabled) for a given copilot
  * model on a given tier. Empty string means the model is gated off
  * (free tier doesn't get the premium-multiplier models, etc.).
