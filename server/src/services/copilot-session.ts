@@ -71,7 +71,7 @@ async function doExchangeAndCache(keyId: number, githubToken: string): Promise<C
   const ex = await exchangeToken(githubToken);
 
   // Persist any newly-observed tier or endpoint shift to the DB so the
-  // dashboard + bootstrap stay current across restarts.
+  // dashboard stays current across restarts.
   const db = getDb();
   const tier: CopilotTier = mapSkuToTier(ex.sku, ex.sessionToken);
   db.prepare('UPDATE api_keys SET tier = ?, endpoint_base = ? WHERE id = ?')

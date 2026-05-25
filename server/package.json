@@ -8,8 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "copilot-login": "tsx src/scripts/copilot-login.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@freellmapi/shared": "*",

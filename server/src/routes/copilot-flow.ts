@@ -113,8 +113,8 @@ copilotFlowRouter.post('/poll', async (req: Request, res: Response) => {
   if (result.status === 'success') {
     // Run Path-A Step 3 once to pull the plan tier + account-variant
     // endpoint base. Don't fail the whole flow if the exchange errors
-    // (network blip, ratelimit, etc.) — store the key without tier
-    // and let the bootstrap backfill retry on next server start.
+    // (network blip, ratelimit, etc.) — store the key with tier=NULL
+    // and let the user pick a tier from the dashboard fallback dropdown.
     let tier: CopilotTier | null = null;
     let endpointBase: string | null = null;
     try {

@@ -20,6 +20,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 
 - [Why this exists](#why-this-exists)
 - [Supported providers](#supported-providers)
+- [GitHub Copilot provider](#github-copilot-provider)
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
@@ -58,7 +59,57 @@ The problem is that stacking them by hand is painful: fourteen different SDKs, f
 <td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM (disabled by default)</a></td>
 <td align="center"><a href="https://huggingface.co/docs/inference-providers"><b>HuggingFace</b><br/>Router → DeepSeek V4 · Kimi K2.6 · Qwen3</a></td>
 </tr>
+<tr>
+<td align="center" colspan="4"><a href="https://docs.github.com/en/copilot"><b>GitHub Copilot</b><br/>gpt-5-mini · gpt-5.4-mini (400k ctx) · gpt-5.2-codex — device-flow login, plan-aware budgets, see <a href="#github-copilot-provider">setup notes below</a></a></td>
+</tr>
 </table>
+
+## GitHub Copilot provider
+
+FreeLLMAPI can route requests through the GitHub Copilot inference endpoint using your existing Copilot subscription. This unlocks **gpt-5-mini**, **gpt-5.4-mini** (400k context), and **gpt-5.2-codex** with no per-call token cap — the request counts against your monthly Copilot quota instead of being clamped to the 4-8k limit you'd hit on the public GitHub Models REST API.
+
+### Setup
+
+1. In the dashboard, navigate to **Keys**, click **Add a provider key**, and pick **GitHub Copilot (device flow)** in the dropdown.
+2. Click **Start GitHub login**. The dashboard shows a `user_code` plus a verification URL. Open the URL in any browser, paste the code, approve the request.
+3. The dashboard polls until GitHub issues the token. If your plan tier is auto-detected (Free / Pro / Pro+ / Student / Business / Enterprise), a `Plan: <tier>` badge appears on the key row. If detection fails, a dropdown lets you pick manually. You can also use **Change plan** on any Copilot row to override later.
+
+No CLI step is required — the entire flow lives in the dashboard.
+
+### Supported models
+
+| Model           | Route               | Multiplier | Notes        |
+|-----------------|---------------------|------------|--------------|
+| `gpt-5-mini`    | `/chat/completions` | 0x         | Unmetered    |
+| `gpt-5.4-mini`  | `/responses`        | 0.33x      | 400k context |
+| `gpt-5.2-codex` | `/responses`        | 1x         | Codex-tuned  |
+
+### Plan tiers and budgets
+
+Budgets are estimates derived from (premium requests per month) × ~13k tokens per request — a Claude-Code-shaped call with tool registry + a couple of tool turns. Real billing happens server-side against your Copilot quota; these numbers are for the dashboard's monthly-budget bar, not a hard cap.
+
+| Tier             | Quota              | gpt-5-mini  | gpt-5.4-mini | gpt-5.2-codex |
+|------------------|--------------------|-------------|--------------|---------------|
+| Free             | 50 reqs / mo       | ~999M (0x)  | disabled     | disabled      |
+| Pro / Student    | 300 reqs / mo      | ~999M       | ~12M         | ~4M           |
+| Pro+             | 1500 reqs / mo     | ~999M       | ~60M         | ~20M          |
+| Business / Ent.  | per-seat allotment | ~999M       | ~12M         | ~4M           |
+
+Hovering the budget label on the **Fallback chain** page shows tier-adjusted call-count math for each multiplier.
+
+### Architecture
+
+FreeLLMAPI uses canonical Path A auth:
+
+1. Device-flow login against the **official VSCode Copilot Chat** OAuth client_id (`Iv1.b507a08c87ecfe98`) — the same id `ericc-ch/copilot-api` and `litellm` use. Other client_ids (like opencode's) return 404 on the next step.
+2. The long-lived `gho_` access token is exchanged at `https://api.github.com/copilot_internal/v2/token` for a short-lived (~30 min) Copilot session token plus the user's `sku=` (mapped to a tier) and `endpoints.api` (the account-variant base URL).
+3. Session tokens are cached in memory and auto-refreshed ~60 seconds before expiry. The `gho_` token is encrypted at rest in `api_keys.encrypted_key`; the session token never leaves memory.
+4. Inference requests Bearer-auth with the cached session token against the account-variant endpoint (`api.githubcopilot.com` for individual / Student / Pro, `api.business.githubcopilot.com` for business, `api.enterprise.githubcopilot.com` for enterprise).
+
+### Caveats
+
+- **AI Credits transition.** GitHub is moving Copilot from request-count quotas to a usage-based "AI Credits" model on 2026-06-01. The dashboard budget math here is request-based; expect to re-tune the numbers post-cutover.
+- **Undocumented endpoint.** The Copilot inference endpoint and `copilot_internal/v2/token` are internal — GitHub's Terms of Service flag proxy usage as bannable. Enforcement appears volume-and-pattern based rather than blanket; see [Terms of Service review](#terms-of-service-review). Use responsibly.
 
 ## Features
 
