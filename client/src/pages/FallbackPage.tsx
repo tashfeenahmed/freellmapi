@@ -81,16 +81,11 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
 
   // Scale each model's segment proportionally so the colored portion of the
   // bar sums to `remaining`; the grey tail represents what's been used.
-  // Models with budget=0 (e.g. github-copilot's "Session capped") can't be
-  // quantified and are dropped from the bar + legend rather than displayed
-  // as a tiny / zero-width slice that pollutes the layout.
-  const modelsWithWidth = models
-    .filter(m => m.budget > 0)
-    .map(m => ({
-      ...m,
-      remainingTokens: totalBudget > 0 ? (m.budget / totalBudget) * remaining : 0,
-      widthPct: totalBudget > 0 ? (m.budget / totalBudget) * (remaining / totalBudget) * 100 : 0,
-    }))
+  const modelsWithWidth = models.map(m => ({
+    ...m,
+    remainingTokens: totalBudget > 0 ? (m.budget / totalBudget) * remaining : 0,
+    widthPct: totalBudget > 0 ? (m.budget / totalBudget) * (remaining / totalBudget) * 100 : 0,
+  }))
   const usedPct = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0
 
   return (
@@ -141,14 +136,22 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   )
 }
 
+function formatTierLabel(tier: string | null | undefined): string {
+  if (!tier) return ''
+  if (tier === 'pro+') return 'Pro+'
+  return tier.charAt(0).toUpperCase() + tier.slice(1)
+}
+
 function SortableModelRow({
   entry,
   index,
   onToggle,
+  tier,
 }: {
   entry: FallbackEntry
   index: number
   onToggle: (modelDbId: number, enabled: boolean) => void
+  tier?: string | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.modelDbId,
@@ -195,7 +198,7 @@ function SortableModelRow({
           {entry.rpdLimit && <span>{entry.rpdLimit} rpd</span>}
           <span>
             {/^[~\d]/.test(entry.monthlyTokenBudget)
-              ? `${entry.monthlyTokenBudget} tok/mo`
+              ? `${entry.monthlyTokenBudget} tok/mo${entry.platform === 'github-copilot' && tier ? ` (${formatTierLabel(tier)} est.)` : ''}`
               : entry.monthlyTokenBudget}
           </span>
         </div>
@@ -221,6 +224,19 @@ export default function FallbackPage() {
     queryKey: ['fallback', 'token-usage'],
     queryFn: () => apiFetch('/api/fallback/token-usage'),
   })
+
+  // Pull tier from /api/keys so we can suffix the github-copilot
+  // chain-row label with "(<Tier> est.)" — telegraphs to the user
+  // that the budget number is a per-tier computed estimate, not a
+  // GitHub-published value.
+  const { data: keys = [] } = useQuery<{ platform: string; tier?: string | null }[]>({
+    queryKey: ['keys'],
+    queryFn: () => apiFetch('/api/keys'),
+  })
+  const tierByPlatform = new Map<string, string | null>()
+  for (const k of keys) {
+    if (k.tier) tierByPlatform.set(k.platform, k.tier)
+  }
 
   const saveMutation = useMutation({
     mutationFn: (data: { modelDbId: number; priority: number; enabled: boolean }[]) =>
@@ -334,6 +350,7 @@ export default function FallbackPage() {
                       entry={entry}
                       index={index}
                       onToggle={handleToggle}
+                      tier={tierByPlatform.get(entry.platform) ?? null}
                     />
                   ))}
                 </SortableContext>

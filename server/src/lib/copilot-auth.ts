@@ -4,9 +4,12 @@
  * Runs the GitHub OAuth device-code flow against opencode's registered
  * OAuth app, returning the long-lived `gho_...` access token. The token
  * is then used directly as `Authorization: Bearer ...` against
- * `api.githubcopilot.com` (no token-exchange step). See
- * vault/02-areas/ai-agents/freellmapi-copilot-integration-plan.md for the
- * tradeoff between this and the canonical VSCode-style Path A.
+ * `api.githubcopilot.com` (no per-request token-exchange dance).
+ *
+ * `exchangeToken()` is a ONE-SHOT call we make at login only — Path-A
+ * Step 3 — so we can pull the user's plan SKU and account-variant
+ * endpoint base URL. The short-lived session token it returns is
+ * thrown away; we use the long-lived gho_ token on inference calls.
  */
 
 // opencode's registered OAuth client_id (Path B). Using this id makes
@@ -170,4 +173,94 @@ export async function runDeviceFlow(
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Path-A Step 3 — one-shot exchange at login.
+// ────────────────────────────────────────────────────────────────────────
+
+const COPILOT_TOKEN_URL = 'https://api.github.com/copilot_internal/v2/token';
+
+export interface ExchangeResult {
+  /** The user's plan tier marker, parsed from the `sku=` field of the
+   *  short-lived session token (e.g. "copilot_individual",
+   *  "copilot_individual_pro_plus", "free", "copilot_student",
+   *  "copilot_business", "copilot_enterprise"). */
+  sku: string;
+  /** The full raw `token` field from the response — semicolon-delimited
+   *  key=value pairs. Kept so callers can inspect other fields like
+   *  `chat_enabled_for_student` without re-doing the exchange. */
+  rawToken: string;
+  /** Account-variant base URL for inference calls. Individual / Student
+   *  Pack accounts get https://api.githubcopilot.com; business and
+   *  enterprise accounts get the business/enterprise hostnames. */
+  endpointBase: string;
+  /** Wall-clock seconds when the exchange happened, for telemetry. */
+  exchangedAt: number;
+}
+
+interface ExchangeApiResponse {
+  token?: string;
+  expires_at?: number;
+  refresh_in?: number;
+  endpoints?: { api?: string };
+}
+
+/**
+ * Path-A Step 3. Trade the long-lived gho_ OAuth token for a session
+ * token whose `sku=` field tells us the user's plan tier and whose
+ * `endpoints.api` tells us the right inference base URL for this
+ * account variant.
+ *
+ * Used at login ONLY. We do NOT call this per inference request — the
+ * gho_ token works directly as Bearer for the inference endpoint, and
+ * the sku rarely changes (a user upgrading their plan would need to
+ * re-login to refresh tier; that's a v3 followup).
+ *
+ * The 3 critical headers below (Editor-Version, Editor-Plugin-Version,
+ * User-Agent) are mandatory — GitHub returns 401 or a sku-stripped
+ * response if any are missing.
+ */
+export async function exchangeToken(githubToken: string): Promise<ExchangeResult> {
+  const res = await fetch(COPILOT_TOKEN_URL, {
+    method: 'GET',
+    headers: {
+      'Authorization': `token ${githubToken}`,
+      'Accept': 'application/json',
+      'User-Agent': 'GitHubCopilotChat/0.26.7',
+      'Editor-Version': 'vscode/1.107.0',
+      'Editor-Plugin-Version': 'copilot-chat/0.26.7',
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`copilot_internal/v2/token failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const data = await res.json() as ExchangeApiResponse;
+  if (!data.token) {
+    throw new Error('copilot_internal/v2/token response missing `token` field');
+  }
+  const sku = extractTokenField(data.token, 'sku') ?? '';
+  const endpointBase = (data.endpoints?.api ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
+  return {
+    sku,
+    rawToken: data.token,
+    endpointBase,
+    exchangedAt: Math.floor(Date.now() / 1000),
+  };
+}
+
+/**
+ * Extract `name=value` from a Copilot session-token field. The field
+ * looks like `tid=abc;exp=1748880000;sku=copilot_individual;...`.
+ * Order isn't guaranteed; the parser is forgiving of stray whitespace.
+ */
+function extractTokenField(raw: string, name: string): string | undefined {
+  for (const pair of raw.split(';')) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) continue;
+    const k = pair.slice(0, eq).trim();
+    if (k === name) return pair.slice(eq + 1).trim();
+  }
+  return undefined;
 }

@@ -52,6 +52,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV15(db);
   migrateModelsV16(db);
   migrateModelsV17(db);
+  migrateModelsV18(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1367,6 +1368,37 @@ function migrateModelsV17(db: Database.Database) {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('copilot_priority_v17_applied', '1')").run();
   });
   apply();
+}
+
+/**
+ * V18 (May 2026): add tier + endpoint_base columns to api_keys so we
+ * can persist what the Path-A Step 3 exchange (lib/copilot-auth.ts
+ * `exchangeToken`) tells us about each Copilot key.
+ *
+ * - tier: 'free' | 'pro' | 'pro+' | 'student' | 'business' | 'enterprise' | 'unknown' | NULL
+ *   NULL means the exchange hasn't been run for this key yet (existing
+ *   rows pre-V18; backfilled by server bootstrap on next start).
+ * - endpoint_base: account-variant inference URL from
+ *   /copilot_internal/v2/token's `endpoints.api`. Falls back to
+ *   https://api.githubcopilot.com if NULL.
+ *
+ * The migration also wipes V17's "Session capped" budget back to
+ * something parseable so the post-V18 tier resolution can write real
+ * numbers. The bootstrap step (server/src/index.ts) calls
+ * `applyCopilotTier()` for each Copilot key once the exchange
+ * resolves a tier; that's where the real numbers land.
+ */
+function migrateModelsV18(db: Database.Database) {
+  const flag = db.prepare("SELECT value FROM settings WHERE key = 'copilot_priority_v18_applied'").get();
+  if (flag) return;
+
+  // ALTER TABLE ADD COLUMN is not idempotent in SQLite — check schema first.
+  const columns = db.prepare("PRAGMA table_info(api_keys)").all() as { name: string }[];
+  const have = new Set(columns.map(c => c.name));
+  if (!have.has('tier'))          db.exec("ALTER TABLE api_keys ADD COLUMN tier TEXT");
+  if (!have.has('endpoint_base')) db.exec("ALTER TABLE api_keys ADD COLUMN endpoint_base TEXT");
+
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('copilot_priority_v18_applied', '1')").run();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

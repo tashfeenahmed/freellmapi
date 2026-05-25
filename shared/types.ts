@@ -52,6 +52,11 @@ export interface ApiKey {
   enabled: boolean;
   createdAt: string;
   lastCheckedAt: string | null;
+  /** Copilot-only: detected plan tier from Path-A Step 3 exchange.
+   *  Null for non-copilot platforms or copilot keys that haven't
+   *  been exchanged yet (legacy / failed exchange / no network). */
+  tier?: string | null;
+  endpointBase?: string | null;
 }
 
 export interface ApiKeyCreate {

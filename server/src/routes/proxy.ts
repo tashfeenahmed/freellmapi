@@ -359,7 +359,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, keyId: route.keyId },
           );
 
           for await (const chunk of gen) {

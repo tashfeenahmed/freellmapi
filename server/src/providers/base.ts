@@ -15,6 +15,10 @@ export interface CompletionOptions {
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
+  /** Optional: the api_keys row id the router selected. The Copilot
+   *  provider uses it to look up endpoint_base for business/enterprise
+   *  account variants. Other providers ignore it. */
+  keyId?: number;
 }
 
 export abstract class BaseProvider {

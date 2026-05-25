@@ -7,6 +7,7 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
 import { contentToString } from '../lib/content.js';
+import { getDb } from '../db/index.js';
 
 /**
  * GitHub Copilot provider — Path B (opencode-style) auth.
@@ -33,7 +34,26 @@ import { contentToString } from '../lib/content.js';
  *   - Tool-call fidelity on the Responses route (basic pass-through only)
  */
 
-const COPILOT_BASE_URL = 'https://api.githubcopilot.com';
+const COPILOT_DEFAULT_BASE_URL = 'https://api.githubcopilot.com';
+
+/**
+ * Resolve the per-key endpoint base URL. Business / enterprise / GHE
+ * accounts come back from `/copilot_internal/v2/token` with a host
+ * other than api.githubcopilot.com; we persist that on api_keys.
+ * Falls back to the individual hostname if the row hasn't been
+ * tier-exchanged yet (NULL endpoint_base).
+ */
+function resolveEndpointBase(keyId: number | undefined): string {
+  if (!keyId) return COPILOT_DEFAULT_BASE_URL;
+  try {
+    const row = getDb()
+      .prepare('SELECT endpoint_base FROM api_keys WHERE id = ?')
+      .get(keyId) as { endpoint_base: string | null } | undefined;
+    return row?.endpoint_base?.replace(/\/+$/, '') || COPILOT_DEFAULT_BASE_URL;
+  } catch {
+    return COPILOT_DEFAULT_BASE_URL;
+  }
+}
 
 // Header constants from ericc-ch/copilot-api `src/lib/api-config.ts`. Bump
 // these in lockstep when GitHub tightens version checks (historically every
@@ -112,8 +132,11 @@ export class GitHubCopilotProvider extends BaseProvider {
   async validateKey(apiKey: string): Promise<boolean> {
     // /models is the cheapest no-side-effect endpoint that still requires
     // the full magic-header set. A 401/403 here means the token won't
-    // work for inference either.
-    const res = await this.fetchWithTimeout(`${COPILOT_BASE_URL}/models`, {
+    // work for inference either. We use the default endpoint here because
+    // validateKey is called without a keyId context (e.g. dashboard
+    // "Check key" button) — business/enterprise users may want to fix
+    // this in the dashboard layer later.
+    const res = await this.fetchWithTimeout(`${COPILOT_DEFAULT_BASE_URL}/models`, {
       method: 'GET',
       headers: buildHeaders(apiKey, []),
     }, 10000);
@@ -131,8 +154,9 @@ export class GitHubCopilotProvider extends BaseProvider {
     options: CompletionOptions | undefined,
     stream: boolean,
   ): Promise<ChatCompletionResponse> {
+    const baseUrl = resolveEndpointBase(options?.keyId);
     const body = this.buildChatBody(messages, modelId, options, stream);
-    const res = await this.fetchWithTimeout(`${COPILOT_BASE_URL}/chat/completions`, {
+    const res = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: buildHeaders(apiKey, messages),
       body: JSON.stringify(body),
@@ -153,8 +177,9 @@ export class GitHubCopilotProvider extends BaseProvider {
     modelId: string,
     options: CompletionOptions | undefined,
   ): AsyncGenerator<ChatCompletionChunk> {
+    const baseUrl = resolveEndpointBase(options?.keyId);
     const body = this.buildChatBody(messages, modelId, options, true);
-    const res = await this.fetchWithTimeout(`${COPILOT_BASE_URL}/chat/completions`, {
+    const res = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: buildHeaders(apiKey, messages),
       body: JSON.stringify(body),
@@ -205,8 +230,9 @@ export class GitHubCopilotProvider extends BaseProvider {
     options: CompletionOptions | undefined,
     _stream: boolean,
   ): Promise<ChatCompletionResponse> {
+    const baseUrl = resolveEndpointBase(options?.keyId);
     const body = this.buildResponsesBody(messages, modelId, options, false);
-    const res = await this.fetchWithTimeout(`${COPILOT_BASE_URL}/responses`, {
+    const res = await this.fetchWithTimeout(`${baseUrl}/responses`, {
       method: 'POST',
       headers: buildHeaders(apiKey, messages),
       body: JSON.stringify(body),
@@ -226,8 +252,9 @@ export class GitHubCopilotProvider extends BaseProvider {
     modelId: string,
     options: CompletionOptions | undefined,
   ): AsyncGenerator<ChatCompletionChunk> {
+    const baseUrl = resolveEndpointBase(options?.keyId);
     const body = this.buildResponsesBody(messages, modelId, options, true);
-    const res = await this.fetchWithTimeout(`${COPILOT_BASE_URL}/responses`, {
+    const res = await this.fetchWithTimeout(`${baseUrl}/responses`, {
       method: 'POST',
       headers: buildHeaders(apiKey, messages),
       body: JSON.stringify(body),

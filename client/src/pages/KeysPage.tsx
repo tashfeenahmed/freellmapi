@@ -44,6 +44,12 @@ const statusLabel: Record<string, string> = {
   unknown: 'unchecked',
 }
 
+function formatTierLabel(tier: string | null | undefined): string {
+  if (!tier) return 'unknown'
+  if (tier === 'pro+') return 'Pro+'
+  return tier.charAt(0).toUpperCase() + tier.slice(1)
+}
+
 interface HealthPlatform {
   platform: string
   totalKeys: number
@@ -319,6 +325,11 @@ export default function KeysPage() {
                           <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
                           {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
                           <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
+                          {k.platform === 'github-copilot' && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground tabular-nums">
+                              Plan: {formatTierLabel(k.tier)}
+                            </span>
+                          )}
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">

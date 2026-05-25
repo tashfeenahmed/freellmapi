@@ -43,6 +43,10 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       enabled: row.enabled === 1,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
+      // Copilot-only — null for other platforms or for keys that
+      // pre-date V18 / haven't been tier-exchanged yet.
+      tier: row.tier ?? null,
+      endpointBase: row.endpoint_base ?? null,
     };
   });
 

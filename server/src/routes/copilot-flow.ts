@@ -22,8 +22,10 @@ import { encrypt, maskKey } from '../lib/crypto.js';
 import {
   requestDeviceCode,
   attemptTokenExchange,
+  exchangeToken,
   type PollResult,
 } from '../lib/copilot-auth.js';
+import { mapSkuToTier, applyCopilotTier, type CopilotTier } from '../services/copilot-tiers.js';
 
 export const copilotFlowRouter = Router();
 
@@ -109,17 +111,33 @@ copilotFlowRouter.post('/poll', async (req: Request, res: Response) => {
   }
 
   if (result.status === 'success') {
+    // Run Path-A Step 3 once to pull the plan tier + account-variant
+    // endpoint base. Don't fail the whole flow if the exchange errors
+    // (network blip, ratelimit, etc.) — store the key without tier
+    // and let the bootstrap backfill retry on next server start.
+    let tier: CopilotTier | null = null;
+    let endpointBase: string | null = null;
+    try {
+      const ex = await exchangeToken(result.accessToken);
+      tier = mapSkuToTier(ex.sku, ex.rawToken);
+      endpointBase = ex.endpointBase;
+    } catch (err) {
+      console.warn(`[copilot-flow] tier exchange failed: ${(err as Error).message}`);
+    }
+
     const label = `dashboard ${new Date().toISOString().slice(0, 10)}`;
     const { encrypted, iv, authTag } = encrypt(result.accessToken);
-    const ins = getDb().prepare(`
-      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-      VALUES ('github-copilot', ?, ?, ?, ?, 'unknown', 1)
-    `).run(label, encrypted, iv, authTag);
+    const db = getDb();
+    const ins = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, tier, endpoint_base)
+      VALUES ('github-copilot', ?, ?, ?, ?, 'unknown', 1, ?, ?)
+    `).run(label, encrypted, iv, authTag, tier, endpointBase);
     const id = Number(ins.lastInsertRowid);
+    if (tier) applyCopilotTier(db, tier);
     const masked = maskKey(result.accessToken);
     session.resolvedKeyId = id;
     session.resolvedMasked = masked;
-    res.json({ status: 'success', id, masked });
+    res.json({ status: 'success', id, masked, tier });
     return;
   }
 

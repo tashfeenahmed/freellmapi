@@ -27,7 +27,8 @@
 import '../env.js';
 import { initDb, getDb } from '../db/index.js';
 import { encrypt, maskKey } from '../lib/crypto.js';
-import { runDeviceFlow } from '../lib/copilot-auth.js';
+import { runDeviceFlow, exchangeToken } from '../lib/copilot-auth.js';
+import { mapSkuToTier, applyCopilotTier, type CopilotTier } from '../services/copilot-tiers.js';
 
 async function main() {
   initDb();
@@ -45,15 +46,31 @@ async function main() {
     console.log('Waiting for authorization...');
   });
 
+  // Path-A Step 3 — pull tier + endpoint_base. Soft-fail if the
+  // exchange errors so the token is still saved.
+  let tier: CopilotTier | null = null;
+  let endpointBase: string | null = null;
+  try {
+    const ex = await exchangeToken(accessToken);
+    tier = mapSkuToTier(ex.sku, ex.rawToken);
+    endpointBase = ex.endpointBase;
+    console.log(`Plan detected: ${tier} (sku=${ex.sku || 'unknown'}, endpoint=${endpointBase})`);
+  } catch (err) {
+    console.warn(`Tier exchange failed: ${(err as Error).message}. Token saved without tier; bootstrap will retry.`);
+  }
+
   const label = `device-flow ${new Date().toISOString().slice(0, 10)}`;
   const { encrypted, iv, authTag } = encrypt(accessToken);
   const result = db.prepare(`
-    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-    VALUES ('github-copilot', ?, ?, ?, ?, 'unknown', 1)
-  `).run(label, encrypted, iv, authTag);
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, tier, endpoint_base)
+    VALUES ('github-copilot', ?, ?, ?, ?, 'unknown', 1, ?, ?)
+  `).run(label, encrypted, iv, authTag, tier, endpointBase);
+
+  if (tier) applyCopilotTier(db, tier);
 
   console.log(`\n✓ Token saved (api_keys.id = ${result.lastInsertRowid}, masked = ${maskKey(accessToken)}).`);
   console.log('  Platform: github-copilot');
+  console.log(`  Tier    : ${tier ?? 'unknown (bootstrap will retry)'}`);
   console.log('  Enabled : yes');
   console.log('  Models  : gpt-5-mini, gpt-5.4-mini, gpt-5.2-codex (seeded by migrateModelsV15)');
   console.log('\nRestart the freellmapi server so the in-memory router picks up the new key.\n');
