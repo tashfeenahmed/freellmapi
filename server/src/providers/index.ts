@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { GitHubCopilotProvider } from './github-copilot.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -68,6 +69,12 @@ register(new OpenAICompatProvider({
   name: 'GitHub Models',
   baseUrl: 'https://models.github.ai/inference',
 }));
+
+// GitHub Copilot — separate provider from GitHub Models. Uses raw GitHub
+// OAuth tokens (Path B / opencode-style) against api.githubcopilot.com.
+// Per-model route selection (chat completions for gpt-*-mini, Responses API
+// for gpt-*-codex). See providers/github-copilot.ts and lib/copilot-auth.ts.
+register(new GitHubCopilotProvider());
 
 // Cohere - OpenAI-compatible via Cohere compatibility endpoint
 register(new CohereProvider());

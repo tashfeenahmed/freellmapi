@@ -14,6 +14,7 @@ export type Platform =
   | 'mistral'
   | 'openrouter'
   | 'github'
+  | 'github-copilot'
   | 'cohere'
   | 'cloudflare'
   | 'zhipu'

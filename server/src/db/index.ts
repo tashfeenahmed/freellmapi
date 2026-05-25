@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1228,6 +1229,46 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): seed the GitHub Copilot provider.
+ *
+ * Adds 3 model rows under the new `github-copilot` platform:
+ *   - gpt-5-mini    (0x mult, /chat/completions)        — free in Copilot's quota
+ *   - gpt-5.4-mini  (0.33x mult, /chat/completions)     — Sondre's target, 400k ctx
+ *   - gpt-5.2-codex (1x mult, /responses)               — agentic codex variant
+ *
+ * No per-call token cap on Copilot's endpoint (unlike public GitHub Models),
+ * so the context-window number reflects the real model limit, not a clamp.
+ * Quota burns against the user's monthly premium-request budget — we don't
+ * mirror that here because it's account-scoped and not visible per-request.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['github-copilot', 'gpt-5.4-mini',  'GPT-5.4-mini (Copilot)',  4, 7, 'Frontier', 60, null, null, null, 'Student (0.33x)', 400000],
+    ['github-copilot', 'gpt-5-mini',    'GPT-5-mini (Copilot)',    6, 7, 'Large',    60, null, null, null, 'Student (0x)',    200000],
+    ['github-copilot', 'gpt-5.2-codex', 'GPT-5.2 Codex (Copilot)', 3, 6, 'Frontier', 60, null, null, null, 'Student (1x)',    200000],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
