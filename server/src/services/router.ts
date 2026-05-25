@@ -167,10 +167,10 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     const provider = getProvider(model.platform as any);
     if (!provider) continue;
 
-    // Get all healthy, enabled keys for this platform
+    // Get enabled keys that have not already failed validation or decryption.
     const keys = db.prepare(
-      'SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status != ?'
-    ).all(model.platform, 'invalid') as KeyRow[];
+      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    ).all(model.platform) as KeyRow[];
 
     if (keys.length === 0) continue;
 
@@ -199,10 +199,17 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       if (!canMakeRequest(model.platform, model.model_id, key.id, limits)) continue;
       if (!canUseTokens(model.platform, model.model_id, key.id, estimatedTokens, limits)) continue;
 
+      let decryptedKey: string;
+      try {
+        decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
+      } catch {
+        db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
+          .run(key.id);
+        continue;
+      }
+
       // We found a working key for this model!
       roundRobinIndex.set(rrKey, idx);
-      const decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
-
       return {
         provider,
         modelId: model.model_id,
