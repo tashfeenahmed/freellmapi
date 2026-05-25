@@ -88,7 +88,7 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
 const SORT_PRESETS: Record<string, string> = {
   intelligence: 'm.intelligence_rank ASC',
   speed: 'm.speed_rank ASC',
-  budget: "CASE m.monthly_token_budget WHEN '~120M' THEN 1 WHEN '~50-100M' THEN 2 WHEN '~30M' THEN 3 WHEN '~18-45M' THEN 4 WHEN '~18M' THEN 5 WHEN '~15M' THEN 6 WHEN '~12M' THEN 7 WHEN '~6M' THEN 8 WHEN '~5-10M' THEN 9 WHEN '~4M' THEN 10 ELSE 11 END ASC",
+  budget: "CASE m.monthly_token_budget WHEN 'Student (0x)' THEN 1 WHEN 'Student (0.33x)' THEN 2 WHEN '~120M' THEN 3 WHEN '~50-100M' THEN 4 WHEN '~30M' THEN 5 WHEN '~18-45M' THEN 6 WHEN '~18M' THEN 7 WHEN '~15M' THEN 8 WHEN '~12M' THEN 9 WHEN 'Student (1x)' THEN 10 WHEN '~6M' THEN 11 WHEN '~5-10M' THEN 12 WHEN '~4M' THEN 13 ELSE 14 END ASC",
 };
 
 fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {

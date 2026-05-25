@@ -50,6 +50,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV13(db);
   migrateModelsV14(db);
   migrateModelsV15(db);
+  migrateModelsV16(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1267,6 +1268,52 @@ function migrateModelsV15(db: Database.Database) {
       const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
       for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
     }
+  });
+  apply();
+}
+
+/**
+ * V16 (May 2026): pin the github-copilot models at the top of the
+ * fallback chain on first application, then never again.
+ *
+ * Order set: #1 gpt-5.4-mini (400k ctx, 0.33x mult — Sondre's primary
+ * target), #2 gpt-5-mini (0x — free), #3 gpt-5.2-codex (1x — most
+ * expensive of the three, kept available but lowest of the trio).
+ * Everything else shifts +3.
+ *
+ * Idempotency uses a one-time settings flag (`copilot_priority_v16_applied`)
+ * instead of inferring state from the priorities themselves. That way a
+ * user who later re-orders the chain on the dashboard doesn't get
+ * overridden the next time the server boots.
+ */
+function migrateModelsV16(db: Database.Database) {
+  const flag = db.prepare("SELECT value FROM settings WHERE key = 'copilot_priority_v16_applied'").get();
+  if (flag) return;
+
+  const rows = db.prepare(`
+    SELECT id, model_id FROM models
+     WHERE platform = 'github-copilot'
+       AND model_id IN ('gpt-5.4-mini', 'gpt-5-mini', 'gpt-5.2-codex')
+  `).all() as { id: number; model_id: string }[];
+  if (rows.length !== 3) return;
+
+  const idByModel = new Map(rows.map(r => [r.model_id, r.id]));
+  const orderedIds = (['gpt-5.4-mini', 'gpt-5-mini', 'gpt-5.2-codex'] as const)
+    .map(id => idByModel.get(id)!);
+
+  const bumpOthers = db.prepare(`
+    UPDATE fallback_config SET priority = priority + 3
+     WHERE model_db_id NOT IN (?, ?, ?)
+  `);
+  const setOne = db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
+  const setFlag = db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('copilot_priority_v16_applied', '1')");
+
+  const apply = db.transaction(() => {
+    bumpOthers.run(...orderedIds);
+    setOne.run(1, orderedIds[0]);
+    setOne.run(2, orderedIds[1]);
+    setOne.run(3, orderedIds[2]);
+    setFlag.run();
   });
   apply();
 }

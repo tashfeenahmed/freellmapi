@@ -63,6 +63,7 @@ const platformColors: Record<string, string> = {
   mistral:     '#f59e0b',
   openrouter:  '#ec4899',
   github:      '#6e7b8b',
+  'github-copilot': '#1f6feb',
   cohere:      '#d946ef',
   cloudflare:  '#f38020',
   zhipu:       '#06b6d4',
