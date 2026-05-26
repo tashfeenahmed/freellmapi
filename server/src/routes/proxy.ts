@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
+import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 
@@ -489,6 +490,7 @@ function logRequest(
       INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error);
+    pruneRequestAnalytics({ db });
   } catch (e) {
     console.error('Failed to log request:', e);
   }
