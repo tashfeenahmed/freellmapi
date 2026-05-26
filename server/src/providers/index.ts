@@ -93,6 +93,13 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://router.huggingface.co/v1',
 }));
 
+// SiliconFlow — OpenAI-compatible aggregator with a permanently free tier for models <= 9B.
+register(new OpenAICompatProvider({
+  platform: 'siliconflow',
+  name: 'SiliconFlow',
+  baseUrl: 'https://api.siliconflow.cn/v1',
+}));
+
 // Moonshot direct integration was dropped in V4 (paid-only); MiniMax direct
 // was dropped in V4 (superseded by the OpenRouter route).
 

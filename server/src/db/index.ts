@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1261,6 +1262,56 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): Seed SiliconFlow permanently free models.
+ *
+ * Adds 6 highly capable, permanently free SiliconFlow models:
+ *   - Qwen/Qwen2.5-7B-Instruct (Qwen 2.5 7B)
+ *   - Qwen/Qwen2.5-Coder-7B-Instruct (Qwen 2.5 Coder 7B)
+ *   - deepseek-ai/DeepSeek-R1-Distill-Qwen-7B (DeepSeek R1 Distill Qwen 7B)
+ *   - deepseek-ai/DeepSeek-R1-Distill-Llama-8B (DeepSeek R1 Distill Llama 8B)
+ *   - THUDM/glm-4-9b-chat (GLM 4 9B)
+ *   - google/gemma-2-9b-it (Gemma 2 9B)
+ *
+ * Configures all with rpm_limit = 20 (standard free QPS limit), context window,
+ * and sets appropriate intelligence ranks mapping among existing models.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['siliconflow', 'Qwen/Qwen2.5-7B-Instruct',                  'Qwen 2.5 7B (SiliconFlow)',              25, 3, 'Small', 20, null, null, null, 'permanently free', 32768],
+    ['siliconflow', 'Qwen/Qwen2.5-Coder-7B-Instruct',            'Qwen 2.5 Coder 7B (SiliconFlow)',        22, 3, 'Small', 20, null, null, null, 'permanently free', 32768],
+    ['siliconflow', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',   'DeepSeek R1 Distill Qwen 7B (Silicon)',  20, 3, 'Small', 20, null, null, null, 'permanently free', 32768],
+    ['siliconflow', 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B',  'DeepSeek R1 Distill Llama 8B (Silicon)', 21, 3, 'Small', 20, null, null, null, 'permanently free', 32768],
+    ['siliconflow', 'THUDM/glm-4-9b-chat',                        'GLM 4 9B (SiliconFlow)',                 24, 4, 'Small', 20, null, null, null, 'permanently free', 8192],
+    ['siliconflow', 'google/gemma-2-9b-it',                      'Gemma 2 9B (SiliconFlow)',               26, 4, 'Small', 20, null, null, null, 'permanently free', 8192],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    
+    // Ensure fallback config entries exist for new models
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) {
+        addFb.run(missing[i].id, maxPriority + i + 1);
+      }
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

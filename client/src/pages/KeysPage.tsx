@@ -26,6 +26,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'pollinations', label: 'Pollinations (anon ok)' },
   { value: 'llm7', label: 'LLM7 (anon ok)' },
   { value: 'huggingface', label: 'HuggingFace Router' },
+  { value: 'siliconflow', label: 'SiliconFlow' },
 ]
 
 const statusDot: Record<string, string> = {
