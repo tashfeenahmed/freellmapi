@@ -7,6 +7,7 @@ import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } fro
 import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
+import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 
 export const proxyRouter = Router();
 
@@ -338,9 +339,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     } catch (err: any) {
       // No more models available
       if (lastError) {
+        const safeLastError = sanitizeProviderErrorMessage(lastError.message);
         res.status(429).json({
           error: {
-            message: `All models rate-limited. Last error: ${lastError.message}`,
+            message: `All models rate-limited. Last error: ${safeLastError}`,
             type: 'rate_limit_error',
           },
         });
@@ -404,7 +406,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message));
             return;
           }
           // Pre-stream error — bubble to outer retry/502 handler.
@@ -435,7 +437,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     } catch (err: any) {
       const latency = Date.now() - start;
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, err.message);
+      const safeError = sanitizeProviderErrorMessage(err.message);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
 
       if (isRetryableError(err)) {
         // Put this model+key on cooldown and try the next one
@@ -449,14 +452,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
-        console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
       }
 
       // Non-retryable error (auth, 4xx, etc.): don't retry
       res.status(502).json({
         error: {
-          message: `Provider error (${route.displayName}): ${err.message}`,
+          message: `Provider error (${route.displayName}): ${safeError}`,
           type: 'provider_error',
         },
       });
@@ -467,7 +470,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Exhausted all retries
   res.status(429).json({
     error: {
-      message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`,
+      message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${sanitizeProviderErrorMessage(lastError?.message)}`,
       type: 'rate_limit_error',
     },
   });
