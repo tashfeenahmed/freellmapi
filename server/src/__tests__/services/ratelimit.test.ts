@@ -6,6 +6,7 @@ import {
   recordRequest,
   recordTokens,
   getRateLimitStatus,
+  getNextCooldownDuration,
 } from '../../services/ratelimit.js';
 
 function removeDbFile(dbPath: string) {
@@ -86,6 +87,31 @@ describe('Rate Limiter', () => {
       expect(status.rpm.limit).toBe(30);
       expect(status.rpd.used).toBe(2);
       expect(status.tpm.used).toBe(500);
+    });
+  });
+
+  describe('escalating cooldown', () => {
+    it('escalates the 2nd/3rd/4th hit within 24h to 10m / 1h / 24h', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      const args = ['cerebras', `escalating-model-${id}`, id] as const;
+      // 1st: 2 minutes
+      expect(getNextCooldownDuration(...args)).toBe(2 * 60 * 1000);
+      // 2nd: 10 minutes
+      expect(getNextCooldownDuration(...args)).toBe(10 * 60 * 1000);
+      // 3rd: 1 hour
+      expect(getNextCooldownDuration(...args)).toBe(60 * 60 * 1000);
+      // 4th: 24 hours
+      expect(getNextCooldownDuration(...args)).toBe(24 * 60 * 60 * 1000);
+      // 5th+ stays at 24h (quarantined until next quota window)
+      expect(getNextCooldownDuration(...args)).toBe(24 * 60 * 60 * 1000);
+    });
+
+    it('counts independently per (platform, model, key)', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      // Different keys for the same model should each start at 2m, not share state.
+      expect(getNextCooldownDuration('groq', `m-${id}`, id)).toBe(2 * 60 * 1000);
+      expect(getNextCooldownDuration('groq', `m-${id}`, id + 1)).toBe(2 * 60 * 1000);
+      expect(getNextCooldownDuration('groq', `m-${id}-other`, id)).toBe(2 * 60 * 1000);
     });
   });
 

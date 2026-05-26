@@ -208,6 +208,31 @@ export function recordTokens(
 // Cooldown: when a provider returns 429, block that model+key for a period
 const cooldowns = new Map<string, number>(); // key -> expiry timestamp
 
+// Escalating cooldown: track hits per key over a rolling 24h window so a
+// daily-quota exhaustion (OpenRouter free: 50/day, Cohere free: 33/day, etc.)
+// quarantines the key for the rest of the day instead of looping through
+// the 2-minute cooldown 20 times per request and consuming every fallback slot.
+// In-memory only — state resets on restart, which is fine (a clean restart
+// will re-escalate on the next 429 if the quota is genuinely exhausted).
+const cooldownHits = new Map<string, number[]>(); // key -> timestamps of recent cooldown set events
+const HOUR = 60 * MINUTE;
+const COOLDOWN_DURATIONS = [
+  2 * MINUTE,   // 1st hit in 24h
+  10 * MINUTE,  // 2nd
+  HOUR,         // 3rd
+  DAY,          // 4th and beyond
+];
+
+export function getNextCooldownDuration(platform: string, modelId: string, keyId: number): number {
+  const key = `${platform}:${modelId}:${keyId}`;
+  const now = Date.now();
+  const hits = (cooldownHits.get(key) ?? []).filter(t => t > now - DAY);
+  hits.push(now);
+  cooldownHits.set(key, hits);
+  const idx = Math.min(hits.length - 1, COOLDOWN_DURATIONS.length - 1);
+  return COOLDOWN_DURATIONS[idx]!;
+}
+
 function persistedCooldownExpiry(
   platform: string,
   modelId: string,
