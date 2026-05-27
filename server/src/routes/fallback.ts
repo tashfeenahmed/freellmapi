@@ -26,6 +26,7 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
     GROUP BY platform
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
+  keyCountMap.set('ollama-local', 1);
 
   // Get current dynamic penalties
   const penalties = getAllPenalties();
@@ -124,6 +125,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     WHERE ak.enabled = 1
   `).all() as { platform: string }[];
   const platformSet = new Set(platforms.map(p => p.platform));
+  platformSet.add('ollama-local');
 
   // Get monthly budget per model, ordered by fallback priority
   const models = db.prepare(`

@@ -167,12 +167,46 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     const provider = getProvider(model.platform as any);
     if (!provider) continue;
 
-    // Get enabled keys that have not already failed validation or decryption.
-    const keys = db.prepare(
-      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
-    ).all(model.platform) as KeyRow[];
+    // Direct route for local Ollama (no API keys needed)
+	if (
+	model.platform === 'ollama-local' &&
+	model.display_name.includes('(Local)')
+	) {
+	return {
+		provider,
+		modelId: model.model_id,
+		modelDbId: model.id,
+		apiKey: 'local-ollama',
+		keyId: -1,
+		platform: model.platform,
+		displayName: model.display_name,
+	};
+	}
 
-    if (keys.length === 0) continue;
+    // Get enabled keys that have not already failed validation or decryption.
+	let keys = db.prepare(
+	"SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+	).all(model.platform) as KeyRow[];
+	
+	// Local Ollama doesn't require real API keys.
+	// If using localhost Ollama, inject a synthetic key so routing works.
+	if (
+	model.platform === 'ollama' &&
+	process.env.OLLAMA_BASE_URL?.includes('localhost') &&
+	keys.length === 0
+	) {
+	keys = [{
+		id: -1,
+		platform: 'ollama',
+		encrypted_key: '',
+		iv: '',
+		auth_tag: '',
+		status: 'healthy',
+		enabled: 1,
+	}];
+	}
+	
+	if (keys.length === 0) continue;
 
     // Get limits once for this model
     const limits = {
@@ -200,12 +234,18 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       if (!canUseTokens(model.platform, model.model_id, key.id, estimatedTokens, limits)) continue;
 
       let decryptedKey: string;
-      try {
-        decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
-      } catch {
-        db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
-          .run(key.id);
-        continue;
+
+      if (key.id === -1) {
+        decryptedKey = 'local-ollama';
+      } else {
+        try {
+          decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
+        } catch {
+          db.prepare(
+            "UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?"
+          ).run(key.id);
+          continue;
+        }
       }
 
       // We found a working key for this model!

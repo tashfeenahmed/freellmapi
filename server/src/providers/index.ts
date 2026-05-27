@@ -5,6 +5,9 @@ import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
 
+const ollamaBaseUrl =
+  process.env.OLLAMA_BASE_URL?.trim() || 'https://ollama.com/v1';
+
 const providers = new Map<Platform, BaseProvider>();
 
 function register(provider: BaseProvider) {
@@ -108,9 +111,15 @@ register(new OpenAICompatProvider({
 // `reasoning_content`) — handled by normalizeChoices.
 register(new OpenAICompatProvider({
   platform: 'ollama',
-  name: 'Ollama Cloud',
+  name: 'Ollama',
   baseUrl: 'https://ollama.com/v1',
-  timeoutMs: 120000,
+  timeoutMs: 600000,
+}));
+register(new OpenAICompatProvider({
+  platform: 'ollama-local',
+  name: 'Ollama Local',
+  baseUrl: process.env.OLLAMA_BASE_URL?.trim() || 'http://127.0.0.1:11434/v1',
+  timeoutMs: 600000,
 }));
 
 // Kilo AI Gateway — OpenAI-compatible aggregator. Anonymous access works
