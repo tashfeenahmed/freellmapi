@@ -209,8 +209,10 @@ export function isRetryableError(err: any): boolean {
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
-    || msg.includes('econnrefused') || msg.includes('econnreset')
-    || msg.includes('503') || msg.includes('unavailable')
+    || msg.includes('econnrefused')
+	|| msg.includes('econnreset')
+    || msg.includes('fetch failed')
+	|| msg.includes('503') || msg.includes('unavailable')
     || msg.includes('500') || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
     // provider in the fallback chain may have a larger limit. Same reasoning as 503.

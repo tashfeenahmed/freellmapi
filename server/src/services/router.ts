@@ -167,12 +167,18 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     const provider = getProvider(model.platform as any);
     if (!provider) continue;
 
-    // Direct route for local Ollama (no API keys needed)
+	// Direct route for local Ollama (no API keys needed)
 	if (
-	model.platform === 'ollama-local' &&
-	model.display_name.includes('(Local)')
+	  model.platform === 'ollama-local' &&
+	  model.display_name.includes('(Local)')
 	) {
-	return {
+	  const skipId = `${model.platform}:${model.model_id}:-1`;
+	
+	  if (skipKeys?.has(skipId)) {
+		continue;
+	  }
+	
+	  return {
 		provider,
 		modelId: model.model_id,
 		modelDbId: model.id,
@@ -180,7 +186,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 		keyId: -1,
 		platform: model.platform,
 		displayName: model.display_name,
-	};
+	  };
 	}
 
     // Get enabled keys that have not already failed validation or decryption.
