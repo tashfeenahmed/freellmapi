@@ -137,6 +137,11 @@ export class OpenAICompatProvider extends BaseProvider {
     // Note: transport errors (DNS / timeout / TLS) propagate to the caller.
     // health.ts catches them and marks status='error' WITHOUT incrementing
     // the consecutive-failure counter — only confirmed 401/403 disables a key.
+    //
+    // Timeout: 30s. Some providers (notably NVIDIA NIM) return a multi-KB
+    // /v1/models catalog that can take 10-15s from high-latency regions
+    // (India, Australia). The previous 10s was too aggressive and produced
+    // false-positive transport errors that flapped key status.
     const url = this.validateUrl ?? `${this.baseUrl}/models`;
     const res = await this.fetchWithTimeout(url, {
       method: 'GET',
@@ -144,7 +149,7 @@ export class OpenAICompatProvider extends BaseProvider {
         'Authorization': `Bearer ${apiKey}`,
         ...this.extraHeaders,
       },
-    }, 10000);
+    }, 30000);
     return res.status !== 401 && res.status !== 403;
   }
 }
