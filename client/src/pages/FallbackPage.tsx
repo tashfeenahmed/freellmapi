@@ -231,8 +231,16 @@ export default function FallbackPage() {
   })
 
   const allEntries = localEntries ?? entries
-  const displayEntries = allEntries.filter(e => e.keyCount > 0)
-  const unconfiguredPlatforms = [...new Set(allEntries.filter(e => e.keyCount === 0).map(e => e.platform))]
+  const displayEntries = allEntries.filter(
+    e => e.keyCount > 0 || e.platform === 'ollama-local'
+  )
+  const unconfiguredPlatforms = [
+    ...new Set(
+      allEntries
+        .filter(e => e.keyCount === 0 && e.platform !== 'ollama-local')
+        .map(e => e.platform)
+    )
+  ]
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -245,7 +253,9 @@ export default function FallbackPage() {
     const oldIndex = displayEntries.findIndex(e => e.modelDbId === active.id)
     const newIndex = displayEntries.findIndex(e => e.modelDbId === over.id)
     const reorderedVisible = arrayMove(displayEntries, oldIndex, newIndex)
-    const unconfigured = allEntries.filter(e => e.keyCount === 0)
+    const unconfigured = allEntries.filter(
+      e => e.keyCount === 0 && e.platform !== 'ollama-local'
+    )
     const merged = [
       ...reorderedVisible.map((e, i) => ({ ...e, priority: i + 1 })),
       ...unconfigured.map((e, i) => ({ ...e, priority: reorderedVisible.length + i + 1 })),

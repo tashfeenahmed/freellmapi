@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -15,6 +16,82 @@ export function getDb(): Database.Database {
     throw new Error('Database not initialized. Call initDb() first.');
   }
   return db;
+}
+
+function seedLocalOllamaModels(db: Database.Database) {
+  const baseUrl = process.env.OLLAMA_BASE_URL?.trim();
+
+  if (
+    !baseUrl?.includes('localhost') &&
+    !baseUrl?.includes('127.0.0.1')
+  ) {
+    return;
+  }
+
+  try {
+    const raw = execSync('curl -s http://127.0.0.1:11434/api/tags', {
+      encoding: 'utf8',
+    });
+
+    const parsed = JSON.parse(raw);
+    const models = parsed.models || [];
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO models (
+        platform,
+        model_id,
+        display_name,
+        intelligence_rank,
+        speed_rank,
+        size_label,
+        monthly_token_budget,
+        context_window,
+        enabled
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertFallback = db.prepare(`
+      INSERT OR IGNORE INTO fallback_config (
+        model_db_id,
+        priority,
+        enabled
+      )
+      VALUES (?, ?, 1)
+    `);
+
+	db.prepare(`
+	  UPDATE fallback_config
+	  SET priority = priority + 100
+	`).run();
+	
+	for (const m of models) {
+	  insert.run(
+		'ollama-local',
+		m.name,
+		`${m.name} (Local)`,
+		50,
+		10,
+		'Local',
+		'unlimited',
+		131072,
+		1
+	  );
+	
+	  const row = db.prepare(`
+		SELECT id FROM models
+		WHERE platform = 'ollama-local' AND model_id = ?
+	  `).get(m.name) as any;
+	
+	  if (row) {
+		insertFallback.run(row.id, 1);
+	  }
+	}
+
+    console.log(`Seeded ${models.length} local Ollama models`);
+  } catch (err) {
+    console.warn('Local Ollama not available');
+  }
 }
 
 export function initDb(dbPath?: string): Database.Database {
@@ -35,6 +112,7 @@ export function initDb(dbPath?: string): Database.Database {
   createTables(db);
   initEncryptionKey(db);
   seedModels(db);
+  seedLocalOllamaModels(db);
   migrateModels(db);
   migrateModelsV2(db);
   migrateModelsV3Ranks(db);

@@ -18,6 +18,7 @@ export type Platform =
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'
+  | 'ollama-local'
   | 'kilo'
   | 'pollinations'
   | 'llm7'

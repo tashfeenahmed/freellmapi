@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
   { value: 'ollama', label: 'Ollama Cloud' },
+  { value: 'ollama-local', label: 'Ollama Local' },
   { value: 'kilo', label: 'Kilo Gateway (anon ok)' },
   { value: 'pollinations', label: 'Pollinations (anon ok)' },
   { value: 'llm7', label: 'LLM7 (anon ok)' },
@@ -133,6 +134,13 @@ export default function KeysPage() {
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
+  useEffect(() => {
+  if (platform === 'ollama-local') {
+	  setApiKey('local-ollama')
+  } else if (platform === 'ollama') {
+	  setApiKey('')
+  }
+  }, [platform])
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -258,16 +266,32 @@ export default function KeysPage() {
                 />
               </div>
             )}
-            <div className="space-y-1.5 flex-1 min-w-[240px]">
-              <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
-                className="font-mono text-xs"
-              />
-            </div>
+			<div className="space-y-1.5 flex-1 min-w-[240px]">
+			{platform !== 'ollama-local' ? (
+				<>
+				<Label className="text-xs">
+					{needsAccountId ? 'API token' : 'API key'}
+				</Label>
+				<Input
+					type="password"
+					value={apiKey}
+					onChange={e => setApiKey(e.target.value)}
+					placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
+					className="font-mono text-xs"
+				/>
+				</>
+			) : (
+				<>
+				<Label className="text-xs">Local Ollama</Label>
+				<div className="rounded-md border px-3 py-2 text-xs font-mono text-muted-foreground">
+					http://127.0.0.1:11434/v1
+				</div>
+				<p className="text-xs text-muted-foreground">
+					Uses your local Ollama daemon. No API key required.
+				</p>
+				</>
+			)}
+			</div>
             <div className="space-y-1.5">
               <Label className="text-xs">Label</Label>
               <Input
@@ -277,7 +301,16 @@ export default function KeysPage() {
                 className="w-[160px]"
               />
             </div>
-            <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
+            <Button
+				type="submit"
+				size="sm"
+				disabled={
+					!platform ||
+					(platform !== 'ollama-local' && !apiKey) ||
+					(needsAccountId && !accountId) ||
+					addKey.isPending
+				}
+			>
               {addKey.isPending ? 'Adding…' : 'Add key'}
             </Button>
           </form>
