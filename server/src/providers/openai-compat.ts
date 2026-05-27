@@ -20,6 +20,8 @@ export class OpenAICompatProvider extends BaseProvider {
   /** Per-provider HTTP timeout override. Cloud APIs finish in ~15s; locally-hosted
    * inference (llama.cpp / vLLM on CPU) can take 30-120s for long prompts. Default 15000. */
   private readonly timeoutMs: number;
+  /** Whether to skip authentication (for local/private Ollama instances) */
+  private readonly skipAuth: boolean;
 
   constructor(opts: {
     platform: Platform;
@@ -28,6 +30,7 @@ export class OpenAICompatProvider extends BaseProvider {
     extraHeaders?: Record<string, string>;
     validateUrl?: string;
     timeoutMs?: number;
+    skipAuth?: boolean;
   }) {
     super();
     this.platform = opts.platform;
@@ -36,6 +39,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.extraHeaders = opts.extraHeaders ?? {};
     this.validateUrl = opts.validateUrl;
     this.timeoutMs = opts.timeoutMs ?? 15000;
+    this.skipAuth = opts.skipAuth ?? false;
   }
 
   async chatCompletion(
@@ -47,7 +51,8 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        // Only add Authorization header if not skipping auth
+        ...(!this.skipAuth ? { 'Authorization': `Bearer ${apiKey}` } : {}),
         'Content-Type': 'application/json',
         ...this.extraHeaders,
       },
@@ -83,7 +88,8 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        // Only add Authorization header if not skipping auth
+        ...(!this.skipAuth ? { 'Authorization': `Bearer ${apiKey}` } : {}),
         'Content-Type': 'application/json',
         ...this.extraHeaders,
       },
@@ -141,7 +147,8 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        // Only add Authorization header if not skipping auth
+        ...(!this.skipAuth ? { 'Authorization': `Bearer ${apiKey}` } : {}),
         ...this.extraHeaders,
       },
     }, 10000);

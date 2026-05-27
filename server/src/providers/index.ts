@@ -96,21 +96,26 @@ register(new OpenAICompatProvider({
 // Moonshot direct integration was dropped in V4 (paid-only); MiniMax direct
 // was dropped in V4 (superseded by the OpenRouter route).
 
-// Ollama Cloud — OpenAI-compatible. Free plan: 1 concurrent model, 5h session
-// caps, GPU-time-based quota (not per-token). Many catalog models on the
-// /v1/models list are subscription-only — Free returns 403 with an explicit
-// "this model requires a subscription" message. Catalog rows are filtered to
-// confirmed-Free entries.
-//
-// Frontier reasoning models (glm-4.7, kimi-k2-thinking, cogito-2.1:671b)
-// regularly take 30-90s on Ollama Cloud Free, so the timeout is bumped from
-// the default 15s. Ollama returns reasoning in `message.reasoning` (not
-// `reasoning_content`) — handled by normalizeChoices.
+// Unified Ollama provider with configurable base URL
+// Defaults to cloud endpoint but can be overridden via OLLAMA_BASE_URL env var
+// Authentication is automatically skipped for local/private network URLs
+const ollamaBaseUrl = process.env.OLLAMA_BASE_URL?.trim() || 'https://ollama.com/v1';
+
+// Detect if we should skip authentication (local/private networks)
+// Matches: localhost, 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+const shouldSkipAuth = ollamaBaseUrl.match(
+  /^https?:\/\/(localhost|127\.(?:[0-9]{1,3}\.){3}[0-9]{1,3}|10\.(?:[0-9]{1,3}\.){3}[0-9]{1,3}|172\.(?:1[6-9]|2[0-9]|3[0-1])\.(?:[0-9]{1,3}\.){3}[0-9]{1,3}|192\.168\.(?:[0-9]{1,3}\.){3}[0-9]{1,3})/
+);
+
+// Ollama — OpenAI-compatible. Works with both cloud and self-hosted instances.
+// Self-hosted instances (localhost, private IPs) skip authentication automatically.
+// Cloud instances require API key from https://ollama.com
 register(new OpenAICompatProvider({
   platform: 'ollama',
-  name: 'Ollama Cloud',
-  baseUrl: 'https://ollama.com/v1',
+  name: 'Ollama',
+  baseUrl: ollamaBaseUrl,
   timeoutMs: 120000,
+  skipAuth: shouldSkipAuth,
 }));
 
 // Kilo AI Gateway — OpenAI-compatible aggregator. Anonymous access works
