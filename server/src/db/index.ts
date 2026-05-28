@@ -160,6 +160,7 @@ function createTables(db: Database.Database) {
       encrypted_key TEXT NOT NULL,
       iv TEXT NOT NULL,
       auth_tag TEXT NOT NULL,
+      base_url TEXT,
       status TEXT NOT NULL DEFAULT 'unknown',
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -220,6 +221,14 @@ function createTables(db: Database.Database) {
   `);
 
   ensureRequestKeyIdColumn(db);
+  ensureApiKeysBaseUrlColumn(db);
+}
+
+function ensureApiKeysBaseUrlColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(api_keys)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'base_url')) {
+    db.prepare('ALTER TABLE api_keys ADD COLUMN base_url TEXT').run();
+  }
 }
 
 function ensureRequestKeyIdColumn(db: Database.Database) {

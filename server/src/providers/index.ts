@@ -118,7 +118,7 @@ register(new OpenAICompatProvider({
 register(new OpenAICompatProvider({
   platform: 'ollama-local',
   name: 'Ollama Local',
-  baseUrl: process.env.OLLAMA_BASE_URL?.trim() || 'http://127.0.0.1:11434/v1',
+  baseUrl: process.env.LOCAL_OLLAMA_URL?.trim() || 'http://127.0.0.1:11434/v1',
   timeoutMs: 600000,
 }));
 

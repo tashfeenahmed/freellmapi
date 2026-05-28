@@ -15,8 +15,9 @@ const PLATFORMS = [
 
 const addKeySchema = z.object({
   platform: z.enum(PLATFORMS),
-  key: z.string().min(1),
+  key: z.string().optional(),
   label: z.string().optional(),
+  baseUrl: z.string().optional(),
 });
 
 // List all keys (masked)
@@ -55,20 +56,32 @@ keysRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  const { platform, key, label } = parsed.data;
-  const { encrypted, iv, authTag } = encrypt(key);
+  const { platform, key, label, baseUrl: rawBaseUrl } = parsed.data;
+  const baseUrl = rawBaseUrl ?? '';
+
+   // For ollama-local, key is optional but we'll store 'local-ollama' placeholder
+   const actualKey = platform === 'ollama-local' ? 'local-ollama' : (key ?? '').trim();
+
+   // Ensure key has at least 1 character for non-ollama-local platforms
+   if (platform !== 'ollama-local' && (!actualKey || actualKey.length === 0)) {
+     res.status(400).json({ error: { message: 'key must be at least 1 character' } });
+     return;
+   }
+
+  const { encrypted, iv, authTag } = encrypt(actualKey);
 
   const db = getDb();
   const result = db.prepare(`
-    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-    VALUES (?, ?, ?, ?, ?, 'unknown', 1)
-  `).run(platform, label ?? '', encrypted, iv, authTag);
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, base_url, status, enabled)
+    VALUES (?, ?, ?, ?, ?, ?, 'unknown', 1)
+  `).run(platform, label ?? '', encrypted, iv, authTag, baseUrl ?? '');
 
   res.status(201).json({
     id: result.lastInsertRowid,
     platform,
     label: label ?? '',
-    maskedKey: maskKey(key),
+    maskedKey: maskKey(actualKey),
+    baseUrl,
     status: 'unknown',
     enabled: true,
   });

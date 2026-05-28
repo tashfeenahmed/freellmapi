@@ -8,7 +8,9 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
-    "test": "npm run test -w server && npm run test -w client --if-present",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "npm run test -w server",
+    "test:client": "npm run test -w client --if-present",
     "build": "npm run build -w server && npm run build -w client",
     "build:server": "npm run build -w server"
   },

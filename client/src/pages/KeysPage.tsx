@@ -134,6 +134,13 @@ export default function KeysPage() {
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:11434/v1')
+  const ollamaSync = useMutation({
+    mutationFn: () => apiFetch('/api/sync', {
+      method: 'POST',
+      body: JSON.stringify({ provider: 'ollama-local' })
+    })
+  })
   useEffect(() => {
   if (platform === 'ollama-local') {
 	  setApiKey('local-ollama')
@@ -240,84 +247,100 @@ export default function KeysPage() {
         <UnifiedKeySection />
 
         <section>
-          <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Platform</Label>
-              <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map(p => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {needsAccountId && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Account ID</Label>
-                <Input
-                  value={accountId}
-                  onChange={e => setAccountId(e.target.value)}
-                  placeholder="a1b2c3d4…"
-                  className="w-[200px] font-mono text-xs"
-                />
-              </div>
-            )}
-			<div className="space-y-1.5 flex-1 min-w-[240px]">
-			{platform !== 'ollama-local' ? (
-				<>
-				<Label className="text-xs">
-					{needsAccountId ? 'API token' : 'API key'}
-				</Label>
-				<Input
-					type="password"
-					value={apiKey}
-					onChange={e => setApiKey(e.target.value)}
-					placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
-					className="font-mono text-xs"
-				/>
-				</>
-			) : (
-				<>
-				<Label className="text-xs">Local Ollama</Label>
-				<div className="rounded-md border px-3 py-2 text-xs font-mono text-muted-foreground">
-					http://127.0.0.1:11434/v1
-				</div>
-				<p className="text-xs text-muted-foreground">
-					Uses your local Ollama daemon. No API key required.
-				</p>
-				</>
-			)}
-			</div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Label</Label>
-              <Input
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="optional"
-                className="w-[160px]"
-              />
-            </div>
-            <Button
-				type="submit"
-				size="sm"
-				disabled={
-					!platform ||
-					(platform !== 'ollama-local' && !apiKey) ||
-					(needsAccountId && !accountId) ||
-					addKey.isPending
-				}
-			>
-              {addKey.isPending ? 'Adding…' : 'Add key'}
-            </Button>
-          </form>
-          {addKey.isError && (
-            <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
-          )}
-        </section>
+                  <h2 className="text-sm font-medium mb-3">
+                    Add a provider
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      className="ml-3"
+                      onClick={() => ollamaSync.mutate()}
+                      disabled={ollamaSync.isPending}
+                    >
+                      {ollamaSync.isPending ? 'Syncing…' : 'Sync Ollama models'}
+                    </Button>
+                  </h2>
+                  <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-card">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs mr-1">Platform</Label>
+                      <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)} aria-label="Platform" data-testid="platform-select">
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PLATFORMS.slice().sort((a,b)=>a.label.localeCompare(b.label)).map(p => (
+                            <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {needsAccountId && (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs mr-1">Account ID</Label>
+                        <Input
+                          value={accountId}
+                          onChange={e => setAccountId(e.target.value)}
+                          placeholder="a1b2c3d4…"
+                          className="w-[140px] font-mono text-xs"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                      {platform !== 'ollama-local' ? (
+                        <>
+                          <Label className="text-xs shrink-0">
+                            {needsAccountId ? 'API token' : 'API key'}
+                          </Label>
+                          <Input
+                            type="password"
+                            value={apiKey}
+                            onChange={e => setApiKey(e.target.value)}
+                            placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
+                            className="flex-1 font-mono text-xs"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Label className="text-xs shrink-0">Base URL</Label>
+                          <Input
+                            type="text"
+                            value={baseUrl}
+                            onChange={e => setBaseUrl(e.target.value)}
+                            placeholder="http://127.0.0.1:11434/v1"
+                            className="flex-1 font-mono text-xs"
+                          />
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs mr-1">Label</Label>
+                      <Input
+                        value={label}
+                        onChange={e => setLabel(e.target.value)}
+                        placeholder="optional"
+                        className="w-[100px] font-mono text-xs"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      size="default"
+                      disabled={
+                        !platform ||
+                        (platform !== 'ollama-local' && !apiKey) ||
+                        (needsAccountId && !accountId) ||
+                        addKey.isPending
+                      }
+                    >
+                      {addKey.isPending ? 'Adding…' : 'Add provider'}
+                    </Button>
+                  </form>
+                  {addKey.isError && (
+                    <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
+                  )}
+                </section>
 
         <section>
           <h2 className="text-sm font-medium mb-3">Configured providers</h2>
