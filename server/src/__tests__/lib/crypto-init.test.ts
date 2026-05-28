@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { initEncryptionKey, encrypt, decrypt } from '../../lib/crypto.js';
 
@@ -8,9 +8,25 @@ function freshDb(): Database.Database {
   return db;
 }
 
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+function restoreEnv() {
+  delete process.env.ENCRYPTION_KEY;
+  delete process.env.DEV_MODE;
+  if (ORIGINAL_NODE_ENV === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  }
+}
+
 describe('initEncryptionKey — input validation', () => {
   beforeEach(() => {
-    delete process.env.ENCRYPTION_KEY;
+    restoreEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
   });
 
   it('accepts a valid 64-char hex env key', () => {
@@ -40,22 +56,49 @@ describe('initEncryptionKey — input validation', () => {
     expect(() => initEncryptionKey(db)).toThrow(/Invalid ENCRYPTION_KEY \(env\)/);
   });
 
-  it('still treats the placeholder as "not set" and falls through to DB / generation', () => {
+  it('requires ENCRYPTION_KEY when dev fallback is not explicitly enabled', () => {
+    const db = freshDb();
+    expect(() => initEncryptionKey(db)).toThrow(/ENCRYPTION_KEY is required/);
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'encryption_key'").get();
+    expect(row).toBeUndefined();
+  });
+
+  it('does not load a DB-stored fallback key when dev fallback is disabled', () => {
+    const db = freshDb();
+    db.prepare("INSERT INTO settings (key, value) VALUES ('encryption_key', ?)").run('b'.repeat(64));
+    expect(() => initEncryptionKey(db)).toThrow(/ENCRYPTION_KEY is required/);
+  });
+
+  it('requires ENCRYPTION_KEY in production even when DEV_MODE is set', () => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'production';
+    const db = freshDb();
+    expect(() => initEncryptionKey(db)).toThrow(/ENCRYPTION_KEY is required/);
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'encryption_key'").get();
+    expect(row).toBeUndefined();
+  });
+
+  it('still treats the placeholder as "not set" and allows explicit dev fallback generation', () => {
     process.env.ENCRYPTION_KEY = 'your-64-char-hex-key-here';
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
     const db = freshDb();
     expect(() => initEncryptionKey(db)).not.toThrow();
-    // Fell through to generation — DB now has a key.
     const row = db.prepare("SELECT value FROM settings WHERE key = 'encryption_key'").get() as { value: string };
     expect(row.value).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('throws on a corrupted DB-stored key', () => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
     const db = freshDb();
     db.prepare("INSERT INTO settings (key, value) VALUES ('encryption_key', ?)").run('not-hex');
     expect(() => initEncryptionKey(db)).toThrow(/Invalid ENCRYPTION_KEY \(db\)/);
   });
 
-  it('generates a fresh key on a virgin DB and persists it', () => {
+  it('generates a fresh key on a virgin DB and persists it only in explicit dev fallback mode', () => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
     const db = freshDb();
     initEncryptionKey(db);
     const row = db.prepare("SELECT value FROM settings WHERE key = 'encryption_key'").get() as { value: string };

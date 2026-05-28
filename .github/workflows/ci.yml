@@ -21,11 +21,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run server tests
-        run: npm test -w server
+      - name: Run tests
+        run: npm test
 
-      - name: Build server
-        run: npm run build -w server
-
-      - name: Build client
-        run: npm run build -w client
+      - name: Build workspaces
+        run: npm run build

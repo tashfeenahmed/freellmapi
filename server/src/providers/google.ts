@@ -79,6 +79,7 @@ const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
   'if', 'then', 'else',
   'contentEncoding', 'contentMediaType', 'contentSchema',
   'dependentRequired', 'dependentSchemas',
+  'additionalProperties',
 ]);
 
 export function sanitizeForGemini(schema: unknown): unknown {

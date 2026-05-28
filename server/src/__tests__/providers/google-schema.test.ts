@@ -87,6 +87,31 @@ describe('sanitizeForGemini', () => {
     expect(sanitizeForGemini(input)).toEqual(input);
   });
 
+  it('strips additionalProperties (Gemini rejects it with 400)', () => {
+    const input = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        address: {
+          type: 'object',
+          properties: { street: { type: 'string' } },
+          additionalProperties: false,
+        },
+      },
+      additionalProperties: false,
+    };
+    expect(sanitizeForGemini(input)).toEqual({
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        address: {
+          type: 'object',
+          properties: { street: { type: 'string' } },
+        },
+      },
+    });
+  });
+
   it('handles primitives and null safely', () => {
     expect(sanitizeForGemini(null)).toBe(null);
     expect(sanitizeForGemini(undefined)).toBe(undefined);

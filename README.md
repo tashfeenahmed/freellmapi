@@ -107,6 +107,10 @@ echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).to
 npm run dev
 ```
 
+`ENCRYPTION_KEY` is required for startup. The server only falls back to a
+database-stored development key when `DEV_MODE=true` and `NODE_ENV` is not
+`production`; do not use that fallback with real provider keys.
+
 Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
 For a production build:
@@ -282,7 +286,8 @@ Contributors very welcome! Good first PRs:
 ```bash
 npm install
 npm run dev      # server on :3001, dashboard on :5173, both with HMR
-npm test         # vitest — 75 tests across providers, routes, router, ratelimit
+npm test         # server vitest; also runs client tests if the workspace adds them
+npm run build    # compile server and dashboard
 ```
 
 PRs should include a test, keep the existing test suite green, and match the `.editorconfig` / tsconfig defaults already in the repo. Issues and discussions are open.
@@ -301,6 +306,8 @@ PRs should include a test, keep the existing test suite green, and match the `.e
 <a href="https://github.com/danscMax"><img src="https://images.weserv.nl/?url=github.com/danscMax.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@danscMax" /></a>
 <a href="https://github.com/jhash"><img src="https://images.weserv.nl/?url=github.com/jhash.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@jhash" /></a>
 <a href="https://github.com/JammyJames1234"><img src="https://images.weserv.nl/?url=github.com/JammyJames1234.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@JammyJames1234" /></a>
+<a href="https://github.com/Sumit4codes"><img src="https://images.weserv.nl/?url=github.com/Sumit4codes.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@Sumit4codes" /></a>
+<a href="https://github.com/meliani"><img src="https://images.weserv.nl/?url=github.com/meliani.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@meliani" /></a>
 
 ## Terms of Service review
 
