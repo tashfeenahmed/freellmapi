@@ -877,11 +877,13 @@ const SortableModelChip = memo(function SortableModelChip({
           className="w-10 shrink-0 flex items-center justify-center gap-1 border-r border-border/40 hover:bg-muted/40 transition-colors cursor-grab active:cursor-grabbing self-stretch pl-1 pr-1.5"
           title="Drag model"
         >
-          <svg width="8" height="12" viewBox="0 0 12 24" fill="currentColor" className="text-muted-foreground/35 group-hover:text-muted-foreground/70 transition-colors shrink-0">
-            <circle cx="3" cy="6" r="2" /><circle cx="9" cy="6" r="2" />
-            <circle cx="3" cy="12" r="2" /><circle cx="9" cy="12" r="2" />
-            <circle cx="3" cy="18" r="2" /><circle cx="9" cy="18" r="2" />
-          </svg>
+          {!isDndDisabled && (
+            <svg width="8" height="12" viewBox="0 0 12 24" fill="currentColor" className="text-muted-foreground/35 group-hover:text-muted-foreground/70 transition-colors shrink-0">
+              <circle cx="3" cy="6" r="2" /><circle cx="9" cy="6" r="2" />
+              <circle cx="3" cy="12" r="2" /><circle cx="9" cy="12" r="2" />
+              <circle cx="3" cy="18" r="2" /><circle cx="9" cy="18" r="2" />
+            </svg>
+          )}
           <div
             className="w-5 h-5 rounded-full border border-white/20 dark:border-black/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm select-none"
             style={{ backgroundColor: platformColors[entry.platform] ?? '#94a3b8' }}
