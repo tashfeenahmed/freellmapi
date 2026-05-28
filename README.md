@@ -24,6 +24,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
 - [Using the API](#using-the-api)
+- [OpenCode](#opencode)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Limitations](#limitations)
@@ -209,6 +210,54 @@ print(final.choices[0].message.content)
 Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, SambaNova, Mistral, OpenRouter, GitHub Models, HuggingFace, Cloudflare, Cohere compat) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
 
 Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served each call. If a request fell over between providers, you'll also see `X-Fallback-Attempts: N`.
+
+## OpenCode
+
+[OpenCode](https://opencode.ai) is a terminal-based AI coding assistant. Make sure FreeLLMAPI is running (`npm run dev` or `node server/dist/index.js`), then add a custom provider to your OpenCode config (`~/.config/opencode/opencode.json` globally, or `opencode.json` in any project):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "freellmapi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "FreeLLMAPI (local)",
+      "options": {
+        "baseURL": "http://localhost:3001/v1",
+        "apiKey": "freellmapi-your-unified-key"
+      },
+      "models": {
+        "auto": {
+          "name": "Auto (router picks)",
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "llama-4-scout-17b-16e-instruct": {
+          "name": "Llama 4 Scout (Groq)",
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "qwen/qwen3-32b": {
+          "name": "Qwen3 32B (Groq)",
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "gpt-oss-120b": {
+          "name": "GPT-OSS 120B (Cerebras)",
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "qwen/qwen3-coder:free": {
+          "name": "Qwen3 Coder (OpenRouter)",
+          "limit": { "context": 131072, "output": 16384 }
+        }
+      }
+    }
+  }
+}
+```
+
+Replace `freellmapi-your-unified-key` with the unified key shown in the dashboard header.
+
+**`auto` is the recommended default** — the router picks the best available model based on your configured keys and current rate limits, so it keeps working even when individual providers are down or exhausted.
+
+**The model catalog changes.** Providers add and remove models regularly; the list above may be outdated. For the authoritative list of model IDs FreeLLMAPI currently knows about, check the **Fallback Chain** page in the dashboard or call `GET http://localhost:3001/v1/models`. Model IDs in your OpenCode config must match exactly what FreeLLMAPI uses internally.
 
 ## Screenshots
 
