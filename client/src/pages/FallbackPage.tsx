@@ -67,6 +67,10 @@ const platformColors: Record<string, string> = {
   cloudflare:  '#f38020',
   zhipu:       '#06b6d4',
   ollama:      '#000000',
+  kilo:        '#7c3aed',
+  pollinations: '#a855f7',
+  llm7:        '#0ea5e9',
+  huggingface: '#ff9d00',
 }
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {

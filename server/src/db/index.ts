@@ -45,6 +45,10 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV8(db);
   migrateModelsV9(db);
   migrateModelsV10(db);
+  migrateModelsV11(db);
+  migrateModelsV12(db);
+  migrateModelsV13(db);
+  migrateModelsV14(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -88,12 +92,33 @@ function createTables(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       platform TEXT NOT NULL,
       model_id TEXT NOT NULL,
+      key_id INTEGER,
       status TEXT NOT NULL,
       input_tokens INTEGER NOT NULL DEFAULT 0,
       output_tokens INTEGER NOT NULL DEFAULT 0,
       latency_ms INTEGER NOT NULL DEFAULT 0,
       error TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limit_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('request', 'tokens')),
+      tokens INTEGER NOT NULL DEFAULT 0,
+      created_at_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limit_cooldowns (
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      expires_at_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (platform, model_id, key_id)
     );
 
     CREATE TABLE IF NOT EXISTS fallback_config (
@@ -111,8 +136,20 @@ function createTables(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup ON rate_limit_usage(platform, model_id, key_id, kind, created_at_ms);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_cooldowns_expires ON rate_limit_cooldowns(expires_at_ms);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
   `);
+
+  ensureRequestKeyIdColumn(db);
+}
+
+function ensureRequestKeyIdColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'key_id')) {
+    db.prepare('ALTER TABLE requests ADD COLUMN key_id INTEGER').run();
+  }
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_key_id ON requests(key_id)').run();
 }
 
 function seedModels(db: Database.Database) {
@@ -825,6 +862,405 @@ function migrateModelsV10(db: Database.Database) {
     }
   });
   apply();
+}
+
+/**
+ * V11 (May 2026):
+ * 1. Fix long-standing bug: Cerebras `qwen3-235b` was inserted with the
+ *    wrong model_id in the original seed (real id is
+ *    `qwen-3-235b-a22b-instruct-2507`). Subsequent rank/limit updates that
+ *    target the correct id have been silent no-ops since V0 on fresh deploys.
+ * 2. Re-enable NVIDIA NIM — `meta/llama-3.1-70b-instruct` was disabled in V2
+ *    when NIM moved to credits. Per May 2026 audit it's free again (~1,000
+ *    starter credits never expire, 40 RPM/model).
+ * 3. Add three new aggregator/anon-friendly platforms confirmed live May 2026:
+ *    Kilo Gateway, Pollinations, LLM7.io — all three accept anonymous
+ *    requests on at least one model.
+ *    - The user still needs a placeholder key entry (any non-empty string
+ *      works) because the router filters on `keys.length === 0` to decide
+ *      whether a platform is routable.
+ *    Chutes was evaluated and dropped: probe with a free-tier key returned
+ *    402 on every model — "Quota exceeded and account balance is $0.0,
+ *    please pay with fiat or send tao". The "free" tier requires a paid
+ *    balance, which conflicts with the no-card criterion.
+ */
+function migrateModelsV11(db: Database.Database) {
+  // 1) Rename cerebras qwen3-235b → qwen-3-235b-a22b-instruct-2507 if the
+  //    old id still exists on this DB. Safe to re-run because of the WHERE.
+  db.prepare(`
+    UPDATE models SET model_id = 'qwen-3-235b-a22b-instruct-2507'
+     WHERE platform = 'cerebras' AND model_id = 'qwen3-235b'
+  `).run();
+
+  // 2) Re-enable NVIDIA NIM (still has 1,000+ starter credits free-tier).
+  db.prepare(`
+    UPDATE models SET enabled = 1, monthly_token_budget = '~3M (1k credits)'
+     WHERE platform = 'nvidia' AND model_id = 'meta/llama-3.1-70b-instruct'
+  `).run();
+
+  // 3) Add catalog rows for the four new platforms. Numeric limits are
+  //    conservative — provider docs publish best-effort bounds that fluctuate.
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // NVIDIA NIM — live-probed May 2026 with a free-tier key. All 8 returned
+    // 200 + content. Limits are per-model: 40 RPM, shared 1k starter credits
+    // (never-expire) used for the rough budget estimate. The existing
+    // meta/llama-3.1-70b-instruct row stays (re-enabled above).
+    ['nvidia',       'meta/llama-3.3-70b-instruct',                       'Llama 3.3 70B (NV)',                17, 6, 'Large',    40, null, null, null, '~3M (credits)', 131072],
+    ['nvidia',       'meta/llama-4-maverick-17b-128e-instruct',           'Llama 4 Maverick (NV)',             11, 6, 'Large',    40, null, null, null, '~3M (credits)', 131072],
+    ['nvidia',       'deepseek-ai/deepseek-v4-pro',                       'DeepSeek V4 Pro (NV)',               3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
+    ['nvidia',       'mistralai/mistral-large-3-675b-instruct-2512',      'Mistral Large 3 675B (NV)',          3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
+    ['nvidia',       'minimaxai/minimax-m2.7',                            'MiniMax M2.7 (NV)',                  3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 196608],
+    ['nvidia',       'nvidia/nemotron-3-super-120b-a12b',                 'Nemotron 3 Super 120B (NV)',        22, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 262144],
+    ['nvidia',       'nvidia/nemotron-3-nano-30b-a3b',                    'Nemotron 3 Nano 30B (NV)',          22, 9, 'Medium',   40, null, null, null, '~3M (credits)', 262144],
+    ['nvidia',       'google/gemma-4-31b-it',                             'Gemma 4 31B (NV)',                  19, 9, 'Medium',   40, null, null, null, '~3M (credits)', 262144],
+    ['nvidia',       'moonshotai/kimi-k2.6',                              'Kimi K2.6 (NV)',                     3, 9, 'Frontier', 40, null, null, null, '~2M (credits)', 131072],
+
+    // Cerebras — live-probed May 2026 with a free-tier key. Both 200 + content.
+    // gpt-oss-120b was removed in V2 ("requires special access, 404 on our
+    // key") but is reachable on the current free tier — re-add. llama3.1-8b
+    // is the fast small-model alternative (no hyphen, distinct from Groq's
+    // llama-3.1-8b-instant id). Free-pool limits match qwen-3-235b row.
+    ['cerebras',     'gpt-oss-120b',                              'GPT-OSS 120B (Cerebras)',        6,  1, 'Large',    30, 1000, 60000, 1000000, '~30M', 131072],
+    ['cerebras',     'llama3.1-8b',                               'Llama 3.1 8B (Cerebras)',       28,  1, 'Small',    30, 1000, 60000, 1000000, '~30M', 131072],
+
+    // Groq compound — agent system that internally routes through gpt-oss
+    // models and exposes the trace in usage metadata. Standard chat-completions
+    // shape works (200 + content). Same free-tier limits as other Groq rows.
+    ['groq',         'groq/compound',                             'Compound (Groq)',                6,  2, 'Large',    30, 1000, 8000, 200000, '~6M', 131072],
+    ['groq',         'groq/compound-mini',                        'Compound Mini (Groq)',          18,  2, 'Medium',   30, 1000, 8000, 200000, '~6M', 131072],
+
+    // Kilo Gateway — 200 req/hr per IP anon. Most named :free routes have
+    // transitioned to paid ("free period ended"); probe-confirmed live:
+    ['kilo',         'nvidia/nemotron-3-super-120b-a12b:free',  'Nemotron 3 Super 120B (Kilo)',  22, 9,  'Frontier', null, null, null, null, '~2-3M (200/hr)', 262144],
+
+    // Pollinations — anonymous /openai endpoint. Public model list returns
+    // just one anonymous-tier entry. Tool calls supported per their metadata.
+    ['pollinations', 'openai-fast',                              'GPT-OSS 20B (Pollinations)',    18, 10, 'Medium',   null, null, null, null, '~? (anon)',      131072],
+
+    // LLM7.io — 100 req/hr free (anonymous works). Probe-confirmed list:
+    ['llm7',         'gpt-oss-20b',                              'GPT-OSS 20B (LLM7)',            18, 10, 'Medium',   100, null, null, null, '~2-3M (100/hr)', 131072],
+    ['llm7',         'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', 'Llama 3.1 8B Turbo (LLM7)', 28, 10, 'Small',    100, null, null, null, '~2-3M (100/hr)', 131072],
+    ['llm7',         'codestral-latest',                          'Codestral (LLM7)',              16, 8,  'Medium',   100, null, null, null, '~2-3M (100/hr)',  32000],
+    ['llm7',         'ministral-8b-2512',                         'Ministral 8B (LLM7)',           28, 10, 'Small',    100, null, null, null, '~2-3M (100/hr)', 131072],
+    ['llm7',         'GLM-4.6V-Flash',                            'GLM-4.6V Flash (LLM7)',         15, 9,  'Large',    100, null, null, null, '~2-3M (100/hr)', 131072],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V12 (May 2026): live-probed delta against OpenRouter's free pool.
+ *
+ * Removals (both confirmed 404 "no longer available as a free model" — moved
+ * to paid SKUs at the same id without the :free suffix):
+ *   - inclusionai/ling-2.6-1t:free
+ *   - tencent/hy3-preview:free
+ *
+ * Additions (probe-verified 200 + tool_calls with tool_choice=auto on the
+ * user's OR key; tool_choice=required is rejected by all three providers,
+ * but the router's tool requests use the OpenAI default of auto):
+ *   - arcee-ai/trinity-large-thinking:free  — Arcee's Trinity *Thinking*
+ *     successor to the trinity-large-preview:free row pulled in V6 (404 then).
+ *   - baidu/cobuddy:free                    — Baidu Qianfan coding/agent
+ *     model with native tool use + reasoning.
+ *   - openrouter/owl-alpha                  — OR-house agentic foundation
+ *     model. Zero-priced but no :free suffix, so it sits on a different rate
+ *     pool than the shared :free 20 RPM / 200 RPD bucket. 1M ctx.
+ *   - nousresearch/hermes-3-llama-3.1-405b:free — 405B route ranked in V3
+ *     but never inserted. Currently 429 on probe (upstream throttle), not
+ *     gone. No tools support listed; router falls past it on tool requests.
+ *
+ * Dropped from the add list:
+ *   - deepseek/deepseek-v4-flash:free — listed at $0 in /v1/models but the
+ *     Crucible provider returns 402 "Out of credits" — not actually free.
+ *
+ * Context-window corrections — OR raised these to match upstream provider
+ * caps; our seeded values were stale:
+ *   - nvidia/nemotron-3-super-120b-a12b:free  262144 → 1000000
+ *   - qwen/qwen3-coder:free                   262144 → 1048576
+ */
+function migrateModelsV12(db: Database.Database) {
+  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
+  const deleteFallback = db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = ? AND model_id = ?
+    )
+  `);
+  const removals: Array<[string, string]> = [
+    ['openrouter', 'inclusionai/ling-2.6-1t:free'],
+    ['openrouter', 'tencent/hy3-preview:free'],
+  ];
+  const applyRemovals = db.transaction(() => {
+    for (const [p, m] of removals) {
+      deleteFallback.run(p, m);
+      deleteModel.run(p, m);
+    }
+  });
+  applyRemovals();
+
+  // Context-window upgrades for existing rows.
+  db.prepare(`
+    UPDATE models SET context_window = 1000000
+     WHERE platform = 'openrouter' AND model_id = 'nvidia/nemotron-3-super-120b-a12b:free'
+  `).run();
+  db.prepare(`
+    UPDATE models SET context_window = 1048576
+     WHERE platform = 'openrouter' AND model_id = 'qwen/qwen3-coder:free'
+  `).run();
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  // :free pool quotas as elsewhere in catalog: 20 RPM / 200 RPD / ~6M tokens.
+  // openrouter/owl-alpha sits on the non-:free zero-priced pool — quotas
+  // unpublished; mirror :free numbers conservatively so it cools down on 429.
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['openrouter', 'arcee-ai/trinity-large-thinking:free',         'Trinity Large Thinking (free)',  5,  9, 'Frontier', 20, 200, null, null, '~6M', 262144],
+    ['openrouter', 'baidu/cobuddy:free',                           'CoBuddy (free)',                 6,  9, 'Large',    20, 200, null, null, '~6M', 131072],
+    ['openrouter', 'openrouter/owl-alpha',                         'Owl Alpha (OR-house)',           5,  9, 'Frontier', 20, 200, null, null, '~6M', 1048576],
+    ['openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free',    'Hermes 3 405B (free)',          17,  9, 'Large',    20, 200, null, null, '~6M', 131072],
+  ];
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V13 (May 2026): cross-provider catalog refresh — live-probed against the
+ * user's keys for Cerebras, Groq, SambaNova, Cloudflare, Google, NVIDIA,
+ * Mistral, Cohere, Ollama, HuggingFace, Z.ai, Chutes. Z.ai/Chutes confirmed
+ * no-change (non-flash Z.ai SKUs require recharge; Chutes still gated on
+ * $0 balance).
+ *
+ * DISABLES (row kept for re-enable history; pattern follows V5/V9):
+ *   - google/gemini-3.1-pro-preview — 429 with quotaMetric `free_tier_requests`
+ *     limit=0; moved off free tier. (V6 inferred Pro was free; lapsed since.)
+ *   - ollama/kimi-k2-thinking, ollama/mistral-large-3:675b, ollama/deepseek-v3.2
+ *     — all return 403 "this model requires a subscription" on the Free plan
+ *     now. (V10 catalogued them as Free; Ollama paywalled them since.)
+ *
+ * HARD REMOVALS (model is gone, not paywalled):
+ *   - sambanova/DeepSeek-V3.1-cb — absent from live /v1/models; V8 was over-eager.
+ *   - cloudflare/@cf/moonshotai/kimi-k2.5 — CF changelog: aliases to k2.6 on
+ *     2026-05-30. Two rows for one backend wastes a fallback slot.
+ *
+ * UPDATES (numbers verified from live response headers or /v1/models):
+ *   - cerebras: all 3 enabled rows → 5 RPM / 30K TPM / 2400 RPD / 1M TPD
+ *     (V4's 30/14400/60K/1M was stale; current free pool is 5 RPM shared).
+ *   - groq/llama-3.3-70b-versatile: TPD 500K → 100K (docs).
+ *   - groq/llama-4-scout: TPM 6K → 30K (live header).
+ *   - groq/compound + groq/compound-mini: RPD 1000→250, TPM 8K→70K, TPD→null
+ *     (compound systems run on a separate budget per docs + live header).
+ *   - sambanova/DeepSeek-V3.2: ctx 131K → 32K (/v1/models reports 32768).
+ *   - cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast: ctx 131K → 24K
+ *     (CF model page: fp8-fast variant capped at 24K).
+ *   - mistral context windows (all stale vs /v1/models):
+ *       codestral-latest        32K → 256K
+ *       devstral-latest        131K → 262K
+ *       magistral-medium       40K → 131K
+ *       mistral-large-latest  131K → 262K
+ *
+ * ADDITIONS (all chat-probed; tools verified with tool_choice=auto):
+ *   - groq: openai/gpt-oss-safeguard-20b (tool-tuned 20B; same pool as gpt-oss-20b)
+ *   - cloudflare: @cf/nvidia/nemotron-3-120b-a12b, @cf/google/gemma-4-26b-a4b-it
+ *     (both 256K ctx, function_calling=true; 429'd on probe due to daily
+ *     neuron exhaustion, not model-level — same Free pool as other CF rows)
+ *   - google: gemini-3.5-flash (2026-05 release; 1M ctx; tool calls verified)
+ *   - nvidia: deepseek-ai/deepseek-v4-flash, z-ai/glm-5.1 (~2min cold start),
+ *     qwen/qwen3-coder-480b-a35b-instruct (full id — discovered via /v1/models)
+ *   - mistral: mistral-small-latest (Small 4), ministral-8b-latest (edge 8B)
+ *   - cohere: command-a-reasoning-08-2025, command-r-08-2024. README ToS
+ *     table marks Cohere "❌ Avoid for personal use" — these rows expand
+ *     fallback coverage but inherit the same caveat.
+ *   - ollama: qwen3-coder-next (~80B-A3B coder)
+ *
+ * NEW PLATFORM (huggingface):
+ *   - V4 removed HF for "tool-call format issues" on the legacy serverless
+ *     endpoint that emitted tool calls as text. The new router.huggingface.co
+ *     meta-router uses each backend's native protocol and normalizes the
+ *     response — chat-probed clean tool_calls on DeepSeek-V4-Flash, Kimi-K2.6,
+ *     Qwen3-Coder-Next, GLM-4.7, Qwen3-235B. Recurring $0.10/mo router credit
+ *     on the free tier (no card, no expiry). Budget ~1-3M tokens/mo depending
+ *     on backend. Seeded with 3 frontier rows.
+ *   - Provider registration lives in server/src/providers/index.ts.
+ *
+ * NO-CHANGE PROVIDERS (probed, nothing to update):
+ *   - openrouter (V12 just shipped)
+ *   - z.ai/zhipu — non-flash SKUs all 1113 "insufficient balance"; flash-only
+ *     pool is correctly catalogued.
+ *   - chutes — every probe 402 on $0 balance; V11 drop decision stands.
+ *
+ * DEFERRED:
+ *   - cerebras/qwen-3-235b-a22b-instruct-2507 + llama3.1-8b: docs flag
+ *     hard-deprecation 2026-05-27 (4d from migration), but both still 200
+ *     today. Disable in V14 on/after that date.
+ *   - sambanova: every chat probe returned 402 PAYMENT_METHOD_REQUIRED on the
+ *     user's account. /v1/models still lists rows so REMOVE/UPDATE above is
+ *     valid, but the SambaNova free tier may have lapsed account-wide.
+ *     Investigate before adding new SambaNova rows.
+ *   - github: gpt-5 family + xai/grok-3 both 400 "unavailable_model" on free
+ *     tier — keep gpt-4o (V2 verdict still holds).
+ */
+function migrateModelsV13(db: Database.Database) {
+  // 1) Disables (row kept; can be re-enabled without losing fallback history).
+  const disable = db.prepare(`UPDATE models SET enabled = 0 WHERE platform = ? AND model_id = ?`);
+  const disables: Array<[string, string]> = [
+    ['google', 'gemini-3.1-pro-preview'],
+    ['ollama', 'kimi-k2-thinking'],
+    ['ollama', 'mistral-large-3:675b'],
+    ['ollama', 'deepseek-v3.2'],
+  ];
+  for (const [p, m] of disables) disable.run(p, m);
+
+  // 2) Hard removals.
+  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
+  const deleteFallback = db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = ? AND model_id = ?
+    )
+  `);
+  const removals: Array<[string, string]> = [
+    ['sambanova', 'DeepSeek-V3.1-cb'],
+    ['cloudflare', '@cf/moonshotai/kimi-k2.5'],
+  ];
+  const applyRemovals = db.transaction(() => {
+    for (const [p, m] of removals) {
+      deleteFallback.run(p, m);
+      deleteModel.run(p, m);
+    }
+  });
+  applyRemovals();
+
+  // 3) Cerebras free-pool limit correction (3 enabled rows; zai-glm-4.7 stays
+  //    on its V5-set per-model 10/100 cap since it's gated separately).
+  db.prepare(`
+    UPDATE models
+       SET rpm_limit = 5, rpd_limit = 2400, tpm_limit = 30000, tpd_limit = 1000000
+     WHERE platform = 'cerebras'
+       AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'gpt-oss-120b', 'llama3.1-8b')
+  `).run();
+
+  // 4) Groq limit corrections.
+  db.prepare(`UPDATE models SET tpd_limit = 100000 WHERE platform = 'groq' AND model_id = 'llama-3.3-70b-versatile'`).run();
+  db.prepare(`UPDATE models SET tpm_limit = 30000 WHERE platform = 'groq' AND model_id = 'meta-llama/llama-4-scout-17b-16e-instruct'`).run();
+  db.prepare(`
+    UPDATE models SET rpd_limit = 250, tpm_limit = 70000, tpd_limit = NULL
+     WHERE platform = 'groq' AND model_id IN ('groq/compound', 'groq/compound-mini')
+  `).run();
+
+  // 5) Single-row context-window corrections.
+  db.prepare(`UPDATE models SET context_window = 32768 WHERE platform = 'sambanova' AND model_id = 'DeepSeek-V3.2'`).run();
+  db.prepare(`UPDATE models SET context_window = 24000 WHERE platform = 'cloudflare' AND model_id = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'`).run();
+
+  // 6) Mistral context-window corrections.
+  db.prepare(`UPDATE models SET context_window = 256000 WHERE platform = 'mistral' AND model_id = 'codestral-latest'`).run();
+  db.prepare(`UPDATE models SET context_window = 262144 WHERE platform = 'mistral' AND model_id = 'devstral-latest'`).run();
+  db.prepare(`UPDATE models SET context_window = 131072 WHERE platform = 'mistral' AND model_id = 'magistral-medium-latest'`).run();
+  db.prepare(`UPDATE models SET context_window = 262144 WHERE platform = 'mistral' AND model_id = 'mistral-large-latest'`).run();
+
+  // 7) Additions across providers (chat-probed; tools verified where claimed).
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // Groq — shared 30 RPM / 1K RPD / 8K TPM / 200K TPD per-model pool.
+    ['groq',       'openai/gpt-oss-safeguard-20b',          'GPT-OSS Safeguard 20B (Groq)',   18, 2, 'Medium',   30, 1000, 8000, 200000, '~6M', 131072],
+
+    // Cloudflare — 10K Neurons/day shared free pool.
+    ['cloudflare', '@cf/nvidia/nemotron-3-120b-a12b',       'Nemotron 3 120B (CF)',            9, 11, 'Frontier', null, null, null, null, '~5-10M',  262144],
+    ['cloudflare', '@cf/google/gemma-4-26b-a4b-it',         'Gemma 4 26B-A4B it (CF)',        22, 11, 'Medium',   null, null, null, null, '~10-20M', 262144],
+
+    // Google — same 20 RPD per-model free pool. 3.5 Flash is the current Flash flagship.
+    ['google',     'gemini-3.5-flash',                      'Gemini 3.5 Flash',                3, 5, 'Large',    10, 20,  250000, null, '~3M', 1048576],
+
+    // NVIDIA NIM — credits-based; per-model 40 RPM.
+    ['nvidia',     'deepseek-ai/deepseek-v4-flash',         'DeepSeek V4 Flash (NV)',          4, 9, 'Frontier', 40, null, null, null, '~3M (credits)', 131072],
+    ['nvidia',     'z-ai/glm-5.1',                          'GLM-5.1 (NV, slow cold-start)',   5, 9, 'Frontier', 40, null, null, null, '~3M (credits)', 200000],
+    ['nvidia',     'qwen/qwen3-coder-480b-a35b-instruct',   'Qwen3-Coder 480B (NV)',           2, 9, 'Frontier', 40, null, null, null, '~3M (credits)', 262144],
+
+    // Mistral — Experiment plan 2 RPM / 500K TPM / shared ~1B/mo.
+    ['mistral',    'mistral-small-latest',                  'Mistral Small 4',                14, 8, 'Medium',   2, null, 500000, null, '~50-100M', 262144],
+    ['mistral',    'ministral-8b-latest',                   'Ministral 3 8B',                 28, 8, 'Small',    2, null, 500000, null, '~50-100M', 262144],
+
+    // Cohere — trial 20 RPM / 1000 RPM total. ToS table marks ❌ Avoid for personal use.
+    ['cohere',     'command-a-reasoning-08-2025',           'Command A Reasoning (08-2025)',  13, 11, 'Large',   20, 33, null, null, '~1-2M', 256000],
+    ['cohere',     'command-r-08-2024',                     'Command R (08-2024)',            25, 11, 'Medium',  20, 33, null, null, '~1-2M', 131072],
+
+    // Ollama Cloud — GPU-time quota.
+    ['ollama',     'qwen3-coder-next',                      'Qwen3-Coder Next (Ollama)',       3, 9, 'Large',   null, null, null, null, '~10-20M', 262144],
+
+    // HuggingFace router (new platform) — recurring $0.10/mo credit, no card.
+    ['huggingface', 'deepseek-ai/DeepSeek-V4-Flash',        'DeepSeek V4 Flash (HF)',          4, 9, 'Frontier', null, null, null, null, '~1-3M', 131072],
+    ['huggingface', 'moonshotai/Kimi-K2.6',                 'Kimi K2.6 (HF)',                  3, 9, 'Frontier', null, null, null, null, '~1-3M', 262144],
+    ['huggingface', 'Qwen/Qwen3-Coder-Next',                'Qwen3-Coder Next (HF)',           3, 9, 'Large',    null, null, null, null, '~1-3M', 262144],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
+ * V14 (May 2026): Cerebras hard-deprecation 2026-05-27.
+ *
+ * Per inference-docs.cerebras.ai/models/overview, both
+ * `qwen-3-235b-a22b-instruct-2507` and `llama3.1-8b` hit a hard deprecation
+ * on 2026-05-27 with no announced free-tier replacement at the same
+ * parameter class. Disable both ahead of the cutover so the router stops
+ * sending traffic to them. Row kept (not deleted) so it can be re-enabled
+ * if Cerebras restores or renames either model — same pattern as V9's
+ * disable of `zai-glm-4.7`.
+ *
+ * Cerebras `gpt-oss-120b` is NOT in the deprecation list and stays enabled
+ * as the sole free-tier Cerebras route.
+ */
+function migrateModelsV14(db: Database.Database) {
+  db.prepare(`
+    UPDATE models SET enabled = 0
+     WHERE platform = 'cerebras'
+       AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
+  `).run();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

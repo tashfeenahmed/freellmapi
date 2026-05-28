@@ -2,8 +2,9 @@
 
 // Active platforms — must match server/src/providers/index.ts and
 // server/src/routes/keys.ts PLATFORMS allowlist.
-// Hugging Face, Moonshot, and MiniMax direct integrations were dropped
-// in migrateModelsV4 (see server/src/db/index.ts).
+// Moonshot and MiniMax direct integrations were dropped in migrateModelsV4
+// (see server/src/db/index.ts). HuggingFace was dropped in V4 and re-added
+// in V13 via the router.huggingface.co Inference Providers meta-router.
 export type Platform =
   | 'google'
   | 'groq'
@@ -16,7 +17,11 @@ export type Platform =
   | 'cohere'
   | 'cloudflare'
   | 'zhipu'
-  | 'ollama';
+  | 'ollama'
+  | 'kilo'
+  | 'pollinations'
+  | 'llm7'
+  | 'huggingface';
 
 export interface Model {
   id: number;
@@ -103,9 +108,16 @@ export type ChatToolChoice =
     };
   };
 
+// OpenAI's multimodal envelope: clients like opencode / continue.dev send
+// content as an array of typed blocks even for text-only messages. We accept
+// it on the wire and flatten to string for providers that don't support it
+// (Cohere, Cloudflare). See server/src/lib/content.ts.
+export type ChatContentBlock = { type: string; text?: string; [key: string]: unknown };
+export type ChatContent = string | null | ChatContentBlock[];
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: ChatContent;
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];

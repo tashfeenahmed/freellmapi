@@ -4,6 +4,7 @@ import type {
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
+import { contentToString } from '../lib/content.js';
 
 /**
  * Cloudflare Workers AI provider.
@@ -20,12 +21,12 @@ export class CloudflareProvider extends BaseProvider {
     return { accountId: apiKey.slice(0, sep), token: apiKey.slice(sep + 1) };
   }
 
-  // Cloudflare's OpenAI-compat endpoint rejects `content: null` on assistant
-  // messages that carry tool_calls, even though the OpenAI spec allows it.
+  // Cloudflare's OpenAI-compat endpoint:
+  //   - rejects `content: null` on assistant messages that carry tool_calls,
+  //     even though the OpenAI spec allows it (collapse to '');
+  //   - doesn't accept the array content envelope, so flatten to string.
   private normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
-    return messages.map(m =>
-      m.content === null ? { ...m, content: '' } : m,
-    );
+    return messages.map(m => ({ ...m, content: contentToString(m.content) }));
   }
 
   async chatCompletion(

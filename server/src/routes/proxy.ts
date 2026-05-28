@@ -4,10 +4,21 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown } from '../services/ratelimit.js';
+import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { contentToString } from '../lib/content.js';
 
 export const proxyRouter = Router();
+
+// Virtual "auto" model. Clients like Hermes require a non-empty `model` field
+// on every request, but freellmapi's whole point is to pick the model itself.
+// Requesting this id means "let the router decide" — identical to omitting
+// `model` entirely.
+const AUTO_MODEL_ID = 'auto';
+
+function isAutoModel(modelId: string | undefined): boolean {
+  return modelId === AUTO_MODEL_ID;
+}
 
 // Constant-time string comparison for the unified API key. Plain `===` leaks
 // length and per-character timing, which a network attacker could in principle
@@ -77,14 +88,24 @@ proxyRouter.get('/models', (_req: Request, res: Response) => {
   const models = db.prepare('SELECT platform, model_id, display_name, context_window FROM models WHERE enabled = 1 ORDER BY intelligence_rank').all() as any[];
   res.json({
     object: 'list',
-    data: models.map(m => ({
-      id: m.model_id,
-      object: 'model',
-      created: 0,
-      owned_by: m.platform,
-      name: m.display_name,
-      context_window: m.context_window,
-    })),
+    data: [
+      {
+        id: AUTO_MODEL_ID,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: 'Auto (router picks the best available model)',
+        context_window: null,
+      },
+      ...models.map(m => ({
+        id: m.model_id,
+        object: 'model',
+        created: 0,
+        owned_by: m.platform,
+        name: m.display_name,
+        context_window: m.context_window,
+      })),
+    ],
   });
 });
 
@@ -100,25 +121,39 @@ const toolCallSchema = z.object({
   thought_signature: z.string().optional(),
 });
 
+// OpenAI multimodal envelope. Clients like opencode / continue.dev send
+// content as an array of typed blocks even when only text is present. We
+// accept the envelope on the wire and flatten to string for providers that
+// don't support arrays (Cohere, Cloudflare). Non-text blocks pass z validation
+// but get dropped by contentToString — vision/audio still isn't supported.
+const contentBlockSchema = z.object({ type: z.string() }).passthrough();
+const contentSchema = z.union([z.string(), z.array(contentBlockSchema)]);
+
+function hasNonEmptyContent(content: unknown): boolean {
+  if (typeof content === 'string') return content.length > 0;
+  if (Array.isArray(content)) return content.length > 0;
+  return false;
+}
+
 const systemMessageSchema = z.object({
   role: z.literal('system'),
-  content: z.string(),
+  content: contentSchema,
   name: z.string().optional(),
 });
 
 const userMessageSchema = z.object({
   role: z.literal('user'),
-  content: z.string(),
+  content: contentSchema,
   name: z.string().optional(),
 });
 
 const assistantMessageSchema = z.object({
   role: z.literal('assistant'),
-  content: z.string().nullable().optional(),
+  content: z.union([contentSchema, z.null()]).optional(),
   name: z.string().optional(),
   tool_calls: z.array(toolCallSchema).optional(),
 }).refine((msg) => {
-  const hasContent = typeof msg.content === 'string' && msg.content.length > 0;
+  const hasContent = hasNonEmptyContent(msg.content);
   const hasToolCalls = (msg.tool_calls?.length ?? 0) > 0;
   return hasContent || hasToolCalls;
 }, {
@@ -127,7 +162,7 @@ const assistantMessageSchema = z.object({
 
 const toolMessageSchema = z.object({
   role: z.literal('tool'),
-  content: z.string(),
+  content: contentSchema,
   tool_call_id: z.string().min(1),
   name: z.string().optional(),
 });
@@ -169,37 +204,42 @@ const chatCompletionSchema = z.object({
   parallel_tool_calls: z.boolean().optional(),
 });
 
-function isRetryableError(err: any): boolean {
+export function isRetryableError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
     || msg.includes('503') || msg.includes('unavailable')
-    || msg.includes('500') || msg.includes('internal server error');
+    || msg.includes('500') || msg.includes('internal server error')
+    // 413: this model's payload limit is too small for the request, but another
+    // provider in the fallback chain may have a larger limit. Same reasoning as 503.
+    || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
+    || msg.includes('request entity too large') || msg.includes('content too large')
+    // 404: model deprecated/removed upstream (e.g. OpenRouter's "no endpoints found"
+    // for a model that's been pulled). Rotate to the next model in the chain —
+    // setCooldown + the health checker will avoid this model on subsequent requests.
+    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    // 400: one provider may reject parameters another accepts (e.g. max_tokens
+    // limits, unsupported params). The matching pattern is "api error 400"
+    // which comes from the OpenAI-compat provider's error formatting, not
+    // a bare "400" which is deliberately non-retryable for validation errors.
+    || msg.includes('api error 400');
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Authenticate with unified API key. Local requests (127.0.0.1) skip the check
-  // since they came from the same machine running the server. Non-local requests
-  // MUST present a valid Bearer token — missing or wrong → 401.
-  //
-  // Note: req.ip is the actual TCP socket peer because we never set
-  // `trust proxy`, so X-Forwarded-For cannot spoof a localhost identity.
-  // If a future change enables `trust proxy`, this localhost bypass MUST be
-  // re-evaluated.
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-  if (!isLocal) {
-    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-    const unifiedKey = getUnifiedApiKey();
-    if (!token || !timingSafeStringEqual(token, unifiedKey)) {
-      res.status(401).json({
-        error: { message: 'Invalid API key', type: 'authentication_error' },
-      });
-      return;
-    }
+  // Authenticate with the unified API key for every proxy request, including
+  // loopback callers. Browser pages can reach localhost, so socket locality is
+  // not a reliable authorization boundary.
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({
+      error: { message: 'Invalid API key', type: 'authentication_error' },
+    });
+    return;
   }
 
   // Validate request
@@ -253,8 +293,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // (see line ~340). Streaming will drift from real consumption — accepted
   // tradeoff because per-request usage isn't always returned mid-stream.
   const estimatedInputTokens = messages.reduce((sum, m) => {
-    if (typeof m.content !== 'string') return sum;
-    return sum + Math.ceil(m.content.length / 4);
+    const text = contentToString(m.content);
+    return sum + Math.ceil(text.length / 4);
   }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
@@ -263,7 +303,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
-  if (requestedModel) {
+  if (isAutoModel(requestedModel)) {
+    // Explicit "auto" → behave exactly like an omitted model field.
+    preferredModel = getStickyModel(messages);
+  } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
@@ -273,7 +316,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
       res.status(400).json({
         error: {
-          message: `Model '${requestedModel}' ${reason}. Omit the 'model' field to auto-route, or call /v1/models for the available list.`,
+          message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
           type: 'invalid_request_error',
           code: 'model_not_found',
         },
@@ -349,7 +392,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId);
-          logRequest(route.platform, route.modelId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
           return;
         } catch (streamErr: any) {
           if (streamStarted) {
@@ -361,7 +404,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
             return;
           }
           // Pre-stream error — bubble to outer retry/502 handler.
@@ -383,7 +426,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         res.json(result);
 
         logRequest(
-          route.platform, route.modelId, 'success',
+          route.platform, route.modelId, route.keyId, 'success',
           result.usage?.prompt_tokens ?? 0,
           result.usage?.completion_tokens ?? 0,
           Date.now() - start, null,
@@ -392,13 +435,18 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     } catch (err: any) {
       const latency = Date.now() - start;
-      logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, 0, latency, err.message);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, err.message);
 
       if (isRetryableError(err)) {
         // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
         skipKeys.add(skipId);
-        setCooldown(route.platform, route.modelId, route.keyId, 120_000);
+        setCooldown(
+          route.platform,
+          route.modelId,
+          route.keyId,
+          getNextCooldownDuration(route.platform, route.modelId, route.keyId),
+        );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
         console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
@@ -428,6 +476,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 function logRequest(
   platform: string,
   modelId: string,
+  keyId: number,
   status: string,
   inputTokens: number,
   outputTokens: number,
@@ -437,9 +486,9 @@ function logRequest(
   try {
     const db = getDb();
     db.prepare(`
-      INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, status, inputTokens, outputTokens, latencyMs, error);
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error);
   } catch (e) {
     console.error('Failed to log request:', e);
   }

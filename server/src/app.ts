@@ -14,8 +14,24 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const DEFAULT_DASHBOARD_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://[::1]:5173',
+];
+
+function getAllowedCorsOrigins() {
+  const configuredOrigins = (process.env.DASHBOARD_ORIGINS ?? '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  return new Set([...DEFAULT_DASHBOARD_ORIGINS, ...configuredOrigins]);
+}
+
 export function createApp() {
   const app = express();
+  const allowedCorsOrigins = getAllowedCorsOrigins();
 
   // CSP intentionally disabled — the SPA bundles inline styles and the OG
   // image is loaded from the same origin; enabling helmet's default CSP
@@ -24,7 +40,11 @@ export function createApp() {
   // stay disabled unless someone serves the proxy over HTTPS publicly
   // (which is also not a supported deployment — see README).
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
-  app.use(cors());
+  app.use(cors({
+    origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+      callback(null, !origin || allowedCorsOrigins.has(origin));
+    },
+  }));
   app.use(express.json({ limit: '1mb' }));
 
   // API routes

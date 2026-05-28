@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
 
@@ -21,6 +22,10 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'cloudflare', label: 'Cloudflare Workers AI' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
   { value: 'ollama', label: 'Ollama Cloud' },
+  { value: 'kilo', label: 'Kilo Gateway (anon ok)' },
+  { value: 'pollinations', label: 'Pollinations (anon ok)' },
+  { value: 'llm7', label: 'LLM7 (anon ok)' },
+  { value: 'huggingface', label: 'HuggingFace Router' },
 ]
 
 const statusDot: Record<string, string> = {
@@ -178,6 +183,19 @@ export default function KeysPage() {
     },
   })
 
+  const togglePlatform = useMutation({
+    mutationFn: ({ platform, enabled }: { platform: string; enabled: boolean }) =>
+      apiFetch(`/api/keys/platform/${platform}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+  })
+
   const needsAccountId = platform === 'cloudflare'
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -282,8 +300,17 @@ export default function KeysPage() {
             <div className="space-y-6">
               {grouped.map(group => (
                 <div key={group.value}>
-                  <div className="flex items-baseline justify-between mb-2">
-                    <h3 className="text-sm font-medium">{group.label}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={group.keys.some(k => k.enabled)}
+                        onCheckedChange={(checked) =>
+                          togglePlatform.mutate({ platform: group.value, enabled: checked })
+                        }
+                        disabled={togglePlatform.isPending}
+                      />
+                      <h3 className="text-sm font-medium">{group.label}</h3>
+                    </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
                     </span>

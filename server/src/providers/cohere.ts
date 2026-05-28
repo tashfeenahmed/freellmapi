@@ -4,6 +4,7 @@ import type {
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
+import { flattenMessageContent } from '../lib/content.js';
 
 const API_BASE = 'https://api.cohere.ai/compatibility/v1';
 
@@ -19,7 +20,7 @@ export class CohereProvider extends BaseProvider {
   ): Promise<ChatCompletionResponse> {
     const body: Record<string, unknown> = {
       model: modelId,
-      messages,
+      messages: flattenMessageContent(messages),
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
@@ -54,7 +55,7 @@ export class CohereProvider extends BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk> {
     const body: Record<string, unknown> = {
       model: modelId,
-      messages,
+      messages: flattenMessageContent(messages),
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
