@@ -3,6 +3,7 @@ import { getProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown } from './ratelimit.js';
 import type { BaseProvider } from '../providers/base.js';
+import type Database from 'better-sqlite3';
 
 interface ModelRow {
   id: number;
@@ -29,6 +30,32 @@ interface FallbackRow {
   model_db_id: number;
   priority: number;
   enabled: number;
+}
+
+function getActiveChain(db: Database.Database): FallbackRow[] {
+  // Check if there is an active profile set in settings
+  const row = db.prepare(`SELECT value FROM settings WHERE key = 'active_profile_id'`).get() as { value: string } | undefined;
+  const activeProfileId = row ? (parseInt(row.value) || null) : null;
+
+  if (activeProfileId) {
+    // Verify profile still exists
+    const profile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(activeProfileId) as any;
+    if (profile) {
+      return db.prepare(`
+        SELECT pm.model_db_id, pm.priority, pm.enabled
+        FROM profile_models pm
+        WHERE pm.profile_id = ?
+        ORDER BY pm.priority ASC
+      `).all(activeProfileId) as FallbackRow[];
+    }
+  }
+
+  // Default: use global fallback_config
+  return db.prepare(`
+    SELECT fc.model_db_id, fc.priority, fc.enabled
+    FROM fallback_config fc
+    ORDER BY fc.priority ASC
+  `).all() as FallbackRow[];
 }
 
 export interface RouteResult {
@@ -131,15 +158,11 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
  * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
  * @param preferredModelDbId - try this model first (sticky session)
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, skipModels?: Set<number>): RouteResult {
   const db = getDb();
 
-  // Get fallback chain ordered by priority
-  const fallbackChain = db.prepare(`
-    SELECT fc.model_db_id, fc.priority, fc.enabled
-    FROM fallback_config fc
-    ORDER BY fc.priority ASC
-  `).all() as FallbackRow[];
+  // Get the active chain — either from the active profile or from the global fallback_config
+  const fallbackChain = getActiveChain(db);
 
   // Apply dynamic penalties: sort by (base priority + penalty)
   const sortedChain = fallbackChain.map(entry => ({
@@ -158,6 +181,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
   for (const entry of sortedChain) {
     if (!entry.enabled) continue;
+    if (skipModels?.has(entry.model_db_id)) continue;
 
     // Get model details
     const model = db.prepare('SELECT * FROM models WHERE id = ? AND enabled = 1').get(entry.model_db_id) as ModelRow | undefined;

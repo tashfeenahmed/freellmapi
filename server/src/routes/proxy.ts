@@ -324,12 +324,18 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
+  const skipModels = new Set<number>();
   let lastError: any = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel);
+      route = routeRequest(
+        estimatedTotal, 
+        skipKeys.size > 0 ? skipKeys : undefined, 
+        preferredModel,
+        skipModels.size > 0 ? skipModels : undefined
+      );
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -433,11 +439,21 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       logRequest(route.platform, route.modelId, 'error', estimatedInputTokens, 0, latency, err.message);
 
       if (isRetryableError(err)) {
-        // Put this model+key on cooldown and try the next one
-        const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
-        skipKeys.add(skipId);
-        setCooldown(route.platform, route.modelId, route.keyId, 120_000);
-        recordRateLimitHit(route.modelDbId);
+        const msg = (err.message ?? '').toLowerCase();
+        const isNotFound = msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
+        
+        if (isNotFound) {
+          // Model is missing/deleted, skip the entire model for this request
+          skipModels.add(route.modelDbId);
+          console.log(`[Proxy] Model not found (${route.displayName}), skipping entire model`);
+        } else {
+          // Put this model+key on cooldown and try the next one
+          const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
+          skipKeys.add(skipId);
+          setCooldown(route.platform, route.modelId, route.keyId, 120_000);
+          recordRateLimitHit(route.modelDbId);
+        }
+        
         lastError = err;
         console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;

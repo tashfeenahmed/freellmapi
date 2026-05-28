@@ -147,3 +147,45 @@
         font-feature-settings: 'ss01';
     }
 }
+
+/* Visible scrollbar for Kanban board */
+.kanban-board-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  display: block;
+}
+.kanban-board-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kanban-board-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(from var(--color-muted-foreground) l c h / 0.2);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+.kanban-board-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(from var(--color-muted-foreground) l c h / 0.4);
+}
+.kanban-board-scrollbar {
+  transform: rotateX(180deg);
+  scrollbar-width: thin;
+  scrollbar-color: oklch(from var(--color-muted-foreground) l c h / 0.2) transparent;
+}
+.kanban-board-scrollbar > * {
+  transform: rotateX(180deg);
+}
+
+/* Hide all tooltips when drag-and-drop is active to prevent visual jumping */
+body.is-dragging-dnd [data-base-ui-tooltip-popup],
+body.is-dragging-dnd .tooltip-content,
+body.is-dragging-dnd [role="tooltip"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Disable scroll snapping during drag and drop to prevent high-speed scrolling */
+body.is-dragging-dnd * {
+  scroll-snap-type: none !important;
+  scroll-snap-align: none !important;
+}
+

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import { seedProfiles } from '../routes/profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -50,6 +51,10 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV13(db);
   migrateModelsV14(db);
   ensureUnifiedKey(db);
+  migrateProfiles(db);
+  seedProfiles(db);
+  migrateProfilesV2(db);
+  migrateFallbackAndDefaultBaseline(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
@@ -108,6 +113,27 @@ function createTables(db: Database.Database) {
       UNIQUE(model_db_id)
     );
 
+    CREATE TABLE IF NOT EXISTS profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      type TEXT NOT NULL DEFAULT 'custom',
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      auto_sort TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS profile_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      model_db_id INTEGER NOT NULL REFERENCES models(id),
+      priority INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(profile_id, model_db_id)
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -117,6 +143,27 @@ function createTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
   `);
+}
+
+/**
+ * Safely deletes a model by first clearing its associations from profile_models
+ * and fallback_config, avoiding FOREIGN KEY constraint violations during migrations.
+ */
+function deleteModelSafely(db: Database.Database, platform: string, modelId: string) {
+  const tableExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='profile_models'`).get();
+  if (tableExists) {
+    db.prepare(`
+      DELETE FROM profile_models WHERE model_db_id IN (
+        SELECT id FROM models WHERE platform = ? AND model_id = ?
+      )
+    `).run(platform, modelId);
+  }
+  db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = ? AND model_id = ?
+    )
+  `).run(platform, modelId);
+  db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`).run(platform, modelId);
 }
 
 function seedModels(db: Database.Database) {
@@ -274,13 +321,6 @@ function migrateModels(db: Database.Database) {
  * live catalog (April 2026).
  */
 function migrateModelsV2(db: Database.Database) {
-  // Helper: delete a model and its fallback_config entry (FK is RESTRICT-by-default)
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     // GitHub free tier does NOT include GPT-5 (only catalog-listed). Revert handled below.
     // Cerebras: qwen-3-coder-480b and llama-4-maverick not on free tier; gpt-oss-120b is listed
@@ -292,10 +332,10 @@ function migrateModelsV2(db: Database.Database) {
     ['openrouter', 'deepseek/deepseek-v3.1:free'],
     ['openrouter', 'moonshotai/kimi-k2:free'],
   ];
+
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -406,12 +446,6 @@ function migrateModelsV3Ranks(db: Database.Database) {
  */
 function migrateModelsV4(db: Database.Database) {
   // 1) Remove entries that are unavailable or fail agentic tool use
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     ['moonshot', 'kimi-latest'],                                            // paid-only now ($1 min deposit)
     ['minimax', 'MiniMax-M1'],                                              // superseded; use OR minimax-m2.5:free
@@ -420,8 +454,7 @@ function migrateModelsV4(db: Database.Database) {
   ];
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -602,19 +635,12 @@ function migrateModelsV5(db: Database.Database) {
  */
 function migrateModelsV6(db: Database.Database) {
   // 1) Remove confirmed-dead OR route
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     ['openrouter', 'arcee-ai/trinity-large-preview:free'],
   ];
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -679,19 +705,12 @@ function migrateModelsV6(db: Database.Database) {
  * HF and NVIDIA left as-is: HF still serves chat with current key; NVIDIA already disabled.
  */
 function migrateModelsV7(db: Database.Database) {
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     ['openrouter', 'inclusionai/ling-2.6-flash:free'],
   ];
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -964,20 +983,13 @@ function migrateModelsV11(db: Database.Database) {
  *   - qwen/qwen3-coder:free                   262144 → 1048576
  */
 function migrateModelsV12(db: Database.Database) {
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     ['openrouter', 'inclusionai/ling-2.6-1t:free'],
     ['openrouter', 'tencent/hy3-preview:free'],
   ];
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -1109,20 +1121,13 @@ function migrateModelsV13(db: Database.Database) {
   for (const [p, m] of disables) disable.run(p, m);
 
   // 2) Hard removals.
-  const deleteModel = db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`);
-  const deleteFallback = db.prepare(`
-    DELETE FROM fallback_config WHERE model_db_id IN (
-      SELECT id FROM models WHERE platform = ? AND model_id = ?
-    )
-  `);
   const removals: Array<[string, string]> = [
     ['sambanova', 'DeepSeek-V3.1-cb'],
     ['cloudflare', '@cf/moonshotai/kimi-k2.5'],
   ];
   const applyRemovals = db.transaction(() => {
     for (const [p, m] of removals) {
-      deleteFallback.run(p, m);
-      deleteModel.run(p, m);
+      deleteModelSafely(db, p, m);
     }
   });
   applyRemovals();
@@ -1250,4 +1255,162 @@ export function regenerateUnifiedKey(): string {
   const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
   return key;
+}
+
+/**
+ * Migrates profiles table schema to support favoriting, ordering, auto-sorting,
+ * and custom layouts (Kanban/Tier-list) via the layout_config column.
+ */
+function migrateProfiles(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(profiles)").all() as { name: string }[];
+  const columnNames = columns.map(c => c.name);
+
+  if (!columnNames.includes('is_favorite')) {
+    db.exec('ALTER TABLE profiles ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
+    console.log('Added is_favorite column to profiles table');
+  }
+  if (!columnNames.includes('sort_order')) {
+    db.exec('ALTER TABLE profiles ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    console.log('Added sort_order column to profiles table');
+  }
+  if (!columnNames.includes('auto_sort')) {
+    db.exec('ALTER TABLE profiles ADD COLUMN auto_sort TEXT');
+    console.log('Added auto_sort column to profiles table');
+  }
+  if (!columnNames.includes('layout_config')) {
+    db.exec('ALTER TABLE profiles ADD COLUMN layout_config TEXT');
+    console.log('Added layout_config column to profiles table');
+  }
+}
+
+/**
+ * Migration helper to transition built-in profiles to custom type, allowing users 
+ * to delete or edit them freely, and seeds the default system profile.
+ */
+function migrateProfilesV2(db: Database.Database) {
+  // 1. Convert any legacy built-in profiles to custom profiles (type = 'custom')
+  db.prepare(`
+    UPDATE profiles
+    SET type = 'custom'
+    WHERE type = 'builtin'
+  `).run();
+
+  // 2. Ensure Default profile exists
+  const hasDefault = db.prepare("SELECT COUNT(*) as cnt FROM profiles WHERE type = 'default'").get() as { cnt: number };
+  if (hasDefault.cnt === 0) {
+    const minOrder = (db.prepare('SELECT COALESCE(MIN(sort_order), 0) AS mn FROM profiles').get() as { mn: number }).mn;
+    const targetOrder = Math.min(-1, minOrder - 1);
+
+    const result = db.prepare(
+      "INSERT INTO profiles (name, emoji, color, type, sort_order) VALUES ('Default', '⚙️', '#6366f1', 'default', ?)"
+    ).run(targetOrder);
+
+    const profileId = result.lastInsertRowid as number;
+
+    // Seed profile models from fallback_config
+    db.prepare(`
+      INSERT INTO profile_models (profile_id, model_db_id, priority, enabled)
+      SELECT ?, model_db_id, priority, enabled
+      FROM fallback_config
+      ORDER BY priority ASC
+    `).run(profileId);
+
+    // Make it the active profile
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('active_profile_id', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(String(profileId));
+
+    console.log('Created Default profile and set it active');
+  } else {
+    // If it exists, ensure its emoji is '⚙️'
+    db.prepare(`
+      UPDATE profiles
+      SET emoji = '⚙️'
+      WHERE type = 'default' AND emoji != '⚙️'
+    `).run();
+  }
+}
+
+/**
+ * Resets fallback_config and the system Default profile to a clean, simple baseline state:
+ * - All models enabled
+ * - Models sorted by budget volume
+ * - Layout config: simple list view, no smart sort, single default board/tier block
+ */
+function migrateFallbackAndDefaultBaseline(db: Database.Database) {
+  const defaultProfile = db.prepare("SELECT id, layout_config FROM profiles WHERE type = 'default'").get() as {id: number, layout_config: string | null} | undefined;
+  if (defaultProfile && defaultProfile.layout_config !== null) {
+    return;
+  }
+
+  const getBudgetRank = (budget: string | null) => {
+    switch (budget) {
+      case '~120M': return 1;
+      case '~50-100M': return 2;
+      case '~30M': return 3;
+      case '~18-45M': return 4;
+      case '~18M': return 5;
+      case '~15M': return 6;
+      case '~12M': return 7;
+      case '~6M': return 8;
+      case '~5-10M': return 9;
+      case '~4M': return 10;
+      default: return 11;
+    }
+  };
+
+  const modelsInfo = db.prepare("SELECT id, monthly_token_budget FROM models").all() as {id: number, monthly_token_budget: string | null}[];
+  modelsInfo.sort((a, b) => getBudgetRank(a.monthly_token_budget) - getBudgetRank(b.monthly_token_budget));
+
+  // Update fallback_config to have all models enabled and sorted by budget
+  const updateFallback = db.prepare("UPDATE fallback_config SET priority = ?, enabled = 1 WHERE model_db_id = ?");
+  db.transaction(() => {
+    modelsInfo.forEach((m, i) => {
+      updateFallback.run(i + 1, m.id);
+    });
+  })();
+
+  // Reset Default profile
+  if (defaultProfile) {
+    const updateProfileModels = db.prepare("UPDATE profile_models SET priority = ?, enabled = 1 WHERE profile_id = ? AND model_db_id = ?");
+    db.transaction(() => {
+      modelsInfo.forEach((m, i) => {
+        updateProfileModels.run(i + 1, defaultProfile.id, m.id);
+      });
+    })();
+
+    const baselineLayout = JSON.stringify({
+      viewMode: "list",
+      compactMode: false,
+      limitsMode: false,
+      limitsVariant: "circle",
+      sortDisabledToBottom: false,
+      kanbanLayout: [
+        {
+          id: "board-default",
+          type: "board",
+          title: "Default",
+          emoji: "📋",
+          color: "rgb(99, 102, 241)",
+          collapsed: false,
+          items: []
+        }
+      ],
+      tierLayout: [
+        {
+          id: "tier-default",
+          type: "tier",
+          title: "Default",
+          emoji: "📋",
+          color: "rgb(99, 102, 241)",
+          collapsed: false,
+          items: []
+        }
+      ]
+    });
+
+    db.prepare("UPDATE profiles SET layout_config = ?, auto_sort = NULL WHERE id = ?").run(baselineLayout, defaultProfile.id);
+    console.log('Reset Default profile and fallback_config to simple budget baseline');
+  }
 }
