@@ -8,7 +8,10 @@ server/data/
 .env
 .env.local
 .DS_Store
+.claude
+opencode.json
 
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh
+
