@@ -24,7 +24,15 @@ const addKeySchema = z.object({
 // List all keys (masked)
 keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
-  const rows = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[];
+  // Emit the naive-UTC timestamp columns as ISO-8601 with a 'Z' so the dashboard
+  // parses them as UTC and localizes them (NULL passes through unchanged).
+  const rows = db.prepare(`
+    SELECT *,
+           strftime('%Y-%m-%dT%H:%M:%SZ', created_at) as created_at_iso,
+           strftime('%Y-%m-%dT%H:%M:%SZ', last_checked_at) as last_checked_at_iso
+    FROM api_keys
+    ORDER BY created_at DESC
+  `).all() as any[];
 
   const keys = rows.map(row => {
     let maskedKey = '****';
@@ -41,8 +49,8 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       maskedKey,
       status: row.status,
       enabled: row.enabled === 1,
-      createdAt: row.created_at,
-      lastCheckedAt: row.last_checked_at,
+      createdAt: row.created_at_iso,
+      lastCheckedAt: row.last_checked_at_iso,
     };
   });
 

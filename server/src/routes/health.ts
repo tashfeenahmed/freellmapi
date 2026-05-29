@@ -24,8 +24,12 @@ healthRouter.get('/', (_req: Request, res: Response) => {
     GROUP BY platform
   `).all() as any[];
 
+  // Emit the naive-UTC timestamp columns as ISO-8601 with a 'Z' so the dashboard
+  // parses them as UTC and localizes them (NULL passes through unchanged).
   const keys = db.prepare(`
-    SELECT id, platform, label, status, enabled, created_at, last_checked_at
+    SELECT id, platform, label, status, enabled,
+           strftime('%Y-%m-%dT%H:%M:%SZ', created_at) as created_at_iso,
+           strftime('%Y-%m-%dT%H:%M:%SZ', last_checked_at) as last_checked_at_iso
     FROM api_keys
     ORDER BY platform, created_at DESC
   `).all() as any[];
@@ -48,8 +52,8 @@ healthRouter.get('/', (_req: Request, res: Response) => {
       label: k.label,
       status: k.status,
       enabled: k.enabled === 1,
-      createdAt: k.created_at,
-      lastCheckedAt: k.last_checked_at,
+      createdAt: k.created_at_iso,
+      lastCheckedAt: k.last_checked_at_iso,
     })),
   });
 });

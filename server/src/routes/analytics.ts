@@ -219,8 +219,12 @@ analyticsRouter.get('/errors', (req: Request, res: Response) => {
   const since = getSinceTimestamp(range);
   const db = getDb();
 
+  // created_at is stored as a naive UTC string ("YYYY-MM-DD HH:MM:SS"); emit it
+  // as ISO-8601 with a 'Z' so the dashboard's new Date(...) parses it as UTC and
+  // localizes it (the space-separated form is otherwise parsed as local time).
   const rows = db.prepare(`
-    SELECT id, platform, model_id, error, latency_ms, created_at
+    SELECT id, platform, model_id, error, latency_ms,
+           strftime('%Y-%m-%dT%H:%M:%SZ', created_at) as created_at_iso
     FROM requests
     WHERE status = 'error' AND created_at >= ?
     ORDER BY created_at DESC
@@ -233,6 +237,6 @@ analyticsRouter.get('/errors', (req: Request, res: Response) => {
     modelId: r.model_id,
     error: r.error,
     latencyMs: r.latency_ms,
-    createdAt: r.created_at,
+    createdAt: r.created_at_iso,
   })));
 });
