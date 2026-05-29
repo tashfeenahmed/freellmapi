@@ -9,16 +9,21 @@ Aggregates free tiers from 13+ LLM providers behind a single OpenAI-compatible `
 ```
 freellmapi/
 ├── shared/            # Shared TypeScript types (Platform, Model, Chat, Analytics)
+│   └── AGENTS.md
 ├── server/            # Express 5 proxy server
 │   └── src/
 │       ├── index.ts         # Entry: initDb → createApp → listen :3001
 │       ├── app.ts           # Express factory: routes, CORS, helmet, static SPA
 │       ├── providers/       # 14+ provider adapters (base + openai-compat + custom)
+│       │   └── AGENTS.md
 │       ├── routes/          # 7 API route files (keys, models, proxy, fallback, etc.)
+│       │   └── AGENTS.md
 │       ├── services/        # Core: router.ts, ratelimit.ts, health.ts
+│       │   └── AGENTS.md
 │       ├── middleware/      # errorHandler.ts
 │       ├── lib/             # crypto.ts (AES-256-GCM), content.ts
 │       ├── db/index.ts      # SQLite schema + 14 sequential migrations (1286 lines)
+│       │   └── AGENTS.md
 │       └── __tests__/       # Per-module test subdirs (vitest)
 ├── client/            # React 19 dashboard (Vite, shadcn/ui, Tailwind 4)
 │   └── src/
@@ -27,12 +32,15 @@ freellmapi/
 │       ├── pages/          # KeysPage, AnalyticsPage, FallbackPage, PlaygroundPage
 │       ├── components/     # shadcn/ui components + page-header
 │       └── lib/            # api.ts (fetch wrapper), utils.ts (cn())
+│       └── AGENTS.md
 ├── .github/workflows/ # CI: npm install → npm test → npm run build (Node 20)
 ├── docs/logos/        # Provider SVG icons
 ├── repo-assets/       # README screenshots
 ├── backups/           # SQLite DB snapshots (gitignored after first commit)
 └── data/              # Empty — unused
 ```
+
+> Subdirectory AGENTS.md files exist for the 6 highest-complexity modules — see inline entries above. Each covers file-by-file breakdown, domain-specific patterns, conventions, and pitfalls.
 
 ---
 
