@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Smile, Palette } from 'lucide-react'
+import { Smile, Palette, Info } from 'lucide-react'
 
 // Harmonic preset colors for styling profile themes
 const PRESET_COLORS = [
@@ -46,6 +46,25 @@ const PRESET_EMOJIS = [
   '🗺️', // Map
 ]
 
+// Reserved names that conflict with system routing keywords
+const RESERVED_PROFILE_NAMES = [
+  'auto', 'smart', 'fast', 'cheap', 'budget',
+  'intelligence', 'speed', 'active', 'default',
+]
+
+const PROFILE_NAME_REGEX = /^[a-zA-Z0-9-_]+$/
+
+function validateProfileName(name: string): string | null {
+  if (!name.trim()) return null // Empty is handled separately by the submit button
+  if (!PROFILE_NAME_REGEX.test(name)) {
+    return 'Only Latin letters, digits, hyphens (-) and underscores (_) are allowed'
+  }
+  if (RESERVED_PROFILE_NAMES.includes(name.toLowerCase())) {
+    return `"${name}" is reserved by the system and cannot be used`
+  }
+  return null
+}
+
 interface Profile {
   id: number
   name: string
@@ -82,6 +101,7 @@ export function CreateProfileModal({
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
   const [copyCurrent, setCopyCurrent] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   // Reset fields or populate them with edited profile values on open/change
   useEffect(() => {
@@ -96,6 +116,7 @@ export function CreateProfileModal({
         setColor('')
         setCopyCurrent(false)
       }
+      setNameError(null)
       setEmojiOpen(false)
       setColorOpen(false)
     }
@@ -134,6 +155,11 @@ export function CreateProfileModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
+    const validationError = validateProfileName(name.trim())
+    if (validationError) {
+      setNameError(validationError)
+      return
+    }
     const payload: { name: string; emoji: string; color: string; sourceProfileId?: number } = {
       name: name.trim(),
       emoji: emoji.trim(),
@@ -286,20 +312,26 @@ export function CreateProfileModal({
               </div>
 
               {/* Title Input */}
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 20))}
-                placeholder="Profile name"
-                className="flex-1"
-                maxLength={20}
-                autoFocus
-              />
+              <div className="flex-1 min-w-0">
+                <Input
+                  value={name}
+                  onChange={(e) => {
+                    const val = e.target.value.slice(0, 20)
+                    setName(val)
+                    setNameError(validateProfileName(val))
+                  }}
+                  placeholder="Profile ID (e.g. code-assistant)"
+                  className={`w-full ${nameError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  maxLength={20}
+                  autoFocus
+                />
+              </div>
 
               {/* Submit Button */}
               <Button
                 size="sm"
                 type="submit"
-                disabled={!name.trim() || mutation.isPending}
+                disabled={!name.trim() || !!nameError || mutation.isPending}
                 className="shrink-0 h-9 px-4"
               >
                 {mutation.isPending
@@ -310,6 +342,32 @@ export function CreateProfileModal({
               </Button>
 
             </div>
+
+            {/* Validation error message */}
+            {nameError && (
+              <p className="text-xs text-destructive pl-1 -mt-1">{nameError}</p>
+            )}
+
+            {/* API usage hint */}
+            {name.trim() && !nameError && (
+              <div className="flex items-start gap-2 bg-muted/50 rounded-lg px-3 py-2 -mt-1">
+                <Info className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Agents can request this profile via{' '}
+                  <code className="font-mono bg-background px-1 py-0.5 rounded text-foreground/80">
+                    auto:{name.trim().toLowerCase()}
+                  </code>{' '}
+                  in the Model ID field.
+                </p>
+              </div>
+            )}
+
+            {/* Server-side error */}
+            {mutation.isError && (
+              <p className="text-xs text-destructive pl-1">
+                {(mutation.error as any)?.message ?? 'Failed to save profile'}
+              </p>
+            )}
 
             {!profileToEdit && (
               <div className="flex items-center space-x-2 pt-1 pl-1">

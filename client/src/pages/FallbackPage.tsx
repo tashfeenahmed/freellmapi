@@ -17,7 +17,8 @@ import {
   Plus,
   ToggleLeft,
   ToggleRight,
-  Settings
+  Settings,
+  Info
 } from 'lucide-react'
 import {
   DndContext,
@@ -2191,6 +2192,19 @@ export default function FallbackPage() {
       />
 
       <div className="space-y-6">
+
+        {/* API Auto-Routing hint */}
+        <div className="text-xs border bg-muted/20 text-muted-foreground px-4 py-3 rounded-xl flex items-start gap-2.5 shadow-sm leading-relaxed">
+          <Info className="size-4 text-foreground/70 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-semibold text-foreground">API Dynamic Routing:</span> Select routing strategies or custom profiles in your API requests by passing{' '}
+            <code className="font-mono bg-background border px-1 py-0.5 rounded text-foreground/80 font-medium">auto:smart</code>,{' '}
+            <code className="font-mono bg-background border px-1 py-0.5 rounded text-foreground/80 font-medium">auto:fast</code>,{' '}
+            <code className="font-mono bg-background border px-1 py-0.5 rounded text-foreground/80 font-medium">auto:cheap</code>, or{' '}
+            <code className="font-mono bg-background border px-1 py-0.5 rounded text-foreground/80 font-medium">auto:profile-name</code>{' '}
+            in the <code className="font-mono text-foreground font-semibold">model</code> parameter of chat completions.
+          </div>
+        </div>
 
         {/* Profiles section */}
         <div className="p-3 border rounded-lg bg-card/50 flex flex-col gap-0 relative group/profiles">

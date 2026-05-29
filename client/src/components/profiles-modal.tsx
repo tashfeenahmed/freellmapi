@@ -126,6 +126,9 @@ function ProfileChipUI({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold truncate text-foreground">
+            {!isBuiltin && (
+              <span className="text-muted-foreground/50 font-normal select-none">auto:</span>
+            )}
             {profile.name}
           </span>
           {isBuiltin && (
@@ -418,7 +421,7 @@ export function ProfilesModal({
               Manage Profiles
             </Dialog.Title>
             <p className="text-xs text-muted-foreground mb-4">
-              Drag to reorder. Click on a profile to activate it.
+              Drag to reorder. Click on a profile to activate it. Custom profile names (prefixed with <code className="font-mono bg-muted px-1 py-0.5 rounded text-foreground/80">auto:</code>) act as API Model IDs.
             </p>
 
             <div className="flex flex-col gap-2 max-h-[360px] overflow-y-auto pr-1">

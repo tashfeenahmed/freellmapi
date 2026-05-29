@@ -3,7 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
+import { routeRequest, recordRateLimitHit, recordSuccess, resolveRoutingChain, type RouteResult, type FallbackRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
@@ -17,7 +17,9 @@ export const proxyRouter = Router();
 const AUTO_MODEL_ID = 'auto';
 
 function isAutoModel(modelId: string | undefined): boolean {
-  return modelId === AUTO_MODEL_ID;
+  if (!modelId) return true;
+  const lower = modelId.toLowerCase();
+  return lower === AUTO_MODEL_ID || lower.startsWith('auto:');
 }
 
 // Constant-time string comparison for the unified API key. Plain `===` leaks
@@ -39,23 +41,26 @@ function timingSafeStringEqual(provided: string, expected: string): boolean {
 const stickySessionMap = new Map<string, { modelDbId: number; lastUsed: number }>();
 const STICKY_TTL_MS = 30 * 60 * 1000; // 30 min session TTL
 
-function getSessionKey(messages: ChatMessage[]): string {
+function getSessionKey(messages: ChatMessage[], strategyKey?: string): string {
   // Use the first user message as session identifier — clients like Hermes
   // re-send the full conversation each turn, so the first user message is
   // stable across turns. Hash the FULL message (not a 100-char slice) so
   // distinct conversations with identical openings don't collide.
   const firstUser = messages.find(m => m.role === 'user');
   if (!firstUser || typeof firstUser.content !== 'string') return '';
-  const hash = crypto.createHash('sha1').update(firstUser.content).digest('hex');
+  // Include the strategyKey so switching profiles mid-conversation
+  // (e.g. auto:coding → auto:chat) resets the sticky session.
+  const payload = strategyKey ? `${firstUser.content}::${strategyKey}` : firstUser.content;
+  const hash = crypto.createHash('sha1').update(payload).digest('hex');
   return `${hash}:${messages.length > 2 ? 'multi' : 'single'}`;
 }
 
-function getStickyModel(messages: ChatMessage[]): number | undefined {
+function getStickyModel(messages: ChatMessage[], strategyKey?: string): number | undefined {
   // Only apply sticky for multi-turn (has assistant messages = continuation)
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
 
-  const key = getSessionKey(messages);
+  const key = getSessionKey(messages, strategyKey);
   if (!key) return undefined;
 
   const entry = stickySessionMap.get(key);
@@ -68,8 +73,8 @@ function getStickyModel(messages: ChatMessage[]): number | undefined {
   return entry.modelDbId;
 }
 
-function setStickyModel(messages: ChatMessage[], modelDbId: number) {
-  const key = getSessionKey(messages);
+function setStickyModel(messages: ChatMessage[], modelDbId: number, strategyKey?: string) {
+  const key = getSessionKey(messages, strategyKey);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
 
@@ -86,6 +91,10 @@ function setStickyModel(messages: ChatMessage[], modelDbId: number) {
 proxyRouter.get('/models', (_req: Request, res: Response) => {
   const db = getDb();
   const models = db.prepare('SELECT platform, model_id, display_name, context_window FROM models WHERE enabled = 1 ORDER BY intelligence_rank').all() as any[];
+
+  // List user-created profiles as auto:profileName virtual models
+  const profiles = db.prepare(`SELECT name FROM profiles WHERE type != 'default' AND type != 'builtin' ORDER BY sort_order ASC`).all() as { name: string }[];
+
   res.json({
     object: 'list',
     data: [
@@ -97,6 +106,20 @@ proxyRouter.get('/models', (_req: Request, res: Response) => {
         name: 'Auto (router picks the best available model)',
         context_window: null,
       },
+      // Global sort strategies
+      { id: 'auto:smart', object: 'model', created: 0, owned_by: 'freellmapi', name: 'Auto: Smart (sort by intelligence)', context_window: null },
+      { id: 'auto:fast', object: 'model', created: 0, owned_by: 'freellmapi', name: 'Auto: Fast (sort by speed)', context_window: null },
+      { id: 'auto:cheap', object: 'model', created: 0, owned_by: 'freellmapi', name: 'Auto: Cheap (sort by budget)', context_window: null },
+      // User-created profiles
+      ...profiles.map(p => ({
+        id: `auto:${p.name.toLowerCase()}`,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: `Auto: Profile "${p.name}"`,
+        context_window: null,
+      })),
+      // Individual models
       ...models.map(m => ({
         id: m.model_id,
         object: 'model',
@@ -298,14 +321,31 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }, 0);
   const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
 
-  // Explicit `model` field pins routing. If the catalog has no enabled row
-  // matching the requested id, return 400 — silently auto-routing to a
-  // different model would be surprising to OpenAI-compatible clients.
-  // Sticky-session is the fallback when no `model` field was sent at all.
+  // ── Resolve routing strategy ONCE before the retry loop ──
+  // This determines which pool of models to use for this request.
+  // For auto:* strings, resolveRoutingChain fetches the chain from DB.
+  // For specific model IDs, we skip this and use the existing pinning logic.
   let preferredModel: number | undefined;
+  let prefetchedChain: FallbackRow[] | undefined;
+  let strategyKey = 'auto';
+
   if (isAutoModel(requestedModel)) {
-    // Explicit "auto" → behave exactly like an omitted model field.
-    preferredModel = getStickyModel(messages);
+    // Resolve the auto:* strategy (profile name, global sort, or default)
+    try {
+      const resolved = resolveRoutingChain(requestedModel);
+      prefetchedChain = resolved.chain;
+      strategyKey = resolved.strategyKey;
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({
+        error: {
+          message: err.message,
+          type: 'invalid_request_error',
+          code: 'routing_error',
+        },
+      });
+      return;
+    }
+    preferredModel = getStickyModel(messages, strategyKey);
   } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
@@ -324,7 +364,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
   } else {
-    preferredModel = getStickyModel(messages);
+    preferredModel = getStickyModel(messages, strategyKey);
   }
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
@@ -339,7 +379,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         estimatedTotal, 
         skipKeys.size > 0 ? skipKeys : undefined, 
         preferredModel,
-        skipModels.size > 0 ? skipModels : undefined
+        skipModels.size > 0 ? skipModels : undefined,
+        prefetchedChain
       );
     } catch (err: any) {
       // No more models available
@@ -397,7 +438,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
-          setStickyModel(messages, route.modelDbId);
+          setStickyModel(messages, route.modelDbId, strategyKey);
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
           return;
         } catch (streamErr: any) {
@@ -425,7 +466,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const totalTokens = result.usage?.total_tokens ?? 0;
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId);
+        setStickyModel(messages, route.modelDbId, strategyKey);
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));

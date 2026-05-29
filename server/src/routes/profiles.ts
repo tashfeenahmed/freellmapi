@@ -11,15 +11,33 @@ import { getDb } from '../db/index.js';
 
 export const profilesRouter = Router();
 
+const RESERVED_PROFILE_NAMES = [
+  'auto', 'smart', 'fast', 'cheap', 'budget',
+  'intelligence', 'speed', 'active', 'default',
+];
+
+const profileNameSchema = z
+  .string()
+  .min(1, 'Profile name cannot be empty')
+  .max(20, 'Profile name must not exceed 20 characters')
+  .regex(
+    /^[a-zA-Z0-9-_]+$/,
+    'Only Latin letters, digits, hyphens (-) and underscores (_) are allowed'
+  )
+  .refine(
+    (name) => !RESERVED_PROFILE_NAMES.includes(name.toLowerCase()),
+    'This name is reserved by the system'
+  );
+
 const createSchema = z.object({
-  name: z.string().min(1).max(20),
+  name: profileNameSchema,
   emoji: z.string().max(4).default(''),
   color: z.string().default('#6366f1'),
   sourceProfileId: z.number().optional(),
 });
 
 const updateSchema = z.object({
-  name: z.string().min(1).max(20).optional(),
+  name: profileNameSchema.optional(),
   emoji: z.string().max(4).optional(),
   color: z.string().optional(),
   is_favorite: z.boolean().optional(),
@@ -120,6 +138,13 @@ profilesRouter.post('/', (req: Request, res: Response) => {
   const db = getDb();
   const { name, emoji, color, sourceProfileId } = parsed.data;
 
+  // Check for case-insensitive duplicate profile names
+  const duplicate = db.prepare('SELECT id FROM profiles WHERE LOWER(name) = LOWER(?)').get(name) as any;
+  if (duplicate) {
+    res.status(409).json({ error: { message: `Profile with name '${name}' already exists` } });
+    return;
+  }
+
   const maxOrder = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS mx FROM profiles').get() as { mx: number }).mx;
 
   let layoutConfig: string | null = null;
@@ -182,6 +207,15 @@ profilesRouter.put('/:id', (req: Request, res: Response) => {
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
     return;
+  }
+
+  // Check for case-insensitive duplicate profile names when editing name
+  if (parsed.data.name !== undefined) {
+    const duplicate = db.prepare('SELECT id FROM profiles WHERE LOWER(name) = LOWER(?) AND id != ?').get(parsed.data.name, profileId) as any;
+    if (duplicate) {
+      res.status(409).json({ error: { message: `Profile with name '${parsed.data.name}' already exists` } });
+      return;
+    }
   }
 
   const isProtected = profile.type === 'default' || profile.type === 'builtin';
