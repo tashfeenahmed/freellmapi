@@ -135,12 +135,7 @@ export default function KeysPage() {
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
   const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:11434/v1')
-  const ollamaSync = useMutation({
-    mutationFn: () => apiFetch('/api/sync', {
-      method: 'POST',
-      body: JSON.stringify({ provider: 'ollama-local' })
-    })
-  })
+  const ollamaSync = useMutation({mutationFn: () => apiFetch('/api/sync?provider=ollama-local')})
   useEffect(() => {
   if (platform === 'ollama-local') {
 	  setApiKey('local-ollama')
@@ -247,8 +242,10 @@ export default function KeysPage() {
         <UnifiedKeySection />
 
         <section>
-                  <h2 className="text-sm font-medium mb-3">
-                    Add a provider
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-medium mb-3">
+                      Add a provider
+                    </h2>
                     <Button
                       variant="outline"
                       size="xs"
@@ -258,7 +255,7 @@ export default function KeysPage() {
                     >
                       {ollamaSync.isPending ? 'Syncing…' : 'Sync Ollama models'}
                     </Button>
-                  </h2>
+                  </div>
                   <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-card">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs mr-1">Platform</Label>

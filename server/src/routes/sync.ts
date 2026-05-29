@@ -1,15 +1,22 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { getDb } from '../db/index.js';
 
 export const syncRouter = Router();
 
 /**
- * POST /api/sync
+ * GET /api/sync
  * On-demand import of Ollama models from configured local providers.
  * Filters out cloud stub models (':cloud' suffix, 'ollama:' prefix).
  */
-syncRouter.post('/', async (_req: Request, res: Response) => {
+syncRouter.get('/', async (_req: Request, res: Response) => {
   const db = getDb();
+ 
+  // Only allow sync when explicitly requested for the local Ollama provider
+  const provider = typeof _req.query.provider === 'string' ? _req.query.provider : '';
+  if (provider !== 'ollama-local') {
+    return res.status(400).json({ error: 'Invalid or missing provider. Use provider=ollama-local to run sync.' });
+  }
 
   // Find all enabled ollama-local keys
   const keys = db.prepare(
@@ -65,18 +72,18 @@ syncRouter.post('/', async (_req: Request, res: Response) => {
           INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         `);
-        insertModel.run(
+        const result = insertModel.run(
           'ollama-local', name, displayName,
           50, 10, 'Local', null, null, null, null, 'unlimited', 131072
         );
-
-        // Insert fallback if needed
-        const row = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get('ollama-local', name) as any;
-        if (row) {
-          db.prepare('INSERT OR IGNORE INTO fallback_config (model_db_id, priority, enabled) VALUES (?,?,1)').run(row.id, 9999);
+        if (result.changes > 0) {
+          imported.push(name);
+          
+          const row = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get('ollama-local', name) as any;
+          if (row) {
+            db.prepare('INSERT OR IGNORE INTO fallback_config (model_db_id, priority, enabled) VALUES (?,?,1)').run(row.id, 9999);
+          }
         }
-
-        imported.push(name);
       }
     } catch (err: any) {
       console.warn(`Failed to fetch from ${fetchedUrl}: ${err.message}`);
