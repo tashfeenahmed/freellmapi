@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1261,6 +1262,48 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): Seed 6 OpenCode Zen free-tier models.
+ *
+ * Values sourced from the public OpenCode Zen /v1/models endpoint.
+ * Since that endpoint has no authentication, validateKey on the proxy
+ * side may be weak — these are best-effort estimates and should be
+ * updated in a future migration if the upstream catalog changes.
+ *
+ * All models share 20 RPM / 200 RPD with NULL TPM/TPD (no token-level
+ * limits reported by the endpoint).
+ * Monthly token budget is ~6M for each model.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['opencode', 'big-pickle',                'Big Pickle',              10, 5,  'Large',   20, 200, null, null, '~6M', 131072],
+    ['opencode', 'deepseek-v4-flash-free',     'DeepSeek V4 Flash Free',  11, 3,  'Frontier', 20, 200, null, null, '~6M', 131072],
+    ['opencode', 'qwen3.6-plus-free',          'Qwen3.6 Plus Free',       11, 4,  'Large',   20, 200, null, null, '~6M', 262144],
+    ['opencode', 'minimax-m2.5-free',          'MiniMax M2.5 Free',       12, 4,  'Large',   20, 200, null, null, '~6M', 196608],
+    ['opencode', 'nemotron-3-super-free',      'Nemotron 3 Super Free',   12, 5,  'Frontier', 20, 200, null, null, '~6M', 262144],
+    ['opencode', 'mimo-v2.5-free',             'MiMo-V2.5 Free',          14, 4,  'Medium',  20, 200, null, null, '~6M', 131072],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
