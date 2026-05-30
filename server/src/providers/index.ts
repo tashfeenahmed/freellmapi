@@ -143,6 +143,16 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.llm7.io/v1',
 }));
 
+// OpenCode Zen — OpenAI-compatible. The /v1/models endpoint returns models
+// without authentication, so validateKey() may pass (return true) for any key.
+// Only requests marked with the `x-opencode-zen` header are proxied to the
+// OpenCode Zen service.
+register(new OpenAICompatProvider({
+  platform: 'opencode',
+  name: 'OpenCode Zen',
+  baseUrl: 'https://opencode.ai/zen/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
