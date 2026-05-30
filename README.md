@@ -9,6 +9,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+[![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 
 ![Fallback chain with per-provider token budget](repo-assets/fallback-chain.png)
 
@@ -142,8 +143,10 @@ node server/dist/index.js     # server + dashboard both served on :3001
 FreeLLMAPI publishes a single production image that contains the Express server and the built React dashboard:
 
 ```bash
-docker pull ghcr.io/tashfeenahmed/freellmapi:latest
+docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # or pin a release, e.g. :v1.2.3
 ```
+
+The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
 
 The included `docker-compose.yml` is the recommended install path:
 
