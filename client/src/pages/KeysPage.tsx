@@ -92,7 +92,7 @@ function DisableDurationPicker({ onSelect, onCancel, isPending }: DisableDuratio
   }, [onCancel])
 
   return (
-    <div ref={ref} className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-popover p-1 shadow-md">
+    <div ref={ref} className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border bg-popover p-1 shadow-md">
       {DISABLE_DURATIONS.map(d => (
         <button
           key={d.value}
@@ -524,16 +524,18 @@ export default function KeysPage() {
                       {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <div className="rounded-lg border divide-y bg-card overflow-hidden">
-                    {group.keys.map(k => {
+                  <div className="rounded-lg border divide-y bg-card">
+                    {group.keys.map((k, idx) => {
                       const h = healthKeyMap.get(k.id)
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
                       const isEditing = editingKeyId === k.id
                       const isDisabled = !k.enabled
                       const isTempDisabled = isDisabled && k.disabledUntil != null
+                      const isFirst = idx === 0
+                      const isLast = idx === group.keys.length - 1
                       return (
-                        <div key={k.id} className="relative flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div key={k.id} className={`relative flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${isFirst ? 'rounded-t-lg' : ''} ${isLast ? 'rounded-b-lg' : ''}`}>
                           <Switch
                             size="sm"
                             checked={k.enabled}
