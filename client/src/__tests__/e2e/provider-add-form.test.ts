@@ -13,6 +13,6 @@ test.describe('Provider Add Form', () => {
     await page.locator('[data-slot="select-item"]', { hasText: 'Ollama Local' }).click();
     
     // Base URL input should become visible
-    await expect(page.getByPlaceholder('Enter custom base URL')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('http://127.0.0.1:11434/v1')).toBeVisible({ timeout: 15000 });
   });
 });

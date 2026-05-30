@@ -17,7 +17,7 @@ test.describe('Provider Addition UI', () => {
     await page.locator('[data-slot="select-item"]', { hasText: 'Ollama Local' }).click();
     
     // Verify Base URL input appears
-    await expect(page.getByPlaceholder('Enter custom base URL')).toBeVisible();
+    await expect(page.getByPlaceholder('http://127.0.0.1:11434/v1')).toBeVisible();
   });
 
   test('Form fields and button are vertically aligned with same height', async ({ page }) => {

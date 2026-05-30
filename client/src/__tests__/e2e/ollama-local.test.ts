@@ -17,7 +17,7 @@ test.describe('Ollama Local Provider', () => {
     await expect(page.getByPlaceholder('Bearer token')).not.toBeVisible();
     
     // Verify Base URL input IS visible
-    await expect(page.getByPlaceholder('Enter custom base URL')).toBeVisible();
+    await expect(page.getByPlaceholder('http://127.0.0.1:11434/v1')).toBeVisible();
     
     // Verify "Sync models" button is visible
     await expect(page.getByRole('button', { name: 'Sync Ollama models' })).toBeVisible();
@@ -29,7 +29,7 @@ test.describe('Ollama Local Provider', () => {
     await page.locator('[data-slot="select-item"]', { hasText: 'Ollama Local' }).click();
     
     // Enter custom base URL
-    await page.getByPlaceholder('Enter custom base URL').fill('http://192.168.1.100:11434/v1');
+    await page.getByPlaceholder('http://127.0.0.1:11434/v1').fill('http://192.168.1.100:11434/v1');
     
     // Add label
     await page.getByPlaceholder('optional').fill('GPU Server Ollama');
