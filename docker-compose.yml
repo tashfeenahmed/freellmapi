@@ -9,8 +9,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
+    # Bound to localhost by default — FreeLLMAPI is single-user and must not be
+    # exposed to the internet. Set HOST_BIND=0.0.0.0 to reach it from your LAN.
     ports:
-      - "${PORT:-3001}:3001"
+      - "${HOST_BIND:-127.0.0.1}:${PORT:-3001}:3001"
     volumes:
       - freellmapi-data:/app/server/data
     restart: unless-stopped
