@@ -21,9 +21,25 @@ const addKeySchema = z.object({
   label: z.string().optional(),
 });
 
+const DISABLE_DURATIONS = ['1h', '5h', '24h', '7d', 'forever'] as const;
+type DisableDuration = typeof DISABLE_DURATIONS[number];
+
+function computeDisabledUntil(duration: DisableDuration): string | null {
+  if (duration === 'forever') return null;
+  const now = new Date();
+  const match = duration.match(/^(\d+)(h|d)$/);
+  if (!match) return null;
+  const amount = parseInt(match[1], 10);
+  const unit = match[2];
+  if (unit === 'h') now.setHours(now.getHours() + amount);
+  else if (unit === 'd') now.setDate(now.getDate() + amount);
+  return now.toISOString();
+}
+
 const updateKeySchema = z.object({
   enabled: z.boolean().optional(),
   label: z.string().optional(),
+  disableDuration: z.enum(DISABLE_DURATIONS).optional(),
 }).refine(data => data.enabled !== undefined || data.label !== undefined, {
   message: 'At least one of enabled or label must be provided',
 });
@@ -49,6 +65,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       baseUrl: row.base_url ?? null,
       status: row.status,
       enabled: row.enabled === 1,
+      disabledUntil: row.disabled_until ?? null,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
     };
@@ -81,6 +98,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     maskedKey: maskKey(key),
     status: 'unknown',
     enabled: true,
+    disabledUntil: null,
   });
 });
 
@@ -198,12 +216,12 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform);
+  const result = db.prepare('UPDATE api_keys SET enabled = ?, disabled_until = NULL WHERE platform = ?').run(enabled ? 1 : 0, platform);
 
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
 
-// Update key (toggle enable/disable or edit label)
+// Update key (toggle enable/disable, edit label, or time-based disable)
 keysRouter.patch('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -217,13 +235,19 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label } = parsed.data;
+  const { enabled, label, disableDuration } = parsed.data;
   const updates: string[] = [];
-  const values: (string | number)[] = [];
+  const values: (string | number | null)[] = [];
 
   if (enabled !== undefined) {
-    updates.push('enabled = ?');
-    values.push(enabled ? 1 : 0);
+    if (enabled) {
+      updates.push('enabled = 1', 'disabled_until = NULL');
+    } else {
+      updates.push('enabled = 0');
+      const disabledUntil = disableDuration ? computeDisabledUntil(disableDuration as DisableDuration) : null;
+      values.push(disabledUntil);
+      updates.push('disabled_until = ?');
+    }
   }
   if (label !== undefined) {
     updates.push('label = ?');

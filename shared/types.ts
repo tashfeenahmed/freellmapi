@@ -53,6 +53,7 @@ export interface ApiKey {
   maskedKey: string;
   status: KeyStatus;
   enabled: boolean;
+  disabledUntil: string | null;
   createdAt: string;
   lastCheckedAt: string | null;
 }

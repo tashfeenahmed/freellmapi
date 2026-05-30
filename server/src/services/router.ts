@@ -174,9 +174,10 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     const provider = getProvider(model.platform as any);
     if (!provider) continue;
 
-    // Get enabled keys that have not already failed validation or decryption.
+    // Get enabled keys that have not already failed validation or decryption,
+    // and are not temporarily disabled (disabled_until in the future).
     const keys = db.prepare(
-      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') AND (disabled_until IS NULL OR disabled_until < datetime('now'))"
     ).all(model.platform) as KeyRow[];
 
     if (keys.length === 0) continue;

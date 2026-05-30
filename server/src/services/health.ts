@@ -52,6 +52,15 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
 
 export async function checkAllKeys(): Promise<void> {
   const db = getDb();
+
+  // Re-enable keys whose temporary disable has expired
+  const reenabled = db.prepare(
+    "UPDATE api_keys SET enabled = 1, disabled_until = NULL WHERE enabled = 0 AND disabled_until IS NOT NULL AND disabled_until < datetime('now')"
+  ).run();
+  if (reenabled.changes > 0) {
+    console.log(`[Health] Re-enabled ${reenabled.changes} temporarily disabled key(s)`);
+  }
+
   const keys = db.prepare('SELECT id, platform FROM api_keys WHERE enabled = 1').all() as { id: number; platform: string }[];
 
   console.log(`[Health] Checking ${keys.length} keys...`);

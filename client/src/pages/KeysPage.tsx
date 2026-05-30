@@ -52,6 +52,61 @@ const statusLabel: Record<string, string> = {
   unknown: 'unchecked',
 }
 
+const DISABLE_DURATIONS = [
+  { value: '1h', label: '1 hour' },
+  { value: '5h', label: '5 hours' },
+  { value: '24h', label: '24 hours' },
+  { value: '7d', label: '7 days' },
+  { value: 'forever', label: 'Until I turn it on' },
+] as const
+
+function formatRemainingTime(isoString: string): string {
+  const diff = new Date(isoString).getTime() - Date.now()
+  if (diff <= 0) return 'expired'
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24)
+    const remHours = hours % 24
+    return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`
+  }
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  return `${minutes}m`
+}
+
+interface DisableDurationPickerProps {
+  onSelect: (duration: string) => void
+  onCancel: () => void
+  isPending: boolean
+}
+
+function DisableDurationPicker({ onSelect, onCancel, isPending }: DisableDurationPickerProps) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onCancel()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onCancel])
+
+  return (
+    <div ref={ref} className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-popover p-1 shadow-md">
+      {DISABLE_DURATIONS.map(d => (
+        <button
+          key={d.value}
+          className="w-full rounded-md px-3 py-1.5 text-left text-xs hover:bg-muted transition-colors disabled:opacity-50"
+          onClick={() => onSelect(d.value)}
+          disabled={isPending}
+        >
+          {d.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 interface HealthPlatform {
   platform: string
   totalKeys: number
@@ -235,6 +290,7 @@ export default function KeysPage() {
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
+  const [pendingDisableKeyId, setPendingDisableKeyId] = useState<number | null>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -332,6 +388,20 @@ export default function KeysPage() {
       editInputRef.current.focus()
     }
   }, [editingKeyId])
+
+  const toggleKey = useMutation({
+    mutationFn: ({ id, enabled, disableDuration }: { id: number; enabled: boolean; disableDuration?: string }) =>
+      apiFetch(`/api/keys/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled, disableDuration }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+  })
+
 
   const needsAccountId = platform === 'cloudflare'
 
@@ -460,8 +530,22 @@ export default function KeysPage() {
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
                       const isEditing = editingKeyId === k.id
+                      const isDisabled = !k.enabled
+                      const isTempDisabled = isDisabled && k.disabledUntil != null
                       return (
-                        <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div key={k.id} className="relative flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                          <Switch
+                            size="sm"
+                            checked={k.enabled}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                toggleKey.mutate({ id: k.id, enabled: true })
+                              } else {
+                                setPendingDisableKeyId(k.id)
+                              }
+                            }}
+                            disabled={toggleKey.isPending}
+                          />
                           <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
                           <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
                           {isEditing ? (
@@ -482,7 +566,17 @@ export default function KeysPage() {
                               {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
                             </>
                           )}
-                          <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
+                          {isTempDisabled && k.disabledUntil && (
+                            <span className="text-[11px] text-amber-600 dark:text-amber-400 tabular-nums">
+                              disabled · {formatRemainingTime(k.disabledUntil)}
+                            </span>
+                          )}
+                          {isDisabled && !isTempDisabled && (
+                            <span className="text-[11px] text-muted-foreground">disabled</span>
+                          )}
+                          {!isDisabled && !isEditing && (
+                            <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
+                          )}
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -500,6 +594,16 @@ export default function KeysPage() {
                           <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={() => deleteKey.mutate(k.id)} disabled={deleteKey.isPending}>
                             Remove
                           </Button>
+                          {pendingDisableKeyId === k.id && (
+                            <DisableDurationPicker
+                              onSelect={(duration) => {
+                                toggleKey.mutate({ id: k.id, enabled: false, disableDuration: duration })
+                                setPendingDisableKeyId(null)
+                              }}
+                              onCancel={() => setPendingDisableKeyId(null)}
+                              isPending={toggleKey.isPending}
+                            />
+                          )}
                         </div>
                       )
                     })}
