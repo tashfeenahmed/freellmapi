@@ -10,7 +10,7 @@ export const keysRouter = Router();
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
 // was dropped in V4 and re-added in V13 via the router.huggingface.co route.
 const PLATFORMS = [
-  'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'ollama-local', 'kilo', 'pollinations', 'llm7', 'huggingface', 'siliconflow'
+  'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'ollama-local', 'kilo', 'pollinations', 'llm7', 'huggingface'
 ] as const;
 
 
