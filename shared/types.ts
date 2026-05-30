@@ -21,8 +21,7 @@ export type Platform =
   | 'kilo'
   | 'pollinations'
   | 'llm7'
-  | 'huggingface'
-  | 'siliconflow';
+  | 'huggingface';
 
 export interface Model {
   id: number;
