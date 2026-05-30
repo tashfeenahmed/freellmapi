@@ -208,6 +208,21 @@ describe('Migration idempotency', () => {
     ]);
   });
 
+  it('V15: SiliconFlow Qwen3-8B free row is present, enabled, and capped at 50 rpd', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const row = db.prepare(`
+      SELECT display_name, enabled, rpd_limit, size_label FROM models
+       WHERE platform = 'siliconflow' AND model_id = 'Qwen/Qwen3-8B'
+    `).get() as { display_name: string; enabled: number; rpd_limit: number; size_label: string } | undefined;
+
+    expect(row).toBeDefined();
+    expect(row!.enabled).toBe(1);
+    expect(row!.rpd_limit).toBe(50);
+    expect(row!.size_label).toBe('Small');
+  });
+
   it('all enabled catalog platforms have a registered provider', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');
