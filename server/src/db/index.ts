@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -199,6 +200,8 @@ function seedModels(db: Database.Database) {
     ['zhipu', 'glm-4.5-flash', 'GLM-4.5 Flash', 5, 4, 'Large', null, null, null, 1000000, '~30M', 131072],
     ['moonshot', 'kimi-latest', 'Kimi Latest', 4, 8, 'Large', 60, null, null, 500000, '~15M', 200000],
     ['minimax', 'MiniMax-M1', 'MiniMax M1', 5, 8, 'Large', 20, null, 1000000, null, '~30M', 200000],
+    // SiliconFlow — zero-cost free model (50 req/day, tools supported). See migrateModelsV15.
+    ['siliconflow', 'Qwen/Qwen3-8B', 'Qwen3 8B (SiliconFlow)', 30, 3, 'Small', null, 50, null, null, '50 req/day', 32768],
   ];
 
   const insertMany = db.transaction(() => {
@@ -1261,6 +1264,42 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): add SiliconFlow (new platform).
+ *
+ * OpenAI-compatible at api.siliconflow.com/v1. New accounts get a one-time
+ * gift balance, but a small set of models are genuinely $0 ("free models",
+ * 50 req/day; 1000/day after any credit purchase). Probed 2026-05: a call to
+ * Qwen/Qwen3-8B left the account balance unchanged (zero-cost) and tool calls
+ * round-trip; Qwen2.5-7B-Instruct DID decrement the balance (paid), so only
+ * the confirmed zero-cost row is seeded. Small 8B model — ranked low so the
+ * router only falls to it near the end of the chain. No card required.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['siliconflow', 'Qwen/Qwen3-8B', 'Qwen3 8B (SiliconFlow)', 30, 3, 'Small', null, 50, null, null, '50 req/day', 32768],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

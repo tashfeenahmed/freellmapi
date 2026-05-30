@@ -143,6 +143,18 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.llm7.io/v1',
 }));
 
+// SiliconFlow — OpenAI-compatible (api.siliconflow.com/v1). New-user accounts
+// get a one-time gift balance, but a small set of models are genuinely $0
+// ("free models", 50 req/day; 1000/day after any credit purchase). Probed
+// 2026-05: balance held flat across calls to Qwen/Qwen3-8B (zero-cost) and
+// tool calls round-trip correctly; Qwen2.5-7B-Instruct DID decrement balance
+// (paid), so only the confirmed zero-cost row is seeded. No card required.
+register(new OpenAICompatProvider({
+  platform: 'siliconflow',
+  name: 'SiliconFlow',
+  baseUrl: 'https://api.siliconflow.com/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
