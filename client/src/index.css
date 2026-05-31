@@ -125,6 +125,7 @@
     }
     html {
         @apply font-sans antialiased;
+        scrollbar-gutter: stable;
         font-feature-settings: 'ss01', 'cv11';
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
