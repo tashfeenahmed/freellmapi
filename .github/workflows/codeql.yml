@@ -1,0 +1,37 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly catch-all so newly-disclosed query patterns scan existing code.
+    - cron: "23 5 * * 1"
+
+# Least-privilege: read the code, write scanning results.
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-typescript"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-extended adds higher-signal security queries beyond the default.
+          queries: security-extended
+
+      # JS/TS is interpreted — no build step needed before analysis.
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3

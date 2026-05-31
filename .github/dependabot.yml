@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # npm — root covers the workspaces (shared/server/client) via the single lockfile.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # One grouped PR for routine bumps keeps the noise down; security updates
+      # still come through Dependabot security alerts regardless of this config.
+      npm-dependencies:
+        patterns: ["*"]
+
+  # Keep the GitHub Actions used in the workflows current/patched.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
