@@ -13,6 +13,7 @@ import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
 import { authRouter } from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
+import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -63,7 +64,10 @@ export function createApp() {
   app.use('/api/health', requireAuth, healthRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
 
-  // OpenAI-compatible proxy
+  // OpenAI-compatible proxy. Per-IP rate limiting (#35 item #6) runs first so
+  // it throttles unauthenticated brute-force / flood attempts before any
+  // routing work. Tune via PROXY_RATE_LIMIT_RPM; 0 disables it.
+  app.use('/v1', createProxyRateLimiter());
   app.use('/v1', proxyRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
   app.use('/v1', responsesRouter);
