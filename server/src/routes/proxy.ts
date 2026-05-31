@@ -33,6 +33,22 @@ export function timingSafeStringEqual(provided: string, expected: string): boole
   return crypto.timingSafeEqual(compareA, b) && a.length === b.length;
 }
 
+// Extract the unified API key from an incoming request. Accepts both the
+// OpenAI-style `Authorization: Bearer <key>` header and the Anthropic-style
+// `x-api-key` header. Clients that speak the Anthropic wire format — notably
+// Claude Code routed through CC Switch (#103) — send the key in `x-api-key`
+// rather than a bearer token, and were getting a spurious "Invalid API key"
+// 401 before this fallback existed.
+export function extractApiToken(req: Request): string | undefined {
+  const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
+  if (bearer) return bearer;
+
+  const apiKeyHeader = req.headers['x-api-key'];
+  const xApiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+  const trimmed = xApiKey?.trim();
+  return trimmed || undefined;
+}
+
 // Sticky sessions: track which model served each "session"
 // Key: hash of first user message → model_db_id
 // This prevents model switching mid-conversation which causes hallucination
@@ -233,7 +249,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Authenticate with the unified API key for every proxy request, including
   // loopback callers. Browser pages can reach localhost, so socket locality is
   // not a reliable authorization boundary.
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
   if (!token || !timingSafeStringEqual(token, unifiedKey)) {
     res.status(401).json({

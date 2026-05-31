@@ -15,6 +15,7 @@ import { contentToString } from '../lib/content.js';
 import {
   isRetryableError,
   timingSafeStringEqual,
+  extractApiToken,
   getStickyModel,
   setStickyModel,
   logRequest,
@@ -229,8 +230,8 @@ export function buildResponseObject(opts: {
 responsesRouter.post('/responses', async (req: Request, res: Response) => {
   const start = Date.now();
 
-  // Same unified-key bearer auth as the proxy.
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  // Same unified-key auth as the proxy (accepts Bearer or x-api-key).
+  const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
   if (!token || !timingSafeStringEqual(token, unifiedKey)) {
     res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
