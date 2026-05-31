@@ -49,6 +49,21 @@ describe('POST /v1/responses (#96)', () => {
     expect((await post(app, '/v1/responses', { model: 'auto' }, key)).status).toBe(400);
   });
 
+  // #103: the x-api-key header (Anthropic wire format) must authenticate here
+  // too, not just on /v1/chat/completions.
+  it('accepts the unified key via the x-api-key header', async () => {
+    const server = app.listen(0);
+    const addr = server.address() as any;
+    const res = await fetch(`http://127.0.0.1:${addr.port}/v1/responses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+      body: JSON.stringify({ input: 'hi' }),
+    });
+    server.close();
+    // Auth passes (not 401); body validity / routing is covered elsewhere.
+    expect(res.status).not.toBe(401);
+  });
+
   it('non-stream: returns a completed Responses object with usage', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() {
