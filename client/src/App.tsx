@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { PlaygroundChatProvider } from '@/lib/playground-chat'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
@@ -69,35 +70,37 @@ function Brand() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
-            <div className="max-w-6xl mx-auto px-6 flex items-center">
-              <Brand />
-              <nav className="flex items-center gap-6 ml-10">
-                <NavItem to="/playground">Playground</NavItem>
-                <NavItem to="/keys">Keys</NavItem>
-                <NavItem to="/fallback">Fallback</NavItem>
-                <NavItem to="/analytics">Analytics</NavItem>
-              </nav>
-              <div className="ml-auto py-2">
-                <DarkModeToggle />
+      <PlaygroundChatProvider>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <div className="min-h-screen bg-background">
+            <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
+              <div className="max-w-6xl mx-auto px-6 flex items-center">
+                <Brand />
+                <nav className="flex items-center gap-6 ml-10">
+                  <NavItem to="/playground">Playground</NavItem>
+                  <NavItem to="/keys">Keys</NavItem>
+                  <NavItem to="/fallback">Fallback</NavItem>
+                  <NavItem to="/analytics">Analytics</NavItem>
+                </nav>
+                <div className="ml-auto py-2">
+                  <DarkModeToggle />
+                </div>
               </div>
-            </div>
-          </header>
-          <main className="max-w-6xl mx-auto px-6 py-8">
-            <Routes>
-              <Route path="/" element={<Navigate to="/playground" replace />} />
-              <Route path="/playground" element={<PlaygroundPage />} />
-              <Route path="/keys" element={<KeysPage />} />
-              <Route path="/fallback" element={<FallbackPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/test" element={<Navigate to="/playground" replace />} />
-              <Route path="/health" element={<Navigate to="/keys" replace />} />
-            </Routes>
-          </main>
-        </div>
-      </BrowserRouter>
+            </header>
+            <main className="max-w-6xl mx-auto px-6 py-8">
+              <Routes>
+                <Route path="/" element={<Navigate to="/playground" replace />} />
+                <Route path="/playground" element={<PlaygroundPage />} />
+                <Route path="/keys" element={<KeysPage />} />
+                <Route path="/fallback" element={<FallbackPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/test" element={<Navigate to="/playground" replace />} />
+                <Route path="/health" element={<Navigate to="/keys" replace />} />
+              </Routes>
+            </main>
+          </div>
+        </BrowserRouter>
+      </PlaygroundChatProvider>
     </QueryClientProvider>
   )
 }
