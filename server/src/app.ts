@@ -11,6 +11,8 @@ import { fallbackRouter } from './routes/fallback.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
+import { authRouter } from './routes/auth.js';
+import { requireAuth } from './middleware/requireAuth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,13 +50,18 @@ export function createApp() {
   }));
   app.use(express.json({ limit: '1mb' }));
 
-  // API routes
-  app.use('/api/keys', keysRouter);
-  app.use('/api/models', modelsRouter);
-  app.use('/api/fallback', fallbackRouter);
-  app.use('/api/analytics', analyticsRouter);
-  app.use('/api/health', healthRouter);
-  app.use('/api/settings', settingsRouter);
+  // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
+  // session; everything else under /api/* requires a logged-in dashboard user.
+  // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
+  app.use('/api/auth', authRouter);
+
+  // API routes — all admin endpoints sit behind requireAuth.
+  app.use('/api/keys', requireAuth, keysRouter);
+  app.use('/api/models', requireAuth, modelsRouter);
+  app.use('/api/fallback', requireAuth, fallbackRouter);
+  app.use('/api/analytics', requireAuth, analyticsRouter);
+  app.use('/api/health', requireAuth, healthRouter);
+  app.use('/api/settings', requireAuth, settingsRouter);
 
   // OpenAI-compatible proxy
   app.use('/v1', proxyRouter);

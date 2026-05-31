@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb } from '../../db/index.js';
+import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+
+let dashToken = '';
 
 async function request(app: Express, method: string, path: string, body?: any) {
   const server = app.listen(0);
@@ -10,7 +13,10 @@ async function request(app: Express, method: string, path: string, body?: any) {
 
   const res = await fetch(url, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(isGatedApiPath(path) ? { Authorization: `Bearer ${dashToken}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -26,6 +32,7 @@ describe('Fallback API', () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
     app = createApp();
+    dashToken = mintDashboardToken();
   });
 
   it('GET /api/fallback returns fallback chain', async () => {
