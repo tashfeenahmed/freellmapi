@@ -6,10 +6,14 @@ import { fileURLToPath } from 'url';
 import { keysRouter } from './routes/keys.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
+import { responsesRouter } from './routes/responses.js';
 import { fallbackRouter } from './routes/fallback.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
+import { authRouter } from './routes/auth.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,16 +51,26 @@ export function createApp() {
   }));
   app.use(express.json({ limit: '1mb' }));
 
-  // API routes
-  app.use('/api/keys', keysRouter);
-  app.use('/api/models', modelsRouter);
-  app.use('/api/fallback', fallbackRouter);
-  app.use('/api/analytics', analyticsRouter);
-  app.use('/api/health', healthRouter);
-  app.use('/api/settings', settingsRouter);
+  // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
+  // session; everything else under /api/* requires a logged-in dashboard user.
+  // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
+  app.use('/api/auth', authRouter);
 
-  // OpenAI-compatible proxy
+  // API routes — all admin endpoints sit behind requireAuth.
+  app.use('/api/keys', requireAuth, keysRouter);
+  app.use('/api/models', requireAuth, modelsRouter);
+  app.use('/api/fallback', requireAuth, fallbackRouter);
+  app.use('/api/analytics', requireAuth, analyticsRouter);
+  app.use('/api/health', requireAuth, healthRouter);
+  app.use('/api/settings', requireAuth, settingsRouter);
+
+  // OpenAI-compatible proxy. Per-IP rate limiting (#35 item #6) runs first so
+  // it throttles unauthenticated brute-force / flood attempts before any
+  // routing work. Tune via PROXY_RATE_LIMIT_RPM; 0 disables it.
+  app.use('/v1', createProxyRateLimiter());
   app.use('/v1', proxyRouter);
+  // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
+  app.use('/v1', responsesRouter);
 
   // Health check
   app.get('/api/ping', (_req, res) => {

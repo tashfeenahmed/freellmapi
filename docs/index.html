@@ -3,26 +3,26 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FreeLLMAPI — One key. One billion free LLM tokens. Every month.</title>
-<meta name="description" content="A self-hosted, OpenAI-compatible proxy that routes across 11 free-tier LLM providers — Gemini, OpenRouter, Cerebras, Groq, Mistral, GitHub Models, SambaNova, Cohere, Cloudflare, Z.ai, NVIDIA. ~1B free tokens / month, 60 models." />
+<title>FreeLLMAPI — One key. 1.7 billion free LLM tokens. Every month.</title>
+<meta name="description" content="A self-hosted, OpenAI-compatible proxy that routes across 16 free-tier LLM providers — Gemini, OpenRouter, Cerebras, Groq, Mistral, GitHub Models, SambaNova, Cohere, Cloudflare, Z.ai, NVIDIA, HuggingFace, Ollama, Kilo, Pollinations, LLM7 — plus any custom OpenAI-compatible endpoint. ~1.7B free tokens / month, 100+ models." />
 <meta name="theme-color" content="#0a0a0a" />
 <link rel="canonical" href="https://tashfeenahmed.github.io/freellmapi/" />
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="FreeLLMAPI" />
-<meta property="og:title" content="FreeLLMAPI — 1B free LLM tokens / month" />
-<meta property="og:description" content="One self-hosted, OpenAI-compatible proxy across 11 free-tier LLM providers. 60 models. ~1B free tokens per month." />
+<meta property="og:title" content="FreeLLMAPI — 1.7B free LLM tokens / month" />
+<meta property="og:description" content="One self-hosted, OpenAI-compatible proxy across 16 free-tier LLM providers. 100+ models. ~1.7B free tokens per month." />
 <meta property="og:url" content="https://tashfeenahmed.github.io/freellmapi/" />
 <meta property="og:image" content="https://tashfeenahmed.github.io/freellmapi/og.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="FreeLLMAPI — 1B free tokens / month, across 11 providers and 60 models." />
+<meta property="og:image:alt" content="FreeLLMAPI — 1.7B free tokens / month, across 16 providers and 100+ models." />
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="FreeLLMAPI — 1B free LLM tokens / month" />
-<meta name="twitter:description" content="One self-hosted, OpenAI-compatible proxy across 11 free-tier LLM providers. 60 models. ~1B free tokens per month." />
+<meta name="twitter:title" content="FreeLLMAPI — 1.7B free LLM tokens / month" />
+<meta name="twitter:description" content="One self-hosted, OpenAI-compatible proxy across 16 free-tier LLM providers. 100+ models. ~1.7B free tokens per month." />
 <meta name="twitter:image" content="https://tashfeenahmed.github.io/freellmapi/og.png" />
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23ffffff'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%230a0a0a'/%3E%3C/svg%3E" />
 <style>
@@ -292,8 +292,8 @@
     </nav>
 
     <header class="hero">
-      <span class="badge"><span class="badge-dot"></span> 60 free models · 11 providers · self-hosted</span>
-      <h1>One key.<br><span class="gradient">One billion</span> free tokens.<br>Every month.</h1>
+      <span class="badge"><span class="badge-dot"></span> 100+ free models · 16 providers · self-hosted</span>
+      <h1>One key.<br><span class="gradient">1.7 billion</span> free tokens.<br>Every month.</h1>
       <p class="subtitle">A self-hosted, OpenAI-compatible proxy that routes across every credible free-tier LLM provider. Bring your own keys; we just point requests at whichever provider still has budget left.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="https://github.com/tashfeenahmed/freellmapi" target="_blank" rel="noopener">View on GitHub →</a>
@@ -303,9 +303,9 @@
 
     <div class="tokens-stat">
       <div class="tokens-label">Aggregate monthly free budget</div>
-      <div class="tokens-number">1B</div>
+      <div class="tokens-number">1.7B</div>
       <div class="tokens-unit">tokens · per month</div>
-      <div class="tokens-sub">Across 60 free-tier models on 11 providers. Mistral alone contributes ~1B; everything else is bonus.</div>
+      <div class="tokens-sub">Across 100+ free-tier models on 16 providers, plus any custom OpenAI-compatible endpoint. Mistral alone contributes ~1B; everything else is bonus.</div>
     </div>
 
     <section id="providers">
@@ -369,6 +369,36 @@
           <div class="provider-name"><span class="provider-icon"><img src="logos/nvidia.svg" alt="" /></span>NVIDIA NIM</div>
           <div class="provider-tokens"><span class="num">credits</span><span class="unit"></span><span class="label">disabled</span></div>
           <div class="provider-models">Llama 3.1 70B. Disabled by default — credit-based, not recurring.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:12px;font-weight:700;color:var(--muted)">HF</span>HuggingFace</div>
+          <div class="provider-tokens"><span class="num">~3M</span><span class="unit">/mo</span><span class="label">router credit</span></div>
+          <div class="provider-models">Inference Providers router → DeepSeek V4 · Kimi K2.6 · Qwen3. Recurring router credit, no card.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:12px;font-weight:700;color:var(--muted)">OL</span>Ollama Cloud</div>
+          <div class="provider-tokens"><span class="num">free</span><span class="unit"></span><span class="label">GPU-time</span></div>
+          <div class="provider-models">GLM-4.7 · Kimi K2 · gpt-oss · Qwen3. Free plan: 1 concurrent model, session/GPU-time caps.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:14px;font-weight:700;color:var(--muted)">K</span>Kilo Gateway</div>
+          <div class="provider-tokens"><span class="num">anon</span><span class="unit"></span><span class="label">~200/hr</span></div>
+          <div class="provider-models"><code>:free</code> routes — anonymous access works per-IP; a key raises the limit.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:14px;font-weight:700;color:var(--muted)">P</span>Pollinations</div>
+          <div class="provider-tokens"><span class="num">anon</span><span class="unit"></span><span class="label">free tier</span></div>
+          <div class="provider-models">GPT-OSS 20B (<code>openai-fast</code>), tools supported. Anonymous tier, no key.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:12px;font-weight:700;color:var(--muted)">L7</span>LLM7</div>
+          <div class="provider-tokens"><span class="num">anon</span><span class="unit"></span><span class="label">~100/hr</span></div>
+          <div class="provider-models">GPT-OSS · Llama 3.1 Turbo · Codestral · GLM via one token. Anonymous access works.</div>
+        </div>
+        <div class="provider-card">
+          <div class="provider-name"><span class="provider-icon" style="font-size:18px;font-weight:700;color:var(--muted)">+</span>Custom endpoint</div>
+          <div class="provider-tokens"><span class="num">∞</span><span class="unit"></span><span class="label">your server</span></div>
+          <div class="provider-models">Point at any OpenAI-compatible URL — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway.</div>
         </div>
       </div>
     </section>

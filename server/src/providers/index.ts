@@ -148,7 +148,40 @@ register(new OpenAICompatProvider({
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
 // non-zero balance, which conflicts with the project's no-card criterion.
 
+// Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
+// behave — but the real instance is built per-key by resolveProvider(), since
+// a custom provider's base URL is user-supplied and lives on the api_keys row.
+register(new OpenAICompatProvider({
+  platform: 'custom',
+  name: 'Custom (OpenAI-compatible)',
+  baseUrl: '',
+}));
+
+// Locally-hosted inference (llama.cpp / vLLM / Ollama on CPU) can be slow, so
+// custom providers get the same extended timeout as Ollama Cloud.
+const CUSTOM_PROVIDER_TIMEOUT_MS = 120000;
+
 export function getProvider(platform: Platform): BaseProvider | undefined {
+  return providers.get(platform);
+}
+
+/**
+ * Resolve the provider for a route. Built-in platforms return their registered
+ * singleton; the 'custom' platform builds a fresh OpenAICompatProvider bound to
+ * the caller-supplied base URL (stored per api_keys row). Returns undefined for
+ * a custom provider with no base URL configured.
+ */
+export function resolveProvider(platform: Platform, baseUrl?: string | null): BaseProvider | undefined {
+  if (platform === 'custom') {
+    const trimmed = baseUrl?.trim();
+    if (!trimmed) return undefined;
+    return new OpenAICompatProvider({
+      platform: 'custom',
+      name: 'Custom (OpenAI-compatible)',
+      baseUrl: trimmed,
+      timeoutMs: CUSTOM_PROVIDER_TIMEOUT_MS,
+    });
+  }
   return providers.get(platform);
 }
 

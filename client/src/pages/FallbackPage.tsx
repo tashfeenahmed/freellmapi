@@ -38,6 +38,7 @@ interface FallbackEntry {
   rpmLimit: number | null
   rpdLimit: number | null
   monthlyTokenBudget: string
+  supportsVision: boolean
   keyCount: number
 }
 
@@ -176,6 +177,14 @@ function SortableModelRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm">{entry.displayName}</span>
           <span className="text-xs text-muted-foreground">{entry.platform}</span>
+          {entry.supportsVision && (
+            <span
+              title="Accepts image input"
+              className="text-xs rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
+            >
+              Vision
+            </span>
+          )}
           {entry.penalty > 0 && (
             <span className="text-xs text-amber-600 dark:text-amber-400">
               −{entry.penalty} penalty

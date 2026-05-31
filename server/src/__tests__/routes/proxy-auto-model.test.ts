@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+
+let dashToken = '';
 
 async function request(app: Express, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
   const server = app.listen(0);
@@ -10,7 +13,7 @@ async function request(app: Express, method: string, path: string, body?: any, h
 
   const res = await fetch(url, {
     method,
-    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
+    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(isGatedApiPath(path) && !('Authorization' in headers) ? { Authorization: `Bearer ${dashToken}` } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -34,6 +37,7 @@ describe('Virtual "auto" model', () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
     app = createApp();
+    dashToken = mintDashboardToken();
   });
 
   beforeEach(async () => {

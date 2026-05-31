@@ -13,7 +13,7 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
     SELECT fc.model_db_id, fc.priority, fc.enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
-           m.monthly_token_budget
+           m.monthly_token_budget, m.supports_vision
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id
     ORDER BY fc.priority ASC
@@ -49,6 +49,7 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       rpmLimit: r.rpm_limit,
       rpdLimit: r.rpd_limit,
       monthlyTokenBudget: r.monthly_token_budget,
+      supportsVision: r.supports_vision === 1,
       keyCount: keyCountMap.get(r.platform) ?? 0,
     };
   }));
@@ -83,10 +84,18 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// `intelligence_rank` is scoped to each provider's own catalog — a provider's
+// #1 model is not globally #1 (see issue #135: MiniMax's top model outranking
+// Gemini Pro because both read "Intel #1"). `size_label` IS a cross-provider
+// capability tier, so normalize on it first and use intelligence_rank only as
+// an in-tier tiebreaker. Unknown labels sort last.
+const INTELLIGENCE_TIER =
+  "CASE m.size_label WHEN 'Frontier' THEN 1 WHEN 'Large' THEN 2 WHEN 'Medium' THEN 3 WHEN 'Small' THEN 4 ELSE 5 END";
+
 // Sort presets — `orderBy` is selected from a fixed whitelist, never from
 // user input directly, so the interpolation below is safe.
 const SORT_PRESETS: Record<string, string> = {
-  intelligence: 'm.intelligence_rank ASC',
+  intelligence: `${INTELLIGENCE_TIER} ASC, m.intelligence_rank ASC`,
   speed: 'm.speed_rank ASC',
   budget: "CASE m.monthly_token_budget WHEN '~120M' THEN 1 WHEN '~50-100M' THEN 2 WHEN '~30M' THEN 3 WHEN '~18-45M' THEN 4 WHEN '~18M' THEN 5 WHEN '~15M' THEN 6 WHEN '~12M' THEN 7 WHEN '~6M' THEN 8 WHEN '~5-10M' THEN 9 WHEN '~4M' THEN 10 ELSE 11 END ASC",
 };

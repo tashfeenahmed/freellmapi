@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb } from '../../db/index.js';
+import { initDb, getUnifiedApiKey } from '../../db/index.js';
 
 async function request(app: Express, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
   const server = app.listen(0);
@@ -39,6 +39,29 @@ describe('Proxy authentication and CORS', () => {
 
     expect(status).toBe(401);
     expect(body.error.type).toBe('authentication_error');
+  });
+
+  // #103: Claude Code via CC Switch (and other Anthropic-format clients) send
+  // the key in the `x-api-key` header, not as an Authorization bearer token.
+  it('rejects a wrong key supplied via the x-api-key header', async () => {
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hello' }],
+    }, { 'x-api-key': 'freellmapi-wrong-key' });
+
+    expect(status).toBe(401);
+    expect(body.error.type).toBe('authentication_error');
+  });
+
+  it('accepts the unified key supplied via the x-api-key header', async () => {
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hello' }],
+    }, { 'x-api-key': getUnifiedApiKey() });
+
+    // Auth passes — it gets past the 401 gate. (Routing then fails because no
+    // provider keys are configured in this test DB, which is fine: we only
+    // care that the x-api-key header authenticated.)
+    expect(status).not.toBe(401);
+    expect(body?.error?.type).not.toBe('authentication_error');
   });
 
   it('does not grant CORS access to arbitrary browser origins', async () => {

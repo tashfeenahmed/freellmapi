@@ -28,3 +28,20 @@ export function flattenMessageContent(messages: ChatMessage[]): ChatMessage[] {
     content: contentToString(m.content),
   }));
 }
+
+// True if the content array carries an image block. OpenAI's multimodal
+// envelope uses `{ type: 'image_url', image_url: { url } }`; some clients send
+// a bare `{ type: 'image', ... }`.
+export function contentHasImage(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  return content.some((block) => {
+    const type = (block as { type?: string })?.type;
+    return type === 'image_url' || type === 'image';
+  });
+}
+
+// True if any message carries an image content block. Used to route image
+// requests only to vision-capable models (#118, #125).
+export function messageHasImage(messages: ChatMessage[]): boolean {
+  return messages.some((m) => contentHasImage(m.content));
+}
