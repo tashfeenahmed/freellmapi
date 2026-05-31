@@ -143,6 +143,7 @@ function createTables(db: Database.Database) {
   `);
 
   ensureRequestKeyIdColumn(db);
+  ensureApiKeysBaseUrlColumn(db);
 }
 
 function ensureRequestKeyIdColumn(db: Database.Database) {
@@ -151,6 +152,15 @@ function ensureRequestKeyIdColumn(db: Database.Database) {
     db.prepare('ALTER TABLE requests ADD COLUMN key_id INTEGER').run();
   }
   db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_key_id ON requests(key_id)').run();
+}
+
+// `base_url` is the upstream endpoint for the user-configured 'custom' provider
+// (#117). NULL for every built-in platform — they use their hardcoded base URL.
+function ensureApiKeysBaseUrlColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(api_keys)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'base_url')) {
+    db.prepare('ALTER TABLE api_keys ADD COLUMN base_url TEXT').run();
+  }
 }
 
 function seedModels(db: Database.Database) {

@@ -1,5 +1,5 @@
 import { getDb } from '../db/index.js';
-import { getProvider } from '../providers/index.js';
+import { getProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown } from './ratelimit.js';
 import type { BaseProvider } from '../providers/base.js';
@@ -23,6 +23,7 @@ interface KeyRow {
   auth_tag: string;
   status: string;
   enabled: number;
+  base_url: string | null;
 }
 
 interface FallbackRow {
@@ -208,10 +209,18 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
         continue;
       }
 
+      // For the 'custom' platform the real provider is built from this key's
+      // base_url (the registered instance is just a placeholder). A custom key
+      // with no base_url can't be routed — skip it.
+      const resolvedProvider = model.platform === 'custom'
+        ? resolveProvider('custom', key.base_url)
+        : provider;
+      if (!resolvedProvider) continue;
+
       // We found a working key for this model!
       roundRobinIndex.set(rrKey, idx);
       return {
-        provider,
+        provider: resolvedProvider,
         modelId: model.model_id,
         modelDbId: model.id,
         apiKey: decryptedKey,

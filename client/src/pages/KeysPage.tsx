@@ -29,6 +29,13 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'huggingface', label: 'HuggingFace Router' },
 ]
 
+// 'custom' is configured through its own form (base URL + model), not the
+// generic key dropdown — but it still appears in the grouped provider list.
+const CUSTOM_GROUP: { value: Platform; label: string } = {
+  value: 'custom',
+  label: 'Custom (OpenAI-compatible)',
+}
+
 const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
   rate_limited: 'bg-amber-500',
@@ -132,6 +139,89 @@ function UnifiedKeySection() {
         <span className="text-muted-foreground">Endpoint</span>
         <code className="font-mono">/v1/chat/completions</code>
       </div>
+    </section>
+  )
+}
+
+function CustomProviderSection() {
+  const queryClient = useQueryClient()
+  const [baseUrl, setBaseUrl] = useState('')
+  const [model, setModel] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [apiKey, setApiKey] = useState('')
+
+  const addCustom = useMutation({
+    mutationFn: (body: { baseUrl: string; model: string; displayName?: string; apiKey?: string }) =>
+      apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      setModel('')
+      setDisplayName('')
+    },
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!baseUrl || !model) return
+    addCustom.mutate({ baseUrl, model, displayName: displayName || undefined, apiKey: apiKey || undefined })
+  }
+
+  return (
+    <section>
+      <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
+      <p className="text-xs text-muted-foreground mb-3">
+        Point at any OpenAI-compatible endpoint — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
+        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
+        (most local servers don't need one).
+      </p>
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
+        <div className="space-y-1.5 flex-1 min-w-[240px]">
+          <Label className="text-xs">Base URL</Label>
+          <Input
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            placeholder="http://127.0.0.1:11434/v1"
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Model</Label>
+          <Input
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            placeholder="qwen3:4b"
+            className="w-[180px] font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Display name</Label>
+          <Input
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder="optional"
+            className="w-[150px]"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">API key</Label>
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder="optional"
+            className="w-[150px] font-mono text-xs"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
+          {addCustom.isPending ? 'Adding…' : 'Add model'}
+        </Button>
+      </form>
+      {addCustom.isError && (
+        <p className="text-destructive text-xs mt-2">{(addCustom.error as Error).message}</p>
+      )}
     </section>
   )
 }
@@ -256,7 +346,7 @@ export default function KeysPage() {
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
 
-  const grouped = PLATFORMS.map(p => ({
+  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
   })).filter(p => p.keys.length > 0)
@@ -332,6 +422,8 @@ export default function KeysPage() {
             <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
           )}
         </section>
+
+        <CustomProviderSection />
 
         <section>
           <h2 className="text-sm font-medium mb-3">Configured providers</h2>
