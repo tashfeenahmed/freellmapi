@@ -121,6 +121,14 @@ docker compose up -d
 
 Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
+> **Reaching it from another machine?** By default the container is published only on `127.0.0.1`, so `http://<server-ip>:3001` won't load from another device (the page just hangs). To expose it on your LAN — e.g. a Raspberry Pi at `http://192.168.1.x:3001` — start it with `HOST_BIND=0.0.0.0`:
+>
+> ```bash
+> HOST_BIND=0.0.0.0 docker compose up -d
+> ```
+>
+> Only do this on a trusted network: the proxy is single-user and guarded only by the unified API key.
+
 ### Local development
 
 **Prerequisites:** Node.js 20+, npm.
@@ -164,6 +172,8 @@ The included `docker-compose.yml` is the recommended install path:
 docker compose up -d
 docker compose logs -f freellmapi
 ```
+
+By default the container's port is bound to `127.0.0.1` (localhost only). To reach the dashboard/API from another machine on your network, publish it on all interfaces with `HOST_BIND=0.0.0.0 docker compose up -d` — only on a trusted LAN, since the proxy is single-user.
 
 SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`. Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because provider keys are encrypted at rest.
 
