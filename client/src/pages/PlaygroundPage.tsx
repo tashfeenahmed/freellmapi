@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { History, MessageSquarePlus } from 'lucide-react'
+import { Check, Copy, History, MessageSquarePlus, Pencil } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { usePlaygroundChat } from '@/lib/playground-chat'
 import type { ChatSessionSummary } from '@/lib/playground-chat'
@@ -44,6 +44,7 @@ export default function PlaygroundPage() {
     newChat,
     loadSession,
   } = usePlaygroundChat()
+  const [copiedMessage, setCopiedMessage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -83,6 +84,23 @@ export default function PlaygroundPage() {
   const handleLoadSession = async (sessionId: number) => {
     await loadSession(sessionId)
     setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleCopyMessage = async (content: string, key: string) => {
+    await navigator.clipboard.writeText(content)
+    setCopiedMessage(key)
+    window.setTimeout(() => setCopiedMessage(current => current === key ? null : current), 1400)
+  }
+
+  const handleEditMessage = (content: string) => {
+    setInput(content)
+    setTimeout(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+    }, 0)
   }
 
   const activeModelLabel = selectedModel === 'auto'
@@ -172,23 +190,57 @@ export default function PlaygroundPage() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      className={`group/message max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                         msg.role === 'user'
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted'
                       }`}
                     >
                       <div className="whitespace-pre-wrap">{msg.content}</div>
-                      {msg.meta && (
-                        <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] opacity-70 tabular-nums">
-                          {msg.meta.platform && <span>{msg.meta.platform}</span>}
-                          {msg.meta.model && <span className="font-mono">· {msg.meta.model}</span>}
-                          {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
-                          {msg.meta.fallbackAttempts != null && msg.meta.fallbackAttempts > 0 && (
-                            <span>· {msg.meta.fallbackAttempts} fallback{msg.meta.fallbackAttempts > 1 ? 's' : ''}</span>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        {msg.meta ? (
+                          <div className="flex items-center gap-2 flex-wrap text-[11px] opacity-70 tabular-nums">
+                            {msg.meta.platform && <span>{msg.meta.platform}</span>}
+                            {msg.meta.model && <span className="font-mono">· {msg.meta.model}</span>}
+                            {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
+                            {msg.meta.fallbackAttempts != null && msg.meta.fallbackAttempts > 0 && (
+                              <span>· {msg.meta.fallbackAttempts} fallback{msg.meta.fallbackAttempts > 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                        <div className="flex shrink-0 items-center gap-1 opacity-70 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+                          {msg.role === 'user' && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="size-6 text-current hover:bg-current/10 hover:text-current"
+                              onClick={() => handleEditMessage(msg.content)}
+                              title="Edit message"
+                              aria-label="Edit message"
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
                           )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="size-6 text-current hover:bg-current/10 hover:text-current"
+                            onClick={() => handleCopyMessage(msg.content, `${msg.role}-${i}`)}
+                            title="Copy message"
+                            aria-label="Copy message"
+                          >
+                            {copiedMessage === `${msg.role}-${i}` ? (
+                              <Check className="size-3.5" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 ))}
