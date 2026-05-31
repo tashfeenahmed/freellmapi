@@ -1,0 +1,52 @@
+# Copy to terraform.tfvars and fill in (terraform.tfvars is gitignored).
+# Tip: run ./gen-tfvars.sh to auto-populate most of these from the oci CLI.
+
+# --- Identity (from the OCI console / `oci iam` ) ---
+tenancy_ocid     = "ocid1.tenancy.oc1..xxxx"
+compartment_ocid = "ocid1.compartment.oc1..xxxx" # your Phase 0 compartment
+region           = "us-ashburn-1"
+
+# Full AD name. List: oci iam availability-domain list --compartment-id <tenancy>
+availability_domain = "Uocm:US-ASHBURN-AD-1"
+
+# --- Access ---
+ssh_public_key = "ssh-ed25519 AAAA... you@host"
+
+# Tighten to Procedure's egress IPs (Phase 9) instead of the whole internet:
+# lb_ingress_cidrs = ["203.0.113.10/32"]
+
+# --- Compute ---
+# Ubuntu 22.04 aarch64 image OCID in your region:
+# oci compute image list --compartment-id <compartment> \
+#   --operating-system "Canonical Ubuntu" --operating-system-version "22.04" \
+#   --shape VM.Standard.A1.Flex --query 'data[0].id' --raw-output
+instance_image_ocid = "ocid1.image.oc1.iad.xxxx"
+instance_ocpus      = 1
+instance_memory_gb  = 6
+
+# --- App ---
+app_image = "ghcr.io/tashfeenahmed/freellmapi:latest"
+
+# 64-char hex. Generate:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# BACK THIS UP — it decrypts every stored provider key.
+encryption_key = "replace-with-64-char-hex"
+
+# Only if the GHCR package is private:
+# ghcr_username   = "tashfeenahmed"
+# ghcr_pull_token = "ghp_xxx"   # read:packages PAT
+
+# --- TLS via OCI Certificates service (no Let's Encrypt) ---
+# Start false (HTTP smoke test). Flip true to have Terraform create an OCI
+# private CA + auto-renewing cert and serve HTTPS on 443. Clients then trust the
+# exported CA bundle (terraform output ca_bundle_fetch_cmd).
+enable_https = false
+domain_name  = "freeai.punkadillo.com"
+# ca_common_name = "FreeLLMAPI Internal Root CA"
+# ca_not_after   = "2035-01-01T00:00:00Z"
+
+# --- Observability (Phase 6/7): Notifications + flow/LB logs + alarms ---
+# Flip on and set alert_email; then CLICK the confirmation link OCI emails you.
+enable_observability = false
+# alert_email        = "procurement@theprocedure.in"
+# log_retention_days = 30
