@@ -243,6 +243,16 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('api error 400');
 }
 
+// Pull the incremental text out of a streaming chunk for token counting.
+// Must tolerate chunks that carry no `choices` array at all: some providers
+// (e.g. Groq) emit usage/keepalive frames shaped like `{usage:{...}}` with no
+// `choices`. Indexing `chunk.choices[0]` on those throws "Cannot read
+// properties of undefined (reading '0')", which — once the SSE stream has
+// started — aborts the response mid-flight with no chance to fall back.
+export function streamChunkText(chunk: any): string {
+  return chunk?.choices?.[0]?.delta?.content ?? '';
+}
+
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
@@ -412,7 +422,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
               streamStarted = true;
             }
-            const text = chunk.choices[0]?.delta?.content ?? '';
+            const text = streamChunkText(chunk);
             totalOutputTokens += Math.ceil(text.length / 4);
             res.write(`data: ${JSON.stringify(chunk)}\n\n`);
           }
