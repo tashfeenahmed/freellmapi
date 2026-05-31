@@ -1,5 +1,5 @@
 import { getDb } from '../db/index.js';
-import { getProvider } from '../providers/index.js';
+import { getProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown } from './ratelimit.js';
 import type { BaseProvider } from '../providers/base.js';
@@ -14,6 +14,7 @@ interface ModelRow {
   rpd_limit: number | null;
   tpm_limit: number | null;
   tpd_limit: number | null;
+  supports_vision: number;
 }
 
 interface KeyRow {
@@ -24,6 +25,7 @@ interface KeyRow {
   auth_tag: string;
   status: string;
   enabled: number;
+  base_url: string | null;
 }
 
 export interface FallbackRow {
@@ -285,8 +287,9 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
  * @param estimatedTokens - estimated total tokens for rate limit check
  * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
  * @param preferredModelDbId - try this model first (sticky session)
+ * @param requireVision - only consider models that accept image input (#118)
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, skipModels?: Set<number>, prefetchedChain?: FallbackRow[]): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, skipModels?: Set<number>, prefetchedChain?: FallbackRow[]): RouteResult {
   const db = getDb();
 
   // Use pre-fetched chain if provided (avoids repeated DB queries in retry loop),
@@ -315,6 +318,10 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // Get model details
     const model = db.prepare('SELECT * FROM models WHERE id = ? AND enabled = 1').get(entry.model_db_id) as ModelRow | undefined;
     if (!model) continue;
+
+    // Vision requests skip text-only models — including a sticky/preferred one,
+    // which is correct: don't pin an image turn to a model that can't see it.
+    if (requireVision && !model.supports_vision) continue;
 
     // Check if we have a provider for this platform
     const provider = getProvider(model.platform as any);
@@ -361,10 +368,18 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
         continue;
       }
 
+      // For the 'custom' platform the real provider is built from this key's
+      // base_url (the registered instance is just a placeholder). A custom key
+      // with no base_url can't be routed — skip it.
+      const resolvedProvider = model.platform === 'custom'
+        ? resolveProvider('custom', key.base_url)
+        : provider;
+      if (!resolvedProvider) continue;
+
       // We found a working key for this model!
       roundRobinIndex.set(rrKey, idx);
       return {
-        provider,
+        provider: resolvedProvider,
         modelId: model.model_id,
         modelDbId: model.id,
         apiKey: decryptedKey,
@@ -386,4 +401,18 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   const err = new Error('All models exhausted. Add more API keys or wait for rate limits to reset.') as any;
   err.status = 429;
   throw err;
+}
+
+// Whether at least one vision-capable model is enabled in the fallback chain.
+// Used to give image requests a clear "enable a vision model" error instead of
+// the generic exhaustion message when none is configured (#118, #125).
+export function hasEnabledVisionModel(): boolean {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT COUNT(*) as cnt
+    FROM fallback_config fc
+    JOIN models m ON m.id = fc.model_db_id
+    WHERE fc.enabled = 1 AND m.enabled = 1 AND m.supports_vision = 1
+  `).get() as { cnt: number };
+  return row.cnt > 0;
 }

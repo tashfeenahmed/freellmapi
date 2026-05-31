@@ -16,4 +16,11 @@ async function main() {
   });
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  // A boot failure (e.g. a missing production ENCRYPTION_KEY) must exit
+  // non-zero rather than leaving a half-initialized process that never starts
+  // listening — that silent state is what surfaces in the client as
+  // "Can't reach the server".
+  console.error('\n[server] Failed to start:\n  ' + (err?.message ?? err) + '\n');
+  process.exit(1);
+});

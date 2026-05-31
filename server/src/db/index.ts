@@ -50,6 +50,8 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
+  migrateModelsV16Vision(db);
   ensureUnifiedKey(db);
   migrateProfiles(db);
   seedProfiles(db);
@@ -77,6 +79,7 @@ function createTables(db: Database.Database) {
       monthly_token_budget TEXT NOT NULL DEFAULT '',
       context_window INTEGER,
       enabled INTEGER NOT NULL DEFAULT 1,
+      supports_vision INTEGER NOT NULL DEFAULT 0,
       UNIQUE(platform, model_id)
     );
 
@@ -160,6 +163,22 @@ function createTables(db: Database.Database) {
       value TEXT NOT NULL
     );
 
+    -- Dashboard accounts (email + password) gating the /api/* admin surface (#35).
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_requests_platform ON requests(platform);
     CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup ON rate_limit_usage(platform, model_id, key_id, kind, created_at_ms);
@@ -168,6 +187,7 @@ function createTables(db: Database.Database) {
   `);
 
   ensureRequestKeyIdColumn(db);
+  ensureApiKeysBaseUrlColumn(db);
 }
 
 function ensureRequestKeyIdColumn(db: Database.Database) {
@@ -197,6 +217,15 @@ function deleteModelSafely(db: Database.Database, platform: string, modelId: str
     )
   `).run(platform, modelId);
   db.prepare(`DELETE FROM models WHERE platform = ? AND model_id = ?`).run(platform, modelId);
+}
+
+// `base_url` is the upstream endpoint for the user-configured 'custom' provider
+// (#117). NULL for every built-in platform — they use their hardcoded base URL.
+function ensureApiKeysBaseUrlColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(api_keys)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'base_url')) {
+    db.prepare('ALTER TABLE api_keys ADD COLUMN base_url TEXT').run();
+  }
 }
 
 function seedModels(db: Database.Database) {
@@ -1266,6 +1295,67 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): purge SiliconFlow.
+ *
+ * SiliconFlow was briefly added (#131) on the belief Qwen/Qwen3-8B was a $0
+ * "free model". Re-verification showed it is PAID ($0.06/M in+out): the
+ * account balance dropped 0.9999 -> 0.9998 across ~2.7K tokens, and the
+ * official pricing page lists it at $0.06/M. The earlier "zero-cost" read was
+ * a 4-decimal rounding artifact on a tiny call. SiliconFlow's .com endpoint is
+ * a one-time $1 trial credit, not a recurring free tier — same disqualifier
+ * as Chutes — so the provider was reverted. This removes any orphaned row from
+ * a DB that already ran the original V15. No-op on DBs that never had it.
+ */
+function migrateModelsV15(db: Database.Database) {
+  db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = 'siliconflow'
+    )
+  `).run();
+  db.prepare(`DELETE FROM models WHERE platform = 'siliconflow'`).run();
+}
+
+// Adds the supports_vision column to existing DBs and (re)applies the vision
+// flags by rule. Rule-based rather than a hardcoded id list because the catalog
+// churns through migrations (model ids get renamed/replaced) — rules survive
+// that. Two constraints decide a model can accept images:
+//   1. The model is genuinely multimodal (every Gemini is; Llama 4 Scout/
+//      Maverick are; GitHub's GPT-4o/4.1/5 are).
+//   2. Its provider adapter forwards image content. OpenAICompat and Google do;
+//      Cohere and Cloudflare flatten content to text, so models on those
+//      platforms are excluded even when the underlying model can see.
+// Conservative on purpose: with hard-fail routing a false negative is just a
+// clear "no vision model" error, while a false positive routes an image to a
+// model that chokes. Idempotent — safe on fresh seeds and upgrades alike.
+function migrateModelsV16Vision(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'supports_vision')) {
+    db.prepare('ALTER TABLE models ADD COLUMN supports_vision INTEGER NOT NULL DEFAULT 0').run();
+  }
+  const apply = db.transaction(() => {
+    // Reset first so de-flagged models (e.g. an id that moved to Cloudflare)
+    // don't keep a stale flag across re-runs.
+    db.prepare('UPDATE models SET supports_vision = 0').run();
+    // Every Gemini is multimodal (the 'google' platform is all Gemini).
+    db.prepare("UPDATE models SET supports_vision = 1 WHERE platform = 'google'").run();
+    // Llama 4 (Scout/Maverick) is natively multimodal — but only where the
+    // adapter forwards images (exclude the text-flattening providers).
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%llama-4%'
+        AND platform NOT IN ('cloudflare', 'cohere')
+    `).run();
+    // GitHub's OpenAI vision models.
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE platform = 'github'
+        AND (model_id LIKE '%gpt-4o%' OR model_id LIKE '%gpt-4.1%' OR model_id LIKE '%gpt-5%')
+    `).run();
+  });
+  apply();
 }
 
 function ensureUnifiedKey(db: Database.Database) {

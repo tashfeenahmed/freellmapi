@@ -26,14 +26,22 @@ function parseHexKey(value: string, source: 'env' | 'db'): Buffer {
   return Buffer.from(value, 'hex');
 }
 
+// Outside production we auto-generate and persist a key so a fresh clone
+// (`npm run dev`) boots without manual setup — the placeholder ENCRYPTION_KEY
+// in .env.example would otherwise crash the server on boot, which surfaces in
+// the client as "Can't reach the server". Production still requires an explicit
+// env key: a generated key lives only in the local DB and silently losing it
+// would make every stored API key undecryptable.
 function isDevFallbackAllowed(): boolean {
-  return process.env.DEV_MODE === 'true' && process.env.NODE_ENV !== 'production';
+  return process.env.NODE_ENV !== 'production';
 }
 
 function missingKeyError(): Error {
   return new Error(
-    'ENCRYPTION_KEY is required for API key encryption. ' +
-    `Set a ${KEY_HEX_LEN}-char hex key, or set DEV_MODE=true outside production to allow a local DB-stored fallback key.`,
+    'ENCRYPTION_KEY is required in production for API key encryption. ' +
+    `Set a ${KEY_HEX_LEN}-char hex key (generate one with: ` +
+    `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"). ` +
+    'Outside production a local DB-stored key is auto-generated.',
   );
 }
 
@@ -57,12 +65,14 @@ export function initEncryptionKey(db: Database.Database): void {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'encryption_key'").get() as { value: string } | undefined;
   if (row) {
     cachedKey = parseHexKey(row.value, 'db');
+    console.warn('[crypto] No ENCRYPTION_KEY set — using auto-generated key from the local DB (dev only).');
     return;
   }
 
   // 3. Generate and persist
   cachedKey = crypto.randomBytes(KEY_BYTES);
   db.prepare("INSERT INTO settings (key, value) VALUES ('encryption_key', ?)").run(cachedKey.toString('hex'));
+  console.warn('[crypto] No ENCRYPTION_KEY set — generated and persisted a local dev key. Set ENCRYPTION_KEY for production.');
 }
 
 function getEncryptionKey(): Buffer {

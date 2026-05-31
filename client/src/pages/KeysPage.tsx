@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
+import { Pencil } from 'lucide-react'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'google', label: 'Google AI Studio' },
@@ -27,6 +28,13 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'llm7', label: 'LLM7 (anon ok)' },
   { value: 'huggingface', label: 'HuggingFace Router' },
 ]
+
+// 'custom' is configured through its own form (base URL + model), not the
+// generic key dropdown — but it still appears in the grouped provider list.
+const CUSTOM_GROUP: { value: Platform; label: string } = {
+  value: 'custom',
+  label: 'Custom (OpenAI-compatible)',
+}
 
 const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
@@ -64,7 +72,7 @@ function UnifiedKeySection() {
   const [showKey, setShowKey] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const { data } = useQuery<{ apiKey: string }>({
+  const { data, isError } = useQuery<{ apiKey: string }>({
     queryKey: ['unified-key'],
     queryFn: () => apiFetch('/api/settings/api-key'),
   })
@@ -99,23 +107,31 @@ function UnifiedKeySection() {
           variant="ghost"
           size="sm"
           onClick={() => regenerate.mutate()}
-          disabled={regenerate.isPending}
+          disabled={regenerate.isPending || isError}
         >
           Regenerate
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-md select-all truncate tabular-nums">
-          {showKey ? apiKey : masked}
-        </code>
-        <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
-          {showKey ? 'Hide' : 'Show'}
-        </Button>
-        <Button variant="outline" size="sm" onClick={copy}>
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      </div>
+      {isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+          Can't reach the server on <code className="font-mono">{baseUrl.replace('/v1', '')}</code>. Make sure the
+          backend is running — <code className="font-mono">npm run dev</code> starts both, and the server logs print
+          under the <code className="font-mono">server</code> prefix.
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-md select-all truncate tabular-nums">
+            {showKey ? apiKey : masked}
+          </code>
+          <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
+            {showKey ? 'Hide' : 'Show'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={copy}>
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
         <span className="text-muted-foreground">Base URL</span>
@@ -127,12 +143,98 @@ function UnifiedKeySection() {
   )
 }
 
+function CustomProviderSection() {
+  const queryClient = useQueryClient()
+  const [baseUrl, setBaseUrl] = useState('')
+  const [model, setModel] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [apiKey, setApiKey] = useState('')
+
+  const addCustom = useMutation({
+    mutationFn: (body: { baseUrl: string; model: string; displayName?: string; apiKey?: string }) =>
+      apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      setModel('')
+      setDisplayName('')
+    },
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!baseUrl || !model) return
+    addCustom.mutate({ baseUrl, model, displayName: displayName || undefined, apiKey: apiKey || undefined })
+  }
+
+  return (
+    <section>
+      <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
+      <p className="text-xs text-muted-foreground mb-3">
+        Point at any OpenAI-compatible endpoint — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
+        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
+        (most local servers don't need one).
+      </p>
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
+        <div className="space-y-1.5 flex-1 min-w-[240px]">
+          <Label className="text-xs">Base URL</Label>
+          <Input
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            placeholder="http://127.0.0.1:11434/v1"
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Model</Label>
+          <Input
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            placeholder="qwen3:4b"
+            className="w-[180px] font-mono text-xs"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Display name</Label>
+          <Input
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder="optional"
+            className="w-[150px]"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">API key</Label>
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder="optional"
+            className="w-[150px] font-mono text-xs"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
+          {addCustom.isPending ? 'Adding…' : 'Add model'}
+        </Button>
+      </form>
+      {addCustom.isError && (
+        <p className="text-destructive text-xs mt-2">{(addCustom.error as Error).message}</p>
+      )}
+    </section>
+  )
+}
+
 export default function KeysPage() {
   const queryClient = useQueryClient()
   const [platform, setPlatform] = useState<Platform | ''>('')
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
+  const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -196,6 +298,41 @@ export default function KeysPage() {
     },
   })
 
+  const updateKey = useMutation({
+    mutationFn: ({ id, label }: { id: number; label: string }) =>
+      apiFetch(`/api/keys/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ label }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      setEditingKeyId(null)
+      setEditingLabel('')
+    },
+  })
+
+  function startEditing(key: ApiKey) {
+    setEditingKeyId(key.id)
+    setEditingLabel(key.label)
+  }
+
+  function cancelEditing() {
+    setEditingKeyId(null)
+    setEditingLabel('')
+  }
+
+  function saveEditing(id: number) {
+    if (editingLabel !== undefined) {
+      updateKey.mutate({ id, label: editingLabel })
+    }
+  }
+
+  useEffect(() => {
+    if (editingKeyId !== null && editInputRef.current) {
+      editInputRef.current.focus()
+    }
+  }, [editingKeyId])
+
   const needsAccountId = platform === 'cloudflare'
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -209,7 +346,7 @@ export default function KeysPage() {
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
 
-  const grouped = PLATFORMS.map(p => ({
+  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
   })).filter(p => p.keys.length > 0)
@@ -286,6 +423,8 @@ export default function KeysPage() {
           )}
         </section>
 
+        <CustomProviderSection />
+
         <section>
           <h2 className="text-sm font-medium mb-3">Configured providers</h2>
           {isLoading ? (
@@ -320,17 +459,40 @@ export default function KeysPage() {
                       const h = healthKeyMap.get(k.id)
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
+                      const isEditing = editingKeyId === k.id
                       return (
                         <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
                           <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
                           <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
-                          {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                          {isEditing ? (
+                            <Input
+                              ref={editInputRef}
+                              value={editingLabel}
+                              onChange={e => setEditingLabel(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') saveEditing(k.id)
+                                if (e.key === 'Escape') cancelEditing()
+                              }}
+                              onBlur={() => saveEditing(k.id)}
+                              className="h-6 w-[160px] text-xs"
+                              disabled={updateKey.isPending}
+                            />
+                          ) : (
+                            <>
+                              {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                            </>
+                          )}
                           <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
                               {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                          )}
+                          {!isEditing && (
+                            <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
+                              <Pencil className="size-3" />
+                            </Button>
                           )}
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                             Check

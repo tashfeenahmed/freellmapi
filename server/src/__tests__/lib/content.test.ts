@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contentToString, flattenMessageContent } from '../../lib/content.js';
+import { contentToString, flattenMessageContent, messageHasImage } from '../../lib/content.js';
 
 describe('contentToString', () => {
   it('passes strings through', () => {
@@ -19,7 +19,7 @@ describe('contentToString', () => {
     ])).toBe('hello world');
   });
 
-  it('drops non-text blocks silently (image_url etc.) — vision unsupported', () => {
+  it('drops non-text blocks (image_url etc.) — text-only providers flatten this way', () => {
     expect(contentToString([
       { type: 'text', text: 'describe ' },
       { type: 'image_url', image_url: { url: 'https://example.com/x.png' } },
@@ -59,5 +59,30 @@ describe('flattenMessageContent', () => {
       tool_call_id: 'call-1',
       name: 'fn',
     });
+  });
+});
+
+describe('messageHasImage', () => {
+  it('detects image_url blocks (OpenAI vision envelope)', () => {
+    expect(messageHasImage([
+      { role: 'user', content: [
+        { type: 'text', text: 'what is this?' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+      ] },
+    ])).toBe(true);
+  });
+
+  it('detects a bare image block type', () => {
+    expect(messageHasImage([
+      { role: 'user', content: [{ type: 'image', source: 'x' } as any] },
+    ])).toBe(true);
+  });
+
+  it('is false for string content and text-only arrays', () => {
+    expect(messageHasImage([{ role: 'user', content: 'hello' }])).toBe(false);
+    expect(messageHasImage([
+      { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+    ])).toBe(false);
+    expect(messageHasImage([{ role: 'assistant', content: null }])).toBe(false);
   });
 });

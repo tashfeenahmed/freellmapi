@@ -68,6 +68,7 @@ interface FallbackEntry {
   tpmLimit: number | null
   tpdLimit: number | null
   monthlyTokenBudget: string
+  supportsVision: boolean
   keyCount: number
 }
 
@@ -642,6 +643,7 @@ function TokenUsageBar({
         }`}>
         {displayModels.map((m, i) => {
           const hasLimits = m.rpmLimit != null || m.rpdLimit != null || m.tpmLimit != null || m.tpdLimit != null;
+          const supportsVision = displayEntries.find(e => e.modelDbId === m.modelDbId)?.supportsVision;
           return (
             <div
               key={i}
@@ -655,8 +657,16 @@ function TokenUsageBar({
                     style={{ backgroundColor: m.enabled ? (platformColors[m.platform] ?? '#94a3b8') : '#94a3b8' }}
                   />
                   <span className="truncate font-medium" title={m.displayName}>{m.displayName}</span>
+                  {supportsVision && (
+                    <span
+                      title="Accepts image input"
+                      className="text-[8px] font-bold rounded-full px-1 py-0 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400 shrink-0 leading-[10px] ml-0.5"
+                    >
+                      VIS
+                    </span>
+                  )}
                   {!m.enabled && (
-                    <span className="text-muted-foreground text-[10px] shrink-0">(off)</span>
+                    <span className="text-muted-foreground text-[10px] shrink-0 ml-0.5">(off)</span>
                   )}
                   {limitsMode === 'hover' && hasLimits && (
                     <Tooltip>
@@ -799,6 +809,14 @@ const SortableModelRow = memo(function SortableModelRow({
             <span className="size-2 rounded-full" style={{ backgroundColor: platformColors[entry.platform] ?? '#94a3b8' }} />
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{entry.platform}</span>
           </div>
+          {entry.supportsVision && (
+            <span
+              title="Accepts image input"
+              className="text-xs rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
+            >
+              Vision
+            </span>
+          )}
           {entry.penalty > 0 && (
             <span className="text-xs text-amber-600 dark:text-amber-400">
               −{entry.penalty} penalty
@@ -905,6 +923,14 @@ const SortableModelChip = memo(function SortableModelChip({
                   <span className="font-semibold text-[11px] text-foreground break-words whitespace-normal leading-tight" title={entry.displayName}>
                     {entry.displayName}
                   </span>
+                  {entry.supportsVision && (
+                    <span
+                      title="Accepts image input"
+                      className="text-[9px] font-bold rounded-full px-1.5 py-0 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400 shrink-0 leading-[12px]"
+                    >
+                      VIS
+                    </span>
+                  )}
                   {entry.penalty > 0 && (
                     <span className="text-[9px] text-amber-600 dark:text-amber-400 shrink-0 font-medium leading-none">
                       −{entry.penalty}
@@ -1055,6 +1081,14 @@ const SortableModelChip = memo(function SortableModelChip({
               <span className="font-semibold text-[11px] text-foreground break-words whitespace-normal leading-none py-0.5" title={entry.displayName}>
                 {entry.displayName}
               </span>
+              {entry.supportsVision && (
+                <span
+                  title="Accepts image input"
+                  className="text-[9px] font-bold rounded-full px-1.5 py-0 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400 shrink-0 leading-[12px]"
+                >
+                  VIS
+                </span>
+              )}
               {entry.penalty > 0 && (
                 <span className="text-[9px] text-amber-600 dark:text-amber-400 shrink-0 font-medium leading-none">
                   −{entry.penalty}

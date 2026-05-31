@@ -45,6 +45,28 @@ describe('GoogleProvider', () => {
     expect(result._routed_via?.platform).toBe('google');
   });
 
+  it('converts an image_url data URL into a Gemini inlineData part (#118)', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{ content: { parts: [{ text: 'a cat' }] }, finishReason: 'STOP' }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      }),
+    } as any);
+
+    await provider.chatCompletion('test-key', [
+      { role: 'user', content: [
+        { type: 'text', text: 'what is this?' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgo=' } },
+      ] as any },
+    ], 'gemini-2.5-flash');
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as any).body);
+    const parts = body.contents[0].parts;
+    expect(parts).toContainEqual({ text: 'what is this?' });
+    expect(parts).toContainEqual({ inlineData: { mimeType: 'image/png', data: 'iVBORw0KGgo=' } });
+  });
+
   it('should throw on API error', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: false,

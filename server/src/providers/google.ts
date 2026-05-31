@@ -14,6 +14,10 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 interface GeminiPart {
   text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
   thoughtSignature?: string;
   functionCall?: {
     id?: string;
@@ -130,10 +134,75 @@ function toGeminiToolConfig(toolChoice?: ChatToolChoice): { functionCallingConfi
   };
 }
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB cap on fetched/inlined images
+
+// Pull the URL out of an OpenAI image content block. Accepts both the object
+// form `{ image_url: { url } }` and the shorthand `{ image_url: '...' }`.
+function extractImageUrl(block: unknown): string | undefined {
+  const iu = (block as { image_url?: unknown })?.image_url;
+  if (typeof iu === 'string') return iu;
+  if (iu && typeof (iu as { url?: unknown }).url === 'string') return (iu as { url: string }).url;
+  return undefined;
+}
+
+// Convert an image URL to a Gemini inlineData part. Handles base64 `data:` URLs
+// directly; for `http(s)` URLs we fetch and inline because the Gemini API does
+// not fetch external URLs itself. Fetching a user-supplied URL is a minor SSRF
+// surface, acceptable for a single-user self-hosted proxy; we still restrict to
+// http/https and cap the size. Returns null (part skipped) on any failure.
+async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; data: string } | null> {
+  const dataMatch = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(url);
+  if (dataMatch) {
+    const mimeType = dataMatch[1] || 'application/octet-stream';
+    const isBase64 = Boolean(dataMatch[2]);
+    const payload = dataMatch[3] ?? '';
+    const data = isBase64
+      ? payload
+      : Buffer.from(decodeURIComponent(payload)).toString('base64');
+    return { mimeType, data };
+  }
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
+      const mimeType = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+      return { mimeType, data: buf.toString('base64') };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// Build Gemini parts for a user message: joined text first, then any images as
+// inlineData. Non-array content (string/null) collapses to a single text part.
+async function userContentToParts(content: ChatMessage['content']): Promise<GeminiPart[]> {
+  const parts: GeminiPart[] = [];
+  const text = contentToString(content);
+  if (text.length > 0) parts.push({ text });
+
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      const type = (block as { type?: string })?.type;
+      if (type !== 'image_url' && type !== 'image') continue;
+      const url = extractImageUrl(block);
+      if (!url) continue;
+      const inlineData = await imageUrlToInlineData(url);
+      if (inlineData) parts.push({ inlineData });
+    }
+  }
+
+  // Gemini rejects empty `parts`; keep at least one (possibly empty) text part.
+  if (parts.length === 0) parts.push({ text: '' });
+  return parts;
+}
+
 // Translate OpenAI messages to Gemini format. Content may arrive as a string,
-// null, or the OpenAI multimodal array envelope — flatten to string first so
-// system/user/tool messages all surface as `parts: [{ text }]` for Gemini.
-function toGeminiContents(messages: ChatMessage[]) {
+// null, or the OpenAI multimodal array envelope. System/assistant/tool messages
+// flatten to text; user messages additionally carry images as inlineData parts.
+async function toGeminiContents(messages: ChatMessage[]) {
   const systemMessages = messages
     .filter(m => m.role === 'system')
     .map(m => contentToString(m.content))
@@ -146,9 +215,9 @@ function toGeminiContents(messages: ChatMessage[]) {
     }
   }
 
-  const contents = messages
+  const contents = (await Promise.all(messages
     .filter(m => m.role !== 'system')
-    .map((m): { role: 'user' | 'model'; parts: GeminiPart[] } | null => {
+    .map(async (m): Promise<{ role: 'user' | 'model'; parts: GeminiPart[] } | null> => {
       if (m.role === 'assistant') {
         const parts: GeminiPart[] = [];
 
@@ -196,9 +265,9 @@ function toGeminiContents(messages: ChatMessage[]) {
 
       return {
         role: 'user',
-        parts: [{ text: contentToString(m.content) }],
+        parts: await userContentToParts(m.content),
       };
-    })
+    })))
     .filter((entry): entry is { role: 'user' | 'model'; parts: GeminiPart[] } => entry !== null);
 
   return {
@@ -250,7 +319,7 @@ export class GoogleProvider extends BaseProvider {
     modelId: string,
     options?: CompletionOptions,
   ): Promise<ChatCompletionResponse> {
-    const { contents, systemInstruction } = toGeminiContents(messages);
+    const { contents, systemInstruction } = await toGeminiContents(messages);
 
     const body: Record<string, unknown> = {
       contents,
@@ -313,7 +382,7 @@ export class GoogleProvider extends BaseProvider {
     modelId: string,
     options?: CompletionOptions,
   ): AsyncGenerator<ChatCompletionChunk> {
-    const { contents, systemInstruction } = toGeminiContents(messages);
+    const { contents, systemInstruction } = await toGeminiContents(messages);
 
     const body: Record<string, unknown> = {
       contents,

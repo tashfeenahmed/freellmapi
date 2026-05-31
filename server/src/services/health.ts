@@ -1,5 +1,5 @@
 import { getDb } from '../db/index.js';
-import { getProvider } from '../providers/index.js';
+import { resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import type { Platform, KeyStatus } from '@freellmapi/shared/types.js';
 
@@ -14,7 +14,7 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
   const row = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId) as any;
   if (!row) return 'error';
 
-  const provider = getProvider(row.platform as Platform);
+  const provider = resolveProvider(row.platform as Platform, row.base_url);
   if (!provider) return 'error';
 
   try {
