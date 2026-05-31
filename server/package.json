@@ -15,7 +15,7 @@
     "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "zod": "^3.24.4"
