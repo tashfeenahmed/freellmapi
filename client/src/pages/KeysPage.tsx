@@ -255,7 +255,21 @@ export default function KeysPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {PLATFORMS.map(p => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    <SelectItem key={p.value} value={p.value}>
+                      <span className="flex items-center justify-between w-full">
+                        <span>{p.label}</span>
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Get API key"
+                        >
+                          <ExternalLink className="size-3" />
+                        </a>
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -323,6 +337,16 @@ export default function KeysPage() {
                         disabled={togglePlatform.isPending}
                       />
                       <h3 className="text-sm font-medium">{group.label}</h3>
+                      <a
+                        href={group.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Get API key"
+                      >
+                        <ExternalLink className="size-3" />
+                      </a>
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
