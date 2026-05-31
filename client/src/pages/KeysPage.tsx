@@ -65,7 +65,7 @@ function UnifiedKeySection() {
   const [showKey, setShowKey] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const { data } = useQuery<{ apiKey: string }>({
+  const { data, isError } = useQuery<{ apiKey: string }>({
     queryKey: ['unified-key'],
     queryFn: () => apiFetch('/api/settings/api-key'),
   })
@@ -100,23 +100,31 @@ function UnifiedKeySection() {
           variant="ghost"
           size="sm"
           onClick={() => regenerate.mutate()}
-          disabled={regenerate.isPending}
+          disabled={regenerate.isPending || isError}
         >
           Regenerate
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-md select-all truncate tabular-nums">
-          {showKey ? apiKey : masked}
-        </code>
-        <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
-          {showKey ? 'Hide' : 'Show'}
-        </Button>
-        <Button variant="outline" size="sm" onClick={copy}>
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      </div>
+      {isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+          Can't reach the server on <code className="font-mono">{baseUrl.replace('/v1', '')}</code>. Make sure the
+          backend is running — <code className="font-mono">npm run dev</code> starts both, and the server logs print
+          under the <code className="font-mono">server</code> prefix.
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-md select-all truncate tabular-nums">
+            {showKey ? apiKey : masked}
+          </code>
+          <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
+            {showKey ? 'Hide' : 'Show'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={copy}>
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
         <span className="text-muted-foreground">Base URL</span>
