@@ -23,7 +23,7 @@ function isAutoModel(modelId: string | undefined): boolean {
 // Constant-time string comparison for the unified API key. Plain `===` leaks
 // length and per-character timing, which a network attacker could in principle
 // use to recover the key one byte at a time.
-function timingSafeStringEqual(provided: string, expected: string): boolean {
+export function timingSafeStringEqual(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   // Compare against a same-length buffer regardless of input length so the
@@ -50,7 +50,7 @@ function getSessionKey(messages: ChatMessage[]): string {
   return `${hash}:${messages.length > 2 ? 'multi' : 'single'}`;
 }
 
-function getStickyModel(messages: ChatMessage[]): number | undefined {
+export function getStickyModel(messages: ChatMessage[]): number | undefined {
   // Only apply sticky for multi-turn (has assistant messages = continuation)
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
@@ -68,7 +68,7 @@ function getStickyModel(messages: ChatMessage[]): number | undefined {
   return entry.modelDbId;
 }
 
-function setStickyModel(messages: ChatMessage[], modelDbId: number) {
+export function setStickyModel(messages: ChatMessage[], modelDbId: number) {
   const key = getSessionKey(messages);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
@@ -473,7 +473,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
 });
 
-function logRequest(
+export function logRequest(
   platform: string,
   modelId: string,
   keyId: number,
