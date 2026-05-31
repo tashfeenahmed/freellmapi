@@ -21,6 +21,13 @@ const addKeySchema = z.object({
   label: z.string().optional(),
 });
 
+const updateKeySchema = z.object({
+  enabled: z.boolean().optional(),
+  label: z.string().optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined, {
+  message: 'At least one of enabled or label must be provided',
+});
+
 // List all keys (masked)
 keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
@@ -115,7 +122,7 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
 
-// Toggle enable/disable
+// Update key (toggle enable/disable or edit label)
 keysRouter.patch('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -123,19 +130,37 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled } = req.body;
-  if (typeof enabled !== 'boolean') {
-    res.status(400).json({ error: { message: 'enabled must be a boolean' } });
+  const parsed = updateKeySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
     return;
   }
 
+  const { enabled, label } = parsed.data;
+  const updates: string[] = [];
+  const values: (string | number)[] = [];
+
+  if (enabled !== undefined) {
+    updates.push('enabled = ?');
+    values.push(enabled ? 1 : 0);
+  }
+  if (label !== undefined) {
+    updates.push('label = ?');
+    values.push(label);
+  }
+
+  values.push(id);
+
   const db = getDb();
-  const result = db.prepare('UPDATE api_keys SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id);
+  const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
   if (result.changes === 0) {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
 
-  res.json({ success: true, enabled });
+  const response: Record<string, unknown> = { success: true };
+  if (enabled !== undefined) response.enabled = enabled;
+  if (label !== undefined) response.label = label;
+  res.json(response);
 });

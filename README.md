@@ -9,6 +9,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+[![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 
 ![Fallback chain with per-provider token budget](repo-assets/fallback-chain.png)
 
@@ -23,6 +24,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, SambaNova, NVIDIA, Mistral
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
+- [Docker](#docker)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -92,18 +94,34 @@ PRs that add any of these are very welcome. See [Contributing](#contributing).
 
 ## Quick start
 
+**Recommended:** Docker Compose. It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
+
+**Prerequisites:** Docker, Docker Compose, OpenSSL.
+
+```bash
+git clone https://github.com/tashfeenahmed/freellmapi.git
+cd freellmapi
+
+# Generate an encryption key for at-rest key storage
+ENCRYPTION_KEY="$(openssl rand -hex 32)"
+printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
+
+docker compose up -d
+```
+
+Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+
+### Local development
+
 **Prerequisites:** Node.js 20+, npm.
 
 ```bash
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
 npm install
-
-# Generate an encryption key for at-rest key storage
 cp .env.example .env
-echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
-
-# Start server + dashboard together
+ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
+printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 npm run dev
 ```
 
@@ -113,12 +131,33 @@ database-stored development key when `DEV_MODE=true` and `NODE_ENV` is not
 
 Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
-For a production build:
+For a production build without Docker:
 
 ```bash
 npm run build
 node server/dist/index.js     # server + dashboard both served on :3001
 ```
+
+## Docker
+
+FreeLLMAPI publishes a single production image that contains the Express server and the built React dashboard:
+
+```bash
+docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # or pin a release, e.g. :v1.2.3
+```
+
+The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
+
+The included `docker-compose.yml` is the recommended install path:
+
+```bash
+docker compose up -d
+docker compose logs -f freellmapi
+```
+
+SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`. Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because provider keys are encrypted at rest.
+
+More Docker operations and examples live in [docker/README.md](./docker/README.md).
 
 ## Using the API
 
@@ -308,6 +347,7 @@ PRs should include a test, keep the existing test suite green, and match the `.e
 <a href="https://github.com/JammyJames1234"><img src="https://images.weserv.nl/?url=github.com/JammyJames1234.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@JammyJames1234" /></a>
 <a href="https://github.com/Sumit4codes"><img src="https://images.weserv.nl/?url=github.com/Sumit4codes.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@Sumit4codes" /></a>
 <a href="https://github.com/meliani"><img src="https://images.weserv.nl/?url=github.com/meliani.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@meliani" /></a>
+<a href="https://github.com/thedavidweng"><img src="https://images.weserv.nl/?url=github.com/thedavidweng.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@thedavidweng" /></a>
 
 ## Terms of Service review
 

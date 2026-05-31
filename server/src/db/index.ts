@@ -49,6 +49,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV12(db);
   migrateModelsV13(db);
   migrateModelsV14(db);
+  migrateModelsV15(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1261,6 +1262,27 @@ function migrateModelsV14(db: Database.Database) {
      WHERE platform = 'cerebras'
        AND model_id IN ('qwen-3-235b-a22b-instruct-2507', 'llama3.1-8b')
   `).run();
+}
+
+/**
+ * V15 (May 2026): purge SiliconFlow.
+ *
+ * SiliconFlow was briefly added (#131) on the belief Qwen/Qwen3-8B was a $0
+ * "free model". Re-verification showed it is PAID ($0.06/M in+out): the
+ * account balance dropped 0.9999 -> 0.9998 across ~2.7K tokens, and the
+ * official pricing page lists it at $0.06/M. The earlier "zero-cost" read was
+ * a 4-decimal rounding artifact on a tiny call. SiliconFlow's .com endpoint is
+ * a one-time $1 trial credit, not a recurring free tier — same disqualifier
+ * as Chutes — so the provider was reverted. This removes any orphaned row from
+ * a DB that already ran the original V15. No-op on DBs that never had it.
+ */
+function migrateModelsV15(db: Database.Database) {
+  db.prepare(`
+    DELETE FROM fallback_config WHERE model_db_id IN (
+      SELECT id FROM models WHERE platform = 'siliconflow'
+    )
+  `).run();
+  db.prepare(`DELETE FROM models WHERE platform = 'siliconflow'`).run();
 }
 
 function ensureUnifiedKey(db: Database.Database) {
