@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
+import { Pencil } from 'lucide-react'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'google', label: 'Google AI Studio' },
@@ -133,6 +134,9 @@ export default function KeysPage() {
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
   const [label, setLabel] = useState('')
+  const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -195,6 +199,41 @@ export default function KeysPage() {
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
   })
+
+  const updateKey = useMutation({
+    mutationFn: ({ id, label }: { id: number; label: string }) =>
+      apiFetch(`/api/keys/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ label }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      setEditingKeyId(null)
+      setEditingLabel('')
+    },
+  })
+
+  function startEditing(key: ApiKey) {
+    setEditingKeyId(key.id)
+    setEditingLabel(key.label)
+  }
+
+  function cancelEditing() {
+    setEditingKeyId(null)
+    setEditingLabel('')
+  }
+
+  function saveEditing(id: number) {
+    if (editingLabel !== undefined) {
+      updateKey.mutate({ id, label: editingLabel })
+    }
+  }
+
+  useEffect(() => {
+    if (editingKeyId !== null && editInputRef.current) {
+      editInputRef.current.focus()
+    }
+  }, [editingKeyId])
 
   const needsAccountId = platform === 'cloudflare'
 
@@ -320,17 +359,40 @@ export default function KeysPage() {
                       const h = healthKeyMap.get(k.id)
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
+                      const isEditing = editingKeyId === k.id
                       return (
                         <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
                           <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
                           <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
-                          {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                          {isEditing ? (
+                            <Input
+                              ref={editInputRef}
+                              value={editingLabel}
+                              onChange={e => setEditingLabel(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') saveEditing(k.id)
+                                if (e.key === 'Escape') cancelEditing()
+                              }}
+                              onBlur={() => saveEditing(k.id)}
+                              className="h-6 w-[160px] text-xs"
+                              disabled={updateKey.isPending}
+                            />
+                          ) : (
+                            <>
+                              {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                            </>
+                          )}
                           <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
                               {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                          )}
+                          {!isEditing && (
+                            <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
+                              <Pencil className="size-3" />
+                            </Button>
                           )}
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                             Check
