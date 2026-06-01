@@ -5,6 +5,7 @@ import type {
   ChatToolCall,
   ChatToolChoice,
   ChatToolDefinition,
+  ReasoningEffort,
   TokenUsage,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, type CompletionOptions } from './base.js';
@@ -14,6 +15,7 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 interface GeminiPart {
   text?: string;
+  thought?: boolean;
   inlineData?: {
     mimeType: string;
     data: string;
@@ -41,7 +43,74 @@ interface GeminiResponse {
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
     totalTokenCount?: number;
+  };
+}
+
+const GEMINI_THINKING_BUDGETS: Record<ReasoningEffort, number> = {
+  minimal: 512,
+  low: 1024,
+  medium: 8192,
+  high: 24576,
+};
+
+const GEMINI_THINKING_LEVELS: Record<ReasoningEffort, string> = {
+  minimal: 'MINIMAL',
+  low: 'LOW',
+  medium: 'MEDIUM',
+  high: 'HIGH',
+};
+
+function isGemini3Model(modelId: string): boolean {
+  return /^gemini-3\./i.test(modelId);
+}
+
+function isGemini31Pro(modelId: string): boolean {
+  return /^gemini-3\.1-pro(?:$|[-:])/i.test(modelId);
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(Math.max(n, min), max);
+}
+
+function thinkingBudgetFor(modelId: string, effort: ReasoningEffort): number {
+  const normalized = modelId.toLowerCase();
+  const baseBudget = effort === 'minimal' && normalized.includes('pro')
+    ? 128
+    : GEMINI_THINKING_BUDGETS[effort];
+
+  if (normalized.includes('gemini-2.5-pro')) {
+    return clamp(baseBudget, 128, 24576);
+  }
+
+  if (normalized.includes('flash-lite')) {
+    return clamp(baseBudget, 512, 24576);
+  }
+
+  if (normalized.includes('flash')) {
+    return clamp(baseBudget, 0, 24576);
+  }
+
+  return clamp(baseBudget, 0, 24576);
+}
+
+function toGeminiThinkingConfig(modelId: string, effort?: ReasoningEffort): Record<string, unknown> | undefined {
+  if (!effort) return undefined;
+
+  if (isGemini3Model(modelId)) {
+    const thinkingLevel = effort === 'minimal' && isGemini31Pro(modelId)
+      ? 'LOW'
+      : GEMINI_THINKING_LEVELS[effort];
+    return {
+      thinkingLevel,
+      includeThoughts: true,
+    };
+  }
+
+  return {
+    thinkingBudget: thinkingBudgetFor(modelId, effort),
+    includeThoughts: true,
   };
 }
 
@@ -301,9 +370,10 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
   return calls;
 }
 
-function extractText(parts: GeminiPart[] | undefined): string | null {
+function extractText(parts: GeminiPart[] | undefined, thought: boolean): string | null {
   if (!parts) return null;
   const text = parts
+    .filter(p => Boolean(p.thought) === thought)
     .map(p => p.text ?? '')
     .join('');
   return text.length > 0 ? text : null;
@@ -327,6 +397,7 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        thinkingConfig: toGeminiThinkingConfig(modelId, options?.reasoning_effort),
       },
       tools: toGeminiTools(options?.tools),
       toolConfig: toGeminiToolConfig(options?.tool_choice),
@@ -349,12 +420,16 @@ export class GoogleProvider extends BaseProvider {
     const candidate = data.candidates?.[0];
     const parts = candidate?.content?.parts;
     const toolCalls = extractToolCalls(parts);
-    const text = extractText(parts);
+    const text = extractText(parts, false);
+    const reasoningText = extractText(parts, true);
 
     const usage: TokenUsage = {
       prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
       completion_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
       total_tokens: data.usageMetadata?.totalTokenCount ?? 0,
+      ...(typeof data.usageMetadata?.thoughtsTokenCount === 'number'
+        ? { completion_tokens_details: { reasoning_tokens: data.usageMetadata.thoughtsTokenCount } }
+        : {}),
     };
 
     return {
@@ -367,6 +442,7 @@ export class GoogleProvider extends BaseProvider {
         message: {
           role: 'assistant',
           content: text,
+          ...(reasoningText ? { reasoning_content: reasoningText } : {}),
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
         },
         finish_reason: toolCalls.length > 0 ? 'tool_calls' : toGeminiFinishReason(candidate?.finishReason),
@@ -390,6 +466,7 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        thinkingConfig: toGeminiThinkingConfig(modelId, options?.reasoning_effort),
       },
       tools: toGeminiTools(options?.tools),
       toolConfig: toGeminiToolConfig(options?.tool_choice),
@@ -461,7 +538,8 @@ export class GoogleProvider extends BaseProvider {
         const candidate = chunk.candidates?.[0];
         const parts = candidate?.content?.parts ?? [];
 
-        const text = extractText(parts);
+        const text = extractText(parts, false);
+        const reasoningText = extractText(parts, true);
         const toolCalls = extractToolCalls(parts).filter(call => {
           const key = `${call.id}:${call.function.name}:${call.function.arguments}`;
           if (seenToolCallKeys.has(key)) return false;
@@ -469,7 +547,7 @@ export class GoogleProvider extends BaseProvider {
           return true;
         });
 
-        if ((text && text.length > 0) || toolCalls.length > 0) {
+        if ((text && text.length > 0) || (reasoningText && reasoningText.length > 0) || toolCalls.length > 0) {
           sawToolCalls = sawToolCalls || toolCalls.length > 0;
           yield {
             id,
@@ -480,6 +558,7 @@ export class GoogleProvider extends BaseProvider {
               index: 0,
               delta: {
                 ...(text ? { content: text } : {}),
+                ...(reasoningText ? { reasoning_content: reasoningText } : {}),
                 ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
               },
               finish_reason: null,

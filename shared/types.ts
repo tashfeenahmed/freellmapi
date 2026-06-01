@@ -118,10 +118,12 @@ export type ChatToolChoice =
 // (Cohere, Cloudflare). See server/src/lib/content.ts.
 export type ChatContentBlock = { type: string; text?: string; [key: string]: unknown };
 export type ChatContent = string | null | ChatContentBlock[];
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: ChatContent;
+  reasoning_content?: string;
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];
@@ -137,6 +139,7 @@ export interface ChatCompletionRequest {
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
+  reasoning_effort?: ReasoningEffort;
 }
 
 export interface ChatCompletionChoice {
@@ -149,6 +152,9 @@ export interface TokenUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  completion_tokens_details?: {
+    reasoning_tokens?: number;
+  };
 }
 
 export interface ChatCompletionResponse {
@@ -174,6 +180,7 @@ export interface ChatCompletionChunk {
     delta: {
       role?: 'assistant';
       content?: string;
+      reasoning_content?: string;
       tool_calls?: ChatToolCall[];
     };
     finish_reason: string | null;

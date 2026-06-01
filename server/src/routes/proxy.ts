@@ -203,6 +203,8 @@ const toolChoiceSchema = z.union([
   }),
 ]);
 
+const reasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+
 const chatCompletionSchema = z.object({
   messages: z.array(z.union([
     systemMessageSchema,
@@ -218,6 +220,7 @@ const chatCompletionSchema = z.object({
   tools: z.array(toolDefinitionSchema).optional(),
   tool_choice: toolChoiceSchema.optional(),
   parallel_tool_calls: z.boolean().optional(),
+  reasoning_effort: reasoningEffortSchema.optional(),
 });
 
 export function isRetryableError(err: any): boolean {
@@ -280,7 +283,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
+  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls, reasoning_effort } = parsed.data;
   const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
     if (m.role === 'assistant') {
       return {
@@ -410,7 +413,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, reasoning_effort },
           );
 
           for await (const chunk of gen) {
@@ -459,7 +462,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, reasoning_effort },
         );
 
         const totalTokens = result.usage?.total_tokens ?? 0;

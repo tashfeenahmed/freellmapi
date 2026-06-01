@@ -4,6 +4,7 @@ import type {
   ChatCompletionChunk,
   ChatToolDefinition,
   ChatToolChoice,
+  ReasoningEffort,
   Platform,
 } from '@freellmapi/shared/types.js';
 
@@ -15,6 +16,7 @@ export interface CompletionOptions {
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
+  reasoning_effort?: ReasoningEffort;
 }
 
 export abstract class BaseProvider {
