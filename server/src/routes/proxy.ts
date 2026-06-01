@@ -3,10 +3,10 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
+import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, type RouteResult } from '../services/router.js';
+import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
-import { contentToString } from '../lib/content.js';
+import { contentToString, messageHasImage } from '../lib/content.js';
 
 export const proxyRouter = Router();
 
@@ -23,7 +23,7 @@ function isAutoModel(modelId: string | undefined): boolean {
 // Constant-time string comparison for the unified API key. Plain `===` leaks
 // length and per-character timing, which a network attacker could in principle
 // use to recover the key one byte at a time.
-function timingSafeStringEqual(provided: string, expected: string): boolean {
+export function timingSafeStringEqual(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   // Compare against a same-length buffer regardless of input length so the
@@ -31,6 +31,22 @@ function timingSafeStringEqual(provided: string, expected: string): boolean {
   // end is what actually decides equality when lengths differ.
   const compareA = a.length === b.length ? a : Buffer.alloc(b.length);
   return crypto.timingSafeEqual(compareA, b) && a.length === b.length;
+}
+
+// Extract the unified API key from an incoming request. Accepts both the
+// OpenAI-style `Authorization: Bearer <key>` header and the Anthropic-style
+// `x-api-key` header. Clients that speak the Anthropic wire format — notably
+// Claude Code routed through CC Switch (#103) — send the key in `x-api-key`
+// rather than a bearer token, and were getting a spurious "Invalid API key"
+// 401 before this fallback existed.
+export function extractApiToken(req: Request): string | undefined {
+  const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
+  if (bearer) return bearer;
+
+  const apiKeyHeader = req.headers['x-api-key'];
+  const xApiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+  const trimmed = xApiKey?.trim();
+  return trimmed || undefined;
 }
 
 // Sticky sessions: track which model served each "session"
@@ -50,7 +66,7 @@ function getSessionKey(messages: ChatMessage[]): string {
   return `${hash}:${messages.length > 2 ? 'multi' : 'single'}`;
 }
 
-function getStickyModel(messages: ChatMessage[]): number | undefined {
+export function getStickyModel(messages: ChatMessage[]): number | undefined {
   // Only apply sticky for multi-turn (has assistant messages = continuation)
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
@@ -68,7 +84,7 @@ function getStickyModel(messages: ChatMessage[]): number | undefined {
   return entry.modelDbId;
 }
 
-function setStickyModel(messages: ChatMessage[], modelDbId: number) {
+export function setStickyModel(messages: ChatMessage[], modelDbId: number) {
   const key = getSessionKey(messages);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
@@ -187,6 +203,8 @@ const toolChoiceSchema = z.union([
   }),
 ]);
 
+const reasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+
 const chatCompletionSchema = z.object({
   messages: z.array(z.union([
     systemMessageSchema,
@@ -202,6 +220,7 @@ const chatCompletionSchema = z.object({
   tools: z.array(toolDefinitionSchema).optional(),
   tool_choice: toolChoiceSchema.optional(),
   parallel_tool_calls: z.boolean().optional(),
+  reasoning_effort: reasoningEffortSchema.optional(),
 });
 
 export function isRetryableError(err: any): boolean {
@@ -227,13 +246,23 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('api error 400');
 }
 
+// Pull the incremental text out of a streaming chunk for token counting.
+// Must tolerate chunks that carry no `choices` array at all: some providers
+// (e.g. Groq) emit usage/keepalive frames shaped like `{usage:{...}}` with no
+// `choices`. Indexing `chunk.choices[0]` on those throws "Cannot read
+// properties of undefined (reading '0')", which — once the SSE stream has
+// started — aborts the response mid-flight with no chance to fall back.
+export function streamChunkText(chunk: any): string {
+  return chunk?.choices?.[0]?.delta?.content ?? '';
+}
+
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
   // Authenticate with the unified API key for every proxy request, including
   // loopback callers. Browser pages can reach localhost, so socket locality is
   // not a reliable authorization boundary.
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
   if (!token || !timingSafeStringEqual(token, unifiedKey)) {
     res.status(401).json({
@@ -254,7 +283,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
+  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls, reasoning_effort } = parsed.data;
   const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
     if (m.role === 'assistant') {
       return {
@@ -296,7 +325,27 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     const text = contentToString(m.content);
     return sum + Math.ceil(text.length / 4);
   }, 0);
-  const estimatedTotal = estimatedInputTokens + (max_tokens ?? 1000);
+
+  // Image requests must route to a vision-capable model. Reject up front with a
+  // clear message when none is enabled, rather than silently dropping the image
+  // or surfacing the generic "all models exhausted" error (#118, #125). Add a
+  // rough per-image token cost so budget routing isn't skewed by content the
+  // heuristic above (text-only) can't see.
+  const hasImage = messageHasImage(messages);
+  if (hasImage && !hasEnabledVisionModel()) {
+    res.status(422).json({
+      error: {
+        message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
+        type: 'invalid_request_error',
+        code: 'no_vision_model',
+      },
+    });
+    return;
+  }
+  const IMAGE_TOKEN_ESTIMATE = 1000;
+  const imageCount = messages.reduce((n, m) =>
+    n + (Array.isArray(m.content) ? m.content.filter(b => (b as { type?: string })?.type === 'image_url' || (b as { type?: string })?.type === 'image').length : 0), 0);
+  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + (max_tokens ?? 1000);
 
   // Explicit `model` field pins routing. If the catalog has no enabled row
   // matching the requested id, return 400 — silently auto-routing to a
@@ -334,7 +383,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -364,7 +413,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, reasoning_effort },
           );
 
           for await (const chunk of gen) {
@@ -376,7 +425,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
               streamStarted = true;
             }
-            const text = chunk.choices[0]?.delta?.content ?? '';
+            const text = streamChunkText(chunk);
             totalOutputTokens += Math.ceil(text.length / 4);
             res.write(`data: ${JSON.stringify(chunk)}\n\n`);
           }
@@ -413,7 +462,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, reasoning_effort },
         );
 
         const totalTokens = result.usage?.total_tokens ?? 0;
@@ -445,7 +494,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.platform,
           route.modelId,
           route.keyId,
-          getNextCooldownDuration(route.platform, route.modelId, route.keyId),
+          getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, {
+            rpd: route.rpdLimit,
+            tpd: route.tpdLimit,
+          }),
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
@@ -473,7 +525,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
 });
 
-function logRequest(
+export function logRequest(
   platform: string,
   modelId: string,
   keyId: number,
