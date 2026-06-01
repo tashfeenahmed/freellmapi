@@ -7,6 +7,7 @@ import {
   recordTokens,
   getRateLimitStatus,
   getNextCooldownDuration,
+  getCooldownDurationForLimit,
 } from '../../services/ratelimit.js';
 
 function removeDbFile(dbPath: string) {
@@ -112,6 +113,39 @@ describe('Rate Limiter', () => {
       expect(getNextCooldownDuration('groq', `m-${id}`, id)).toBe(2 * 60 * 1000);
       expect(getNextCooldownDuration('groq', `m-${id}`, id + 1)).toBe(2 * 60 * 1000);
       expect(getNextCooldownDuration('groq', `m-${id}-other`, id)).toBe(2 * 60 * 1000);
+    });
+  });
+
+  describe('getCooldownDurationForLimit (daily vs transient 429)', () => {
+    it('uses a short, non-escalating cooldown when the daily quota is NOT exhausted', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      const args = ['groq', `transient-${id}`, id] as const;
+      // groq-like: large daily quota, no requests recorded yet → transient (TPM/RPM)
+      // 429s must stay at the short fixed cooldown and never escalate.
+      expect(getCooldownDurationForLimit(...args, { rpd: 1000, tpd: null })).toBe(90 * 1000);
+      expect(getCooldownDurationForLimit(...args, { rpd: 1000, tpd: null })).toBe(90 * 1000);
+      expect(getCooldownDurationForLimit(...args, { rpd: 1000, tpd: null })).toBe(90 * 1000);
+    });
+
+    it('treats a null daily limit as never-exhausted (always transient)', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      for (let i = 0; i < 50; i++) recordRequest('mistral', `nolimit-${id}`, id);
+      expect(
+        getCooldownDurationForLimit('mistral', `nolimit-${id}`, id, { rpd: null, tpd: null }),
+      ).toBe(90 * 1000);
+    });
+
+    it('escalates only once the daily request limit is actually reached', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      const platform = 'openrouter';
+      const model = `daily-${id}`;
+      // Below the daily limit → still transient.
+      recordRequest(platform, model, id);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: 5, tpd: null })).toBe(90 * 1000);
+      // Reach the daily limit → now it escalates (2m, then 10m, ...).
+      for (let i = 0; i < 5; i++) recordRequest(platform, model, id);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: 5, tpd: null })).toBe(2 * 60 * 1000);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: 5, tpd: null })).toBe(10 * 60 * 1000);
     });
   });
 

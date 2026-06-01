@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getNextCooldownDuration } from '../services/ratelimit.js';
+import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage } from '../lib/content.js';
 
@@ -491,7 +491,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.platform,
           route.modelId,
           route.keyId,
-          getNextCooldownDuration(route.platform, route.modelId, route.keyId),
+          getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, {
+            rpd: route.rpdLimit,
+            tpd: route.tpdLimit,
+          }),
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;

@@ -233,6 +233,39 @@ export function getNextCooldownDuration(platform: string, modelId: string, keyId
   return COOLDOWN_DURATIONS[idx]!;
 }
 
+// Short cooldown for a transient (per-minute) 429 — recovers within ~one window.
+const TRANSIENT_COOLDOWN_MS = 90 * 1000;
+
+// Decide how long to bench a model+key after an upstream 429. Escalate to the
+// long quarantine (getNextCooldownDuration, up to 24h) ONLY when the model is
+// genuinely at its DAILY limit (RPD or TPD) — that won't recover until the
+// provider's daily reset, so a long bench avoids hammering a truly-dead key.
+//
+// A transient RPM/TPM 429 gets a short fixed cooldown and does NOT count toward
+// escalation. This is the common case for providers with a tight per-minute
+// token budget but a large daily quota — e.g. groq gpt-oss-120b has rpd=1000
+// yet tpm=8000, so a single burst of large prompts 429s on TPM while the daily
+// quota is barely touched. Without this split, those transient bursts escalated
+// (2m → 10m → 1h → 24h) and quarantined a perfectly healthy provider for the
+// rest of the day. Daily counters are persisted (countPersistedRequests /
+// sumPersistedTokens), so this verdict is stable across restarts.
+export function getCooldownDurationForLimit(
+  platform: string,
+  modelId: string,
+  keyId: number,
+  limits: { rpd: number | null; tpd: number | null },
+): number {
+  const now = Date.now();
+  const rpdExhausted =
+    limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
+  const tpdExhausted =
+    limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
+  if (rpdExhausted || tpdExhausted) {
+    return getNextCooldownDuration(platform, modelId, keyId);
+  }
+  return TRANSIENT_COOLDOWN_MS;
+}
+
 function persistedCooldownExpiry(
   platform: string,
   modelId: string,

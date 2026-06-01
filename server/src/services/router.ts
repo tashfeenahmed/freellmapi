@@ -41,6 +41,10 @@ export interface RouteResult {
   keyId: number;
   platform: string;
   displayName: string;
+  // Daily limits for this model, so a 429 handler can tell a genuine daily
+  // exhaustion (escalate the cooldown) from a transient per-minute spike.
+  rpdLimit: number | null;
+  tpdLimit: number | null;
 }
 
 // Round-robin index per platform
@@ -233,6 +237,8 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
         keyId: key.id,
         platform: model.platform,
         displayName: model.display_name,
+        rpdLimit: limits.rpd,
+        tpdLimit: limits.tpd,
       };
     }
 
