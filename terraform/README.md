@@ -75,16 +75,31 @@ and OCI won't let you set a shorter validity. So the live deployment uses a
 
 1. DNS-01 issuance (DNS on Cloudflare): `certbot certonly --dns-cloudflare
    --dns-cloudflare-credentials <token.ini> -d freeai.punkadillo.com`.
-2. Import to the LB as an LB-local cert + point the 443 listener at it:
-   `oci lb certificate create … --certificate-name letsencrypt-freeai …` then
-   `oci lb listener update … --ssl-certificate-name letsencrypt-freeai`.
-3. The listener (`loadbalancer.tf`) uses `certificate_name = var.tls_lb_certificate_name`
-   with `ignore_changes = [ssl_configuration]`, so 60-day renewals (certbot +
-   the `deploy-hook` that re-imports a freshly-named cert and repoints the
-   listener) don't show as drift or get reverted by `apply`.
+2. Import the LE cert into the **Certificate service** as an IMPORTED cert
+   (`oci certs-mgmt certificate create-by-importing-config`) → a **stable OCID**.
+3. The listener (`loadbalancer.tf`) references it via `certificate_ids =
+   [var.tls_server_certificate_id]`. Renewal updates the cert *version* in place
+   (`oci certs-mgmt certificate update-certificate-by-importing-config-details`,
+   from the certbot `deploy-hook`), so the OCID — and thus the listener — never
+   changes. No drift, no `ignore_changes`.
 
-Result: real padlock on every device, no client-side CA bundle. The private-CA
-resources in `certificates.tf` remain as the non-public fallback.
+Result: real padlock on every device, no client-side CA bundle.
+
+### Client-cert auth (mTLS)
+
+Access is gated by a **client certificate**, not IP (works through a VPN whose IP
+changes). The listener sets `verify_peer_certificate = true` +
+`trusted_certificate_authority_ids = [var.tls_client_ca_bundle_id]`, where the CA
+bundle holds a private **client CA** (openssl). A client cert signed by it is
+installed on each allowed device; everyone else is rejected at the TLS handshake
+(HTTP 400). The NSG can therefore be open (`lb_ingress_cidrs = ["0.0.0.0/0"]`).
+The client CA + cert live outside the repo in `~/.secrets/freellmapi-mtls/`.
+
+Note: OCI won't mix an LB-local server cert (`certificate_name`) with cert-service
+client-CA trust — both must be cert-service (`certificate_ids` +
+`trusted_certificate_authority_ids`), and the trusted-CA field can only be set via
+Terraform (the `oci lb listener update` CLI lacks the flag). The private-CA
+resources in `certificates.tf` remain an unused fallback.
 
 ## Enable observability (Phases 6/7)
 

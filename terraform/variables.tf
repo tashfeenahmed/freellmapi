@@ -159,12 +159,27 @@ variable "domain_name" {
 
 variable "tls_lb_certificate_name" {
   type        = string
-  description = <<-EOT
-    Name of the LB-local TLS certificate the HTTPS listener uses. The Let's
-    Encrypt cert is imported under this name by certbot + the oci CLI; renewal
-    rotates it (and ssl_configuration is ignore_changes'd so apply won't revert).
-  EOT
+  description = "Legacy: LB-local cert name (pre-mTLS). Unused now that the listener uses the cert-service model; kept for reference."
   default     = "letsencrypt-freeai"
+}
+
+variable "tls_server_certificate_id" {
+  type        = string
+  description = <<-EOT
+    OCID of the Certificate-service IMPORTED certificate (the Let's Encrypt
+    server cert). Created/renewed out-of-band via
+    `oci certs-mgmt certificate (create|update)-...-importing-config`; the OCID
+    is stable across renewals (only the version changes).
+  EOT
+}
+
+variable "tls_client_ca_bundle_id" {
+  type        = string
+  description = <<-EOT
+    OCID of the Certificate-service CA bundle holding the private CLIENT CA.
+    Clients must present a cert signed by it (mTLS). Created with
+    `oci certs-mgmt ca-bundle create`.
+  EOT
 }
 
 variable "ca_common_name" {

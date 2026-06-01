@@ -44,11 +44,14 @@ resource "oci_load_balancer_backend" "be" {
 }
 
 # HTTPS listener — TLS terminates here; the instance stays plain HTTP on 3001.
-# The cert is a Let's Encrypt LB-local certificate (publicly trusted → browser
-# padlock), created and ROTATED out-of-band by certbot + the oci CLI on renewal.
-# ssl_configuration is therefore ignored: renewal swaps the cert name, and we
-# don't want `apply` to revert it. (The private-CA resources in certificates.tf
-# are no longer wired to the listener; kept only as the non-public fallback.)
+# Cert-service model (required for mTLS):
+#   - server cert = the Let's Encrypt cert IMPORTED into the Certificates service
+#     (var.tls_server_certificate_id). Stable OCID; renewal updates the cert
+#     VERSION in place (`oci certs-mgmt certificate update-...-importing-config`),
+#     so the listener never changes — no drift, no ignore_changes needed.
+#   - mTLS: verify_peer_certificate + trusted_certificate_authority_ids points at
+#     a CA bundle (var.tls_client_ca_bundle_id) of our private client CA, so only
+#     clients presenting a cert signed by it can connect (IP-independent).
 resource "oci_load_balancer_listener" "https" {
   count                    = var.enable_https ? 1 : 0
   load_balancer_id         = oci_load_balancer_load_balancer.lb.id
@@ -58,12 +61,10 @@ resource "oci_load_balancer_listener" "https" {
   protocol                 = "HTTP"
 
   ssl_configuration {
-    certificate_name        = var.tls_lb_certificate_name
-    verify_peer_certificate = false
-  }
-
-  lifecycle {
-    ignore_changes = [ssl_configuration]
+    certificate_ids                   = [var.tls_server_certificate_id]
+    verify_peer_certificate           = true
+    verify_depth                      = 2
+    trusted_certificate_authority_ids = [var.tls_client_ca_bundle_id]
   }
 }
 
