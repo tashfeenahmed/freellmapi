@@ -130,15 +130,24 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
  * Models are sorted by (base_priority + rate_limit_penalty) so frequently
  * rate-limited models automatically sink below working ones.
  *
- * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
+ * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions)
+ * unless strictPreferred is true, in which case only that model is considered
+ * (explicit model pinning).
  * This prevents hallucination from model switching mid-conversation.
  *
  * @param estimatedTokens - estimated total tokens for rate limit check
  * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
- * @param preferredModelDbId - try this model first (sticky session)
+ * @param preferredModelDbId - try this model first
  * @param requireVision - only consider models that accept image input (#118)
+ * @param strictPreferred - only consider preferredModelDbId; used for explicit model requests
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false): RouteResult {
+export function routeRequest(
+  estimatedTokens = 1000,
+  skipKeys?: Set<string>,
+  preferredModelDbId?: number,
+  requireVision = false,
+  strictPreferred = false,
+): RouteResult {
   const db = getDb();
 
   // Get fallback chain ordered by priority
@@ -154,10 +163,19 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     effectivePriority: entry.priority + getPenalty(entry.model_db_id),
   })).sort((a, b) => a.effectivePriority - b.effectivePriority);
 
-  // Sticky session: move preferred model to front of chain
+  // Preferred model: sticky sessions move it to the front; explicit `model`
+  // requests set strictPreferred and must not silently route elsewhere.
   if (preferredModelDbId) {
     const idx = sortedChain.findIndex(e => e.model_db_id === preferredModelDbId);
-    if (idx > 0) {
+    if (strictPreferred) {
+      if (idx >= 0) {
+        const [preferred] = sortedChain.splice(idx, 1);
+        sortedChain.length = 0;
+        sortedChain.push(preferred);
+      } else {
+        sortedChain.length = 0;
+      }
+    } else if (idx > 0) {
       const [preferred] = sortedChain.splice(idx, 1);
       sortedChain.unshift(preferred);
     }

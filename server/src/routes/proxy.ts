@@ -7,6 +7,7 @@ import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel,
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage } from '../lib/content.js';
+import { extractApiToken, logRequest, timingSafeStringEqual } from '../lib/proxyShared.js';
 
 export const proxyRouter = Router();
 
@@ -18,35 +19,6 @@ const AUTO_MODEL_ID = 'auto';
 
 function isAutoModel(modelId: string | undefined): boolean {
   return modelId === AUTO_MODEL_ID;
-}
-
-// Constant-time string comparison for the unified API key. Plain `===` leaks
-// length and per-character timing, which a network attacker could in principle
-// use to recover the key one byte at a time.
-export function timingSafeStringEqual(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  // Compare against a same-length buffer regardless of input length so the
-  // comparison itself runs in constant time; the explicit length check at the
-  // end is what actually decides equality when lengths differ.
-  const compareA = a.length === b.length ? a : Buffer.alloc(b.length);
-  return crypto.timingSafeEqual(compareA, b) && a.length === b.length;
-}
-
-// Extract the unified API key from an incoming request. Accepts both the
-// OpenAI-style `Authorization: Bearer <key>` header and the Anthropic-style
-// `x-api-key` header. Clients that speak the Anthropic wire format — notably
-// Claude Code routed through CC Switch (#103) — send the key in `x-api-key`
-// rather than a bearer token, and were getting a spurious "Invalid API key"
-// 401 before this fallback existed.
-export function extractApiToken(req: Request): string | undefined {
-  const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
-  if (bearer) return bearer;
-
-  const apiKeyHeader = req.headers['x-api-key'];
-  const xApiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
-  const trimmed = xApiKey?.trim();
-  return trimmed || undefined;
 }
 
 // Sticky sessions: track which model served each "session"
@@ -349,6 +321,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
+  let strictPreferredModel = false;
   if (isAutoModel(requestedModel)) {
     // Explicit "auto" → behave exactly like an omitted model field.
     preferredModel = getStickyModel(messages);
@@ -357,6 +330,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
       preferredModel = enabled.id;
+      strictPreferredModel = true;
     } else {
       const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
@@ -380,7 +354,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, strictPreferredModel);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -521,24 +495,3 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     },
   });
 });
-
-export function logRequest(
-  platform: string,
-  modelId: string,
-  keyId: number,
-  status: string,
-  inputTokens: number,
-  outputTokens: number,
-  latencyMs: number,
-  error: string | null,
-) {
-  try {
-    const db = getDb();
-    db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error);
-  } catch (e) {
-    console.error('Failed to log request:', e);
-  }
-}

@@ -59,6 +59,18 @@ describe('Keys API', () => {
     expect(body.maskedKey).toContain('...');
   });
 
+  it('POST /api/keys accepts Agnes AI keys', async () => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform: 'agnes',
+      key: 'agnes_test123456789',
+      label: 'My Agnes Key',
+    });
+
+    expect(status).toBe(201);
+    expect(body.platform).toBe('agnes');
+    expect(body.label).toBe('My Agnes Key');
+  });
+
   it('GET /api/keys returns the created key', async () => {
     // First create a key
     await request(app, 'POST', '/api/keys', {

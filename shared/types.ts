@@ -22,6 +22,7 @@ export type Platform =
   | 'pollinations'
   | 'llm7'
   | 'huggingface'
+  | 'agnes'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

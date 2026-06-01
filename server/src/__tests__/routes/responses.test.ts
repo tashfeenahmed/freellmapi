@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 // Mock only routeRequest so we don't need real provider keys; keep the rest of
 // the router module (recordSuccess / recordRateLimitHit) intact.
@@ -10,10 +10,28 @@ vi.mock('../../services/router.js', async (importOriginal) => {
 
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { encrypt } from '../../lib/crypto.js';
+import { AGNES_TEXT_MODEL } from '../../providers/agnes.js';
 
-function fakeRoute(provider: any) {
-  return { provider, modelId: 'fake-model', modelDbId: 9999, apiKey: 'k', keyId: 1, platform: 'fake', displayName: 'Fake Model' };
+function fakeRoute(provider: any, overrides: Partial<{
+  modelId: string;
+  modelDbId: number;
+  apiKey: string;
+  keyId: number;
+  platform: string;
+  displayName: string;
+}> = {}) {
+  return {
+    provider,
+    modelId: 'fake-model',
+    modelDbId: 9999,
+    apiKey: 'k',
+    keyId: 1,
+    platform: 'fake',
+    displayName: 'Fake Model',
+    ...overrides,
+  };
 }
 
 async function post(app: Express, path: string, body: any, key?: string) {
@@ -26,7 +44,15 @@ async function post(app: Express, path: string, body: any, key?: string) {
   });
   const text = await res.text();
   server.close();
-  return { status: res.status, text, contentType: res.headers.get('content-type') ?? '' };
+  return { status: res.status, text, contentType: res.headers.get('content-type') ?? '', headers: res.headers };
+}
+
+function addHealthyKey(platform: string, keyValue: string) {
+  const { encrypted, iv, authTag } = encrypt(keyValue);
+  getDb().prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(platform, `${platform}-test`, encrypted, iv, authTag, 'healthy', 1);
 }
 
 describe('POST /v1/responses (#96)', () => {
@@ -38,6 +64,21 @@ describe('POST /v1/responses (#96)', () => {
     initDb(':memory:');
     app = createApp();
     key = getUnifiedApiKey();
+  });
+
+  beforeEach(() => {
+    mockRouteRequest.mockReset();
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+    getDb().prepare('DELETE FROM api_keys').run();
   });
 
   it('rejects requests without a valid unified key (401)', async () => {
@@ -100,6 +141,85 @@ describe('POST /v1/responses (#96)', () => {
     expect(body.output_text).toBe('Hello from fake');
     expect(body.output[0]).toMatchObject({ type: 'message', role: 'assistant' });
     expect(body.usage.total_tokens).toBe(7);
+  });
+
+  it('routes an explicit known Agnes model to Agnes with strict pinning', async () => {
+    const agnesModel = getDb()
+      .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ? AND enabled = 1')
+      .get('agnes', AGNES_TEXT_MODEL) as { id: number };
+    addHealthyKey('agnes', 'agnes_test_key');
+
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: AGNES_TEXT_MODEL,
+          choices: [{ index: 0, message: { role: 'assistant', content: 'Hello from Agnes' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }, {
+      platform: 'agnes',
+      modelId: AGNES_TEXT_MODEL,
+      modelDbId: agnesModel.id,
+      displayName: 'Agnes 2.0 Flash',
+    }));
+
+    const { status, text, headers } = await post(app, '/v1/responses', {
+      model: AGNES_TEXT_MODEL,
+      input: 'hi',
+      stream: false,
+    }, key);
+
+    expect(status).toBe(200);
+    expect(headers.get('x-routed-via')).toBe(`agnes/${AGNES_TEXT_MODEL}`);
+    expect(JSON.parse(text).model).toBe(AGNES_TEXT_MODEL);
+    expect(mockRouteRequest).toHaveBeenCalledWith(expect.any(Number), undefined, agnesModel.id, false, true);
+  });
+
+  it('returns model_not_found for an unknown explicit model', async () => {
+    const { status, text } = await post(app, '/v1/responses', {
+      model: 'definitely-not-a-real-model',
+      input: 'hi',
+    }, key);
+
+    expect(status).toBe(400);
+    const body = JSON.parse(text);
+    expect(body.error.code).toBe('model_not_found');
+    expect(mockRouteRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not fallback to another provider when an explicit model has no usable key', async () => {
+    const agnesModel = getDb()
+      .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ? AND enabled = 1')
+      .get('agnes', AGNES_TEXT_MODEL) as { id: number };
+    addHealthyKey('groq', 'groq_test_key');
+    mockRouteRequest.mockImplementation((_tokens, _skip, _preferred, _vision, strictPreferred) => {
+      if (strictPreferred) {
+        const err = new Error('All models exhausted. Add more API keys or wait for rate limits to reset.') as any;
+        err.status = 429;
+        throw err;
+      }
+      return fakeRoute({
+        async chatCompletion() {
+          return {
+            id: 'c', object: 'chat.completion', created: 0, model: 'openai/gpt-oss-120b',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'fallback' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          };
+        },
+        async *streamChatCompletion() { /* unused */ },
+      }, { platform: 'groq', modelId: 'openai/gpt-oss-120b' });
+    });
+
+    const { status, text } = await post(app, '/v1/responses', {
+      model: AGNES_TEXT_MODEL,
+      input: 'hi',
+    }, key);
+
+    expect(status).toBe(429);
+    expect(JSON.parse(text).error.type).toBe('routing_error');
+    expect(mockRouteRequest).toHaveBeenCalledWith(expect.any(Number), undefined, agnesModel.id, false, true);
   });
 
   it('stream: emits the Responses SSE event sequence', async () => {

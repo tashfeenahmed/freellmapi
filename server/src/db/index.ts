@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import { AGNES_TEXT_MODEL } from '../providers/agnes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -51,6 +52,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV14(db);
   migrateModelsV15(db);
   migrateModelsV16Vision(db);
+  migrateModelsV17Agnes(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1351,6 +1353,37 @@ function migrateModelsV16Vision(db: Database.Database) {
     `).run();
   });
   apply();
+}
+
+/**
+ * V17 (June 2026): Agnes AI documents hosted API access for its 2.0 Flash family.
+ *
+ * Text is OpenAI-compatible and can participate in the normal fallback chain.
+ * Image/video generation are exposed through dedicated /v1 media routes, not
+ * as chat fallback models, so only the text model is seeded here.
+ */
+function migrateModelsV17Agnes(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models
+      (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+       rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
+       enabled, supports_vision)
+    VALUES ('agnes', ?, 'Agnes 2.0 Flash', 6, 4, 'Large',
+            NULL, NULL, NULL, NULL, '~? (free)', 256000, 1, 0)
+  `);
+  insert.run(AGNES_TEXT_MODEL);
+
+  const row = db.prepare(`
+    SELECT id FROM models WHERE platform = 'agnes' AND model_id = ?
+  `).get(AGNES_TEXT_MODEL) as { id: number } | undefined;
+  if (!row) return;
+
+  const existing = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(row.id);
+  if (existing) return;
+
+  const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS priority FROM fallback_config').get() as { priority: number };
+  db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)')
+    .run(row.id, max.priority + 1);
 }
 
 function ensureUnifiedKey(db: Database.Database) {

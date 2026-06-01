@@ -208,6 +208,35 @@ describe('Migration idempotency', () => {
     ]);
   });
 
+  it('V17: Agnes text model is seeded with a fallback entry', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const row = db.prepare(`
+      SELECT m.platform, m.model_id, m.display_name, m.enabled, m.supports_vision, COUNT(f.id) AS fallback_count
+        FROM models m
+        LEFT JOIN fallback_config f ON f.model_db_id = m.id
+       WHERE m.platform = 'agnes' AND m.model_id = 'agnes-2.0-flash'
+       GROUP BY m.id
+    `).get() as {
+      platform: string;
+      model_id: string;
+      display_name: string;
+      enabled: number;
+      supports_vision: number;
+      fallback_count: number;
+    };
+
+    expect(row).toEqual({
+      platform: 'agnes',
+      model_id: 'agnes-2.0-flash',
+      display_name: 'Agnes 2.0 Flash',
+      enabled: 1,
+      supports_vision: 0,
+      fallback_count: 1,
+    });
+  });
+
   it('all enabled catalog platforms have a registered provider', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');

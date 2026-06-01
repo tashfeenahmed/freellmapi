@@ -27,6 +27,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'pollinations', label: 'Pollinations (anon ok)' },
   { value: 'llm7', label: 'LLM7 (anon ok)' },
   { value: 'huggingface', label: 'HuggingFace Router' },
+  { value: 'agnes', label: 'Agnes AI' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the

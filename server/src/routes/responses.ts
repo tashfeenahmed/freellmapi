@@ -10,15 +10,13 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
-import { getUnifiedApiKey } from '../db/index.js';
+import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
+import { extractApiToken, logRequest, timingSafeStringEqual } from '../lib/proxyShared.js';
 import {
   isRetryableError,
-  timingSafeStringEqual,
-  extractApiToken,
   getStickyModel,
   setStickyModel,
-  logRequest,
 } from './proxy.js';
 
 export const responsesRouter = Router();
@@ -40,6 +38,11 @@ export const responsesRouter = Router();
 // ─────────────────────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 20;
+const AUTO_MODEL_ID = 'auto';
+
+function isAutoModel(modelId: string | undefined): boolean {
+  return modelId === AUTO_MODEL_ID;
+}
 
 function newId(prefix: string): string {
   return `${prefix}_${crypto.randomBytes(18).toString('hex')}`;
@@ -300,7 +303,31 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     0,
   );
   const estimatedTotal = estimatedInputTokens + (reqData.max_output_tokens ?? 1000);
-  const preferredModel = getStickyModel(messages);
+  let preferredModel: number | undefined;
+  let strictPreferredModel = false;
+  if (isAutoModel(reqData.model)) {
+    preferredModel = getStickyModel(messages);
+  } else if (reqData.model) {
+    const db = getDb();
+    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(reqData.model) as { id: number } | undefined;
+    if (enabled) {
+      preferredModel = enabled.id;
+      strictPreferredModel = true;
+    } else {
+      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(reqData.model) as { id: number } | undefined;
+      const reason = disabled ? 'is disabled' : 'is not in the catalog';
+      res.status(400).json({
+        error: {
+          message: `Model '${reqData.model}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+          type: 'invalid_request_error',
+          code: 'model_not_found',
+        },
+      });
+      return;
+    }
+  } else {
+    preferredModel = getStickyModel(messages);
+  }
 
   const responseId = newId('resp');
   const skipKeys = new Set<string>();
@@ -317,7 +344,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, strictPreferredModel);
     } catch (err: any) {
       const status = lastError ? 429 : (err.status ?? 503);
       const message = lastError

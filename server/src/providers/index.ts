@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { AGNES_BASE_URL } from './agnes.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -91,6 +92,15 @@ register(new OpenAICompatProvider({
   platform: 'huggingface',
   name: 'HuggingFace Router',
   baseUrl: 'https://router.huggingface.co/v1',
+}));
+
+// Agnes AI — OpenAI-compatible text endpoint. Image/video APIs are routed
+// through dedicated /v1/images and /v1/videos proxy routes because they are
+// media-generation tasks, not chat fallback models.
+register(new OpenAICompatProvider({
+  platform: 'agnes',
+  name: 'Agnes AI',
+  baseUrl: AGNES_BASE_URL,
 }));
 
 // Moonshot direct integration was dropped in V4 (paid-only); MiniMax direct

@@ -247,6 +247,7 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },
     { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
     { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+    { platform: 'agnes',      name: 'Agnes AI',      baseUrl: 'https://apihub.agnes-ai.com/v1' },
   ] as const;
 
   for (const p of platforms) {
