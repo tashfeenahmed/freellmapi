@@ -1,0 +1,14 @@
+node_modules/
+dist/
+server/data/
+*.db
+*.db-wal
+*.db-shm
+*.bak
+.env
+.env.local
+.DS_Store
+
+# Personal deployment scripts (contain keys/credentials — kept local)
+deploy-pi.sh
+update-hermes.sh
