@@ -24,6 +24,12 @@ instance_image_ocid = "ocid1.image.oc1.iad.xxxx"
 instance_ocpus      = 1
 instance_memory_gb  = 6
 
+# Fallback when A1 (ARM) is persistently "Out of capacity": deploy on the AMD
+# Always-Free E2.1.Micro pool (x86, fixed 1 OCPU / 1 GB). Needs an x86 image
+# (oci compute image list ... --shape VM.Standard.E2.1.Micro).
+# use_micro_fallback      = true
+# instance_image_ocid_x86 = "ocid1.image.oc1.iad.xxxx"
+
 # --- App ---
 app_image = "ghcr.io/tashfeenahmed/freellmapi:latest"
 

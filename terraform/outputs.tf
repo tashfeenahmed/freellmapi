@@ -33,7 +33,7 @@ output "certificate_ocid" {
 output "ca_bundle_fetch_cmd" {
   description = "Command to export the CA bundle clients need to trust the cert."
   value = try(
-    "oci certificates-management certificate-authority-bundle get --certificate-authority-id ${oci_certificates_management_certificate_authority.root[0].id} --query 'data.\"cert-chain-pem\"' --raw-output > ca-bundle.pem",
+    "oci certificates certificate-authority-bundle get --certificate-authority-id ${oci_certificates_management_certificate_authority.root[0].id} --query 'data.\"certificate-pem\"' --raw-output > ca-bundle.pem",
     "(set enable_https = true and apply to create the CA first)"
   )
 }

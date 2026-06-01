@@ -1,21 +1,36 @@
-# A1 instance in the private subnet. The app is installed and run entirely by
+# Instance in the private subnet. The app is installed and run entirely by
 # cloud-init (Docker + the GHCR image + Watchtower auto-updates) — no SSH-based
 # provisioning, so a redeploy is just CI pushing a new image.
+#
+# Shape is A1.Flex (ARM) by default, or E2.1.Micro (x86, AMD pool) when
+# use_micro_fallback = true — a different capacity pool for when A1 is full.
+# The multi-arch image runs whichever arch the chosen shape needs.
+
+locals {
+  is_micro     = var.use_micro_fallback
+  app_shape    = local.is_micro ? "VM.Standard.E2.1.Micro" : "VM.Standard.A1.Flex"
+  app_image_id = local.is_micro ? var.instance_image_ocid_x86 : var.instance_image_ocid
+}
 
 resource "oci_core_instance" "app" {
   compartment_id      = var.compartment_ocid
   availability_domain = var.availability_domain
   display_name        = "freellmapi-app"
-  shape               = "VM.Standard.A1.Flex"
+  shape               = local.app_shape
 
-  shape_config {
-    ocpus         = var.instance_ocpus
-    memory_in_gbs = var.instance_memory_gb
+  # E2.1.Micro is a fixed shape (1 OCPU / 1 GB) — no shape_config. Only A1.Flex
+  # takes ocpus/memory.
+  dynamic "shape_config" {
+    for_each = local.is_micro ? [] : [1]
+    content {
+      ocpus         = var.instance_ocpus
+      memory_in_gbs = var.instance_memory_gb
+    }
   }
 
   source_details {
     source_type = "image"
-    source_id   = var.instance_image_ocid
+    source_id   = local.app_image_id
   }
 
   create_vnic_details {
@@ -36,5 +51,12 @@ resource "oci_core_instance" "app" {
   }
 
   # A1 capacity is frequently "Out of capacity". Re-running apply retries; if it
-  # persistently fails, switch `availability_domain` or region per Phase 2.
+  # persistently fails, switch `availability_domain`, or set use_micro_fallback
+  # to land on the AMD E2.1.Micro pool instead.
+  lifecycle {
+    precondition {
+      condition     = !var.use_micro_fallback || length(var.instance_image_ocid_x86) > 0
+      error_message = "Set instance_image_ocid_x86 (an x86_64 Ubuntu image) when use_micro_fallback = true."
+    }
+  }
 }

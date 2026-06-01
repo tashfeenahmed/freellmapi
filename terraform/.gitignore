@@ -6,3 +6,9 @@
 terraform.tfvars
 *.auto.tfvars
 crash.log
+
+# rendered cloud-init (contains ENCRYPTION_KEY)
+*.rendered.sh
+
+# exported CA trust bundle (generated per-deployment)
+*.pem
