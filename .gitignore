@@ -12,3 +12,8 @@ server/data/
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh
+repo-assets/
+docs/logos
+docs/index.html
+docs/og.png
+docs/og.svg

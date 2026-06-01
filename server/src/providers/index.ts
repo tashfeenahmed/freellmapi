@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { MemosProvider } from './memos.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -142,6 +143,12 @@ register(new OpenAICompatProvider({
   name: 'LLM7',
   baseUrl: 'https://api.llm7.io/v1',
 }));
+
+// MemOS — custom API (non-OpenAI). Bridges to memos.memtensor.cn hosted
+// inference models (qwen3-32b, deepseek-r1, qwen2.5-72b-instruct). Uses
+// Token auth and a custom request/response format. Replaces the standalone
+// memos_proxy.py service — MemOS is now a native FreeLLMAPI provider.
+register(new MemosProvider());
 
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is

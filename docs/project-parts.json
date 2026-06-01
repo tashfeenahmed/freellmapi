@@ -1,0 +1,61 @@
+{
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "part_id": "server",
+      "display_name": "Express API Gateway",
+      "project_type_id": "backend",
+      "root_path": "server/",
+      "tech_stack": "Express 5, TypeScript 5.8, better-sqlite3, Zod, Vitest",
+      "entry_point": "server/src/index.ts",
+      "source_files": 48,
+      "test_files": 21
+    },
+    {
+      "part_id": "client",
+      "display_name": "React Dashboard",
+      "project_type_id": "web",
+      "root_path": "client/",
+      "tech_stack": "React 19, Vite 8, Tailwind CSS 4, shadcn/ui, TanStack Query",
+      "entry_point": "client/src/App.tsx",
+      "source_files": 20,
+      "test_files": 0
+    },
+    {
+      "part_id": "shared",
+      "display_name": "Shared Types Library",
+      "project_type_id": "library",
+      "root_path": "shared/",
+      "tech_stack": "TypeScript",
+      "entry_point": "shared/types.ts",
+      "source_files": 1,
+      "test_files": 0
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "client",
+      "to": "server",
+      "type": "REST API",
+      "details": "/api/* endpoints for dashboard CRUD, /v1/* for proxy"
+    },
+    {
+      "from": "server",
+      "to": "upstream_providers",
+      "type": "REST API",
+      "details": "17 provider adapters (Google, Groq, Cerebras, etc.)"
+    },
+    {
+      "from": "client",
+      "to": "shared",
+      "type": "TypeScript import",
+      "details": "@freellmapi/shared/types.js via npm workspace"
+    },
+    {
+      "from": "server",
+      "to": "shared",
+      "type": "TypeScript import",
+      "details": "@freellmapi/shared/types.js via npm workspace"
+    }
+  ]
+}
