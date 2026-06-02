@@ -187,7 +187,10 @@ describe('Keys API', () => {
       const { body, headers } = createMultipartBody({ filename, content });
       const res = await fetch(url, {
         method: 'POST',
-        headers,
+        headers: {
+          ...headers,
+          Authorization: `Bearer ${dashToken}`,
+        },
         body,
       });
       const data = await res.json().catch(() => null);
@@ -299,7 +302,10 @@ describe('Keys API', () => {
       const { body, headers } = createPreviewMultipartBody(files);
       const res = await fetch(url, {
         method: 'POST',
-        headers,
+        headers: {
+          ...headers,
+          Authorization: `Bearer ${dashToken}`,
+        },
         body,
       });
       const data = await res.json().catch(() => null);
@@ -419,6 +425,5 @@ describe('Keys API', () => {
       const { status, body } = await request(app, 'POST', '/api/keys/import-selected', {});
       expect(status).toBe(400);
     });
-  });
   });
 });

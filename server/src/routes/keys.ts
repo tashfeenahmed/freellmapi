@@ -400,12 +400,12 @@ keysRouter.post('/import-selected', (req: Request, res: Response) => {
 
       try {
         const keyValue = key.keyValue ?? '';
-        if (platformParse.data === 'ollama-local' ? false : !keyValue) {
+        if (!keyValue) {
           errors.push({ key: key.keyName, error: 'keyValue must be at least 1 character' });
           continue;
         }
 
-        const actualValue = platformParse.data === 'ollama-local' ? 'local-ollama' : keyValue.trim();
+        const actualValue = keyValue.trim();
         const { encrypted, iv, authTag } = encrypt(actualValue);
 
         const stmt = db.prepare(`
