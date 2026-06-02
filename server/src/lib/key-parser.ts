@@ -411,6 +411,39 @@ function resolvePlatform(prefix: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// looksLikeApiKey — value-based heuristic to filter out non-API-key values
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when the given value *looks* like an API key (or an opaque
+ * credential token).  This is intentionally permissive — it only rejects
+ * values that are **clearly** not keys:
+ *
+ *  - Shorter than 8 characters
+ *  - Boolean literals (`true`, `false`, `yes`, `no`)
+ *  - Pure numbers (integers and decimals)
+ *  - URLs (`http://…`, `https://…`)
+ *  - Values without any alphabetic character
+ */
+export function looksLikeApiKey(value: string): boolean {
+  if (value.length < 8) return false;
+
+  const lower = value.toLowerCase();
+  if (lower === 'true' || lower === 'false' || lower === 'yes' || lower === 'no') return false;
+
+  // Pure number (integer or decimal)
+  if (/^-?\d+(\.\d+)?$/.test(value)) return false;
+
+  // URL
+  if (/^https?:\/\//.test(lower)) return false;
+
+  // Must contain at least one alphabetic character
+  if (!/[a-zA-Z]/.test(value)) return false;
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers for parseKeysFromFile
 // ---------------------------------------------------------------------------
 
@@ -419,12 +452,28 @@ function resolvePlatform(prefix: string): string {
  */
 function parseEnvFile(text: string): ParseResult {
   const pairs = parseDotEnv(text);
-  const keys: ParsedKey[] = pairs.map(({ key, value }) => ({
-    rawKey: `${key}=${value}`,
-    prefix: extractPrefix(key),
-    platform: resolvePlatform(extractPrefix(key)),
-  }));
-  return { keys, skipped: [] };
+  const keys: ParsedKey[] = [];
+  const skipped: string[] = [];
+
+  for (const { key, value } of pairs) {
+    const prefix = extractPrefix(key);
+    const platform = resolvePlatform(prefix);
+
+    // Known platform prefix → always include (prefix match is stronger evidence)
+    if (platform !== 'unknown') {
+      keys.push({ rawKey: `${key}=${value}`, prefix, platform });
+      continue;
+    }
+
+    // Unknown prefix → check if value looks like an API key
+    if (looksLikeApiKey(value)) {
+      keys.push({ rawKey: `${key}=${value}`, prefix, platform });
+    } else {
+      skipped.push(`${key}=${value}: value does not look like an API key`);
+    }
+  }
+
+  return { keys, skipped };
 }
 
 /**

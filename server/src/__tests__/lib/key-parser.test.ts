@@ -8,6 +8,7 @@ import {
   parseKeysFromFile,
   parseAuthJson,
   AUTH_JSON_PROVIDER_MAP,
+  looksLikeApiKey,
 } from '../../lib/key-parser.js';
 
 // =============================================================================
@@ -656,6 +657,101 @@ describe('detectPlatform', () => {
 });
 
 // =============================================================================
+// looksLikeApiKey — value-based API key heuristic
+// =============================================================================
+describe('looksLikeApiKey', () => {
+  // --- Should return true for known API key formats ---
+  it('returns true for sk-or-v1-xxxx (OpenRouter key format)', () => {
+    expect(looksLikeApiKey('sk-or-v1-fakekey1234567890abcdef')).toBe(true);
+  });
+
+  it('returns true for nvapi-xxxx (NVIDIA key format)', () => {
+    expect(looksLikeApiKey('nvapi-fake-nvidia-key-for-test')).toBe(true);
+  });
+
+  it('returns true for gsk_xxxx (Groq key format)', () => {
+    expect(looksLikeApiKey('gsk_abc123def456ghi789jkl012')).toBe(true);
+  });
+
+  it('returns true for AIzaSyxxxx (Google key format)', () => {
+    expect(looksLikeApiKey('AIzaSyFakeGoogleKey123456789')).toBe(true);
+  });
+
+  it('returns true for ghp_xxxx (GitHub token)', () => {
+    expect(looksLikeApiKey('ghp_abc123def456ghi789jkl012mno345')).toBe(true);
+  });
+
+  it('returns true for sk-th-xxxx (TokenHub key)', () => {
+    expect(looksLikeApiKey('sk-th-abc123def456ghi789jkl012')).toBe(true);
+  });
+
+  it('returns true for hf_xxxx (HuggingFace token)', () => {
+    expect(looksLikeApiKey('hf_abc123def456ghi789jkl012')).toBe(true);
+  });
+
+  it('returns true for 8638891443:AAH-xxxx (Telegram bot token)', () => {
+    expect(looksLikeApiKey('8638891443:AAH-abc123def456ghi789jkl012')).toBe(true);
+  });
+
+  // --- Should return false for clearly non-API-key values ---
+  it('returns false for "true" (boolean)', () => {
+    expect(looksLikeApiKey('true')).toBe(false);
+  });
+
+  it('returns false for "false" (boolean)', () => {
+    expect(looksLikeApiKey('false')).toBe(false);
+  });
+
+  it('returns false for "60" (pure number)', () => {
+    expect(looksLikeApiKey('60')).toBe(false);
+  });
+
+  it('returns false for "300" (pure number)', () => {
+    expect(looksLikeApiKey('300')).toBe(false);
+  });
+
+  it('returns false for "http://homeassistant.local:8123" (URL)', () => {
+    expect(looksLikeApiKey('http://homeassistant.local:8123')).toBe(false);
+  });
+
+  it('returns false for "https://example.com" (URL)', () => {
+    expect(looksLikeApiKey('https://example.com')).toBe(false);
+  });
+
+  it('returns false for "dummy" (5 chars, too short)', () => {
+    expect(looksLikeApiKey('dummy')).toBe(false);
+  });
+
+  it('returns false for "local" (5 chars)', () => {
+    expect(looksLikeApiKey('local')).toBe(false);
+  });
+
+  it('returns false for "" (empty string)', () => {
+    expect(looksLikeApiKey('')).toBe(false);
+  });
+
+  it('returns false for decimal number "3.14"', () => {
+    expect(looksLikeApiKey('3.14')).toBe(false);
+  });
+
+  it('returns false for negative number "-42"', () => {
+    expect(looksLikeApiKey('-42')).toBe(false);
+  });
+
+  it('returns false for "yes" (boolean-like)', () => {
+    expect(looksLikeApiKey('yes')).toBe(false);
+  });
+
+  it('returns false for "no" (boolean-like)', () => {
+    expect(looksLikeApiKey('no')).toBe(false);
+  });
+
+  it('returns false for value with only digits and special chars (no letters)', () => {
+    expect(looksLikeApiKey('1234567890!@#$%^&*()')).toBe(false);
+  });
+});
+
+// =============================================================================
 // parseKeysFromFile — orchestrator combining format detection + parsing + platform detection
 // =============================================================================
 describe('parseKeysFromFile', () => {
@@ -727,11 +823,36 @@ describe('parseKeysFromFile', () => {
 
     it('reports skipped keys for invalid .env lines', () => {
       const result = parseKeysFromFile(
-        'VALID_KEY=ok\nINVALID_NO_EQUALS\n# comment\n\nANOTHER_VALID=yes',
+        'VALID_KEY=sk-test-key\nINVALID_NO_EQUALS\n# comment\n\nANOTHER_VALID=sk-other-key',
         'config.env',
       );
       // INVALID_NO_EQUALS has no '=', so it's likely skipped
       expect(result.keys.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('filters non-API-key values using looksLikeApiKey heuristic', () => {
+      const result = parseKeysFromFile(
+        [
+          'GROQ_API_KEY=gsk_test123',
+          'TERMINAL_TIMEOUT=60',
+          'BROWSERBASE_PROXIES=true',
+          'HASS_URL=http://homeassistant.local:8123',
+          'OLLAMAFREEAPI_KEY=dummy',
+        ].join('\n'),
+        'secrets.env',
+      );
+
+      // GROQ_API_KEY has known prefix GROQ_ → always included
+      expect(result.keys).toHaveLength(1);
+      expect(result.keys[0].rawKey).toBe('GROQ_API_KEY=gsk_test123');
+      expect(result.keys[0].platform).toBe('groq');
+
+      // The other 4 values should be in skipped
+      expect(result.skipped).toHaveLength(4);
+      expect(result.skipped[0]).toBe('TERMINAL_TIMEOUT=60: value does not look like an API key');
+      expect(result.skipped[1]).toBe('BROWSERBASE_PROXIES=true: value does not look like an API key');
+      expect(result.skipped[2]).toBe('HASS_URL=http://homeassistant.local:8123: value does not look like an API key');
+      expect(result.skipped[3]).toBe('OLLAMAFREEAPI_KEY=dummy: value does not look like an API key');
     });
   });
 
@@ -844,9 +965,9 @@ describe('parseKeysFromFile', () => {
   // --- Format detection via filename ---
   describe('format detection', () => {
     it('detects .env format by filename', () => {
-      const result = parseKeysFromFile('TEST_KEY=val', 'some.env');
+      const result = parseKeysFromFile('TEST_KEY=sk-test-key-123', 'some.env');
       expect(result.keys).toHaveLength(1);
-      expect(result.keys[0].rawKey).toBe('TEST_KEY=val');
+      expect(result.keys[0].rawKey).toBe('TEST_KEY=sk-test-key-123');
     });
 
     it('detects .json format by filename', () => {
@@ -865,13 +986,13 @@ describe('parseKeysFromFile', () => {
     });
 
     it('uses .env as fallback for unknown file extensions', () => {
-      const result = parseKeysFromFile('TEST_KEY=val', 'creds.txt');
+      const result = parseKeysFromFile('TEST_KEY=sk-test-key-123', 'creds.txt');
       expect(result.keys).toHaveLength(1);
-      expect(result.keys[0].rawKey).toBe('TEST_KEY=val');
+      expect(result.keys[0].rawKey).toBe('TEST_KEY=sk-test-key-123');
     });
 
     it('uses .env as fallback when no filename is provided', () => {
-      const result = parseKeysFromFile('TEST_KEY=val', '');
+      const result = parseKeysFromFile('TEST_KEY=sk-test-key-123', '');
       expect(result.keys).toHaveLength(1);
     });
   });
@@ -885,7 +1006,7 @@ describe('parseKeysFromFile', () => {
     });
 
     it('handles keys without an underscore (no prefix)', () => {
-      const result = parseKeysFromFile('API_KEY=val', 'test.env');
+      const result = parseKeysFromFile('API_KEY=sk-test-key-123', 'test.env');
       expect(result.keys).toHaveLength(1);
       // No underscore prefix means no platform prefix extracted
       expect(result.keys[0].prefix).toBe('');
@@ -893,9 +1014,9 @@ describe('parseKeysFromFile', () => {
 
     it('handles mix of recognized and unrecognized prefixes', () => {
       const content = [
-        'GOOGLE_API_KEY=gkey',
-        'OPENAI_API_KEY=skey',
-        'GROQ_KEY=gsk',
+        'GOOGLE_API_KEY=sk-google-key-123',
+        'OPENAI_API_KEY=sk-test-456',
+        'GROQ_KEY=gsk-test-key-789',
       ].join('\n');
       const result = parseKeysFromFile(content, 'mix.env');
       expect(result.keys).toHaveLength(3);
