@@ -1,3 +1,35 @@
+// ---- Key Import Types ----
+
+export interface PreviewKey {
+  keyName: string
+  keyValue: string
+  detectedPlatform: string | null
+  prefix: string
+}
+
+export interface ImportKey {
+  keyName: string
+  keyValue: string
+  platform: string
+}
+
+export interface PreviewResponse {
+  keys: PreviewKey[]
+  total: number
+  skipped: string[]
+}
+
+export interface ImportSelectedRequest {
+  keys: ImportKey[]
+}
+
+export interface ImportSelectedResponse {
+  imported: number
+  skipped: string[]
+  errors: Array<{ key: string; error: string }>
+  total: number
+}
+
 // ---- Platform & Model Types ----
 
 // Active platforms — must match server/src/providers/index.ts and

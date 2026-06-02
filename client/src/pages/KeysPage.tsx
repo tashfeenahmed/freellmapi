@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
-import type { ApiKey, Platform } from '../../../shared/types'
+import type { ApiKey, Platform, PreviewKey, PreviewResponse, ImportSelectedResponse } from '../../../shared/types'
 import { Pencil } from 'lucide-react'
+import { DialogRoot, DialogPortal, DialogOverlay, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { ImportPreviewTable } from '@/components/import-preview-table'
+import type { ImportKey } from '@/components/import-preview-table'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'google', label: 'Google AI Studio' },
@@ -236,6 +239,59 @@ export default function KeysPage() {
   const [editingLabel, setEditingLabel] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
 
+  // Modal state
+  const [importOpen, setImportOpen] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previewResult, setPreviewResult] = useState<PreviewKey[] | null>(null)
+  const [step, setStep] = useState<'upload' | 'preview' | 'results'>('upload')
+  const [selectedImportKeys, setSelectedImportKeys] = useState<ImportKey[]>([])
+  const [importResult, setImportResult] = useState<ImportSelectedResponse | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  const previewMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData()
+      files.forEach(f => formData.append('files', f))
+      const res = await fetch('/api/keys/preview', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: { message: 'Preview failed' } }))
+        throw new Error(body.error?.message ?? `HTTP ${res.status}`)
+      }
+      return res.json() as Promise<PreviewResponse>
+    },
+    onSuccess: (data) => {
+      setPreviewResult(data.keys)
+      setStep('preview')
+    },
+    onError: (error) => {
+      setImportError((error as Error).message)
+    },
+  })
+
+  const importSelectedMutation = useMutation({
+    mutationFn: async (keys: ImportKey[]) => {
+      const res = await fetch('/api/keys/import-selected', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: { message: 'Import failed' } }))
+        throw new Error(body.error?.message ?? `HTTP ${res.status}`)
+      }
+      return res.json() as Promise<ImportSelectedResponse>
+    },
+    onSuccess: (data) => {
+      setImportResult(data)
+      setStep('results')
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+    },
+    onError: (error) => {
+      setImportError((error as Error).message)
+    },
+  })
+
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
     queryFn: () => apiFetch('/api/keys'),
@@ -352,33 +408,56 @@ export default function KeysPage() {
   })).filter(p => p.keys.length > 0)
 
   return (
-    <div>
-      <PageHeader
-        title="Keys"
-        description="Provider credentials and the unified API key your apps connect with."
-        actions={
-          keys.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
-              {checkAll.isPending ? 'Checking…' : 'Check all'}
-            </Button>
-          )
-        }
-      />
+    <DialogRoot open={importOpen} onOpenChange={setImportOpen}>
+      <div>
+        <PageHeader
+          title="Keys"
+          description="Provider credentials and the unified API key your apps connect with."
+          actions={
+            <div className="flex items-center gap-2">
+              {keys.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
+                  {checkAll.isPending ? 'Checking…' : 'Check all'}
+                </Button>
+              )}
+              <Button size="sm" onClick={() => { setImportOpen(true); setStep('upload'); setPreviewResult(null); setImportResult(null); setImportError(null); }}>
+                Import keys
+              </Button>
+            </div>
+          }
+        />
 
       <div className="space-y-8">
         <UnifiedKeySection />
 
+
+
         <section>
-          <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium">Add a provider key</h2>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => ollamaSync.mutate()}
+                disabled={ollamaSync.isPending}
+              >
+                {ollamaSync.isPending ? 'Syncing…' : 'Sync Ollama'}
+              </Button>
+              <Button variant="outline" size="xs" onClick={() => setImportOpen(true)}>
+                Batch Import
+              </Button>
+            </div>
+          </div>
           <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
             <div className="space-y-1.5">
               <Label className="text-xs">Platform</Label>
-              <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+              <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)} aria-label="Platform">
                 <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PLATFORMS.map(p => (
+                  {PLATFORMS.slice().sort((a,b)=>a.label.localeCompare(b.label)).map(p => (
                     <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                   ))}
                 </SelectContent>
