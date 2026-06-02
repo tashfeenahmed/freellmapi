@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 
-export const modelsRouter = Router();
+export const modelsRouter: Router = Router();
 
 // List all models with availability info
 modelsRouter.get('/', (_req: Request, res: Response) => {

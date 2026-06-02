@@ -21,7 +21,7 @@ import {
   logRequest,
 } from './proxy.js';
 
-export const responsesRouter = Router();
+export const responsesRouter: Router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────
 // OpenAI Responses API shim (POST /v1/responses).

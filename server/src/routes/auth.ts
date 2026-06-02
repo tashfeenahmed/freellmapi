@@ -10,7 +10,7 @@ import {
   deleteSession,
 } from '../services/auth.js';
 
-export const authRouter = Router();
+export const authRouter: Router = Router();
 
 // Dashboard auth (#35). These routes are mounted BEFORE requireAuth, so
 // /status, /setup and /login are reachable without a session (bootstrap);

@@ -104,6 +104,106 @@ describe('Virtual "auto" model', () => {
     expect(body.choices[0].message.content).toBe('routed via auto');
   });
 
+  it('starts explicit auto routing with a stable preferred model when available', async () => {
+    const addMistralKey = await request(app, 'POST', '/api/keys', {
+      platform: 'mistral',
+      key: 'mistral_auto_model_test',
+      label: 'auto-model-mistral',
+    });
+    expect(addMistralKey.status).toBe(201);
+
+    const origFetch = global.fetch;
+    let calledCerebras = false;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.cerebras.ai/v1/chat/completions')) {
+        calledCerebras = true;
+      }
+      if (urlStr.includes('api.mistral.ai/v1/chat/completions')) {
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-auto-mistral',
+            object: 'chat.completion',
+            created: 123,
+            model: 'mistral-large-latest',
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'stable auto' },
+              finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, body, headers } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'hello' }],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(calledCerebras).toBe(false);
+    expect(headers.get('x-routed-via')).toBe('mistral/mistral-large-latest');
+    expect(body.choices[0].message.content).toBe('stable auto');
+  });
+
+  it('falls back when the first preferred auto model returns a model 404', async () => {
+    const addMistralKey = await request(app, 'POST', '/api/keys', {
+      platform: 'mistral',
+      key: 'mistral_auto_model_test',
+      label: 'auto-model-mistral',
+    });
+    expect(addMistralKey.status).toBe(201);
+
+    const origFetch = global.fetch;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.mistral.ai/v1/chat/completions')) {
+        return {
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: () => Promise.resolve({ error: { message: 'Unknown model' } }),
+        } as any;
+      }
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        const providerBody = JSON.parse((init as any).body);
+        expect(providerBody.model).toBe('groq/compound-mini');
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-auto-fallback',
+            object: 'chat.completion',
+            created: 123,
+            model: 'groq/compound-mini',
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'fallback worked' },
+              finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, body, headers } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'hello' }],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(headers.get('x-routed-via')).toBe('groq/groq/compound-mini');
+    expect(headers.get('x-fallback-attempts')).toBe('2');
+    expect(body.choices[0].message.content).toBe('fallback worked');
+  });
+
   it('still rejects an unknown model with model_not_found', async () => {
     const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
       model: 'definitely-not-a-real-model',

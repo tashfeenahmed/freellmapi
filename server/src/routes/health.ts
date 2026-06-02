@@ -4,7 +4,7 @@ import { getDb } from '../db/index.js';
 import { checkKeyHealth, checkAllKeys } from '../services/health.js';
 import { hasProvider } from '../providers/index.js';
 
-export const healthRouter = Router();
+export const healthRouter: Router = Router();
 
 // Get health status for all platforms
 healthRouter.get('/', (_req: Request, res: Response) => {

@@ -12,3 +12,11 @@ server/data/
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh
+
+# Local Paperclip/OpenCode integration state
+paperclip-opencode-config/
+paperclip-opencode-data/
+opencode-ai-*.tgz
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.npmrc

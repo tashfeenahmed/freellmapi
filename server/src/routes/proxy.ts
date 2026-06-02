@@ -10,16 +10,33 @@ import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 
-export const proxyRouter = Router();
+export const proxyRouter: Router = Router();
 
 // Virtual "auto" model. Clients like Hermes require a non-empty `model` field
 // on every request, but freellmapi's whole point is to pick the model itself.
 // Requesting this id means "let the router decide" — identical to omitting
 // `model` entirely.
 const AUTO_MODEL_ID = 'auto';
+const AUTO_PREFERRED_MODEL_IDS = [
+  'mistral-large-latest',
+  'mistral-medium-latest',
+  'groq/compound-mini',
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+];
 
 function isAutoModel(modelId: string | undefined): boolean {
   return modelId === AUTO_MODEL_ID;
+}
+
+function getPreferredAutoModels(): number[] {
+  const db = getDb();
+  const ids: number[] = [];
+  for (const modelId of AUTO_PREFERRED_MODEL_IDS) {
+    const row = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(modelId) as { id: number } | undefined;
+    if (row) ids.push(row.id);
+  }
+  return ids;
 }
 
 // Constant-time string comparison for the unified API key. Plain `===` leaks
@@ -222,8 +239,9 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
-    || msg.includes('503') || msg.includes('unavailable')
-    || msg.includes('500') || msg.includes('internal server error')
+    || msg.includes('408') || msg.includes('409')
+    || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504')
+    || msg.includes('internal server error') || msg.includes('unavailable') || msg.includes('bad gateway')
     // 413: this model's payload limit is too small for the request, but another
     // provider in the fallback chain may have a larger limit. Same reasoning as 503.
     || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
@@ -236,7 +254,8 @@ export function isRetryableError(err: any): boolean {
     // limits, unsupported params). The matching pattern is "api error 400"
     // which comes from the OpenAI-compat provider's error formatting, not
     // a bare "400" which is deliberately non-retryable for validation errors.
-    || msg.includes('api error 400');
+    || msg.includes('api error 400')
+    || msg.includes('model not found') || msg.includes('unknown model');
 }
 
 // Pull the incremental text out of a streaming chunk for token counting.
@@ -418,15 +437,20 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // matching the requested id, return 400 — silently auto-routing to a
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
-  let preferredModel: number | undefined;
+  let preferredModels: number[] | undefined;
   if (isAutoModel(requestedModel)) {
-    // Explicit "auto" → behave exactly like an omitted model field.
-    preferredModel = getStickyModel(messages);
+    // Explicit "auto" is commonly used by coding agents. Start with stable,
+    // tool-friendly models, but keep the normal fallback chain behind them.
+    const stickyModel = getStickyModel(messages);
+    preferredModels = [
+      ...(stickyModel ? [stickyModel] : []),
+      ...getPreferredAutoModels().filter(id => id !== stickyModel),
+    ];
   } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
-      preferredModel = enabled.id;
+      preferredModels = [enabled.id];
     } else {
       const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
@@ -440,7 +464,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
   } else {
-    preferredModel = getStickyModel(messages);
+    const stickyModel = getStickyModel(messages);
+    preferredModels = stickyModel ? [stickyModel] : undefined;
   }
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
@@ -450,7 +475,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModels, hasImage);
     } catch (err: any) {
       // No more models available
       if (lastError) {

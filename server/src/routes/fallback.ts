@@ -6,7 +6,7 @@ import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrate
 import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 
-export const fallbackRouter = Router();
+export const fallbackRouter: Router = Router();
 
 // ── Bandit routing strategy ─────────────────────────────────────────────────
 // GET  /routing → active strategy, preset weights, and the per-model score

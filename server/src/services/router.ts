@@ -333,15 +333,16 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
  * downstream — key round-robin, cooldowns, token pre-checks, custom base_url
  * resolution, vision filtering, sticky sessions — is strategy-independent.
  *
- * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
+ * If preferredModelDbIds is set, those models get tried FIRST (sticky sessions
+ * and client-specific stable model preferences).
  * This prevents hallucination from model switching mid-conversation.
  *
  * @param estimatedTokens - estimated total tokens for rate limit check
  * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
- * @param preferredModelDbId - try this model first (sticky session)
+ * @param preferredModelDbIds - try these models first (sticky/session preference)
  * @param requireVision - only consider models that accept image input (#118)
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbIds?: number | number[], requireVision = false): RouteResult {
   const db = getDb();
 
   const strategy = getRoutingStrategy();
@@ -361,9 +362,14 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
   const sortedChain = orderChain(chain, strategy);
 
-  // Sticky session: move preferred model to front of chain
-  if (preferredModelDbId) {
-    const idx = sortedChain.findIndex(e => e.model_db_id === preferredModelDbId);
+  // Sticky/stable preference: move preferred models to the front of the chain
+  // while preserving the caller's preference order.
+  const preferredIds = Array.isArray(preferredModelDbIds)
+    ? preferredModelDbIds
+    : (preferredModelDbIds ? [preferredModelDbIds] : []);
+  for (let insertAt = preferredIds.length - 1; insertAt >= 0; insertAt--) {
+    const preferredId = preferredIds[insertAt];
+    const idx = sortedChain.findIndex(e => e.model_db_id === preferredId);
     if (idx > 0) {
       const [preferred] = sortedChain.splice(idx, 1);
       sortedChain.unshift(preferred);

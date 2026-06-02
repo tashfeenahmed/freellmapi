@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
@@ -33,7 +34,7 @@ function getAllowedCorsOrigins() {
   return new Set([...DEFAULT_DASHBOARD_ORIGINS, ...configuredOrigins]);
 }
 
-export function createApp() {
+export function createApp(): Express {
   const app = express();
   const allowedCorsOrigins = getAllowedCorsOrigins();
 
