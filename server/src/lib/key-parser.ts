@@ -42,6 +42,7 @@ export const PREFIX_MAP: Record<string, string> = {
   ZHIPU_: 'zhipu',
   OLLAMA_: 'ollama',
   HF_: 'huggingface',
+  OPENCODE_: 'opencode',
 };
 
 // ---------------------------------------------------------------------------
@@ -49,10 +50,11 @@ export const PREFIX_MAP: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
-  'gemini': 'google',
-  'openrouter': 'openrouter',
+  gemini: 'google',
+  openrouter: 'openrouter',
   'ollama-cloud': 'ollama',
-  'nvidia': 'nvidia',
+  nvidia: 'nvidia',
+  'opencode-zen': 'opencode',
 };
 
 // ---------------------------------------------------------------------------

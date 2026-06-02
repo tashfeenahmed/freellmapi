@@ -259,6 +259,24 @@ describe('parseAuthJson', () => {
     expect(orKeys[0].rawKey).toBe('my-or-key=sk-or-v1-test');
   });
 
+  it('maps opencode-zen provider to opencode platform', () => {
+    const authJson = JSON.stringify({
+      version: 1,
+      providers: {},
+      active_provider: null,
+      updated_at: '2026-05-29T18:11:48.250808+00:00',
+      credential_pool: {
+        'opencode-zen': [
+          { id: '1', label: 'my-zen-key', auth_type: 'api_key', access_token: 'sk-opencode-test-12345', base_url: 'https://opencode.ai/zen/v1' },
+        ],
+      },
+    });
+    const result = parseAuthJson(authJson);
+    const zenKeys = result.keys.filter(k => k.platform === 'opencode');
+    expect(zenKeys).toHaveLength(1);
+    expect(zenKeys[0].rawKey).toBe('my-zen-key=sk-opencode-test-12345');
+  });
+
   it('returns empty result for JSON without credential_pool', () => {
     const json = JSON.stringify({ KEY: 'val', updated_at: '2026-01-01' });
     const result = parseAuthJson(json);
@@ -348,9 +366,9 @@ describe('parseAuthJson', () => {
     const nvidiaKeys = result.keys.filter(k => k.platform === 'nvidia');
     expect(nvidiaKeys).toHaveLength(1);
 
-    // Unmapped providers (opencode-zen, xai) → platform 'unknown'
+    // Unmapped providers (xai) → platform 'unknown'
     const unknownKeys = result.keys.filter(k => k.platform === 'unknown');
-    expect(unknownKeys).toHaveLength(2);
+    expect(unknownKeys).toHaveLength(1);
 
     // google-gemini-cli → oauth, skipped entirely
     const gcliKeys = result.keys.filter(k => k.rawKey.includes('usful.web'));
@@ -515,7 +533,7 @@ describe('parseJavaScript', () => {
 // =============================================================================
 describe('PREFIX_MAP', () => {
   it('contains exactly 13 recognized prefix mappings', () => {
-    expect(Object.keys(PREFIX_MAP)).toHaveLength(13);
+    expect(Object.keys(PREFIX_MAP)).toHaveLength(14);
   });
 
   it('maps GOOGLE_ to google', () => {
