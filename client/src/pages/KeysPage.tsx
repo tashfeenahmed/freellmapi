@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
 import { Pencil } from 'lucide-react'
+import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'google', label: 'Google AI Studio' },
@@ -486,7 +487,7 @@ export default function KeysPage() {
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
-                              {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatSqliteUtcToLocalTime(lastChecked)}
                             </span>
                           )}
                           {!isEditing && (
