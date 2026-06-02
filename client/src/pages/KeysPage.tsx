@@ -435,15 +435,7 @@ export default function KeysPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium">Add a provider key</h2>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => ollamaSync.mutate()}
-                disabled={ollamaSync.isPending}
-              >
-                {ollamaSync.isPending ? 'Syncing…' : 'Sync Ollama'}
-              </Button>
+            <div className="flex items-center gap-2">           
               <Button variant="outline" size="xs" onClick={() => setImportOpen(true)}>
                 Batch Import
               </Button>

@@ -191,7 +191,7 @@ describe('Keys API', () => {
           ...headers,
           Authorization: `Bearer ${dashToken}`,
         },
-        body,
+        body: body as unknown as BodyInit,
       });
       const data = await res.json().catch(() => null);
       server.close();
@@ -306,7 +306,7 @@ describe('Keys API', () => {
           ...headers,
           Authorization: `Bearer ${dashToken}`,
         },
-        body,
+        body: body as unknown as BodyInit,
       });
       const data = await res.json().catch(() => null);
       server.close();

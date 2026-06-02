@@ -13,6 +13,7 @@
     "build:server": "npm run build -w server"
   },
   "devDependencies": {
+    "@types/multer": "^2.1.0",
     "concurrently": "^9.1.2"
   }
 }

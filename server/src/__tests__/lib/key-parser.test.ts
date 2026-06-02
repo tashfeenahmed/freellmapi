@@ -311,7 +311,7 @@ describe('parseAuthJson', () => {
       updated_at: '2026-05-29T18:11:48.250808+00:00',
       credential_pool: {
         'opencode-zen': [
-          { id: '52f84e', label: 'api-key-6', auth_type: 'api_key', access_token: 'sk-fake-opencode-zen-key', base_url: 'https://opencode.ai/zen/v1' },
+<          { id: '52f84e', label: 'api-key-6', auth_type: 'api_key', access_token: 'sk-fake-opencode-zen-key', base_url: 'https://opencode.ai/zen/v1' },
         ],
         'gemini': [
           { id: '53e827', label: 'digilab.dekrook@gmail.com', auth_type: 'api_key', access_token: 'AIzaSyFakeGoogleKey123456789', base_url: 'https://generativelanguage.googleapis.com/v1beta' },
@@ -323,13 +323,13 @@ describe('parseAuthJson', () => {
           { id: '6690fd', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'fake-ollama-cloud-key', base_url: 'https://ollama.com/v1' },
         ],
         'nvidia': [
-          { id: '8571a8', label: 'NVIDIA_API_KEY', auth_type: 'api_key', access_token: 'nvapi-test-key', base_url: 'https://integrate.api.nvidia.com/v1' },
+          { id: '8571a8', label: 'NVIDIA_API_KEY', auth_type: 'api_key', access_token: 'nvapi-fake-key-for-testing', base_url: 'https://integrate.api.nvidia.com/v1' },
         ],
         'google-gemini-cli': [
           { id: '0b7074', label: 'usful.web@gmail.com', auth_type: 'oauth', access_token: 'ya29.oauth-token', refresh_token: '1//...' },
         ],
         'xai': [
-          { id: '7549ec', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'xai-fake-xai-key-for-test', base_url: 'https://api.x.ai/v1' },
+<          { id: '7549ec', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'xai-fake-xai-key-for-test', base_url: 'https://api.x.ai/v1' },
         ],
       },
     });
