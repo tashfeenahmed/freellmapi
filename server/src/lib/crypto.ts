@@ -17,13 +17,11 @@ const KEY_HEX_LEN = KEY_BYTES * 2;
 const PLACEHOLDER_KEY = 'your-64-char-hex-key-here';
 
 function parseHexKey(value: string, source: 'env' | 'db'): Buffer {
-  if (value.length !== KEY_HEX_LEN || !/^[0-9a-fA-F]+$/.test(value)) {
-    throw new Error(
-      `Invalid ENCRYPTION_KEY (${source}): expected ${KEY_HEX_LEN} hex chars (32 bytes), got ${value.length} chars. ` +
-      `Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`,
-    );
+  if (value.length === KEY_HEX_LEN && /^[0-9a-fA-F]+$/.test(value)) {
+    return Buffer.from(value, 'hex');
   }
-  return Buffer.from(value, 'hex');
+  // Fallback: hash the key to 32 bytes using SHA-256 to allow arbitrary-format keys (e.g. Render auto-generated keys) securely.
+  return crypto.createHash('sha256').update(value).digest();
 }
 
 // Outside production we auto-generate and persist a key so a fresh clone

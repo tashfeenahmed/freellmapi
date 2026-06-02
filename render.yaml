@@ -1,0 +1,33 @@
+# Render Blueprint Specification for FreeLLMAPI
+# For details, see: https://render.com/docs/blueprints
+
+services:
+  - type: web
+    name: freellmapi
+    runtime: node
+    plan: free
+    
+    # Render builds the monorepo by installing root dependencies and compiling both client & server
+    buildCommand: npm install && npm run build
+    
+    # Uses the root start script: npm run start -w server
+    startCommand: npm start
+
+    # Bind the server to the port dynamically assigned by Render
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: PORT
+        value: 10000
+
+      # Auto-generates a secure encryption key on initial creation
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Option to configure analytics retention if desired
+      - key: REQUEST_ANALYTICS_RETENTION_DAYS
+        value: 90
+
+      - key: REQUEST_ANALYTICS_MAX_ROWS
+        value: 100000
