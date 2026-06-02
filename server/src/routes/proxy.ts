@@ -280,25 +280,31 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     return;
   }
   const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
-  const requested = parsed.data.model && parsed.data.model !== 'auto' ? parsed.data.model : 'text-embedding-004';
+  // gemini-embedding-001 is the current Generative Language embedding model
+  // (text-embedding-004 isn't exposed on this API tier). Callers can override.
+  const requested = parsed.data.model && parsed.data.model !== 'auto' ? parsed.data.model : 'gemini-embedding-001';
   const model = requested.startsWith('models/') ? requested : `models/${requested}`;
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/${model}:batchEmbedContents?key=${googleKey}`;
-    const gres = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requests: inputs.map((text) => ({ model, content: { parts: [{ text }] } })) }),
-    });
-    if (!gres.ok) {
-      const detail = await gres.text();
-      res.status(502).json({ error: { message: `embedding upstream ${gres.status}`, type: 'server_error', detail: detail.slice(0, 300) } });
-      return;
-    }
-    const gjson = (await gres.json()) as { embeddings?: Array<{ values: number[] }> };
-    const embeddings = gjson.embeddings ?? [];
+    // These models support :embedContent (single), not :batchEmbedContents — so
+    // fan out one call per input and reassemble in input order.
+    const vectors = await Promise.all(
+      inputs.map(async (text) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${googleKey}`;
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: { parts: [{ text }] } }),
+        });
+        if (!r.ok) {
+          throw new Error(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        }
+        const j = (await r.json()) as { embedding?: { values: number[] } };
+        return j.embedding?.values ?? [];
+      }),
+    );
     res.json({
       object: 'list',
-      data: embeddings.map((e, i) => ({ object: 'embedding', index: i, embedding: e.values })),
+      data: vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
       model: requested,
       usage: { prompt_tokens: 0, total_tokens: 0 },
     });
