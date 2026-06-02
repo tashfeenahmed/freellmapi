@@ -107,4 +107,44 @@ describe('POST /v1/completions', () => {
     expect(capturedBody.messages[1].content).toContain('const answer');
     expect(capturedBody.messages[1].content).toContain('console.log(answer);');
   });
+
+  it('accepts autocomplete clients that send more than four stop sequences and forwards a provider-safe subset', async () => {
+    let capturedBody: any = null;
+    const origFetch = global.fetch;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        capturedBody = JSON.parse(String(init?.body));
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-stop',
+            object: 'chat.completion',
+            created: 123,
+            model: capturedBody.model,
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'suggestion' },
+              finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/completions', {
+      model: 'auto',
+      prompt: 'function demo() {',
+      max_tokens: 16,
+      stop: ['\n', '}', ';', '<|end|>', '<|fim_suffix|>', '<|fim_middle|>'],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].text).toBe('suggestion');
+    expect(capturedBody.stop).toEqual(['\n', '}', ';', '<|end|>']);
+  });
+
 });

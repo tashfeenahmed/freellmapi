@@ -199,7 +199,7 @@ const toolChoiceSchema = z.union([
   }),
 ]);
 
-const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(4)]);
+const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
 
 const chatCompletionSchema = z.object({
   messages: z.array(z.union([
@@ -356,6 +356,11 @@ function completionIdFromChat(id: string | undefined): string {
   return id.startsWith('cmpl-') ? id : `cmpl-${id}`;
 }
 
+function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+  if (!Array.isArray(stop)) return stop;
+  return stop.slice(0, 4);
+}
+
 function legacyCompletionChunk(route: RouteResult, chunk: any, text: string) {
   return {
     id: completionIdFromChat(chunk?.id),
@@ -405,10 +410,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     suffix,
     temperature,
     top_p,
-    stop,
     stream,
   } = parsed.data;
   const max_tokens = parsed.data.max_tokens ?? 128;
+  const stop = providerSafeStop(parsed.data.stop);
   const messages = completionPromptToMessages(prompt, suffix);
   const estimatedInputTokens = Math.ceil((prompt.length + (suffix?.length ?? 0)) / 4);
   const estimatedTotal = estimatedInputTokens + max_tokens;
