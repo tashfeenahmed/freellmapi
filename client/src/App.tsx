@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, NavLink, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
+import { Menu, Moon, Sun } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { AuthGate } from '@/components/auth-gate'
 import { logout } from '@/lib/api'
 import KeysPage from '@/pages/KeysPage'
@@ -11,6 +20,22 @@ import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 
 const queryClient = new QueryClient()
+
+const navItems = [
+  { to: '/models', label: 'Models' },
+  { to: '/playground', label: 'Playground' },
+  { to: '/keys', label: 'Keys' },
+  { to: '/analytics', label: 'Analytics' },
+]
+
+function getPreferredDarkMode() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const stored = localStorage.getItem('theme')
+  return stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)
+}
 
 function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
   return (
@@ -29,33 +54,33 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
   )
 }
 
-function DarkModeToggle() {
-  const [dark, setDark] = useState(() =>
-    typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
-  )
+function useDarkMode() {
+  const [dark, setDark] = useState(getPreferredDarkMode)
 
   useEffect(() => {
-    const stored = localStorage.getItem('theme')
-    if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark')
-      setDark(true)
-    }
-  }, [])
+    document.documentElement.classList.toggle('dark', dark)
+  }, [dark])
 
   function toggle() {
-    const next = !dark
-    setDark(next)
-    document.documentElement.classList.toggle('dark', next)
-    localStorage.setItem('theme', next ? 'dark' : 'light')
+    setDark((current) => {
+      const next = !current
+      localStorage.setItem('theme', next ? 'dark' : 'light')
+      return next
+    })
   }
 
+  return { dark, toggle }
+}
+
+function DarkModeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
   return (
-    <Button variant="ghost" size="sm" onClick={toggle} aria-label="Toggle theme">
-      {dark ? (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-      )}
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onToggle}
+      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+    >
+      {dark ? <Sun /> : <Moon />}
     </Button>
   )
 }
@@ -69,27 +94,75 @@ function Brand() {
   )
 }
 
+function Navbar() {
+  const { dark, toggle } = useDarkMode()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  function isActiveRoute(to: string) {
+    return location.pathname === to
+  }
+
+  return (
+    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center px-4 sm:px-6">
+        <Brand />
+        <nav className="ml-10 hidden items-center gap-6 md:flex">
+          {navItems.map((item) => (
+            <NavItem key={item.to} to={item.to}>
+              {item.label}
+            </NavItem>
+          ))}
+        </nav>
+        <div className="ml-auto hidden items-center gap-1 md:flex">
+          <DarkModeToggle dark={dark} onToggle={toggle} />
+          <Button variant="ghost" size="sm" onClick={() => logout()}>
+            Sign out
+          </Button>
+        </div>
+        <div className="ml-auto md:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+              aria-label="Open navigation menu"
+            >
+              <Menu />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuGroup>
+                {navItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.to}
+                    onClick={() => navigate(item.to)}
+                    className={isActiveRoute(item.to) ? 'bg-accent text-accent-foreground font-medium' : undefined}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={toggle} className="justify-between">
+                  <span>Theme</span>
+                  {dark ? <Sun /> : <Moon />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </header>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthGate>
           <div className="min-h-screen bg-background">
-            <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
-              <div className="max-w-6xl mx-auto px-6 flex items-center">
-                <Brand />
-                <nav className="flex items-center gap-6 ml-10">
-                  <NavItem to="/models">Models</NavItem>
-                  <NavItem to="/playground">Playground</NavItem>
-                  <NavItem to="/keys">Keys</NavItem>
-                  <NavItem to="/analytics">Analytics</NavItem>
-                </nav>
-                <div className="ml-auto py-2 flex items-center gap-1">
-                  <DarkModeToggle />
-                  <Button variant="ghost" size="sm" onClick={() => logout()}>Sign out</Button>
-                </div>
-              </div>
-            </header>
+            <Navbar />
             <main className="max-w-6xl mx-auto px-6 py-8">
               <Routes>
                 <Route path="/" element={<Navigate to="/models/chat" replace />} />

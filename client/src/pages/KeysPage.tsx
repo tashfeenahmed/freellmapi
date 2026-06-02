@@ -402,7 +402,7 @@ export default function KeysPage() {
 
         <section>
           <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
+          <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 rounded-3xl border p-4 bg-card">
             <div className="space-y-1.5">
               <Label className="text-xs">Platform</Label>
               <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
@@ -449,16 +449,18 @@ export default function KeysPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Label</Label>
-              <Input
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="optional"
-                className="w-[160px]"
-              />
-            </div>
-            <Button type="submit" size="sm" disabled={!platform || (!isKeyless && !apiKey) || (needsAccountId && !accountId) || addKey.isPending}>
-              {addKey.isPending ? 'Adding…' : isKeyless ? 'Enable' : 'Add key'}
-            </Button>
+              <div className="flex flex-wrap items-center space-x-3">
+                <Input
+                  value={label}
+                  onChange={e => setLabel(e.target.value)}
+                  placeholder="optional"
+                  className="w-[160px]"
+                />
+                <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
+                  {addKey.isPending ? 'Adding…' : 'Add key'}
+                </Button>
+              </div>
+            </div>  
           </form>
           {addKey.isError && (
             <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
