@@ -437,6 +437,9 @@ export function looksLikeApiKey(value: string): boolean {
   // URL
   if (/^https?:\/\//.test(lower)) return false;
 
+  // Docker image / file path (no API key format uses '/')
+  if (value.includes('/')) return false;
+
   // Must contain at least one alphabetic character
   if (!/[a-zA-Z]/.test(value)) return false;
 

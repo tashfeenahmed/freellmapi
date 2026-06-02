@@ -693,6 +693,10 @@ describe('looksLikeApiKey', () => {
     expect(looksLikeApiKey('8638891443:AAH-abc123def456ghi789jkl012')).toBe(true);
   });
 
+  it('returns false for Docker image reference (nikolaik/python-nodejs:tag)', () => {
+    expect(looksLikeApiKey('nikolaik/python-nodejs:python3.11-nodejs20')).toBe(false);
+  });
+
   // --- Should return false for clearly non-API-key values ---
   it('returns false for "true" (boolean)', () => {
     expect(looksLikeApiKey('true')).toBe(false);
