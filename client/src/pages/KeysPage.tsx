@@ -511,5 +511,87 @@ export default function KeysPage() {
         </section>
       </div>
     </div>
+
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>
+              {step === 'upload' && 'Import API Keys'}
+              {step === 'preview' && 'Review imported keys'}
+              {step === 'results' && 'Import results'}
+            </DialogTitle>
+            <DialogDescription>
+              {step === 'upload' && 'Upload .env, .json, .md, .txt, or .jsonc files'}
+              {step === 'preview' && 'Check which keys to import, edit platforms and values'}
+              {step === 'results' && importResult && `Imported ${importResult.imported} of ${importResult.total} key(s)`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {step === 'upload' && (
+            <div className="space-y-4">
+              <Input
+                type="file"
+                multiple
+                accept=".env,.json,.md,.txt,.jsonc"
+                onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                className="file:mr-3 file:rounded-md file:border file:border-input file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-medium"
+              />
+              {importError && <p className="text-xs text-destructive">{importError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => { setImportError(null); previewMutation.mutate(selectedFiles); }}
+                  disabled={selectedFiles.length === 0 || previewMutation.isPending}
+                >
+                  {previewMutation.isPending ? 'Parsing…' : 'Preview'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 'preview' && previewResult && (
+            <div className="max-h-[70vh] overflow-y-auto space-y-4 pr-1">
+              <ImportPreviewTable
+                keys={previewResult}
+                onSelectionChange={setSelectedImportKeys}
+              />
+              {importError && <p className="text-xs text-destructive">{importError}</p>}
+              <div className="flex justify-end gap-2 sticky bottom-0 bg-background pt-2 pb-1">
+                <Button variant="outline" onClick={() => setStep('upload')}>Back</Button>
+                <Button
+                  onClick={() => {
+                    setImportError(null)
+                    importSelectedMutation.mutate(selectedImportKeys)
+                  }}
+                  disabled={importSelectedMutation.isPending}
+                >
+                  {importSelectedMutation.isPending ? 'Importing…' : 'Import selected'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 'results' && importResult && (
+            <div className="space-y-4">
+              <p className="text-sm">Successfully imported {importResult.imported} key(s)</p>
+              {importResult.errors.length > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 px-3 py-2">
+                  <p className="text-xs font-medium text-red-700 dark:text-red-400">Errors</p>
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-red-600 dark:text-red-500 mt-0.5 font-mono">{e.key}: {e.error}</p>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button onClick={() => { setImportOpen(false); setPreviewResult(null); setImportResult(null); }}>Done</Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter />
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
   )
 }

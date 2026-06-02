@@ -45,6 +45,17 @@ export const PREFIX_MAP: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// AUTH_JSON_PROVIDER_MAP — Hermes/OpenCode auth.json provider → platform
+// ---------------------------------------------------------------------------
+
+export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
+  'gemini': 'google',
+  'openrouter': 'openrouter',
+  'ollama-cloud': 'ollama',
+  'nvidia': 'nvidia',
+};
+
+// ---------------------------------------------------------------------------
 // detectPlatform
 // ---------------------------------------------------------------------------
 
@@ -267,6 +278,101 @@ export function parseJavaScript(content: string): Array<{ key: string; value: st
 }
 
 // ---------------------------------------------------------------------------
+// parseAuthJson — Hermes/OpenCode auth.json parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a Hermes/OpenCode auth.json file that uses a `credential_pool`
+ * structure.  Returns a ParseResult with only the recognised API-key
+ * credentials (skips OAuth tokens, missing access_tokens, and unmapped
+ * providers).
+ */
+export function parseAuthJson(content: string): ParseResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return { keys: [], skipped: [] };
+  }
+
+  // Only plain objects are valid
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { keys: [], skipped: [] };
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (!('credential_pool' in obj)) {
+    return { keys: [], skipped: [] };
+  }
+
+  const credentialPool = obj['credential_pool'];
+  if (typeof credentialPool !== 'object' || credentialPool === null || Array.isArray(credentialPool)) {
+    return { keys: [], skipped: [] };
+  }
+
+  const keys: ParsedKey[] = [];
+  const skipped: string[] = [];
+
+  for (const [providerName, credentials] of Object.entries(credentialPool)) {
+    if (!Array.isArray(credentials)) {
+      skipped.push(`${providerName}: not an array`);
+      continue;
+    }
+
+    for (const cred of credentials) {
+      if (typeof cred !== 'object' || cred === null) {
+        continue;
+      }
+
+      const credObj = cred as Record<string, unknown>;
+
+      // Skip credentials where auth_type exists and is not 'api_key'
+      if ('auth_type' in credObj && credObj.auth_type !== 'api_key') {
+        skipped.push(`${providerName}/${credObj.label ?? credObj.id}: auth_type is ${credObj.auth_type}`);
+        continue;
+      }
+
+      // Skip credentials without an access_token
+      if (!('access_token' in credObj) || typeof credObj.access_token !== 'string' || credObj.access_token === '') {
+        skipped.push(`${providerName}/${credObj.label ?? credObj.id}: no access_token`);
+        continue;
+      }
+
+      const label = typeof credObj.label === 'string' ? credObj.label
+        : typeof credObj.id === 'string' ? credObj.id
+        : 'unknown';
+
+      const accessToken = credObj.access_token;
+
+      // Look up provider in AUTH_JSON_PROVIDER_MAP
+      const mappedPlatform = AUTH_JSON_PROVIDER_MAP[providerName];
+
+      let platform: string;
+      let prefix: string;
+
+      if (mappedPlatform) {
+        platform = mappedPlatform;
+        // Derive prefix from PREFIX_MAP (e.g. 'google' → 'GOOGLE_')
+        const prefixEntry = Object.entries(PREFIX_MAP).find(([, v]) => v === mappedPlatform);
+        prefix = prefixEntry ? prefixEntry[0] : `${mappedPlatform.toUpperCase()}_`;
+      } else {
+        platform = 'unknown';
+        prefix = `${providerName.toUpperCase()}_`;
+        skipped.push(`${providerName}/${label}: no platform mapping`);
+      }
+
+      keys.push({
+        rawKey: `${label}=${accessToken}`,
+        prefix,
+        platform,
+      });
+    }
+  }
+
+  return { keys, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // Prefix helpers
 // ---------------------------------------------------------------------------
 
@@ -336,6 +442,11 @@ function parseJsonFile(text: string): ParseResult {
   // Non-object JSON → .env fallback
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parseEnvFile(text);
+  }
+
+  // Hermes/OpenCode auth.json detection — delegate to parseAuthJson
+  if ('credential_pool' in (parsed as Record<string, unknown>)) {
+    return parseAuthJson(text);
   }
 
   const keys: ParsedKey[] = [];

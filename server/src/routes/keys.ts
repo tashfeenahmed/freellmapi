@@ -10,18 +10,13 @@ import { parseKeysFromFile } from '../lib/key-parser.js';
 export const keysRouter = Router();
 
 const ALLOWED_EXTENSIONS = ['.txt', '.env', '.json', '.jsonc', '.md'];
-const ALLOWED_MIME_TYPES = [
-  'text/plain',
-  'application/json',
-  'application/octet-stream',
-];
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 10 },
   fileFilter: (_req: any, file: any, cb: any) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return cb(new Error('Unsupported file type'));
     }
     cb(null, true);

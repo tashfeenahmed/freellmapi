@@ -6,6 +6,8 @@ import {
   parseJavaScript,
   detectPlatform,
   parseKeysFromFile,
+  parseAuthJson,
+  AUTH_JSON_PROVIDER_MAP,
 } from '../../lib/key-parser.js';
 
 // =============================================================================
@@ -205,6 +207,190 @@ describe('parseJson', () => {
     const result = parseJson(input);
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ key: 'MISTRAL_API_KEY', value: 'mistral-val' });
+  });
+});
+
+// =============================================================================
+// parseAuthJson — Hermes/OpenCode auth.json parser
+// =============================================================================
+describe('parseAuthJson', () => {
+  // --- AUTH_JSON_PROVIDER_MAP ---
+  describe('AUTH_JSON_PROVIDER_MAP', () => {
+    it("maps 'gemini' provider to platform 'google'", () => {
+      expect(AUTH_JSON_PROVIDER_MAP.gemini).toBe('google');
+    });
+
+    it("maps 'openrouter' provider to platform 'openrouter'", () => {
+      expect(AUTH_JSON_PROVIDER_MAP.openrouter).toBe('openrouter');
+    });
+
+    it("maps 'ollama-cloud' provider to platform 'ollama'", () => {
+      expect(AUTH_JSON_PROVIDER_MAP['ollama-cloud']).toBe('ollama');
+    });
+
+    it("maps 'nvidia' provider to platform 'nvidia'", () => {
+      expect(AUTH_JSON_PROVIDER_MAP.nvidia).toBe('nvidia');
+    });
+  });
+
+  // --- Basic detection and extraction ---
+  it('extracts API keys from credential_pool structure', () => {
+    const authJson = JSON.stringify({
+      credential_pool: {
+        gemini: [
+          { id: '1', label: 'my-gemini-key', auth_type: 'api_key', access_token: 'AIzaSy-test' },
+        ],
+        openrouter: [
+          { id: '2', label: 'my-or-key', auth_type: 'api_key', access_token: 'sk-or-v1-test' },
+        ],
+      },
+    });
+    const result = parseAuthJson(authJson);
+
+    // gemini → google
+    const googleKeys = result.keys.filter(k => k.platform === 'google');
+    expect(googleKeys).toHaveLength(1);
+    expect(googleKeys[0].rawKey).toBe('my-gemini-key=AIzaSy-test');
+
+    // openrouter → openrouter
+    const orKeys = result.keys.filter(k => k.platform === 'openrouter');
+    expect(orKeys).toHaveLength(1);
+    expect(orKeys[0].rawKey).toBe('my-or-key=sk-or-v1-test');
+  });
+
+  it('returns empty result for JSON without credential_pool', () => {
+    const json = JSON.stringify({ KEY: 'val', updated_at: '2026-01-01' });
+    const result = parseAuthJson(json);
+    expect(result.keys).toHaveLength(0);
+    // Normal parseJson would still handle this flat JSON
+    const normalResult = parseJson(json);
+    expect(normalResult).toHaveLength(2);
+  });
+
+  it('returns empty result for non-object JSON (string)', () => {
+    expect(parseAuthJson('"string"').keys).toHaveLength(0);
+  });
+
+  it('returns empty result for array JSON', () => {
+    expect(parseAuthJson('[]').keys).toHaveLength(0);
+  });
+
+  // --- Filtering logic ---
+  it('skips credentials with auth_type other than api_key', () => {
+    const authJson = JSON.stringify({
+      credential_pool: {
+        'google-gemini-cli': [
+          { id: '1', label: 'user@gmail.com', auth_type: 'oauth', access_token: 'ya29.oauth-token' },
+        ],
+      },
+    });
+    const result = parseAuthJson(authJson);
+    expect(result.keys).toHaveLength(0);
+    expect(result.skipped.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skips credentials without access_token', () => {
+    const authJson = JSON.stringify({
+      credential_pool: {
+        openrouter: [
+          { id: '1', label: 'no-token-key', auth_type: 'api_key' },
+        ],
+      },
+    });
+    const result = parseAuthJson(authJson);
+    expect(result.keys).toHaveLength(0);
+  });
+
+  // --- Realistic auth.json input ---
+  it('parses a realistic auth.json with multiple providers', () => {
+    const authJson = JSON.stringify({
+      version: 1,
+      providers: {},
+      active_provider: null,
+      updated_at: '2026-05-29T18:11:48.250808+00:00',
+      credential_pool: {
+        'opencode-zen': [
+          { id: '52f84e', label: 'api-key-6', auth_type: 'api_key', access_token: 'sk-fake-opencode-zen-key', base_url: 'https://opencode.ai/zen/v1' },
+        ],
+        'gemini': [
+          { id: '53e827', label: 'digilab.dekrook@gmail.com', auth_type: 'api_key', access_token: 'AIzaSyFakeGoogleKey123456789', base_url: 'https://generativelanguage.googleapis.com/v1beta' },
+        ],
+        'openrouter': [
+          { id: '09ae6c', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'sk-or-v1-fake-openrouter-key', base_url: 'https://openrouter.ai/api/v1' },
+        ],
+        'ollama-cloud': [
+          { id: '6690fd', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'fake-ollama-cloud-key', base_url: 'https://ollama.com/v1' },
+        ],
+        'nvidia': [
+          { id: '8571a8', label: 'NVIDIA_API_KEY', auth_type: 'api_key', access_token: 'nvapi-test-key', base_url: 'https://integrate.api.nvidia.com/v1' },
+        ],
+        'google-gemini-cli': [
+          { id: '0b7074', label: 'usful.web@gmail.com', auth_type: 'oauth', access_token: 'ya29.oauth-token', refresh_token: '1//...' },
+        ],
+        'xai': [
+          { id: '7549ec', label: 'aldo.fieuw@gmail.com', auth_type: 'api_key', access_token: 'xai-fake-xai-key-for-test', base_url: 'https://api.x.ai/v1' },
+        ],
+      },
+    });
+    const result = parseAuthJson(authJson);
+
+    // Known platform mappings should be extracted
+    const openrouterKeys = result.keys.filter(k => k.platform === 'openrouter');
+    expect(openrouterKeys).toHaveLength(1);
+
+    const googleKeys = result.keys.filter(k => k.platform === 'google');
+    expect(googleKeys).toHaveLength(1); // gemini → google
+
+    const ollamaKeys = result.keys.filter(k => k.platform === 'ollama');
+    expect(ollamaKeys).toHaveLength(1); // ollama-cloud → ollama
+
+    const nvidiaKeys = result.keys.filter(k => k.platform === 'nvidia');
+    expect(nvidiaKeys).toHaveLength(1);
+
+    // Unmapped providers (opencode-zen, xai) → platform 'unknown'
+    const unknownKeys = result.keys.filter(k => k.platform === 'unknown');
+    expect(unknownKeys).toHaveLength(2);
+
+    // google-gemini-cli → oauth, skipped entirely
+    const gcliKeys = result.keys.filter(k => k.rawKey.includes('usful.web'));
+    expect(gcliKeys).toHaveLength(0);
+
+    // updated_at should NOT appear (it's not in credential_pool)
+    expect(result.keys.every(k => !k.rawKey.includes('updated_at'))).toBe(true);
+
+    // Total extracted keys: 4 mapped + 2 unknown = 6
+    expect(result.keys).toHaveLength(6);
+  });
+
+  // --- Integration with parseKeysFromFile ---
+  it('wires into parseKeysFromFile for .json files with credential_pool', () => {
+    const authJson = JSON.stringify({
+      credential_pool: {
+        gemini: [
+          { id: '1', label: 'my-key', auth_type: 'api_key', access_token: 'AIzaSy-test' },
+        ],
+        openrouter: [
+          { id: '2', label: 'my-or-key', auth_type: 'api_key', access_token: 'sk-or-v1-test' },
+        ],
+      },
+    });
+    const result = parseKeysFromFile(authJson, 'auth.json');
+
+    const googleKeys = result.keys.filter(k => k.platform === 'google');
+    expect(googleKeys).toHaveLength(1);
+    expect(googleKeys[0].rawKey).toBe('my-key=AIzaSy-test');
+
+    const orKeys = result.keys.filter(k => k.platform === 'openrouter');
+    expect(orKeys).toHaveLength(1);
+    expect(orKeys[0].rawKey).toBe('my-or-key=sk-or-v1-test');
+  });
+
+  it('still parses flat JSON without credential_pool via parseKeysFromFile', () => {
+    const flatJson = JSON.stringify({ GOOGLE_API_KEY: 'ai-key', GROQ_KEY: 'gsk_abc' });
+    const result = parseKeysFromFile(flatJson, 'keys.json');
+    expect(result.keys).toHaveLength(2);
+    expect(result.keys[0].platform).toBe('google');
+    expect(result.keys[1].platform).toBe('groq');
   });
 });
 
