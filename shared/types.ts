@@ -54,6 +54,9 @@ export type Platform =
   | 'pollinations'
   | 'llm7'
   | 'huggingface'
+  // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
+  // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
+  | 'opencode'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

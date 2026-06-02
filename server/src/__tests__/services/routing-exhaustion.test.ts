@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { routeRequest } from '../../services/router.js';
+import { routeRequest, setRoutingStrategy } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
 import * as crypto from '../../lib/crypto.js';
@@ -45,8 +45,13 @@ describe('Routing Key Exhaustion', () => {
     process.env.DEV_MODE = 'true';
     process.env.NODE_ENV = 'test';
     initDb(':memory:');
+    // This suite asserts deterministic key/model fallback mechanics, which are
+    // strategy-independent — pin the legacy priority order so the bandit's
+    // score-based reordering (now the default) doesn't pick seeded catalog
+    // models that share the 'google' platform.
+    setRoutingStrategy('priority');
     const db = getDb();
-    
+
     // Setup: 2 models (Pro and Flash)
     // Pro is higher priority (priority 1), Flash is lower (priority 2)
     db.prepare("INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, enabled) VALUES ('google', 'gemini-1.5-pro', 'Pro', 1, 1, 1)").run();

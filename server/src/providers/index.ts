@@ -143,6 +143,18 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.llm7.io/v1',
 }));
 
+// OpenCode Zen — OpenAI-compatible gateway (https://opencode.ai/zen/v1), same
+// adapter as Groq/OpenRouter. A handful of promotional models are free for a
+// limited time; they need a free account key from https://opencode.ai/auth
+// (no card required — billing only applies to paid models). The free roster is
+// trial-only and prompts/outputs may be used to improve the models, so we seed
+// just the docs-confirmed free IDs (migrateModelsV18) with conservative limits.
+register(new OpenAICompatProvider({
+  platform: 'opencode',
+  name: 'OpenCode Zen',
+  baseUrl: 'https://opencode.ai/zen/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { routeRequest } from '../../services/router.js';
+import { routeRequest, setRoutingStrategy } from '../../services/router.js';
 
 describe('Router', () => {
   beforeAll(() => {
@@ -11,6 +11,9 @@ describe('Router', () => {
 
   beforeEach(() => {
     const db = getDb();
+    // These cases assert the manual priority order specifically; pin it so the
+    // bandit (now the default strategy) doesn't reorder by score.
+    setRoutingStrategy('priority');
     db.prepare('DELETE FROM api_keys').run();
     // Reset fallback order to intelligence ranking
     const models = db.prepare('SELECT id, intelligence_rank FROM models ORDER BY intelligence_rank ASC').all() as any[];
@@ -95,6 +98,43 @@ describe('Router', () => {
 
     const result = routeRequest();
     expect(result.platform).toBe('groq');
+  });
+
+  it('skips a model whose context window cannot hold the request (#167)', () => {
+    const db = getDb();
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'test', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    // Remove token rate-limit interference so we isolate the context-window
+    // behavior (canUseTokens would otherwise also skip on a large estimate).
+    db.prepare("UPDATE models SET tpm_limit = NULL, tpd_limit = NULL WHERE platform = 'groq'").run();
+
+    // Whatever model a small request lands on, give it a tiny context window.
+    const baseline = routeRequest(5);
+    db.prepare('UPDATE models SET context_window = 10 WHERE id = ?').run(baseline.modelDbId);
+
+    // A small request still lands on it (5 < 10) ...
+    expect(routeRequest(5).modelDbId).toBe(baseline.modelDbId);
+
+    // ... but a request larger than its window is routed elsewhere (2000 > 10).
+    const large = routeRequest(2000);
+    expect(large.modelDbId).not.toBe(baseline.modelDbId);
+  });
+
+  it('still routes a model with an unknown (null) context window (#167)', () => {
+    const db = getDb();
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'test', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+    db.prepare("UPDATE models SET tpm_limit = NULL, tpd_limit = NULL WHERE platform = 'groq'").run();
+    // A null context_window means "unknown" — never filtered out, even for a huge request.
+    db.prepare("UPDATE models SET context_window = NULL WHERE platform = 'groq'").run();
+    expect(() => routeRequest(500000)).not.toThrow();
   });
 
   it('should skip keys that cannot be decrypted and use a valid fallback key', () => {

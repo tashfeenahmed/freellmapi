@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -42,6 +43,36 @@ interface FallbackEntry {
   keyCount: number
 }
 
+type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable'
+
+interface RoutingScore {
+  modelDbId: number
+  reliability: number
+  speed: number
+  intelligence: number
+  headroom: number
+  rateLimit: number
+  score: number
+  totalRequests: number
+}
+
+interface RoutingData {
+  strategy: RoutingStrategy
+  weights: { reliability: number; speed: number; intelligence: number } | null
+  scores: (RoutingScore & { platform: string; modelId: string; displayName: string; enabled: boolean })[]
+}
+
+// A merged row: fallback-chain metadata + live bandit scores.
+type Row = FallbackEntry & Partial<RoutingScore>
+
+const STRATEGIES: { key: RoutingStrategy; label: string; blurb: string }[] = [
+  { key: 'priority', label: 'Manual', blurb: 'Route in the exact order you set below. Drag the handles to reorder. No scoring — the chain is followed top-to-bottom.' },
+  { key: 'balanced', label: 'Balanced', blurb: 'Reliability leads (50%), with speed and intelligence weighted equally (25% each). A sensible all-round default.' },
+  { key: 'smartest', label: 'Smartest', blurb: 'Prefer the most capable model that still works. Intelligence 55%, reliability 35%, speed 10%.' },
+  { key: 'fastest', label: 'Fastest', blurb: 'Prefer the fastest model that still works. Speed 55%, reliability 35%, intelligence 10%.' },
+  { key: 'reliable', label: 'Most reliable', blurb: 'Maximize success rate above all. Reliability 70%, speed and intelligence 15% each.' },
+]
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -74,13 +105,67 @@ const platformColors: Record<string, string> = {
   huggingface: '#ff9d00',
 }
 
+// Hover tooltip rendered through a portal to document.body, so it's never
+// clipped by an ancestor's overflow (e.g. the table's overflow-x-auto). Position
+// is computed from the trigger's rect and clamped to the viewport.
+function Tooltip({ text, children }: { text: string; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
+
+  function show() {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const half = 116 // ~half of the w-56 tooltip
+    const x = Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8)
+    setCoords({ x, y: r.top })
+  }
+  const hide = () => setCoords(null)
+
+  return (
+    <span
+      ref={ref}
+      className="inline-flex"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
+      {children}
+      {coords && createPortal(
+        <span
+          role="tooltip"
+          style={{ position: 'fixed', left: coords.x, top: coords.y - 8, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
+          className="pointer-events-none w-56 rounded-md bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md"
+        >
+          {text}
+        </span>,
+        document.body,
+      )}
+    </span>
+  )
+}
+
+// A 0..1 value as a thin horizontal bar with the number beside it.
+function AxisBar({ value, color }: { value: number | undefined; color: string }) {
+  const v = value ?? 0
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="h-1.5 w-12 rounded-full bg-muted overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${Math.round(v * 100)}%`, backgroundColor: color }} />
+      </div>
+      <span className="font-mono text-[11px] text-muted-foreground tabular-nums w-7 text-right">
+        {value === undefined ? '–' : Math.round(v * 100)}
+      </span>
+    </div>
+  )
+}
+
 function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
   const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
 
-  // Scale each model's segment proportionally so the colored portion of the
-  // bar sums to `remaining`; the grey tail represents what's been used.
   const modelsWithWidth = models.map(m => ({
     ...m,
     remainingTokens: totalBudget > 0 ? (m.budget / totalBudget) * remaining : 0,
@@ -136,74 +221,92 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   )
 }
 
-function SortableModelRow({
-  entry,
-  index,
+// ── One row of the unified table ────────────────────────────────────────────
+function RowContent({
+  row,
+  rank,
+  draggable,
+  dragHandle,
   onToggle,
 }: {
-  entry: FallbackEntry
-  index: number
+  row: Row
+  rank: number
+  draggable: boolean
+  dragHandle?: ReactNode
   onToggle: (modelDbId: number, enabled: boolean) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: entry.modelDbId,
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
+  const guard = (row.headroom ?? 1) * (row.rateLimit ?? 1)
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`group flex items-center gap-3 px-4 py-3 bg-card ${isDragging ? 'opacity-50' : ''} ${entry.enabled ? '' : 'opacity-50'}`}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
-        aria-label="Drag to reorder"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
-          <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-          <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
-        </svg>
-      </button>
-      <span className="text-xs font-mono text-muted-foreground w-5 tabular-nums">{index + 1}</span>
-      <div className="flex-1 min-w-0">
+    <>
+      <td className="py-2 pl-3 pr-1 w-6 align-middle">
+        {draggable ? dragHandle : <span className="text-muted-foreground/30 select-none">·</span>}
+      </td>
+      <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
+      <td className="py-2 pr-3 align-middle">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm">{entry.displayName}</span>
-          <span className="text-xs text-muted-foreground">{entry.platform}</span>
-          {entry.supportsVision && (
+          <span className="font-medium text-sm">{row.displayName}</span>
+          <span className="text-xs text-muted-foreground">{row.platform}</span>
+          {row.supportsVision && (
             <span
               title="Accepts image input"
-              className="text-xs rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
+              className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
             >
               Vision
             </span>
           )}
-          {entry.penalty > 0 && (
-            <span className="text-xs text-amber-600 dark:text-amber-400">
-              −{entry.penalty} penalty
-            </span>
+          {(row.penalty ?? 0) > 0 && (
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">−{row.penalty} penalty</span>
+          )}
+          {row.totalRequests !== undefined && row.totalRequests > 0 && (
+            <span className="text-[10px] text-muted-foreground/60 tabular-nums">{row.totalRequests} obs</span>
           )}
         </div>
-        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground tabular-nums">
-          <span>Intel #{entry.intelligenceRank}</span>
-          <span>Speed #{entry.speedRank}</span>
-          {entry.rpmLimit && <span>{entry.rpmLimit} rpm</span>}
-          {entry.rpdLimit && <span>{entry.rpdLimit} rpd</span>}
-          <span>{entry.monthlyTokenBudget} tok/mo</span>
+        <div className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
+          {row.monthlyTokenBudget} tok/mo
+          {row.rpmLimit ? ` · ${row.rpmLimit} rpm` : ''}
+          {row.rpdLimit ? ` · ${row.rpdLimit} rpd` : ''}
         </div>
-      </div>
-      <Switch
-        checked={entry.enabled}
-        onCheckedChange={(checked) => onToggle(entry.modelDbId, checked)}
-      />
-    </div>
+      </td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={row.speed} color="#3b82f6" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={row.intelligence} color="#a855f7" /></td>
+      <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">
+        {guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}
+      </td>
+      <td className="py-2 pr-3 align-middle text-right font-mono text-xs font-medium tabular-nums">
+        {row.score !== undefined ? row.score.toFixed(3) : '–'}
+      </td>
+      <td className="py-2 pr-3 align-middle text-right">
+        <Switch checked={row.enabled} onCheckedChange={(c) => onToggle(row.modelDbId, c)} />
+      </td>
+    </>
+  )
+}
+
+function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
+  const handle = (
+    <button
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+      aria-label="Drag to reorder"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+        <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+        <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+      </svg>
+    </button>
+  )
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
+    >
+      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
+    </tr>
   )
 }
 
@@ -221,6 +324,12 @@ export default function FallbackPage() {
     queryFn: () => apiFetch('/api/fallback/token-usage'),
   })
 
+  const { data: routing } = useQuery<RoutingData>({
+    queryKey: ['fallback', 'routing'],
+    queryFn: () => apiFetch('/api/fallback/routing'),
+    refetchInterval: 15_000,
+  })
+
   const saveMutation = useMutation({
     mutationFn: (data: { modelDbId: number; priority: number; enabled: boolean }[]) =>
       apiFetch('/api/fallback', { method: 'PUT', body: JSON.stringify(data) }),
@@ -230,18 +339,26 @@ export default function FallbackPage() {
     },
   })
 
-  const sortMutation = useMutation({
-    mutationFn: (preset: string) =>
-      apiFetch(`/api/fallback/sort/${preset}`, { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fallback'] })
-      setLocalEntries(null)
-    },
+  const strategyMutation = useMutation({
+    mutationFn: (strategy: RoutingStrategy) =>
+      apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify({ strategy }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
   })
 
+  const strategy: RoutingStrategy = routing?.strategy ?? 'balanced'
+  const isManual = strategy === 'priority'
+
+  // Merge fallback metadata with live scores, keyed by model.
+  const scoreById = new Map((routing?.scores ?? []).map(s => [s.modelDbId, s]))
   const allEntries = localEntries ?? entries
-  const displayEntries = allEntries.filter(e => e.keyCount > 0)
+  const configured = allEntries.filter(e => e.keyCount > 0)
   const unconfiguredPlatforms = [...new Set(allEntries.filter(e => e.keyCount === 0).map(e => e.platform))]
+
+  const rows: Row[] = configured.map(e => ({ ...e, ...(scoreById.get(e.modelDbId) ?? {}) }))
+  // Manual → the order you set (by priority). Bandit → ranked by live score.
+  const ordered = isManual
+    ? [...rows].sort((a, b) => a.priority - b.priority)
+    : [...rows].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -251,65 +368,110 @@ export default function FallbackPage() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const oldIndex = displayEntries.findIndex(e => e.modelDbId === active.id)
-    const newIndex = displayEntries.findIndex(e => e.modelDbId === over.id)
-    const reorderedVisible = arrayMove(displayEntries, oldIndex, newIndex)
+    const oldIndex = ordered.findIndex(e => e.modelDbId === active.id)
+    const newIndex = ordered.findIndex(e => e.modelDbId === over.id)
+    const reorderedVisible = arrayMove(ordered, oldIndex, newIndex)
     const unconfigured = allEntries.filter(e => e.keyCount === 0)
-    const merged = [
-      ...reorderedVisible.map((e, i) => ({ ...e, priority: i + 1 })),
+    const merged: FallbackEntry[] = [
+      ...reorderedVisible.map((e, i) => ({ ...(e as FallbackEntry), priority: i + 1 })),
       ...unconfigured.map((e, i) => ({ ...e, priority: reorderedVisible.length + i + 1 })),
     ]
     setLocalEntries(merged)
   }
 
   function handleToggle(modelDbId: number, enabled: boolean) {
-    const updated = allEntries.map(e =>
-      e.modelDbId === modelDbId ? { ...e, enabled } : e
-    )
-    setLocalEntries(updated)
+    setLocalEntries(allEntries.map(e => (e.modelDbId === modelDbId ? { ...e, enabled } : e)))
   }
 
   function handleSave() {
-    if (!localEntries) return
-    saveMutation.mutate(
-      allEntries.map(e => ({
-        modelDbId: e.modelDbId,
-        priority: e.priority,
-        enabled: e.enabled,
-      }))
-    )
+    saveMutation.mutate(allEntries.map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled: e.enabled })))
   }
 
   const hasChanges = localEntries !== null
+
+  const tableHead = (
+    <thead>
+      <tr className="text-left text-muted-foreground border-b">
+        <th className="py-2 pl-3 pr-1 w-6"></th>
+        <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
+        <th className="py-2 pr-3 font-medium">Model</th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />Reliability</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />Speed</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <Tooltip text="Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.">
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">Guardrails</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">
+          <Tooltip text="Final routing score = weighted average of the three axes, multiplied by the guardrails. Higher routes first.">
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">Score</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">On</th>
+      </tr>
+    </thead>
+  )
 
   return (
     <div>
       <PageHeader
         title="Fallback chain"
-        description="Drag to reorder. Requests try models top-to-bottom until one succeeds."
-        actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => sortMutation.mutate('intelligence')} disabled={sortMutation.isPending}>
-              Sort by intelligence
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => sortMutation.mutate('speed')} disabled={sortMutation.isPending}>
-              Sort by speed
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => sortMutation.mutate('budget')} disabled={sortMutation.isPending}>
-              Sort by budget
-            </Button>
-          </>
-        }
+        description="Pick a routing strategy. In Manual mode you drag to set the order; the other strategies route by live score across reliability, speed and intelligence."
       />
 
       <div className="space-y-6">
-        {tokenUsage && tokenUsage.totalBudget > 0 && (
-          <TokenUsageBar data={tokenUsage} />
-        )}
+        {/* Monthly token budget — moved to the top */}
+        {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
+        {/* Strategy selector */}
+        <section className="rounded-lg border bg-card p-5">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-sm font-medium">Routing strategy</h2>
+            {routing?.weights && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                reliability {Math.round(routing.weights.reliability * 100)}% ·
+                {' '}speed {Math.round(routing.weights.speed * 100)}% ·
+                {' '}intelligence {Math.round(routing.weights.intelligence * 100)}%
+              </span>
+            )}
+          </div>
+
+          <div className="inline-flex flex-wrap gap-1 rounded-lg border p-1">
+            {STRATEGIES.map(s => (
+              <Tooltip key={s.key} text={s.blurb}>
+                <button
+                  disabled={strategyMutation.isPending}
+                  onClick={() => strategyMutation.mutate(s.key)}
+                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                    s.key === strategy
+                      ? 'bg-foreground text-background font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+
+          <p className="mt-2 text-xs text-muted-foreground">
+            {isManual
+              ? 'Manual mode: requests follow the order below, top-to-bottom. Drag to reorder.'
+              : 'Scores update from live traffic. The order below is how requests are routed right now.'}
+          </p>
+        </section>
+
+        {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : displayEntries.length === 0 ? (
+        ) : ordered.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No models available. Add API keys on the <a href="/keys" className="underline text-foreground">Keys page</a> first.
@@ -317,43 +479,49 @@ export default function FallbackPage() {
           </div>
         ) : (
           <>
-            <div className="rounded-lg border divide-y overflow-hidden">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={displayEntries.map(e => e.modelDbId)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {displayEntries.map((entry, index) => (
-                    <SortableModelRow
-                      key={entry.modelDbId}
-                      entry={entry}
-                      index={index}
-                      onToggle={handleToggle}
-                    />
-                  ))}
-                </SortableContext>
+            {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
+                live-region <div>s, which are invalid as direct <table> children. */}
+            {isManual ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <div className="rounded-lg border overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {tableHead}
+                    <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
+                      <tbody>
+                        {ordered.map((row, i) => (
+                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} />
+                        ))}
+                      </tbody>
+                    </SortableContext>
+                  </table>
+                </div>
               </DndContext>
-            </div>
+            ) : (
+              <div className="rounded-lg border overflow-x-auto">
+                <table className="w-full text-sm">
+                  {tableHead}
+                  <tbody>
+                    {ordered.map((row, i) => (
+                      <tr key={row.modelDbId} className={`border-b last:border-0 ${row.enabled ? '' : 'opacity-50'}`}>
+                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} />
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {hasChanges && (
               <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>
-                  Discard
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>Discard</Button>
                 <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? 'Saving…' : 'Save order'}
+                  {saveMutation.isPending ? 'Saving…' : 'Save changes'}
                 </Button>
               </div>
             )}
 
             {unconfiguredPlatforms.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Hidden (no keys): {unconfiguredPlatforms.join(', ')}
-              </p>
+              <p className="text-xs text-muted-foreground">Hidden (no keys): {unconfiguredPlatforms.join(', ')}</p>
             )}
           </>
         )}

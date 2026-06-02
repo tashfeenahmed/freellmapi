@@ -139,10 +139,19 @@ describe('OpenAI multimodal array content', () => {
     expect(status).toBe(400);
   });
 
-  it('rejects an assistant message with neither content nor tool_calls', async () => {
-    const { status } = await request(app, 'POST', '/v1/chat/completions', {
-      messages: [{ role: 'assistant', content: [] }],
+  it('accepts an assistant message with empty content and no tool_calls (#165)', async () => {
+    // OpenAI accepts empty/null assistant turns in history; we coerce to "" and
+    // forward rather than 400-ing a payload OpenAI would take. The request then
+    // routes (and fails downstream on the fake key) — the point is it is NOT a
+    // 400 schema rejection.
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: [] },
+        { role: 'user', content: 'continue' },
+      ],
     }, authHeaders());
-    expect(status).toBe(400);
+    expect(status).not.toBe(400);
+    if (status === 400) throw new Error(`unexpected 400: ${JSON.stringify(body)}`);
   });
 });

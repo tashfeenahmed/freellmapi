@@ -82,8 +82,16 @@ const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
   'patternProperties', 'unevaluatedProperties', 'unevaluatedItems',
   'if', 'then', 'else',
   'contentEncoding', 'contentMediaType', 'contentSchema',
-  'dependentRequired', 'dependentSchemas',
+  'dependentRequired', 'dependentSchemas', 'dependencies',
   'additionalProperties',
+  'examples', 'const', 'readOnly', 'writeOnly',
+  'uniqueItems',
+  'not', 'allOf', 'oneOf',
+  'prefixItems',
+  'contains', 'minContains', 'maxContains',
+  'propertyNames',
+  'multipleOf',
+  'deprecated',
 ]);
 
 export function sanitizeForGemini(schema: unknown): unknown {

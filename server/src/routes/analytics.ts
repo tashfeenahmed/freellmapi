@@ -4,18 +4,22 @@ import { getDb } from '../db/index.js';
 
 export const analyticsRouter = Router();
 
-// Map range to a JS-computed ISO timestamp passed as a bind parameter,
-// so the SQL string never includes user-controlled fragments.
+// Format UTC timestamps the same way SQLite stores created_at text values.
+const toSqliteDateTime = (timestamp: number) =>
+    new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ');
+
+// Return the rolling cutoff timestamp for the selected analytics range.
 function getSinceTimestamp(range: string): string {
   const now = Date.now();
+
   switch (range) {
     case '24h':
-      return new Date(now - 24 * 60 * 60 * 1000).toISOString();
+      return toSqliteDateTime(now - 24 * 60 * 60 * 1000);
     case '30d':
-      return new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+      return toSqliteDateTime(now - 30 * 24 * 60 * 60 * 1000);
     case '7d':
     default:
-      return new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+      return toSqliteDateTime(now - 7 * 24 * 60 * 60 * 1000);
   }
 }
 

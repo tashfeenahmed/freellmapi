@@ -138,13 +138,18 @@ export class OpenAICompatProvider extends BaseProvider {
     // health.ts catches them and marks status='error' WITHOUT incrementing
     // the consecutive-failure counter — only confirmed 401/403 disables a key.
     const url = this.validateUrl ?? `${this.baseUrl}/models`;
+    // 30s (not 10s): some upstreams return a large /v1/models catalog that
+    // takes >10s from high-latency regions (e.g. NVIDIA NIM measured ~11.2s
+    // from India). A 10s cap aborted those calls and health.ts marked a
+    // perfectly good key status='error'. 30s aligns with chatCompletion's
+    // own slow-upstream allowance and costs nothing for fast providers.
     const res = await this.fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         ...this.extraHeaders,
       },
-    }, 10000);
+    }, 30000);
     return res.status !== 401 && res.status !== 403;
   }
 }

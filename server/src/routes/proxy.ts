@@ -5,8 +5,10 @@ import { z } from 'zod';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
+import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
-import { contentToString, messageHasImage } from '../lib/content.js';
+import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
+import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 
 export const proxyRouter = Router();
 
@@ -145,12 +147,6 @@ const toolCallSchema = z.object({
 const contentBlockSchema = z.object({ type: z.string() }).passthrough();
 const contentSchema = z.union([z.string(), z.array(contentBlockSchema)]);
 
-function hasNonEmptyContent(content: unknown): boolean {
-  if (typeof content === 'string') return content.length > 0;
-  if (Array.isArray(content)) return content.length > 0;
-  return false;
-}
-
 const systemMessageSchema = z.object({
   role: z.literal('system'),
   content: contentSchema,
@@ -163,17 +159,17 @@ const userMessageSchema = z.object({
   name: z.string().optional(),
 });
 
+// Assistant turns may carry empty/null content and no tool_calls — OpenAI
+// accepts these in conversation history (a turn that produced no visible text,
+// a placeholder, a tool turn whose content was emptied), and clients replay
+// them verbatim. We accept them too and coerce empty/null content to "" before
+// forwarding (see message build below) rather than 400-ing a payload OpenAI
+// would take. (#165)
 const assistantMessageSchema = z.object({
   role: z.literal('assistant'),
   content: z.union([contentSchema, z.null()]).optional(),
   name: z.string().optional(),
   tool_calls: z.array(toolCallSchema).optional(),
-}).refine((msg) => {
-  const hasContent = hasNonEmptyContent(msg.content);
-  const hasToolCalls = (msg.tool_calls?.length ?? 0) > 0;
-  return hasContent || hasToolCalls;
-}, {
-  message: 'assistant messages must include non-empty content or tool_calls',
 });
 
 const toolMessageSchema = z.object({
@@ -253,6 +249,70 @@ export function streamChunkText(chunk: any): string {
   return chunk?.choices?.[0]?.delta?.content ?? '';
 }
 
+// OpenAI-compatible embeddings endpoint. The chat key store is per-model and
+// chat-specific, so embeddings use their own dedicated key via the
+// EMBEDDINGS_GOOGLE_KEY env var, routed to Google's embedding API (Gemini
+// `text-embedding-004` by default). Same unified-key auth as the rest of /v1.
+// Lets downstream clients (e.g. RAG apps) get embeddings through the gateway
+// with no extra provider wiring. Returns 503 when no embeddings key is set.
+const EmbeddingsBody = z.object({
+  model: z.string().optional(),
+  input: z.union([z.string(), z.array(z.string())]),
+});
+
+proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+  const googleKey = process.env.EMBEDDINGS_GOOGLE_KEY;
+  if (!googleKey) {
+    res.status(503).json({
+      error: { message: 'Embeddings not configured on this gateway (set EMBEDDINGS_GOOGLE_KEY)', type: 'server_error' },
+    });
+    return;
+  }
+  const parsed = EmbeddingsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
+    return;
+  }
+  const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
+  // gemini-embedding-001 is the current Generative Language embedding model
+  // (text-embedding-004 isn't exposed on this API tier). Callers can override.
+  const requested = parsed.data.model && parsed.data.model !== 'auto' ? parsed.data.model : 'gemini-embedding-001';
+  const model = requested.startsWith('models/') ? requested : `models/${requested}`;
+  try {
+    // These models support :embedContent (single), not :batchEmbedContents — so
+    // fan out one call per input and reassemble in input order.
+    const vectors = await Promise.all(
+      inputs.map(async (text) => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${googleKey}`;
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: { parts: [{ text }] } }),
+        });
+        if (!r.ok) {
+          throw new Error(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        }
+        const j = (await r.json()) as { embedding?: { values: number[] } };
+        return j.embedding?.values ?? [];
+      }),
+    );
+    res.json({
+      object: 'list',
+      data: vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
+      model: requested,
+      usage: { prompt_tokens: 0, total_tokens: 0 },
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type: 'server_error' } });
+  }
+});
+
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
@@ -283,9 +343,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
   const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
     if (m.role === 'assistant') {
+      const hasToolCalls = (m.tool_calls?.length ?? 0) > 0;
+      // With tool_calls, content: null is the correct OpenAI shape — keep it.
+      // Without tool_calls, coerce empty/null content to "" so strict upstreams
+      // don't choke on a null-content assistant turn we just accepted. (#165)
+      const isEmptyContent = m.content == null
+        || (typeof m.content === 'string' && m.content.length === 0)
+        || (Array.isArray(m.content) && m.content.length === 0);
+      const assistantContent: ChatMessage['content'] = hasToolCalls
+        ? (m.content ?? null)
+        : (isEmptyContent ? '' : m.content!);
       return {
         role: 'assistant',
-        content: m.content ?? null,
+        content: assistantContent,
         ...(m.name ? { name: m.name } : {}),
         ...(m.tool_calls ? { tool_calls: m.tool_calls.map(tc => ({
           id: tc.id,
@@ -384,9 +454,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     } catch (err: any) {
       // No more models available
       if (lastError) {
+        const safeLastError = sanitizeProviderErrorMessage(lastError.message);
         res.status(429).json({
           error: {
-            message: `All models rate-limited. Last error: ${lastError.message}`,
+            message: `All models rate-limited. Last error: ${safeLastError}`,
             type: 'rate_limit_error',
           },
         });
@@ -407,6 +478,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // instead of a silently truncated stream.
         let totalOutputTokens = 0;
         let streamStarted = false;
+        let ttfbMs: number | null = null;
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
@@ -415,6 +487,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
           for await (const chunk of gen) {
             if (!streamStarted) {
+              // Time-to-first-byte: dispatch → first chunk. Feeds the router's
+              // latency axis (server/src/services/scoring.ts).
+              ttfbMs = Date.now() - start;
               res.setHeader('Content-Type', 'text/event-stream');
               res.setHeader('Cache-Control', 'no-cache');
               res.setHeader('Connection', 'keep-alive');
@@ -422,6 +497,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
               streamStarted = true;
             }
+            // Coerce array-shaped delta.content to a string before forwarding,
+            // so spec-conforming clients don't break and tool_calls survive (#166).
+            normalizeOutboundContent(chunk);
             const text = streamChunkText(chunk);
             totalOutputTokens += Math.ceil(text.length / 4);
             res.write(`data: ${JSON.stringify(chunk)}\n\n`);
@@ -438,7 +516,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId);
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs);
           return;
         } catch (streamErr: any) {
           if (streamStarted) {
@@ -450,7 +528,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, streamErr.message);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message));
             return;
           }
           // Pre-stream error — bubble to outer retry/502 handler.
@@ -469,7 +547,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
-        res.json(result);
+        // Normalize array-shaped message.content to a string on the way out (#166).
+        res.json(normalizeOutboundContent(result));
 
         logRequest(
           route.platform, route.modelId, route.keyId, 'success',
@@ -481,7 +560,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     } catch (err: any) {
       const latency = Date.now() - start;
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, err.message);
+      const safeError = sanitizeProviderErrorMessage(err.message);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
 
       if (isRetryableError(err)) {
         // Put this model+key on cooldown and try the next one
@@ -498,14 +578,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
-        console.log(`[Proxy] ${err.message.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
       }
 
       // Non-retryable error (auth, 4xx, etc.): don't retry
       res.status(502).json({
         error: {
-          message: `Provider error (${route.displayName}): ${err.message}`,
+          message: `Provider error (${route.displayName}): ${safeError}`,
           type: 'provider_error',
         },
       });
@@ -516,7 +596,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Exhausted all retries
   res.status(429).json({
     error: {
-      message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`,
+      message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${sanitizeProviderErrorMessage(lastError?.message)}`,
       type: 'rate_limit_error',
     },
   });
@@ -531,13 +611,15 @@ export function logRequest(
   outputTokens: number,
   latencyMs: number,
   error: string | null,
+  ttfbMs: number | null = null,
 ) {
   try {
     const db = getDb();
     db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error);
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs);
+    pruneRequestAnalytics({ db });
   } catch (e) {
     console.error('Failed to log request:', e);
   }

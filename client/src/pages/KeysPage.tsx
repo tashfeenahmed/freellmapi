@@ -8,35 +8,57 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform, PreviewKey, PreviewResponse, ImportSelectedResponse } from '../../../shared/types'
-import { Pencil } from 'lucide-react'
+import { Pencil, ExternalLink } from 'lucide-react'
+import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { DialogRoot, DialogPortal, DialogOverlay, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { ImportPreviewTable } from '@/components/import-preview-table'
 import type { ImportKey } from '@/components/import-preview-table'
 
-const PLATFORMS: { value: Platform; label: string }[] = [
-  { value: 'google', label: 'Google AI Studio' },
-  { value: 'groq', label: 'Groq' },
-  { value: 'cerebras', label: 'Cerebras' },
-  { value: 'sambanova', label: 'SambaNova' },
-  { value: 'nvidia', label: 'NVIDIA NIM' },
-  { value: 'mistral', label: 'Mistral' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'github', label: 'GitHub Models' },
-  { value: 'cohere', label: 'Cohere' },
-  { value: 'cloudflare', label: 'Cloudflare Workers AI' },
-  { value: 'zhipu', label: 'Zhipu AI (Z.ai)' },
-  { value: 'ollama', label: 'Ollama Cloud' },
-  { value: 'kilo', label: 'Kilo Gateway (anon ok)' },
-  { value: 'pollinations', label: 'Pollinations (anon ok)' },
-  { value: 'llm7', label: 'LLM7 (anon ok)' },
-  { value: 'huggingface', label: 'HuggingFace Router' },
+// Small "Get API key" external link shown next to a provider (#137).
+function GetKeyLink({ url }: { url: string }) {
+  if (!url) return null
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      Get API key
+      <ExternalLink className="size-3" />
+    </a>
+  )
+}
+
+// `url` points to each provider's key-management / signup page so the Keys page
+// can show a "Get API key" shortcut (#137). OpenCode Zen's key is free from
+// opencode.ai/auth — no card needed; billing only applies to paid models (#128).
+const PLATFORMS: { value: Platform; label: string; url: string }[] = [
+  { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
+  { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
+  { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
+  { value: 'sambanova', label: 'SambaNova', url: 'https://cloud.sambanova.ai' },
+  { value: 'nvidia', label: 'NVIDIA NIM', url: 'https://build.nvidia.com/settings/api-keys' },
+  { value: 'mistral', label: 'Mistral', url: 'https://console.mistral.ai/api-keys/' },
+  { value: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/keys' },
+  { value: 'github', label: 'GitHub Models', url: 'https://github.com/settings/tokens' },
+  { value: 'cohere', label: 'Cohere', url: 'https://dashboard.cohere.com/api-keys' },
+  { value: 'cloudflare', label: 'Cloudflare Workers AI', url: 'https://dash.cloudflare.com' },
+  { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
+  { value: 'ollama', label: 'Ollama Cloud', url: 'https://ollama.com/settings/keys' },
+  { value: 'kilo', label: 'Kilo Gateway (anon ok)', url: 'https://app.kilo.ai' },
+  { value: 'pollinations', label: 'Pollinations (anon ok)', url: 'https://pollinations.ai' },
+  { value: 'llm7', label: 'LLM7 (anon ok)', url: 'https://llm7.io' },
+  { value: 'huggingface', label: 'HuggingFace Router', url: 'https://huggingface.co/settings/tokens' },
+  { value: 'opencode', label: 'OpenCode Zen (free key)', url: 'https://opencode.ai/auth' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the
 // generic key dropdown — but it still appears in the grouped provider list.
-const CUSTOM_GROUP: { value: Platform; label: string } = {
+const CUSTOM_GROUP: { value: Platform; label: string; url: string } = {
   value: 'custom',
   label: 'Custom (OpenAI-compatible)',
+  url: '',
 }
 
 const statusDot: Record<string, string> = {
@@ -454,6 +476,10 @@ export default function KeysPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {(() => {
+                const sel = PLATFORMS.find(p => p.value === platform)
+                return sel?.url ? <div className="pt-0.5"><GetKeyLink url={sel.url} /></div> : null
+              })()}
             </div>
             {needsAccountId && (
               <div className="space-y-1.5">
@@ -520,6 +546,7 @@ export default function KeysPage() {
                         disabled={togglePlatform.isPending}
                       />
                       <h3 className="text-sm font-medium">{group.label}</h3>
+                      <GetKeyLink url={group.url} />
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
@@ -557,7 +584,7 @@ export default function KeysPage() {
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
-                              {new Date(lastChecked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatSqliteUtcToLocalTime(lastChecked, { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           )}
                           {!isEditing && (
