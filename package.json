@@ -15,5 +15,8 @@
   "devDependencies": {
     "@types/multer": "^2.1.0",
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0"
   }
 }
