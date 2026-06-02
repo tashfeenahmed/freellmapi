@@ -249,6 +249,64 @@ export function streamChunkText(chunk: any): string {
   return chunk?.choices?.[0]?.delta?.content ?? '';
 }
 
+// OpenAI-compatible embeddings endpoint. The chat key store is per-model and
+// chat-specific, so embeddings use their own dedicated key via the
+// EMBEDDINGS_GOOGLE_KEY env var, routed to Google's embedding API (Gemini
+// `text-embedding-004` by default). Same unified-key auth as the rest of /v1.
+// Lets downstream clients (e.g. RAG apps) get embeddings through the gateway
+// with no extra provider wiring. Returns 503 when no embeddings key is set.
+const EmbeddingsBody = z.object({
+  model: z.string().optional(),
+  input: z.union([z.string(), z.array(z.string())]),
+});
+
+proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+  const googleKey = process.env.EMBEDDINGS_GOOGLE_KEY;
+  if (!googleKey) {
+    res.status(503).json({
+      error: { message: 'Embeddings not configured on this gateway (set EMBEDDINGS_GOOGLE_KEY)', type: 'server_error' },
+    });
+    return;
+  }
+  const parsed = EmbeddingsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
+    return;
+  }
+  const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
+  const requested = parsed.data.model && parsed.data.model !== 'auto' ? parsed.data.model : 'text-embedding-004';
+  const model = requested.startsWith('models/') ? requested : `models/${requested}`;
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/${model}:batchEmbedContents?key=${googleKey}`;
+    const gres = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: inputs.map((text) => ({ model, content: { parts: [{ text }] } })) }),
+    });
+    if (!gres.ok) {
+      const detail = await gres.text();
+      res.status(502).json({ error: { message: `embedding upstream ${gres.status}`, type: 'server_error', detail: detail.slice(0, 300) } });
+      return;
+    }
+    const gjson = (await gres.json()) as { embeddings?: Array<{ values: number[] }> };
+    const embeddings = gjson.embeddings ?? [];
+    res.json({
+      object: 'list',
+      data: embeddings.map((e, i) => ({ object: 'embedding', index: i, embedding: e.values })),
+      model: requested,
+      usage: { prompt_tokens: 0, total_tokens: 0 },
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type: 'server_error' } });
+  }
+});
+
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
 
