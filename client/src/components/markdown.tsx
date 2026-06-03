@@ -91,7 +91,7 @@ const components: Components = {
     )
   },
   pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-md border bg-background/60 p-3 first:mt-0 last:mb-0">
+    <pre className="my-2 overflow-x-auto rounded-lg border bg-background/60 p-3 first:mt-0 last:mb-0">
       {children}
     </pre>
   ),
