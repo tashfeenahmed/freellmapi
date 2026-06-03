@@ -193,9 +193,56 @@ export function stripJsoncComments(text: string): string {
 
 /**
  * Strip trailing commas (a JSONC extension).  Handles both `,}` and `,]`.
+ *
+ * Walks the string character by character, tracking JSON string boundaries
+ * so that commas appearing inside string literals (e.g. `"Hello, } world"`)
+ * are **not** treated as trailing commas.
  */
 export function stripTrailingCommas(text: string): string {
-  return text.replace(/,(\s*[}\]])/g, '$1');
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    // String literal — copy verbatim (JSON only uses double quotes)
+    if (text[i] === '"') {
+      out.push('"');
+      i++;
+      while (i < text.length) {
+        out.push(text[i]);
+        if (text[i] === '\\') {
+          i++;
+          if (i < text.length) {
+            out.push(text[i]);
+            i++;
+          }
+        } else if (text[i] === '"') {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // Outside string — check for trailing comma pattern: `,` + whitespace + `}` or `]`
+    if (text[i] === ',') {
+      let j = i + 1;
+      while (j < text.length && (text[j] === ' ' || text[j] === '\t' || text[j] === '\n' || text[j] === '\r')) {
+        j++;
+      }
+      if (j < text.length && (text[j] === '}' || text[j] === ']')) {
+        // Trailing comma found — skip it, keeping the following whitespace and bracket
+        i++;
+        continue;
+      }
+    }
+
+    out.push(text[i]);
+    i++;
+  }
+
+  return out.join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +620,7 @@ function parseJsonFile(text: string): ParseResult {
 
   // Hermes/OpenCode auth.json detection — delegate to parseAuthJson
   if ('credential_pool' in (parsed as Record<string, unknown>)) {
-    return parseAuthJson(text);
+    return parseAuthJson(clean);
   }
 
   const keys: ParsedKey[] = [];

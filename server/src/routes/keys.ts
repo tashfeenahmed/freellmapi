@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
-import { parseKeysFromFile, stripJsoncComments } from '../lib/key-parser.js';
+import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 
 export const keysRouter = Router();
 
@@ -250,7 +250,7 @@ keysRouter.post('/import', (req: Request, res: Response, next: any) => {
       const isJsonOrJsonc = /\.jsonc?$/i.test(req.file.originalname);
       if (isJsonOrJsonc) {
         try {
-          JSON.parse(stripJsoncComments(content));
+          JSON.parse(stripTrailingCommas(stripJsoncComments(content)));
         } catch {
           res.status(400).json({ error: { message: 'Invalid JSON format' } });
           return;
@@ -311,7 +311,7 @@ keysRouter.post('/import', (req: Request, res: Response, next: any) => {
         res.status(400).json({ error: { message: handlerErr.message } });
         return;
       }
-      throw handlerErr;
+      next(handlerErr);
     }
   });
 });
@@ -352,7 +352,7 @@ keysRouter.post('/preview', (req: Request, res: Response, next: any) => {
         const isJsonOrJsonc = /\.jsonc?$/i.test(file.originalname);
         if (isJsonOrJsonc) {
           try {
-            JSON.parse(stripJsoncComments(content));
+            JSON.parse(stripTrailingCommas(stripJsoncComments(content)));
           } catch {
             res.status(400).json({ error: { message: 'Invalid JSON format' } });
             return;
