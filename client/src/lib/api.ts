@@ -17,13 +17,15 @@ export const UNAUTHORIZED_EVENT = 'freellmapi:unauthorized';
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  const { headers: optHeaders, ...rest } = options ?? {};
+  const isFormData = rest.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
+      ...(optHeaders as Record<string, string>),
     },
-    ...options,
+    ...rest,
   });
   if (res.status === 401) {
     // Session missing/expired — drop the token and let the AuthGate re-render.

@@ -14,28 +14,28 @@ import { DialogRoot, DialogPortal, DialogOverlay, DialogContent, DialogHeader, D
 import { ImportPreviewTable } from '@/components/import-preview-table'
 import type { ImportKey } from '@/components/import-preview-table'
 
-// ── Example files for download in the import dialog ──────────────────────────
+// -- Example files for download in the import dialog -------------------------
 
-const EXAMPLE_DOTENV = `# FreeLLMAPI Key Import — .env format
+const EXAMPLE_DOTENV = `# FreeLLMAPI Key Import - .env format
 # Uncomment the provider(s) you want to import, then paste your key.
 # Format: PREFIX_KEY_NAME=your-api-key
 #
-# Provider     │ Env-var prefix │ Get your key at
-# ─────────────┼────────────────┼──────────────────────────────────────────
-# Google       │ GOOGLE_        │ https://aistudio.google.com/apikey
-# Groq         │ GROQ_          │ https://console.groq.com/keys
-# Cerebras     │ CEREBRAS_      │ https://cloud.cerebras.ai
-# SambaNova    │ SAMBANOVA_     │ https://cloud.sambanova.ai
-# NVIDIA       │ NVIDIA_        │ https://build.nvidia.com/settings/api-keys
-# Mistral      │ MISTRAL_       │ https://console.mistral.ai/api-keys
-# OpenRouter   │ OPENROUTER_    │ https://openrouter.ai/keys
-# GitHub       │ GITHUB_        │ https://github.com/settings/tokens
-# Cohere       │ COHERE_        │ https://dashboard.cohere.com/api-keys
-# Cloudflare   │ CLOUDFLARE_    │ https://dash.cloudflare.com
-# Zhipu (Z.ai) │ ZHIPU_         │ https://z.ai/manage-apikey/apikey-list
-# Ollama Cloud │ OLLAMA_        │ https://ollama.com/settings/keys
-# OpenCode Zen │ OPENCODE_      │ https://opencode.ai/auth
-# HuggingFace  │ HF_            │ https://huggingface.co/settings/tokens
+# Provider       | Env-var prefix | Get your key at
+# ---------------+---------------+------------------------------------------
+# Google         | GOOGLE_        | https://aistudio.google.com/apikey
+# Groq           | GROQ_          | https://console.groq.com/keys
+# Cerebras       | CEREBRAS_      | https://cloud.cerebras.ai
+# SambaNova      | SAMBANOVA_     | https://cloud.sambanova.ai
+# NVIDIA         | NVIDIA_        | https://build.nvidia.com/settings/api-keys
+# Mistral        | MISTRAL_       | https://console.mistral.ai/api-keys
+# OpenRouter     | OPENROUTER_    | https://openrouter.ai/keys
+# GitHub         | GITHUB_        | https://github.com/settings/tokens
+# Cohere         | COHERE_        | https://dashboard.cohere.com/api-keys
+# Cloudflare     | CLOUDFLARE_    | https://dash.cloudflare.com
+# Zhipu (Z.ai)   | ZHIPU_         | https://z.ai/manage-apikey/apikey-list
+# Ollama Cloud   | OLLAMA_        | https://ollama.com/settings/keys
+# OpenCode Zen   | OPENCODE_      | https://opencode.ai/auth
+# HuggingFace    | HF_            | https://huggingface.co/settings/tokens
 
 # GOOGLE_API_KEY=AIzaSy...
 # GROQ_API_KEY=gsk_your-groq-key
@@ -51,6 +51,10 @@ const EXAMPLE_DOTENV = `# FreeLLMAPI Key Import — .env format
 # OLLAMA_API_KEY=ollama-key-here
 # OPENCODE_API_KEY=opencode-key-here
 # HF_API_KEY=hf_your-huggingface-token
+#
+# You can also add multiple keys for the same provider (e.g. two Groq keys):
+# GROQ_API_KEY_1=gsk_your-first-groq-key
+# GROQ_API_KEY_2=gsk_your-second-groq-key
 `
 
 const EXAMPLE_AUTH_JSON = `{
@@ -354,12 +358,10 @@ export default function KeysPage() {
     mutationFn: async (files: File[]) => {
       const formData = new FormData()
       files.forEach(f => formData.append('files', f))
-      const res = await fetch('/api/keys/preview', { method: 'POST', body: formData })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: { message: 'Preview failed' } }))
-        throw new Error(body.error?.message ?? `HTTP ${res.status}`)
-      }
-      return res.json() as Promise<PreviewResponse>
+      return apiFetch<PreviewResponse>('/api/keys/preview', {
+        method: 'POST',
+        body: formData,
+      })
     },
     onSuccess: (data) => {
       setPreviewResult(data.keys)
@@ -371,18 +373,11 @@ export default function KeysPage() {
   })
 
   const importSelectedMutation = useMutation({
-    mutationFn: async (keys: ImportKey[]) => {
-      const res = await fetch('/api/keys/import-selected', {
+    mutationFn: async (keys: ImportKey[]) =>
+      apiFetch<ImportSelectedResponse>('/api/keys/import-selected', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keys }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: { message: 'Import failed' } }))
-        throw new Error(body.error?.message ?? `HTTP ${res.status}`)
-      }
-      return res.json() as Promise<ImportSelectedResponse>
-    },
+      }),
     onSuccess: (data) => {
       setImportResult(data)
       setStep('results')
@@ -780,7 +775,7 @@ export default function KeysPage() {
                     setImportError(null)
                     importSelectedMutation.mutate(selectedImportKeys)
                   }}
-                  disabled={importSelectedMutation.isPending}
+                  disabled={selectedImportKeys.length === 0 || importSelectedMutation.isPending}
                 >
                   {importSelectedMutation.isPending ? 'Importing…' : 'Import selected'}
                 </Button>
