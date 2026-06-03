@@ -93,11 +93,24 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
+
   const { data, isLoading, isError, refetch } = useQuery<AuthStatus>({
     queryKey: ['auth-status'],
     queryFn: () => apiFetch('/api/auth/status'),
     retry: false,
   })
+
+  useEffect(() => {
+    if (!isLoading) {
+      const loader = document.getElementById('startup-loader')
+      if (loader) {
+        loader.style.opacity = '0'
+        loader.style.pointerEvents = 'none'
+        setTimeout(() => loader.remove(), 500)
+      }
+    }
+  }, [isLoading])
+
 
   useEffect(() => {
     const handler = () => { refetch() }

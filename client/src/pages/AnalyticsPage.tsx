@@ -4,6 +4,25 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend,
 } from 'recharts'
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover/95 backdrop-blur-md border border-border/80 rounded-2xl p-3 shadow-lg">
+        <p className="text-sm font-medium mb-2 pb-1 border-b border-border/50">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2 text-sm tabular-nums">
+            <div className="size-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-medium text-foreground">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
+
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -19,20 +38,20 @@ function formatTokens(n?: number): string {
   return String(n)
 }
 
-function Stat({ label, value, className }: { label: string; value: string | number; className?: string }) {
+function Stat({ label, value, className, colorClass }: { label: string; value: string | number; className?: string; colorClass?: string }) {
   return (
-    <div className="rounded-lg border bg-card px-4 py-3">
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
-      <p className={`text-xl font-semibold tabular-nums mt-1 ${className ?? ''}`}>{value}</p>
+    <div className={`rounded-3xl border border-border/80 bg-card/70 backdrop-blur-sm px-5 py-4 ${className ?? ''}`}>
+      <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium mb-1.5">{label}</p>
+      <p className={`text-2xl font-semibold tabular-nums tracking-tight ${colorClass ?? ''}`}>{value}</p>
     </div>
   )
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="px-4 py-3 border-b">
-        <h3 className="text-sm font-medium">{title}</h3>
+    <div className="rounded-3xl border border-border/80 bg-card/70 backdrop-blur-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border/50 bg-background/30">
+        <h3 className="text-sm font-medium tracking-wide">{title}</h3>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -99,9 +118,18 @@ export default function AnalyticsPage() {
 
       <div className="space-y-6">
         {/* Summary stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <Stat label="Requests" value={summary?.totalRequests ?? 0} />
-          <Stat label="Success rate" value={`${summary?.successRate ?? 0}%`} />
+          <Stat
+            label="Success rate"
+            value={`${summary?.successRate ?? 0}%`}
+            colorClass={
+              !summary ? '' :
+              summary.successRate >= 95 ? 'text-green-500' :
+              summary.successRate >= 85 ? 'text-amber-500' :
+              'text-red-500 animate-pulse'
+            }
+          />
           <Stat label="Input tokens" value={formatTokens(summary?.totalInputTokens)} />
           <Stat label="Output tokens" value={formatTokens(summary?.totalOutputTokens)} />
           <Stat label="Avg latency" value={`${summary?.avgLatencyMs ?? 0} ms`} />
@@ -167,7 +195,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
               ) : (
                 <div className="max-h-[360px] overflow-y-auto overflow-x-auto -mx-4">
-                  <Table className="min-w-[600px]">
+                  <Table className="w-full min-w-[700px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="pl-4">Model</TableHead>
@@ -198,17 +226,17 @@ export default function AnalyticsPage() {
             </Panel>
           </div>
 
-          <Panel title="Errors by provider">
-            {!errorDist?.byPlatform?.length ? (
+          <Panel title="Errors by Category">
+            {!errorDist?.byCategory?.length ? (
               <p className="text-sm text-muted-foreground text-center py-8">No errors</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={errorDist.byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
-                  <XAxis dataKey="platform" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} />
-                  <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="count" fill="var(--destructive)" radius={[3, 3, 0, 0]} />
+                <BarChart data={errorDist.byCategory} layout="vertical" margin={{ top: 6, right: 6, left: 40, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} horizontal={false} />
+                  <XAxis type="number" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} />
+                  <YAxis type="category" dataKey="category" tick={axisStyle} tickLine={false} axisLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.2 }} />
+                  <Bar dataKey="count" name="Errors" fill="var(--destructive)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -218,21 +246,25 @@ export default function AnalyticsPage() {
             {errors.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No errors</p>
             ) : (
-              <div className="max-h-[240px] overflow-y-auto overflow-x-auto -mx-4">
-                <Table className="min-w-[500px]">
+              <div className="max-h-[300px] overflow-y-auto overflow-x-auto -mx-5 px-5">
+                <Table className="w-full min-w-[600px]">
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">Provider</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead className="text-right pr-4">Time</TableHead>
+                    <TableRow className="border-border/50">
+                      <TableHead className="w-[120px]">Provider</TableHead>
+                      <TableHead>Message / Stack Trace</TableHead>
+                      <TableHead className="text-right w-[100px]">Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {errors.slice(0, 20).map((e: any) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="pl-4 text-xs">{e.platform}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">{e.error}</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground tabular-nums pr-4">
+                      <TableRow key={e.id} className="border-border/50">
+                        <TableCell className="text-xs font-medium">{e.platform}</TableCell>
+                        <TableCell className="text-xs">
+                          <div className="font-mono bg-muted/40 p-1.5 rounded-md text-muted-foreground truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px]">
+                            {e.error}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                           {formatSqliteUtcToLocalTime(e.createdAt, { hour: '2-digit', minute: '2-digit' })}
                         </TableCell>
                       </TableRow>

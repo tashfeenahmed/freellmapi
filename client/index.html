@@ -5,9 +5,74 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FreeLLMAPI · Unified LLM Router</title>
+    <style>
+      #startup-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: oklch(0.135 0 0); /* dark theme fallback */
+        color: white;
+        transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+      }
+      @media (prefers-color-scheme: light) {
+        #startup-loader {
+          background-color: oklch(0.995 0 0); /* light theme fallback */
+          color: black;
+        }
+      }
+      .loader-icon {
+        width: 64px;
+        height: 64px;
+        animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .loader-icon svg {
+        width: 100%;
+        height: 100%;
+        animation: spin 3s linear infinite;
+      }
+      .loader-icon path {
+        stroke-dasharray: 100;
+        stroke-dashoffset: 100;
+        animation: dash 2s ease-in-out infinite alternate;
+      }
+      @keyframes spin {
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes dash {
+        0% { stroke-dashoffset: 100; }
+        100% { stroke-dashoffset: 0; }
+      }
+      @keyframes pulse-ring {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+      }
+    </style>
   </head>
   <body>
+    <div id="startup-loader">
+      <div class="loader-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 22 22 22"></polygon>
+        </svg>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Make sure the theme applies early
+      const stored = localStorage.getItem('theme');
+      if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        document.getElementById('startup-loader').style.backgroundColor = 'oklch(0.135 0 0)';
+        document.getElementById('startup-loader').style.color = 'white';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('startup-loader').style.backgroundColor = 'oklch(0.995 0 0)';
+        document.getElementById('startup-loader').style.color = 'black';
+      }
+    </script>
   </body>
 </html>
