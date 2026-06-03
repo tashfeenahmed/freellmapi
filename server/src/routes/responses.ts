@@ -12,6 +12,7 @@ import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, 
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
+import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import {
   isRetryableError,
   timingSafeStringEqual,
@@ -296,6 +297,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   const stream = reqData.stream ?? false;
   const messages = toChatMessages(reqData);
   const tools = toChatTools(reqData.tools);
+  // name → parameter schema, for repairing double-encoded tool arguments on
+  // the way back out (see lib/tool-args.ts).
+  const toolSchemas = toolSchemaMap(tools);
   const tool_choice = toChatToolChoice(reqData.tool_choice);
   const completionOpts = {
     temperature: reqData.temperature ?? undefined,
@@ -477,12 +481,18 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           sse('response.content_part.done', { item_id: msgItemId, output_index: 0, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
           sse('response.output_item.done', { output_index: 0, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
         }
-        // Finalize tool-call items.
+        // Finalize tool-call items. Arguments are repaired against the tool's
+        // parameter schema at this point (after the full string accumulated):
+        // models like GLM double-encode nested arrays/objects as strings, and
+        // Codex hard-rejects the call ("invalid type: string, expected a
+        // sequence"). Clients consume the *.done events / final response for
+        // arguments, so repairing here covers the streamed path too.
         const finalToolCalls: ChatToolCall[] = [];
         for (const acc of toolAcc.values()) {
-          sse('response.function_call_arguments.done', { item_id: acc.itemId, output_index: acc.outputIndex, arguments: acc.args });
-          sse('response.output_item.done', { output_index: acc.outputIndex, item: { id: acc.itemId, type: 'function_call', status: 'completed', call_id: acc.callId, name: acc.name, arguments: acc.args } });
-          finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: acc.args } });
+          const repairedArgs = repairToolArguments(acc.args, toolSchemas.get(acc.name));
+          sse('response.function_call_arguments.done', { item_id: acc.itemId, output_index: acc.outputIndex, arguments: repairedArgs });
+          sse('response.output_item.done', { output_index: acc.outputIndex, item: { id: acc.itemId, type: 'function_call', status: 'completed', call_id: acc.callId, name: acc.name, arguments: repairedArgs } });
+          finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: repairedArgs } });
         }
 
         const finalResponse = buildResponseObject({
@@ -502,7 +512,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
 
         const msg = result.choices[0]?.message;
         const text = contentToString(msg?.content ?? '');
-        const toolCalls = msg?.tool_calls ?? [];
+        const toolCalls = (msg?.tool_calls ?? []).map((tc) => ({
+          ...tc,
+          function: { ...tc.function, arguments: repairToolArguments(tc.function.arguments, toolSchemas.get(tc.function.name)) },
+        }));
         const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
         const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
 
