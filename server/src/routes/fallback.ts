@@ -187,6 +187,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
       COALESCE(SUM(input_tokens + output_tokens), 0) as total_used
     FROM requests
     WHERE created_at >= datetime('now', 'start of month')
+      AND request_type = 'chat'
   `).get() as { total_used: number };
 
   res.json({

@@ -161,8 +161,12 @@ function UnifiedKeySection() {
       <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
         <span className="text-muted-foreground">Base URL</span>
         <code className="font-mono">{baseUrl}</code>
-        <span className="text-muted-foreground">Endpoint</span>
+        <span className="text-muted-foreground">Chat</span>
         <code className="font-mono">/v1/chat/completions</code>
+        <span className="text-muted-foreground">Responses</span>
+        <code className="font-mono">/v1/responses</code>
+        <span className="text-muted-foreground">Embeddings</span>
+        <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">— model: "auto" or a family from the Embeddings tab</span></code>
       </div>
     </section>
   )

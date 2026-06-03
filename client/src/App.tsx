@@ -7,6 +7,7 @@ import { logout } from '@/lib/api'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
+import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 
 const queryClient = new QueryClient()
@@ -78,7 +79,7 @@ function App() {
               <div className="max-w-6xl mx-auto px-6 flex items-center">
                 <Brand />
                 <nav className="flex items-center gap-6 ml-10">
-                  <NavItem to="/fallback">Fallback</NavItem>
+                  <NavItem to="/models">Models</NavItem>
                   <NavItem to="/playground">Playground</NavItem>
                   <NavItem to="/keys">Keys</NavItem>
                   <NavItem to="/analytics">Analytics</NavItem>
@@ -91,10 +92,13 @@ function App() {
             </header>
             <main className="max-w-6xl mx-auto px-6 py-8">
               <Routes>
-                <Route path="/" element={<Navigate to="/fallback" replace />} />
+                <Route path="/" element={<Navigate to="/models/chat" replace />} />
+                <Route path="/models" element={<Navigate to="/models/chat" replace />} />
+                <Route path="/models/chat" element={<FallbackPage />} />
+                <Route path="/models/embeddings" element={<EmbeddingsPage />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
-                <Route path="/fallback" element={<FallbackPage />} />
+                <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/test" element={<Navigate to="/playground" replace />} />
                 <Route path="/health" element={<Navigate to="/keys" replace />} />

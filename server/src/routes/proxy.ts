@@ -6,6 +6,7 @@ import type { ChatMessage } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
+import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -250,12 +251,11 @@ export function streamChunkText(chunk: any): string {
   return chunk?.choices?.[0]?.delta?.content ?? '';
 }
 
-// OpenAI-compatible embeddings endpoint. The chat key store is per-model and
-// chat-specific, so embeddings use their own dedicated key via the
-// EMBEDDINGS_GOOGLE_KEY env var, routed to Google's embedding API (Gemini
-// `text-embedding-004` by default). Same unified-key auth as the rest of /v1.
-// Lets downstream clients (e.g. RAG apps) get embeddings through the gateway
-// with no extra provider wiring. Returns 503 when no embeddings key is set.
+// OpenAI-compatible embeddings endpoint, routed through the embeddings family
+// catalog: `model: "auto"` (or omitted) → the configured default family; a
+// family name or provider model id → that family's provider chain. Failover
+// only happens WITHIN a family (same model on another provider) — never across
+// models, since vectors from different models are incompatible.
 const EmbeddingsBody = z.object({
   model: z.string().optional(),
   input: z.union([z.string(), z.array(z.string())]),
@@ -268,49 +268,25 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
     return;
   }
-  const googleKey = process.env.EMBEDDINGS_GOOGLE_KEY;
-  if (!googleKey) {
-    res.status(503).json({
-      error: { message: 'Embeddings not configured on this gateway (set EMBEDDINGS_GOOGLE_KEY)', type: 'server_error' },
-    });
-    return;
-  }
   const parsed = EmbeddingsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
     return;
   }
   const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
-  // gemini-embedding-001 is the current Generative Language embedding model
-  // (text-embedding-004 isn't exposed on this API tier). Callers can override.
-  const requested = parsed.data.model && parsed.data.model !== 'auto' ? parsed.data.model : 'gemini-embedding-001';
-  const model = requested.startsWith('models/') ? requested : `models/${requested}`;
   try {
-    // These models support :embedContent (single), not :batchEmbedContents — so
-    // fan out one call per input and reassemble in input order.
-    const vectors = await Promise.all(
-      inputs.map(async (text) => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${googleKey}`;
-        const r = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: { parts: [{ text }] } }),
-        });
-        if (!r.ok) {
-          throw new Error(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`);
-        }
-        const j = (await r.json()) as { embedding?: { values: number[] } };
-        return j.embedding?.values ?? [];
-      }),
-    );
+    const result = await runEmbeddings(parsed.data.model, inputs);
     res.json({
       object: 'list',
-      data: vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
-      model: requested,
-      usage: { prompt_tokens: 0, total_tokens: 0 },
+      data: result.vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
+      model: result.family,
+      provider: result.platform,
+      usage: { prompt_tokens: result.inputTokens, total_tokens: result.inputTokens },
     });
   } catch (err: any) {
-    res.status(502).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type: 'server_error' } });
+    const status = err instanceof EmbeddingsError ? err.status : 502;
+    const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
+    res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type } });
   }
 });
 

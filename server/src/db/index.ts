@@ -57,6 +57,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
   migrateModelsV22Tools(db);
+  migrateEmbeddingsV1(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1688,6 +1689,66 @@ function migrateModelsV22Tools(db: Database.Database) {
     `).run();
   });
   apply();
+}
+
+// Embeddings V1 (2026-06): per-family embedding catalog. A "family" is one
+// model identity + dimension — vectors from different families live in
+// incompatible spaces, so /v1/embeddings only ever fails over WITHIN a family
+// (same model served by another provider), never across families.
+// Every entry was live-verified against the provider on 2026-06-04.
+function migrateEmbeddingsV1(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS embedding_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      family TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      dimensions INTEGER NOT NULL,
+      max_input_tokens INTEGER,
+      priority INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      quota_label TEXT NOT NULL DEFAULT '',
+      UNIQUE(platform, model_id)
+    );
+  `);
+
+  // Tag request rows so embeddings traffic doesn't pollute the chat token
+  // budget / headroom math. Existing rows backfill to 'chat' via the default.
+  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'request_type')) {
+    db.prepare("ALTER TABLE requests ADD COLUMN request_type TEXT NOT NULL DEFAULT 'chat'").run();
+  }
+
+  const seed = db.prepare(`
+    INSERT OR IGNORE INTO embedding_models
+      (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const rows: Array<[string, string, string, string, number, number | null, number, number, string]> = [
+    // family, platform, provider model id, display name, dims, max input, priority, enabled, quota label
+    ['gemini-embedding-001', 'google', 'gemini-embedding-001', 'Gemini Embedding', 3072, 2048, 1, 1, '100 rpm · 1K req/day'],
+    ['llama-nemotron-embed-vl-1b-v2', 'nvidia', 'nvidia/llama-nemotron-embed-vl-1b-v2', 'Nemotron Embed VL 1B', 2048, 8192, 1, 1, '~40 rpm'],
+    ['llama-nemotron-embed-vl-1b-v2', 'openrouter', 'nvidia/llama-nemotron-embed-vl-1b-v2', 'Nemotron Embed VL 1B (OR)', 2048, 8192, 2, 1, '$0/M tok'],
+    ['llama-nemotron-embed-1b-v2', 'nvidia', 'nvidia/llama-nemotron-embed-1b-v2', 'Nemotron Embed 1B', 2048, 8192, 1, 1, '~40 rpm'],
+    ['nv-embedqa-e5-v5', 'nvidia', 'nvidia/nv-embedqa-e5-v5', 'NV-EmbedQA E5 v5', 1024, 512, 1, 1, '~40 rpm'],
+    ['text-embedding-3-small', 'github', 'openai/text-embedding-3-small', 'Text Embedding 3 Small', 1536, 8191, 1, 1, 'rate-limited free'],
+    ['text-embedding-3-large', 'github', 'openai/text-embedding-3-large', 'Text Embedding 3 Large', 3072, 8191, 1, 1, 'rate-limited free'],
+    ['bge-m3', 'cloudflare', '@cf/baai/bge-m3', 'BGE-M3', 1024, 8192, 1, 1, '10K neurons/day (shared)'],
+    ['bge-m3', 'huggingface', 'BAAI/bge-m3', 'BGE-M3 (HF)', 1024, 8192, 2, 1, '$0.10/mo credits'],
+    ['embeddinggemma-300m', 'cloudflare', '@cf/google/embeddinggemma-300m', 'EmbeddingGemma 300M', 768, 2048, 1, 1, '10K neurons/day (shared)'],
+    ['qwen3-embedding-0.6b', 'cloudflare', '@cf/qwen/qwen3-embedding-0.6b', 'Qwen3 Embedding 0.6B', 1024, 4096, 1, 1, '10K neurons/day (shared)'],
+    // Cohere trial keys allow 1,000 calls/month TOTAL shared with chat —
+    // disabled by default so embedding traffic can't silently eat chat quota.
+    ['embed-v4.0', 'cohere', 'embed-v4.0', 'Cohere Embed v4', 1536, 128000, 1, 0, '1K calls/mo (shared w/ chat)'],
+  ];
+  const apply = db.transaction(() => { for (const r of rows) seed.run(...r); });
+  apply();
+
+  const def = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get();
+  if (!def) {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('embeddings_default_family', 'gemini-embedding-001')").run();
+  }
 }
 
 /** Append any models not yet in the fallback chain, lowest priority, ordered by

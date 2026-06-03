@@ -8,6 +8,7 @@ import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
 import { responsesRouter } from './routes/responses.js';
 import { fallbackRouter } from './routes/fallback.js';
+import { embeddingsRouter } from './routes/embeddings.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
@@ -60,6 +61,7 @@ export function createApp() {
   app.use('/api/keys', requireAuth, keysRouter);
   app.use('/api/models', requireAuth, modelsRouter);
   app.use('/api/fallback', requireAuth, fallbackRouter);
+  app.use('/api/embeddings', requireAuth, embeddingsRouter);
   app.use('/api/analytics', requireAuth, analyticsRouter);
   app.use('/api/health', requireAuth, healthRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
