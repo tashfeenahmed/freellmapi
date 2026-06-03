@@ -8,7 +8,7 @@ import type {
   ChatToolDefinition,
   ChatToolChoice,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
+import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit } from '../services/ratelimit.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
@@ -313,6 +313,22 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   const estimatedTotal = estimatedInputTokens + (reqData.max_output_tokens ?? 1000);
   const preferredModel = getStickyModel(messages);
 
+  // Tool-bearing requests (the normal case for Codex/agent clients on this
+  // endpoint) must stay on models that emit structured tool_calls — a model
+  // that serializes the call into text strands the agent harness with a
+  // "successful" run it can't act on. Mirrors the /chat/completions gate.
+  const wantsTools = (tools?.length ?? 0) > 0;
+  if (wantsTools && !hasEnabledToolsModel()) {
+    res.status(422).json({
+      error: {
+        message: 'This request includes tools, but no tool-capable model is enabled. Enable a tool-calling model (e.g. GPT-OSS 120B, Gemini 3.5 Flash, GLM-4.7) in the Fallback Chain.',
+        type: 'invalid_request_error',
+        code: 'no_tools_model',
+      },
+    });
+    return;
+  }
+
   const responseId = newId('resp');
   const skipKeys = new Set<string>();
   let lastError: any = null;
@@ -328,7 +344,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, wantsTools);
     } catch (err: any) {
       const status = lastError ? 429 : (err.status ?? 503);
       const message = lastError

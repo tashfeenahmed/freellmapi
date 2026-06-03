@@ -56,6 +56,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV19Gemma4(db);
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
+  migrateModelsV22Tools(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1619,6 +1620,71 @@ function migrateModelsV21PruneDead(db: Database.Database) {
     db.prepare(`
       UPDATE fallback_config SET enabled = 1
        WHERE model_db_id = (SELECT id FROM models WHERE platform = 'cerebras' AND model_id = 'zai-glm-4.7')
+    `).run();
+  });
+  apply();
+}
+
+// ── V22: tools-aware routing (2026-06-04) ──
+// Adds the supports_tools column and flags the models that reliably emit
+// STRUCTURED tool_calls. Motivation: an OpenAI-compatible agent client
+// (Paperclip/Codex via /v1/responses) sent tool-bearing requests that the
+// chain cascaded down to models with no real function-calling support —
+// nemotron-3-nano answered 72 requests averaging ~38 output tokens, and the
+// tool call leaked into chat text as literal `</tool_call>` XML, so the agent
+// harness never saw a status update and every issue dead-ended in manual
+// recovery. The router now keeps tool-bearing requests on this flagged subset
+// (see routeRequest's requireTools).
+//
+// Rule-based by model family rather than a hardcoded id list, same reasoning
+// as V16Vision: the catalog churns through migrations and LIKE rules survive
+// renames. A family is flagged only when (a) it has native, documented
+// function calling AND (b) we've seen structured tool_calls from it through
+// this gateway (the 2026-06-01 live tool-calling benchmark, V4's probe pass,
+// or production traffic). Conservative on purpose: a false negative just
+// narrows the pool, while a false positive reproduces the silent-garbage
+// failure above. Deliberately NOT flagged: gemma (weak at tools — V4),
+// nemotron nano/9b (the incident model), poolside laguna (returns ~2 tokens),
+// hermes-3 (emits tool calls as text — V4), groq compound (built-in tools
+// only, rejects user functions), r1-distills, and the small/stealth/unknown
+// tail (granite, lfm, stepfun, big-pickle, mimo, owl-alpha, cogito,
+// pollinations). Idempotent — reset-then-set, safe on fresh seeds and
+// upgrades alike.
+function migrateModelsV22Tools(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'supports_tools')) {
+    db.prepare('ALTER TABLE models ADD COLUMN supports_tools INTEGER NOT NULL DEFAULT 0').run();
+  }
+  const apply = db.transaction(() => {
+    // Reset first so a de-flagged model doesn't keep a stale flag across re-runs.
+    db.prepare('UPDATE models SET supports_tools = 0').run();
+    db.prepare(`
+      UPDATE models SET supports_tools = 1
+      WHERE (
+           LOWER(model_id) LIKE '%gpt-oss%'        -- groq/OR/cerebras/CF/sambanova/ollama; incl. safeguard (tool-tuned)
+        OR ((LOWER(model_id) LIKE '%llama-3%' OR LOWER(model_id) LIKE '%llama-4%')
+            AND LOWER(model_id) NOT LIKE '%hermes%') -- Llama 3.x/4 native tools; hermes-3-llama emits text tool calls
+        OR LOWER(model_id) LIKE '%gemini-%'        -- every Gemini; gemma intentionally NOT matched
+        OR LOWER(model_id) LIKE '%glm-%'           -- GLM 4.5+/5.x are agentic-tuned (zai/zhipu/CF/ollama)
+        OR LOWER(model_id) LIKE '%qwen3%'
+        OR LOWER(model_id) LIKE '%qwen-3%'         -- Qwen3 incl. coder/next variants
+        OR LOWER(model_id) LIKE '%deepseek-v%'     -- V3.x/V4 function calling; excludes r1-distill
+        OR LOWER(model_id) LIKE '%kimi-k2%'        -- K2 family is tool-native
+        OR LOWER(model_id) LIKE '%minimax-m2%'     -- M2.x is agent-focused
+        OR LOWER(model_id) LIKE '%mistral-large%'  -- Mistral API function calling (whole family)
+        OR LOWER(model_id) LIKE '%mistral-medium%'
+        OR LOWER(model_id) LIKE '%mistral-small%'
+        OR LOWER(model_id) LIKE '%magistral%'
+        OR LOWER(model_id) LIKE '%codestral%'
+        OR LOWER(model_id) LIKE '%devstral%'
+        OR LOWER(model_id) LIKE '%ministral%'
+        OR LOWER(model_id) LIKE '%command-a%'      -- Cohere native tool use (benchmarked top-20)
+        OR LOWER(model_id) LIKE '%command-r%'
+        OR LOWER(model_id) LIKE '%gpt-4o%'         -- GitHub's OpenAI models
+        OR LOWER(model_id) LIKE '%gpt-4.1%'
+        OR LOWER(model_id) LIKE '%gpt-5%'
+        OR LOWER(model_id) LIKE '%nemotron-3-super%' -- benchmarked #8 with real tool calls; nano stays excluded
+      )
     `).run();
   });
   apply();

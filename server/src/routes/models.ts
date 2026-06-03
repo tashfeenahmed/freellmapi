@@ -41,6 +41,7 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     contextWindow: m.context_window,
     enabled: m.enabled === 1,
     supportsVision: m.supports_vision === 1,
+    supportsTools: m.supports_tools === 1,
     priority: m.priority,
     fallbackEnabled: m.fallback_enabled === 1,
     hasProvider: hasProvider(m.platform),

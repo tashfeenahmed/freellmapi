@@ -45,6 +45,7 @@ export interface Model {
   contextWindow: number | null;
   enabled: boolean;
   supportsVision: boolean;
+  supportsTools: boolean;
 }
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';

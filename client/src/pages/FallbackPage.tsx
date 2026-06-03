@@ -40,6 +40,7 @@ interface FallbackEntry {
   rpdLimit: number | null
   monthlyTokenBudget: string
   supportsVision: boolean
+  supportsTools: boolean
   keyCount: number
 }
 
@@ -252,6 +253,14 @@ function RowContent({
               className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
             >
               Vision
+            </span>
+          )}
+          {row.supportsTools && (
+            <span
+              title="Emits structured tool calls — eligible for tool-bearing requests"
+              className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400"
+            >
+              Tools
             </span>
           )}
           {(row.penalty ?? 0) > 0 && (
