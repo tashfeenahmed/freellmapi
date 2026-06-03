@@ -53,6 +53,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV16Vision(db);
   migrateModelsV17IntelligenceTiers(db);
   migrateModelsV18OpenCodeZen(db);
+  migrateModelsV19(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1512,6 +1513,30 @@ function migrateModelsV18OpenCodeZen(db: Database.Database) {
       const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
       for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
     }
+  });
+  apply();
+}
+
+/**
+ * V19 (June 2026):
+ * Add the `poolside/laguna-m.1:free`, hosted by Kilo
+ */
+function migrateModelsV19(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  // Add catalog row for the new model. Numeric limits are conservative
+  // provider docs publish best-effort bounds that fluctuate.
+  const addition: [string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null] = 
+
+    // Kilo Gateway — 200 req/hr per IP anon. Probe-confirmed live.
+    // Intelligence and speed ranks as well as size adapted from OpenRouter,
+    // whose rankings are similar to Kilo.
+    ['kilo',         'poolside/laguna-m.1:free',  'Poolside Laguna M.1 (Kilo)',  13, 9,  'Large', null, null, null, null, '~2-3M (200/hr)', 131072];
+
+  const apply = db.transaction(() => {
+    insert.run(...addition);
   });
   apply();
 }
