@@ -28,6 +28,7 @@ export class OpenAICompatProvider extends BaseProvider {
     extraHeaders?: Record<string, string>;
     validateUrl?: string;
     timeoutMs?: number;
+    keyless?: boolean;
   }) {
     super();
     this.platform = opts.platform;
@@ -36,6 +37,14 @@ export class OpenAICompatProvider extends BaseProvider {
     this.extraHeaders = opts.extraHeaders ?? {};
     this.validateUrl = opts.validateUrl;
     this.timeoutMs = opts.timeoutMs ?? 15000;
+    this.keyless = opts.keyless ?? false;
+  }
+
+  /** Keyless providers (Kilo's anonymous free tier) must send NO Authorization
+   * header — a stored sentinel like `Bearer no-key` could be treated as an
+   * invalid key. Everyone else sends the bearer as usual. */
+  private authHeader(apiKey: string): Record<string, string> {
+    return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
   }
 
   async chatCompletion(
@@ -47,7 +56,7 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
         ...this.extraHeaders,
       },
@@ -83,7 +92,7 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
         ...this.extraHeaders,
       },
@@ -146,7 +155,7 @@ export class OpenAICompatProvider extends BaseProvider {
     const res = await this.fetchWithTimeout(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        ...this.authHeader(apiKey),
         ...this.extraHeaders,
       },
     }, 30000);

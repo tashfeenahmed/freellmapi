@@ -30,7 +30,10 @@ function GetKeyLink({ url }: { url: string }) {
 // `url` points to each provider's key-management / signup page so the Keys page
 // can show a "Get API key" shortcut (#137). OpenCode Zen's key is free from
 // opencode.ai/auth — no card needed; billing only applies to paid models (#128).
-const PLATFORMS: { value: Platform; label: string; url: string }[] = [
+// `keyless: true` providers (Kilo's anonymous free tier) need no API key — the
+// form disables the key field and submits a sentinel the backend stores so
+// routing treats the platform as configured.
+const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean }[] = [
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
   { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
   { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
@@ -43,7 +46,7 @@ const PLATFORMS: { value: Platform; label: string; url: string }[] = [
   { value: 'cloudflare', label: 'Cloudflare Workers AI', url: 'https://dash.cloudflare.com' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
   { value: 'ollama', label: 'Ollama Cloud', url: 'https://ollama.com/settings/keys' },
-  { value: 'kilo', label: 'Kilo Gateway (anon ok)', url: 'https://app.kilo.ai' },
+  { value: 'kilo', label: 'Kilo Gateway (no key needed)', url: 'https://app.kilo.ai', keyless: true },
   { value: 'pollinations', label: 'Pollinations (anon ok)', url: 'https://pollinations.ai' },
   { value: 'llm7', label: 'LLM7 (anon ok)', url: 'https://llm7.io' },
   { value: 'huggingface', label: 'HuggingFace Router', url: 'https://huggingface.co/settings/tokens' },
@@ -356,12 +359,15 @@ export default function KeysPage() {
   }, [editingKeyId])
 
   const needsAccountId = platform === 'cloudflare'
+  const isKeyless = PLATFORMS.find(p => p.value === platform)?.keyless ?? false
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!platform || !apiKey) return
+    if (!platform) return
+    if (!isKeyless && !apiKey) return
     if (needsAccountId && !accountId) return
-    const key = needsAccountId ? `${accountId}:${apiKey}` : apiKey
+    // Keyless providers submit an empty key; the backend stores a sentinel.
+    const key = isKeyless ? '' : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
     addKey.mutate({ platform, key, label: label || undefined })
   }
 
@@ -425,11 +431,17 @@ export default function KeysPage() {
               <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
               <Input
                 type="password"
-                value={apiKey}
+                value={isKeyless ? '' : apiKey}
                 onChange={e => setApiKey(e.target.value)}
-                placeholder={needsAccountId ? 'Bearer token' : 'paste key here'}
+                placeholder={isKeyless ? 'No API key needed' : (needsAccountId ? 'Bearer token' : 'paste key here')}
                 className="font-mono text-xs"
+                disabled={isKeyless}
               />
+              {isKeyless && (
+                <p className="text-[11px] text-muted-foreground">
+                  No API key needed — this provider's free tier is anonymous (rate-limited per IP).
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Label</Label>
@@ -440,8 +452,8 @@ export default function KeysPage() {
                 className="w-[160px]"
               />
             </div>
-            <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
-              {addKey.isPending ? 'Adding…' : 'Add key'}
+            <Button type="submit" size="sm" disabled={!platform || (!isKeyless && !apiKey) || (needsAccountId && !accountId) || addKey.isPending}>
+              {addKey.isPending ? 'Adding…' : isKeyless ? 'Enable' : 'Add key'}
             </Button>
           </form>
           {addKey.isError && (

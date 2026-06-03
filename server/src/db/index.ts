@@ -53,6 +53,8 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV16Vision(db);
   migrateModelsV17IntelligenceTiers(db);
   migrateModelsV18OpenCodeZen(db);
+  migrateModelsV19Gemma4(db);
+  migrateModelsV20KiloFree(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1514,6 +1516,78 @@ function migrateModelsV18OpenCodeZen(db: Database.Database) {
     }
   });
   apply();
+}
+
+/**
+ * V19 (June 2026): Google Gemma 4 (released Mar 2026) on the AI Studio free tier.
+ * Both IDs are reachable with the same key as Gemini (live-probed 200). The 26B
+ * is an MoE model (~3.8B active) — Google's real id is `gemma-4-26b-a4b-it`, not
+ * a plain "26B". Tiers match V17's bands (both Large; V17 re-asserts on every
+ * boot). Free limits are now AI-Studio-dashboard-driven and were cut 50-80% in
+ * Dec 2025, so rpd/tpm are conservative. Idempotent (INSERT OR IGNORE + fallback
+ * backfill), safe to re-run.
+ */
+function migrateModelsV19Gemma4(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['google', 'gemma-4-31b-it',     'Gemma 4 31B IT', 19, 4, 'Large', 15, 1000, 250000, null, '~30M', 32768],
+    ['google', 'gemma-4-26b-a4b-it', 'Gemma 4 26B IT', 20, 4, 'Large', 15, 1000, 250000, null, '~30M', 32768],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+  });
+  apply();
+}
+
+/**
+ * V20 (June 2026): Kilo Gateway anonymous free models. Live-probed keyless
+ * (no API key, cost:0); Kilo documents anonymous access for `:free` routes,
+ * rate-limited 200 req/hr per IP shared across ALL free models. Per-model rate
+ * limits are left null on purpose — the 200/hr budget is per-IP, not per-model,
+ * so we rely on Kilo's own 429s + gateway failover rather than guessing a split.
+ * Prompts/outputs are logged for training (don't send sensitive data); the 120B
+ * Nemotron is additionally flagged trial-use by Kilo. Tiers follow V17 bands
+ * (V17 re-asserts nemotron-3-super → Large on every boot). Routing also needs a
+ * 'kilo' api_keys sentinel row, added via the keyless Keys-page flow. Idempotent
+ * (INSERT OR IGNORE + fallback backfill), safe to re-run.
+ */
+function migrateModelsV20KiloFree(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    ['kilo', 'poolside/laguna-m.1:free',               'Poolside Laguna M.1 (Kilo)',    13, 8, 'Large',  null, null, null, null, 'free · 200/hr per IP',         262144],
+    ['kilo', 'poolside/laguna-xs.2:free',              'Poolside Laguna XS.2 (Kilo)',   16, 4, 'Medium', null, null, null, null, 'free · 200/hr per IP',         262144],
+    ['kilo', 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super 120B (Kilo)',  12, 5, 'Large',  null, null, null, null, 'free · 200/hr per IP (trial)', 1000000],
+    ['kilo', 'stepfun/step-3.7-flash:free',            'StepFun Step 3.7 Flash (Kilo)', 14, 3, 'Medium', null, null, null, null, 'free · 200/hr per IP',         262144],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+  });
+  apply();
+}
+
+/** Append any models not yet in the fallback chain, lowest priority, ordered by
+ * intelligence_rank. Shared by the recent model migrations (V18–V20). */
+function backfillFallback(db: Database.Database) {
+  const missing = db.prepare(`
+    SELECT m.id FROM models m
+    LEFT JOIN fallback_config f ON m.id = f.model_db_id
+    WHERE f.id IS NULL ORDER BY m.intelligence_rank ASC
+  `).all() as { id: number }[];
+  if (missing.length > 0) {
+    const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+    const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+    for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+  }
 }
 
 function ensureUnifiedKey(db: Database.Database) {

@@ -20,6 +20,11 @@ export interface CompletionOptions {
 export abstract class BaseProvider {
   abstract readonly platform: Platform;
   abstract readonly name: string;
+  /** Providers whose free tier needs no API key (e.g. Kilo's anonymous gateway).
+   * When true, the gateway stores a sentinel key row so routing still considers
+   * the platform "configured", and the provider omits the Authorization header
+   * on outgoing requests. Defaults to false; set by subclasses. */
+  keyless = false;
 
   abstract chatCompletion(
     apiKey: string,
