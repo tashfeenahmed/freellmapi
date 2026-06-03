@@ -296,7 +296,7 @@ export default function PlaygroundPage() {
         </div>
 
         {/* MESSAGES WILL GO HERE */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-32">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 pb-32">
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-center">
               <div className="space-y-4 max-w-sm">
@@ -313,9 +313,9 @@ export default function PlaygroundPage() {
             <>
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[90%] md:max-w-[80%] rounded-3xl px-5 py-4 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-card/70 backdrop-blur-sm border border-border/80 rounded-bl-sm shadow-sm'}`}>
+                  <div className={`max-w-[90%] md:max-w-[80%] rounded-3xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-card/70 backdrop-blur-sm border border-border/80 rounded-bl-sm shadow-sm'}`}>
                     {msg.role === 'assistant' && msg.meta && (
-                      <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/50 w-fit px-3 py-1.5 rounded-full border border-border/50">
+                      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/70 bg-transparent w-fit px-1 py-0.5">
                         <Cpu className="size-3 text-primary animate-pulse" />
                         <span>Routed via {msg.meta.platform} · {msg.meta.model}</span>
                         {msg.meta.fallbackAttempts ? (
@@ -336,8 +336,8 @@ export default function PlaygroundPage() {
               ))}
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-card/70 backdrop-blur-sm border border-border/80 rounded-3xl rounded-bl-sm px-5 py-4 min-w-[200px]">
-                     <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/50 w-fit px-3 py-1.5 rounded-full border border-border/50">
+                  <div className="bg-card/70 backdrop-blur-sm border border-border/80 rounded-3xl rounded-bl-sm px-4 py-3 min-w-[200px]">
+                     <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/70 bg-transparent w-fit px-1 py-0.5">
                         <ListFilter className="size-3 text-primary animate-spin" />
                         <span>Evaluating routing path...</span>
                       </div>
