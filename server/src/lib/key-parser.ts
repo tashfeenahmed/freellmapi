@@ -134,6 +134,71 @@ export function parseDotEnv(content: string): Array<{ key: string; value: string
 }
 
 // ---------------------------------------------------------------------------
+// stripJsoncComments — strip JSONC comments before JSON.parse
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip JSONC comments (single-line // and block /* * /) from a string,
+ * respecting string literals so that comment-like content inside quotes is
+ * preserved.
+ *
+ * Also removes trailing commas after the last property/element (another JSONC
+ * extension that `JSON.parse` does not accept).
+ */
+export function stripJsoncComments(text: string): string {
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    // String literal — copy verbatim
+    if (text[i] === '"') {
+      out.push('"');
+      i++;
+      while (i < text.length) {
+        out.push(text[i]);
+        if (text[i] === '\\') {
+          i++;
+          if (i < text.length) { out.push(text[i]); i++; }
+        } else if (text[i] === '"') {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // Single-line comment  // …
+    if (text[i] === '/' && i + 1 < text.length && text[i + 1] === '/') {
+      i += 2;
+      while (i < text.length && text[i] !== '\n') i++;
+      continue;
+    }
+
+    // Block comment  /* … */
+    if (text[i] === '/' && i + 1 < text.length && text[i + 1] === '*') {
+      i += 2;
+      while (i + 1 < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+      i += 2; // skip the closing */
+      continue;
+    }
+
+    out.push(text[i]);
+    i++;
+  }
+
+  return out.join('');
+}
+
+/**
+ * Strip trailing commas (a JSONC extension).  Handles both `,}` and `,]`.
+ */
+export function stripTrailingCommas(text: string): string {
+  return text.replace(/,(\s*[}\]])/g, '$1');
+}
+
+// ---------------------------------------------------------------------------
 // parseJson
 // ---------------------------------------------------------------------------
 
@@ -490,9 +555,13 @@ function parseEnvFile(text: string): ParseResult {
  * not a valid JSON object.
  */
 function parseJsonFile(text: string): ParseResult {
+  // Strip JSONC comments before parsing so .jsonc files (and .json files with
+  // informal comments) work correctly instead of silently falling back to .env.
+  const clean = stripTrailingCommas(stripJsoncComments(text));
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(clean);
   } catch {
     return parseEnvFile(text);
   }

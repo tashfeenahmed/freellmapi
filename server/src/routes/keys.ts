@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
-import { parseKeysFromFile } from '../lib/key-parser.js';
+import { parseKeysFromFile, stripJsoncComments } from '../lib/key-parser.js';
 
 export const keysRouter = Router();
 
@@ -247,9 +247,10 @@ keysRouter.post('/import', (req: Request, res: Response, next: any) => {
         return;
       }
 
-      if (req.file.originalname.toLowerCase().endsWith('.json')) {
+      const isJsonOrJsonc = /\.jsonc?$/i.test(req.file.originalname);
+      if (isJsonOrJsonc) {
         try {
-          JSON.parse(content);
+          JSON.parse(stripJsoncComments(content));
         } catch {
           res.status(400).json({ error: { message: 'Invalid JSON format' } });
           return;
@@ -269,18 +270,29 @@ keysRouter.post('/import', (req: Request, res: Response, next: any) => {
           continue;
         }
 
+        // rawKey is "KEY=VALUE" — split so we store only the value encrypted
+        // and use the key name as the human-readable label.
+        const eqIdx = key.rawKey.indexOf('=');
+        const keyName = eqIdx >= 0 ? key.rawKey.slice(0, eqIdx) : key.rawKey;
+        const keyValue = eqIdx >= 0 ? key.rawKey.slice(eqIdx + 1) : '';
+
+        if (!keyValue) {
+          errors.push({ key: keyName, error: 'No key value found' });
+          continue;
+        }
+
         try {
-          const { encrypted, iv, authTag } = encrypt(key.rawKey);
+          const { encrypted, iv, authTag } = encrypt(keyValue);
 
           const stmt = db.prepare(`
             INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, base_url, status, enabled)
             VALUES (?, ?, ?, ?, ?, ?, 'unknown', 1)
           `);
-          stmt.run(key.platform, key.rawKey, encrypted, iv, authTag, '');
+          stmt.run(key.platform, keyName, encrypted, iv, authTag, '');
 
-          imported.push({ keyName: key.rawKey, platform: key.platform || 'unknown' });
+          imported.push({ keyName, platform: key.platform || 'unknown' });
         } catch (insertErr) {
-          errors.push({ key: key.rawKey, error: (insertErr as Error).message });
+          errors.push({ key: keyName, error: (insertErr as Error).message });
         }
       }
 
@@ -337,9 +349,10 @@ keysRouter.post('/preview', (req: Request, res: Response, next: any) => {
           return;
         }
 
-        if (file.originalname.toLowerCase().endsWith('.json')) {
+        const isJsonOrJsonc = /\.jsonc?$/i.test(file.originalname);
+        if (isJsonOrJsonc) {
           try {
-            JSON.parse(content);
+            JSON.parse(stripJsoncComments(content));
           } catch {
             res.status(400).json({ error: { message: 'Invalid JSON format' } });
             return;
