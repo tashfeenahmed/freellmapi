@@ -62,7 +62,11 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export function detectPlatform(prefix: string): string | null {
-  return PREFIX_MAP[prefix] ?? null;
+  const platform = PREFIX_MAP[prefix];
+  if (platform != null) {
+    return platform;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
