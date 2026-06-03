@@ -1,0 +1,19 @@
+<<<<<<< SEARCH
+export function initEncryptionKey(db: any) {
+  let envKey = process.env.ENCRYPTION_KEY;
+
+  if (envKey && envKey !== 'generate-me-for-local-dev-only') {
+    if (envKey.length !== 64 || !/^[0-9a-f]+$/i.test(envKey)) {
+      console.warn('[crypto] Invalid ENCRYPTION_KEY length or format');
+    }
+  }
+=======
+export function initEncryptionKey(db: any) {
+  let envKey = process.env.ENCRYPTION_KEY;
+
+  if (envKey && envKey !== 'generate-me-for-local-dev-only') {
+    if (envKey.length !== 64 || !/^[0-9a-f]+$/i.test(envKey)) {
+      throw new Error('[crypto] Invalid ENCRYPTION_KEY length or format');
+    }
+  }
+>>>>>>> REPLACE

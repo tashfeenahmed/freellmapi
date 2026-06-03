@@ -1,4 +1,5 @@
-import js from '@eslint/js'
+with open('client/eslint.config.js', 'w') as f:
+    f.write("""import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
@@ -25,8 +26,8 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-explicit-any': 'off',
       'react-hooks/rules-of-hooks': 'off',
-      'react-hooks/exhaustive-deps': 'off',
-      'react-hooks/set-state-in-effect': 'off'
+      'react-hooks/exhaustive-deps': 'off'
     },
   },
 )
+""")
