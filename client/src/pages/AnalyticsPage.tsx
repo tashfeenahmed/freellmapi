@@ -99,7 +99,7 @@ export default function AnalyticsPage() {
 
       <div className="space-y-6">
         {/* Summary stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           <Stat label="Requests" value={summary?.totalRequests ?? 0} />
           <Stat label="Success rate" value={`${summary?.successRate ?? 0}%`} />
           <Stat label="Input tokens" value={formatTokens(summary?.totalInputTokens)} />
@@ -166,8 +166,8 @@ export default function AnalyticsPage() {
               {byModel.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
               ) : (
-                <div className="max-h-[360px] overflow-y-auto -mx-4">
-                  <Table>
+                <div className="max-h-[360px] overflow-y-auto overflow-x-auto -mx-4">
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="pl-4">Model</TableHead>
@@ -218,8 +218,8 @@ export default function AnalyticsPage() {
             {errors.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No errors</p>
             ) : (
-              <div className="max-h-[240px] overflow-y-auto -mx-4">
-                <Table>
+              <div className="max-h-[240px] overflow-y-auto overflow-x-auto -mx-4">
+                <Table className="min-w-[500px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="pl-4">Provider</TableHead>

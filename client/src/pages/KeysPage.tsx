@@ -200,7 +200,7 @@ function CustomProviderSection() {
         (most local servers don't need one).
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
-        <div className="space-y-1.5 flex-1 min-w-[240px]">
+        <div className="space-y-1.5 w-full sm:flex-1 sm:min-w-[240px]">
           <Label className="text-xs">Base URL</Label>
           <Input
             value={baseUrl}
@@ -209,35 +209,35 @@ function CustomProviderSection() {
             className="font-mono text-xs"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 w-full sm:w-auto">
           <Label className="text-xs">Model</Label>
           <Input
             value={model}
             onChange={e => setModel(e.target.value)}
             placeholder="qwen3:4b"
-            className="w-[180px] font-mono text-xs"
+            className="w-full sm:w-[180px] font-mono text-xs"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 w-full sm:w-auto">
           <Label className="text-xs">Display name</Label>
           <Input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
             placeholder="optional"
-            className="w-[150px]"
+            className="w-full sm:w-[150px]"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 w-full sm:w-auto">
           <Label className="text-xs">API key</Label>
           <Input
             type="password"
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
             placeholder="optional"
-            className="w-[150px] font-mono text-xs"
+            className="w-full sm:w-[150px] font-mono text-xs"
           />
         </div>
-        <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
+        <Button type="submit" size="sm" className="w-full sm:w-auto" disabled={!baseUrl || !model || addCustom.isPending}>
           {addCustom.isPending ? 'Adding…' : 'Add model'}
         </Button>
       </form>
@@ -393,10 +393,10 @@ export default function KeysPage() {
         <section>
           <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
           <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full sm:w-auto">
               <Label className="text-xs">Platform</Label>
               <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger className="w-full sm:w-[220px]">
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
@@ -411,17 +411,17 @@ export default function KeysPage() {
               })()}
             </div>
             {needsAccountId && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 w-full sm:w-auto">
                 <Label className="text-xs">Account ID</Label>
                 <Input
                   value={accountId}
                   onChange={e => setAccountId(e.target.value)}
                   placeholder="a1b2c3d4…"
-                  className="w-[200px] font-mono text-xs"
+                  className="w-full sm:w-[200px] font-mono text-xs"
                 />
               </div>
             )}
-            <div className="space-y-1.5 flex-1 min-w-[240px]">
+            <div className="space-y-1.5 w-full sm:flex-1 sm:min-w-[240px]">
               <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
               <Input
                 type="password"
@@ -431,16 +431,16 @@ export default function KeysPage() {
                 className="font-mono text-xs"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full sm:w-auto">
               <Label className="text-xs">Label</Label>
               <Input
                 value={label}
                 onChange={e => setLabel(e.target.value)}
                 placeholder="optional"
-                className="w-[160px]"
+                className="w-full sm:w-[160px]"
               />
             </div>
-            <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
+            <Button type="submit" size="sm" className="w-full sm:w-auto" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
               {addKey.isPending ? 'Adding…' : 'Add key'}
             </Button>
           </form>
@@ -488,9 +488,9 @@ export default function KeysPage() {
                       const lastChecked = h?.lastCheckedAt
                       const isEditing = editingKeyId === k.id
                       return (
-                        <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <div key={k.id} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
                           <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
-                          <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
+                          <code className="text-xs font-mono flex-shrink-0 sm:flex-1 max-w-[200px] truncate sm:max-w-none">{k.maskedKey}</code>
                           {isEditing ? (
                             <Input
                               ref={editInputRef}
@@ -501,7 +501,7 @@ export default function KeysPage() {
                                 if (e.key === 'Escape') cancelEditing()
                               }}
                               onBlur={() => saveEditing(k.id)}
-                              className="h-6 w-[160px] text-xs"
+                              className="h-8 w-full sm:w-[160px] text-xs"
                               disabled={updateKey.isPending}
                             />
                           ) : (
@@ -510,7 +510,7 @@ export default function KeysPage() {
                             </>
                           )}
                           <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
-                          <div className="flex-1" />
+                          <div className="flex-1 hidden sm:block" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
                               {formatSqliteUtcToLocalTime(lastChecked, { hour: '2-digit', minute: '2-digit' })}
