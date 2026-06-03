@@ -142,6 +142,30 @@ describe('Empty-completion failover', () => {
     expect(streamChatCompletion).toHaveBeenCalledTimes(2);
   });
 
+  it('/v1/responses (stream): a connect-time provider error fails over instead of dying mid-"stream"', async () => {
+    // Regression: headers used to be sent BEFORE the provider call, so a 503
+    // at stream open was misclassified as mid-stream → returned to the client
+    // with no failover and no cooldown (observed as 17 consecutive 503s to
+    // the same model). With lazy headers it must take the retry path.
+    async function* failsAtOpen(): AsyncGenerator<any> {
+      throw new Error('OpenRouter API error 503: Provider returned error');
+    }
+    streamChatCompletion
+      .mockReturnValueOnce(failsAtOpen())
+      .mockReturnValueOnce(goodStream());
+
+    const { status, raw } = await post(app, '/v1/responses', {
+      input: 'hi',
+      stream: true,
+    }, key);
+
+    expect(status).toBe(200);
+    expect(raw).toContain('response.completed');
+    expect(raw).toContain('streamed answer');
+    expect(raw).not.toContain('response.failed');
+    expect(streamChatCompletion).toHaveBeenCalledTimes(2);
+  });
+
   it('logs the empty attempt as an error and the failover as success', async () => {
     chatCompletion
       .mockResolvedValueOnce(EMPTY_RESULT)

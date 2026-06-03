@@ -364,21 +364,6 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
 
     try {
       if (stream) {
-        // Headers + response.created on the first attempt that gets this far.
-        if (!streamStarted) {
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-          const skeleton = {
-            id: responseId, object: 'response', created_at: nowUnix(),
-            status: 'in_progress', model: route.modelId, output: [], output_text: '',
-          };
-          sse('response.created', { response: skeleton });
-          sse('response.in_progress', { response: skeleton });
-          streamStarted = true;
-        }
-
         let outputIndex = 0;
         let msgItemId: string | null = null;
         let msgText = '';
@@ -389,6 +374,32 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         const gen = route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, completionOpts);
 
         for await (const chunk of gen) {
+          // LAZY header set — headers + the response.created/in_progress
+          // skeleton go out only once the provider actually streams a chunk.
+          // Sending them before the provider call (the previous behavior)
+          // committed the SSE response, so a provider error AT STREAM OPEN —
+          // e.g. OpenRouter 503ing a large-context request — was misclassified
+          // as mid-stream and returned to the client with NO failover and NO
+          // cooldown; the next request then hit the same broken model again
+          // (observed: 17 consecutive 503s to the same model while the rest of
+          // the chain sat idle). With lazy headers a connect-time error
+          // bubbles to the catch with streamStarted=false and takes the normal
+          // retry path. Mirrors the proxy's streaming handler.
+          if (!streamStarted) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+            if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+            const skeleton = {
+              id: responseId, object: 'response', created_at: nowUnix(),
+              status: 'in_progress', model: route.modelId, output: [], output_text: '',
+            };
+            sse('response.created', { response: skeleton });
+            sse('response.in_progress', { response: skeleton });
+            streamStarted = true;
+          }
+
           const delta = chunk.choices[0]?.delta;
           if (!delta) continue;
 
