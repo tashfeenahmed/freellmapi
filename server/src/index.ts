@@ -10,8 +10,8 @@ async function main() {
   const app = createApp();
 
   app.listen(Number(PORT), '::', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-    console.log(`Proxy endpoint: http://0.0.0.0:${PORT}/v1/chat/completions`);
+    console.log(`Server running on http://[::]:${PORT}`);
+    console.log(`Proxy endpoint: http://[::]:${PORT}/v1/chat/completions`);
     startHealthChecker();
   });
 }
