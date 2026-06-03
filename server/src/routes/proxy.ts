@@ -523,9 +523,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           }
 
           if (!streamStarted) {
-            // Upstream returned no chunks — emit minimal successful stream.
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+            // Upstream returned zero chunks — an empty completion in stream
+            // clothing. No headers are out yet, so fail over to the next model
+            // instead of handing the client a valid-looking empty stream
+            // (production case: nemotron-3-super returning nothing on large
+            // contexts while the request logs as success).
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (stream produced no chunks)');
+            skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+            setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
+            recordRateLimitHit(route.modelDbId);
+            lastError = new Error(`empty completion from ${route.displayName}`);
+            continue;
           }
           res.write('data: [DONE]\n\n');
           res.end();
@@ -556,6 +564,20 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.apiKey, messages, route.modelId,
           { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
+
+        // Empty completion (no text, no tool calls) → fail over rather than
+        // return a transport-level "success" the caller can't act on. Mirrors
+        // the zero-chunk streaming case above.
+        const respMsg = result.choices?.[0]?.message;
+        const respText = contentToString(respMsg?.content ?? '');
+        if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+          setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
+          recordRateLimitHit(route.modelDbId);
+          lastError = new Error(`empty completion from ${route.displayName}`);
+          continue;
+        }
 
         const totalTokens = result.usage?.total_tokens ?? 0;
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);

@@ -443,6 +443,23 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           }
         }
 
+        // Empty completion — the provider returned 200 with no text AND no
+        // tool calls. Seen in production from nemotron-3-super on ~65k-token
+        // contexts: transport-level "success", zero usable output, so the
+        // agent client records a successful run it can't act on and its issue
+        // dead-ends. Nothing substantive has been emitted yet (output_item
+        // events only fire on the first delta; only the created/in_progress
+        // skeletons are out), so it's safe to fail over to the next model on
+        // the same SSE stream.
+        if (msgText.length === 0 && toolAcc.size === 0) {
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+          setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
+          recordRateLimitHit(route.modelDbId);
+          lastError = new Error(`empty completion from ${route.displayName}`);
+          continue;
+        }
+
         // Finalize any open text item.
         if (msgItemId !== null) {
           sse('response.output_text.done', { item_id: msgItemId, output_index: 0, content_index: 0, text: msgText });
@@ -477,6 +494,16 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         const toolCalls = msg?.tool_calls ?? [];
         const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
         const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+
+        // Empty completion → fail over (see the streaming-path comment above).
+        if (!text && toolCalls.length === 0) {
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+          setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
+          recordRateLimitHit(route.modelDbId);
+          lastError = new Error(`empty completion from ${route.displayName}`);
+          continue;
+        }
 
         recordTokens(route.platform, route.modelId, route.keyId, result.usage?.total_tokens ?? 0);
         recordSuccess(route.modelDbId);
@@ -517,7 +544,17 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     }
   }
 
+  // Exhausted all retries. The streaming skeleton may already be on the wire
+  // (reachable since empty-completion failover can burn every attempt after
+  // streamStarted) — close the SSE stream with a failed event instead of
+  // writing JSON onto a committed event-stream response.
+  const exhaustedMsg = `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`;
+  if (streamStarted) {
+    sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhaustedMsg, type: 'rate_limit_error' } } });
+    res.end();
+    return;
+  }
   res.status(429).json({
-    error: { message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`, type: 'rate_limit_error' },
+    error: { message: exhaustedMsg, type: 'rate_limit_error' },
   });
 });
