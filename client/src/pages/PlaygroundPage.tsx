@@ -423,7 +423,7 @@ export default function PlaygroundPage() {
                  </div>
                  <div className="flex justify-between items-center">
                    <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="size-3"/> Started</span>
-                   <span className="font-mono text-xs">{new Date(sessions.find(s => s.id === currentSessionId)?.date || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                   <span className="font-mono text-xs">{new Date(sessions.find(s => s.id === currentSessionId)?.date || "2024-01-01T00:00:00.000Z").toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                  </div>
                </div>
              </div>
