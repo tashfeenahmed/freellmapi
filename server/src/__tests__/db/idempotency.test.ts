@@ -84,20 +84,28 @@ describe('Migration idempotency', () => {
     `).all();
     expect(dead).toEqual([]);
 
-    const live = db.prepare(`
+    // V21 pruned these three after live probing returned 404 "no endpoints found".
+    const pruned = db.prepare(`
       SELECT model_id FROM models
        WHERE platform = 'openrouter'
          AND model_id IN (
            'arcee-ai/trinity-large-thinking:free',
-           'baidu/cobuddy:free',
+           'minimax/minimax-m2.5:free',
+           'baidu/cobuddy:free'
+         )
+    `).all();
+    expect(pruned).toEqual([]);
+
+    const live = db.prepare(`
+      SELECT model_id FROM models
+       WHERE platform = 'openrouter'
+         AND model_id IN (
            'openrouter/owl-alpha',
            'nousresearch/hermes-3-llama-3.1-405b:free'
          )
        ORDER BY model_id
     `).all() as { model_id: string }[];
     expect(live.map(r => r.model_id)).toEqual([
-      'arcee-ai/trinity-large-thinking:free',
-      'baidu/cobuddy:free',
       'nousresearch/hermes-3-llama-3.1-405b:free',
       'openrouter/owl-alpha',
     ]);

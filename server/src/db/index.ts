@@ -55,6 +55,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV18OpenCodeZen(db);
   migrateModelsV19Gemma4(db);
   migrateModelsV20KiloFree(db);
+  migrateModelsV21PruneDead(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1571,6 +1572,54 @@ function migrateModelsV20KiloFree(db: Database.Database) {
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);
     backfillFallback(db);
+  });
+  apply();
+}
+
+/**
+ * V21 (June 2026): Remove models confirmed DEAD by live probing (2026-06-03 with
+ * production keys), and re-enable Cerebras zai-glm-4.7 which serves free again.
+ *
+ * Deleted (fallback_config row removed first — foreign_keys=ON forbids deleting a
+ * referenced models row):
+ *   - llm7/gpt-oss-20b, llm7/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo,
+ *     llm7/ministral-8b-2512 — LLM7 silently serves `mistral-small-3.2` for these
+ *     (200 OK but wrong model — a routing footgun).
+ *   - llm7/GLM-4.6V-Flash — now pro-gated (402 "upgrade required").
+ *   - openrouter/arcee-ai/trinity-large-thinking:free,
+ *     openrouter/minimax/minimax-m2.5:free, openrouter/baidu/cobuddy:free —
+ *     404 "no endpoints found" (delisted / moved to paid).
+ *
+ * Re-enabled: cerebras/zai-glm-4.7 (V9 disabled it; live-probed 200 free again).
+ * These ids are re-inserted by their original migrations on each boot, so this
+ * later DELETE is what keeps them out. Idempotent, safe to re-run.
+ */
+function migrateModelsV21PruneDead(db: Database.Database) {
+  const dead: Array<[string, string]> = [
+    ['llm7', 'gpt-oss-20b'],
+    ['llm7', 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'],
+    ['llm7', 'ministral-8b-2512'],
+    ['llm7', 'GLM-4.6V-Flash'],
+    ['openrouter', 'arcee-ai/trinity-large-thinking:free'],
+    ['openrouter', 'minimax/minimax-m2.5:free'],
+    ['openrouter', 'baidu/cobuddy:free'],
+  ];
+  const apply = db.transaction(() => {
+    const getId = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?');
+    const delFb = db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?');
+    const delModel = db.prepare('DELETE FROM models WHERE id = ?');
+    for (const [platform, modelId] of dead) {
+      const row = getId.get(platform, modelId) as { id: number } | undefined;
+      if (!row) continue;
+      delFb.run(row.id);   // remove the fallback chain entry first (FK)
+      delModel.run(row.id);
+    }
+    // Re-enable Cerebras zai-glm-4.7 (model + its fallback chain entry).
+    db.prepare("UPDATE models SET enabled = 1 WHERE platform = 'cerebras' AND model_id = 'zai-glm-4.7'").run();
+    db.prepare(`
+      UPDATE fallback_config SET enabled = 1
+       WHERE model_db_id = (SELECT id FROM models WHERE platform = 'cerebras' AND model_id = 'zai-glm-4.7')
+    `).run();
   });
   apply();
 }
