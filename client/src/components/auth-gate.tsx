@@ -51,7 +51,7 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
         <span className="inline-block size-2 rounded-full bg-foreground" />
         <span className="font-semibold tracking-tight text-sm">FreeLLMAPI</span>
       </div>
-      <div className="rounded-lg border bg-card p-6">
+      <div className="rounded-3xl border bg-card p-6">
         <h1 className="text-base font-medium">{isSetup ? 'Create your account' : 'Sign in'}</h1>
         <p className="text-xs text-muted-foreground mt-1 mb-4">
           {isSetup
@@ -115,7 +115,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (isError || !data) {
     return (
       <Centered>
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
           Can't reach the server. Make sure the backend is running (<code className="font-mono">npm run dev</code>).
         </div>
       </Centered>

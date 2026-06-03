@@ -120,7 +120,7 @@ function UnifiedKeySection() {
   }
 
   return (
-    <section className="rounded-lg border bg-card p-5">
+    <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
           <h2 className="text-sm font-medium">Your unified API key</h2>
@@ -139,14 +139,14 @@ function UnifiedKeySection() {
       </div>
 
       {isError ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
           Can't reach the server on <code className="font-mono">{baseUrl.replace('/v1', '')}</code>. Make sure the
           backend is running — <code className="font-mono">npm run dev</code> starts both, and the server logs print
           under the <code className="font-mono">server</code> prefix.
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-md select-all truncate tabular-nums">
+          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-lg select-all truncate tabular-nums">
             {showKey ? apiKey : masked}
           </code>
           <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
@@ -202,7 +202,7 @@ function CustomProviderSection() {
         gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
         (most local servers don't need one).
       </p>
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
         <div className="space-y-1.5 flex-1 min-w-[240px]">
           <Label className="text-xs">Base URL</Label>
           <Input
@@ -398,7 +398,7 @@ export default function KeysPage() {
 
         <section>
           <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border p-4 bg-card">
+          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
             <div className="space-y-1.5">
               <Label className="text-xs">Platform</Label>
               <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
@@ -468,7 +468,7 @@ export default function KeysPage() {
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : keys.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center">
+            <div className="rounded-3xl border border-dashed p-8 text-center">
               <p className="text-sm text-muted-foreground">
                 No provider keys yet. Add one above to start routing.
               </p>
@@ -493,7 +493,7 @@ export default function KeysPage() {
                       {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <div className="rounded-lg border divide-y bg-card overflow-hidden">
+                  <div className="rounded-2xl border divide-y bg-card overflow-hidden">
                     {group.keys.map(k => {
                       const h = healthKeyMap.get(k.id)
                       const status = h?.status ?? k.status

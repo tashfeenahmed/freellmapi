@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, NavLink, Link } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { AuthGate } from '@/components/auth-gate'
@@ -61,10 +61,10 @@ function DarkModeToggle() {
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2">
+    <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-70">
       <span className="inline-block size-2 rounded-full bg-foreground" />
       <span className="font-semibold tracking-tight text-sm">FreeLLMAPI</span>
-    </div>
+    </Link>
   )
 }
 
@@ -78,9 +78,9 @@ function App() {
               <div className="max-w-6xl mx-auto px-6 flex items-center">
                 <Brand />
                 <nav className="flex items-center gap-6 ml-10">
+                  <NavItem to="/fallback">Fallback</NavItem>
                   <NavItem to="/playground">Playground</NavItem>
                   <NavItem to="/keys">Keys</NavItem>
-                  <NavItem to="/fallback">Fallback</NavItem>
                   <NavItem to="/analytics">Analytics</NavItem>
                 </nav>
                 <div className="ml-auto py-2 flex items-center gap-1">
@@ -91,7 +91,7 @@ function App() {
             </header>
             <main className="max-w-6xl mx-auto px-6 py-8">
               <Routes>
-                <Route path="/" element={<Navigate to="/playground" replace />} />
+                <Route path="/" element={<Navigate to="/fallback" replace />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<FallbackPage />} />

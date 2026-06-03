@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -137,7 +138,7 @@ function Tooltip({ text, children }: { text: string; children: ReactNode }) {
         <span
           role="tooltip"
           style={{ position: 'fixed', left: coords.x, top: coords.y - 8, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
-          className="pointer-events-none w-56 rounded-md bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md"
+          className="pointer-events-none w-56 rounded-lg bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md"
         >
           {text}
         </span>,
@@ -162,10 +163,29 @@ function AxisBar({ value, color }: { value: number | undefined; color: string })
   )
 }
 
+// Legend rows visible while collapsed (~6 rows: 6 × 16px line + 5 × 6px gap).
+const LEGEND_COLLAPSED_PX = 126
+
 function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
   const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
+
+  // Collapse the per-model legend to a few rows; the chevron reveals the rest.
+  // The toggle only appears when the legend actually overflows the collapsed
+  // height (column count — and so row count — depends on viewport width).
+  const [expanded, setExpanded] = useState(false)
+  const [collapsible, setCollapsible] = useState(false)
+  const legendRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = legendRef.current
+    if (!el) return
+    const check = () => setCollapsible(el.scrollHeight > LEGEND_COLLAPSED_PX + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [models.length])
 
   const modelsWithWidth = models.map(m => ({
     ...m,
@@ -175,7 +195,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const usedPct = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0
 
   return (
-    <section className="rounded-lg border bg-card p-5">
+    <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-sm font-medium">Monthly token budget</h2>
         <span className="text-xs text-muted-foreground tabular-nums">
@@ -205,20 +225,65 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-1.5 text-xs tabular-nums">
-        {modelsWithWidth.map((m, i) => (
-          <div key={i} className="flex items-center gap-2 min-w-0">
-            <span
-              className="size-2 rounded-sm flex-shrink-0"
-              style={{ backgroundColor: platformColors[m.platform] ?? '#94a3b8' }}
-            />
-            <span className="truncate">{m.displayName}</span>
-            <span className="flex-1" />
-            <span className="font-mono text-muted-foreground">{formatTokens(m.remainingTokens)}</span>
-          </div>
-        ))}
+      <div
+        ref={legendRef}
+        className="mt-4 overflow-hidden transition-[max-height] duration-300 ease-in-out"
+        style={collapsible ? { maxHeight: expanded ? legendRef.current?.scrollHeight : LEGEND_COLLAPSED_PX } : undefined}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-1.5 text-xs tabular-nums">
+          {modelsWithWidth.map((m, i) => (
+            <div key={i} className="flex items-center gap-2 min-w-0">
+              <span
+                className="size-2 rounded-sm flex-shrink-0"
+                style={{ backgroundColor: platformColors[m.platform] ?? '#94a3b8' }}
+              />
+              <span className="truncate">{m.displayName}</span>
+              <span className="flex-1" />
+              <span className="font-mono text-muted-foreground">{formatTokens(m.remainingTokens)}</span>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {collapsible && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? 'Show less' : `Show all ${models.length} models`}
+          <ChevronDown className={`size-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      )}
     </section>
+  )
+}
+
+// Viewport-fixed action bar that slides up when shown and — instead of
+// vanishing — slides back down before unmounting (kept in the tree for the
+// duration of the exit animation).
+function FloatingBar({ show, children }: { show: boolean; children: ReactNode }) {
+  const [render, setRender] = useState(show)
+  useEffect(() => {
+    if (show) {
+      setRender(true)
+      return
+    }
+    const t = setTimeout(() => setRender(false), 300) // match animation duration
+    return () => clearTimeout(t)
+  }, [show])
+  if (!render) return null
+  return (
+    <div
+      className={`fixed inset-x-0 bottom-6 z-50 flex justify-center px-6 pointer-events-none duration-300 ${
+        show
+          ? 'animate-in slide-in-from-bottom-4 fade-in'
+          : 'animate-out slide-out-to-bottom-4 fade-out fill-mode-forwards'
+      }`}
+    >
+      <div className="pointer-events-auto flex items-center gap-3 rounded-full border bg-card px-4 py-2 shadow-lg">
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -363,7 +428,9 @@ export default function FallbackPage() {
   const configured = allEntries.filter(e => e.keyCount > 0)
   const unconfiguredPlatforms = [...new Set(allEntries.filter(e => e.keyCount === 0).map(e => e.platform))]
 
-  const rows: Row[] = configured.map(e => ({ ...e, ...(scoreById.get(e.modelDbId) ?? {}) }))
+  // Entry fields win on overlap: the routing snapshot also carries `enabled`
+  // (and identity fields), which would otherwise clobber unsaved local toggles.
+  const rows: Row[] = configured.map(e => ({ ...(scoreById.get(e.modelDbId) ?? {}), ...e }))
   // Manual → the order you set (by priority). Bandit → ranked by live score.
   const ordered = isManual
     ? [...rows].sort((a, b) => a.priority - b.priority)
@@ -433,6 +500,7 @@ export default function FallbackPage() {
       <PageHeader
         title="Fallback chain"
         description="Pick a routing strategy. In Manual mode you drag to set the order; the other strategies route by live score across reliability, speed and intelligence."
+        divider={false}
       />
 
       <div className="space-y-6">
@@ -440,7 +508,7 @@ export default function FallbackPage() {
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
         {/* Strategy selector */}
-        <section className="rounded-lg border bg-card p-5">
+        <section className="rounded-3xl border bg-card p-5">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm font-medium">Routing strategy</h2>
             {routing?.weights && (
@@ -452,13 +520,13 @@ export default function FallbackPage() {
             )}
           </div>
 
-          <div className="inline-flex flex-wrap gap-1 rounded-lg border p-1">
+          <div className="inline-flex flex-wrap gap-1 rounded-xl border p-1">
             {STRATEGIES.map(s => (
               <Tooltip key={s.key} text={s.blurb}>
                 <button
                   disabled={strategyMutation.isPending}
                   onClick={() => strategyMutation.mutate(s.key)}
-                  className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
                     s.key === strategy
                       ? 'bg-foreground text-background font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -481,7 +549,7 @@ export default function FallbackPage() {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : ordered.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center">
+          <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No models available. Add API keys on the <a href="/keys" className="underline text-foreground">Keys page</a> first.
             </p>
@@ -492,7 +560,7 @@ export default function FallbackPage() {
                 live-region <div>s, which are invalid as direct <table> children. */}
             {isManual ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <div className="rounded-lg border overflow-x-auto">
+                <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
                     {tableHead}
                     <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
@@ -506,7 +574,7 @@ export default function FallbackPage() {
                 </div>
               </DndContext>
             ) : (
-              <div className="rounded-lg border overflow-x-auto">
+              <div className="rounded-2xl border overflow-x-auto">
                 <table className="w-full text-sm">
                   {tableHead}
                   <tbody>
@@ -520,14 +588,15 @@ export default function FallbackPage() {
               </div>
             )}
 
-            {hasChanges && (
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>Discard</Button>
-                <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? 'Saving…' : 'Save changes'}
-                </Button>
-              </div>
-            )}
+            {/* Floating action bar — fixed to the viewport so it's always visible,
+                sliding up when there are unsaved changes and back down on save/discard. */}
+            <FloatingBar show={hasChanges}>
+              <span className="text-xs text-muted-foreground">Unsaved changes</span>
+              <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>Discard</Button>
+              <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+              </Button>
+            </FloatingBar>
 
             {unconfiguredPlatforms.length > 0 && (
               <p className="text-xs text-muted-foreground">Hidden (no keys): {unconfiguredPlatforms.join(', ')}</p>

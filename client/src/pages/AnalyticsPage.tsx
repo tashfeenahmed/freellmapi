@@ -21,7 +21,7 @@ function formatTokens(n?: number): string {
 
 function Stat({ label, value, className }: { label: string; value: string | number; className?: string }) {
   return (
-    <div className="rounded-lg border bg-card px-4 py-3">
+    <div className="rounded-3xl border bg-card px-4 py-3">
       <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={`text-xl font-semibold tabular-nums mt-1 ${className ?? ''}`}>{value}</p>
     </div>
@@ -30,7 +30,7 @@ function Stat({ label, value, className }: { label: string; value: string | numb
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-card">
+    <div className="rounded-3xl border bg-card">
       <div className="px-4 py-3 border-b">
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
         title="Analytics"
         description="Request volume, latency, token usage, and failures."
         actions={
-          <div className="flex gap-1 rounded-md border p-0.5">
+          <div className="flex gap-1 rounded-lg border p-0.5">
             {(['24h', '7d', '30d'] as TimeRange[]).map(r => (
               <Button
                 key={r}
