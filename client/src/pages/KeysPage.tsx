@@ -517,7 +517,7 @@ export default function KeysPage() {
                   {checkAll.isPending ? 'Checking…' : 'Check all'}
                 </Button>
               )}
-              <Button size="sm" onClick={() => { setImportOpen(true); setStep('upload'); setPreviewResult(null); setImportResult(null); setImportError(null); }}>
+              <Button size="sm" onClick={() => { setImportOpen(true); setStep('upload'); setSelectedFiles([]); setPreviewResult(null); setSelectedImportKeys([]); setImportResult(null); setImportError(null); }}>
                 Import keys
               </Button>
             </div>
