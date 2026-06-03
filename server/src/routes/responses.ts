@@ -82,9 +82,14 @@ const inputItemSchema = z.union([
   messageItemSchema,
 ]);
 
+// Accept ANY tool type, not just 'function'. Codex (Responses API) sends
+// built-in tools like `web_search` / `local_shell` alongside function tools;
+// a strict z.literal('function') rejected the whole request. We validate
+// loosely here and drop non-function tools at conversion (toChatTools), since
+// chat-completions providers only accept type:'function'.
 const responsesToolSchema = z.object({
-  type: z.literal('function'),
-  name: z.string(),
+  type: z.string(),
+  name: z.string().optional(),
   description: z.string().nullable().optional(),
   parameters: z.record(z.string(), z.unknown()).nullable().optional(),
   strict: z.boolean().nullable().optional(),
@@ -180,7 +185,13 @@ export function toChatMessages(req: ResponsesRequest): ChatMessage[] {
 
 export function toChatTools(tools?: ResponsesRequest['tools']): ChatToolDefinition[] | undefined {
   if (!tools?.length) return undefined;
-  return tools.map((t) => ({
+  // Forward only function tools — chat-completions upstreams reject other
+  // Responses-API tool types (web_search, local_shell, etc.). Codex sends those
+  // extras alongside its function tools (shell/exec, apply_patch); dropping them
+  // keeps the request valid without losing the tools that actually do the work.
+  const fns = tools.filter((t): t is typeof t & { name: string } => t.type === 'function' && typeof t.name === 'string');
+  if (!fns.length) return undefined;
+  return fns.map((t) => ({
     type: 'function',
     function: {
       name: t.name,
