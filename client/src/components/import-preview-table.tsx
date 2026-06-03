@@ -36,6 +36,7 @@ const PLATFORM_OPTIONS = [
   { value: "cloudflare", label: "Cloudflare Workers AI" },
   { value: "zhipu", label: "Zhipu AI (Z.ai)" },
   { value: "ollama", label: "Ollama Cloud" },
+  { value: "opencode", label: "OpenCode Zen" },
   { value: "kilo", label: "Kilo Gateway (anon ok)" },
   { value: "pollinations", label: "Pollinations (anon ok)" },
   { value: "llm7", label: "LLM7 (anon ok)" },
