@@ -456,11 +456,11 @@ export default function KeysPage() {
                   placeholder="optional"
                   className="w-[160px]"
                 />
-                <Button type="submit" size="sm" disabled={!platform || !apiKey || (needsAccountId && !accountId) || addKey.isPending}>
-                  {addKey.isPending ? 'Adding…' : 'Add key'}
+                <Button type="submit" size="sm" disabled={!platform || (!isKeyless && !apiKey) || (needsAccountId && !accountId) || addKey.isPending}>
+                  {addKey.isPending ? 'Adding…' : isKeyless ? 'Enable' : 'Add key'}
                 </Button>
               </div>
-            </div>  
+            </div>
           </form>
           {addKey.isError && (
             <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
