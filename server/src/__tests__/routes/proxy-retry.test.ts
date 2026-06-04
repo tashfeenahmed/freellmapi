@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRetryableError } from '../../routes/proxy.js';
+import { isRetryableError, isPaymentRequiredError } from '../../routes/proxy.js';
 
 describe('isRetryableError', () => {
   describe('413 Payload Too Large', () => {
@@ -50,6 +50,25 @@ describe('isRetryableError', () => {
 
     it('but a bare validation "400 Bad Request" (our own schema) is still NOT retryable', () => {
       expect(isRetryableError(new Error('400 Bad Request'))).toBe(false);
+    });
+  });
+
+  describe('402 Payment Required out-of-credits fails over (graceful degradation)', () => {
+    it('treats a HuggingFace Router 402 as retryable (same model lives on other providers)', () => {
+      expect(isRetryableError(new Error('HuggingFace Router API error 402: Payment required'))).toBe(true);
+    });
+
+    it('catches common out-of-credits phrasings', () => {
+      expect(isRetryableError(new Error('Payment Required'))).toBe(true);
+      expect(isRetryableError(new Error('You exceeded your current quota: insufficient_quota'))).toBe(true);
+      expect(isRetryableError(new Error('Insufficient credit for this request'))).toBe(true);
+      expect(isRetryableError(new Error('Insufficient balance'))).toBe(true);
+    });
+
+    it('isPaymentRequiredError flags 402 (drives the long bench) but not a 429', () => {
+      expect(isPaymentRequiredError(new Error('HuggingFace Router API error 402: Payment required'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('429 Too Many Requests'))).toBe(false);
+      expect(isPaymentRequiredError(new Error('503 Service Unavailable'))).toBe(false);
     });
   });
 
