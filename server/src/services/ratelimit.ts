@@ -301,6 +301,13 @@ export function getNextCooldownDuration(platform: string, modelId: string, keyId
 // Short cooldown for a transient (per-minute) 429 — recovers within ~one window.
 const TRANSIENT_COOLDOWN_MS = 90 * 1000;
 
+// Long cooldown for a 402 Payment Required (provider/key out of credits). Unlike
+// a 429, this won't clear on the next minute/day window — it needs a top-up or
+// billing reset. Bench the model+key for a full day so the router fails over to
+// other providers instead of re-hammering a dead key every retry. Re-escalates
+// on the next 402 after expiry if still unpaid; a restart re-benches on first hit.
+export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
+
 // Decide how long to bench a model+key after an upstream 429. Escalate to the
 // long quarantine (getNextCooldownDuration, up to 24h) ONLY when the model is
 // genuinely at its DAILY limit (RPD or TPD) — that won't recover until the
