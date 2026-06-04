@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import http from 'node:http';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { routeRequest } from '../../services/router.js';
 import { resolveProvider, getProvider } from '../../providers/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
@@ -28,6 +29,18 @@ async function get(app: Express, path: string) {
   const server = app.listen(0);
   const addr = server.address() as any;
   const res = await fetch(`http://127.0.0.1:${addr.port}${path}`, {
+    headers: isGatedApiPath(path) ? { Authorization: `Bearer ${dashToken}` } : {},
+  });
+  const data = await res.json().catch(() => null);
+  server.close();
+  return { status: res.status, body: data };
+}
+
+async function del(app: Express, path: string) {
+  const server = app.listen(0);
+  const addr = server.address() as any;
+  const res = await fetch(`http://127.0.0.1:${addr.port}${path}`, {
+    method: 'DELETE',
     headers: isGatedApiPath(path) ? { Authorization: `Bearer ${dashToken}` } : {},
   });
   const data = await res.json().catch(() => null);
@@ -110,5 +123,88 @@ describe('POST /api/keys/custom (#117)', () => {
     expect(route.platform).toBe('custom');
     expect((route.provider as any).baseUrl).toBe('http://127.0.0.1:11434/v1');
     expect(['qwen3:4b', 'llama3:8b']).toContain(route.modelId);
+  });
+
+  it('deleting the custom key cascades its models out of the fallback chain (#189)', async () => {
+    const db = getDb();
+    const key = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom'").get() as { id: number };
+    const customModelIds = (db.prepare("SELECT id FROM models WHERE platform = 'custom'").all() as { id: number }[]).map(r => r.id);
+    expect(customModelIds.length).toBe(2); // qwen3:4b + llama3:8b from earlier tests
+    const builtinModels = (db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform != 'custom'").get() as { n: number }).n;
+
+    const { status } = await del(app, `/api/keys/${key.id}`);
+    expect(status).toBe(200);
+
+    // Custom models and their fallback entries are gone — not orphaned.
+    expect((db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'custom'").get() as { n: number }).n).toBe(0);
+    const placeholders = customModelIds.map(() => '?').join(',');
+    expect((db.prepare(`SELECT COUNT(*) AS n FROM fallback_config WHERE model_db_id IN (${placeholders})`).get(...customModelIds) as { n: number }).n).toBe(0);
+    // Built-in catalog rows are untouched.
+    expect((db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform != 'custom'").get() as { n: number }).n).toBe(builtinModels);
+  });
+
+  it('deleting a built-in platform key does NOT cascade its catalog models', async () => {
+    const db = getDb();
+    const r = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('groq', 'test', 'x', 'x', 'x', 'unknown', 1)
+    `).run();
+    const groqModels = (db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'groq'").get() as { n: number }).n;
+    expect(groqModels).toBeGreaterThan(0);
+
+    const { status } = await del(app, `/api/keys/${r.lastInsertRowid}`);
+    expect(status).toBe(200);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'groq'").get() as { n: number }).n).toBe(groqModels);
+  });
+
+  it('re-adding a custom provider after deletion starts a fresh chain entry', async () => {
+    const { status, body } = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:8080/v1',
+      model: 'mistral:7b',
+    });
+    expect(status).toBe(201);
+    const db = getDb();
+    expect((db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number }).n).toBe(1);
+    const fc = db.prepare('SELECT * FROM fallback_config WHERE model_db_id = ?').get(body.modelDbId);
+    expect(fc).toBeDefined();
+  });
+
+  it('surfaces a clear error when the custom endpoint speaks NDJSON, not OpenAI (#189)', async () => {
+    // Real upstream that answers like Ollama's native /api/chat: HTTP 200,
+    // newline-delimited JSON documents — res.json() in the provider would die
+    // with "Unexpected non-whitespace character after JSON at position …".
+    const upstream = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+      res.end(
+        JSON.stringify({ model: 'qwen3:4b', message: { role: 'assistant', content: 'hi' } }, null, 2) +
+        '\n' +
+        JSON.stringify({ done: true }) +
+        '\n',
+      );
+    });
+    await new Promise<void>(resolve => upstream.listen(0, resolve));
+    const upstreamPort = (upstream.address() as any).port;
+
+    // Point the custom provider at the NDJSON upstream and pin its model.
+    const reg = await post(app, '/api/keys/custom', {
+      baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
+      model: 'ndjson-model',
+    });
+    expect(reg.status).toBe(201);
+
+    const server = app.listen(0);
+    const addr = server.address() as any;
+    const res = await fetch(`http://127.0.0.1:${addr.port}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getUnifiedApiKey()}` },
+      body: JSON.stringify({ model: 'ndjson-model', messages: [{ role: 'user', content: 'hi' }] }),
+    });
+    const body = await res.json().catch(() => null);
+    server.close();
+
+    upstream.close();
+    expect(res.status).toBe(502);
+    expect(JSON.stringify(body)).toMatch(/not OpenAI-compatible/);
+    expect(JSON.stringify(body)).not.toMatch(/Unexpected non-whitespace/);
   });
 });

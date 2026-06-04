@@ -206,12 +206,28 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
-
-  if (result.changes === 0) {
+  const row = db.prepare('SELECT platform FROM api_keys WHERE id = ?').get(id) as { platform: string } | undefined;
+  if (!row) {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
+
+  const remove = db.transaction(() => {
+    db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+    // Custom models exist only because POST /custom registered them alongside
+    // this endpoint key (#117) — they can't route without it. Built-in
+    // platforms keep their seeded catalog rows, but once the last custom key
+    // is gone, orphaned custom models would linger in the fallback chain
+    // forever (#189), so cascade them away.
+    if (row.platform === 'custom') {
+      const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
+      if (remaining.n === 0) {
+        db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
+        db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+      }
+    }
+  });
+  remove();
 
   res.json({ success: true });
 });

@@ -77,7 +77,19 @@ export class OpenAICompatProvider extends BaseProvider {
       throw new Error(`${this.name} API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
-    const data = await res.json() as ChatCompletionResponse;
+    let data: ChatCompletionResponse;
+    try {
+      data = await res.json() as ChatCompletionResponse;
+    } catch {
+      // A 200 whose body isn't a single JSON document — typically a base URL
+      // pointing at a non-OpenAI-compatible API (e.g. Ollama's native NDJSON
+      // /api endpoints instead of /v1, #189). Surface what's wrong instead of
+      // the raw JSON.parse position error.
+      throw new Error(
+        `${this.name} returned 200 with a non-JSON body — the endpoint is not OpenAI-compatible. ` +
+        `Check the base URL (for Ollama use http://host:11434/v1, for llama.cpp/vLLM/LM Studio the /v1 path).`,
+      );
+    }
     normalizeChoices(data);
     data._routed_via = { platform: this.platform, model: modelId };
     return data;
