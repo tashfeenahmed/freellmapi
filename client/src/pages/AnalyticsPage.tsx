@@ -247,6 +247,22 @@ export default function AnalyticsPage() {
     queryFn: () => apiFetch<any[]>(`/api/analytics/live-requests?range=${range}&errorsOnly=${logFilter === 'errors'}`),
   })
 
+  const { data: summary30 } = useQuery({
+    queryKey: ['analytics', 'summary', '30d'],
+    queryFn: () => apiFetch<any>(`/api/analytics/summary?range=30d`),
+  })
+
+  const baseSavings = summary30?.estimatedCostSavings ?? 0
+  const spanDays = (() => {
+    if (!summary30?.firstRequestAt) return 30
+    const first = new Date(summary30.firstRequestAt.replace(' ', 'T') + 'Z').getTime()
+    const days = (Date.now() - first) / 86_400_000
+    if (!Number.isFinite(days)) return 30
+    return Math.min(Math.max(days, 1 / 24), 30)
+  })()
+  const extrapolated = spanDays < 29.5
+  const savings30d = extrapolated ? baseSavings * (30 / spanDays) : baseSavings
+
   return (
     <div>
       <PageHeader
@@ -276,7 +292,7 @@ export default function AnalyticsPage() {
           <Stat label="Input tokens" value={formatTokens(summary?.totalInputTokens)} />
           <Stat label="Output tokens" value={formatTokens(summary?.totalOutputTokens)} />
           <Stat label="Avg latency" value={`${summary?.avgLatencyMs ?? 0} ms`} />
-          <Stat label="Est. savings" value={`$${summary?.estimatedCostSavings ?? '0.00'}`} />
+          <Stat label="Est. savings" value={`$${savings30d.toFixed(2)}`} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -413,11 +429,12 @@ export default function AnalyticsPage() {
                           <TableHead>Provider</TableHead>
                           {([
                             { key: 'requests', label: 'Requests' },
+                            { key: 'pinnedRequests', label: 'Pinned' },
                             { key: 'successRate', label: 'Success' },
                             { key: 'avgLatencyMs', label: 'Latency' },
                             { key: 'totalInputTokens', label: 'In tokens' },
                             { key: 'totalOutputTokens', label: 'Out tokens' },
-                            { key: 'estimatedCost', label: 'Cost' },
+                            { key: 'estimatedCost', label: 'Saved' },
                           ] as const).map(col => (
                             <TableHead
                               key={col.key}
@@ -449,11 +466,12 @@ export default function AnalyticsPage() {
                             <TableCell className="pl-4 text-sm font-medium">{m.displayName}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{m.platform}</TableCell>
                             <TableCell className="text-right tabular-nums">{m.requests}</TableCell>
+                            <TableCell className="text-right tabular-nums">{m.pinnedRequests > 0 ? m.pinnedRequests : '—'}</TableCell>
                             <TableCell className="text-right tabular-nums">{m.successRate}%</TableCell>
                             <TableCell className="text-right tabular-nums">{m.avgLatencyMs} ms</TableCell>
                             <TableCell className="text-right tabular-nums">{formatTokens(m.totalInputTokens)}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatTokens(m.totalOutputTokens)}</TableCell>
-                            <TableCell className="text-right tabular-nums pr-4">${m.estimatedCost?.toFixed(2) ?? '0.00'}</TableCell>
+                            <TableCell className="text-right tabular-nums pr-4">${(m.estimatedCost ?? 0).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
