@@ -4,6 +4,7 @@ installLogRedaction();
 import './env.js';
 import { createApp } from './app.js';
 import { initDb } from './db/index.js';
+import { hardenDatabase } from './db/hardening.js';
 import { startHealthChecker } from './services/health.js';
 
 const PORT = process.env.PORT ?? 3001;
@@ -16,7 +17,8 @@ async function main() {
   // DB_PATH lets production hosts mount SQLite on persistent storage, e.g.
   // Render disk: DB_PATH=/var/data/freeapi.db. Without it, initDb() keeps the
   // existing local dev default from server/src/db/index.ts.
-  initDb(process.env.DB_PATH);
+  const db = initDb(process.env.DB_PATH);
+  hardenDatabase(db);
   const app = createApp();
 
   const onReady = (host: string) => () => {
