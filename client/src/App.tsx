@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Menu, Moon, Sun } from 'lucide-react'
+import { Menu, Moon, Sun, Languages } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AuthGate } from '@/components/auth-gate'
 import { logout } from '@/lib/api'
+import { I18nProvider, useI18n, type Locale } from '@/i18n/context'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
@@ -22,10 +23,10 @@ import AnalyticsPage from '@/pages/AnalyticsPage'
 const queryClient = new QueryClient()
 
 const navItems = [
-  { to: '/models', label: 'Models' },
-  { to: '/playground', label: 'Playground' },
-  { to: '/keys', label: 'Keys' },
-  { to: '/analytics', label: 'Analytics' },
+  { to: '/models', labelKey: 'nav.models' },
+  { to: '/playground', labelKey: 'nav.playground' },
+  { to: '/keys', labelKey: 'nav.keys' },
+  { to: '/analytics', labelKey: 'nav.analytics' },
 ]
 
 function getPreferredDarkMode() {
@@ -73,14 +74,33 @@ function useDarkMode() {
 }
 
 function DarkModeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  const { t } = useI18n()
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onToggle}
-      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+      aria-label={dark ? t('nav.switchLight') : t('nav.switchDark')}
     >
       {dark ? <Sun /> : <Moon />}
+    </Button>
+  )
+}
+
+function LanguageToggle() {
+  const { locale, setLocale, t } = useI18n()
+  const next: Locale = locale === 'en' ? 'zh' : 'en'
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setLocale(next)}
+      aria-label={t('nav.language')}
+      title={next === 'zh' ? '切换到中文' : 'Switch to English'}
+    >
+      <Languages />
+      <span className="ml-1.5 text-xs font-medium uppercase">{locale === 'en' ? '中' : 'EN'}</span>
     </Button>
   )
 }
@@ -96,6 +116,7 @@ function Brand() {
 
 function Navbar() {
   const { dark, toggle } = useDarkMode()
+  const { t } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -110,21 +131,22 @@ function Navbar() {
         <nav className="ml-10 hidden items-center gap-6 md:flex">
           {navItems.map((item) => (
             <NavItem key={item.to} to={item.to}>
-              {item.label}
+              {t(item.labelKey)}
             </NavItem>
           ))}
         </nav>
         <div className="ml-auto hidden items-center gap-1 md:flex">
+          <LanguageToggle />
           <DarkModeToggle dark={dark} onToggle={toggle} />
           <Button variant="ghost" size="sm" onClick={() => logout()}>
-            Sign out
+            {t('nav.signOut')}
           </Button>
         </div>
         <div className="ml-auto md:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger
               className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-              aria-label="Open navigation menu"
+              aria-label={t('nav.openMenu')}
             >
               <Menu />
             </DropdownMenuTrigger>
@@ -136,17 +158,17 @@ function Navbar() {
                     onClick={() => navigate(item.to)}
                     className={isActiveRoute(item.to) ? 'bg-accent text-accent-foreground font-medium' : undefined}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={toggle} className="justify-between">
-                  <span>Theme</span>
+                  <span>{t('nav.theme')}</span>
                   {dark ? <Sun /> : <Moon />}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -156,30 +178,38 @@ function Navbar() {
   )
 }
 
+function AppRoutes() {
+  return (
+    <AuthGate>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="max-w-6xl mx-auto px-6 py-8">
+          <Routes>
+            <Route path="/" element={<Navigate to="/models/chat" replace />} />
+            <Route path="/models" element={<Navigate to="/models/chat" replace />} />
+            <Route path="/models/chat" element={<FallbackPage />} />
+            <Route path="/models/embeddings" element={<EmbeddingsPage />} />
+            <Route path="/playground" element={<PlaygroundPage />} />
+            <Route path="/keys" element={<KeysPage />} />
+            <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/test" element={<Navigate to="/playground" replace />} />
+            <Route path="/health" element={<Navigate to="/keys" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </AuthGate>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <AuthGate>
-          <div className="min-h-screen bg-background">
-            <Navbar />
-            <main className="max-w-6xl mx-auto px-6 py-8">
-              <Routes>
-                <Route path="/" element={<Navigate to="/models/chat" replace />} />
-                <Route path="/models" element={<Navigate to="/models/chat" replace />} />
-                <Route path="/models/chat" element={<FallbackPage />} />
-                <Route path="/models/embeddings" element={<EmbeddingsPage />} />
-                <Route path="/playground" element={<PlaygroundPage />} />
-                <Route path="/keys" element={<KeysPage />} />
-                <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/test" element={<Navigate to="/playground" replace />} />
-                <Route path="/health" element={<Navigate to="/keys" replace />} />
-              </Routes>
-            </main>
-          </div>
-        </AuthGate>
-      </BrowserRouter>
+      <I18nProvider>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <AppRoutes />
+        </BrowserRouter>
+      </I18nProvider>
     </QueryClientProvider>
   )
 }

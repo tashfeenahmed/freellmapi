@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/page-header'
 import { Markdown } from '@/components/markdown'
+import { useI18n } from '@/i18n/context'
 
 interface FallbackEntry {
   modelDbId: number
@@ -29,6 +30,7 @@ interface ChatMessage {
 }
 
 export default function PlaygroundPage() {
+  const { t } = useI18n()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -134,14 +136,14 @@ export default function PlaygroundPage() {
   }
 
   const activeModelLabel = selectedModel === 'auto'
-    ? 'Auto (fallback chain)'
+    ? t('playground.auto')
     : availableModels.find(m => m.modelId === selectedModel)?.displayName ?? selectedModel
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader
-        title="Playground"
-        description="Send a chat completion through the router and see which provider serves it."
+        title={t('playground.title')}
+        description={t('playground.description')}
         actions={
           <>
             <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v ?? 'auto')}>
@@ -149,7 +151,7 @@ export default function PlaygroundPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto (fallback chain)</SelectItem>
+                <SelectItem value="auto">{t('playground.auto')}</SelectItem>
                 {availableModels.map(m => (
                   <SelectItem key={m.modelDbId} value={m.modelId}>
                     <span className="flex items-center gap-2">
@@ -162,7 +164,7 @@ export default function PlaygroundPage() {
             </Select>
             {messages.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleClear}>
-                Clear
+                {t('playground.clear')}
               </Button>
             )}
           </>
@@ -174,9 +176,11 @@ export default function PlaygroundPage() {
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-center">
               <div className="space-y-2 max-w-sm">
-                <p className="text-base font-medium">Send a message to get started.</p>
+                <p className="text-base font-medium">{t('playground.startMessage')}</p>
                 <p className="text-sm text-muted-foreground">
-                  Using <span className="text-foreground">{activeModelLabel}</span>. Switch models in the selector above.
+                  {t('playground.using')}{' '}
+                  <span className="text-foreground">{activeModelLabel}</span>.{' '}
+                  {t('playground.switchModels')}
                 </p>
               </div>
             </div>
@@ -202,7 +206,10 @@ export default function PlaygroundPage() {
                         {msg.meta.model && <span className="font-mono">· {msg.meta.model}</span>}
                         {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
                         {msg.meta.fallbackAttempts != null && msg.meta.fallbackAttempts > 0 && (
-                          <span>· {msg.meta.fallbackAttempts} fallback{msg.meta.fallbackAttempts > 1 ? 's' : ''}</span>
+                          <span>
+                            · {msg.meta.fallbackAttempts}{' '}
+                            {msg.meta.fallbackAttempts > 1 ? t('playground.fallback_other') : t('playground.fallback_one')}
+                          </span>
                         )}
                       </div>
                     )}
@@ -232,7 +239,7 @@ export default function PlaygroundPage() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message… (⏎ to send, ⇧⏎ for newline)"
+              placeholder={t('playground.placeholder')}
               rows={1}
               className="flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 min-h-[40px] max-h-[160px]"
               style={{ height: 'auto', overflow: 'hidden' }}
@@ -243,7 +250,7 @@ export default function PlaygroundPage() {
               }}
             />
             <Button onClick={handleSend} disabled={loading || !input.trim()} size="default">
-              {loading ? 'Sending…' : 'Send'}
+              {loading ? t('playground.sending') : t('playground.send')}
             </Button>
           </div>
         </div>

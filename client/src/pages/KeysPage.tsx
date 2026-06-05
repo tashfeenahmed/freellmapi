@@ -10,9 +10,11 @@ import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
 import { Pencil, ExternalLink } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
+import { useI18n } from '@/i18n/context'
 
 // Small "Get API key" external link shown next to a provider (#137).
 function GetKeyLink({ url }: { url: string }) {
+  const { t } = useI18n()
   if (!url) return null
   return (
     <a
@@ -21,7 +23,7 @@ function GetKeyLink({ url }: { url: string }) {
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
-      Get API key
+      {t('keys.getKey')}
       <ExternalLink className="size-3" />
     </a>
   )
@@ -69,14 +71,6 @@ const statusDot: Record<string, string> = {
   unknown: 'bg-muted-foreground/40',
 }
 
-const statusLabel: Record<string, string> = {
-  healthy: 'healthy',
-  rate_limited: 'rate-limited',
-  invalid: 'invalid',
-  error: 'error',
-  unknown: 'unchecked',
-}
-
 interface HealthPlatform {
   platform: string
   totalKeys: number
@@ -93,6 +87,7 @@ interface HealthData {
 }
 
 function UnifiedKeySection() {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [showKey, setShowKey] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -108,7 +103,7 @@ function UnifiedKeySection() {
   })
 
   const apiKey = data?.apiKey ?? ''
-  const masked = apiKey ? apiKey.slice(0, 13) + '•'.repeat(32) : '…'
+  const masked = apiKey ? apiKey.slice(0, 13) + '\u2022'.repeat(32) : '\u2026'
   const baseUrl = import.meta.env.DEV
     ? `http://${window.location.hostname}:${__SERVER_PORT__}/v1`
     : `${window.location.origin}/v1`
@@ -123,9 +118,9 @@ function UnifiedKeySection() {
     <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
-          <h2 className="text-sm font-medium">Your unified API key</h2>
+          <h2 className="text-sm font-medium">{t('keys.unifiedKey')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Use this as your OpenAI <code className="font-mono">api_key</code>; it authenticates requests to this proxy.
+            {t('keys.unifiedKeyDesc')}
           </p>
         </div>
         <Button
@@ -134,15 +129,13 @@ function UnifiedKeySection() {
           onClick={() => regenerate.mutate()}
           disabled={regenerate.isPending || isError}
         >
-          Regenerate
+          {t('keys.regenerate')}
         </Button>
       </div>
 
       {isError ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-          Can't reach the server on <code className="font-mono">{baseUrl.replace('/v1', '')}</code>. Make sure the
-          backend is running — <code className="font-mono">npm run dev</code> starts both, and the server logs print
-          under the <code className="font-mono">server</code> prefix.
+          {t('auth.serverError')}
         </div>
       ) : (
         <div className="flex items-center gap-2">
@@ -150,22 +143,22 @@ function UnifiedKeySection() {
             {showKey ? apiKey : masked}
           </code>
           <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
-            {showKey ? 'Hide' : 'Show'}
+            {showKey ? t('common.hide') : t('common.show')}
           </Button>
           <Button variant="outline" size="sm" onClick={copy}>
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('common.copied') : t('common.copy')}
           </Button>
         </div>
       )}
 
       <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
-        <span className="text-muted-foreground">Base URL</span>
+        <span className="text-muted-foreground">{t('keys.baseUrl')}</span>
         <code className="font-mono">{baseUrl}</code>
-        <span className="text-muted-foreground">Chat</span>
+        <span className="text-muted-foreground">{t('keys.chat')}</span>
         <code className="font-mono">/v1/chat/completions</code>
-        <span className="text-muted-foreground">Responses</span>
+        <span className="text-muted-foreground">{t('keys.responses')}</span>
         <code className="font-mono">/v1/responses</code>
-        <span className="text-muted-foreground">Embeddings</span>
+        <span className="text-muted-foreground">{t('keys.embeddings')}</span>
         <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">— model: "auto" or a family from the Embeddings tab</span></code>
       </div>
     </section>
@@ -173,6 +166,7 @@ function UnifiedKeySection() {
 }
 
 function CustomProviderSection() {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
@@ -200,52 +194,48 @@ function CustomProviderSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
-      <p className="text-xs text-muted-foreground mb-3">
-        Point at any OpenAI-compatible endpoint — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
-        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
-        (most local servers don't need one).
-      </p>
+      <h2 className="text-sm font-medium mb-1">{t('keys.customTitle')}</h2>
+      <p className="text-xs text-muted-foreground mb-3">{t('keys.customDesc')}</p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
         <div className="space-y-1.5 flex-1 min-w-[240px]">
-          <Label className="text-xs">Base URL</Label>
+          <Label className="text-xs">{t('keys.baseUrl')}</Label>
           <Input
             value={baseUrl}
             onChange={e => setBaseUrl(e.target.value)}
-            placeholder="http://127.0.0.1:11434/v1"
+            placeholder={t('keys.baseUrlPlaceholder')}
             className="font-mono text-xs"
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Model</Label>
+          <Label className="text-xs">{t('keys.model')}</Label>
           <Input
             value={model}
             onChange={e => setModel(e.target.value)}
-            placeholder="qwen3:4b"
+            placeholder={t('keys.modelPlaceholder')}
             className="w-[180px] font-mono text-xs"
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Display name</Label>
+          <Label className="text-xs">{t('keys.displayName')}</Label>
           <Input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
-            placeholder="optional"
+            placeholder={t('common.optional')}
             className="w-[150px]"
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">API key</Label>
+          <Label className="text-xs">{t('keys.apiKey')}</Label>
           <Input
             type="password"
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
-            placeholder="optional"
+            placeholder={t('common.optional')}
             className="w-[150px] font-mono text-xs"
           />
         </div>
         <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
-          {addCustom.isPending ? 'Adding…' : 'Add model'}
+          {addCustom.isPending ? t('common.adding') : t('keys.addModel')}
         </Button>
       </form>
       {addCustom.isError && (
@@ -256,6 +246,7 @@ function CustomProviderSection() {
 }
 
 export default function KeysPage() {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [platform, setPlatform] = useState<Platform | ''>('')
   const [apiKey, setApiKey] = useState('')
@@ -378,7 +369,15 @@ export default function KeysPage() {
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
 
-  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
+  const statusLabelMap: Record<string, string> = {
+    healthy: t('keys.status.healthy'),
+    rate_limited: t('keys.status.rate_limited'),
+    invalid: t('keys.status.invalid'),
+    error: t('keys.status.error'),
+    unknown: t('keys.status.unknown'),
+  }
+
+  const groupedPlatforms = [...PLATFORMS, { ...CUSTOM_GROUP, label: t('keys.custom') }].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
   })).filter(p => p.keys.length > 0)
@@ -386,12 +385,12 @@ export default function KeysPage() {
   return (
     <div>
       <PageHeader
-        title="Keys"
-        description="Provider credentials and the unified API key your apps connect with."
+        title={t('keys.title')}
+        description={t('keys.description')}
         actions={
           keys.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
-              {checkAll.isPending ? 'Checking…' : 'Check all'}
+              {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
             </Button>
           )
         }
@@ -401,13 +400,13 @@ export default function KeysPage() {
         <UnifiedKeySection />
 
         <section>
-          <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
+          <h2 className="text-sm font-medium mb-3">{t('keys.addProvider')}</h2>
           <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 rounded-3xl border p-4 bg-card">
             <div className="space-y-1.5">
-              <Label className="text-xs">Platform</Label>
+              <Label className="text-xs">{t('keys.platform')}</Label>
               <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Select provider" />
+                  <SelectValue placeholder={t('keys.selectProvider')} />
                 </SelectTrigger>
                 <SelectContent>
                   {PLATFORMS.map(p => (
@@ -422,42 +421,42 @@ export default function KeysPage() {
             </div>
             {needsAccountId && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Account ID</Label>
+                <Label className="text-xs">{t('keys.accountId')}</Label>
                 <Input
                   value={accountId}
                   onChange={e => setAccountId(e.target.value)}
-                  placeholder="a1b2c3d4…"
+                  placeholder="a1b2c3d4\u2026"
                   className="w-[200px] font-mono text-xs"
                 />
               </div>
             )}
             <div className="space-y-1.5 flex-1 min-w-[240px]">
-              <Label className="text-xs">{needsAccountId ? 'API token' : 'API key'}</Label>
+              <Label className="text-xs">{needsAccountId ? t('keys.apiToken') : t('keys.apiKey')}</Label>
               <Input
                 type="password"
                 value={isKeyless ? '' : apiKey}
                 onChange={e => setApiKey(e.target.value)}
-                placeholder={isKeyless ? 'No API key needed' : (needsAccountId ? 'Bearer token' : 'paste key here')}
+                placeholder={isKeyless ? t('keys.noApiKeyPlaceholder') : (needsAccountId ? t('keys.bearerToken') : t('keys.pasteKey'))}
                 className="font-mono text-xs"
                 disabled={isKeyless}
               />
               {isKeyless && (
                 <p className="text-[11px] text-muted-foreground">
-                  No API key needed — this provider's free tier is anonymous (rate-limited per IP).
+                  {t('keys.keylessDesc')}
                 </p>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Label</Label>
+              <Label className="text-xs">{t('keys.label')}</Label>
               <div className="flex flex-wrap items-center space-x-3">
                 <Input
                   value={label}
                   onChange={e => setLabel(e.target.value)}
-                  placeholder="optional"
+                  placeholder={t('common.optional')}
                   className="w-[160px]"
                 />
                 <Button type="submit" size="sm" disabled={!platform || (!isKeyless && !apiKey) || (needsAccountId && !accountId) || addKey.isPending}>
-                  {addKey.isPending ? 'Adding…' : isKeyless ? 'Enable' : 'Add key'}
+                  {addKey.isPending ? t('common.adding') : isKeyless ? t('keys.enable') : t('keys.addKey')}
                 </Button>
               </div>
             </div>
@@ -470,18 +469,18 @@ export default function KeysPage() {
         <CustomProviderSection />
 
         <section>
-          <h2 className="text-sm font-medium mb-3">Configured providers</h2>
+          <h2 className="text-sm font-medium mb-3">{t('keys.configuredProviders')}</h2>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
           ) : keys.length === 0 ? (
             <div className="rounded-3xl border border-dashed p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                No provider keys yet. Add one above to start routing.
+                {t('keys.noKeys')}
               </p>
             </div>
           ) : (
             <div className="space-y-6">
-              {grouped.map(group => (
+              {groupedPlatforms.map(group => (
                 <div key={group.value}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -496,7 +495,7 @@ export default function KeysPage() {
                       <GetKeyLink url={group.url} />
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
+                      {group.keys.length} {group.keys.length === 1 ? t('keys.key_one') : t('keys.key_other')}
                     </span>
                   </div>
                   <div className="rounded-2xl border divide-y bg-card overflow-hidden">
@@ -527,7 +526,7 @@ export default function KeysPage() {
                               {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
                             </>
                           )}
-                          <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>
+                          <span className="text-xs text-muted-foreground">{statusLabelMap[status] ?? status}</span>
                           <div className="flex-1" />
                           {lastChecked && (
                             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -540,10 +539,10 @@ export default function KeysPage() {
                             </Button>
                           )}
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
-                            Check
+                            {t('common.check')}
                           </Button>
                           <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={() => deleteKey.mutate(k.id)} disabled={deleteKey.isPending}>
-                            Remove
+                            {t('common.remove')}
                           </Button>
                         </div>
                       )
