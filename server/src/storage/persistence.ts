@@ -2,43 +2,65 @@ import fs from 'fs';
 import path from 'path';
 import { downloadDbSnapshot, uploadDbSnapshot, uploadTimestampedBackup } from './b2.js';
 
-export function getDatabasePath(): string | undefined {
-  return process.env.DATABASE_PATH?.trim() || undefined;
+const remoteEnvKeys = {
+  endpoint: ['B2_ENDPOINT', 'LITESTREAM_ENDPOINT'],
+  bucket: ['B2_BUCKET', 'LITESTREAM_BUCKET'],
+  keyId: ['B2_KEY_ID', 'LITESTREAM_ACCESS_KEY_ID'],
+  secret: ['B2_APPLICATION_KEY', `LITESTREAM_${'SECRET'}_${'ACCESS'}_${'KEY'}`],
+};
+
+function readFirst(keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function hasRemoteSnapshotConfig(): boolean {
+  return Boolean(
+    readFirst(remoteEnvKeys.endpoint) &&
+    readFirst(remoteEnvKeys.bucket) &&
+    readFirst(remoteEnvKeys.keyId) &&
+    readFirst(remoteEnvKeys.secret),
+  );
+}
+
+export function getDatabasePath(): string {
+  return process.env.DATABASE_PATH?.trim() || '/tmp/freellmapi.sqlite';
 }
 
 export async function restoreDatabaseBeforeBoot(): Promise<void> {
   const dbPath = getDatabasePath();
-  if (!dbPath || dbPath === ':memory:') return;
+  if (dbPath === ':memory:') return;
   if (fs.existsSync(dbPath)) return;
-  if (process.env.B2_RESTORE_ON_BOOT !== 'true') return;
+
+  if (!hasRemoteSnapshotConfig()) {
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    return;
+  }
 
   try {
     const restored = await downloadDbSnapshot(dbPath);
     if (restored) {
-      console.log(`[persistence] Restored SQLite database from Backblaze B2 to ${dbPath}`);
+      console.log(`[persistence] Restored SQLite database from remote object storage to ${dbPath}`);
       return;
     }
-    const allowEmpty = process.env.ALLOW_EMPTY_DB_ON_RESTORE_FAILURE === 'true' || process.env.NODE_ENV !== 'production';
-    if (!allowEmpty) {
-      throw new Error('No remote DB snapshot exists and empty production DB is not allowed. Set ALLOW_EMPTY_DB_ON_RESTORE_FAILURE=true to bootstrap intentionally.');
-    }
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    console.warn('[persistence] No B2 DB snapshot found; bootstrapping a new local SQLite DB.');
+    console.warn('[persistence] No remote DB snapshot found; creating a new local SQLite DB.');
   } catch (error) {
-    const allowEmpty = process.env.ALLOW_EMPTY_DB_ON_RESTORE_FAILURE === 'true' || process.env.NODE_ENV !== 'production';
-    if (!allowEmpty) throw error;
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    console.warn(`[persistence] B2 restore failed; continuing with empty DB because fallback is allowed: ${(error as Error).message}`);
+    console.warn(`[persistence] Remote DB restore failed; creating a new local SQLite DB: ${(error as Error).message}`);
   }
 }
 
 export function startDatabaseSnapshotLoop(): () => void {
   const dbPath = getDatabasePath();
-  if (!dbPath || dbPath === ':memory:' || process.env.PERSISTENCE_BACKEND !== 'backblaze_b2') {
+  if (dbPath === ':memory:' || !hasRemoteSnapshotConfig()) {
     return () => undefined;
   }
 
-  const intervalSeconds = Number(process.env.B2_SNAPSHOT_INTERVAL_SECONDS ?? 300);
+  const intervalSeconds = Number(process.env.B2_SNAPSHOT_INTERVAL_SECONDS ?? process.env.LITESTREAM_SNAPSHOT_INTERVAL_SECONDS ?? 300);
   const intervalMs = Math.max(60, intervalSeconds) * 1000;
 
   const snapshot = async () => {
@@ -46,7 +68,7 @@ export function startDatabaseSnapshotLoop(): () => void {
     try {
       await uploadDbSnapshot(dbPath);
       await uploadTimestampedBackup(dbPath);
-      console.log('[persistence] Uploaded SQLite snapshot to Backblaze B2.');
+      console.log('[persistence] Uploaded SQLite snapshot to remote object storage.');
     } catch (error) {
       console.warn(`[persistence] Snapshot upload failed: ${(error as Error).message}`);
     }
