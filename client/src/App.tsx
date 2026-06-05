@@ -16,16 +16,17 @@ import { logout } from '@/lib/api'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
-import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
+import CostPage from '@/pages/CostPage'
 
 const queryClient = new QueryClient()
 
 const navItems = [
-  { to: '/models', label: 'Models' },
   { to: '/playground', label: 'Playground' },
   { to: '/keys', label: 'Keys' },
+  { to: '/models', label: 'Fallback' },
   { to: '/analytics', label: 'Analytics' },
+  { to: '/pricing', label: 'Pricing' },
 ]
 
 function getPreferredDarkMode() {
@@ -42,10 +43,9 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `relative text-sm px-1 py-4 transition-colors ${
-          isActive
-            ? 'text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-foreground'
-            : 'text-muted-foreground hover:text-foreground'
+        `relative text-sm px-1 py-4 transition-colors ${isActive
+          ? 'text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-foreground'
+          : 'text-muted-foreground hover:text-foreground'
         }`
       }
     >
@@ -168,11 +168,12 @@ function App() {
                 <Route path="/" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models/chat" element={<FallbackPage />} />
-                <Route path="/models/embeddings" element={<EmbeddingsPage />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/cost" element={<Navigate to="/pricing" replace />} />
+                <Route path="/pricing" element={<CostPage />} />
                 <Route path="/test" element={<Navigate to="/playground" replace />} />
                 <Route path="/health" element={<Navigate to="/keys" replace />} />
               </Routes>

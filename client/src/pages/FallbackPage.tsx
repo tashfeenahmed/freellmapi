@@ -24,7 +24,6 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
-import { ModelsTabs } from '@/components/models-tabs'
 
 interface FallbackEntry {
   modelDbId: number
@@ -91,21 +90,21 @@ interface TokenUsageData {
 }
 
 const platformColors: Record<string, string> = {
-  google:      '#4285f4',
-  groq:        '#f55036',
-  cerebras:    '#8b5cf6',
-  sambanova:   '#14b8a6',
-  nvidia:      '#76b900',
-  mistral:     '#f59e0b',
-  openrouter:  '#ec4899',
-  github:      '#6e7b8b',
-  cohere:      '#d946ef',
-  cloudflare:  '#f38020',
-  zhipu:       '#06b6d4',
-  ollama:      '#000000',
-  kilo:        '#7c3aed',
+  google: '#4285f4',
+  groq: '#f55036',
+  cerebras: '#8b5cf6',
+  sambanova: '#14b8a6',
+  nvidia: '#76b900',
+  mistral: '#f59e0b',
+  openrouter: '#ec4899',
+  github: '#6e7b8b',
+  cohere: '#d946ef',
+  cloudflare: '#f38020',
+  zhipu: '#06b6d4',
+  ollama: '#000000',
+  kilo: '#7c3aed',
   pollinations: '#a855f7',
-  llm7:        '#0ea5e9',
+  llm7: '#0ea5e9',
   huggingface: '#ff9d00',
 }
 
@@ -474,7 +473,6 @@ export default function FallbackPage() {
         title="Models"
         description="Pick a routing strategy. In Manual mode you drag to set the order; the other strategies route by live score across reliability, speed and intelligence."
         divider={false}
-        actions={<ModelsTabs />}
       />
 
       <div className="space-y-6">
@@ -500,11 +498,10 @@ export default function FallbackPage() {
                 <button
                   disabled={strategyMutation.isPending}
                   onClick={() => strategyMutation.mutate(s.key)}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                    s.key === strategy
-                      ? 'bg-foreground text-background font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${s.key === strategy
+                    ? 'bg-foreground text-background font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
                 >
                   {s.label}
                 </button>
