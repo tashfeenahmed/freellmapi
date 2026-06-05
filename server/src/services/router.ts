@@ -40,6 +40,9 @@ interface ChainRow {
   supports_vision: number;
   supports_tools: number;
   context_window: number | null;
+  // Custom models bind to the api_keys row carrying their endpoint (#212);
+  // NULL for built-in platforms.
+  key_id: number | null;
 }
 
 export interface RouteResult {
@@ -136,7 +139,8 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
 
 // ── Routing strategy (persisted) ────────────────────────────────────────────
 const STRATEGY_KEY = 'routing_strategy';
-const VALID_STRATEGIES: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable'];
+const CUSTOM_WEIGHTS_KEY = 'routing_custom_weights';
+const VALID_STRATEGIES: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'];
 
 export function getRoutingStrategy(): RoutingStrategy {
   const raw = getSetting(STRATEGY_KEY);
@@ -152,8 +156,47 @@ export function setRoutingStrategy(strategy: RoutingStrategy): void {
   setSetting(STRATEGY_KEY, strategy);
 }
 
+// ── Custom weights (persisted) ──────────────────────────────────────────────
+// User-tuned weight vector for the 'custom' strategy. Stored normalized (sums
+// to 1) so the dashboard percentages read cleanly; combineScore would tolerate
+// any non-negative vector regardless. Falls back to the balanced preset until
+// the user has saved their own.
+export function getCustomWeights(): RoutingWeights {
+  const raw = getSetting(CUSTOM_WEIGHTS_KEY);
+  if (raw) {
+    try {
+      const w = JSON.parse(raw) as RoutingWeights;
+      if (
+        [w.reliability, w.speed, w.intelligence].every(v => Number.isFinite(v) && v >= 0) &&
+        w.reliability + w.speed + w.intelligence > 0
+      ) {
+        return { reliability: w.reliability, speed: w.speed, intelligence: w.intelligence };
+      }
+    } catch { /* corrupt setting → fall through to default */ }
+  }
+  return { ...BANDIT_PRESETS.balanced };
+}
+
+export function setCustomWeights(weights: RoutingWeights): void {
+  const { reliability, speed, intelligence } = weights;
+  if (![reliability, speed, intelligence].every(v => Number.isFinite(v) && v >= 0)) {
+    throw new Error('Custom weights must be non-negative numbers');
+  }
+  const sum = reliability + speed + intelligence;
+  if (sum <= 0) {
+    throw new Error('Custom weights must not all be zero');
+  }
+  setSetting(CUSTOM_WEIGHTS_KEY, JSON.stringify({
+    reliability: reliability / sum,
+    speed: speed / sum,
+    intelligence: intelligence / sum,
+  }));
+}
+
 function weightsFor(strategy: RoutingStrategy): RoutingWeights | null {
-  return strategy === 'priority' ? null : BANDIT_PRESETS[strategy];
+  if (strategy === 'priority') return null;
+  if (strategy === 'custom') return getCustomWeights();
+  return BANDIT_PRESETS[strategy];
 }
 
 // ── Analytics stats cache (decay-weighted) ──────────────────────────────────
@@ -356,7 +399,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window
+           m.supports_tools, m.context_window, m.key_id
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
     WHERE fc.enabled = 1
@@ -422,6 +465,12 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     for (let attempt = 0; attempt < keys.length; attempt++) {
       const key = keys[idx % keys.length];
       idx++;
+
+      // A custom model belongs to exactly one endpoint: skip every custom key
+      // except the one it was registered with. Without this, multiple custom
+      // providers would round-robin each other's models onto the wrong
+      // endpoint. (#212) Legacy rows (key_id NULL) keep the old any-key match.
+      if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) continue;
 
       const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
       if (skipKeys?.has(skipId)) continue;

@@ -10,7 +10,10 @@
     "dev": "concurrently --kill-others-on-fail --names server,client \"npm run dev -w server\" \"npm run dev -w client\"",
     "test": "npm run test -w server && npm run test -w client --if-present",
     "build": "npm run build -w server && npm run build -w client",
-    "build:server": "npm run build -w server"
+    "build:server": "npm run build -w server",
+    "desktop:dev": "npm run build -w client && npm --prefix desktop run dev",
+    "desktop:dist": "npm run build -w client && npm --prefix desktop run dist",
+    "desktop:dist:win": "npm run build -w client && npm --prefix desktop run dist:win"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

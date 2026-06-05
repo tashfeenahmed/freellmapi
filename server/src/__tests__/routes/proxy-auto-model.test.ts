@@ -58,7 +58,7 @@ describe('Virtual "auto" model', () => {
   });
 
   it('lists "auto" as the first /v1/models entry', async () => {
-    const { status, body } = await request(app, 'GET', '/v1/models');
+    const { status, body } = await request(app, 'GET', '/v1/models', undefined, authHeaders());
     expect(status).toBe(200);
     expect(body.object).toBe('list');
     expect(body.data[0]).toMatchObject({
@@ -68,6 +68,22 @@ describe('Virtual "auto" model', () => {
     });
     // Real catalog models still follow.
     expect(body.data.length).toBeGreaterThan(1);
+  });
+
+  it('fails when authentication is missing or wrong', async () => {
+    const { status: status1 } = await request(app, 'GET', '/v1/models');
+    expect(status1).toBe(401);
+
+    const { status: status2 } = await request(app, 'GET', '/v1/models', undefined, { Authorization: 'Bearer wrongkey' });
+    expect(status2).toBe(401);
+  });
+
+  it('returns unique model ids from /v1/models', async () => {
+    const { status, body } = await request(app, 'GET', '/v1/models', undefined, authHeaders());
+    expect(status).toBe(200);
+
+    const ids = body.data.map((model: { id: string }) => model.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('treats model:"auto" as auto-route instead of a 400', async () => {

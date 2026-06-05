@@ -141,7 +141,7 @@ function UnifiedKeySection() {
       {isError ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
           Can't reach the server on <code className="font-mono">{baseUrl.replace('/v1', '')}</code>. Make sure the
-          backend is running — <code className="font-mono">npm run dev</code> starts both, and the server logs print
+          backend is running. <code className="font-mono">npm run dev</code> starts both, and the server logs print
           under the <code className="font-mono">server</code> prefix.
         </div>
       ) : (
@@ -166,7 +166,7 @@ function UnifiedKeySection() {
         <span className="text-muted-foreground">Responses</span>
         <code className="font-mono">/v1/responses</code>
         <span className="text-muted-foreground">Embeddings</span>
-        <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">— model: "auto" or a family from the Embeddings tab</span></code>
+        <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">(model: "auto" or a family from the Embeddings tab)</span></code>
       </div>
     </section>
   )
@@ -202,7 +202,7 @@ function CustomProviderSection() {
     <section>
       <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
       <p className="text-xs text-muted-foreground mb-3">
-        Point at any OpenAI-compatible endpoint — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
+        Point at any OpenAI-compatible endpoint: llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
         gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
         (most local servers don't need one).
       </p>
@@ -443,7 +443,7 @@ export default function KeysPage() {
               />
               {isKeyless && (
                 <p className="text-[11px] text-muted-foreground">
-                  No API key needed — this provider's free tier is anonymous (rate-limited per IP).
+                  No API key needed: this provider's free tier is anonymous (rate-limited per IP).
                 </p>
               )}
             </div>

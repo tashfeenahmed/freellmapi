@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  /* Theme variables: dark by default (deep black glass), body.light flips
+     them. The theme is driven by the dashboard's toggle via main.ts. */
+  :root {
+    --fg: rgba(255, 255, 255, 0.92);
+    --fg-dim: rgba(255, 255, 255, 0.55);
+    --fg-faint: rgba(255, 255, 255, 0.32);
+    --hairline: rgba(255, 255, 255, 0.10);
+    --card: rgba(255, 255, 255, 0.055);
+    --card-edge: rgba(255, 255, 255, 0.10);
+    --ghost: rgba(255, 255, 255, 0.08);
+    --ghost-hover: rgba(255, 255, 255, 0.13);
+    --switch-off: rgba(255, 255, 255, 0.16);
+    --sheen: rgba(255, 255, 255, 0.12);
+    --zero-bar: rgba(255, 255, 255, 0.10);
+    --accent: #6aa6ff;
+    --accent-2: #8e7bff;
+    --ok: #34c759;
+    --panel-tint: linear-gradient(180deg, rgba(12,12,15,0.62), rgba(0,0,2,0.72));
+    --panel-solid: linear-gradient(180deg, #19191d, #0a0a0d);
+  }
+  body.light {
+    --fg: rgba(20, 20, 24, 0.92);
+    --fg-dim: rgba(20, 20, 24, 0.56);
+    --fg-faint: rgba(20, 20, 24, 0.34);
+    --hairline: rgba(0, 0, 0, 0.10);
+    --card: rgba(0, 0, 0, 0.05);
+    --card-edge: rgba(255, 255, 255, 0.45);
+    --ghost: rgba(0, 0, 0, 0.06);
+    --ghost-hover: rgba(0, 0, 0, 0.10);
+    --switch-off: rgba(0, 0, 0, 0.14);
+    --sheen: rgba(255, 255, 255, 0.55);
+    --zero-bar: rgba(0, 0, 0, 0.10);
+    --ok: #1ea83f;
+    --panel-tint: linear-gradient(180deg, rgba(255,255,255,0.38), rgba(244,244,247,0.46));
+    --panel-solid: linear-gradient(180deg, #f4f4f6, #e9e9ee);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  /* The window itself is the panel: native rounded corners + vibrancy show
+     through everywhere the page stays (near-)transparent. CSS adds only a
+     tint and the gloss sheen. */
+  html, body { background: transparent; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+  }
+  .panel {
+    position: relative;
+    height: 100%;
+    background: var(--panel-tint);
+    box-shadow: inset 0 1px 0 var(--card-edge);
+    overflow: hidden;
+    padding: 14px 14px 12px;
+  }
+  body.no-vibrancy .panel { background: var(--panel-solid); }
+  /* gloss sheen */
+  .panel::before {
+    content: "";
+    position: absolute; inset: 0 0 auto 0; height: 110px;
+    background: radial-gradient(120% 100% at 50% -20%, var(--sheen), rgba(255,255,255,0) 70%);
+    pointer-events: none;
+  }
+
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .mark {
+    width: 22px; height: 22px; border-radius: 7px; flex: none;
+    background: linear-gradient(180deg, #3a3a40, #232327);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+    display: grid; place-items: center;
+  }
+  .mark svg { display: block; }
+  .title { font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+  .addr { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--fg-dim); }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
+    box-shadow: 0 0 6px rgba(52,199,89,0.9);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.55; } }
+
+  .stats { display: flex; gap: 8px; margin-bottom: 10px; }
+  .stat {
+    flex: 1; padding: 9px 11px 8px;
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: inset 0 0.5px 0 var(--card-edge);
+  }
+  .stat .v { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 10px; color: var(--fg-dim); margin-top: 1px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .sub { font-size: 10px; color: var(--ok); margin-top: 1px; }
+
+  .chartwrap { padding: 4px 2px 0; }
+  canvas { display: block; width: 100%; height: 64px; }
+  .axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--fg-faint); padding: 3px 2px 0; }
+
+  .lastmodel {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--fg-dim);
+    padding: 9px 2px 10px;
+    border-bottom: 0.5px solid var(--hairline);
+    margin-bottom: 10px;
+  }
+  .lastmodel b { color: var(--fg); font-weight: 500; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .actions { display: flex; gap: 7px; margin-bottom: 10px; }
+  button {
+    font: inherit; color: var(--fg); border: 0; cursor: pointer;
+    border-radius: 10px; font-size: 11.5px; font-weight: 550;
+    white-space: nowrap;
+    transition: transform 0.06s ease, filter 0.15s ease;
+  }
+  button:active { transform: scale(0.97); }
+  .primary {
+    flex: 1.6; padding: 8px 8px;
+    background: linear-gradient(180deg, var(--accent), #4d86e8);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(74,134,232,0.35);
+  }
+  .primary:hover { filter: brightness(1.07); }
+  .ghost {
+    flex: 1; padding: 8px 4px;
+    background: var(--ghost);
+    box-shadow: inset 0 0.5px 0 var(--card-edge);
+    color: var(--fg);
+  }
+  .ghost:hover { background: var(--ghost-hover); }
+  .ghost.copied { color: var(--ok); }
+
+  .foot { display: flex; align-items: center; font-size: 11.5px; color: var(--fg-dim); }
+  .switch {
+    position: relative; width: 30px; height: 18px; border-radius: 9px;
+    background: var(--switch-off); margin-right: 7px; flex: none;
+    transition: background 0.18s ease; cursor: pointer;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    transition: left 0.18s ease;
+  }
+  .switch.on { background: var(--ok); }
+  .switch.on::after { left: 14px; }
+  .quit {
+    margin-left: auto; background: none; color: var(--fg-dim);
+    font-size: 11.5px; padding: 4px 6px; border-radius: 7px;
+  }
+  .quit:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="head">
+      <div class="mark">
+        <svg width="13" height="13" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="11" fill="#fafafa"/>
+          <circle cx="32" cy="32" r="22" fill="none" stroke="#fafafa" stroke-opacity=".45"
+                  stroke-width="6" stroke-linecap="round" stroke-dasharray="104 34"
+                  transform="rotate(-60 32 32)"/>
+        </svg>
+      </div>
+      <div>
+        <div class="title">FreeLLMAPI</div>
+        <div class="addr" id="addr">127.0.0.1:…</div>
+      </div>
+      <div class="status"><span class="dot"></span>running</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="v" id="reqs">0</div>
+        <div class="l">Requests today</div>
+        <div class="sub" id="rate"></div>
+      </div>
+      <div class="stat">
+        <div class="v" id="tokens">0</div>
+        <div class="l">Tokens today</div>
+      </div>
+    </div>
+
+    <div class="chartwrap">
+      <canvas id="chart" width="0" height="0"></canvas>
+      <div class="axis"><span>24h ago</span><span id="peak"></span><span>now</span></div>
+    </div>
+
+    <div class="lastmodel">Last model <b id="model">—</b></div>
+
+    <div class="actions">
+      <button class="primary" id="open">Open Dashboard</button>
+      <button class="ghost" id="copyurl">Copy URL</button>
+      <button class="ghost" id="copykey">Copy Key</button>
+    </div>
+
+    <div class="foot">
+      <div class="switch" id="login"></div>
+      <span>Start at login</span>
+      <button class="quit" id="quit">Quit</button>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n);
+
+  function drawChart(hourly) {
+    const c = $('chart');
+    const cssW = c.clientWidth, cssH = 64, dpr = window.devicePixelRatio || 2;
+    c.width = cssW * dpr; c.height = cssH * dpr;
+    const ctx = c.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const n = hourly.length, gap = 3;
+    const bw = (cssW - gap * (n - 1)) / n;
+    const max = Math.max(...hourly, 1);
+    const grad = ctx.createLinearGradient(0, 0, 0, cssH);
+    grad.addColorStop(0, 'rgba(48,209,88,0.95)');
+    grad.addColorStop(1, 'rgba(52,199,89,0.45)');
+    const zeroBar = getComputedStyle(document.body).getPropertyValue('--zero-bar').trim();
+    for (let i = 0; i < n; i++) {
+      const v = hourly[i];
+      const h = v === 0 ? 2 : Math.max(3, (v / max) * (cssH - 6));
+      const x = i * (bw + gap), y = cssH - h;
+      ctx.fillStyle = v === 0 ? zeroBar : grad;
+      ctx.beginPath();
+      ctx.roundRect(x, y, bw, h, Math.min(3, bw / 2));
+      ctx.fill();
+    }
+    $('peak').textContent = max > 1 ? 'peak ' + max + '/h' : '';
+  }
+
+  let loginOn = false;
+  async function refresh() {
+    const s = await window.freeapi.snapshot();
+    document.body.classList.toggle('light', s.theme === 'light');
+    $('addr').textContent = '127.0.0.1:' + s.port;
+    $('reqs').textContent = fmt(s.requests);
+    $('tokens').textContent = fmt(s.tokens);
+    $('rate').textContent = s.successRate == null ? '' : s.successRate + '% success';
+    $('model').textContent = s.lastModel;
+    loginOn = s.loginItem;
+    $('login').classList.toggle('on', loginOn);
+    drawChart(s.hourly);
+  }
+
+  function flash(btn, label) {
+    const orig = btn.textContent;
+    btn.textContent = label; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1100);
+  }
+
+  $('open').addEventListener('click', () => window.freeapi.openDashboard());
+  $('copyurl').addEventListener('click', (e) => { window.freeapi.copyBaseUrl(); flash(e.target, 'Copied ✓'); });
+  $('copykey').addEventListener('click', (e) => { window.freeapi.copyApiKey(); flash(e.target, 'Copied ✓'); });
+  $('quit').addEventListener('click', () => window.freeapi.quit());
+  $('login').addEventListener('click', () => {
+    loginOn = !loginOn;
+    $('login').classList.toggle('on', loginOn);
+    window.freeapi.setLoginItem(loginOn);
+  });
+
+  window.freeapi.onRefresh(refresh);
+  refresh();
+</script>
+</body>
+</html>

@@ -94,6 +94,19 @@ function Brand() {
   )
 }
 
+// True when the dashboard runs inside the desktop shell (Electron preload
+// sets this). The navbar then doubles as the window title bar: draggable,
+// padded for the macOS traffic lights, and without the web-only Sign out.
+const isDesktopApp = typeof window !== 'undefined' && (window as any).__FREEAPI_DESKTOP__ === true
+
+// The preload's own early classList.add can be lost (it may run before this
+// document exists), so the client claims the class itself at module load —
+// before the first React paint — keeping html.desktop CSS (transparent body,
+// glass backdrop) reliable.
+if (isDesktopApp) {
+  document.documentElement.classList.add('desktop')
+}
+
 function Navbar() {
   const { dark, toggle } = useDarkMode()
   const location = useLocation()
@@ -104,21 +117,37 @@ function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center px-4 sm:px-6">
+    <header
+      // In the desktop shell the body backdrop is already translucent glass;
+      // a lighter wash keeps the title bar from looking more solid than the page.
+      className={`sticky top-0 z-40 border-b backdrop-blur ${isDesktopApp ? 'bg-background/45' : 'bg-background/80'}`}
+      style={isDesktopApp ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
+    >
+      <div
+        className={`mx-auto flex max-w-6xl items-center px-4 sm:px-6 ${isDesktopApp ? 'pl-20 sm:pl-20' : ''}`}
+        style={isDesktopApp ? { minHeight: 52 } : undefined}
+      >
         <Brand />
-        <nav className="ml-10 hidden items-center gap-6 md:flex">
+        <nav
+          className="ml-10 hidden items-center gap-6 md:flex"
+          style={isDesktopApp ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
+        >
           {navItems.map((item) => (
             <NavItem key={item.to} to={item.to}>
               {item.label}
             </NavItem>
           ))}
         </nav>
-        <div className="ml-auto hidden items-center gap-1 md:flex">
+        <div
+          className="ml-auto hidden items-center gap-1 md:flex"
+          style={isDesktopApp ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
+        >
           <DarkModeToggle dark={dark} onToggle={toggle} />
-          <Button variant="ghost" size="sm" onClick={() => logout()}>
-            Sign out
-          </Button>
+          {!isDesktopApp && (
+            <Button variant="ghost" size="sm" onClick={() => logout()}>
+              Sign out
+            </Button>
+          )}
         </div>
         <div className="ml-auto md:hidden">
           <DropdownMenu>
@@ -146,7 +175,9 @@ function Navbar() {
                   <span>Theme</span>
                   {dark ? <Sun /> : <Moon />}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+                {!isDesktopApp && (
+                  <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -161,7 +192,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthGate>
-          <div className="min-h-screen bg-background">
+          <div className={`min-h-screen ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
             <Navbar />
             <main className="max-w-6xl mx-auto px-6 py-8">
               <Routes>

@@ -48,6 +48,13 @@ export interface Model {
   supportsTools: boolean;
 }
 
+export interface ModelListRow {
+  platform: string;
+  model_id: string;
+  display_name: string;
+  context_window: number | null;
+}
+
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
 
 export interface ApiKey {
@@ -117,10 +124,12 @@ export type ChatToolChoice =
   };
 
 // OpenAI's multimodal envelope: clients like opencode / continue.dev send
-// content as an array of typed blocks even for text-only messages. We accept
-// it on the wire and flatten to string for providers that don't support it
-// (Cohere, Cloudflare). See server/src/lib/content.ts.
-export type ChatContentBlock = { type: string; text?: string; [key: string]: unknown };
+// content as an array of typed blocks even for text-only messages, and
+// Gemini-lineage agents (Qwen Code, AionUI) send part-style `{ text }` blocks
+// with no `type` — plus bare strings inside arrays. We accept all of it on
+// the wire and flatten to string for providers that don't support arrays
+// (Cohere, Cloudflare). See server/src/lib/content.ts. (#200)
+export type ChatContentBlock = string | { type?: string; text?: string; [key: string]: unknown };
 export type ChatContent = string | null | ChatContentBlock[];
 
 export interface ChatMessage {

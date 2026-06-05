@@ -28,11 +28,12 @@ export interface RoutingWeights {
   intelligence: number;
 }
 
-// Strategy is either the legacy manual chain ('priority') or one of the bandit
-// presets. Each preset is just a weight vector — the engine is identical.
-export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable';
+// Strategy is either the legacy manual chain ('priority'), one of the bandit
+// presets, or 'custom' (a user-tuned weight vector persisted in settings — see
+// router.ts). Each is just a weight vector — the engine is identical.
+export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom';
 
-export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority'>, RoutingWeights> = {
+export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority' | 'custom'>, RoutingWeights> = {
   // Reliability leads; speed and intelligence split the rest evenly.
   balanced: { reliability: 0.5, speed: 0.25, intelligence: 0.25 },
   // Intelligence leads, but reliability still carries real weight so a smart

@@ -1,0 +1,35 @@
+appId: com.freellmapi.desktop
+productName: FreeLLMAPI
+directories:
+  output: dist-electron
+files:
+  - build/**/*
+  - renderer/**/*
+  - assets/**/*
+  - "!**/*.map"
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**/*.node"
+  - "**/node_modules/better-sqlite3/build/Release/**"
+extraResources:
+  - from: ../client/dist
+    to: client-dist
+mac:
+  category: public.app-category.developer-tools
+  icon: assets/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  extendInfo:
+    LSUIElement: 1
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # electron-builder converts a >=256px PNG to .ico at build time.
+  icon: assets/appicon_1024.png
+nsis:
+  oneClick: true
+  deleteAppDataOnUninstall: false

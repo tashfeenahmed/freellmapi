@@ -27,6 +27,12 @@ describe('contentToString', () => {
     ])).toBe('describe this');
   });
 
+  it('extracts Gemini-part-style { text } blocks with no type field (#200)', () => {
+    expect(contentToString([{ text: 'hi' }, { text: ' there' }])).toBe('hi there');
+    // a typed NON-text block still gets dropped even when it carries text
+    expect(contentToString([{ type: 'reasoning', text: 'inner monologue' }, { type: 'text', text: 'ok' }])).toBe('ok');
+  });
+
   it('handles an array of bare strings (some clients send this)', () => {
     expect(contentToString(['foo', 'bar'])).toBe('foobar');
   });

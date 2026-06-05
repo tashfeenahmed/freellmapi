@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import type { ChatMessage } from '@freellmapi/shared/types.js';
+import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
@@ -103,9 +103,30 @@ export function setStickyModel(messages: ChatMessage[], modelDbId: number) {
 }
 
 // OpenAI-compatible /models endpoint (used by Hermes for metadata)
-proxyRouter.get('/models', (_req: Request, res: Response) => {
+proxyRouter.get('/models', (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+
   const db = getDb();
-  const models = db.prepare('SELECT platform, model_id, display_name, context_window FROM models WHERE enabled = 1 ORDER BY intelligence_rank').all() as any[];
+  const models = db.prepare(`
+    SELECT platform, model_id, display_name, context_window
+    FROM (
+      SELECT platform, model_id, display_name, context_window, intelligence_rank, id,
+             ROW_NUMBER() OVER (
+               PARTITION BY model_id
+               ORDER BY intelligence_rank ASC, id ASC
+             ) AS rn
+      FROM models
+      WHERE enabled = 1
+    )
+    WHERE rn = 1
+    ORDER BY intelligence_rank ASC, id ASC
+  `).all() as ModelListRow[];
+
   res.json({
     object: 'list',
     data: [
@@ -131,26 +152,47 @@ proxyRouter.get('/models', (_req: Request, res: Response) => {
 
 const MAX_RETRIES = 20;
 
+// Echo-tolerant tool calls: agents replay OUR responses back as history, and
+// not all of them preserve the strict OpenAI shape. `type` may be dropped
+// (re-added on forward), Gemini-lineage agents (Qwen Code, AionUI) often
+// send `arguments` as a parsed object instead of a JSON string, and `id` may
+// be missing or empty (ids aren't a Gemini concept) — all get normalized
+// below rather than 400-ing the whole session. Missing ids are synthesized
+// and paired with their tool-result messages by order. (#200)
 const toolCallSchema = z.object({
-  id: z.string().min(1),
-  type: z.literal('function'),
+  id: z.string().optional(),
+  type: z.literal('function').optional(),
   function: z.object({
     name: z.string().min(1),
-    arguments: z.string(),
+    arguments: z.union([z.string(), z.record(z.string(), z.unknown())]),
   }),
   thought_signature: z.string().optional(),
 });
 
+const toolCallArgsToString = (args: string | Record<string, unknown>): string =>
+  typeof args === 'string' ? args : JSON.stringify(args);
+
 // OpenAI multimodal envelope. Clients like opencode / continue.dev send
-// content as an array of typed blocks even when only text is present. We
-// accept the envelope on the wire and flatten to string for providers that
-// don't support arrays (Cohere, Cloudflare). Non-text blocks pass z validation
-// but get dropped by contentToString — vision/audio still isn't supported.
-const contentBlockSchema = z.object({ type: z.string() }).passthrough();
+// content as an array of typed blocks even when only text is present, and
+// Gemini-lineage agents send part-style blocks like `{ "text": "..." }` with
+// no `type` at all. Accept any object (or bare string) as a block; flatten to
+// string for providers that don't support arrays (Cohere, Cloudflare).
+// Non-text blocks pass z validation but get dropped by contentToString —
+// vision/audio still isn't supported. (#200)
+const contentBlockSchema = z.union([z.string(), z.record(z.string(), z.unknown())]);
 const contentSchema = z.union([z.string(), z.array(contentBlockSchema)]);
 
 const systemMessageSchema = z.object({
   role: z.literal('system'),
+  content: contentSchema,
+  name: z.string().optional(),
+});
+
+// OpenAI's newer SDKs send the system prompt as role:"developer"; accept it
+// and forward as "system" — none of the routed providers know the developer
+// role. (#200)
+const developerMessageSchema = z.object({
+  role: z.literal('developer'),
   content: contentSchema,
   name: z.string().optional(),
 });
@@ -174,15 +216,28 @@ const assistantMessageSchema = z.object({
   tool_calls: z.array(toolCallSchema).optional(),
 });
 
+// Tool results may arrive with null/missing content (a tool that returned
+// nothing) and a missing/empty tool_call_id (Gemini-lineage agents) — coerced
+// to "" and paired by order with the preceding tool_calls respectively. (#200)
 const toolMessageSchema = z.object({
   role: z.literal('tool'),
-  content: contentSchema,
-  tool_call_id: z.string().min(1),
+  content: z.union([contentSchema, z.null()]).optional(),
+  tool_call_id: z.string().optional(),
   name: z.string().optional(),
 });
 
+// Legacy function-calling shape (pre-tools OpenAI API). Old clients still
+// replay these in history; forwarded as a tool message. (#200)
+const functionMessageSchema = z.object({
+  role: z.literal('function'),
+  name: z.string().min(1),
+  content: z.union([contentSchema, z.null()]).optional(),
+});
+
 const toolDefinitionSchema = z.object({
-  type: z.literal('function'),
+  // Some agents omit `type` on tool definitions; re-defaulted to 'function'
+  // on forward. (#200)
+  type: z.literal('function').optional(),
   function: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
@@ -192,7 +247,9 @@ const toolDefinitionSchema = z.object({
 });
 
 const toolChoiceSchema = z.union([
-  z.enum(['none', 'auto', 'required']),
+  // 'any' is the Mistral/Gemini wording for OpenAI's 'required'; mapped on
+  // forward. (#200)
+  z.enum(['none', 'auto', 'required', 'any']),
   z.object({
     type: z.literal('function'),
     function: z.object({
@@ -204,13 +261,17 @@ const toolChoiceSchema = z.union([
 const chatCompletionSchema = z.object({
   messages: z.array(z.union([
     systemMessageSchema,
+    developerMessageSchema,
     userMessageSchema,
     assistantMessageSchema,
     toolMessageSchema,
+    functionMessageSchema,
   ])).min(1),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
-  max_tokens: z.number().int().positive().optional(),
+  // Some clients send max_tokens <= 0 (or -1) to mean "no limit"; accepted and
+  // treated as unset on forward. (#200)
+  max_tokens: z.number().int().optional(),
   top_p: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   tools: z.array(toolDefinitionSchema).optional(),
@@ -324,16 +385,47 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Validate request
   const parsed = chatCompletionSchema.safeParse(req.body);
   if (!parsed.success) {
+    // Path-qualified issues ("messages.1.content: Invalid input" beats a bare
+    // "Invalid input") and a server-side breadcrumb — these rejections never
+    // reach the request log, which made #200 nearly undebuggable.
+    const detail = parsed.error.errors
+      .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
+      .slice(0, 5)
+      .join(', ');
+    console.warn(`[proxy] 400 invalid /chat/completions request: ${detail}`);
     res.status(400).json({
       error: {
-        message: `Invalid request: ${parsed.error.errors.map(e => e.message).join(', ')}`,
+        message: `Invalid request: ${detail}`,
         type: 'invalid_request_error',
       },
     });
     return;
   }
 
-  const { model: requestedModel, temperature, max_tokens, top_p, stream, tools, tool_choice, parallel_tool_calls } = parsed.data;
+  const { model: requestedModel, temperature, top_p, stream, parallel_tool_calls } = parsed.data;
+  // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
+  // limit" in several clients → unset; tool_choice 'any' is OpenAI's
+  // 'required'; tool definitions get their 'function' type re-defaulted.
+  const max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
+    ? parsed.data.max_tokens : undefined;
+  const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice;
+  const tools = parsed.data.tools?.map(t => ({ ...t, type: 'function' as const }));
+
+  // Pairing state for id-less tool calls (#200): every tool_call id (given or
+  // synthesized) queues up here; a tool message without a tool_call_id takes
+  // the oldest unanswered one, which matches the single-call-per-turn flow
+  // Gemini-lineage agents produce.
+  const pendingToolCallIds: string[] = [];
+  let syntheticIdCounter = 0;
+  const takeToolCallId = (given: string | undefined): string => {
+    if (given && given.length > 0) {
+      const qi = pendingToolCallIds.indexOf(given);
+      if (qi !== -1) pendingToolCallIds.splice(qi, 1);
+      return given;
+    }
+    return pendingToolCallIds.shift() ?? `call_auto_${++syntheticIdCounter}`;
+  };
+
   const messages: ChatMessage[] = parsed.data.messages.map((m): ChatMessage => {
     if (m.role === 'assistant') {
       const hasToolCalls = (m.tool_calls?.length ?? 0) > 0;
@@ -350,26 +442,47 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         role: 'assistant',
         content: assistantContent,
         ...(m.name ? { name: m.name } : {}),
-        ...(m.tool_calls ? { tool_calls: m.tool_calls.map(tc => ({
-          id: tc.id,
-          type: tc.type,
-          function: tc.function,
-          thought_signature: tc.thought_signature,
-        })) } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls.map(tc => {
+          // Normalize echo-tolerant inputs back to the strict OpenAI shape
+          // before forwarding (see toolCallSchema); synthesize missing ids
+          // and queue every id for order-based tool-result pairing. (#200)
+          const id = tc.id && tc.id.length > 0 ? tc.id : `call_auto_${++syntheticIdCounter}`;
+          pendingToolCallIds.push(id);
+          return {
+            id,
+            type: 'function' as const,
+            function: { name: tc.function.name, arguments: toolCallArgsToString(tc.function.arguments) },
+            thought_signature: tc.thought_signature,
+          };
+        }) } : {}),
       };
     }
 
     if (m.role === 'tool') {
       return {
         role: 'tool',
-        content: m.content,
-        tool_call_id: m.tool_call_id,
+        // Null/missing content (a tool that returned nothing) → "". (#200)
+        content: m.content ?? '',
+        tool_call_id: takeToolCallId(m.tool_call_id),
         ...(m.name ? { name: m.name } : {}),
       };
     }
 
+    // Legacy function-calling result → forward as a tool message, paired by
+    // order like an id-less tool message. (#200)
+    if (m.role === 'function') {
+      return {
+        role: 'tool',
+        content: m.content ?? '',
+        tool_call_id: takeToolCallId(undefined),
+        name: m.name,
+      };
+    }
+
     return {
-      role: m.role,
+      // 'developer' is OpenAI's newer name for the system role — providers
+      // downstream only know 'system'. (#200)
+      role: m.role === 'developer' ? 'system' : m.role,
       content: m.content,
       ...(m.name ? { name: m.name } : {}),
     };
@@ -453,6 +566,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     preferredModel = getStickyModel(messages);
   }
 
+  // For analytics: the model id the client pinned, null when auto-routed
+  // ('auto' or omitted). Logged with every request row so pinned vs auto
+  // traffic and failover overrides are visible.
+  const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
+
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
   let lastError: any = null;
@@ -521,7 +639,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             // instead of handing the client a valid-looking empty stream
             // (production case: nemotron-3-super returning nothing on large
             // contexts while the request logs as success).
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (stream produced no chunks)');
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (stream produced no chunks)', null, pinnedModelId);
             skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
             setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
             recordRateLimitHit(route.modelDbId);
@@ -534,7 +652,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId);
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs);
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
         } catch (streamErr: any) {
           if (streamStarted) {
@@ -546,7 +664,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message));
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), null, pinnedModelId);
             return;
           }
           // Pre-stream error — bubble to outer retry/502 handler.
@@ -564,7 +682,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const respMsg = result.choices?.[0]?.message;
         const respText = contentToString(respMsg?.content ?? '');
         if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
-          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
           recordRateLimitHit(route.modelDbId);
@@ -598,14 +716,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.platform, route.modelId, route.keyId, 'success',
           result.usage?.prompt_tokens ?? 0,
           result.usage?.completion_tokens ?? 0,
-          Date.now() - start, null,
+          Date.now() - start, null, null, pinnedModelId,
         );
         return;
       }
     } catch (err: any) {
       const latency = Date.now() - start;
       const safeError = sanitizeProviderErrorMessage(err.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
 
       if (isRetryableError(err)) {
         // Put this model+key on cooldown and try the next one
@@ -658,13 +776,17 @@ export function logRequest(
   latencyMs: number,
   error: string | null,
   ttfbMs: number | null = null,
+  // The model id the client pinned; null for auto-routed requests. Lets
+  // analytics split pinned vs auto traffic and detect failover overrides
+  // (requested_model set but != model_id).
+  requestedModel: string | null = null,
 ) {
   try {
     const db = getDb();
     db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs);
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel);
     pruneRequestAnalytics({ db });
   } catch (e) {
     console.error('Failed to log request:', e);

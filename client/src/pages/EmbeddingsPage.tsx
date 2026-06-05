@@ -111,7 +111,7 @@ export default function EmbeddingsPage() {
     <div>
       <PageHeader
         title="Models"
-        description="Embeddings fail over within a family only — the same model served by another provider. Vectors from different models are incompatible, so the router never swaps models on you."
+        description="Embeddings fail over within a family only: the same model served by another provider. Vectors from different models are incompatible, so the router never swaps models on you."
         divider={false}
         actions={<ModelsTabs />}
       />

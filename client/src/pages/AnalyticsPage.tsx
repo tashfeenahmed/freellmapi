@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PageHeader } from '@/components/page-header'
+import { Tooltip as HoverTooltip } from '@/components/tooltip'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import {
   Drawer,
@@ -29,31 +30,16 @@ function formatTokens(n?: number): string {
   return String(n)
 }
 
-function formatAxisLabel(value: string, range: TimeRange): string {
-  if (!value) return ''
-  if (range === '1h') {
-    // 2026-06-05T06:42:00 → 06:42
-    return value.slice(11, 16)
-  }
-  if (range === '24h') {
-    // 2026-06-05T06:00:00 → 6 AM
-    const hour = parseInt(value.slice(11, 13), 10)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const h = hour % 12 || 12
-    return `${h} ${ampm}`
-  }
-  // 7d / 30d: 2026-06-05 → Jun 5
-  const date = new Date(value + 'T00:00:00')
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function Stat({ label, value, className }: { label: string; value: string | number; className?: string }) {
-  return (
+function Stat({ label, value, hint, className }: { label: string; value: string | number; hint?: string; className?: string }) {
+  const card = (
     <div className="rounded-3xl border bg-card px-4 py-3">
       <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={`text-xl font-semibold tabular-nums mt-1 ${className ?? ''}`}>{value}</p>
     </div>
   )
+  // Same portal tooltip as the routing strategy chips. Opens BELOW the card:
+  // the stats row sits right under the sticky navbar.
+  return hint ? <HoverTooltip text={hint} side="bottom" className="block">{card}</HoverTooltip> : card
 }
 
 function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
@@ -247,14 +233,23 @@ export default function AnalyticsPage() {
     queryFn: () => apiFetch<any[]>(`/api/analytics/live-requests?range=${range}&errorsOnly=${logFilter === 'errors'}`),
   })
 
+  // Savings card shows ONE stable monthly figure regardless of the selected
+  // range: the last-30-days data projected to a full month from its actual
+  // span (a young install with 2 days of data shows 15x its 2-day total).
+  // Once 30 days of history exist the real total shows as-is. The hover
+  // hint carries the selected period's actual amount and the projection
+  // basis. Querying 30d separately is free: react-query shares the cache
+  // with the 30d tab.
   const { data: summary30 } = useQuery({
     queryKey: ['analytics', 'summary', '30d'],
     queryFn: () => apiFetch<any>(`/api/analytics/summary?range=30d`),
   })
 
+  const actualSavings = summary?.estimatedCostSavings ?? 0
   const baseSavings = summary30?.estimatedCostSavings ?? 0
   const spanDays = (() => {
     if (!summary30?.firstRequestAt) return 30
+    // SQLite stores UTC "YYYY-MM-DD HH:MM:SS"
     const first = new Date(summary30.firstRequestAt.replace(' ', 'T') + 'Z').getTime()
     const days = (Date.now() - first) / 86_400_000
     if (!Number.isFinite(days)) return 30
@@ -262,6 +257,21 @@ export default function AnalyticsPage() {
   })()
   const extrapolated = spanDays < 29.5
   const savings30d = extrapolated ? baseSavings * (30 / spanDays) : baseSavings
+  const rangeLabel = range === '24h' ? '24 hours' : range === '7d' ? '7 days' : '30 days'
+  const spanLabel = spanDays >= 2 ? `${Math.round(spanDays)} days` : `${Math.max(1, Math.round(spanDays * 24))} hours`
+  const savingsHint =
+    `You actually saved $${actualSavings.toFixed(2)} over the last ${rangeLabel}. That is what the same tokens would have cost on paid APIs, priced per model. ` +
+    (extrapolated
+      ? `The number shown projects your pace from the last ${spanLabel} of data to a full 30 days.`
+      : `The number shown is your real 30-day total.`)
+
+  // Pinned = the client named a specific model instead of auto-routing.
+  // Honored = that model actually served it (the rest failed over).
+  const pinned = summary?.pinnedRequests ?? 0
+  const pinHonored = summary?.pinHonoredRequests ?? 0
+  const requestsHint = pinned > 0
+    ? `${pinned} of these requests pinned a specific model by name. ${pinHonored} were served by the pinned model; ${pinned - pinHonored} failed over to a different one. The rest were auto-routed.`
+    : 'All requests in this period were auto-routed; no client pinned a specific model by name.'
 
   return (
     <div>
@@ -287,12 +297,16 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         {/* Summary stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Stat label="Requests" value={summary?.totalRequests ?? 0} />
+          <Stat label="Requests" value={summary?.totalRequests ?? 0} hint={requestsHint} />
           <Stat label="Success rate" value={`${summary?.successRate ?? 0}%`} />
           <Stat label="Input tokens" value={formatTokens(summary?.totalInputTokens)} />
           <Stat label="Output tokens" value={formatTokens(summary?.totalOutputTokens)} />
           <Stat label="Avg latency" value={`${summary?.avgLatencyMs ?? 0} ms`} />
-          <Stat label="Est. savings" value={`$${savings30d.toFixed(2)}`} />
+          {/* Priced per request at the served model's paid-API equivalent
+              rate (not a flat frontier-model rate) — see db/model-pricing.ts.
+              The value is a 30-day projection; the hover hint tells the whole
+              story (actual period amount + whether it was extrapolated). */}
+          <Stat label="Est. savings" value={`$${savings30d.toFixed(2)}`} hint={savingsHint} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -549,6 +563,133 @@ export default function AnalyticsPage() {
                   <OverTimeChart data={byModelTimeline} range={range} />
                 )
               )}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-4">Model</TableHead>
+                        <TableHead>Provider</TableHead>
+                        {([
+                          { key: 'requests', label: 'Requests' },
+                          { key: 'pinnedRequests', label: 'Pinned' },
+                          { key: 'successRate', label: 'Success' },
+                          { key: 'avgLatencyMs', label: 'Latency' },
+                          { key: 'totalInputTokens', label: 'In tokens' },
+                          { key: 'totalOutputTokens', label: 'Out tokens' },
+                          { key: 'estimatedCost', label: 'Saved' },
+                        ] as const).map(col => (
+                          <TableHead
+                            key={col.key}
+                            className={`text-right cursor-pointer select-none ${col.key === 'estimatedCost' ? 'pr-4' : ''}`}
+                            onClick={() => {
+                              if (sortKey === col.key) {
+                                setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                              } else {
+                                setSortKey(col.key)
+                                setSortDir('desc')
+                              }
+                            }}
+                          >
+                            <span className="inline-flex items-center gap-0.5">
+                              {col.label}
+                              {sortKey === col.key && <ArrowUpDown className="size-3" />}
+                            </span>
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...byModel].sort((a: any, b: any) => {
+                        const av = a[sortKey] ?? 0
+                        const bv = b[sortKey] ?? 0
+                        return sortDir === 'asc' ? av - bv : bv - av
+                      }).map((m: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="pl-4 text-sm font-medium">{m.displayName}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{m.platform}</TableCell>
+                          <TableCell className="text-right tabular-nums">{m.requests}</TableCell>
+                          <TableCell className="text-right tabular-nums">{m.pinnedRequests > 0 ? m.pinnedRequests : '—'}</TableCell>
+                          <TableCell className="text-right tabular-nums">{m.successRate}%</TableCell>
+                          <TableCell className="text-right tabular-nums">{m.avgLatencyMs} ms</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalInputTokens)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalOutputTokens)}</TableCell>
+                          <TableCell className="text-right tabular-nums pr-4">${(m.estimatedCost ?? 0).toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : modelView === 'bar' ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={byModel} margin={{ top: 6, right: 6, left: -12, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
+                    <XAxis
+                      dataKey="displayName"
+                      tick={<WrappedTick />}
+                      tickLine={false}
+                      axisLine={{ stroke: gridStyle }}
+                      interval={0}
+                    />
+                    <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="requests" fill={primaryFill} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                    <Pie
+                      data={byModel}
+                      dataKey="requests"
+                      nameKey="displayName"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={110}
+                      labelLine={false}
+                      label={showPieLabels ? ({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%` : false}
+                    >
+                      {byModel.map((_: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={`hsl(${(index * 137.5) % 360}, 60%, 55%)`} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              )
+            ) : (
+              /* Over Time mode */
+              byModelTimeline.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
+              ) : modelView === 'table' ? (
+                <div className="max-h-[360px] overflow-y-auto -mx-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-4">Time</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead className="text-right">Requests</TableHead>
+                        <TableHead className="text-right">In tokens</TableHead>
+                        <TableHead className="text-right">Out tokens</TableHead>
+                        <TableHead className="text-right pr-4">Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {byModelTimeline.map((m: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="pl-4 text-xs text-muted-foreground tabular-nums">{m.timestamp}</TableCell>
+                          <TableCell className="text-xs">{m.modelId}</TableCell>
+                          <TableCell className="text-right tabular-nums">{m.requests}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalInputTokens)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalOutputTokens)}</TableCell>
+                          <TableCell className="text-right tabular-nums pr-4">${m.estimatedCost?.toFixed(2) ?? '0.00'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <OverTimeChart data={byModelTimeline} range={range} />
+              )
+            )}
             </Panel>
           </div>
 

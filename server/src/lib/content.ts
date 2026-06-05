@@ -16,7 +16,18 @@ export function contentToString(content: unknown): string {
   if (content == null) return '';
   if (Array.isArray(content)) {
     return content
-      .map((b) => (typeof b === 'string' ? b : (b as ContentTextBlock)?.type === 'text' ? (b as ContentTextBlock).text : ''))
+      .map((b) => {
+        if (typeof b === 'string') return b;
+        const block = b as { type?: string; text?: unknown };
+        // OpenAI blocks carry type:'text'; Gemini-lineage agents (Qwen Code,
+        // AionUI) send part-style `{ text }` with no type at all — accept any
+        // block whose `text` is a string and whose type doesn't say it's
+        // something else. (#200)
+        if (typeof block?.text === 'string' && (block.type === 'text' || block.type === undefined)) {
+          return block.text;
+        }
+        return '';
+      })
       .join('');
   }
   return '';

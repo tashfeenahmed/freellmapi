@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
+import { applyModelPricing } from './model-pricing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -57,7 +58,9 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
   migrateModelsV22Tools(db);
-  migrateModelsV23Cost(db);
+  // After all model migrations: add/refresh paid-equivalent pricing
+  // (drives the realistic "Est. savings" analytics stat).
+  applyModelPricing(db);
   migrateEmbeddingsV1(db);
   ensureUnifiedKey(db);
 
@@ -173,7 +176,20 @@ function createTables(db: Database.Database) {
 
   ensureRequestKeyIdColumn(db);
   ensureApiKeysBaseUrlColumn(db);
+  ensureModelsKeyIdColumn(db);
   ensureRequestTtfbColumn(db);
+  ensureRequestRequestedModelColumn(db);
+}
+
+// `requested_model` is the model id the CLIENT pinned in the request body.
+// NULL when the request was auto-routed ('auto' or omitted model field).
+// requested_model = model_id means the pin was honored; a different model_id
+// means rate limits or failures forced a failover to another model.
+function ensureRequestRequestedModelColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'requested_model')) {
+    db.prepare('ALTER TABLE requests ADD COLUMN requested_model TEXT').run();
+  }
 }
 
 // `ttfb_ms` is the time-to-first-byte for streaming responses (ms from dispatch
@@ -200,6 +216,23 @@ function ensureApiKeysBaseUrlColumn(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(api_keys)').all() as { name: string }[];
   if (!columns.some(col => col.name === 'base_url')) {
     db.prepare('ALTER TABLE api_keys ADD COLUMN base_url TEXT').run();
+  }
+}
+
+// `key_id` binds a custom model to the api_keys row that carries ITS endpoint,
+// so several custom providers can coexist (#212). NULL for built-in platforms
+// (any key of the platform serves any of its models).
+function ensureModelsKeyIdColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'key_id')) {
+    db.prepare('ALTER TABLE models ADD COLUMN key_id INTEGER').run();
+    // Backfill: bind pre-existing custom models to the (single) legacy custom
+    // endpoint key so they keep routing to the URL they were created for.
+    db.prepare(`
+      UPDATE models
+         SET key_id = (SELECT id FROM api_keys WHERE platform = 'custom' ORDER BY id LIMIT 1)
+       WHERE platform = 'custom' AND key_id IS NULL
+    `).run();
   }
 }
 

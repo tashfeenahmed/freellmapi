@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -18,12 +17,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
+import { ModelsTabs } from '@/components/models-tabs'
+import { Tooltip } from '@/components/tooltip'
 
 interface FallbackEntry {
   modelDbId: number
@@ -46,7 +48,9 @@ interface FallbackEntry {
   keyCount: number
 }
 
-type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable'
+type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom'
+
+type RoutingWeights = { reliability: number; speed: number; intelligence: number }
 
 interface RoutingScore {
   modelDbId: number
@@ -61,7 +65,8 @@ interface RoutingScore {
 
 interface RoutingData {
   strategy: RoutingStrategy
-  weights: { reliability: number; speed: number; intelligence: number } | null
+  weights: RoutingWeights | null
+  customWeights: RoutingWeights
   scores: (RoutingScore & { platform: string; modelId: string; displayName: string; enabled: boolean })[]
 }
 
@@ -69,12 +74,114 @@ interface RoutingData {
 type Row = FallbackEntry & Partial<RoutingScore>
 
 const STRATEGIES: { key: RoutingStrategy; label: string; blurb: string }[] = [
-  { key: 'priority', label: 'Manual', blurb: 'Route in the exact order you set below. Drag the handles to reorder. No scoring — the chain is followed top-to-bottom.' },
+  { key: 'priority', label: 'Manual', blurb: 'Route in the exact order you set below. Drag the handles to reorder. No scoring; the chain is followed top-to-bottom.' },
   { key: 'balanced', label: 'Balanced', blurb: 'Reliability leads (50%), with speed and intelligence weighted equally (25% each). A sensible all-round default.' },
   { key: 'smartest', label: 'Smartest', blurb: 'Prefer the most capable model that still works. Intelligence 55%, reliability 35%, speed 10%.' },
   { key: 'fastest', label: 'Fastest', blurb: 'Prefer the fastest model that still works. Speed 55%, reliability 35%, intelligence 10%.' },
   { key: 'reliable', label: 'Most reliable', blurb: 'Maximize success rate above all. Reliability 70%, speed and intelligence 15% each.' },
+  { key: 'custom', label: 'Custom', blurb: 'Set your own balance of reliability, speed and intelligence with sliders. Same engine as the presets, just your weights.' },
 ]
+
+// Slider axes share the colors used by the score table columns below.
+const WEIGHT_AXES: { key: keyof RoutingWeights; label: string; color: string }[] = [
+  { key: 'reliability', label: 'Reliability', color: '#22c55e' },
+  { key: 'speed', label: 'Speed', color: '#3b82f6' },
+  { key: 'intelligence', label: 'Intelligence', color: '#a855f7' },
+]
+
+// Slider popover for the 'custom' strategy. Sliders are independent (0-100)
+// and the server renormalizes any vector, so we just show each axis's
+// effective share live. Nothing is saved until Apply is pressed.
+function CustomWeightsPopover({ saved, onSave, saving }: {
+  saved: RoutingWeights
+  onSave: (w: RoutingWeights) => void
+  saving: boolean
+}) {
+  const [values, setValues] = useState<RoutingWeights>(() => fromSaved(saved))
+  const [dirty, setDirty] = useState(false)
+
+  function fromSaved(w: RoutingWeights): RoutingWeights {
+    return {
+      reliability: Math.round(w.reliability * 100),
+      speed: Math.round(w.speed * 100),
+      intelligence: Math.round(w.intelligence * 100),
+    }
+  }
+
+  function update(key: keyof RoutingWeights, v: number) {
+    setValues({ ...values, [key]: v })
+    setDirty(true)
+  }
+
+  function apply() {
+    if (sum <= 0) return
+    onSave({
+      reliability: values.reliability / 100,
+      speed: values.speed / 100,
+      intelligence: values.intelligence / 100,
+    })
+    setDirty(false)
+  }
+
+  const sum = values.reliability + values.speed + values.intelligence
+
+  return (
+    <Popover onOpenChange={open => { if (open) { setValues(fromSaved(saved)); setDirty(false) } }}>
+      <PopoverTrigger className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+        <SlidersHorizontal className="size-3.5" />
+        Adjust
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium">Custom weights</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Sliders are independent; shares auto-balance to 100%.
+            </p>
+          </div>
+          {WEIGHT_AXES.map(axis => {
+            const share = sum > 0 ? Math.round((values[axis.key] / sum) * 100) : 0
+            return (
+              <div key={axis.key}>
+                <div className="mb-1 flex items-baseline justify-between text-xs">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-sm" style={{ background: axis.color }} />
+                    {axis.label}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">{share}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={values[axis.key]}
+                  onChange={e => update(axis.key, Number(e.target.value))}
+                  className="w-full cursor-pointer"
+                  style={{ accentColor: axis.color }}
+                  aria-label={`${axis.label} weight`}
+                />
+              </div>
+            )
+          })}
+          {sum <= 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-500">
+              At least one weight must be above zero.
+            </p>
+          )}
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!dirty || sum <= 0 || saving}
+            onClick={apply}
+          >
+            {saving ? 'Applying…' : dirty ? 'Apply' : 'Applied'}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
@@ -106,47 +213,6 @@ const platformColors: Record<string, string> = {
   pollinations: '#a855f7',
   llm7: '#0ea5e9',
   huggingface: '#ff9d00',
-}
-
-// Hover tooltip rendered through a portal to document.body, so it's never
-// clipped by an ancestor's overflow (e.g. the table's overflow-x-auto). Position
-// is computed from the trigger's rect and clamped to the viewport.
-function Tooltip({ text, children }: { text: string; children: ReactNode }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
-
-  function show() {
-    const el = ref.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const half = 116 // ~half of the w-56 tooltip
-    const x = Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8)
-    setCoords({ x, y: r.top })
-  }
-  const hide = () => setCoords(null)
-
-  return (
-    <span
-      ref={ref}
-      className="inline-flex"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
-      {children}
-      {coords && createPortal(
-        <span
-          role="tooltip"
-          style={{ position: 'fixed', left: coords.x, top: coords.y - 8, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
-          className="pointer-events-none w-56 rounded-lg bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md"
-        >
-          {text}
-        </span>,
-        document.body,
-      )}
-    </span>
-  )
 }
 
 // A 0..1 value as a thin horizontal bar with the number beside it.
@@ -210,7 +276,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         {modelsWithWidth.map((m, i) => (
           <div
             key={i}
-            title={`${m.displayName} (${m.platform}) — ${formatTokens(m.remainingTokens)} remaining`}
+            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} remaining`}
             style={{
               width: `${m.widthPct}%`,
               backgroundColor: platformColors[m.platform] ?? '#94a3b8',
@@ -219,7 +285,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         ))}
         {totalUsed > 0 && (
           <div
-            title={`Used — ${formatTokens(totalUsed)}`}
+            title={`Used: ${formatTokens(totalUsed)}`}
             className="bg-muted-foreground/30"
             style={{ width: `${usedPct}%` }}
           />
@@ -294,7 +360,7 @@ function RowContent({
           )}
           {row.supportsTools && (
             <span
-              title="Emits structured tool calls — eligible for tool-bearing requests"
+              title="Emits structured tool calls, so it is eligible for tool-bearing requests"
               className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400"
             >
               Tools
@@ -386,8 +452,8 @@ export default function FallbackPage() {
   })
 
   const strategyMutation = useMutation({
-    mutationFn: (strategy: RoutingStrategy) =>
-      apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify({ strategy }) }),
+    mutationFn: (payload: { strategy: RoutingStrategy; weights?: RoutingWeights }) =>
+      apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify(payload) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
   })
 
@@ -492,21 +558,29 @@ export default function FallbackPage() {
             )}
           </div>
 
-          <div className="inline-flex flex-wrap gap-1 rounded-xl border p-1">
+          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border p-1">
             {STRATEGIES.map(s => (
               <Tooltip key={s.key} text={s.blurb}>
                 <button
                   disabled={strategyMutation.isPending}
-                  onClick={() => strategyMutation.mutate(s.key)}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${s.key === strategy
-                    ? 'bg-foreground text-background font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
+                  onClick={() => strategyMutation.mutate({ strategy: s.key })}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                    s.key === strategy
+                      ? 'bg-foreground text-background font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
                 >
                   {s.label}
                 </button>
               </Tooltip>
             ))}
+            {strategy === 'custom' && routing && (
+              <CustomWeightsPopover
+                saved={routing.customWeights}
+                saving={strategyMutation.isPending}
+                onSave={w => strategyMutation.mutate({ strategy: 'custom', weights: w })}
+              />
+            )}
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">

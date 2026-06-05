@@ -207,4 +207,74 @@ describe('POST /api/keys/custom (#117)', () => {
     expect(JSON.stringify(body)).toMatch(/not OpenAI-compatible/);
     expect(JSON.stringify(body)).not.toMatch(/Unexpected non-whitespace/);
   });
+
+  // #212: adding a second custom provider used to overwrite the first one's
+  // endpoint — one shared key row held THE base_url. Now each endpoint gets
+  // its own key row and models bind to their endpoint via models.key_id.
+  describe('multiple custom providers (#212)', () => {
+    beforeAll(async () => {
+      // Sweep custom state left by the tests above for a deterministic start.
+      const db = getDb();
+      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
+      db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+      db.prepare("DELETE FROM api_keys WHERE platform = 'custom'").run();
+
+      const a = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:11434/v1', model: 'llama3:8b', label: 'Ollama box' });
+      const b = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:1234/v1', model: 'qwen3:4b', label: 'LM Studio' });
+      expect(a.status).toBe(201);
+      expect(b.status).toBe(201);
+    });
+
+    it('keeps a separate key row per endpoint instead of overwriting', () => {
+      const db = getDb();
+      const keys = db.prepare("SELECT id, base_url FROM api_keys WHERE platform = 'custom' ORDER BY id").all() as any[];
+      expect(keys.length).toBe(2);
+      expect(keys.map(k => k.base_url).sort()).toEqual(['http://127.0.0.1:11434/v1', 'http://127.0.0.1:1234/v1'].sort());
+    });
+
+    it('binds each model to its own endpoint key', () => {
+      const db = getDb();
+      const llama = db.prepare("SELECT m.key_id, k.base_url FROM models m JOIN api_keys k ON k.id = m.key_id WHERE m.platform = 'custom' AND m.model_id = 'llama3:8b'").get() as any;
+      const qwen = db.prepare("SELECT m.key_id, k.base_url FROM models m JOIN api_keys k ON k.id = m.key_id WHERE m.platform = 'custom' AND m.model_id = 'qwen3:4b'").get() as any;
+      expect(llama.base_url).toBe('http://127.0.0.1:11434/v1');
+      expect(qwen.base_url).toBe('http://127.0.0.1:1234/v1');
+    });
+
+    it('routes each model through ITS endpoint, never the other one', () => {
+      const db = getDb();
+      const llamaId = (db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = 'llama3:8b'").get() as any).id;
+      const qwenId = (db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = 'qwen3:4b'").get() as any).id;
+
+      const llamaRoute = routeRequest(1000, undefined, llamaId);
+      expect(llamaRoute.modelId).toBe('llama3:8b');
+      expect((llamaRoute.provider as any).baseUrl).toBe('http://127.0.0.1:11434/v1');
+
+      const qwenRoute = routeRequest(1000, undefined, qwenId);
+      expect(qwenRoute.modelId).toBe('qwen3:4b');
+      expect((qwenRoute.provider as any).baseUrl).toBe('http://127.0.0.1:1234/v1');
+    });
+
+    it('re-submitting an existing endpoint updates it instead of adding a third', async () => {
+      const { status } = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:11434/v1', model: 'mistral:7b', label: 'Ollama box renamed' });
+      expect(status).toBe(201);
+      const db = getDb();
+      expect((db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as any).n).toBe(2);
+      const key = db.prepare("SELECT label FROM api_keys WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:11434/v1'").get() as any;
+      expect(key.label).toBe('Ollama box renamed');
+    });
+
+    it('deleting one endpoint removes only ITS models from catalog and chain', async () => {
+      const db = getDb();
+      const ollamaKey = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:11434/v1'").get() as any;
+
+      const { status } = await del(app, `/api/keys/${ollamaKey.id}`);
+      expect(status).toBe(200);
+
+      const remainingModels = (db.prepare("SELECT model_id FROM models WHERE platform = 'custom'").all() as any[]).map(r => r.model_id);
+      expect(remainingModels).toEqual(['qwen3:4b']); // llama3:8b + mistral:7b cascaded with their key
+      const keys = db.prepare("SELECT base_url FROM api_keys WHERE platform = 'custom'").all() as any[];
+      expect(keys.length).toBe(1);
+      expect(keys[0].base_url).toBe('http://127.0.0.1:1234/v1');
+    });
+  });
 });
