@@ -10,7 +10,10 @@ const PORT = process.env.PORT ?? 3001;
 const HOST = process.env.HOST ?? '::';
 
 async function main() {
-  initDb();
+  // DB_PATH lets production hosts mount SQLite on persistent storage, e.g.
+  // Render disk: DB_PATH=/var/data/freeapi.db. Without it, initDb() keeps the
+  // existing local dev default from server/src/db/index.ts.
+  initDb(process.env.DB_PATH);
   const app = createApp();
 
   const onReady = (host: string) => () => {
