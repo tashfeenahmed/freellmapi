@@ -2001,4 +2001,3 @@ export function setSetting(key: string, value: string): void {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(key, value);
 }
-}
