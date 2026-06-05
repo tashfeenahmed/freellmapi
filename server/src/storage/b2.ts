@@ -18,15 +18,26 @@ export type StorageStatus = {
   message: string;
 };
 
+export function getDbObjectKey(): string {
+  return process.env.B2_DB_OBJECT_KEY ?? process.env.LITESTREAM_DB_OBJECT_KEY ?? 'db/freellmapi.sqlite';
+}
+
+export function getBackupPrefix(): string {
+  return process.env.B2_BACKUP_PREFIX ?? process.env.LITESTREAM_BACKUP_PREFIX ?? 'db/backups/';
+}
+
+function inferRegion(endpoint: string): string {
+  const match = endpoint.match(/s3\.([a-z0-9-]+)\.backblazeb2\.com/i);
+  return process.env.B2_REGION ?? process.env.LITESTREAM_REGION ?? match?.[1] ?? 'us-west-004';
+}
+
 function getConfig(): B2Config | null {
-  if (process.env.PERSISTENCE_BACKEND !== 'backblaze_b2') return null;
-  const endpoint = process.env.B2_ENDPOINT?.replace(/\/+$/, '');
-  const region = process.env.B2_REGION;
-  const bucket = process.env.B2_BUCKET;
-  const keyId = process.env.B2_KEY_ID;
-  const applicationKey = process.env.B2_APPLICATION_KEY;
-  if (!endpoint || !region || !bucket || !keyId || !applicationKey) return null;
-  return { endpoint, region, bucket, keyId, applicationKey };
+  const endpoint = (process.env.B2_ENDPOINT ?? process.env.LITESTREAM_ENDPOINT)?.replace(/\/+$/, '');
+  const bucket = process.env.B2_BUCKET ?? process.env.LITESTREAM_BUCKET;
+  const keyId = process.env.B2_KEY_ID ?? process.env.LITESTREAM_ACCESS_KEY_ID;
+  const applicationKey = process.env.B2_APPLICATION_KEY ?? process.env.LITESTREAM_SECRET_ACCESS_KEY;
+  if (!endpoint || !bucket || !keyId || !applicationKey) return null;
+  return { endpoint, region: inferRegion(endpoint), bucket, keyId, applicationKey };
 }
 
 function hmac(key: Buffer | string, value: string): Buffer {
@@ -70,15 +81,15 @@ function signRequest(config: B2Config, method: string, objectKey: string, body: 
 }
 
 export function getB2StorageStatus(): StorageStatus {
-  const objectKey = process.env.B2_DB_OBJECT_KEY ?? 'db/freellmapi.sqlite';
+  const objectKey = getDbObjectKey();
   const config = getConfig();
   if (!config) {
-    return { configured: false, backend: process.env.PERSISTENCE_BACKEND ?? 'local', objectKey, message: 'Backblaze B2 is not fully configured.' };
+    return { configured: false, backend: 'local', objectKey, message: 'Backblaze/Litestream-compatible storage is not fully configured.' };
   }
-  return { configured: true, backend: 'backblaze_b2', bucket: config.bucket, objectKey, message: 'Backblaze B2 snapshot storage is configured.' };
+  return { configured: true, backend: 'backblaze_b2_litestream_env', bucket: config.bucket, objectKey, message: 'Backblaze B2 snapshot storage is configured from existing LITESTREAM_* envs.' };
 }
 
-export async function downloadDbSnapshot(targetPath: string, objectKey = process.env.B2_DB_OBJECT_KEY ?? 'db/freellmapi.sqlite'): Promise<boolean> {
+export async function downloadDbSnapshot(targetPath: string, objectKey = getDbObjectKey()): Promise<boolean> {
   const config = getConfig();
   if (!config) return false;
   const signed = signRequest(config, 'GET', objectKey);
@@ -91,7 +102,7 @@ export async function downloadDbSnapshot(targetPath: string, objectKey = process
   return true;
 }
 
-export async function uploadDbSnapshot(sourcePath: string, objectKey = process.env.B2_DB_OBJECT_KEY ?? 'db/freellmapi.sqlite'): Promise<void> {
+export async function uploadDbSnapshot(sourcePath: string, objectKey = getDbObjectKey()): Promise<void> {
   const config = getConfig();
   if (!config) return;
   const body = await fs.readFile(sourcePath);
@@ -107,7 +118,7 @@ export async function uploadDbSnapshot(sourcePath: string, objectKey = process.e
 export async function uploadTimestampedBackup(sourcePath: string): Promise<string | null> {
   const config = getConfig();
   if (!config) return null;
-  const prefix = process.env.B2_BACKUP_PREFIX ?? 'db/backups/';
+  const prefix = getBackupPrefix();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const objectKey = `${prefix.replace(/\/+$/, '')}/freellmapi-${stamp}.sqlite`;
   await uploadDbSnapshot(sourcePath, objectKey);
