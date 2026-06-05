@@ -449,8 +449,8 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       // For the 'custom' platform the real provider is built from this key's
       // base_url (the registered instance is just a placeholder). A custom key
       // with no base_url can't be routed — skip it.
-      const resolvedProvider = entry.platform === 'custom'
-        ? resolveProvider('custom', key.base_url)
+      const resolvedProvider = (entry.platform === 'custom' || entry.platform.startsWith('custom:'))
+        ? resolveProvider(entry.platform as any, key.base_url)
         : provider;
       if (!resolvedProvider) continue;
 

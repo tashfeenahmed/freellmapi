@@ -145,34 +145,34 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
 
   const db = getDb();
   const upsert = db.transaction(() => {
-    // One shared 'custom' key holds the endpoint URL. Reuse it across models;
-    // update its base_url/key when re-submitted.
-    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' LIMIT 1").get() as { id: number } | undefined;
-    let keyId: number;
-    if (existing) {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      db.prepare("UPDATE api_keys SET base_url = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-        .run(baseUrl, encrypted, iv, authTag, existing.id);
-      keyId = existing.id;
-    } else {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      const r = db.prepare(`
-        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
-        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label, encrypted, iv, authTag, baseUrl);
-      keyId = Number(r.lastInsertRowid);
-    }
+    // One model = One key. We no longer reuse custom keys. Every time the user 
+    // adds a custom model, we give it a dedicated endpoint key (with its own ID).
+    // The key's label is set to the model's display name so it's clear in the UI.
+    const keyLabel = parsed.data.label || displayName;
+    
+    const { encrypted, iv, authTag } = encrypt(rawKey);
+    const r = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+      VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
+    `).run(keyLabel, encrypted, iv, authTag, baseUrl);
+    
+    const keyId = Number(r.lastInsertRowid);
+    const virtualPlatform = `custom:${keyId}`;
+    
+    db.prepare("UPDATE api_keys SET platform = ? WHERE id = ?").run(virtualPlatform, keyId);
 
-    // Register the model (idempotent on platform+model_id). Custom models carry
-    // no rate limits and sort last in the intelligence preset (size_label tier).
+    // Register the model into the specific virtual namespace.
+    // Idempotent on platform+model_id.
     db.prepare(`
-      INSERT OR IGNORE INTO models
+      INSERT INTO models
         (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
          rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled)
-      VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1)
-    `).run(modelId, displayName);
+      VALUES (?, ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1)
+      ON CONFLICT(platform, model_id) DO UPDATE SET
+        display_name = excluded.display_name
+    `).run(virtualPlatform, modelId, displayName);
 
-    const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
+    const modelRow = db.prepare("SELECT id FROM models WHERE platform = ? AND model_id = ?").get(virtualPlatform, modelId) as { id: number };
 
     // Append to the fallback chain if not already present.
     const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
@@ -181,15 +181,15 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
       db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
     }
 
-    return { keyId, modelDbId: modelRow.id };
+    return { keyId, virtualPlatform, modelDbId: modelRow.id };
   });
 
-  const { keyId, modelDbId } = upsert();
+  const { keyId, virtualPlatform, modelDbId } = upsert();
   res.status(201).json({
     success: true,
     keyId,
     modelDbId,
-    platform: 'custom',
+    platform: virtualPlatform,
     baseUrl,
     model: modelId,
     displayName,
@@ -215,16 +215,12 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   const remove = db.transaction(() => {
     db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
     // Custom models exist only because POST /custom registered them alongside
-    // this endpoint key (#117) — they can't route without it. Built-in
-    // platforms keep their seeded catalog rows, but once the last custom key
-    // is gone, orphaned custom models would linger in the fallback chain
-    // forever (#189), so cascade them away.
-    if (row.platform === 'custom') {
-      const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
-      if (remaining.n === 0) {
-        db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
-        db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
-      }
+    // this endpoint key (#117) — they can't route without it.
+    // With virtual namespaces (e.g. 'custom:5'), every endpoint is its own platform.
+    // When the key is deleted, cascade delete all models bound to this virtual platform.
+    if (row.platform.startsWith('custom:')) {
+      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = ?)").run(row.platform);
+      db.prepare("DELETE FROM models WHERE platform = ?").run(row.platform);
     }
   });
   remove();
@@ -247,7 +243,12 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform);
+  let result;
+  if (platform === 'custom') {
+    result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform LIKE \'custom:%\'').run(enabled ? 1 : 0);
+  } else {
+    result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform);
+  }
 
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });

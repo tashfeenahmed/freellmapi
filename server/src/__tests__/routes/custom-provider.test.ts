@@ -68,6 +68,7 @@ describe('resolveProvider (#117)', () => {
 
 describe('POST /api/keys/custom (#117)', () => {
   let app: Express;
+  let customKeyId: number;
 
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
@@ -88,59 +89,62 @@ describe('POST /api/keys/custom (#117)', () => {
       displayName: 'Local Qwen3 4B',
     });
     expect(status).toBe(201);
-    expect(body.platform).toBe('custom');
-    expect(body.baseUrl).toBe('http://127.0.0.1:11434/v1'); // trailing slash trimmed
+    expect(body.platform).toMatch(/^custom:\d+$/);
+    expect(body.baseUrl).toBe('http://127.0.0.1:11434/v1'); // trailing slash stripped
     expect(body.model).toBe('qwen3:4b');
-
-    const db = getDb();
-    const key = db.prepare("SELECT * FROM api_keys WHERE platform = 'custom'").get() as any;
-    expect(key.base_url).toBe('http://127.0.0.1:11434/v1');
-    const model = db.prepare("SELECT * FROM models WHERE platform = 'custom' AND model_id = 'qwen3:4b'").get() as any;
-    expect(model).toBeDefined();
-    const fc = db.prepare('SELECT * FROM fallback_config WHERE model_db_id = ?').get(model.id);
-    expect(fc).toBeDefined();
+    expect(body.displayName).toBe('Local Qwen3 4B');
+    expect(body.maskedKey).toBe('****-key');
+    customKeyId = body.keyId;
   });
 
-  it('reuses the single custom key when a second model is added', async () => {
-    await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:11434/v1', model: 'llama3:8b' });
+  it('creates a new key when a second model is added', async () => {
+    const { status, body } = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:11434/v1/', // same base URL, but we no longer reuse
+      model: 'llama3:8b',
+      apiKey: 'sk-different',
+    });
+    expect(status).toBe(201);
+    expect(body.platform).toMatch(/^custom:\d+$/);
+    expect(body.platform).not.toBe(`custom:${customKeyId}`);
+
     const db = getDb();
-    const keys = db.prepare("SELECT * FROM api_keys WHERE platform = 'custom'").all();
-    expect(keys.length).toBe(1); // not a second key
-    const models = db.prepare("SELECT * FROM models WHERE platform = 'custom'").all();
+    const keys = db.prepare("SELECT * FROM api_keys WHERE platform LIKE 'custom:%'").all();
+    expect(keys.length).toBe(2); // exactly 2 keys now
+    const models = db.prepare("SELECT * FROM models WHERE platform LIKE 'custom:%'").all();
     expect(models.length).toBe(2);
   });
 
   it('surfaces baseUrl in the keys listing', async () => {
     const { body } = await get(app, '/api/keys');
-    const custom = body.find((k: any) => k.platform === 'custom');
+    const custom = body.find((k: any) => k.platform.startsWith('custom:'));
     expect(custom.baseUrl).toBe('http://127.0.0.1:11434/v1');
   });
 
   it('routes a request to the custom model through its base URL', () => {
-    // The seeded built-in models have no keys, so the only routable model is
-    // the custom one we registered above.
     const route = routeRequest(1000);
-    expect(route.platform).toBe('custom');
+    expect(route.platform).toMatch(/^custom:\d+$/);
     expect((route.provider as any).baseUrl).toBe('http://127.0.0.1:11434/v1');
     expect(['qwen3:4b', 'llama3:8b']).toContain(route.modelId);
   });
 
-  it('deleting the custom key cascades its models out of the fallback chain (#189)', async () => {
+  it('deleting the custom key cascades ONLY its own models out of the fallback chain', async () => {
     const db = getDb();
-    const key = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom'").get() as { id: number };
-    const customModelIds = (db.prepare("SELECT id FROM models WHERE platform = 'custom'").all() as { id: number }[]).map(r => r.id);
-    expect(customModelIds.length).toBe(2); // qwen3:4b + llama3:8b from earlier tests
-    const builtinModels = (db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform != 'custom'").get() as { n: number }).n;
+    const key = db.prepare("SELECT id, platform FROM api_keys WHERE platform LIKE 'custom:%' LIMIT 1").get() as { id: number; platform: string };
+    const customModelIds = (db.prepare("SELECT id FROM models WHERE platform = ?").all(key.platform) as any[]).map(r => r.id);
+    expect(customModelIds.length).toBe(1); // 1 key = 1 model now!
+
+    const builtinModels = (db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform NOT LIKE 'custom:%'").get() as any).n;
 
     const { status } = await del(app, `/api/keys/${key.id}`);
     expect(status).toBe(200);
 
-    // Custom models and their fallback entries are gone — not orphaned.
-    expect((db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'custom'").get() as { n: number }).n).toBe(0);
-    const placeholders = customModelIds.map(() => '?').join(',');
-    expect((db.prepare(`SELECT COUNT(*) AS n FROM fallback_config WHERE model_db_id IN (${placeholders})`).get(...customModelIds) as { n: number }).n).toBe(0);
-    // Built-in catalog rows are untouched.
-    expect((db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform != 'custom'").get() as { n: number }).n).toBe(builtinModels);
+    const fcRemaining = db.prepare(`SELECT COUNT(*) AS n FROM fallback_config WHERE model_db_id IN (${customModelIds.join(',')})`).get() as any;
+    expect(fcRemaining.n).toBe(0);
+
+    const modelsRemaining = db.prepare(`SELECT COUNT(*) AS n FROM models WHERE platform = ?`).get(key.platform) as any;
+    expect(modelsRemaining.n).toBe(0);
+
+    expect((db.prepare(`SELECT COUNT(*) AS n FROM models WHERE platform NOT LIKE 'custom:%'`).get() as any).n).toBe(builtinModels);
   });
 
   it('deleting a built-in platform key does NOT cascade its catalog models', async () => {
@@ -164,15 +168,13 @@ describe('POST /api/keys/custom (#117)', () => {
     });
     expect(status).toBe(201);
     const db = getDb();
-    expect((db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number }).n).toBe(1);
-    const fc = db.prepare('SELECT * FROM fallback_config WHERE model_db_id = ?').get(body.modelDbId);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform LIKE 'custom:%'").get() as any).n).toBe(2); // One is still left from earlier
+    const fc = db.prepare('SELECT * FROM fallback_config WHERE model_db_id = ?').get(body.modelDbId) as any;
     expect(fc).toBeDefined();
+    expect(fc.priority).toBeGreaterThan(0); // Appended to end of chain
   });
 
   it('surfaces a clear error when the custom endpoint speaks NDJSON, not OpenAI (#189)', async () => {
-    // Real upstream that answers like Ollama's native /api/chat: HTTP 200,
-    // newline-delimited JSON documents — res.json() in the provider would die
-    // with "Unexpected non-whitespace character after JSON at position …".
     const upstream = http.createServer((_req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
       res.end(
@@ -185,7 +187,6 @@ describe('POST /api/keys/custom (#117)', () => {
     await new Promise<void>(resolve => upstream.listen(0, resolve));
     const upstreamPort = (upstream.address() as any).port;
 
-    // Point the custom provider at the NDJSON upstream and pin its model.
     const reg = await post(app, '/api/keys/custom', {
       baseUrl: `http://127.0.0.1:${upstreamPort}/v1`,
       model: 'ndjson-model',

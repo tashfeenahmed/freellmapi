@@ -203,7 +203,7 @@ function CustomProviderSection() {
       <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
       <p className="text-xs text-muted-foreground mb-3">
         Point at any OpenAI-compatible endpoint — llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
-        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
+        gateway. Add each model you want routed; models sharing the same Base URL will group under the same endpoint below. The API key is optional
         (most local servers don't need one).
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
@@ -380,7 +380,11 @@ export default function KeysPage() {
 
   const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
     ...p,
-    keys: keys.filter(k => k.platform === p.value),
+    keys: keys.filter(k => 
+      p.value === 'custom' 
+        ? (k.platform === 'custom' || k.platform.startsWith('custom:'))
+        : k.platform === p.value
+    ),
   })).filter(p => p.keys.length > 0)
 
   return (
@@ -525,6 +529,7 @@ export default function KeysPage() {
                           ) : (
                             <>
                               {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                              {k.baseUrl && <code className="text-[11px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">{k.baseUrl}</code>}
                             </>
                           )}
                           <span className="text-xs text-muted-foreground">{statusLabel[status] ?? status}</span>

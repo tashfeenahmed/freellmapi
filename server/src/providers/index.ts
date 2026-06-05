@@ -180,6 +180,11 @@ register(new OpenAICompatProvider({
 const CUSTOM_PROVIDER_TIMEOUT_MS = 120000;
 
 export function getProvider(platform: Platform): BaseProvider | undefined {
+  if (platform.startsWith('custom:')) {
+    // Return a dummy object just so `hasProvider` passes true if checked
+    // Normally, the custom provider is built per-key via resolveProvider()
+    return providers.get('custom');
+  }
   return providers.get(platform);
 }
 
@@ -190,12 +195,15 @@ export function getProvider(platform: Platform): BaseProvider | undefined {
  * a custom provider with no base URL configured.
  */
 export function resolveProvider(platform: Platform, baseUrl?: string | null): BaseProvider | undefined {
-  if (platform === 'custom') {
+  if (platform === 'custom' || platform.startsWith('custom:')) {
     const trimmed = baseUrl?.trim();
     if (!trimmed) return undefined;
+    
+    // Some local servers omit the '/v1' suffix or use different paths;
+    // we take the user-supplied URL as the absolute base.
     return new OpenAICompatProvider({
-      platform: 'custom',
-      name: 'Custom (OpenAI-compatible)',
+      platform: platform as Platform,
+      name: `Custom (${trimmed})`,
       baseUrl: trimmed,
       timeoutMs: CUSTOM_PROVIDER_TIMEOUT_MS,
     });
@@ -208,5 +216,8 @@ export function getAllProviders(): BaseProvider[] {
 }
 
 export function hasProvider(platform: Platform): boolean {
+  if (platform.startsWith('custom:')) return true;
   return providers.has(platform);
 }
+
+

@@ -27,7 +27,9 @@ export type Platform =
   | 'opencode'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
-  | 'custom';
+  | 'custom'
+  // Virtual platform namespace for distinct custom endpoints (e.g. custom:1)
+  | `custom:${string}`;
 
 export interface Model {
   id: number;
@@ -62,6 +64,7 @@ export interface ApiKey {
   platform: Platform;
   label: string;
   maskedKey: string;
+  baseUrl?: string | null;
   status: KeyStatus;
   enabled: boolean;
   createdAt: string;

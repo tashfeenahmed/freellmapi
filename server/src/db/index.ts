@@ -58,6 +58,8 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
   migrateModelsV22Tools(db);
+  migrateModelsV23CustomNamespaces(db);
+
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -1693,6 +1695,65 @@ function migrateModelsV22Tools(db: Database.Database) {
     `).run();
   });
   apply();
+}
+
+/**
+ * V23 (June 2026): Custom platform namespacing.
+ * Convert the monolithic 'custom' platform into per-endpoint namespaces
+ * (e.g., 'custom:5') so multiple local endpoints can be routed cleanly.
+ */
+function migrateModelsV23CustomNamespaces(db: Database.Database) {
+  // Find any 'custom' or 'custom:X' keys that have MULTIPLE models attached to them,
+  // which indicates they are legacy squeezed keys that need fission.
+  const customKeys = db.prepare("SELECT * FROM api_keys WHERE platform = 'custom' OR platform LIKE 'custom:%'").all() as any[];
+
+  const migrate = db.transaction(() => {
+    for (const key of customKeys) {
+      const customModels = db.prepare("SELECT * FROM models WHERE platform = ?").all(key.platform) as any[];
+
+      if (customModels.length <= 1) {
+        // If it's literally 'custom', just rename it to custom:ID
+        if (key.platform === 'custom') {
+          db.prepare("UPDATE api_keys SET platform = ? WHERE id = ?").run(`custom:${key.id}`, key.id);
+          if (customModels.length === 1) {
+            db.prepare("UPDATE models SET platform = ? WHERE id = ?").run(`custom:${key.id}`, customModels[0].id);
+            db.prepare("UPDATE requests SET platform = ? WHERE platform = 'custom' AND model_id = ?").run(`custom:${key.id}`, customModels[0].model_id);
+          }
+          db.prepare("UPDATE requests SET platform = ? WHERE platform = 'custom'").run(`custom:${key.id}`);
+        }
+        continue;
+      }
+
+      // Fission needed: this key has multiple models
+      for (let i = 0; i < customModels.length; i++) {
+        const m = customModels[i];
+        let newKeyId: number;
+
+        if (i === 0) {
+          // Reuse the existing key for the first model
+          newKeyId = key.id;
+          db.prepare("UPDATE api_keys SET platform = ?, label = ? WHERE id = ?").run(`custom:${newKeyId}`, m.display_name, newKeyId);
+        } else {
+          // Clone for the rest
+          const r = db.prepare(`
+            INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url, created_at, last_checked_at)
+            VALUES ('custom', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(m.display_name, key.encrypted_key, key.iv, key.auth_tag, key.status, key.enabled, key.base_url, key.created_at, key.last_checked_at);
+          newKeyId = Number(r.lastInsertRowid);
+          db.prepare("UPDATE api_keys SET platform = ? WHERE id = ?").run(`custom:${newKeyId}`, newKeyId);
+        }
+
+        const virtualPlatform = `custom:${newKeyId}`;
+        db.prepare("UPDATE models SET platform = ? WHERE id = ?").run(virtualPlatform, m.id);
+        db.prepare("UPDATE requests SET platform = ? WHERE platform = ? AND model_id = ?").run(virtualPlatform, key.platform, m.model_id);
+      }
+      
+      // Cleanup any dangling requests for this old platform
+      db.prepare("UPDATE requests SET platform = ? WHERE platform = ?").run(`custom:${key.id}`, key.platform);
+    }
+  });
+  
+  migrate();
 }
 
 // Embeddings V1 (2026-06): per-family embedding catalog. A "family" is one

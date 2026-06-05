@@ -116,7 +116,7 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
 
   const rows = db.prepare(`
     SELECT
-      platform,
+      CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END as platform,
       COUNT(*) as requests,
       SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate,
       AVG(latency_ms) as avg_latency_ms,
@@ -124,7 +124,7 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
       SUM(output_tokens) as total_output_tokens
     FROM requests
     WHERE created_at >= ?
-    GROUP BY platform
+    GROUP BY CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END
     ORDER BY requests DESC
   `).all(since) as any[];
 
@@ -177,7 +177,7 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
   // Group errors by category (extract the key part of the error message)
   const rows = db.prepare(`
     SELECT
-      platform,
+      CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END as platform,
       model_id,
       CASE
         WHEN error LIKE '%429%' OR error LIKE '%rate limit%' OR error LIKE '%too many%' OR error LIKE '%quota%' THEN 'Rate Limited (429)'
@@ -192,7 +192,7 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
       COUNT(*) as count
     FROM requests
     WHERE status = 'error' AND created_at >= ?
-    GROUP BY platform, error_category
+    GROUP BY CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END, error_category
     ORDER BY count DESC
   `).all(since) as any[];
 
@@ -218,10 +218,10 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
 
   // Errors by platform
   const byPlatform = db.prepare(`
-    SELECT platform, COUNT(*) as count
+    SELECT CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END as platform, COUNT(*) as count
     FROM requests
     WHERE status = 'error' AND created_at >= ?
-    GROUP BY platform
+    GROUP BY CASE WHEN platform LIKE 'custom:%' THEN 'custom' ELSE platform END
     ORDER BY count DESC
   `).all(since) as any[];
 
