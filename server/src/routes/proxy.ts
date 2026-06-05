@@ -347,9 +347,8 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
   }
 });
 
-proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
+async function handleRequest(req: Request, res: Response) {
   const start = Date.now();
-
   // Authenticate with the unified API key for every proxy request, including
   // loopback callers. Browser pages can reach localhost, so socket locality is
   // not a reliable authorization boundary.
@@ -362,7 +361,25 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  // Validate request
+
+
+  if (req.body && Array.isArray(req.body.tools)) {
+    req.body.tools = req.body.tools.map((tool: any) => {
+      if (tool && typeof tool === 'object' && tool.type === 'function' && !tool.function) {
+        return {
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters,
+            strict: tool.strict,
+          },
+        };
+      }
+      return tool;
+    });
+  }
+
   const parsed = chatCompletionSchema.safeParse(req.body);
   if (!parsed.success) {
     // Path-qualified issues ("messages.1.content: Invalid input" beats a bare
@@ -428,12 +445,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     };
   });
 
-  // Token estimation is intentionally a heuristic (~4 chars per token). Used
-  // for routing decisions (skip a model whose budget is too small) and for
-  // streaming bookkeeping where the provider doesn't echo a final usage count.
-  // Non-streaming requests reconcile against the provider's real `usage` block
-  // (see line ~340). Streaming will drift from real consumption — accepted
-  // tradeoff because per-request usage isn't always returned mid-stream.
   const estimatedInputTokens = messages.reduce((sum, m) => {
     const text = contentToString(m.content);
     return sum + Math.ceil(text.length / 4);
@@ -483,30 +494,41 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
   if (isAutoModel(requestedModel)) {
-    // Explicit "auto" → behave exactly like an omitted model field.
     preferredModel = getStickyModel(messages);
   } else if (requestedModel) {
     const db = getDb();
-    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
-    if (enabled) {
-      preferredModel = enabled.id;
-    } else {
-      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
-      const reason = disabled ? 'is disabled' : 'is not in the catalog';
+    let modelRow = db.prepare('SELECT id, enabled FROM models WHERE model_id = ?').get(requestedModel) as { id: number; enabled: number } | undefined;
+    if (!modelRow) {
+      modelRow = db.prepare('SELECT id, enabled FROM models WHERE (model_id LIKE ? OR model_id = ?)').get(`%/${requestedModel}`, requestedModel) as { id: number; enabled: number } | undefined;
+    }
+
+    if (!modelRow) {
       res.status(400).json({
         error: {
-          message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+          message: `Model "${requestedModel}" is not in the catalog.`,
           type: 'invalid_request_error',
           code: 'model_not_found',
         },
       });
       return;
     }
+
+    if (modelRow.enabled === 0) {
+      res.status(400).json({
+        error: {
+          message: `Model "${requestedModel}" is disabled.`,
+          type: 'invalid_request_error',
+          code: 'model_not_found',
+        },
+      });
+      return;
+    }
+
+    preferredModel = modelRow.id;
   } else {
     preferredModel = getStickyModel(messages);
   }
 
-  // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
   let lastError: any = null;
 
@@ -515,7 +537,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     try {
       route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools);
     } catch (err: any) {
-      // No more models available
       if (lastError) {
         const safeLastError = sanitizeProviderErrorMessage(lastError.message);
         res.status(429).json({
@@ -536,9 +557,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
     try {
       if (stream) {
-        // Lazy header set: pre-stream errors stay retryable (no headers sent yet);
-        // mid-stream errors emit an `error` SSE frame so the client sees a real signal
-        // instead of a silently truncated stream.
         let totalOutputTokens = 0;
         let streamStarted = false;
         let ttfbMs: number | null = null;
@@ -565,6 +583,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             normalizeOutboundContent(chunk);
             const text = streamChunkText(chunk);
             totalOutputTokens += Math.ceil(text.length / 4);
+            
             res.write(`data: ${JSON.stringify(chunk)}\n\n`);
           }
 
@@ -591,10 +610,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           return;
         } catch (streamErr: any) {
           if (streamStarted) {
-            // Mid-stream error — finish the SSE response cleanly instead of leaving
-            // the client hanging or letting Express's default handler take over.
-            // Full upstream message goes to the log; the client sees a generic
-            // message so we don't leak provider internals into a partial stream.
             console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
@@ -602,7 +617,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message));
             return;
           }
-          // Pre-stream error — bubble to outer retry/502 handler.
           throw streamErr;
         }
       } else {
@@ -661,7 +675,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
 
       if (isRetryableError(err)) {
-        // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
         skipKeys.add(skipId);
         setCooldown(
@@ -681,7 +694,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         continue;
       }
 
-      // Non-retryable error (auth, 4xx, etc.): don't retry
       res.status(502).json({
         error: {
           message: `Provider error (${route.displayName}): ${safeError}`,
@@ -692,13 +704,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
   }
 
-  // Exhausted all retries
   res.status(429).json({
     error: {
       message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${sanitizeProviderErrorMessage(lastError?.message)}`,
       type: 'rate_limit_error',
     },
   });
+}
+
+proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
+  await handleRequest(req, res);
 });
 
 export function logRequest(

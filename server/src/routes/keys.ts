@@ -9,11 +9,10 @@ export const keysRouter = Router();
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
-// was dropped in V4 and re-added in V13 via the router.huggingface.co route.
 const PLATFORMS = [
   'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
-  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'custom',
+  'kilo', 'pollinations', 'llm7', 'huggingface', 'memos', 'opencode', 'custom',
 ] as const;
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added

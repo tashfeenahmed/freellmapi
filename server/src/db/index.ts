@@ -29,7 +29,8 @@ export function initDb(dbPath?: string): Database.Database {
     }
   }
 
-  db = new Database(resolvedPath);
+  // Nous Research Hermes contention protocol: 1-second timeout
+  db = new Database(resolvedPath, { timeout: 1000 });
   if (!isMemory) db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
@@ -51,6 +52,7 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV13(db);
   migrateModelsV14(db);
   migrateModelsV15(db);
+  migrateModelsV15SiliconFlow(db);
   migrateModelsV16Vision(db);
   migrateModelsV17IntelligenceTiers(db);
   migrateModelsV18OpenCodeZen(db);
@@ -62,6 +64,7 @@ export function initDb(dbPath?: string): Database.Database {
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
   migrateEmbeddingsV1(db);
+  migrateModelsV17(db);
   ensureUnifiedKey(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
@@ -1333,6 +1336,52 @@ function migrateModelsV14(db: Database.Database) {
 }
 
 /**
+ * V15 (May 2026): MemOS native provider integration.
+ *
+ * Adds MemOS hosted inference models as a first-class FreeLLMAPI provider,
+ * replacing the standalone memos_proxy.py and provider_router.py Python
+ * services. MemOS bridges to memos.memtensor.cn and provides access to
+ * qwen3-32b, deepseek-r1, and qwen2.5-72b-instruct via Token auth.
+ *
+ * The MemOS provider uses a custom API format (not OpenAI-compatible upstream)
+ * but the FreeLLMAPI MemosProvider class translates transparently.
+ */
+function migrateModelsV15(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models
+      (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+       rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // [platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+  //  rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window]
+  const additions: [string, string, string, number, number, string,
+    number | null, number | null, number | null, number | null, string, number | null][] = [
+    ['memos', 'qwen3-32b',              'Qwen3 32B (MemOS)',               8, 7, 'Medium', null, null, null, null, '~1-5M', 32768],
+    ['memos', 'deepseek-r1',            'DeepSeek R1 (MemOS)',             3, 9, 'Frontier', null, null, null, null, '~1-5M', 65536],
+    ['memos', 'qwen2.5-72b-instruct',   'Qwen2.5 72B Instruct (MemOS)',    5, 8, 'Large', null, null, null, null, '~1-5M', 32768],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+
+    const missing = db.prepare(`
+      SELECT m.id FROM models m
+      LEFT JOIN fallback_config f ON m.id = f.model_db_id
+      WHERE f.id IS NULL AND m.platform = 'memos'
+      ORDER BY m.intelligence_rank ASC
+    `).all() as { id: number }[];
+    if (missing.length > 0) {
+      const maxPriority = (db.prepare('SELECT COALESCE(MAX(priority), 0) AS mx FROM fallback_config').get() as { mx: number }).mx;
+      const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+      for (let i = 0; i < missing.length; i++) addFb.run(missing[i].id, maxPriority + i + 1);
+    }
+  });
+  apply();
+}
+
+/**
  * V15 (May 2026): purge SiliconFlow.
  *
  * SiliconFlow was briefly added (#131) on the belief Qwen/Qwen3-8B was a $0
@@ -1344,7 +1393,7 @@ function migrateModelsV14(db: Database.Database) {
  * as Chutes — so the provider was reverted. This removes any orphaned row from
  * a DB that already ran the original V15. No-op on DBs that never had it.
  */
-function migrateModelsV15(db: Database.Database) {
+function migrateModelsV15SiliconFlow(db: Database.Database) {
   db.prepare(`
     DELETE FROM fallback_config WHERE model_db_id IN (
       SELECT id FROM models WHERE platform = 'siliconflow'
@@ -1808,6 +1857,134 @@ export function regenerateUnifiedKey(): string {
   const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
   return key;
+}
+
+function migrateModelsV17(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      user_id TEXT,
+      model TEXT,
+      system_prompt TEXT,
+      parent_session_id TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL,
+      title TEXT,
+      ended_at TEXT,
+      end_reason TEXT,
+      prompt_tokens INTEGER NOT NULL DEFAULT 0,
+      completion_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      cost REAL NOT NULL DEFAULT 0.0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_source ON chat_sessions(source);
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_parent ON chat_sessions(parent_session_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_created ON chat_sessions(created_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_sessions_title_unique ON chat_sessions(title) WHERE title IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tool_calls TEXT,
+      reasoning TEXT,
+      reasoning_content TEXT,
+      timestamp REAL NOT NULL DEFAULT (strftime('%s', 'now') || '.' || substr(strftime('%f', 'now'), 4)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, timestamp);
+
+    CREATE TRIGGER IF NOT EXISTS update_session_timestamp_on_message_insert
+    AFTER INSERT ON messages
+    BEGIN
+      UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = NEW.session_id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS update_session_timestamp_on_message_update
+    AFTER UPDATE ON messages
+    BEGIN
+      UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = NEW.session_id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS update_session_timestamp_on_message_delete
+    AFTER DELETE ON messages
+    BEGIN
+      UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = OLD.session_id;
+    END;
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+      message_id UNINDEXED,
+      session_id UNINDEXED,
+      role,
+      content
+    );
+
+    CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+      INSERT INTO messages_fts(message_id, session_id, role, content) VALUES (NEW.id, NEW.session_id, NEW.role, NEW.content);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+      DELETE FROM messages_fts WHERE message_id = OLD.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages BEGIN
+      UPDATE messages_fts SET role = NEW.role, content = NEW.content WHERE message_id = NEW.id;
+    END;
+  `);
+
+  // Declarative column reconciliation for existing databases (idempotent)
+  const sessionCols = db.prepare('PRAGMA table_info(chat_sessions)').all() as { name: string }[];
+  const colNames = new Set(sessionCols.map(c => c.name));
+  if (!colNames.has('title')) {
+    try { db.prepare('ALTER TABLE chat_sessions ADD COLUMN title TEXT').run(); } catch {}
+  }
+  if (!colNames.has('ended_at')) {
+    try { db.prepare('ALTER TABLE chat_sessions ADD COLUMN ended_at TEXT').run(); } catch {}
+  }
+  if (!colNames.has('end_reason')) {
+    try { db.prepare('ALTER TABLE chat_sessions ADD COLUMN end_reason TEXT').run(); } catch {}
+  }
+}
+
+const sharedBuffer = new Int32Array(new SharedArrayBuffer(4));
+export function sleepSync(ms: number) {
+  Atomics.wait(sharedBuffer, 0, 0, ms);
+}
+
+export function runWithRetry<T>(fn: () => T, maxRetries = 15): T {
+  let attempt = 0;
+  while (true) {
+    try {
+      return fn();
+    } catch (err: any) {
+      const isLocked = err.code === 'SQLITE_BUSY' || err.message?.includes('busy') || err.message?.includes('locked');
+      if (isLocked && attempt < maxRetries) {
+        attempt++;
+        const jitter = Math.floor(Math.random() * (150 - 20 + 1) + 20);
+        sleepSync(jitter);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+let writeCounter = 0;
+export function recordWriteAndMaybeCheckpoint() {
+  writeCounter++;
+  if (writeCounter >= 50) {
+    writeCounter = 0;
+    try {
+      const database = getDb();
+      database.pragma('wal_checkpoint(PASSIVE)');
+    } catch (err) {
+      console.error('WAL checkpoint failed:', err);
+    }
+  }
 }
 
 // Generic key/value settings accessors (used by routing strategy, etc.).

@@ -12,6 +12,14 @@ server/data/
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh
+<<<<<<< HEAD
+repo-assets/
+docs/logos
+docs/index.html
+docs/og.png
+docs/og.svg
+=======
 
 # Monetization planning — private, never committed
 monetization/
+>>>>>>> upstream/main

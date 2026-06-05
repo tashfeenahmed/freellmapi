@@ -22,6 +22,7 @@ export type Platform =
   | 'pollinations'
   | 'llm7'
   | 'huggingface'
+  | 'memos'
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
   // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
   | 'opencode'

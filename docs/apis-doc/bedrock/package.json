@@ -1,0 +1,14 @@
+{
+  "name": "bedrock-openai-test",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Test Amazon Bedrock OpenAI-compatible API",
+  "main": "test-bedrock-openai.mjs",
+    "scripts": {
+      "test:bedrock": "node test-bedrock-openai.mjs",
+      "test:models": "node diagnose-bedrock-models.mjs"
+    },
+  "dependencies": {
+    "openai": "^4.52.0"
+  }
+}
