@@ -162,11 +162,15 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   res.json({ success: true, preset });
 });
 
-// Token usage per model for the stacked bar
-fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
+// Token usage per model for the stacked bar.
+// ?proxy=true  → multiply per-model budget by key count (multi-IP deployment).
+// ?proxy=false → use raw per-key budget (single-IP / no proxy), default.
+fallbackRouter.get('/token-usage', (req: Request, res: Response) => {
   const db = getDb();
+  const proxy = req.query.proxy === 'true';
 
-  // Count enabled keys per platform — multiple keys carry independent quotas
+  // Count enabled keys per platform — always fetch so we can filter out
+  // platforms with zero keys; only multiply when in proxy mode.
   const keyCounts = db.prepare(`
     SELECT platform, COUNT(*) as count
     FROM api_keys WHERE enabled = 1
@@ -184,15 +188,16 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     ORDER BY fc.priority ASC
   `).all() as { platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number }[];
 
-  // Build per-model breakdown: budget × key count (multiple keys = multiple quotas).
-  // Optimal when keys are used behind separate IPs (some providers rate-limit
-  // by IP + key, so a single IP may share a pool regardless of key count).
+  // Build per-model breakdown: only platforms with keys; multiply by key count
+  // when in proxy mode (multi-IP = truly independent quotas).
   const modelBudgets = models
     .filter(m => keyCountMap.has(m.platform))
     .map(m => ({
       displayName: m.display_name,
       platform: m.platform,
-      budget: parseBudget(m.monthly_token_budget) * (keyCountMap.get(m.platform) ?? 1),
+      budget: proxy
+        ? parseBudget(m.monthly_token_budget) * (keyCountMap.get(m.platform) ?? 1)
+        : parseBudget(m.monthly_token_budget),
     }));
 
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
@@ -210,5 +215,6 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     totalBudget,
     totalUsed: usage.total_used,
     models: modelBudgets,
+    proxy, // let the client know which mode was used
   });
 });
