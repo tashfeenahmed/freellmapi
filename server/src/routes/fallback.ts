@@ -166,13 +166,13 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
 fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   const db = getDb();
 
-  // Get platforms that have enabled keys
-  const platforms = db.prepare(`
-    SELECT DISTINCT ak.platform
-    FROM api_keys ak
-    WHERE ak.enabled = 1
-  `).all() as { platform: string }[];
-  const platformSet = new Set(platforms.map(p => p.platform));
+  // Count enabled keys per platform — multiple keys carry independent quotas
+  const keyCounts = db.prepare(`
+    SELECT platform, COUNT(*) as count
+    FROM api_keys WHERE enabled = 1
+    GROUP BY platform
+  `).all() as { platform: string; count: number }[];
+  const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
 
   // Get monthly budget per model, ordered by fallback priority
   const models = db.prepare(`
@@ -184,13 +184,15 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     ORDER BY fc.priority ASC
   `).all() as { platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number }[];
 
-  // Build per-model breakdown (only platforms with keys)
+  // Build per-model breakdown: budget × key count (multiple keys = multiple quotas).
+  // Optimal when keys are used behind separate IPs (some providers rate-limit
+  // by IP + key, so a single IP may share a pool regardless of key count).
   const modelBudgets = models
-    .filter(m => platformSet.has(m.platform))
+    .filter(m => keyCountMap.has(m.platform))
     .map(m => ({
       displayName: m.display_name,
       platform: m.platform,
-      budget: parseBudget(m.monthly_token_budget),
+      budget: parseBudget(m.monthly_token_budget) * (keyCountMap.get(m.platform) ?? 1),
     }));
 
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
