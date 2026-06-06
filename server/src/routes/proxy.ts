@@ -4,12 +4,15 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
+import { getProvider } from '../providers/index.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
+import { isFreeImageModel } from './image-models.js';
+import { decrypt } from '../lib/crypto.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 
@@ -221,6 +224,11 @@ const userMessageSchema = z.object({
 // them verbatim. We accept them too and coerce empty/null content to "" before
 // forwarding (see message build below) rather than 400-ing a payload OpenAI
 // would take. (#165)
+//
+// images: echoed assistant turns from image-generation responses may carry
+// the generated images array. zod strips unknown keys by default — declaring
+// the field (even as z.any()) prevents data loss when clients replay history
+// containing "images" on assistant messages. (#image-gen)
 const assistantMessageSchema = z.object({
   role: z.literal('assistant'),
   content: z.union([contentSchema, z.null()]).optional(),
@@ -229,6 +237,7 @@ const assistantMessageSchema = z.object({
   // no-tool assistant turns — aionrs (AionUI's engine) writes it into every
   // session-resumed assistant echo. Treated as absent. (#200)
   tool_calls: z.array(toolCallSchema).nullable().optional(),
+  images: z.array(z.any()).optional(),
 });
 
 // Tool results may arrive with null/missing content (a tool that returned
@@ -295,6 +304,9 @@ const chatCompletionSchema = z.object({
   tools: z.array(toolDefinitionSchema).nullable().optional(),
   tool_choice: toolChoiceSchema.nullable().optional(),
   parallel_tool_calls: z.boolean().nullable().optional(),
+  // Image generation fields — forwarded to OpenRouter as-is when present.
+  modalities: z.array(z.string()).nullable().optional(),
+  image_config: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export function isRetryableError(err: any): boolean {
@@ -428,7 +440,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, top_p, stream } = parsed.data;
+  const { model: requestedModel, temperature, top_p, stream, modalities, image_config } = parsed.data;
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
@@ -485,6 +497,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             thought_signature: tc.thought_signature,
           };
         }) } : {}),
+        // Preserve echoed images from image-generation history so clients
+        // that replay full conversation context (including generated images)
+        // don't lose data when forwarding to upstream providers. (#image-gen)
+        ...((m as any).images?.length ? { images: (m as any).images } : {}),
       };
     }
 
@@ -534,6 +550,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // or surfacing the generic "all models exhausted" error (#118, #125). Add a
   // rough per-image token cost so budget routing isn't skewed by content the
   // heuristic above (text-only) can't see.
+  // Image generation requests bypass catalog validation — route directly
+  // to OpenRouter which hosts the image models. (#image-gen)
+  const isImageRequest = Array.isArray(modalities) && modalities.includes('image');
+
   const hasImage = messageHasImage(messages);
   if (hasImage && !hasEnabledVisionModel()) {
     res.status(422).json({
@@ -578,6 +598,23 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
+  // Image generation passthrough: when the requested model is an image model
+  // not in our catalog, route directly to OpenRouter. Local models that happen
+  // to accept modalities: ["image"] are NOT hijacked — they go through normal routing.
+  // When model is 'auto' or omitted but modalities includes "image", reject with
+  // a clear message: image generation needs an explicit model (our catalog has
+  // no image models, and 'auto' can't route to OpenRouter without a model id). (#image-gen)
+  let isImagePassthrough = false;
+  if (isImageRequest && (isAutoModel(requestedModel) || !requestedModel)) {
+    res.status(400).json({
+      error: {
+        message: 'Image generation requires a specific model. Use one of the image models listed on the Models > Images page, or call GET /api/image-models for the available list.',
+        type: 'invalid_request_error',
+        code: 'image_model_required',
+      },
+    });
+    return;
+  }
   if (isAutoModel(requestedModel)) {
     // Explicit "auto" → behave exactly like an omitted model field.
     preferredModel = getStickyModel(messages, sessionIdHeader);
@@ -586,6 +623,34 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
     if (enabled) {
       preferredModel = enabled.id;
+    } else if (isImageRequest) {
+      // Image generation models (e.g. sourceful/riverflow-v2.5-pro) are not
+      // in the local catalog — they live exclusively on OpenRouter. Only
+      // passthrough when the model is genuinely absent from our catalog.
+      // Enforce free-only: image generation never bills the user's OpenRouter
+      // credits. (#image-gen)
+      if (!(await isFreeImageModel(requestedModel))) {
+        res.status(400).json({
+          error: {
+            message: `Image generation is restricted to free models. '${requestedModel}' is either paid or not in the free catalog. Use one of the free models from the Models > Images page.`,
+            type: 'invalid_request_error',
+            code: 'image_model_not_free',
+          },
+        });
+        return;
+      }
+      const orKey = db.prepare("SELECT id FROM api_keys WHERE platform = 'openrouter' AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1").get() as { id: number } | undefined;
+      if (!orKey) {
+        res.status(400).json({
+          error: {
+            message: `Image model '${requestedModel}' requires an OpenRouter API key. Add one on the Keys page.`,
+            type: 'invalid_request_error',
+            code: 'no_openrouter_key',
+          },
+        });
+        return;
+      }
+      isImagePassthrough = true;
     } else {
       const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
@@ -613,24 +678,67 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
-    try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools);
-    } catch (err: any) {
-      // No more models available
-      if (lastError) {
-        const safeLastError = sanitizeProviderErrorMessage(lastError.message);
-        res.status(429).json({
-          error: {
-            message: `All models rate-limited. Last error: ${safeLastError}`,
-            type: 'rate_limit_error',
-          },
-        });
-      } else {
-        res.status(err.status ?? 503).json({
-          error: { message: err.message, type: 'routing_error' },
-        });
+    // Image generation passthrough: bypass the normal routing chain and
+    // directly route to OpenRouter with the requested model slug. Image
+    // models don't exist in the local catalog, so routeRequest would
+    // either skip them or route to the wrong provider. Keys are iterated
+    // with skipKeys support so a dead OR key fails over to the next one. (#image-gen)
+    if (isImagePassthrough) {
+      const provider = getProvider('openrouter');
+      if (!provider) {
+        res.status(500).json({ error: { message: 'OpenRouter provider not configured', type: 'server_error' } });
+        return;
       }
-      return;
+      const db = getDb();
+      // Iterate OR keys in id order, skipping previously-failed ones.
+      const allKeyRows = db.prepare(
+        "SELECT id, encrypted_key, iv, auth_tag FROM api_keys WHERE platform = 'openrouter' AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id"
+      ).all() as { id: number; encrypted_key: string; iv: string; auth_tag: string }[];
+      const keyRow = allKeyRows.find(k => !skipKeys.has(`openrouter:${requestedModel!}:${k.id}`));
+      if (!keyRow) {
+        if (lastError) {
+          const safeLastError = sanitizeProviderErrorMessage(lastError.message);
+          res.status(429).json({
+            error: { message: `All OpenRouter keys exhausted for image model '${requestedModel}'. Last error: ${safeLastError}`, type: 'rate_limit_error' },
+          });
+        } else {
+          res.status(400).json({
+            error: { message: `Image model '${requestedModel}' requires an OpenRouter API key. Add one on the Keys page.`, type: 'invalid_request_error', code: 'no_openrouter_key' },
+          });
+        }
+        return;
+      }
+      route = {
+        provider,
+        modelId: requestedModel!,
+        modelDbId: 0,
+        apiKey: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
+        keyId: keyRow.id,
+        platform: 'openrouter',
+        displayName: `OpenRouter (${requestedModel!})`,
+        rpdLimit: null,
+        tpdLimit: null,
+      };
+    } else {
+      try {
+        route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools);
+      } catch (err: any) {
+        // No more models available
+        if (lastError) {
+          const safeLastError = sanitizeProviderErrorMessage(lastError.message);
+          res.status(429).json({
+            error: {
+              message: `All models rate-limited. Last error: ${safeLastError}`,
+              type: 'rate_limit_error',
+            },
+          });
+        } else {
+          res.status(err.status ?? 503).json({
+            error: { message: err.message, type: 'routing_error' },
+          });
+        }
+        return;
+      }
     }
 
     recordRequest(route.platform, route.modelId, route.keyId);
@@ -692,7 +800,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined },
           );
 
           for await (const chunk of gen) {
@@ -806,8 +914,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
           }
 
+          // Image generation streams may produce no text and no tool_calls —
+          // images arrive in delta.images via real SSE streaming. Skip the
+          // empty-completion check for image requests. (#image-gen)
           const hasText = headerSent || heldText.trim().length > 0;
-          if (!hasText && completedCalls.length === 0) {
+          if (!hasText && completedCalls.length === 0 && !isImageRequest) {
             // Nothing usable came out — same failover semantics as the
             // non-stream empty-completion path. Headers can't have been sent
             // (header flush requires payload), so the client never notices.
@@ -835,7 +946,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.end();
 
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
-          recordSuccess(route.modelDbId);
+          if (route.modelDbId > 0) recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId, sessionIdHeader);
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
@@ -859,19 +970,22 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined },
         );
 
         // Empty completion (no text, no tool calls) → fail over rather than
         // return a transport-level "success" the caller can't act on. Mirrors
-        // the zero-chunk streaming case above.
+        // the zero-chunk streaming case above. Image generation responses carry
+        // images on the message instead of text — skip the empty check. (#image-gen)
         const respMsg = result.choices?.[0]?.message;
         const respText = contentToString(respMsg?.content ?? '');
-        if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
+        const respImages = respMsg?.images;
+        const hasImages = Array.isArray(respImages) && respImages.length > 0;
+        if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0 && !hasImages) {
           logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          recordRateLimitHit(route.modelDbId);
+          if (route.modelDbId > 0) recordRateLimitHit(route.modelDbId);
           lastError = new Error(`empty completion from ${route.displayName}`);
           continue;
         }
@@ -902,7 +1016,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         const totalTokens = result.usage?.total_tokens ?? 0;
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
-        recordSuccess(route.modelDbId);
+        if (route.modelDbId > 0) recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
@@ -950,7 +1064,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
                 tpd: route.tpdLimit,
               }),
         );
-        recordRateLimitHit(route.modelDbId);
+        if (route.modelDbId > 0) recordRateLimitHit(route.modelDbId);
         lastError = err;
         console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
