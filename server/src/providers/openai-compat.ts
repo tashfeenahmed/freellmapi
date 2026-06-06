@@ -69,6 +69,8 @@ export class OpenAICompatProvider extends BaseProvider {
         tools: options?.tools,
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
+        ...(options?.modalities ? { modalities: options.modalities } : {}),
+        ...(options?.image_config ? { image_config: options.image_config } : {}),
       }),
     }, this.timeoutMs);
 
@@ -81,10 +83,6 @@ export class OpenAICompatProvider extends BaseProvider {
     try {
       data = await res.json() as ChatCompletionResponse;
     } catch {
-      // A 200 whose body isn't a single JSON document — typically a base URL
-      // pointing at a non-OpenAI-compatible API (e.g. Ollama's native NDJSON
-      // /api endpoints instead of /v1, #189). Surface what's wrong instead of
-      // the raw JSON.parse position error.
       throw new Error(
         `${this.name} returned 200 with a non-JSON body — the endpoint is not OpenAI-compatible. ` +
         `Check the base URL (for Ollama use http://host:11434/v1, for llama.cpp/vLLM/LM Studio the /v1 path).`,
@@ -118,6 +116,8 @@ export class OpenAICompatProvider extends BaseProvider {
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
+        ...(options?.modalities ? { modalities: options.modalities } : {}),
+        ...(options?.image_config ? { image_config: options.image_config } : {}),
       }),
     }, this.timeoutMs);
 
@@ -126,32 +126,7 @@ export class OpenAICompatProvider extends BaseProvider {
       throw new Error(`${this.name} API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') return;
-        try {
-          yield JSON.parse(data) as ChatCompletionChunk;
-        } catch {
-          // Skip malformed chunks
-        }
-      }
-    }
+    yield* this.readSseStream(res);
   }
 
   async validateKey(apiKey: string): Promise<boolean> {

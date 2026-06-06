@@ -11,8 +11,9 @@ export function ModelsTabs() {
     }`
   return (
     <div className="inline-flex gap-1 rounded-xl border p-1">
-      <NavLink to="/models/chat" className={({ isActive }) => tab(isActive)}>Chat models</NavLink>
+      <NavLink to="/models/chat" className={({ isActive }) => tab(isActive)}>Chat</NavLink>
       <NavLink to="/models/embeddings" className={({ isActive }) => tab(isActive)}>Embeddings</NavLink>
+      <NavLink to="/models/images" className={({ isActive }) => tab(isActive)}>Images</NavLink>
     </div>
   )
 }
