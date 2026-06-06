@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
 import { applyModelPricing } from './model-pricing.js';
+import { syncCapabilities } from '../services/capabilities.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -61,6 +62,8 @@ export function initDb(dbPath?: string): Database.Database {
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
+  // Sync model capabilities from OpenRouter's public API
+  syncCapabilities(db);
   migrateEmbeddingsV1(db);
   ensureUnifiedKey(db);
 
@@ -1689,6 +1692,9 @@ function migrateModelsV22Tools(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
   if (!columns.some(col => col.name === 'supports_tools')) {
     db.prepare('ALTER TABLE models ADD COLUMN supports_tools INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!columns.some(col => col.name === 'supports_reasoning')) {
+    db.prepare('ALTER TABLE models ADD COLUMN supports_reasoning INTEGER NOT NULL DEFAULT 0').run();
   }
   const apply = db.transaction(() => {
     // Reset first so a de-flagged model doesn't keep a stale flag across re-runs.

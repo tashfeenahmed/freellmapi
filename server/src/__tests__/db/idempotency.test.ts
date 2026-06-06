@@ -177,12 +177,12 @@ describe('Migration idempotency', () => {
     const sambanovaCtx = (db.prepare(`
       SELECT context_window FROM models WHERE platform = 'sambanova' AND model_id = 'DeepSeek-V3.2'
     `).get() as { context_window: number }).context_window;
-    expect(sambanovaCtx).toBe(32768);
+    expect(sambanovaCtx).toBe(131072) // API: deepseek/deepseek-v3.2 context_length;
 
     const cfFp8Ctx = (db.prepare(`
       SELECT context_window FROM models WHERE platform = 'cloudflare' AND model_id = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
     `).get() as { context_window: number }).context_window;
-    expect(cfFp8Ctx).toBe(24000);
+    expect(cfFp8Ctx).toBe(131072) // API: meta-llama/llama-3.3-70b-instruct context_length (strategy 8 reverse name);
 
     const mistralCtx = db.prepare(`
       SELECT model_id, context_window FROM models
@@ -193,7 +193,7 @@ describe('Migration idempotency', () => {
     expect(mistralCtx).toEqual([
       { model_id: 'codestral-latest',       context_window: 256000 },
       { model_id: 'devstral-latest',        context_window: 262144 },
-      { model_id: 'magistral-medium-latest', context_window: 131072 },
+      { model_id: 'magistral-medium-latest', context_window: 40960  },
       { model_id: 'mistral-large-latest',   context_window: 262144 },
     ]);
   });
