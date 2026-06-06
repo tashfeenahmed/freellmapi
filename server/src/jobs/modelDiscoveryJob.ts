@@ -121,6 +121,109 @@ function mirrorLegacyModelsIntoCatalog(): void {
   }
 }
 
+function classifySizeLabel(contextWindow: number | null): string {
+  if ((contextWindow ?? 0) >= 262144) return 'Frontier';
+  if ((contextWindow ?? 0) >= 131072) return 'Large';
+  if ((contextWindow ?? 0) >= 32768) return 'Medium';
+  return 'Small';
+}
+
+function looksReasoningOrCoder(modelId: string): boolean {
+  const id = modelId.toLowerCase();
+  return id.includes('coder') || id.includes('code') || id.includes('reason') || id.includes('r1') || id.includes('thinking');
+}
+
+function syncDiscoveredCatalogIntoLegacyModels(): number {
+  const db = getDb();
+  const discovered = db.prepare(`
+    SELECT pcm.provider_slug, pcm.provider_model_id, pcm.display_name, pcm.context_window,
+           pcm.supports_tools, pcm.supports_vision,
+           pml.rpm_limit, pml.rpd_limit, pml.tpm_limit, pml.tpd_limit
+    FROM provider_catalog_models pcm
+    LEFT JOIN provider_model_limits pml
+      ON pml.provider_slug = pcm.provider_slug AND pml.provider_model_id = pcm.provider_model_id
+    WHERE pcm.status = 'active'
+  `).all() as any[];
+
+  let synced = 0;
+  const maxPriority = db.prepare('SELECT COALESCE(MAX(priority), 0) AS max_priority FROM fallback_config').get() as { max_priority: number };
+  let nextPriority = maxPriority.max_priority + 1;
+
+  for (const row of discovered) {
+    const existing = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
+      .get(row.provider_slug, row.provider_model_id) as { id: number } | undefined;
+
+    if (existing) {
+      db.prepare(`
+        UPDATE models SET
+          display_name = COALESCE(?, display_name),
+          context_window = COALESCE(?, context_window),
+          supports_tools = ?,
+          supports_vision = ?,
+          rpm_limit = COALESCE(?, rpm_limit),
+          rpd_limit = COALESCE(?, rpd_limit),
+          tpm_limit = COALESCE(?, tpm_limit),
+          tpd_limit = COALESCE(?, tpd_limit)
+        WHERE id = ?
+      `).run(
+        row.display_name,
+        row.context_window,
+        row.supports_tools ? 1 : 0,
+        row.supports_vision ? 1 : 0,
+        row.rpm_limit,
+        row.rpd_limit,
+        row.tpm_limit,
+        row.tpd_limit,
+        existing.id,
+      );
+      synced += 1;
+      continue;
+    }
+
+    // New upstream model: make it visible in the existing Models page, but do
+    // not automatically route production traffic to it. The user can explicitly
+    // enable it in the fallback chain after seeing it and testing the account.
+    const displayName = row.display_name || row.provider_model_id;
+    const contextWindow = row.context_window ?? null;
+    const sizeLabel = classifySizeLabel(contextWindow);
+    const intelligenceRank = looksReasoningOrCoder(row.provider_model_id) ? 6 : 12;
+    const speedRank = 10;
+    const monthlyBudget = 'discovered';
+
+    const insert = db.prepare(`
+      INSERT INTO models (
+        platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+        rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
+        enabled, supports_vision, supports_tools
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(
+      row.provider_slug,
+      row.provider_model_id,
+      displayName,
+      intelligenceRank,
+      speedRank,
+      sizeLabel,
+      row.rpm_limit ?? null,
+      row.rpd_limit ?? null,
+      row.tpm_limit ?? null,
+      row.tpd_limit ?? null,
+      monthlyBudget,
+      contextWindow,
+      row.supports_vision ? 1 : 0,
+      row.supports_tools ? 1 : 0,
+    );
+
+    const modelDbId = Number(insert.lastInsertRowid);
+    db.prepare(`
+      INSERT OR IGNORE INTO fallback_config (model_db_id, priority, enabled)
+      VALUES (?, ?, 0)
+    `).run(modelDbId, nextPriority++);
+    synced += 1;
+  }
+
+  return synced;
+}
+
 function getAccountsForDiscovery() {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM api_keys WHERE enabled = 1').all() as any[];
@@ -141,7 +244,7 @@ function getAccountsForDiscovery() {
   });
 }
 
-export async function runModelDiscoveryOnce(): Promise<{ discovered: number; accounts: number; errors: string[] }> {
+export async function runModelDiscoveryOnce(): Promise<{ discovered: number; accounts: number; errors: string[]; synced: number }> {
   const db = getDb();
   ensurePersistenceSchema(db);
   mirrorLegacyModelsIntoCatalog();
@@ -180,7 +283,8 @@ export async function runModelDiscoveryOnce(): Promise<{ discovered: number; acc
     }
   }
 
-  return { discovered, accounts: accounts.length, errors };
+  const synced = syncDiscoveredCatalogIntoLegacyModels();
+  return { discovered, accounts: accounts.length, errors, synced };
 }
 
 export function startModelDiscoveryLoop(): void {
