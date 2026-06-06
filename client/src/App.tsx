@@ -17,6 +17,7 @@ import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
 import EmbeddingsPage from '@/pages/EmbeddingsPage'
+import ImageModelsPage from '@/pages/ImageModelsPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 
 const queryClient = new QueryClient()
@@ -200,6 +201,7 @@ function App() {
                 <Route path="/models" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models/chat" element={<FallbackPage />} />
                 <Route path="/models/embeddings" element={<EmbeddingsPage />} />
+                <Route path="/models/images" element={<ImageModelsPage />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />

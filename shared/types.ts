@@ -138,6 +138,8 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];
+  /** Image generation responses carry generated images here (OpenRouter extension). */
+  images?: Array<{ type?: 'image_url'; image_url: { url: string; detail?: string } }>;
 }
 
 export interface ChatCompletionRequest {
@@ -150,6 +152,10 @@ export interface ChatCompletionRequest {
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
+  /** Image generation: output modalities (e.g. ["image", "text"]). */
+  modalities?: string[];
+  /** Image generation: model-specific config (aspect_ratio, image_size, etc.). */
+  image_config?: Record<string, unknown>;
 }
 
 export interface ChatCompletionChoice {
