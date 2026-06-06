@@ -194,6 +194,7 @@ interface TokenUsageData {
   totalBudget: number
   totalUsed: number
   models: { displayName: string; platform: string; budget: number }[]
+  proxy: boolean
 }
 
 const platformColors: Record<string, string> = {
@@ -233,7 +234,7 @@ function AxisBar({ value, color }: { value: number | undefined; color: string })
 // Legend rows visible while collapsed (~6 rows: 6 × 16px line + 5 × 6px gap).
 const LEGEND_COLLAPSED_PX = 126
 
-function TokenUsageBar({ data }: { data: TokenUsageData }) {
+function TokenUsageBar({ data, proxyMode, onProxyToggle }: { data: TokenUsageData; proxyMode: boolean; onProxyToggle: (v: boolean) => void }) {
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
   const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
@@ -264,7 +265,15 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   return (
     <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-medium">Monthly token budget</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-medium">Monthly token budget</h2>
+          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <Switch checked={proxyMode} onCheckedChange={onProxyToggle} />
+            <span className="text-[11px] text-muted-foreground">
+              {proxyMode ? 'Per key · multi-IP' : 'Per provider'}
+            </span>
+          </label>
+        </div>
         <span className="text-xs text-muted-foreground tabular-nums">
           <span className="text-foreground font-medium">{formatTokens(remaining)}</span> remaining
           <span className="mx-1.5">·</span>
@@ -431,9 +440,11 @@ export default function FallbackPage() {
     queryFn: () => apiFetch('/api/fallback'),
   })
 
+  const [proxyMode, setProxyMode] = useState(false)
+
   const { data: tokenUsage } = useQuery<TokenUsageData>({
-    queryKey: ['fallback', 'token-usage'],
-    queryFn: () => apiFetch('/api/fallback/token-usage'),
+    queryKey: ['fallback', 'token-usage', proxyMode],
+    queryFn: () => apiFetch(`/api/fallback/token-usage?proxy=${proxyMode}`),
   })
 
   const { data: routing } = useQuery<RoutingData>({
@@ -544,7 +555,7 @@ export default function FallbackPage() {
 
       <div className="space-y-6">
         {/* Monthly token budget — moved to the top */}
-        {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
+        {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} proxyMode={proxyMode} onProxyToggle={setProxyMode} />}
 
         {/* Strategy selector */}
         <section className="rounded-3xl border bg-card p-5">
