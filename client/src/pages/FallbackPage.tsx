@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -45,6 +45,8 @@ interface FallbackEntry {
   monthlyTokenBudget: string
   supportsVision: boolean
   supportsTools: boolean
+  supportsReasoning: boolean
+  contextWindow: number | null
   keyCount: number
 }
 
@@ -366,6 +368,14 @@ function RowContent({
               Tools
             </span>
           )}
+          {row.supportsReasoning && (
+            <span
+              title="Supports chain-of-thought / extended reasoning"
+              className="text-[10px] rounded-full px-1.5 py-0.5 bg-emerald-600/15 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-400"
+            >
+              Reasoning
+            </span>
+          )}
           {(row.penalty ?? 0) > 0 && (
             <span className="text-[10px] text-amber-600 dark:text-amber-400">−{row.penalty} penalty</span>
           )}
@@ -382,6 +392,9 @@ function RowContent({
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.speed} color="#3b82f6" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.intelligence} color="#a855f7" /></td>
+      <td className="py-2 pr-3 align-middle text-right font-mono text-[11px] text-muted-foreground tabular-nums">
+        {row.contextWindow != null ? (row.contextWindow >= 1_000_000 ? `${(row.contextWindow / 1_000_000).toFixed(1)}M` : row.contextWindow >= 10_000 ? `${Math.round(row.contextWindow / 1000)}K` : `${row.contextWindow}`) : '–'}
+      </td>
       <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">
         {guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}
       </td>
@@ -425,6 +438,8 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
 export default function FallbackPage() {
   const queryClient = useQueryClient()
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
+  const [syncResult, setSyncResult] = useState<{ updated: number; unmatched: { platform: string; modelId: string; displayName: string }[]; total: number; matched: number; platformSynced: number; error?: string } | null>(null)
+  const [showSyncModal, setShowSyncModal] = useState(false)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
     queryKey: ['fallback'],
@@ -455,6 +470,19 @@ export default function FallbackPage() {
     mutationFn: (payload: { strategy: RoutingStrategy; weights?: RoutingWeights }) =>
       apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify(payload) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
+  })
+
+  const syncMutation = useMutation({
+    mutationFn: () => apiFetch('/api/fallback/sync-capabilities', { method: 'POST' }) as Promise<{ updated: number; unmatched: { platform: string; modelId: string; displayName: string }[]; total: number; matched: number; platformSynced: number; error?: string }>,
+    onSuccess: (result) => {
+      setSyncResult(result)
+      setShowSyncModal(true)
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+    onError: (err) => {
+      setSyncResult({ updated: 0, unmatched: [], total: 0, matched: 0, platformSynced: 0, error: String(err) })
+      setShowSyncModal(true)
+    },
   })
 
   const strategy: RoutingStrategy = routing?.strategy ?? 'balanced'
@@ -518,6 +546,7 @@ export default function FallbackPage() {
         <th className="py-2 pr-3 font-medium">
           <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence</span>
         </th>
+        <th className="py-2 pr-3 font-medium text-right tabular-nums">Context</th>
         <th className="py-2 pr-3 font-medium">
           <Tooltip text="Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.">
             <span className="underline decoration-dotted underline-offset-2 cursor-help">Guardrails</span>
@@ -591,6 +620,18 @@ export default function FallbackPage() {
           </p>
         </section>
 
+        {/* Sync capabilities button */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors border text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? 'Syncing…' : 'Sync API'}
+          </button>
+        </div>
+
         {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -644,7 +685,67 @@ export default function FallbackPage() {
               </Button>
             </FloatingBar>
 
-            {unconfiguredPlatforms.length > 0 && (
+            
+            {/* Sync result modal */}
+            {showSyncModal && syncResult && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSyncModal(false)}>
+                <div className="bg-card rounded-2xl border shadow-lg max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h2 className="text-sm font-medium">OpenRouter Sync Results</h2>
+                    <button onClick={() => setShowSyncModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-y-auto space-y-3">
+                    {syncResult.error ? (
+                      <p className="text-sm text-red-600 dark:text-red-400">Error: {syncResult.error}</p>
+                    ) : (
+                      <>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>Total models: <span className="text-foreground font-medium">{syncResult.total}</span></p>
+                          <p>Matched on OpenRouter: <span className="text-foreground font-medium">{syncResult.matched}</span></p>
+                          <p>Updated from API: <span className="text-foreground font-medium">{syncResult.updated}</span></p>
+                          {syncResult.platformSynced > 0 && (
+                            <p>Enriched from platform specs: <span className="text-foreground font-medium">{syncResult.platformSynced}</span></p>
+                          )}
+                          <p>Not found: <span className="text-foreground font-medium">{syncResult.unmatched.length}</span></p>
+                        </div>
+                        {syncResult.unmatched.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-medium text-muted-foreground mb-2">Models not found on OpenRouter:</h3>
+                            <div className="rounded-lg border overflow-hidden">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="text-left text-muted-foreground border-b bg-muted/50">
+                                    <th className="py-1.5 px-2 font-medium">Platform</th>
+                                    <th className="py-1.5 px-2 font-medium">Model ID</th>
+                                    <th className="py-1.5 px-2 font-medium">Display Name</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {syncResult.unmatched.map((m, i) => (
+                                    <tr key={i} className="border-b last:border-0">
+                                      <td className="py-1.5 px-2">{m.platform}</td>
+                                      <td className="py-1.5 px-2 font-mono text-muted-foreground select-all">{m.modelId}</td>
+                                      <td className="py-1.5 px-2 text-muted-foreground">{m.displayName}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="p-4 border-t flex justify-end">
+                    <Button size="sm" onClick={() => setShowSyncModal(false)}>Close</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+{unconfiguredPlatforms.length > 0 && (
               <p className="text-xs text-muted-foreground">Hidden (no keys): {unconfiguredPlatforms.join(', ')}</p>
             )}
           </>
