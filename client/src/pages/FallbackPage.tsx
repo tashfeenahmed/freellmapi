@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -17,11 +17,12 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, Copy, CopyCheck, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
@@ -45,6 +46,8 @@ interface FallbackEntry {
   monthlyTokenBudget: string
   supportsVision: boolean
   supportsTools: boolean
+  supportsReasoning: boolean
+  contextWindow: number | null
   keyCount: number
 }
 
@@ -196,6 +199,13 @@ interface TokenUsageData {
   models: { displayName: string; platform: string; budget: number }[]
 }
 
+const CONTEXT_FILTERS: { key: string; label: string; min: number; max: number | null }[] = [
+  { key: 'small',  label: '< 32K',  min: 0,      max: 32_000 },
+  { key: 'mid',    label: '32–128K', min: 32_000,  max: 128_000 },
+  { key: 'large',  label: '128–256K', min: 128_000, max: 256_000 },
+  { key: 'xlarge', label: '256K+',   min: 256_000, max: null },
+]
+
 const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',
@@ -325,6 +335,20 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   )
 }
 
+// Highlight matching substrings in search results.
+function highlightMatch(text: string, query: string): ReactNode {
+  const q = query.trim()
+  if (!q) return text
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`(${escaped})`, 'gi')
+  const lower = q.toLowerCase()
+  return text.split(re).map((part, i) =>
+    part.toLowerCase() === lower
+      ? <mark key={i} className="bg-amber-200/60 dark:bg-amber-500/30 text-inherit rounded-sm px-0.5">{part}</mark>
+      : part
+  )
+}
+
 // ── One row of the unified table ────────────────────────────────────────────
 function RowContent({
   row,
@@ -332,14 +356,25 @@ function RowContent({
   draggable,
   dragHandle,
   onToggle,
+  searchQuery,
 }: {
   row: Row
   rank: number
   draggable: boolean
   dragHandle?: ReactNode
   onToggle: (modelDbId: number, enabled: boolean) => void
+  searchQuery: string
 }) {
   const guard = (row.headroom ?? 1) * (row.rateLimit ?? 1)
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation()
+    navigator.clipboard.writeText(row.modelId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
   return (
     <>
       <td className="py-2 pl-3 pr-1 w-6 align-middle">
@@ -348,8 +383,8 @@ function RowContent({
       <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
       <td className="py-2 pr-3 align-middle">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm">{row.displayName}</span>
-          <span className="text-xs text-muted-foreground">{row.platform}</span>
+          <span className="font-medium text-sm">{highlightMatch(row.displayName, searchQuery)}</span>
+          <span className="text-xs text-muted-foreground">{highlightMatch(row.platform, searchQuery)}</span>
           {row.supportsVision && (
             <span
               title="Accepts image input"
@@ -366,12 +401,31 @@ function RowContent({
               Tools
             </span>
           )}
+          {row.supportsReasoning && (
+            <span
+              title="Supports chain-of-thought / extended reasoning"
+              className="text-[10px] rounded-full px-1.5 py-0.5 bg-emerald-600/15 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-400"
+            >
+              Reasoning
+            </span>
+          )}
           {(row.penalty ?? 0) > 0 && (
             <span className="text-[10px] text-amber-600 dark:text-amber-400">−{row.penalty} penalty</span>
           )}
           {row.totalRequests !== undefined && row.totalRequests > 0 && (
             <span className="text-[10px] text-muted-foreground/60 tabular-nums">{row.totalRequests} obs</span>
           )}
+        </div>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-[11px] font-mono text-muted-foreground/60 select-all">{highlightMatch(row.modelId, searchQuery)}</span>
+          <button
+            onClick={handleCopy}
+            className="inline-flex items-center text-muted-foreground/40 hover:text-foreground transition-colors"
+            aria-label="Copy model ID"
+            title="Copy model ID"
+          >
+            {copied ? <CopyCheck className="size-3 text-green-500" /> : <Copy className="size-3" />}
+          </button>
         </div>
         <div className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
           {row.monthlyTokenBudget} tok/mo
@@ -382,6 +436,9 @@ function RowContent({
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.speed} color="#3b82f6" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.intelligence} color="#a855f7" /></td>
+      <td className="py-2 pr-3 align-middle text-right font-mono text-[11px] text-muted-foreground tabular-nums">
+        {row.contextWindow != null ? (row.contextWindow >= 1_000_000 ? `${(row.contextWindow / 1_000_000).toFixed(1)}M` : row.contextWindow >= 10_000 ? `${Math.round(row.contextWindow / 1000)}K` : `${row.contextWindow}`) : '–'}
+      </td>
       <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">
         {guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}
       </td>
@@ -395,7 +452,7 @@ function RowContent({
   )
 }
 
-function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
+function SortableRow({ row, rank, onToggle, searchQuery }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void; searchQuery: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
   const handle = (
     <button
@@ -417,7 +474,7 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
     >
-      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
+      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} searchQuery={searchQuery} />
     </tr>
   )
 }
@@ -425,6 +482,18 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
 export default function FallbackPage() {
   const queryClient = useQueryClient()
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
+
+  // Filters
+  type EnabledFilter = 'all' | 'active' | 'inactive'
+  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
+  const [platformFilter, setPlatformFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [visionOnly, setVisionOnly] = useState(false)
+  const [toolsOnly, setToolsOnly] = useState(false)
+  const [reasoningOnly, setReasoningOnly] = useState(false)
+  const [contextFilters, setContextFilters] = useState<Set<string>>(new Set())
+  const [syncResult, setSyncResult] = useState<{ updated: number; unmatched: { platform: string; modelId: string; displayName: string }[]; total: number; matched: number; platformSynced: number; error?: string } | null>(null)
+  const [showSyncModal, setShowSyncModal] = useState(false)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
     queryKey: ['fallback'],
@@ -457,6 +526,19 @@ export default function FallbackPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
   })
 
+  const syncMutation = useMutation({
+    mutationFn: () => apiFetch('/api/fallback/sync-capabilities', { method: 'POST' }) as Promise<{ updated: number; unmatched: { platform: string; modelId: string; displayName: string }[]; total: number; matched: number; platformSynced: number; error?: string }>,
+    onSuccess: (result) => {
+      setSyncResult(result)
+      setShowSyncModal(true)
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+    onError: (err) => {
+      setSyncResult({ updated: 0, unmatched: [], total: 0, matched: 0, platformSynced: 0, error: String(err) })
+      setShowSyncModal(true)
+    },
+  })
+
   const strategy: RoutingStrategy = routing?.strategy ?? 'balanced'
   const isManual = strategy === 'priority'
 
@@ -473,6 +555,40 @@ export default function FallbackPage() {
   const ordered = isManual
     ? [...rows].sort((a, b) => a.priority - b.priority)
     : [...rows].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+
+  // Apply filters
+  const q = searchQuery.toLowerCase().trim()
+  const filtered = ordered.filter(row => {
+    if (enabledFilter === 'active' && !row.enabled) return false
+    if (enabledFilter === 'inactive' && row.enabled) return false
+    if (platformFilter !== 'all' && row.platform !== platformFilter) return false
+    if (visionOnly && !row.supportsVision) return false
+    if (toolsOnly && !row.supportsTools) return false
+    if (reasoningOnly && !row.supportsReasoning) return false
+    if (contextFilters.size > 0) {
+      const match = CONTEXT_FILTERS.some(f => {
+        if (!contextFilters.has(f.key)) return false
+        if (row.contextWindow == null) return false
+        if (f.max != null) return row.contextWindow >= f.min && row.contextWindow < f.max
+        return row.contextWindow >= f.min
+      })
+      if (!match) return false
+    }
+    if (q && !row.displayName.toLowerCase().includes(q) && !row.modelId.toLowerCase().includes(q) && !row.platform.toLowerCase().includes(q)) return false
+    return true
+  })
+
+  // Unique platforms for the filter dropdown (only configured ones, sorted alphabetically)
+  const platforms = [...new Set(configured.map(e => e.platform))].sort()
+  const contextCounts = useMemo(() => CONTEXT_FILTERS.map(f => ({
+    ...f,
+    count: configured.filter(r => {
+      if (r.contextWindow == null) return false
+      if (f.max != null) return r.contextWindow >= f.min && r.contextWindow < f.max
+      return r.contextWindow >= f.min
+    }).length,
+  })), [configured])
+  const hasFilters = enabledFilter !== 'all' || platformFilter !== 'all' || searchQuery !== '' || visionOnly || toolsOnly || reasoningOnly || contextFilters.size > 0
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -518,6 +634,7 @@ export default function FallbackPage() {
         <th className="py-2 pr-3 font-medium">
           <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence</span>
         </th>
+        <th className="py-2 pr-3 font-medium text-right tabular-nums">Context</th>
         <th className="py-2 pr-3 font-medium">
           <Tooltip text="Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.">
             <span className="underline decoration-dotted underline-offset-2 cursor-help">Guardrails</span>
@@ -591,13 +708,166 @@ export default function FallbackPage() {
           </p>
         </section>
 
+        {/* Filters */}
+        <section className="rounded-3xl border bg-card p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Active / Inactive / All toggle */}
+            <div className="inline-flex items-center gap-1 rounded-xl border p-1">
+              {(['all', 'active', 'inactive'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setEnabledFilter(f)}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors capitalize ${
+                    f === enabledFilter
+                      ? 'bg-foreground text-background font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search models…"
+                className="h-8 w-48 rounded-lg border border-input bg-transparent pl-8 pr-3 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Capability chips */}
+            <button
+              onClick={() => setVisionOnly(v => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors border ${
+                visionOnly
+                  ? 'bg-cyan-600/15 text-cyan-700 border-cyan-600/30 dark:bg-cyan-400/15 dark:text-cyan-400 dark:border-cyan-400/30'
+                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className={`size-1.5 rounded-full ${visionOnly ? 'bg-cyan-600 dark:bg-cyan-400' : 'bg-muted-foreground/40'}`} />
+              Vision
+            </button>
+            <button
+              onClick={() => setToolsOnly(t => !t)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors border ${
+                toolsOnly
+                  ? 'bg-violet-600/15 text-violet-700 border-violet-600/30 dark:bg-violet-400/15 dark:text-violet-400 dark:border-violet-400/30'
+                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className={`size-1.5 rounded-full ${toolsOnly ? 'bg-violet-600 dark:bg-violet-400' : 'bg-muted-foreground/40'}`} />
+              Tools
+            </button>
+            <button
+              onClick={() => setReasoningOnly(r => !r)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors border ${
+                reasoningOnly
+                  ? 'bg-emerald-600/15 text-emerald-700 border-emerald-600/30 dark:bg-emerald-400/15 dark:text-emerald-400 dark:border-emerald-400/30'
+                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border'
+              }`}
+            >
+              <span className={`size-1.5 rounded-full ${reasoningOnly ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-muted-foreground/40'}`} />
+              Reasoning
+            </button>
+
+            {/* Context window chips — multi-select with per-filter counts */}
+            <div className="inline-flex items-center gap-1">
+              {contextCounts.map(f => {
+                const active = contextFilters.has(f.key)
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setContextFilters(prev => {
+                      const next = new Set(prev)
+                      if (active) next.delete(f.key)
+                      else next.add(f.key)
+                      return next
+                    })}
+                    className={`px-2.5 py-1.5 text-xs rounded-lg transition-colors border ${
+                      active
+                        ? 'bg-amber-600/15 text-amber-700 border-amber-600/30 dark:bg-amber-400/15 dark:text-amber-400 dark:border-amber-400/30'
+                        : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border'
+                    }`}
+                  >
+                    <span className={`size-1.5 rounded-full ${active ? 'bg-amber-600 dark:bg-amber-400' : 'bg-muted-foreground/40'}`} />
+                    {f.label}{f.count > 0 ? ` (${f.count})` : ''}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Provider dropdown */}
+            <Select value={platformFilter} onValueChange={v => setPlatformFilter(v ?? 'all')}>
+              <SelectTrigger size="sm" className="min-w-[140px]">
+                <SelectValue placeholder="All providers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All providers</SelectItem>
+                {platforms.map(p => (
+                  <SelectItem key={p} value={p}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="size-2 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: platformColors[p] ?? '#94a3b8' }}
+                      />
+                      {p}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Refresh capabilities */}
+            <button
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors border text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-border disabled:opacity-50"
+            >
+              <RefreshCw className={`size-3 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              {syncMutation.isPending ? 'Syncing…' : 'Sync API'}
+            </button>
+
+            {/* Clear filters */}
+            {hasFilters && (
+              <button
+                onClick={() => { setEnabledFilter('all'); setPlatformFilter('all'); setSearchQuery(''); setVisionOnly(false); setToolsOnly(false); setReasoningOnly(false); setContextFilters(new Set()) }}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="size-3" />
+                Clear
+              </button>
+            )}
+
+            {/* Result count */}
+            <span className="text-xs text-muted-foreground ml-auto tabular-nums">
+              {filtered.length} of {ordered.length} models
+            </span>
+          </div>
+        </section>
+
         {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : ordered.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No models available. Add API keys on the <a href="/keys" className="underline text-foreground">Keys page</a> first.
+              {hasFilters
+                ? 'No models match the current filters.'
+                : <>No models available. Add API keys on the <a href="/keys" className="underline text-foreground">Keys page</a> first.</>}
             </p>
           </div>
         ) : (
@@ -609,10 +879,10 @@ export default function FallbackPage() {
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
                     {tableHead}
-                    <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={filtered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
                       <tbody>
-                        {ordered.map((row, i) => (
-                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} />
+                        {filtered.map((row, i) => (
+                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} searchQuery={searchQuery} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -624,9 +894,9 @@ export default function FallbackPage() {
                 <table className="w-full text-sm">
                   {tableHead}
                   <tbody>
-                    {ordered.map((row, i) => (
+                    {filtered.map((row, i) => (
                       <tr key={row.modelDbId} className={`border-b last:border-0 ${row.enabled ? '' : 'opacity-50'}`}>
-                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} />
+                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} searchQuery={searchQuery} />
                       </tr>
                     ))}
                   </tbody>
@@ -646,6 +916,70 @@ export default function FallbackPage() {
 
             {unconfiguredPlatforms.length > 0 && (
               <p className="text-xs text-muted-foreground">Hidden (no keys): {unconfiguredPlatforms.join(', ')}</p>
+            )}
+
+            {/* Sync result modal */}
+            {showSyncModal && syncResult && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSyncModal(false)}>
+                <div className="bg-card rounded-2xl border shadow-lg max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h2 className="text-sm font-medium">OpenRouter Sync Results</h2>
+                    <button onClick={() => setShowSyncModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-y-auto space-y-3">
+                    {syncResult.error ? (
+                      <p className="text-sm text-red-600 dark:text-red-400">Error: {syncResult.error}</p>
+                    ) : (
+                      <>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>Total models: <span className="text-foreground font-medium">{syncResult.total}</span></p>
+                          <p>Matched on OpenRouter: <span className="text-foreground font-medium">{syncResult.matched}</span></p>
+                          <p>Updated from API: <span className="text-foreground font-medium">{syncResult.updated}</span></p>
+                          {syncResult.platformSynced > 0 && (
+                            <p>Enriched from platform specs: <span className="text-foreground font-medium">{syncResult.platformSynced}</span></p>
+                          )}
+                          <p>Not found: <span className="text-foreground font-medium">{syncResult.unmatched.length}</span></p>
+                        </div>
+                        {syncResult.unmatched.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-medium text-muted-foreground mb-2">Models not found on OpenRouter:</h3>
+                            <div className="rounded-lg border overflow-hidden">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="text-left text-muted-foreground border-b bg-muted/50">
+                                    <th className="py-1.5 px-2 font-medium">Platform</th>
+                                    <th className="py-1.5 px-2 font-medium">Model ID</th>
+                                    <th className="py-1.5 px-2 font-medium">Display Name</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {syncResult.unmatched.map((m, i) => (
+                                    <tr key={i} className="border-b last:border-0">
+                                      <td className="py-1.5 px-2">
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <span className="size-1.5 rounded-full" style={{ backgroundColor: platformColors[m.platform] ?? '#94a3b8' }} />
+                                          {m.platform}
+                                        </span>
+                                      </td>
+                                      <td className="py-1.5 px-2 font-mono text-muted-foreground select-all">{m.modelId}</td>
+                                      <td className="py-1.5 px-2 text-muted-foreground">{m.displayName}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="p-4 border-t flex justify-end">
+                    <Button size="sm" onClick={() => setShowSyncModal(false)}>Close</Button>
+                  </div>
+                </div>
+              </div>
             )}
           </>
         )}

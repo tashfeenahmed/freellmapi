@@ -129,9 +129,9 @@ describe('bandit router', () => {
   });
 
   it('smartest vs fastest flips which model wins, at equal reliability', () => {
-    // Smart: frontier tier, slow. Fast: small tier, high throughput. Equal success.
-    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
-    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 9, sizeLabel: 'Small', budget: '~50M', priority: 2 });
+    // Smart: AA ~55 (rank 45), slow. Fast: AA ~10 (rank 90), high throughput.
+    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 45, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 90, sizeLabel: 'Small', budget: '~50M', priority: 2 });
     addHistory('google', 'smart', { successes: 40, failures: 1, outTokens: 100, latencyMs: 3000, ttfbMs: 2500 });
     addHistory('groq', 'fast', { successes: 40, failures: 1, outTokens: 1000, latencyMs: 1000, ttfbMs: 150 });
 

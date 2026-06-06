@@ -71,9 +71,9 @@ describe('intelligence tier audit (migrateModelsV17)', () => {
     expect(tiersForFamily('%gpt-oss-120b%')).toEqual(['Large']);
   });
 
-  it('leaves models with no published AA Index at their seeded tier', () => {
-    expect(tier('ollama', 'cogito-2.1:671b')).toBe('Frontier');
-    expect(tier('openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free')).toBe('Large');
+  it('uses V24 authoritative tier for models without direct AA scores', () => {
+    expect(tier('ollama', 'cogito-2.1:671b')).toBe('Large');
+    expect(tier('openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free')).toBe('Medium');
     expect(tier('openrouter', 'poolside/laguna-m.1:free')).toBe('Large');
   });
 

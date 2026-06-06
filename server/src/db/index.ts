@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initEncryptionKey } from '../lib/crypto.js';
 import { applyModelPricing } from './model-pricing.js';
+import { syncCapabilities } from '../services/capabilities.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -60,11 +61,16 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV22Tools(db);
   migrateModelsV23OpenCodeFree(db);
   migrateModelsV24ReRank(db);
+  migrateModelsV25Reasoning(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
   migrateEmbeddingsV1(db);
   ensureUnifiedKey(db);
+
+  // Auto-sync capabilities from OpenRouter + provider /v1/models APIs.
+  // V16/V22 LIKE rules run first as fallback; this overrides with live data.
+  syncCapabilities(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
@@ -88,6 +94,8 @@ function createTables(db: Database.Database) {
       context_window INTEGER,
       enabled INTEGER NOT NULL DEFAULT 1,
       supports_vision INTEGER NOT NULL DEFAULT 0,
+      supports_tools INTEGER NOT NULL DEFAULT 0,
+      supports_reasoning INTEGER NOT NULL DEFAULT 0,
       UNIQUE(platform, model_id)
     );
 
@@ -1403,6 +1411,21 @@ function migrateModelsV16Vision(db: Database.Database) {
       WHERE platform = 'github'
         AND (model_id LIKE '%gpt-4o%' OR model_id LIKE '%gpt-4.1%' OR model_id LIKE '%gpt-5%')
     `).run();
+    // MiniMax M3 is natively multimodal (text + image + video).
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%minimax-m3%'
+    `).run();
+    // Qwen3.6 Plus is a VLM (Vision Language Model) with image understanding.
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%qwen3.6%'
+    `).run();
+    // MiMo-V2.5 is omnimodal (text + image + video + audio).
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%mimo-v2.5%'
+    `).run();
   });
   apply();
 }
@@ -1602,10 +1625,10 @@ function migrateModelsV20KiloFree(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
-    ['kilo', 'poolside/laguna-m.1:free',               'Poolside Laguna M.1 (Kilo)',    13, 8, 'Large',  null, null, null, null, 'free · 200/hr per IP',         262144],
-    ['kilo', 'poolside/laguna-xs.2:free',              'Poolside Laguna XS.2 (Kilo)',   16, 4, 'Medium', null, null, null, null, 'free · 200/hr per IP',         262144],
-    ['kilo', 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super 120B (Kilo)',  12, 5, 'Large',  null, null, null, null, 'free · 200/hr per IP (trial)', 1000000],
-    ['kilo', 'stepfun/step-3.7-flash:free',            'StepFun Step 3.7 Flash (Kilo)', 14, 3, 'Medium', null, null, null, null, 'free · 200/hr per IP',         262144],
+    ['kilo', 'poolside/laguna-m.1:free',               'Poolside Laguna M.1 (Kilo)',    13, 8, 'Large',  null, null, null, null, 'free · 200/hr per IP',         null],
+    ['kilo', 'poolside/laguna-xs.2:free',              'Poolside Laguna XS.2 (Kilo)',   16, 4, 'Medium', null, null, null, null, 'free · 200/hr per IP',         null],
+    ['kilo', 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super 120B (Kilo)',  12, 5, 'Large',  null, null, null, null, 'free · 200/hr per IP (trial)', null],
+    ['kilo', 'stepfun/step-3.7-flash:free',            'StepFun Step 3.7 Flash (Kilo)', 14, 3, 'Medium', null, null, null, null, 'free · 200/hr per IP',         null],
   ];
 
   const apply = db.transaction(() => {
@@ -1709,6 +1732,8 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%deepseek-v%'     -- V3.x/V4 function calling; excludes r1-distill
         OR LOWER(model_id) LIKE '%kimi-k2%'        -- K2 family is tool-native
         OR LOWER(model_id) LIKE '%minimax-m2%'     -- M2.x is agent-focused
+         OR LOWER(model_id) LIKE '%minimax-m3%'     -- M3 is agentic, native function calling
+         OR LOWER(model_id) LIKE '%mimo-v2.5%'      -- MiMo-V2.5 omnimodal, supports tool calling
         OR LOWER(model_id) LIKE '%mistral-large%'  -- Mistral API function calling (whole family)
         OR LOWER(model_id) LIKE '%mistral-medium%'
         OR LOWER(model_id) LIKE '%mistral-small%'
@@ -1722,6 +1747,7 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%gpt-4.1%'
         OR LOWER(model_id) LIKE '%gpt-5%'
         OR LOWER(model_id) LIKE '%nemotron-3-super%' -- benchmarked #8 with real tool calls; nano stays excluded
+         OR LOWER(model_id) LIKE '%nemotron-3-ultra%' -- Nemotron 3 Ultra 550B, native tool use
       )
     `).run();
   });
@@ -1740,14 +1766,28 @@ function migrateModelsV23OpenCodeFree(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
-    ['opencode', 'qwen3.6-plus-free',     'Qwen3.6 Plus Free (OpenCode Zen)',    4, 4, 'Frontier', 20, 200, null, null, 'promo (trial)', 131072],
-    ['opencode', 'minimax-m3-free',        'MiniMax M3 Free (OpenCode Zen)',      6, 4, 'Large',    20, 200, null, null, 'promo (trial)', 200000],
-    ['opencode', 'nemotron-3-ultra-free',  'Nemotron 3 Ultra Free (OpenCode Zen)', 9, 4, 'Large',   20, 200, null, null, 'promo (trial)', 131072],
+    ['opencode', 'qwen3.6-plus-free',     'Qwen3.6 Plus Free (OpenCode Zen)',    4, 4, 'Frontier', 20, 200, null, null, 'promo (trial)', null],
+    ['opencode', 'minimax-m3-free',        'MiniMax M3 Free (OpenCode Zen)',      6, 4, 'Large',    20, 200, null, null, 'promo (trial)', null],
+    ['opencode', 'nemotron-3-ultra-free',  'Nemotron 3 Ultra Free (OpenCode Zen)', 9, 4, 'Large',   20, 200, null, null, 'promo (trial)', null],
   ];
 
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);
     backfillFallback(db);
+    // Set capability flags for the newly inserted rows. V16 (vision) and V22
+    // (tools) already ran; the INSERT defaults leave these at 0, so we manually
+    // flag the new models that support vision and/or tools.
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%minimax-m3%'
+         OR LOWER(model_id) LIKE '%qwen3.6%'
+    `).run();
+    db.prepare(`
+      UPDATE models SET supports_tools = 1
+      WHERE LOWER(model_id) LIKE '%minimax-m3%'
+         OR LOWER(model_id) LIKE '%qwen3.6%'
+         OR LOWER(model_id) LIKE '%nemotron-3-ultra%'
+    `).run();
   });
   apply();
 }
@@ -1875,127 +1915,161 @@ export function setSetting(key: string, value: string): void {
  *
  * Higher rank = weaker. Ties allowed (same capability family across providers).
  */
+/**
+ * V24 (June 2026): Calibrate BOTH size_label and intelligence_rank from fresh
+ * Artificial Analysis Intelligence Index scores scraped 2026-06-05.
+ *
+ *   intelligence_rank = CEIL(100 - AA_score)  — lower rank = smarter
+ *   size_label: Frontier ≥ 45  ·  Large 26–44  ·  Medium 13–25  ·  Small ≤ 12
+ *
+ * Models NOT found in the AA leaderboard keep their current values (unchanged).
+ * Idempotent — safe to re-run on every boot.
+ */
 function migrateModelsV24ReRank(db: Database.Database) {
-  const setRank = db.prepare(`UPDATE models SET intelligence_rank = ? WHERE platform = ? AND model_id = ?`);
-  const ranks: Array<[number, string, string]> = [
-    // ── Frontier (AA ≥ 45, V17 tier) ──
-    [1,  'nvidia',      'qwen/qwen3-coder-480b-a35b-instruct'],   // SWE-bench leader among open models
-    [2,  'nvidia',      'deepseek-ai/deepseek-v4-pro'],           // strongest frontier coder
-    [3,  'nvidia',      'deepseek-ai/deepseek-v4-flash'],         // fast frontier
-    [3,  'huggingface', 'deepseek-ai/DeepSeek-V4-Flash'],
-    [3,  'opencode',    'deepseek-v4-flash-free'],
-    [4,  'google',      'gemini-3.5-flash'],                      // AA 55
-    [5,  'nvidia',      'moonshotai/kimi-k2.6'],                  // strong all-rounder
-    [5,  'cloudflare',  '@cf/moonshotai/kimi-k2.6'],
-    [5,  'huggingface', 'moonshotai/Kimi-K2.6'],
-    [6,  'nvidia',      'z-ai/glm-5.1'],                          // strong but slow cold-start
-    [7,  'opencode',    'minimax-m3-free'],                        // M3 > M2.7
-    [8,  'nvidia',      'minimaxai/minimax-m2.7'],
-    [9,  'google',      'gemini-3-flash-preview'],                // AA 46
-    [10, 'ollama',      'cogito-2.1:671b'],                        // reasoning specialist
-    [11, 'openrouter',  'openrouter/owl-alpha'],                   // OR-house agentic
-    [12, 'opencode',    'qwen3.6-plus-free'],                      // seed Frontier, no AA score yet
+  const update = db.prepare(`
+    UPDATE models SET size_label = ?, intelligence_rank = ?
+     WHERE platform = ? AND model_id = ?
+  `);
 
-    // ── Large (AA 26–44, V17 tier) ──
-    [1,  'ollama',      'qwen3-coder-next'],                       // ~80B-A3B coder
-    [1,  'huggingface', 'Qwen/Qwen3-Coder-Next'],
-    [2,  'cerebras',    'zai-glm-4.7'],                            // AA 42, re-enabled V21
-    [2,  'ollama',      'glm-4.7'],
-    [3,  'nvidia',      'nvidia/nemotron-3-super-120b-a12b'],      // AA 36
-    [3,  'opencode',    'nemotron-3-super-free'],
-    [3,  'kilo',        'nvidia/nemotron-3-super-120b-a12b:free'],
-    [3,  'cloudflare',  '@cf/nvidia/nemotron-3-120b-a12b'],
-    [4,  'opencode',    'nemotron-3-ultra-free'],                  // Ultra > Super, no AA yet
-    [5,  'sambanova',   'DeepSeek-V3.2'],                          // AA 32
-    [6,  'sambanova',   'DeepSeek-V3.1'],                          // AA 28
-    [7,  'openrouter',  'nousresearch/hermes-3-llama-3.1-405b:free'], // 405B, tool-use tuned
-    [8,  'cloudflare',  '@cf/zai-org/glm-4.7-flash'],              // GLM-4.7 distill
-    [8,  'zhipu',       'glm-4.7-flash'],                          // same GLM-4.7 family
-    [9,  'google',      'gemini-2.5-pro'],                         // AA 35, DISABLED V5
-    [9,  'google',      'gemini-3.1-pro-preview'],                 // DISABLED V13, AA 60+
-    [10, 'mistral',     'mistral-medium-latest'],                  // Mistral Medium 3.5, AA 32
-    [10, 'mistral',     'magistral-medium-latest'],                // reasoning-focused
-    [11, 'google',      'gemma-4-31b-it'],                          // AA 39
-    [11, 'google',      'gemma-4-26b-a4b-it'],                      // AA 31
-    [11, 'nvidia',      'google/gemma-4-31b-it'],
-    [11, 'cloudflare',  '@cf/google/gemma-4-26b-a4b-it'],
-    [11, 'ollama',      'gemma4:31b'],
-    [12, 'sambanova',   'gpt-oss-120b'],
-    [12, 'groq',        'openai/gpt-oss-120b'],
-    [12, 'cloudflare',  '@cf/openai/gpt-oss-120b'],
-    [12, 'ollama',      'gpt-oss:120b'],
-    [12, 'cerebras',    'gpt-oss-120b'],
-    [12, 'openrouter',  'openai/gpt-oss-120b:free'],               // same gpt-oss-120b family
-    [13, 'google',      'gemini-3.1-flash-lite-preview'],          // AA 34
-    [14, 'github',      'openai/gpt-4.1'],                          // AA 26-44 range
-    [14, 'zhipu',       'glm-4.5-flash'],                          // seed Large, no AA score
-    [15, 'openrouter',  'qwen/qwen3-next-80b-a3b-instruct:free'],
-    [16, 'opencode',    'big-pickle'],                              // stealth model, unknown capability
-    [17, 'kilo',        'poolside/laguna-m.1:free'],               // Poolside Laguna M.1
-    [17, 'openrouter',  'poolside/laguna-m.1:free'],               // same Laguna M.1 family
-    [18, 'cohere',      'command-a-03-2025'],                       // RAG/agent focused
-    [18, 'cohere',      'command-a-reasoning-08-2025'],
-    [19, 'ollama',      'devstral-2:123b'],                         // Devstral 2
-    [20, 'ollama',      'mistral-large-3:675b'],                   // DISABLED V13
-    [21, 'ollama',      'deepseek-v3.2'],                           // DISABLED V13
-    [22, 'ollama',      'kimi-k2-thinking'],                        // DISABLED V13
+  // [size_label, intelligence_rank, platform, model_id]
+  // Sorted by intelligence_rank ascending (best models first).
+  const ranked: Array<[string, number, string, string]> = [
+    // ── Frontier (AA ≥ 45) ──
+    ['Frontier', 43, 'google',      'gemini-3.1-pro-preview'],          // AA 57 (disabled V13)
+    ['Frontier', 45, 'google',      'gemini-3.5-flash'],                // AA 55
+    ['Frontier', 45, 'opencode',    'minimax-m3-free'],                 // AA 55 (MiniMax-M3)
+    ['Frontier', 46, 'nvidia',      'moonshotai/kimi-k2.6'],            // AA 54 (Kimi K2.6)
+    ['Frontier', 46, 'cloudflare',  '@cf/moonshotai/kimi-k2.6'],
+    ['Frontier', 46, 'huggingface', 'moonshotai/Kimi-K2.6'],
+    ['Frontier', 49, 'nvidia',      'z-ai/glm-5.1'],                    // AA 51 (GLM-5.1)
+    ['Frontier', 50, 'nvidia',      'minimaxai/minimax-m2.7'],          // AA 50 (MiniMax-M2.7)
+    ['Frontier', 50, 'opencode',    'qwen3.6-plus-free'],               // AA 50 (Qwen3.6 Plus)
+    ['Frontier', 51, 'opencode',    'mimo-v2.5-free'],                  // AA 49 (MiMo-V2.5)
+    ['Frontier', 52, 'opencode',    'nemotron-3-ultra-free'],           // AA 48 (Nemotron 3 Ultra)
+    ['Frontier', 55, 'google',      'gemini-3-flash-preview'],          // AA 45 (as V17, keep Frontier)
 
-    // ── Medium (AA 13–25, V17 tier) ──
-    [1,  'openrouter',  'qwen/qwen3-coder:free'],                  // AA 25 — top of Medium
-    [1,  'ollama',      'qwen3-coder:480b'],
-    [2,  'cerebras',    'qwen-3-235b-a22b-instruct-2507'],         // AA 25, DISABLED V14
-    [3,  'cloudflare',  '@cf/qwen/qwen3-30b-a3b-fp8'],            // Qwen3 30B MoE
-    [4,  'mistral',     'mistral-large-latest'],                   // AA 23
-    [4,  'nvidia',      'mistralai/mistral-large-3-675b-instruct-2512'],
-    [5,  'nvidia',      'meta/llama-4-maverick-17b-128e-instruct'], // AA 18
-    [5,  'sambanova',   'Llama-4-Maverick-17B-128E-Instruct'],
-    [6,  'google',      'gemini-2.5-flash'],                        // AA 21
-    [7,  'github',      'gpt-4o'],                                   // AA 17
-    [8,  'openrouter',  'z-ai/glm-4.5-air:free'],                   // AA 23
-    [9,  'cloudflare',  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'], // AA 17
-    [11, 'mistral',     'devstral-latest'],
-    [12, 'groq',        'meta-llama/llama-4-scout-17b-16e-instruct'], // AA 14
-    [12, 'cloudflare',  '@cf/meta/llama-4-scout-17b-16e-instruct'],
-    [13, 'groq',        'groq/compound'],                             // agent system, not a model
-    [15, 'google',      'gemini-2.5-flash-lite'],
-    [16, 'groq',        'llama-3.3-70b-versatile'],                  // AA 14
-    [16, 'sambanova',   'Meta-Llama-3.3-70B-Instruct'],
-    [16, 'cloudflare',  '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
-    [16, 'nvidia',      'meta/llama-3.3-70b-instruct'],
-    [16, 'nvidia',      'meta/llama-3.1-70b-instruct'],
-    [16, 'openrouter',  'meta-llama/llama-3.3-70b-instruct:free'],
-    [18, 'kilo',        'poolside/laguna-xs.2:free'],              // Poolside Laguna XS.2
-    [18, 'openrouter',  'poolside/laguna-xs.2:free'],              // same Laguna XS.2 family
-    [19, 'groq',        'qwen/qwen3-32b'],                           // Qwen3 32B
-    [20, 'openrouter',  'openai/gpt-oss-20b:free'],
-    [20, 'groq',        'openai/gpt-oss-20b'],
-    [20, 'groq',        'openai/gpt-oss-safeguard-20b'],
-    [20, 'ollama',      'gpt-oss:20b'],
-    [20, 'pollinations', 'openai-fast'],
-    [21, 'groq',        'groq/compound-mini'],                       // agent system, smaller
-    [22, 'mistral',     'mistral-small-latest'],                    // Mistral Small 4
-    [23, 'opencode',    'mimo-v2.5-free'],                           // MiMo-V2.5
-    [24, 'kilo',        'stepfun/step-3.7-flash:free'],            // StepFun 3.7 Flash
-    [25, 'nvidia',      'nvidia/nemotron-3-nano-30b-a3b'],          // weak at tools (V22 incident)
-    [25, 'openrouter',  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'],
-    [25, 'openrouter',  'nvidia/nemotron-3-nano-30b-a3b:free'],    // non-omni variant
-    [26, 'openrouter',  'nvidia/nemotron-nano-9b-v2:free'],        // even smaller
-    [27, 'cohere',      'command-r-plus-08-2024'],                    // RAG-focused, weak on code
-    [27, 'cohere',      'command-r-08-2024'],
-    [28, 'llm7',        'codestral-latest'],                          // LLM7 surviving row
+    // ── Large (AA 26–44) ──
+    ['Large',    57, 'cloudflare',  '@cf/qwen/qwen3-30b-a3b-fp8'],     // AA 43 (Qwen3.6 35B A3B)
+    ['Large',    57, 'kilo',        'stepfun/step-3.7-flash:free'],     // AA 43 (Step 3.7 Flash)
+    ['Large',    61, 'google',      'gemma-4-31b-it'],                  // AA 39 (Gemma 4 31B)
+    ['Large',    61, 'nvidia',      'google/gemma-4-31b-it'],
+    ['Large',    61, 'ollama',      'gemma4:31b'],
+    ['Large',    61, 'openrouter',  'google/gemma-4-31b-it:free'],
+    ['Large',    61, 'mistral',     'mistral-medium-latest'],           // AA 39 (Mistral Medium 3.5)
+    ['Large',    61, 'nvidia',      'deepseek-ai/deepseek-v4-pro'],     // AA 39 (DeepSeek V4 Pro)
+    ['Large',    64, 'nvidia',      'deepseek-ai/deepseek-v4-flash'],   // AA 36 (DeepSeek V4 Flash)
+    ['Large',    64, 'huggingface', 'deepseek-ai/DeepSeek-V4-Flash'],
+    ['Large',    64, 'opencode',    'deepseek-v4-flash-free'],
+    ['Large',    64, 'nvidia',      'nvidia/nemotron-3-super-120b-a12b'], // AA 36 (Nemotron 3 Super)
+    ['Large',    64, 'cloudflare',  '@cf/nvidia/nemotron-3-120b-a12b'],
+    ['Large',    64, 'openrouter',  'nvidia/nemotron-3-super-120b-a12b:free'],
+    ['Large',    64, 'kilo',        'nvidia/nemotron-3-super-120b-a12b:free'],
+    ['Large',    64, 'opencode',    'nemotron-3-super-free'],
+    ['Large',    65, 'google',      'gemini-2.5-pro'],                  // AA 35 (disabled V5)
+    ['Large',    66, 'google',      'gemini-3.1-flash-lite-preview'],   // AA 34
+    ['Large',    67, 'sambanova',   'gpt-oss-120b'],                    // AA 33 (gpt-oss-120b high)
+    ['Large',    67, 'groq',        'openai/gpt-oss-120b'],
+    ['Large',    67, 'cloudflare',  '@cf/openai/gpt-oss-120b'],
+    ['Large',    67, 'ollama',      'gpt-oss:120b'],
+    ['Large',    67, 'cerebras',    'gpt-oss-120b'],
+    ['Large',    67, 'openrouter',  'openai/gpt-oss-120b:free'],
+    ['Large',    69, 'google',      'gemma-4-26b-a4b-it'],              // AA 31 (Gemma 4 26B A4B)
+    ['Large',    69, 'cloudflare',  '@cf/google/gemma-4-26b-a4b-it'],
+    ['Large',    69, 'openrouter',  'google/gemma-4-26b-a4b-it:free'],
+    ['Large',    72, 'ollama',      'qwen3-coder-next'],                // AA 28 (Qwen3 Coder Next)
+    ['Large',    72, 'huggingface', 'Qwen/Qwen3-Coder-Next'],
+    ['Large',    72, 'sambanova',   'DeepSeek-V3.1'],                   // AA 28
+    ['Large',    72, 'mistral',     'mistral-small-latest'],            // AA 28 (Mistral Small 4)
+    ['Large',    73, 'openrouter',  'qwen/qwen3-next-80b-a3b-instruct:free'], // AA 27 (Qwen3 Next 80B A3B)
+    ['Large',    73, 'mistral',     'magistral-medium-latest'],         // AA 27 (Magistral Medium 1.2)
 
-    // ── Small (AA ≤ 12, V17 tier) ──
-    [1,  'mistral',     'codestral-latest'],                       // HumanEval 86.6%, AA 8
-    [2,  'sambanova',   'gemma-3-12b-it'],                          // AA 9
-    [3,  'cloudflare',  '@cf/ibm-granite/granite-4.0-h-micro'],    // Granite 4.0 H Micro
-    [4,  'openrouter',  'liquid/lfm-2.5-1.2b-instruct:free'],      // Liquid 1.2B
-    [4,  'openrouter',  'liquid/lfm-2.5-1.2b-thinking:free'],      // Liquid 1.2B Thinking
-    [5,  'groq',        'llama-3.1-8b-instant'],                     // Llama 3.1 8B
-    [5,  'cerebras',    'llama3.1-8b'],                              // DISABLED V14
-    [6,  'mistral',     'ministral-8b-latest'],                     // Ministral 3 8B
+    // ── Medium (AA 13–25) ──
+    ['Medium',   76, 'openrouter',  'openai/gpt-oss-20b:free'],         // AA 24 (gpt-oss-20B high)
+    ['Medium',   76, 'groq',        'openai/gpt-oss-20b'],
+    ['Medium',   76, 'groq',        'openai/gpt-oss-safeguard-20b'],
+    ['Medium',   76, 'ollama',      'gpt-oss:20b'],
+    ['Medium',   76, 'pollinations', 'openai-fast'],
+    ['Medium',   76, 'nvidia',      'nvidia/nemotron-3-nano-30b-a3b'],  // AA 24 (Nemotron 3 Nano)
+    ['Medium',   76, 'openrouter',  'nvidia/nemotron-3-nano-30b-a3b:free'],
+    ['Medium',   77, 'mistral',     'mistral-large-latest'],            // AA 23 (Mistral Large 3)
+    ['Medium',   77, 'nvidia',      'mistralai/mistral-large-3-675b-instruct-2512'],
+    ['Medium',   77, 'ollama',      'mistral-large-3:675b'],            // disabled V13
+    ['Medium',   77, 'openrouter',  'z-ai/glm-4.5-air:free'],           // AA 23 (GLM-4.5 Air)
+    ['Medium',   78, 'ollama',      'devstral-2:123b'],                  // AA 22 (Devstral 2)
+    ['Medium',   79, 'google',      'gemini-2.5-flash'],                // AA 21 (Gemini 2.5 Flash)
+    ['Medium',   79, 'openrouter',  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'], // AA 21
+    ['Medium',   81, 'nvidia',      'meta/llama-4-maverick-17b-128e-instruct'], // AA 18 (Llama 4 Maverick)
+    ['Medium',   82, 'sambanova',   'Llama-4-Maverick-17B-128E-Instruct'],
+    ['Medium',   83, 'github',      'gpt-4o'],                           // AA 17
+    ['Medium',   83, 'cloudflare',  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'], // AA 17
+    ['Medium',   83, 'openrouter',  'nousresearch/hermes-3-llama-3.1-405b:free'], // AA 17 (Llama 3.1 405B)
+    ['Medium',   85, 'google',      'gemini-2.5-flash-lite'],           // AA 15 (Gemini 2.5 Flash-Lite estimated)
+    ['Medium',   85, 'openrouter',  'nvidia/nemotron-nano-9b-v2:free'], // AA 15 (Nemotron Nano 9B V2)
+    ['Medium',   85, 'mistral',     'ministral-8b-latest'],             // AA 15 (Ministral 3 8B)
+    ['Medium',   86, 'groq',        'llama-3.3-70b-versatile'],         // AA 14 (Llama 3.3 70B)
+    ['Medium',   86, 'sambanova',   'Meta-Llama-3.3-70B-Instruct'],
+    ['Medium',   86, 'cloudflare',  '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+    ['Medium',   86, 'nvidia',      'meta/llama-3.3-70b-instruct'],
+    ['Medium',   86, 'openrouter',  'meta-llama/llama-3.3-70b-instruct:free'],
+    ['Medium',   86, 'groq',        'meta-llama/llama-4-scout-17b-16e-instruct'], // AA 14 (Llama 4 Scout)
+    ['Medium',   86, 'cloudflare',  '@cf/meta/llama-4-scout-17b-16e-instruct'],
+    ['Medium',   87, 'nvidia',      'meta/llama-3.1-70b-instruct'],     // AA 13 (Llama 3.1 Nemotron 70B)
+    ['Medium',   87, 'cohere',      'command-a-03-2025'],               // AA 13 (Command A)
+
+    // ── Small (AA ≤ 12) ──
+    ['Small',    92, 'mistral',     'codestral-latest'],                // AA 8 (Codestral)
+    ['Small',    92, 'llm7',        'codestral-latest'],
+    ['Small',    92, 'openrouter',  'liquid/lfm-2.5-1.2b-instruct:free'],  // AA 8 (LFM 2.5 1.2B)
+    ['Small',    92, 'openrouter',  'liquid/lfm-2.5-1.2b-thinking:free'],  // AA 8
+    ['Small',    95, 'cloudflare',  '@cf/ibm-granite/granite-4.0-h-micro'], // AA 5 (Granite 4.0 H 350M estimated)
+    ['Small',    95, 'groq',        'llama-3.1-8b-instant'],            // AA 5 (Llama 3.1 8B estimated)
+    ['Small',    95, 'cerebras',    'llama3.1-8b'],                     // disabled V14
+
+    // ── Models without AA scores — best-guess ranks ──
+    ['Medium',   75, 'nvidia',      'qwen/qwen3-coder-480b-a35b-instruct'], // Qwen3-Coder 480B
+    ['Large',    68, 'sambanova',   'DeepSeek-V3.2'],
+    ['Large',    70, 'cerebras',    'zai-glm-4.7'],                     // re-enabled V21
+    ['Large',    70, 'ollama',      'glm-4.7'],
+    ['Large',    74, 'github',      'openai/gpt-4.1'],
+    ['Large',    74, 'zhipu',       'glm-4.5-flash'],
+    ['Large',    74, 'cloudflare',  '@cf/zai-org/glm-4.7-flash'],
+    ['Large',    74, 'zhipu',       'glm-4.7-flash'],
+    ['Large',    75, 'opencode',    'big-pickle'],
+    ['Medium',   75, 'openrouter',  'qwen/qwen3-coder:free'],
+    ['Medium',   75, 'ollama',      'qwen3-coder:480b'],
+    ['Medium',   75, 'cerebras',    'qwen-3-235b-a22b-instruct-2507'],  // disabled V14
+    ['Large',    75, 'kilo',        'poolside/laguna-m.1:free'],
+    ['Large',    75, 'openrouter',  'poolside/laguna-m.1:free'],
+    ['Medium',   80, 'groq',        'groq/compound'],
+    ['Medium',   80, 'groq',        'groq/compound-mini'],
+    ['Medium',   85, 'groq',        'qwen/qwen3-32b'],
+    ['Medium',   88, 'kilo',        'poolside/laguna-xs.2:free'],
+    ['Medium',   88, 'openrouter',  'poolside/laguna-xs.2:free'],
+    ['Medium',   88, 'mistral',     'devstral-latest'],
+    ['Medium',   88, 'cohere',      'command-r-plus-08-2024'],
+    ['Small',    92, 'cohere',      'command-r-08-2024'],
+    ['Medium',   88, 'cohere',      'command-a-reasoning-08-2025'],
+    ['Small',    90, 'sambanova',   'gemma-3-12b-it'],
+    ['Large',    75, 'openrouter',  'openrouter/owl-alpha'],
+    ['Large',    75, 'ollama',      'cogito-2.1:671b'],
+    ['Large',    75, 'ollama',      'kimi-k2-thinking'],                // disabled V13
+    ['Large',    75, 'ollama',      'deepseek-v3.2'],                    // disabled V13
   ];
+
   const apply = db.transaction(() => {
-    for (const [r, p, m] of ranks) setRank.run(r, p, m);
+    for (const row of ranked) update.run(...row);
   });
   apply();
+}
+
+
+/**
+ * V25 (June 2026): Add supports_reasoning column.
+ * Seeded via the live OpenRouter frontend capability sync (capabilities.ts).
+ */
+function migrateModelsV25Reasoning(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'supports_reasoning')) {
+    db.prepare('ALTER TABLE models ADD COLUMN supports_reasoning INTEGER NOT NULL DEFAULT 0').run();
+  }
 }

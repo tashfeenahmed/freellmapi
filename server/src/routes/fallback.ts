@@ -5,6 +5,7 @@ import { getDb } from '../db/index.js';
 import { getAllPenalties, getCustomWeights, getRoutingScores, getRoutingStrategy, setCustomWeights, setRoutingStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
+import { syncCapabilitiesDetailed } from '../services/capabilities.js';
 
 export const fallbackRouter = Router();
 
@@ -52,7 +53,8 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
     SELECT fc.model_db_id, fc.priority, fc.enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
-           m.monthly_token_budget, m.supports_vision, m.supports_tools
+           m.monthly_token_budget, m.supports_vision, m.supports_tools, m.supports_reasoning,
+           m.context_window
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id
     ORDER BY fc.priority ASC
@@ -90,6 +92,8 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       monthlyTokenBudget: r.monthly_token_budget,
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
+      supportsReasoning: r.supports_reasoning === 1,
+      contextWindow: r.context_window,
       keyCount: keyCountMap.get(r.platform) ?? 0,
     };
   }));
@@ -160,6 +164,13 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   reorder();
 
   res.json({ success: true, preset });
+});
+
+// Force re-sync capabilities from OpenRouter API.
+fallbackRouter.post('/sync-capabilities', (_req: Request, res: Response) => {
+  const db = getDb();
+  const result = syncCapabilitiesDetailed(db);
+  res.json(result);
 });
 
 // Token usage per model for the stacked bar

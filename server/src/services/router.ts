@@ -293,14 +293,12 @@ export function refreshStatsCache(db: Database, force = false): void {
   statsCacheTime = Date.now();
 }
 
-// Composite intelligence: size_label is the cross-provider capability tier
-// (issue #135 — intelligence_rank is only meaningful within one provider), so
-// tier dominates and intelligence_rank breaks ties inside a tier.
-const TIER_VALUE: Record<string, number> = { Frontier: 4, Large: 3, Medium: 2, Small: 1 };
-function intelligenceComposite(sizeLabel: string, intelligenceRank: number): number {
-  const tier = TIER_VALUE[sizeLabel] ?? 0;
-  // tier*1000 keeps tiers strictly separated; -rank prefers lower rank in-tier.
-  return tier * 1000 - intelligenceRank;
+// Intelligence: raw AA score (100 - intelligence_rank).
+// intelligence_rank = CEIL(100 - AA_score) from migrateModelsV24ReRank,
+// so this inverts it to recover the actual Artificial Analysis Intelligence
+// Index value (0-100 scale). Higher = smarter.
+function intelligenceComposite(_sizeLabel: string, intelligenceRank: number): number {
+  return 100 - intelligenceRank;
 }
 
 // Per-model axis values + the final score. `sampled` chooses Thompson sampling
@@ -361,8 +359,11 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
   }
 
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
-  const intelMin = composites.length ? Math.min(...composites) : 0;
-  const intelMax = composites.length ? Math.max(...composites) : 0;
+  // Use fixed [0, 100] range — AA scores are naturally 0-100, so this gives
+  // each model its true intelligence percentile without compressing same-tier
+  // models together (which happened with tier*1000 - rank).
+  const intelMin = 0;
+  const intelMax = 100;
 
   return chain
     .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true).score }))
@@ -572,8 +573,9 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   // table still shows a meaningful ranking even with the bandit turned off.
   const weights = weightsFor(strategy) ?? BANDIT_PRESETS.balanced;
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
-  const intelMin = composites.length ? Math.min(...composites) : 0;
-  const intelMax = composites.length ? Math.max(...composites) : 0;
+  // Fixed [0, 100] range — AA scores are naturally 0-100.
+  const intelMin = 0;
+  const intelMax = 100;
 
   const scores: RoutingScore[] = chain.map(entry => {
     const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false);
