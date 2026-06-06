@@ -255,6 +255,56 @@ function CustomProviderSection() {
   )
 }
 
+
+function PersistenceStatusBanner() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => apiFetch('/api/storage').then(r => (r as Response).json()),
+  })
+
+  if (isLoading || !data) return null;
+
+  const p = data.persistence;
+  const isFresh = p.restoreStatus === 'fresh';
+  const hasError = p.lastBackupError !== null || !p.configured;
+
+  return (
+    <section className="mb-6 space-y-2">
+      <h2 className="text-sm font-medium">Persistence & Backup Health</h2>
+      <div className={`rounded-xl border p-4 text-xs ${hasError ? 'bg-destructive/10 border-destructive/30' : (isFresh ? 'bg-amber-500/10 border-amber-500/30' : 'bg-card')}`}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div>
+            <span className="text-muted-foreground block">DB Path</span>
+            <span className="font-mono">{p.path}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground block">Restore Status</span>
+            <span className="capitalize">{p.restoreStatus}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground block">Last Backup</span>
+            <span>{p.lastBackupTime ? new Date(p.lastBackupTime).toLocaleString() : 'Never'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground block">Size</span>
+            <span>{(p.size / 1024).toFixed(1)} KB</span>
+          </div>
+        </div>
+        {hasError && (
+          <p className="mt-2 text-destructive font-medium">
+            Warning: Remote persistence is not configured or failed (${p.lastBackupError || 'Not configured'}). Your keys will be lost on container restart.
+          </p>
+        )}
+        {isFresh && !hasError && (
+          <p className="mt-2 text-amber-600 dark:text-amber-400 font-medium">
+            Notice: Loaded from a fresh DB. If you expected existing keys, check your remote storage config.
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export default function KeysPage() {
   const queryClient = useQueryClient()
   const [platform, setPlatform] = useState<Platform | ''>('')
@@ -398,6 +448,7 @@ export default function KeysPage() {
       />
 
       <div className="space-y-8">
+        <PersistenceStatusBanner />
         <UnifiedKeySection />
 
         <section>
@@ -495,8 +546,19 @@ export default function KeysPage() {
                       <h3 className="text-sm font-medium">{group.label}</h3>
                       <GetKeyLink url={group.url} />
                     </div>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {group.keys.length} key{group.keys.length === 1 ? '' : 's'}
+                    <span className="text-xs text-muted-foreground tabular-nums flex gap-3">
+                      <span>{group.keys.length} key{group.keys.length === 1 ? '' : 's'}</span>
+                      {(() => {
+                        const h = healthData?.platforms?.find((p: any) => p.platform === group.value);
+                        if (!h) return null;
+                        return (
+                          <>
+                            {h.healthyKeys > 0 && <span className="text-green-500">{h.healthyKeys} healthy</span>}
+                            {h.invalidKeys > 0 && <span className="text-destructive">{h.invalidKeys} invalid</span>}
+                            {h.errorKeys > 0 && <span className="text-amber-500">{h.errorKeys} error</span>}
+                          </>
+                        )
+                      })()}
                     </span>
                   </div>
                   <div className="rounded-2xl border divide-y bg-card overflow-hidden">

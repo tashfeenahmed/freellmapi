@@ -272,7 +272,7 @@ export async function runModelDiscoveryOnce(): Promise<{ discovered: number; acc
           if (!seen.has(row.provider_model_id)) {
             db.prepare(`
               UPDATE provider_catalog_models
-              SET status = 'removed', removed_at = datetime('now'), updated_at = datetime('now')
+              SET status = 'inactive', removed_at = datetime('now'), updated_at = datetime('now')
               WHERE provider_slug = ? AND provider_model_id = ?
             `).run(account.providerSlug, row.provider_model_id);
           }

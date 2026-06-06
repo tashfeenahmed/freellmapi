@@ -17,9 +17,18 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
   const provider = resolveProvider(row.platform as Platform, row.base_url);
   if (!provider) return 'error';
 
+
   try {
-    const apiKey = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    let apiKey: string;
+    try {
+      apiKey = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    } catch (decryptErr) {
+      console.warn(`[Health] Decrypt failed for key ${keyId}: ${(decryptErr as Error).message}`);
+      db.prepare("UPDATE api_keys SET status = ?, last_checked_at = datetime('now') WHERE id = ?").run('unreadable', keyId);
+      return 'invalid' as KeyStatus; // Use a known status to avoid deleting, UI will handle 'unreadable' if needed.
+    }
     const isValid = await provider.validateKey(apiKey);
+
 
     const status: KeyStatus = isValid ? 'healthy' : 'invalid';
 

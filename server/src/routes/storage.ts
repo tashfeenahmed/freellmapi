@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getB2StorageStatus, uploadDbSnapshot, downloadDbSnapshot, uploadTimestampedBackup } from '../storage/b2.js';
-import { getDatabasePath } from '../storage/persistence.js';
+import { getDatabasePath, getPersistenceStatus } from '../storage/persistence.js';
 
 export const storageRouter = Router();
 
