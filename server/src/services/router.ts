@@ -445,6 +445,12 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // gets the normal "all models exhausted" error rather than a wasted sweep.
     if (entry.context_window != null && estimatedTokens > entry.context_window) continue;
 
+    // Same guard for a model with a small per-minute token budget: a single
+    // request that alone exceeds tpm_limit can never fit one minute of quota and
+    // returns a guaranteed 413 (e.g. Groq gpt-oss-120b: 131k context but 8k TPM).
+    // estimatedTokens already includes reserved output, mirroring the check above.
+    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
+
     // Check if we have a provider for this platform
     const provider = getProvider(entry.platform as any);
     if (!provider) continue;
