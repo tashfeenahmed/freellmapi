@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { routeRequest, setRoutingStrategy } from '../../services/router.js';
+import {
+  getAllPenalties,
+  recordRateLimitHit,
+  routeRequest,
+  setRoutingStrategy,
+} from '../../services/router.js';
 
 describe('Router', () => {
   beforeAll(() => {
@@ -21,6 +26,10 @@ describe('Router', () => {
     for (let i = 0; i < models.length; i++) {
       update.run(i + 1, models[i].id);
     }
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should throw when no keys are configured', () => {
@@ -157,5 +166,20 @@ describe('Router', () => {
     expect(result.platform).toBe('groq');
     expect(result.apiKey).toBe('test-groq-key');
     expect(corruptKey.status).toBe('error');
+  });
+
+  it('applies elapsed decay before adding a new 429 penalty', () => {
+    vi.useFakeTimers();
+    const modelDbId = 987654321;
+
+    recordRateLimitHit(modelDbId);
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    recordRateLimitHit(modelDbId);
+
+    expect(getAllPenalties()).toContainEqual({
+      modelDbId,
+      count: 2,
+      penalty: 3,
+    });
   });
 });

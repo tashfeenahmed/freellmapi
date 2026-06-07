@@ -29,13 +29,14 @@ function isAutoModel(modelId: string | undefined): boolean {
 // length and per-character timing, which a network attacker could in principle
 // use to recover the key one byte at a time.
 export function timingSafeStringEqual(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  // Compare against a same-length buffer regardless of input length so the
-  // comparison itself runs in constant time; the explicit length check at the
-  // end is what actually decides equality when lengths differ.
-  const compareA = a.length === b.length ? a : Buffer.alloc(b.length);
-  return crypto.timingSafeEqual(compareA, b) && a.length === b.length;
+  // Use HMAC to produce fixed-length digests so timingSafeEqual always
+  // receives same-length buffers regardless of input length. This eliminates
+  // both the per-character timing leak and the length-branch timing leak that
+  // the Buffer.alloc-on-mismatch approach had.
+  const key = Buffer.alloc(32);
+  const a = crypto.createHmac('sha256', key).update(provided).digest();
+  const b = crypto.createHmac('sha256', key).update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 // Extract the unified API key from an incoming request. Accepts both the
@@ -644,8 +645,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
 
-    recordRequest(route.platform, route.modelId, route.keyId);
-
     try {
       if (stream) {
         // — Stream turn-integrity (#231 audit) —
@@ -775,7 +774,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const probe = heldText.trimStart();
             if (startsWithDialectMarker(probe)) {
               mode = 'dialect';
-            } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+            } else if (!couldBecomeDialectMarker(probe) || probe.length > 256) {
               mode = 'passthrough';
               flushHeaders();
               writeChunk(mkChunk({ content: heldText }, null));
@@ -828,7 +827,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           flushHeaders();
           if (heldText.length > 0) {
             writeChunk(mkChunk({ content: heldText }, null));
-            totalOutputTokens += Math.ceil(heldText.length / 4);
           }
           if (completedCalls.length > 0) {
             writeChunk(mkChunk({ tool_calls: completedCalls.map((c, i) => ({ index: i, ...c })) }, null));
@@ -845,6 +843,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.write('data: [DONE]\n\n');
           res.end();
 
+          recordRequest(route.platform, route.modelId, route.keyId);
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId, sessionIdHeader);
@@ -912,6 +911,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
 
         const totalTokens = result.usage?.total_tokens ?? 0;
+        recordRequest(route.platform, route.modelId, route.keyId);
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
