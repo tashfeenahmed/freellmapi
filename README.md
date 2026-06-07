@@ -315,6 +315,66 @@ Works with `stream=True` as well — you'll get `delta.tool_calls` chunks follow
 
 Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served each call. If a request fell over between providers, you'll also see `X-Fallback-Attempts: N`.
 
+## Hermes Integration: `freellmapi-orchestrator` Skill
+
+FreeLLMAPI provides a **native Hermes skill** that exposes the dynamic router as callable tools. Instead of configuring FreeLLMAPI as a static model provider, agents invoke tools that route through FreeLLMAPI's intelligent router — with penalties, cooldowns, scoring, and automatic system prompt injection.
+
+### Native Tools
+- **`tools.run_llm_query(prompt, messages?, context?, stream?)`** — Route a prompt through FreeLLMAPI's router. Returns `{ text, model_used, routed_via, fallback_attempts, usage, finish_reason }`.
+- **`tools.get_routing_state()`** — Fetch live penalties, scores, guardrails, and strategy for agent-aware routing decisions.
+
+### Key Capabilities
+- **Auto-routing intelligence** — Agents see which model was used, fallback attempts, and full usage metadata.
+- **Context hints** — `prefer_speed`, `prefer_intelligence`, `require_tools`, `require_vision`, `session_id` for sticky routing.
+- **System prompt injection** — Default persona injected at proxy level; survives model failover. Configured via Hermes config or skill `.env`.
+- **Native registration** — Tools register at Hermes startup; no `execute_code` needed.
+
+### Installation
+```bash
+# Copy to Hermes skills directory
+cp -r integrations/hermes/freellmapi-orchestrator ~/.hermes/skills/external-api/
+
+# Install dependencies
+cd ~/.hermes/skills/external-api/freellmapi-orchestrator/scripts
+pip install -r requirements.txt
+```
+
+### Configuration (Hermes `config.yaml`)
+```yaml
+skills:
+  freellmapi-orchestrator:
+    config:
+      FREELLAPI_BASE: "http://localhost:3001/v1"
+      FREELLAPI_KEY: "freellmapi-xxx..."      # From FreeLLMAPI Keys page
+      FREELLAPI_DASH_TOKEN: "xxx"              # Optional: for routing state
+      DEFAULT_SYSTEM_PROMPT: "You are a concise, helpful assistant."
+      DEFAULT_TIMEOUT: 120
+```
+
+### Usage in Agent Code
+```python
+# Route a query
+result = await tools.run_llm_query(
+    prompt="Summarize the fall of Rome in one sentence.",
+    context={"prefer_speed": true}
+)
+print(result["text"])
+print(f"Routed via: {result['routed_via']}")
+
+# Check routing intelligence
+state = await tools.get_routing_state()
+# state.strategy, state.models[].penalty, state.models[].score, state.models[].guardrails
+```
+
+### Documentation
+- **Skill metadata**: `integrations/hermes/freellmapi-orchestrator/SKILL.md` — tool schemas, config schema, architecture
+- **Full guide**: `integrations/hermes/freellmapi-orchestrator/README.md` — install, usage, troubleshooting, verification checklist
+- **Config template**: `integrations/hermes/freellmapi-orchestrator/scripts/.env.example`
+
+---
+
+This integration turns FreeLLMAPI from a simple API proxy into an **agent-aware routing fabric** — persistent penalties, cooldown history, and system prompt injection all exposed as native tools for Hermes agents.
+
 ### Embeddings
 
 `/v1/embeddings` is OpenAI-compatible, with one deliberate difference from chat routing: **failover never crosses models.** Vectors from different models live in incompatible spaces — silently switching models would corrupt any vector store built on top of the proxy. So embeddings route by **family** (one model identity + dimension), and failover only walks the providers serving that same family.
