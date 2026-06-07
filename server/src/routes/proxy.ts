@@ -7,7 +7,7 @@ import { routeRequest, resolveRoutingChain, recordRateLimitHit, recordSuccess, h
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
-import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { getDb, getUnifiedApiKey, getDefaultSystemPrompt } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
@@ -598,6 +598,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       ...(m.name ? { name: m.name } : {}),
     };
   });
+
+  // Inject default system prompt (if configured) so every model gets the same base persona
+  // regardless of failover. Only prepend if no system message already exists (client-provided
+  // system prompt takes precedence).
+  const defaultSystemPrompt = getDefaultSystemPrompt();
+  if (defaultSystemPrompt) {
+    const hasSystem = messages.some(m => m.role === 'system');
+    if (!hasSystem) {
+      messages.unshift({ role: 'system', content: defaultSystemPrompt });
+    }
+  }
 
   // Token estimation is intentionally a heuristic (~4 chars per token). Used
   // for routing decisions (skip a model whose budget is too small) and for

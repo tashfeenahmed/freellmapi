@@ -75,6 +75,27 @@ const roundRobinIndex = new Map<string, number>();
 // Key: model_db_id → { count, lastHit, penalty }
 const rateLimitPenalties = new Map<number, { count: number; lastHit: number; penalty: number }>();
 
+const PENALTIES_KEY = 'rate_limit_penalties';
+
+// Load persisted penalties on module init
+function loadPenalties(): void {
+  try {
+    const raw = getSetting(PENALTIES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw) as Array<{ modelDbId: number; count: number; lastHit: number; penalty: number }>;
+      for (const p of arr) rateLimitPenalties.set(p.modelDbId, { count: p.count, lastHit: p.lastHit, penalty: p.penalty });
+    }
+  } catch { /* DB not ready or corrupt → start fresh */ }
+}
+
+function savePenalties(): void {
+  const arr = Array.from(rateLimitPenalties.entries()).map(([modelDbId, v]) => ({ modelDbId, ...v }));
+  setSetting(PENALTIES_KEY, JSON.stringify(arr));
+}
+
+// Call once on module load
+loadPenalties();
+
 // Penalty decays over time so models recover
 const PENALTY_PER_429 = 3;        // each 429 adds this many priority positions
 const MAX_PENALTY = 10;            // cap so a model doesn't sink forever
@@ -96,6 +117,7 @@ export function recordRateLimitHit(modelDbId: number) {
   } else {
     rateLimitPenalties.set(modelDbId, { count: 1, lastHit: now, penalty: PENALTY_PER_429 });
   }
+  savePenalties();
 }
 
 /**
@@ -108,6 +130,7 @@ export function recordSuccess(modelDbId: number) {
     if (existing.penalty === 0) {
       rateLimitPenalties.delete(modelDbId);
     }
+    savePenalties();
   }
 }
 
