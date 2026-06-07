@@ -277,9 +277,10 @@ const cooldowns = new Map<string, number>(); // key -> expiry timestamp
 // daily-quota exhaustion (OpenRouter free: 50/day, Cohere free: 33/day, etc.)
 // quarantines the key for the rest of the day instead of looping through
 // the 2-minute cooldown 20 times per request and consuming every fallback slot.
-// In-memory only — state resets on restart, which is fine (a clean restart
-// will re-escalate on the next 429 if the quota is genuinely exhausted).
+// NOW PERSISTED: survives restarts so a key that hit daily cap yesterday
+// doesn't get a fresh 2m cooldown today.
 const cooldownHits = new Map<string, number[]>(); // key -> timestamps of recent cooldown set events
+
 const HOUR = 60 * MINUTE;
 const COOLDOWN_DURATIONS = [
   2 * MINUTE,   // 1st hit in 24h
@@ -288,12 +289,48 @@ const COOLDOWN_DURATIONS = [
   DAY,          // 4th and beyond
 ];
 
+// Load persisted cooldown hits on module init
+function loadCooldownHits(): void {
+  try {
+    const rows = getDb().prepare(`
+      SELECT platform, model_id, key_id, hit_at_ms
+      FROM rate_limit_cooldown_hits
+      WHERE hit_at_ms > ?
+    `).all(Date.now() - DAY) as Array<{ platform: string; model_id: string; key_id: number; hit_at_ms: number }>;
+    for (const r of rows) {
+      const key = `${r.platform}:${r.model_id}:${r.key_id}`;
+      const arr = cooldownHits.get(key) ?? [];
+      arr.push(r.hit_at_ms);
+      cooldownHits.set(key, arr);
+    }
+  } catch { /* DB not ready or corrupt → start fresh */ }
+}
+
+// Persist a single cooldown hit
+function persistCooldownHit(platform: string, modelId: string, keyId: number, hitAtMs: number): void {
+  withDb(db => {
+    db.prepare(`
+      INSERT INTO rate_limit_cooldown_hits (platform, model_id, key_id, hit_at_ms)
+      VALUES (?, ?, ?, ?)
+    `).run(platform, modelId, keyId, hitAtMs);
+    // Prune old hits (> 24h)
+    db.prepare(`
+      DELETE FROM rate_limit_cooldown_hits
+      WHERE hit_at_ms <= ?
+    `).run(Date.now() - DAY);
+  });
+}
+
+// Call once on module load
+loadCooldownHits();
+
 export function getNextCooldownDuration(platform: string, modelId: string, keyId: number): number {
   const key = `${platform}:${modelId}:${keyId}`;
   const now = Date.now();
   const hits = (cooldownHits.get(key) ?? []).filter(t => t > now - DAY);
   hits.push(now);
   cooldownHits.set(key, hits);
+  persistCooldownHit(platform, modelId, keyId, now);
   const idx = Math.min(hits.length - 1, COOLDOWN_DURATIONS.length - 1);
   return COOLDOWN_DURATIONS[idx]!;
 }
