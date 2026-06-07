@@ -114,7 +114,8 @@ export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessi
   }
 }
 
-// OpenAI-compatible /models endpoint (used by Hermes for metadata)
+// OpenAI-compatible /models endpoint (used by Hermes for metadata) 
+// shows API models which is linked by the user
 proxyRouter.get('/models', (req: Request, res: Response) => {
   const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
@@ -132,8 +133,14 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
                PARTITION BY model_id
                ORDER BY intelligence_rank ASC, id ASC
              ) AS rn
-      FROM models
-      WHERE enabled = 1
+      FROM models m
+      WHERE m.enabled = 1
+        AND EXISTS (
+          SELECT 1 FROM api_keys k
+          WHERE k.platform = m.platform
+            AND k.enabled = 1
+            AND (m.key_id IS NULL OR k.id = m.key_id)
+        )
     )
     WHERE rn = 1
     ORDER BY intelligence_rank ASC, id ASC
@@ -161,6 +168,7 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     ],
   });
 });
+
 
 const MAX_RETRIES = 20;
 
