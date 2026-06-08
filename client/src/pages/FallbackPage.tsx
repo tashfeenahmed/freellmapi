@@ -24,7 +24,6 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
-import { ModelsTabs } from '@/components/models-tabs'
 import { Tooltip } from '@/components/tooltip'
 
 interface FallbackEntry {

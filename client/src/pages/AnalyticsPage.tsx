@@ -112,6 +112,24 @@ const axisStyle = { fontSize: 11, fill: 'var(--muted-foreground)' } as const
 const gridStyle = 'var(--border)'
 const primaryFill = 'var(--foreground)'
 
+function formatAxisLabel(value: string, range: TimeRange): string {
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return value
+
+  switch (range) {
+    case '1h':
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    case '24h':
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    case '7d':
+      return d.toLocaleDateString('en-US', { weekday: 'short' })
+    case '30d':
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    default:
+      return value
+  }
+}
+
 /* ── Over Time chart: aggregates per-model rows by timestamp so each
     point on the X axis is the total across all models for that bucket ── */
 function OverTimeChart({ data, range }: { data: any[]; range: TimeRange }) {
@@ -563,133 +581,6 @@ export default function AnalyticsPage() {
                   <OverTimeChart data={byModelTimeline} range={range} />
                 )
               )}
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-4">Model</TableHead>
-                        <TableHead>Provider</TableHead>
-                        {([
-                          { key: 'requests', label: 'Requests' },
-                          { key: 'pinnedRequests', label: 'Pinned' },
-                          { key: 'successRate', label: 'Success' },
-                          { key: 'avgLatencyMs', label: 'Latency' },
-                          { key: 'totalInputTokens', label: 'In tokens' },
-                          { key: 'totalOutputTokens', label: 'Out tokens' },
-                          { key: 'estimatedCost', label: 'Saved' },
-                        ] as const).map(col => (
-                          <TableHead
-                            key={col.key}
-                            className={`text-right cursor-pointer select-none ${col.key === 'estimatedCost' ? 'pr-4' : ''}`}
-                            onClick={() => {
-                              if (sortKey === col.key) {
-                                setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-                              } else {
-                                setSortKey(col.key)
-                                setSortDir('desc')
-                              }
-                            }}
-                          >
-                            <span className="inline-flex items-center gap-0.5">
-                              {col.label}
-                              {sortKey === col.key && <ArrowUpDown className="size-3" />}
-                            </span>
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...byModel].sort((a: any, b: any) => {
-                        const av = a[sortKey] ?? 0
-                        const bv = b[sortKey] ?? 0
-                        return sortDir === 'asc' ? av - bv : bv - av
-                      }).map((m: any, i: number) => (
-                        <TableRow key={i}>
-                          <TableCell className="pl-4 text-sm font-medium">{m.displayName}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{m.platform}</TableCell>
-                          <TableCell className="text-right tabular-nums">{m.requests}</TableCell>
-                          <TableCell className="text-right tabular-nums">{m.pinnedRequests > 0 ? m.pinnedRequests : '—'}</TableCell>
-                          <TableCell className="text-right tabular-nums">{m.successRate}%</TableCell>
-                          <TableCell className="text-right tabular-nums">{m.avgLatencyMs} ms</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalInputTokens)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalOutputTokens)}</TableCell>
-                          <TableCell className="text-right tabular-nums pr-4">${(m.estimatedCost ?? 0).toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : modelView === 'bar' ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={byModel} margin={{ top: 6, right: 6, left: -12, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
-                    <XAxis
-                      dataKey="displayName"
-                      tick={<WrappedTick />}
-                      tickLine={false}
-                      axisLine={{ stroke: gridStyle }}
-                      interval={0}
-                    />
-                    <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                    <Bar dataKey="requests" fill={primaryFill} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <PieChart>
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                    <Pie
-                      data={byModel}
-                      dataKey="requests"
-                      nameKey="displayName"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={110}
-                      labelLine={false}
-                      label={showPieLabels ? ({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%` : false}
-                    >
-                      {byModel.map((_: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(${(index * 137.5) % 360}, 60%, 55%)`} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              )
-            ) : (
-              /* Over Time mode */
-              byModelTimeline.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
-              ) : modelView === 'table' ? (
-                <div className="max-h-[360px] overflow-y-auto -mx-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-4">Time</TableHead>
-                        <TableHead>Model</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">In tokens</TableHead>
-                        <TableHead className="text-right">Out tokens</TableHead>
-                        <TableHead className="text-right pr-4">Cost</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {byModelTimeline.map((m: any, i: number) => (
-                        <TableRow key={i}>
-                          <TableCell className="pl-4 text-xs text-muted-foreground tabular-nums">{m.timestamp}</TableCell>
-                          <TableCell className="text-xs">{m.modelId}</TableCell>
-                          <TableCell className="text-right tabular-nums">{m.requests}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalInputTokens)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatTokens(m.totalOutputTokens)}</TableCell>
-                          <TableCell className="text-right tabular-nums pr-4">${m.estimatedCost?.toFixed(2) ?? '0.00'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <OverTimeChart data={byModelTimeline} range={range} />
-              )
-            )}
             </Panel>
           </div>
 
