@@ -262,6 +262,7 @@ export default function KeysPage() {
   const [label, setLabel] = useState('')
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
@@ -541,8 +542,22 @@ export default function KeysPage() {
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                             Check
                           </Button>
-                          <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={() => deleteKey.mutate(k.id)} disabled={deleteKey.isPending}>
-                            Remove
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className={confirmDeleteId === k.id ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}
+                            onClick={() => {
+                              if (confirmDeleteId === k.id) {
+                                deleteKey.mutate(k.id)
+                                setConfirmDeleteId(null)
+                              } else {
+                                setConfirmDeleteId(k.id)
+                                setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
+                              }
+                            }}
+                            disabled={deleteKey.isPending}
+                          >
+                            {confirmDeleteId === k.id ? 'Confirm?' : 'Remove'}
                           </Button>
                         </div>
                       )

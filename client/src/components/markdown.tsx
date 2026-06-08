@@ -1,7 +1,31 @@
-import { memo } from 'react'
+import { memo, isValidElement, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
+import { CopyButton } from './copy-button'
+
+// react-markdown hands <pre> its rendered <code> element, not the raw source,
+// so pull the text back out of the React tree for the copy button.
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(nodeText).join('')
+  if (isValidElement(node)) return nodeText((node.props as { children?: ReactNode }).children)
+  return ''
+}
+
+function Pre({ children }: { children?: ReactNode }) {
+  return (
+    <pre className="group relative my-2 overflow-x-auto rounded-lg border bg-background/60 p-3 first:mt-0 last:mb-0">
+      <CopyButton
+        text={nodeText(children).replace(/\n$/, '')}
+        label="Copy code"
+        className="absolute right-2 top-2 size-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+      />
+      {children}
+    </pre>
+  )
+}
 
 const components: Components = {
   p: ({ children }) => (
@@ -90,11 +114,7 @@ const components: Components = {
       </code>
     )
   },
-  pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-lg border bg-background/60 p-3 first:mt-0 last:mb-0">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => <Pre>{children}</Pre>,
 }
 
 interface MarkdownProps {
