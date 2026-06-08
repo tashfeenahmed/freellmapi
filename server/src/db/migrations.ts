@@ -31,7 +31,6 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV22Tools(db);
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
-  migrateModelsV25Cost(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
