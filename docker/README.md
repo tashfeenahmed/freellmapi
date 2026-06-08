@@ -88,3 +88,7 @@ docker pull ghcr.io/tashfeenahmed/freellmapi:latest
 ```
 
 The Docker workflow builds pull requests without pushing. After this repository receives the workflow on `main`, pushes to `main` and version tags publish images to GHCR automatically.
+
+## Development Guidelines
+
+Please refer to the [root README.md](../README.md#development-guidelines) for project-wide development constraints, including our Mobile-First & Dark-Mode UI requirements, Zero Backend Disruption rule, and Strict Dependency Containment policies. Additionally, please ensure you avoid using external BuildKit syntax directives (e.g., `# syntax=docker/dockerfile:...`) in the Dockerfile to prevent 'grpc server closed unexpectedly' or rate limit errors in Render or CI environments.

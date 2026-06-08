@@ -458,3 +458,14 @@ Removed since the April 2026 review: Hugging Face, Moonshot, and MiniMax direct 
 ## License
 
 [MIT](./LICENSE)
+
+## Development Guidelines
+
+When contributing to this project, please adhere to the following guidelines:
+
+- **Zero Backend Disruption:** Do not change backend query parameters, data endpoints, schemas, or existing state objects. Use client-side state hooks for new UI session adjustments.
+- **Mobile-First & Dark-Mode UI:** UI layout changes must strictly follow a Mobile-First paradigm (design for 360px-430px first, progressively enhance) using responsive Tailwind base classes. No desktop-only layouts, horizontal overflow, or wide tables (use mobile card/list alternatives). Ensure elements stack cleanly, modals fit screens, charts resize properly, and buttons are thumb-friendly (min 44x44px tap targets) with smooth rounded-3xl or rounded-full edges. Emphasize a premium dark-mode aesthetic utilizing glassmorphism textures (e.g., `bg-card/70 backdrop-blur-md border-border/80`).
+- **Strict Dependency Containment:** Do not add foreign or unmanaged code libraries. Depend completely on native layout utilities and pre-configured component tools.
+- **Docker constraints:** Avoid using external BuildKit syntax directives (e.g., `# syntax=docker/dockerfile:...`) in the Dockerfile to prevent 'grpc server closed unexpectedly' or rate limit errors in Render or CI environments.
+- **Architecture:** The 'freellmapi' repository is a Unified LLM Router utilizing React, Vite, Tailwind CSS, Shadcn/UI, and Recharts, structured with npm workspaces ('client', 'server', 'shared').
+- **Testing & Execution:** Build the frontend using `npm run build -w client`. Run tests across the project with `npm run test`.

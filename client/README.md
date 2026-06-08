@@ -71,3 +71,7 @@ export default defineConfig([
   },
 ])
 ```
+
+## Development Guidelines
+
+Please refer to the [root README.md](../README.md#development-guidelines) for project-wide development constraints, including our Mobile-First & Dark-Mode UI requirements, Zero Backend Disruption rule, and Strict Dependency Containment policies.

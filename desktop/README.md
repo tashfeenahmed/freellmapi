@@ -60,3 +60,7 @@ open for real-screen captures.
 - Do not run plain `npm rebuild` here — it rebuilds better-sqlite3 for the
   system Node ABI and breaks the Electron dev loop (`npm run rebuild:native`
   fixes it). Packaging rebuilds natives itself.
+
+## Development Guidelines
+
+Please refer to the [root README.md](../README.md#development-guidelines) for project-wide development constraints, including our Mobile-First & Dark-Mode UI requirements, Zero Backend Disruption rule, and Strict Dependency Containment policies.
