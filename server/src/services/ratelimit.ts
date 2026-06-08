@@ -326,16 +326,21 @@ export function getCooldownDurationForLimit(
   modelId: string,
   keyId: number,
   limits: { rpd: number | null; tpd: number | null },
+  retryAfterMs?: number | null,
 ): number {
   const now = Date.now();
   const rpdExhausted =
     limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
   const tpdExhausted =
     limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
-  if (rpdExhausted || tpdExhausted) {
-    return getNextCooldownDuration(platform, modelId, keyId);
-  }
-  return TRANSIENT_COOLDOWN_MS;
+  const base = (rpdExhausted || tpdExhausted)
+    ? getNextCooldownDuration(platform, modelId, keyId)
+    : TRANSIENT_COOLDOWN_MS;
+  // Honor an upstream Retry-After as a floor: never bench shorter than our own
+  // heuristic, but extend (capped at a day) when the provider explicitly asks
+  // to wait longer than we otherwise would.
+  if (retryAfterMs != null && retryAfterMs > base) return Math.min(retryAfterMs, DAY);
+  return base;
 }
 
 function persistedCooldownExpiry(
