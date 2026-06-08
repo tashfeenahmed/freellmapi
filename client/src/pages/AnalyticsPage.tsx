@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PageHeader } from '@/components/page-header'
 import { Tooltip as HoverTooltip } from '@/components/tooltip'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 
 type TimeRange = '24h' | '7d' | '30d'
 
@@ -48,6 +49,7 @@ const gridStyle = 'var(--border)'
 const primaryFill = 'var(--foreground)'
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation()
   const [range, setRange] = useState<TimeRange>('7d')
 
   const { data: summary } = useQuery({
@@ -122,8 +124,8 @@ export default function AnalyticsPage() {
   return (
     <div>
       <PageHeader
-        title="Analytics"
-        description="Request volume, latency, token usage, and failures."
+        title={t('analytics.pageTitle')}
+        description={t('analytics.pageDesc')}
         actions={
           <div className="flex gap-1 rounded-lg border p-0.5">
             {(['24h', '7d', '30d'] as TimeRange[]).map(r => (
@@ -133,7 +135,7 @@ export default function AnalyticsPage() {
                 size="xs"
                 onClick={() => setRange(r)}
               >
-                {r}
+                {r === '24h' ? t('analytics.twentyFourH') : r === '7d' ? t('analytics.sevenDays') : t('analytics.thirtyDays')}
               </Button>
             ))}
           </div>
@@ -143,22 +145,22 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         {/* Summary stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Stat label="Requests" value={summary?.totalRequests ?? 0} hint={requestsHint} />
-          <Stat label="Success rate" value={`${summary?.successRate ?? 0}%`} />
-          <Stat label="Input tokens" value={formatTokens(summary?.totalInputTokens)} />
-          <Stat label="Output tokens" value={formatTokens(summary?.totalOutputTokens)} />
-          <Stat label="Avg latency" value={`${summary?.avgLatencyMs ?? 0} ms`} />
+          <Stat label={t('analytics.requests')} value={summary?.totalRequests ?? 0} hint={requestsHint} />
+          <Stat label={t('analytics.successRate')} value={`${summary?.successRate ?? 0}%`} />
+          <Stat label={t('analytics.inputTokens')} value={formatTokens(summary?.totalInputTokens)} />
+          <Stat label={t('analytics.outputTokens')} value={formatTokens(summary?.totalOutputTokens)} />
+          <Stat label={t('analytics.avgLatency')} value={`${summary?.avgLatencyMs ?? 0} ms`} />
           {/* Priced per request at the served model's paid-API equivalent
               rate (not a flat frontier-model rate) — see db/model-pricing.ts.
               The value is a 30-day projection; the hover hint tells the whole
               story (actual period amount + whether it was extrapolated). */}
-          <Stat label="Est. savings" value={`$${savings30d.toFixed(2)}`} hint={savingsHint} />
+          <Stat label={t('analytics.estSavings')} value={`$${savings30d.toFixed(2)}`} hint={savingsHint} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Panel title="Requests by provider">
+          <Panel title={t('analytics.requestsByProvider')}>
             {byPlatform.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noDataYet')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
@@ -172,9 +174,9 @@ export default function AnalyticsPage() {
             )}
           </Panel>
 
-          <Panel title="Avg latency by provider">
+          <Panel title={t('analytics.avgLatencyByProvider')}>
             {byPlatform.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noDataYet')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
@@ -189,9 +191,9 @@ export default function AnalyticsPage() {
           </Panel>
 
           <div className="lg:col-span-2">
-            <Panel title="Requests over time">
+            <Panel title={t('analytics.requestsOverTime')}>
               {timeline.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noDataYet')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
@@ -200,8 +202,8 @@ export default function AnalyticsPage() {
                     <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
                     <Legend wrapperStyle={{ fontSize: 12 }} iconType="line" />
-                    <Line type="monotone" dataKey="successCount" name="Success" stroke={primaryFill} strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="failureCount" name="Failures" stroke="var(--destructive)" strokeWidth={1.5} dot={false} />
+                    <Line type="monotone" dataKey="successCount" name={t('analytics.success')} stroke={primaryFill} strokeWidth={1.5} dot={false} />
+                    <Line type="monotone" dataKey="failureCount" name={t('analytics.failures')} stroke="var(--destructive)" strokeWidth={1.5} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -209,23 +211,23 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <Panel title="Per-model breakdown">
+            <Panel title={t('analytics.perModel')}>
               {byModel.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noDataYet')}</p>
               ) : (
                 <div className="max-h-[360px] overflow-y-auto -mx-4">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="pl-4">Model</TableHead>
-                        <TableHead>Provider</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">Pinned</TableHead>
-                        <TableHead className="text-right">Success</TableHead>
-                        <TableHead className="text-right">Latency</TableHead>
-                        <TableHead className="text-right">In tokens</TableHead>
-                        <TableHead className="text-right">Out tokens</TableHead>
-                        <TableHead className="text-right pr-4">Saved</TableHead>
+                        <TableHead className="pl-4">{t('analytics.model')}</TableHead>
+                        <TableHead>{t('analytics.provider')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.requests')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.pinned')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.success')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.latency')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.inTokens')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.outTokens')}</TableHead>
+                        <TableHead className="text-right pr-4">{t('analytics.saved')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -249,9 +251,9 @@ export default function AnalyticsPage() {
             </Panel>
           </div>
 
-          <Panel title="Errors by provider">
+          <Panel title={t('analytics.errorsByProvider')}>
             {!errorDist?.byPlatform?.length ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No errors</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noErrors')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={errorDist.byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
@@ -265,17 +267,17 @@ export default function AnalyticsPage() {
             )}
           </Panel>
 
-          <Panel title="Recent errors">
+          <Panel title={t('analytics.recentErrors')}>
             {errors.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No errors</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noErrors')}</p>
             ) : (
               <div className="max-h-[240px] overflow-y-auto -mx-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="pl-4">Provider</TableHead>
+                      <TableHead className="pl-4">{t('analytics.provider')}</TableHead>
                       <TableHead>Message</TableHead>
-                      <TableHead className="text-right pr-4">Time</TableHead>
+                      <TableHead className="text-right pr-4">{t('analytics.latency')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

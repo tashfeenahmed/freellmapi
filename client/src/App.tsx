@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Menu, Moon, Sun } from 'lucide-react'
+import { Menu, Moon, Sun, Languages } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AuthGate } from '@/components/auth-gate'
 import { logout } from '@/lib/api'
+import { setLanguage, getLanguage } from '@/locales'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
@@ -21,11 +23,11 @@ import AnalyticsPage from '@/pages/AnalyticsPage'
 
 const queryClient = new QueryClient()
 
-const navItems = [
-  { to: '/models', label: 'Models' },
-  { to: '/playground', label: 'Playground' },
-  { to: '/keys', label: 'Keys' },
-  { to: '/analytics', label: 'Analytics' },
+const navRoutes = [
+  { to: '/models', labelKey: 'nav.models' },
+  { to: '/playground', labelKey: 'nav.playground' },
+  { to: '/keys', labelKey: 'nav.keys' },
+  { to: '/analytics', labelKey: 'nav.analytics' },
 ]
 
 function getPreferredDarkMode() {
@@ -72,13 +74,47 @@ function useDarkMode() {
   return { dark, toggle }
 }
 
+const LANGUAGES = [
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'zh', label: '中文', flag: '🇨🇳' },
+] as const
+
+function LanguageSwitcher() {
+  const { t } = useTranslation()
+  const current = getLanguage()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+        aria-label={t('nav.language')}
+      >
+        <Languages className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {LANGUAGES.map((lang) => (
+          <DropdownMenuItem
+            key={lang.code}
+            onClick={() => setLanguage(lang.code)}
+            className={current === lang.code ? 'bg-accent text-accent-foreground font-medium' : undefined}
+          >
+            <span className="mr-2">{lang.flag}</span>
+            {lang.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function DarkModeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  const { t } = useTranslation()
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onToggle}
-      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+      aria-label={dark ? t('nav.switchToLight') : t('nav.switchToDark')}
     >
       {dark ? <Sun /> : <Moon />}
     </Button>
@@ -108,6 +144,7 @@ if (isDesktopApp) {
 }
 
 function Navbar() {
+  const { t } = useTranslation()
   const { dark, toggle } = useDarkMode()
   const location = useLocation()
   const navigate = useNavigate()
@@ -132,9 +169,9 @@ function Navbar() {
           className="ml-10 hidden items-center gap-6 md:flex"
           style={isDesktopApp ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
         >
-          {navItems.map((item) => (
+          {navRoutes.map((item) => (
             <NavItem key={item.to} to={item.to}>
-              {item.label}
+              {t(item.labelKey)}
             </NavItem>
           ))}
         </nav>
@@ -145,38 +182,39 @@ function Navbar() {
           <DarkModeToggle dark={dark} onToggle={toggle} />
           {!isDesktopApp && (
             <Button variant="ghost" size="sm" onClick={() => logout()}>
-              Sign out
+              {t('nav.signOut')}
             </Button>
           )}
         </div>
+        <LanguageSwitcher />
         <div className="ml-auto md:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger
               className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-              aria-label="Open navigation menu"
+              aria-label={t('nav.openNav')}
             >
               <Menu />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuGroup>
-                {navItems.map((item) => (
+                {navRoutes.map((item) => (
                   <DropdownMenuItem
                     key={item.to}
                     onClick={() => navigate(item.to)}
                     className={isActiveRoute(item.to) ? 'bg-accent text-accent-foreground font-medium' : undefined}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={toggle} className="justify-between">
-                  <span>Theme</span>
+                  <span>{t('nav.theme')}</span>
                   {dark ? <Sun /> : <Moon />}
                 </DropdownMenuItem>
                 {!isDesktopApp && (
-                  <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
                 )}
               </DropdownMenuGroup>
             </DropdownMenuContent>

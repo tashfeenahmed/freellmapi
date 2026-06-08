@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
+import { useTranslation } from 'react-i18next'
 
 interface ProviderEntry {
   id: number
@@ -43,6 +44,7 @@ function formatTokens(n: number): string {
 }
 
 export default function EmbeddingsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   // Local unsaved edits, same pattern as the chat fallback page.
   const [localFamilies, setLocalFamilies] = useState<Family[] | null>(null)
@@ -110,8 +112,8 @@ export default function EmbeddingsPage() {
   return (
     <div>
       <PageHeader
-        title="Models"
-        description="Embeddings fail over within a family only: the same model served by another provider. Vectors from different models are incompatible, so the router never swaps models on you."
+        title={t('embeddings.pageTitle')}
+        description={t('embeddings.pageDesc')}
         divider={false}
         actions={<ModelsTabs />}
       />
@@ -135,28 +137,28 @@ export default function EmbeddingsPage() {
                   <div className="flex items-baseline gap-2.5 min-w-0">
                     <h2 className="text-sm font-medium font-mono truncate">{f.family}</h2>
                     <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
-                      {f.dimensions}d
+                      {t('embeddings.dims', { dims: f.dimensions })}
                     </span>
                     {f.maxInputTokens && (
                       <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-                        {formatTokens(f.maxInputTokens)} tok max
+                        {t('embeddings.maxTokens', { count: formatTokens(f.maxInputTokens) })}
                       </span>
                     )}
                     {f.family === defaultFamily ? (
                       <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-foreground text-background font-medium">
-                        Default · auto
+                        {t('embeddings.defaultAuto')}
                       </span>
                     ) : (
                       <button
                         onClick={() => setLocalDefault(f.family)}
                         className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 transition-colors"
                       >
-                        Make default
+                        {t('embeddings.makeDefault')}
                       </button>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {u ? <>{u.requestsToday} req today · {formatTokens(u.tokensMonth)} tok this month</> : '—'}
+                    {u ? `${t('embeddings.reqToday', { count: u.requestsToday })} · ${t('embeddings.tokMonth', { tokens: formatTokens(u.tokensMonth) })}` : '—'}
                   </span>
                 </div>
 
@@ -170,7 +172,7 @@ export default function EmbeddingsPage() {
                           <span className="truncate font-mono text-[11px] text-muted-foreground">{p.modelId}</span>
                           {p.keyCount === 0 && (
                             <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-amber-600/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-400">
-                              no key
+                              {t('fallback.noKeys')}
                             </span>
                           )}
                         </div>
@@ -209,10 +211,10 @@ export default function EmbeddingsPage() {
         )}
 
         <FloatingBar show={hasChanges}>
-          <span className="text-xs text-muted-foreground">Unsaved changes</span>
-          <Button variant="outline" size="sm" onClick={discard}>Discard</Button>
+          <span className="text-xs text-muted-foreground">{t('fallback.unsaved')}</span>
+          <Button variant="outline" size="sm" onClick={discard}>{t('fallback.discard')}</Button>
           <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+            {saveMutation.isPending ? t('fallback.saving') : t('fallback.saveChanges')}
           </Button>
         </FloatingBar>
       </div>
