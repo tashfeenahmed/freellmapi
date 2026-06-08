@@ -145,15 +145,14 @@ Open http://localhost:3001, add your provider keys on the **Keys** page, reorder
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
 npm install
-cp .env.example .env
 ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
 printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 npm run dev
 ```
 
 `ENCRYPTION_KEY` is required for startup. The server only falls back to a
-database-stored development key when `DEV_MODE=true` and `NODE_ENV` is not
-`production`; do not use that fallback with real provider keys.
+database-stored development key when `NODE_ENV` is not `production`; do not use
+that fallback with real provider keys.
 
 Request analytics are retained for 90 days or 100000 request rows by default,
 whichever limit prunes first. Set `REQUEST_ANALYTICS_RETENTION_DAYS=0` or
