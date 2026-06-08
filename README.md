@@ -69,6 +69,8 @@ The problem is that stacking them by hand is painful: sixteen different SDKs, si
 </tr>
 </table>
 
+Plus [**Atlas Cloud**](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=freellmapi) — a full-modal, OpenAI-compatible inference gateway (DeepSeek V4, Qwen3, GLM, Kimi, MiniMax, …). Pay-as-you-go with a new-user API credit. Configure it from the Keys page under **Atlas Cloud**.
+
 Plus a **custom** provider — point at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway) from the Keys page.
 
 ## Features

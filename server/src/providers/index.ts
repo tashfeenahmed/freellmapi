@@ -159,6 +159,16 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://opencode.ai/zen/v1',
 }));
 
+// Atlas Cloud — full-modal OpenAI-compatible inference gateway.
+// Pay-as-you-go; no free tier, but offers a generous new-user credit.
+// Hosts DeepSeek, Qwen, GLM, Kimi, MiniMax and more behind one endpoint.
+// See https://www.atlascloud.ai/
+register(new OpenAICompatProvider({
+  platform: 'atlascloud',
+  name: 'Atlas Cloud',
+  baseUrl: 'https://api.atlascloud.ai/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
