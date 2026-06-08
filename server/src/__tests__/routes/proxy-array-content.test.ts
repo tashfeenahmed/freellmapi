@@ -277,5 +277,73 @@ describe('OpenAI multimodal array content', () => {
       expect(status).not.toBe(400);
       if (status === 400) throw new Error(`unexpected 400: ${JSON.stringify(body)}`);
     });
+
+    it('accepts an assistant echo with tool_calls: null (aionrs/AionUI session replay)', async () => {
+      // The exact second-turn shape captured from aionrs v0.1.28 (AionUI's
+      // engine): resumed sessions replay the assistant turn with an explicit
+      // tool_calls: null plus a reasoning_content side field.
+      const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+        max_tokens: 8192,
+        messages: [
+          { role: 'system', content: 'You are an AI assistant.' },
+          { role: 'user', content: 'ciao' },
+          {
+            role: 'assistant',
+            content: 'Ciao! Come posso aiutarti oggi?',
+            reasoning_content: 'The user is greeting me in Italian.',
+            tool_calls: null,
+          },
+          { role: 'user', content: 'Che modello sei' },
+        ],
+      }, authHeaders());
+      expect(status).not.toBe(400);
+      if (status === 400) throw new Error(`unexpected 400: ${JSON.stringify(body)}`);
+    });
+
+    it('accepts null top-level tool knobs (tools, tool_choice, parallel_tool_calls)', async () => {
+      const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+        tools: null,
+        tool_choice: null,
+        parallel_tool_calls: null,
+        messages: [{ role: 'user', content: 'hi' }],
+      }, authHeaders());
+      expect(status).not.toBe(400);
+      if (status === 400) throw new Error(`unexpected 400: ${JSON.stringify(body)}`);
+    });
+
+    it('drops null/empty tool_calls instead of forwarding them upstream', async () => {
+      const origFetch = global.fetch;
+      vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+        const urlStr = typeof url === 'string' ? url : url.toString();
+        if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+          const body = JSON.parse(String((init as RequestInit).body));
+          // Strict upstreams reject tool_calls: null AND tool_calls: [] —
+          // neither may survive normalization.
+          expect(body.messages[1]).not.toHaveProperty('tool_calls');
+          expect(body.messages[2]).not.toHaveProperty('tool_calls');
+          return {
+            ok: true,
+            json: () => Promise.resolve({
+              id: 'chatcmpl-nulltc', object: 'chat.completion', created: 1, model: 'openai/gpt-oss-120b',
+              choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+              usage: { prompt_tokens: 4, completion_tokens: 2, total_tokens: 6 },
+            }),
+          } as any;
+        }
+        return origFetch(url, init);
+      });
+
+      const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+        model: 'auto',
+        messages: [
+          { role: 'user', content: 'ciao' },
+          { role: 'assistant', content: 'Ciao!', tool_calls: null },
+          { role: 'assistant', content: 'ancora', tool_calls: [] },
+          { role: 'user', content: 'Che modello sei' },
+        ],
+      }, authHeaders());
+      expect(status).toBe(200);
+      expect(body.choices[0].message.content).toBe('ok');
+    });
   });
 });

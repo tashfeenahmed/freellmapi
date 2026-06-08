@@ -11,6 +11,7 @@ import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 
 export const proxyRouter = Router();
 
@@ -59,23 +60,34 @@ export function extractApiToken(req: Request): string | undefined {
 const stickySessionMap = new Map<string, { modelDbId: number; lastUsed: number }>();
 const STICKY_TTL_MS = 30 * 60 * 1000; // 30 min session TTL
 
-function getSessionKey(messages: ChatMessage[]): string {
-  // Use the first user message as session identifier — clients like Hermes
-  // re-send the full conversation each turn, so the first user message is
-  // stable across turns. Hash the FULL message (not a 100-char slice) so
-  // distinct conversations with identical openings don't collide.
+function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string): string {
+  // Explicit session pinning: clients that manage their own conversation ids
+  // (agent harnesses especially) can send X-Session-Id and get exact
+  // affinity regardless of how their message history mutates. (#231)
+  if (sessionIdHeader) return `hdr:${sessionIdHeader}`;
+
+  // Otherwise the first user message identifies the session — clients re-send
+  // the full conversation each turn, so it is stable across turns. Flatten
+  // array-of-blocks content before hashing: opencode-style agents send
+  // [{type:'text',...}] even for plain text, and the old string-only check
+  // silently disabled stickiness for them, re-routing every turn (#231 audit:
+  // observed a rank-2 → rank-11 mid-conversation flip). No turn-count suffix:
+  // the old ':single'/':multi' split guaranteed a sticky MISS on turn 2,
+  // exactly where agents replay the assistant's tool-call dialect and a model
+  // switch causes cross-dialect contamination.
   const firstUser = messages.find(m => m.role === 'user');
-  if (!firstUser || typeof firstUser.content !== 'string') return '';
-  const hash = crypto.createHash('sha1').update(firstUser.content).digest('hex');
-  return `${hash}:${messages.length > 2 ? 'multi' : 'single'}`;
+  if (!firstUser) return '';
+  const text = contentToString(firstUser.content ?? '');
+  if (!text) return '';
+  return crypto.createHash('sha1').update(text).digest('hex');
 }
 
-export function getStickyModel(messages: ChatMessage[]): number | undefined {
+export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string): number | undefined {
   // Only apply sticky for multi-turn (has assistant messages = continuation)
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
 
-  const key = getSessionKey(messages);
+  const key = getSessionKey(messages, sessionIdHeader);
   if (!key) return undefined;
 
   const entry = stickySessionMap.get(key);
@@ -88,8 +100,8 @@ export function getStickyModel(messages: ChatMessage[]): number | undefined {
   return entry.modelDbId;
 }
 
-export function setStickyModel(messages: ChatMessage[], modelDbId: number) {
-  const key = getSessionKey(messages);
+export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessionIdHeader?: string) {
+  const key = getSessionKey(messages, sessionIdHeader);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
 
@@ -213,7 +225,10 @@ const assistantMessageSchema = z.object({
   role: z.literal('assistant'),
   content: z.union([contentSchema, z.null()]).optional(),
   name: z.string().optional(),
-  tool_calls: z.array(toolCallSchema).optional(),
+  // tool_calls: null (not just missing) is what several agents replay for
+  // no-tool assistant turns — aionrs (AionUI's engine) writes it into every
+  // session-resumed assistant echo. Treated as absent. (#200)
+  tool_calls: z.array(toolCallSchema).nullable().optional(),
 });
 
 // Tool results may arrive with null/missing content (a tool that returned
@@ -274,9 +289,12 @@ const chatCompletionSchema = z.object({
   max_tokens: z.number().int().optional(),
   top_p: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
-  tools: z.array(toolDefinitionSchema).optional(),
-  tool_choice: toolChoiceSchema.optional(),
-  parallel_tool_calls: z.boolean().optional(),
+  // Top-level tool knobs may arrive as explicit nulls from clients that
+  // serialize every field of their request struct; all treated as absent
+  // and never forwarded as null. (#200)
+  tools: z.array(toolDefinitionSchema).nullable().optional(),
+  tool_choice: toolChoiceSchema.nullable().optional(),
+  parallel_tool_calls: z.boolean().nullable().optional(),
 });
 
 export function isRetryableError(err: any): boolean {
@@ -305,7 +323,15 @@ export function isRetryableError(err: any): boolean {
     // provider (Kimi K2.6 is on HF + Cloudflare + NVIDIA), so fail over instead
     // of killing the workflow. Paired with a long cooldown (isPaymentRequiredError)
     // so we don't re-hammer the broke key every retry.
-    || isPaymentRequiredError(err);
+    || isPaymentRequiredError(err)
+    // Dead-turn classes from the stream turn-integrity layer (#231 audit):
+    // all thrown before any byte reached the client, so another model can
+    // serve the request invisibly.
+    || msg.includes('empty completion')
+    || msg.includes('in-band provider error')
+    || msg.includes('stream ended unexpectedly')
+    || msg.includes('stream stalled')
+    || msg.includes('unparseable inline tool-call dialect');
 }
 
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:
@@ -316,6 +342,16 @@ export function isPaymentRequiredError(err: any): boolean {
   return msg.includes('402') || msg.includes('payment required')
     || msg.includes('insufficient_quota') || msg.includes('insufficient credit')
     || msg.includes('insufficient balance');
+}
+
+// A 404 "model removed/deprecated upstream" error. It's a MODEL-level failure,
+// not a key-level one: every key for the platform will 404 the same way, so the
+// retry loop skips the entire model for the rest of the request instead of
+// burning one fallback attempt per key on the same dead route.
+// (PR #111, credits @barbotkonv.)
+export function isModelNotFoundError(err: any): boolean {
+  const msg = (err.message ?? '').toLowerCase();
+  return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
 }
 
 // Pull the incremental text out of a streaming chunk for token counting.
@@ -402,14 +438,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, top_p, stream, parallel_tool_calls } = parsed.data;
+  const { model: requestedModel, temperature, top_p, stream } = parsed.data;
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
   const max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
     ? parsed.data.max_tokens : undefined;
-  const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice;
+  const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice ?? undefined;
   const tools = parsed.data.tools?.map(t => ({ ...t, type: 'function' as const }));
+  const parallel_tool_calls = parsed.data.parallel_tool_calls ?? undefined;
 
   // Pairing state for id-less tool calls (#200): every tool_call id (given or
   // synthesized) queues up here; a tool message without a tool_call_id takes
@@ -442,7 +479,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         role: 'assistant',
         content: assistantContent,
         ...(m.name ? { name: m.name } : {}),
-        ...(m.tool_calls ? { tool_calls: m.tool_calls.map(tc => {
+        // hasToolCalls (not a bare truthiness check) so null AND empty-array
+        // tool_calls are dropped rather than forwarded — strict upstreams
+        // reject both shapes. (#200)
+        ...(hasToolCalls ? { tool_calls: m.tool_calls!.map(tc => {
           // Normalize echo-tolerant inputs back to the strict OpenAI shape
           // before forwarding (see toolCallSchema); synthesize missing ids
           // and queue every id for order-based tool-result pairing. (#200)
@@ -537,6 +577,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
+  // Optional client-managed session affinity (see getSessionKey). Express
+  // lower-cases header names; a repeated header arrives as an array — take
+  // the first value.
+  const rawSessionId = req.headers['x-session-id'];
+  const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
+
   // Explicit `model` field pins routing. If the catalog has no enabled row
   // matching the requested id, return 400 — silently auto-routing to a
   // different model would be surprising to OpenAI-compatible clients.
@@ -544,7 +590,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   let preferredModel: number | undefined;
   if (isAutoModel(requestedModel)) {
     // Explicit "auto" → behave exactly like an omitted model field.
-    preferredModel = getStickyModel(messages);
+    preferredModel = getStickyModel(messages, sessionIdHeader);
   } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
@@ -563,7 +609,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
   } else {
-    preferredModel = getStickyModel(messages);
+    preferredModel = getStickyModel(messages, sessionIdHeader);
   }
 
   // For analytics: the model id the client pinned, null when auto-routed
@@ -573,12 +619,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
+  const skipModels = new Set<number>();
   let lastError: any = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -601,12 +648,58 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
     try {
       if (stream) {
-        // Lazy header set: pre-stream errors stay retryable (no headers sent yet);
-        // mid-stream errors emit an `error` SSE frame so the client sees a real signal
-        // instead of a silently truncated stream.
+        // — Stream turn-integrity (#231 audit) —
+        // The old loop forwarded upstream chunks verbatim and called any
+        // stream that produced bytes a success. Live failure modes that
+        // slipped through: in-band `{"error":...}` frames delivered as dead
+        // turns, tool calls with no terminal finish_reason, inline tool-call
+        // dialect emitted as text, truncations logged as success. This loop
+        // validates the TURN, not the transport:
+        //  - headers are held until the first real payload, so anything that
+        //    dies before producing one fails over invisibly;
+        //  - text that starts with an inline tool-call dialect marker is held
+        //    and rescued into structured tool_calls (or failed over);
+        //  - tool_call deltas are buffered, argument-repaired, and emitted as
+        //    one complete chunk, always followed by finish_reason
+        //    "tool_calls" — agents never see calls without a terminal reason;
+        //  - a stream that ends with neither content nor calls is an empty
+        //    completion and fails over like the non-stream path.
         let totalOutputTokens = 0;
-        let streamStarted = false;
+        let headerSent = false;
         let ttfbMs: number | null = null;
+
+        // Hold-window state: 'undecided' until the first text either matches
+        // a dialect marker (→ 'dialect': buffer everything, rescue at end) or
+        // provably cannot (→ 'passthrough': flush and stream normally).
+        let mode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+        let heldText = '';
+        const preamble: unknown[] = []; // role-only chunks held until flush
+        const toolCallAcc = new Map<number, { id?: string; name: string; args: string }>();
+        let upstreamFinish: string | null = null;
+        let usageChunk: unknown = null;
+        let lastMeta: { id?: string; model?: string; created?: number } = {};
+
+        const flushHeaders = () => {
+          if (headerSent) return;
+          ttfbMs = Date.now() - start;
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          headerSent = true;
+          for (const p of preamble) res.write(`data: ${JSON.stringify(p)}\n\n`);
+          preamble.length = 0;
+        };
+        const mkChunk = (delta: Record<string, unknown>, finish: string | null) => ({
+          id: lastMeta.id ?? `chatcmpl-${Date.now()}`,
+          object: 'chat.completion.chunk',
+          created: lastMeta.created ?? Math.floor(Date.now() / 1000),
+          model: lastMeta.model ?? route.modelId,
+          choices: [{ index: 0, delta, finish_reason: finish }],
+        });
+        const writeChunk = (c: unknown) => res.write(`data: ${JSON.stringify(c)}\n\n`);
+
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
@@ -614,52 +707,153 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
-            if (!streamStarted) {
-              // Time-to-first-byte: dispatch → first chunk. Feeds the router's
-              // latency axis (server/src/services/scoring.ts).
-              ttfbMs = Date.now() - start;
-              res.setHeader('Content-Type', 'text/event-stream');
-              res.setHeader('Cache-Control', 'no-cache');
-              res.setHeader('Connection', 'keep-alive');
-              res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-              if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
-              streamStarted = true;
+            const anyChunk = chunk as Record<string, any>;
+
+            // In-band upstream error frame (observed live: Groq emits
+            // {"error":{...,"code":"tool_use_failed"}} inside a 200 SSE
+            // stream). Before headers: retryable, the next model gets the
+            // request. After: surface an error frame instead of pretending
+            // the turn succeeded.
+            if (anyChunk.error && !anyChunk.choices) {
+              const msg = anyChunk.error.message ?? JSON.stringify(anyChunk.error).slice(0, 200);
+              if (!headerSent) throw new Error(`in-band provider error from ${route.displayName}: ${msg}`);
+              console.error(`[Proxy] In-band error frame from ${route.displayName} mid-stream:`, msg);
+              writeChunk({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(String(msg))}`, type: 'stream_error' } });
+              try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+              logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, ttfbMs, pinnedModelId);
+              return;
             }
-            // Coerce array-shaped delta.content to a string before forwarding,
-            // so spec-conforming clients don't break and tool_calls survive (#166).
+
+            if (anyChunk.id) lastMeta = { id: anyChunk.id, model: anyChunk.model, created: anyChunk.created };
+
+            const choice = anyChunk.choices?.[0];
+            if (!choice) {
+              // Usage-only frame (stream_options.include_usage) — held and
+              // re-emitted after our finish chunk to preserve OpenAI ordering.
+              if (anyChunk.usage) usageChunk = anyChunk;
+              continue;
+            }
+
+            if (choice.finish_reason) upstreamFinish = choice.finish_reason;
+
+            // Buffer tool_call deltas — emitted complete + repaired at end.
+            for (const tc of choice.delta?.tool_calls ?? []) {
+              const idx = tc.index ?? 0;
+              if (!toolCallAcc.has(idx)) toolCallAcc.set(idx, { id: undefined, name: '', args: '' });
+              const acc = toolCallAcc.get(idx)!;
+              if (tc.id && !acc.id) acc.id = tc.id;
+              if (tc.function?.name) acc.name += tc.function.name;
+              if (tc.function?.arguments) acc.args += tc.function.arguments;
+            }
+
             normalizeOutboundContent(chunk);
-            const text = streamChunkText(chunk);
+            const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
+
+            if (text.length === 0) {
+              // Role preamble / keep-alive: hold until first payload decides
+              // the mode, forward afterwards. tool_calls and finish_reason are
+              // stripped — both are re-emitted complete at the end (OpenRouter
+              // attaches tool_call deltas to chunks that also carry role/
+              // reasoning keys; forwarding them raw would duplicate the call).
+              if (choice.delta && Object.keys(choice.delta).some(k => k !== 'content' && k !== 'tool_calls' && choice.delta[k] != null)) {
+                const cleaned = { ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] };
+                if (headerSent) writeChunk(cleaned); else preamble.push(cleaned);
+              }
+              continue;
+            }
+
             totalOutputTokens += Math.ceil(text.length / 4);
-            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+
+            if (mode === 'passthrough') {
+              writeChunk({ ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] });
+              continue;
+            }
+
+            heldText += text;
+            if (mode === 'dialect') continue;
+
+            const probe = heldText.trimStart();
+            if (startsWithDialectMarker(probe)) {
+              mode = 'dialect';
+            } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+              mode = 'passthrough';
+              flushHeaders();
+              writeChunk(mkChunk({ content: heldText }, null));
+              heldText = '';
+            }
+            // else: still a strict prefix of a marker — keep holding.
           }
 
-          if (!streamStarted) {
-            // Upstream returned zero chunks — an empty completion in stream
-            // clothing. No headers are out yet, so fail over to the next model
-            // instead of handing the client a valid-looking empty stream
-            // (production case: nemotron-3-super returning nothing on large
-            // contexts while the request logs as success).
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (stream produced no chunks)', null, pinnedModelId);
-            skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-            setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-            recordRateLimitHit(route.modelDbId);
-            lastError = new Error(`empty completion from ${route.displayName}`);
-            continue;
+          // — Stream ended cleanly (provider saw [DONE] or a finish_reason) —
+
+          // Assemble buffered tool calls: synthesize missing ids, repair
+          // double-encoded arguments against the request's schemas, drop
+          // calls whose args still aren't valid JSON.
+          const schemas = toolSchemaMap(tools);
+          let syntheticStreamIds = 0;
+          const completedCalls = [...toolCallAcc.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([, acc]) => ({
+              id: acc.id && acc.id.length > 0 ? acc.id : `call_stream_${++syntheticStreamIds}`,
+              type: 'function' as const,
+              function: { name: acc.name, arguments: repairToolArguments(acc.args || '{}', schemas.get(acc.name)) },
+            }))
+            .filter(c => { try { JSON.parse(c.function.arguments); return c.function.name.length > 0; } catch { return false; } });
+
+          // Dialect rescue: the held text is an inline tool call in some
+          // model's private syntax. Parse it into structured calls or treat
+          // the turn as dead (headers were never sent in dialect mode, so
+          // failing over is free).
+          if (mode === 'dialect' || (mode === 'undecided' && heldText.length > 0 && containsDialectMarker(heldText))) {
+            const rescue = rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)));
+            if (rescue.detected) {
+              if (!rescue.calls) throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${heldText.slice(0, 120)}`);
+              let rescuedIds = 0;
+              for (const c of rescue.calls) {
+                completedCalls.push({ id: `call_rescued_${++rescuedIds}`, type: 'function', function: { name: c.name, arguments: repairToolArguments(c.arguments, schemas.get(c.name)) } });
+              }
+              heldText = rescue.cleanText;
+              console.log(`[Proxy] Rescued ${rescuedIds} inline tool call(s) from ${route.displayName} into structured tool_calls`);
+            }
           }
+
+          const hasText = headerSent || heldText.trim().length > 0;
+          if (!hasText && completedCalls.length === 0) {
+            // Nothing usable came out — same failover semantics as the
+            // non-stream empty-completion path. Headers can't have been sent
+            // (header flush requires payload), so the client never notices.
+            throw new Error(`empty completion from ${route.displayName} (stream produced no content and no tool calls)`);
+          }
+
+          flushHeaders();
+          if (heldText.length > 0) {
+            writeChunk(mkChunk({ content: heldText }, null));
+            totalOutputTokens += Math.ceil(heldText.length / 4);
+          }
+          if (completedCalls.length > 0) {
+            writeChunk(mkChunk({ tool_calls: completedCalls.map((c, i) => ({ index: i, ...c })) }, null));
+            totalOutputTokens += Math.ceil(completedCalls.reduce((n, c) => n + c.function.arguments.length, 0) / 4);
+          }
+          // Terminal finish_reason, ALWAYS present: calls win over a sloppy
+          // upstream 'stop'; 'length'/'content_filter' survive for pure-text
+          // turns; missing upstream reason is synthesized.
+          const finish = completedCalls.length > 0
+            ? 'tool_calls'
+            : (upstreamFinish && upstreamFinish !== 'tool_calls' ? upstreamFinish : 'stop');
+          writeChunk(mkChunk({}, finish));
+          if (usageChunk) writeChunk(usageChunk);
           res.write('data: [DONE]\n\n');
           res.end();
 
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
-          setStickyModel(messages, route.modelDbId);
+          setStickyModel(messages, route.modelDbId, sessionIdHeader);
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
         } catch (streamErr: any) {
-          if (streamStarted) {
-            // Mid-stream error — finish the SSE response cleanly instead of leaving
-            // the client hanging or letting Express's default handler take over.
-            // Full upstream message goes to the log; the client sees a generic
-            // message so we don't leak provider internals into a partial stream.
+          if (headerSent) {
+            // Mid-stream error after real payload reached the client — finish
+            // the SSE response honestly instead of leaving the client hanging.
             console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
@@ -667,7 +861,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), null, pinnedModelId);
             return;
           }
-          // Pre-stream error — bubble to outer retry/502 handler.
+          // Headers never sent — bubble to the outer retry handler, which
+          // cooldowns this model+key and tries the next one. Covers upstream
+          // HTTP errors, in-band error frames, abrupt EOF, stalls, empty
+          // completions, and unparseable dialect turns alike.
           throw streamErr;
         }
       } else {
@@ -690,10 +887,34 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           continue;
         }
 
+        // Inline tool-call dialect rescue (#231 audit): a tool-bearing
+        // request answered with the call serialized as TEXT (a mid-
+        // conversation model switch makes the new model imitate the previous
+        // model's private syntax). Re-parse it into structured tool_calls so
+        // the client's agent loop keeps working; a detected-but-unparseable
+        // dialect is a dead turn and fails over like an empty completion.
+        if (wantsTools && respMsg && (respMsg.tool_calls?.length ?? 0) === 0 && respText) {
+          const rescue = rescueInlineToolCalls(respText, new Set((tools ?? []).map(t => t.function.name)));
+          if (rescue.detected) {
+            if (!rescue.calls) {
+              throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${respText.slice(0, 120)}`);
+            }
+            const schemas = toolSchemaMap(tools);
+            respMsg.tool_calls = rescue.calls.map((c, i) => ({
+              id: `call_rescued_${i + 1}`,
+              type: 'function' as const,
+              function: { name: c.name, arguments: repairToolArguments(c.arguments, schemas.get(c.name)) },
+            }));
+            respMsg.content = rescue.cleanText.length > 0 ? rescue.cleanText : null;
+            if (result.choices?.[0]) result.choices[0].finish_reason = 'tool_calls';
+            console.log(`[Proxy] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName} into structured tool_calls`);
+          }
+        }
+
         const totalTokens = result.usage?.total_tokens ?? 0;
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId);
+        setStickyModel(messages, route.modelDbId, sessionIdHeader);
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
@@ -726,6 +947,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
 
       if (isRetryableError(err)) {
+        // Model-level 404 (removed/deprecated upstream): rule the whole model
+        // out for the rest of this request — its other keys would 404 the same
+        // way. The per-key cooldown below still applies, so cross-request
+        // behavior (#66/#76) is unchanged. (PR #111, credits @barbotkonv.)
+        if (isModelNotFoundError(err)) skipModels.add(route.modelDbId);
+
         // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
         skipKeys.add(skipId);

@@ -5,6 +5,7 @@ describe('GoogleProvider', () => {
   let provider: GoogleProvider;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     provider = new GoogleProvider();
   });
 

@@ -387,7 +387,7 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
  * @param requireVision - only consider models that accept image input (#118)
  * @param requireTools - only consider models that emit structured tool_calls
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>): RouteResult {
   const db = getDb();
 
   const strategy = getRoutingStrategy();
@@ -417,6 +417,12 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   }
 
   for (const entry of sortedChain) {
+    // Models the caller has ruled out for this request — e.g. a 404
+    // "model removed upstream" already seen this request: trying the same
+    // model again on a different key would just burn another attempt on the
+    // same dead route (PR #111, credits @barbotkonv).
+    if (skipModels?.has(entry.model_db_id)) continue;
+
     // Vision requests skip text-only models — including a sticky/preferred one,
     // which is correct: don't pin an image turn to a model that can't see it.
     if (requireVision && !entry.supports_vision) continue;

@@ -8,7 +8,7 @@ import { BaseProvider, type CompletionOptions } from './base.js';
 
 /**
  * Generic provider for platforms that use an OpenAI-compatible API.
- * Covers: Groq, Cerebras, SambaNova, NVIDIA NIM, Mistral, OpenRouter,
+ * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
  * GitHub Models, Fireworks AI.
  */
 export class OpenAICompatProvider extends BaseProvider {
@@ -70,7 +70,7 @@ export class OpenAICompatProvider extends BaseProvider {
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
       }),
-    }, this.timeoutMs);
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -126,32 +126,7 @@ export class OpenAICompatProvider extends BaseProvider {
       throw new Error(`${this.name} API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') return;
-        try {
-          yield JSON.parse(data) as ChatCompletionChunk;
-        } catch {
-          // Skip malformed chunks
-        }
-      }
-    }
+    yield* this.readSseStream(res);
   }
 
   async validateKey(apiKey: string): Promise<boolean> {

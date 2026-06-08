@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { isRetryableError, isPaymentRequiredError } from '../../routes/proxy.js';
+import { isRetryableError, isPaymentRequiredError, isModelNotFoundError } from '../../routes/proxy.js';
+
+describe('isModelNotFoundError (drives whole-model skip within a request)', () => {
+  it('flags 404 / not-found / no-endpoints phrasings', () => {
+    expect(isModelNotFoundError(new Error('OpenRouter API error 404: Provider returned error'))).toBe(true);
+    expect(isModelNotFoundError(new Error('Model not found'))).toBe(true);
+    expect(isModelNotFoundError(new Error('No endpoints found for openrouter/minimax/minimax-m2.5:free'))).toBe(true);
+  });
+
+  it('does not flag rate limits, 5xx, or payment errors', () => {
+    expect(isModelNotFoundError(new Error('429 Too Many Requests'))).toBe(false);
+    expect(isModelNotFoundError(new Error('503 Service Unavailable'))).toBe(false);
+    expect(isModelNotFoundError(new Error('HuggingFace Router API error 402: Payment required'))).toBe(false);
+  });
+});
 
 describe('isRetryableError', () => {
   describe('413 Payload Too Large', () => {
