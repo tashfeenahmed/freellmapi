@@ -1,4 +1,5 @@
 import './env.js';
+import { initProxy } from './lib/proxy.js';
 import { createApp } from './app.js';
 import { initDb } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
@@ -10,6 +11,7 @@ const PORT = process.env.PORT ?? 3001;
 const HOST = process.env.HOST ?? '::';
 
 async function main() {
+  initProxy();
   initDb();
   const app = createApp();
 
