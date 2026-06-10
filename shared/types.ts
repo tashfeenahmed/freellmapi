@@ -26,6 +26,9 @@ export type Platform =
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
   // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
   | 'opencode'
+  // OVHcloud AI Endpoints — OpenAI-compatible, keyless anonymous tier
+  // (2 req/min per IP per model); see migrateModelsV26.
+  | 'ovh'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';
