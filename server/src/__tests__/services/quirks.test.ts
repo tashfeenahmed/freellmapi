@@ -22,7 +22,7 @@ describe('quirks resolution (migrateQuirksV1)', () => {
       .all() as { model_id: string }[];
     expect(nvidiaModels.length).toBeGreaterThan(0);
     for (const m of nvidiaModels) {
-      expect(slugsFor('nvidia', m.model_id)).toContain('nvidia-credits-based');
+      expect(slugsFor('nvidia', m.model_id)).toContain('nvidia-rate-limited');
     }
   });
 
@@ -51,9 +51,9 @@ describe('quirks resolution (migrateQuirksV1)', () => {
     const defs = listQuirkDefinitions();
     const keyless = defs.find((d) => d.slug === 'keyless-anonymous');
     expect(keyless).toBeDefined();
-    // keyless-anonymous targets three keyless platforms.
+    // keyless-anonymous targets the four keyless platforms.
     const platforms = keyless!.targets.map((t) => t.platform).sort();
-    expect(platforms).toEqual(['kilo', 'llm7', 'pollinations']);
+    expect(platforms).toEqual(['kilo', 'llm7', 'ovh', 'pollinations']);
   });
 
   it('resolves stably and dedups overlapping selectors', () => {
