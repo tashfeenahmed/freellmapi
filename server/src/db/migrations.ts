@@ -33,10 +33,10 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV24ZenRefresh(db);
   migrateModelsV25ZenDeadPromos(db);
   // V25 is the LAST model-data migration. Since the Premium live catalog
-  // shipped (June 2026), model/limit DATA is authored in the suite's catalog
-  // (catalog/data/catalog.live.json, served signed from the Oracle catalog
-  // service) and reaches installs via catalog-sync — premium on the live tier
-  // within ~12h, free at the monthly promote. Shipping model data as a
+  // shipped (June 2026), model/limit DATA is maintained in the published
+  // catalog (served signed by the catalog service) and reaches installs via
+  // catalog-sync — premium on the live tier within ~12h, free at the monthly
+  // promote. Shipping model data as a
   // migration would hand it to free users on their next binary update,
   // bypassing the tier gate. Migrations from here on are baseline/code-level
   // only (schema, family rules, provider plumbing, quirk-seed corrections).
@@ -1877,9 +1877,8 @@ function migrateModelsV25ZenDeadPromos(db: Database.Database) {
 // from this audit (4 OVH rows, opencode/north-mini-code-free, Cerebras
 // 5 RPM/30K TPM/1M TPD limits, NVIDIA "free · 40 RPM" labels, LLM7 60-100/hr
 // label) were briefly shipped as a data migration and then MOVED to the
-// authored catalog (catalog/data/catalog.live.json in the suite → Oracle) —
-// catalog data is distributed via catalog-sync, never via migrations, so the
-// premium tier gate holds. What remains in code from that audit: the 'ovh'
+// published catalog — catalog data is distributed via catalog-sync, never
+// via migrations, so the premium tier gate holds. What remains in code from that audit: the 'ovh'
 // keyless provider, Pollinations keyless, the V22 north-mini-code tools rule,
 // and the corrected quirk seeds in migrateQuirksV1 (incl. the
 // 'nvidia-credits-based' → 'nvidia-rate-limited' replacement; the stale slug
