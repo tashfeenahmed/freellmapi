@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader } from '@/components/page-header'
 import { Markdown } from '@/components/markdown'
+import { Copy, Pencil, Square } from 'lucide-react'
 
 interface FallbackEntry {
   modelDbId: number
@@ -33,8 +34,13 @@ export default function PlaygroundPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('auto')
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const editRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const { data: keyData } = useQuery<{ apiKey: string }>({
     queryKey: ['unified-key'],
@@ -52,23 +58,26 @@ export default function PlaygroundPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || loading) return
+  useEffect(() => {
+    if (editingIndex != null && editRef.current) {
+      editRef.current.focus()
+      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length)
+    }
+  }, [editingIndex])
 
-    const userMsg: ChatMessage = { role: 'user', content: text }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
-    setInput('')
+  async function sendMessages(msgs: ChatMessage[]) {
+    setMessages(msgs)
     setLoading(true)
-    inputRef.current?.focus()
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (keyData?.apiKey) headers['Authorization'] = `Bearer ${keyData.apiKey}`
 
       const body: any = {
-        messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+        messages: msgs.map(m => ({ role: m.role, content: m.content })),
       }
       if (selectedModel !== 'auto') body.model = selectedModel
 
@@ -78,6 +87,7 @@ export default function PlaygroundPage() {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
 
       const latency = Date.now() - start
@@ -86,7 +96,7 @@ export default function PlaygroundPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }))
-        setMessages([...newMessages, {
+        setMessages([...msgs, {
           role: 'assistant',
           content: `Error: ${err.error?.message ?? 'Unknown error'}`,
         }])
@@ -100,7 +110,7 @@ export default function PlaygroundPage() {
         model: routedVia.split('/').slice(1).join('/'),
       } : undefined)
 
-      setMessages([...newMessages, {
+      setMessages([...msgs, {
         role: 'assistant',
         content,
         meta: {
@@ -111,14 +121,46 @@ export default function PlaygroundPage() {
         },
       }])
     } catch (err: any) {
-      setMessages([...newMessages, {
+      if (err.name === 'AbortError') return
+      setMessages([...msgs, {
         role: 'assistant',
         content: `Error: ${err.message}`,
       }])
     } finally {
+      abortRef.current = null
       setLoading(false)
       setTimeout(() => inputRef.current?.focus(), 0)
     }
+  }
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || loading) return
+    setInput('')
+    await sendMessages([...messages, { role: 'user', content: text }])
+  }
+
+  function handleEditStart(index: number) {
+    if (loading) return
+    setEditingIndex(index)
+    setEditText(messages[index].content)
+  }
+
+  function handleEditCancel() {
+    setEditingIndex(null)
+    setEditText('')
+  }
+
+  function handleStop() {
+    abortRef.current?.abort()
+  }
+
+  async function handleEditConfirm(index: number) {
+    const text = editText.trim()
+    if (!text) return
+    setEditingIndex(null)
+    const truncated = messages.slice(0, index)
+    await sendMessages([...truncated, { role: 'user', content: text }])
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -183,7 +225,7 @@ export default function PlaygroundPage() {
           ) : (
             <>
               {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
                     className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
@@ -191,7 +233,24 @@ export default function PlaygroundPage() {
                         : 'bg-muted'
                     }`}
                   >
-                    {msg.role === 'assistant' ? (
+                    {editingIndex === i ? (
+                      <textarea
+                        ref={editRef}
+                        value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleEditConfirm(i)
+                          }
+                          if (e.key === 'Escape') {
+                            handleEditCancel()
+                          }
+                        }}
+                        className="w-full bg-transparent resize-none focus:outline-none"
+                        rows={3}
+                      />
+                    ) : msg.role === 'assistant' ? (
                       <Markdown>{msg.content}</Markdown>
                     ) : (
                       <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -205,6 +264,29 @@ export default function PlaygroundPage() {
                           <span>· {msg.meta.fallbackAttempts} fallback{msg.meta.fallbackAttempts > 1 ? 's' : ''}</span>
                         )}
                       </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1 mt-1 px-1">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content)
+                        setCopiedIndex(i)
+                        setTimeout(() => setCopiedIndex(null), 1500)
+                      }}
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Copy className="size-3" />
+                      {copiedIndex === i ? 'Copied!' : 'Copy'}
+                    </button>
+                    {msg.role === 'user' && editingIndex !== i && (
+                      <button
+                        onClick={() => handleEditStart(i)}
+                        disabled={loading}
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Pencil className="size-3" />
+                        Edit
+                      </button>
                     )}
                   </div>
                 </div>
@@ -242,9 +324,16 @@ export default function PlaygroundPage() {
                 el.style.height = Math.min(el.scrollHeight, 160) + 'px'
               }}
             />
-            <Button onClick={handleSend} disabled={loading || !input.trim()} size="default">
-              {loading ? 'Sending…' : 'Send'}
-            </Button>
+            {loading ? (
+              <Button onClick={handleStop} variant="destructive" size="default" className="gap-1.5">
+                <Square className="size-3.5 fill-current" />
+                Stop
+              </Button>
+            ) : (
+              <Button onClick={handleSend} disabled={!input.trim()} size="default">
+                Send
+              </Button>
+            )}
           </div>
         </div>
       </div>

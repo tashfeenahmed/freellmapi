@@ -86,6 +86,14 @@ authRouter.post('/login', (req: Request, res: Response) => {
   }
   const { email, password } = parsed.data;
 
+  // Dev mode: auto-provision test user on first login.
+  // Matches the hardcoded TEST_CREDENTIALS in client/src/components/auth-gate.tsx.
+  // if (process.env.NODE_ENV !== 'production' && email === 'dev@freeapi.local' && !verifyCredentials(email, password)) {
+  //   try {
+  //     createUser(email, password);
+  //   } catch { /* email_taken — race, just fall through */ }
+  // }
+
   if (isLockedOut(email)) {
     res.status(429).json({ error: { message: 'Too many failed attempts. Try again later.', type: 'rate_limit_error' } });
     return;

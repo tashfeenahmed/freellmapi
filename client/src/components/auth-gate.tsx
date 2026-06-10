@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// Dev-only test credentials — hardcoded for local development convenience.
+// The server auto-provisions this account in non-production mode on first login.
+// const TEST_CREDENTIALS = { email: 'dev@freeapi.local', password: 'dev123456' }
+
 interface AuthStatus {
   needsSetup: boolean
   authenticated: boolean
@@ -82,10 +86,18 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
             />
           </div>
           {error && <p className="text-destructive text-xs">{error}</p>}
-          <Button type="submit" className="w-full" disabled={busy || !email || !password}>
-            {busy ? (isSetup ? 'Creating…' : 'Signing in…') : isSetup ? 'Create account' : 'Sign in'}
-          </Button>
-        </form>
+            <Button type="submit" className="w-full" disabled={busy || !email || !password}>
+              {busy ? (isSetup ? 'Creating…' : 'Signing in…') : isSetup ? 'Create account' : 'Sign in'}
+            </Button>
+            {/* <Button
+              type="button"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={() => { setEmail(TEST_CREDENTIALS.email); setPassword(TEST_CREDENTIALS.password) }}
+            >
+              Use test credentials
+            </Button> */}
+          </form>
       </div>
     </Centered>
   )
