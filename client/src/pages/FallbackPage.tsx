@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -331,12 +331,14 @@ function RowContent({
   draggable,
   dragHandle,
   onToggle,
+  onDelete,
 }: {
   row: Row
   rank: number
   draggable: boolean
   dragHandle?: ReactNode
   onToggle: (modelDbId: number, enabled: boolean) => void
+  onDelete?: (row: Row) => void
 }) {
   const guard = (row.headroom ?? 1) * (row.rateLimit ?? 1)
   return (
@@ -388,13 +390,24 @@ function RowContent({
         {row.score !== undefined ? row.score.toFixed(3) : '–'}
       </td>
       <td className="py-2 pr-3 align-middle text-right">
-        <Switch checked={row.enabled} onCheckedChange={(c) => onToggle(row.modelDbId, c)} />
+        <div className="flex items-center justify-end gap-2">
+          <Switch checked={row.enabled} onCheckedChange={(c) => onToggle(row.modelDbId, c)} />
+          {row.platform === 'custom' && onDelete && (
+            <button
+              onClick={() => onDelete(row)}
+              aria-label="Delete custom model"
+              className="rounded-md p-1 text-muted-foreground/60 hover:text-destructive transition-colors"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
+        </div>
       </td>
     </>
   )
 }
 
-function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
+function SortableRow({ row, rank, onToggle, onDelete }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void; onDelete?: (row: Row) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
   const handle = (
     <button
@@ -416,7 +429,7 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
     >
-      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
+      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} onDelete={onDelete} />
     </tr>
   )
 }
@@ -455,6 +468,20 @@ export default function FallbackPage() {
       apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify(payload) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
   })
+
+  // Remove a custom chat model (keeps its endpoint key — other models may use it).
+  const deleteMutation = useMutation({
+    mutationFn: (modelDbId: number) => apiFetch(`/api/models/custom/${modelDbId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      setLocalEntries(null)
+    },
+  })
+
+  function handleDelete(row: Row) {
+    if (confirm(`Remove custom model "${row.displayName}"?`)) deleteMutation.mutate(row.modelDbId)
+  }
 
   const strategy: RoutingStrategy = routing?.strategy ?? 'balanced'
   const isManual = strategy === 'priority'
@@ -611,7 +638,7 @@ export default function FallbackPage() {
                     <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
                       <tbody>
                         {ordered.map((row, i) => (
-                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} />
+                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} onDelete={handleDelete} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -625,7 +652,7 @@ export default function FallbackPage() {
                   <tbody>
                     {ordered.map((row, i) => (
                       <tr key={row.modelDbId} className={`border-b last:border-0 ${row.enabled ? '' : 'opacity-50'}`}>
-                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} />
+                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} onDelete={handleDelete} />
                       </tr>
                     ))}
                   </tbody>

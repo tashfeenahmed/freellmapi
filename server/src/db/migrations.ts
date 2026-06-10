@@ -36,6 +36,7 @@ export function migrateDbSchema(db: Database.Database) {
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
   migrateEmbeddingsV1(db);
+  migrateEmbeddingsV2Custom(db);
   ensureUnifiedKey(db);
 }
 
@@ -1920,6 +1921,18 @@ function migrateEmbeddingsV1(db: Database.Database) {
   const def = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get();
   if (!def) {
     db.prepare("INSERT INTO settings (key, value) VALUES ('embeddings_default_family', 'gemini-embedding-001')").run();
+  }
+}
+
+// Custom OpenAI-compatible embedding providers (#117/#212, extended to
+// embeddings). `key_id` binds a custom embedding row to the api_keys row that
+// carries ITS endpoint (base_url) — mirroring models.key_id — so several
+// self-hosted/third-party embedding endpoints coexist. NULL for built-in
+// platforms, which resolve their key by platform name as before.
+function migrateEmbeddingsV2Custom(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(embedding_models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'key_id')) {
+    db.prepare('ALTER TABLE embedding_models ADD COLUMN key_id INTEGER').run();
   }
 }
 

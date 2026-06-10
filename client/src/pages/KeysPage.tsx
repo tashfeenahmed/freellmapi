@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -171,22 +171,70 @@ function UnifiedKeySection() {
   )
 }
 
-function CustomProviderSection() {
+// Sentinel for "don't join an existing family" — Select can't hold an empty
+// string value, so we map this to `family: undefined` on submit.
+const OWN_FAMILY = '__own__'
+
+// One form for both kinds of custom OpenAI-compatible model. A Chat/Embedding
+// toggle picks where the model lands (models vs embedding_models); both share
+// the one endpoint key (matched on base_url), so the same endpoint can serve
+// several chat and embedding models. Base URL + API key persist after submit so
+// you can add another model to the same endpoint without re-typing them.
+function CustomModelSection() {
   const queryClient = useQueryClient()
+  const [type, setType] = useState<'chat' | 'embedding'>('chat')
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
+  const [family, setFamily] = useState(OWN_FAMILY)
+  const [familyTouched, setFamilyTouched] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [apiKey, setApiKey] = useState('')
 
+  // Existing families populate the dropdown so users join one by picking it
+  // rather than retyping (and risking a typo that silently makes a new family).
+  const { data: emb } = useQuery<{ families: { family: string; dimensions: number; providers?: { modelId: string }[] }[] }>({
+    queryKey: ['embeddings'],
+    queryFn: () => apiFetch('/api/embeddings'),
+  })
+  const existingFamilies = emb?.families ?? []
+
+  // Auto-suggest a family: a model whose (provider-prefix-stripped, lowercased)
+  // id matches an existing family's name or a member model id is very likely the
+  // SAME model, so default to joining that family for failover. Only a default —
+  // the user can override, and the server's dimension check still guards.
+  const normId = (s: string) => s.trim().toLowerCase().split('/').pop() ?? ''
+  const suggestedFamily = useMemo(() => {
+    const n = normId(model)
+    if (!n) return null
+    for (const f of existingFamilies) {
+      if (normId(f.family) === n) return f.family
+      if (f.providers?.some(p => normId(p.modelId) === n)) return f.family
+    }
+    return null
+  }, [model, existingFamilies])
+
+  // Follow the suggestion until the user manually picks a family themselves.
+  useEffect(() => {
+    if (type === 'embedding' && !familyTouched) setFamily(suggestedFamily ?? OWN_FAMILY)
+  }, [suggestedFamily, type, familyTouched])
+
   const addCustom = useMutation({
-    mutationFn: (body: { baseUrl: string; model: string; displayName?: string; apiKey?: string }) =>
-      apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(body) }),
+    mutationFn: (body: { type: 'chat' | 'embedding'; baseUrl: string; model: string; family?: string; displayName?: string; apiKey?: string }) => {
+      const { type: t, ...rest } = body
+      return t === 'embedding'
+        ? apiFetch('/api/embeddings/custom', { method: 'POST', body: JSON.stringify(rest) })
+        : apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(rest) })
+    },
     onSuccess: () => {
+      // Both kinds touch the shared keys list; each also refreshes its own home.
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       setModel('')
+      setFamily(OWN_FAMILY)
+      setFamilyTouched(false)
       setDisplayName('')
     },
   })
@@ -194,18 +242,44 @@ function CustomProviderSection() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!baseUrl || !model) return
-    addCustom.mutate({ baseUrl, model, displayName: displayName || undefined, apiKey: apiKey || undefined })
+    addCustom.mutate({
+      type,
+      baseUrl,
+      model,
+      ...(type === 'embedding' && family !== OWN_FAMILY ? { family } : {}),
+      displayName: displayName || undefined,
+      apiKey: apiKey || undefined,
+    })
   }
+
+  const tab = (value: 'chat' | 'embedding', label: string) => (
+    <button
+      type="button"
+      onClick={() => setType(value)}
+      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+        type === value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <section>
-      <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
+      <h2 className="text-sm font-medium mb-1">Add a custom model</h2>
       <p className="text-xs text-muted-foreground mb-3">
-        Point at any OpenAI-compatible endpoint: llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
-        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
-        (most local servers don't need one).
+        Point at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, Ollama, or a remote gateway) and add a
+        model on it. Several chat and embedding models can share one endpoint and key. The API key is optional — leave
+        it blank when adding another model to an endpoint you've already configured.
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Type</Label>
+          <div className="inline-flex h-8 items-center rounded-lg border p-0.5">
+            {tab('chat', 'Chat')}
+            {tab('embedding', 'Embedding')}
+          </div>
+        </div>
         <div className="space-y-1.5 flex-1 min-w-[240px]">
           <Label className="text-xs">Base URL</Label>
           <Input
@@ -220,10 +294,32 @@ function CustomProviderSection() {
           <Input
             value={model}
             onChange={e => setModel(e.target.value)}
-            placeholder="qwen3:4b"
+            placeholder={type === 'embedding' ? 'nomic-embed-text' : 'qwen3:4b'}
             className="w-[180px] font-mono text-xs"
           />
         </div>
+        {type === 'embedding' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Family</Label>
+            <div>
+              <Select value={family} onValueChange={(v) => { if (v) { setFamily(v); setFamilyTouched(true) } }}>
+                <SelectTrigger className="h-8 w-[200px] font-mono text-xs">
+                  <SelectValue>
+                    {(value: string) => (value === OWN_FAMILY ? 'New family (own)' : value)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={OWN_FAMILY}>New family (own)</SelectItem>
+                  {existingFamilies.map(f => (
+                    <SelectItem key={f.family} value={f.family} className="font-mono text-xs">
+                      {f.family} · {f.dimensions}d
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs">Display name</Label>
           <Input
@@ -244,9 +340,18 @@ function CustomProviderSection() {
           />
         </div>
         <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
-          {addCustom.isPending ? 'Adding…' : 'Add model'}
+          {addCustom.isPending ? (type === 'embedding' ? 'Probing…' : 'Adding…') : 'Add model'}
         </Button>
       </form>
+      {type === 'embedding' && (
+        <p className="text-[11px] text-muted-foreground/70 mt-2">
+          Embedding dimension is detected automatically. Pick <span className="font-medium">New family</span> to make this
+          model its own family, or an existing family to add it as a failover provider (its dimension must match).
+          {suggestedFamily && family === suggestedFamily && (
+            <> Matched <code className="font-mono">{suggestedFamily}</code> by model id — change it if that's not the same model.</>
+          )}
+        </p>
+      )}
       {addCustom.isError && (
         <p className="text-destructive text-xs mt-2">{(addCustom.error as Error).message}</p>
       )}
@@ -466,7 +571,7 @@ export default function KeysPage() {
           )}
         </section>
 
-        <CustomProviderSection />
+        <CustomModelSection />
 
         <section>
           <h2 className="text-sm font-medium mb-3">Configured providers</h2>

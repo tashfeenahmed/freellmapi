@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -17,6 +17,7 @@ interface ProviderEntry {
   enabled: boolean
   quotaLabel: string
   keyCount: number
+  isCustom: boolean
 }
 
 interface Family {
@@ -67,6 +68,14 @@ export default function EmbeddingsPage() {
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       setLocalFamilies(null)
       setLocalDefault(null)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/embeddings/custom/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['embeddings'] })
+      setLocalFamilies(null)
     },
   })
 
@@ -200,6 +209,17 @@ export default function EmbeddingsPage() {
                         checked={p.enabled}
                         onCheckedChange={(c) => updateProvider(f.family, p.id, { enabled: c })}
                       />
+                      {p.isCustom && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove custom embedding provider "${p.displayName}"?`)) deleteMutation.mutate(p.id)
+                          }}
+                          aria-label="Delete custom provider"
+                          className="rounded-md p-1 text-muted-foreground/60 hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

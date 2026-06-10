@@ -37,7 +37,6 @@ export function initDb(dbPath?: string): Database.Database {
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
 }
-
 export function getUnifiedApiKey(): string {
   const db = getDb();
   const row = db.prepare("SELECT value FROM settings WHERE key = 'unified_api_key'").get() as { value: string };

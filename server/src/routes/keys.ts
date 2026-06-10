@@ -144,8 +144,9 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   const modelId = parsed.data.model.trim();
   const displayName = (parsed.data.displayName ?? modelId).trim();
   // Local servers often need no key; keep a sentinel so there's always a bearer.
-  const rawKey = parsed.data.apiKey?.trim() || 'no-key';
-  const label = parsed.data.label ?? 'Custom';
+  const providedKey = parsed.data.apiKey?.trim();
+  const providedLabel = parsed.data.label?.trim();
+  const label = providedLabel || 'Custom'; // only used when inserting a new row
 
   const db = getDb();
   const upsert = db.transaction(() => {
@@ -156,12 +157,21 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
       .get(baseUrl) as { id: number } | undefined;
     let keyId: number;
     if (existing) {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      db.prepare("UPDATE api_keys SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-        .run(label, encrypted, iv, authTag, existing.id);
+      // Adding another model to an existing endpoint: update key and label
+      // independently, each only when actually supplied, so a blank field
+      // doesn't clobber what the endpoint's other models depend on.
+      if (providedKey) {
+        const { encrypted, iv, authTag } = encrypt(providedKey);
+        db.prepare("UPDATE api_keys SET encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown' WHERE id = ?")
+          .run(encrypted, iv, authTag, existing.id);
+      }
+      if (providedLabel) {
+        db.prepare('UPDATE api_keys SET label = ? WHERE id = ?').run(providedLabel, existing.id);
+      }
+      db.prepare('UPDATE api_keys SET enabled = 1 WHERE id = ?').run(existing.id);
       keyId = existing.id;
     } else {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
+      const { encrypted, iv, authTag } = encrypt(providedKey || 'no-key');
       const r = db.prepare(`
         INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
         VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
@@ -203,7 +213,7 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
     baseUrl,
     model: modelId,
     displayName,
-    maskedKey: maskKey(rawKey),
+    maskedKey: maskKey(providedKey || 'no-key'),
   });
 });
 
@@ -232,10 +242,15 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
     if (row.platform === 'custom') {
       db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
       db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
+      // Custom embedding providers bind to this same endpoint key via
+      // embedding_models.key_id — drop the ones pointing at THIS endpoint so
+      // they don't linger as unroutable orphans.
+      db.prepare('DELETE FROM embedding_models WHERE key_id = ?').run(id);
       const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
       if (remaining.n === 0) {
         db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
         db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+        db.prepare('DELETE FROM embedding_models WHERE key_id IS NOT NULL').run();
       }
     }
   });

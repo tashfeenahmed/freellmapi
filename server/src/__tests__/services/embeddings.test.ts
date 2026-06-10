@@ -167,6 +167,41 @@ describe('embeddings service', () => {
       expect(result.platform).toBe('openrouter');
     });
 
+    it('routes a custom provider to its endpoint base_url and bound key', async () => {
+      // Register a custom endpoint key (platform='custom', base_url) and an
+      // embedding row bound to it via key_id — the shape POST /custom produces.
+      const { encrypted, iv, authTag } = encrypt('secret-key');
+      const keyRow = getDb().prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+        VALUES ('custom', 'test', ?, ?, ?, 'healthy', 1, 'https://my.host/v1')
+      `).run(encrypted, iv, authTag);
+      getDb().prepare(`
+        INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
+        VALUES ('my-embed', 'custom', 'my-embed', 'My Embed', 768, NULL, 1, 1, 'custom endpoint', ?)
+      `).run(Number(keyRow.lastInsertRowid));
+
+      const fetchMock = vi.fn(async () => okEmbeddingResponse(768));
+      globalThis.fetch = fetchMock as any;
+
+      const result = await runEmbeddings('my-embed', ['hello']);
+      expect(result.platform).toBe('custom');
+      expect(result.dimensions).toBe(768);
+      expect(String(fetchMock.mock.calls[0][0])).toBe('https://my.host/v1/embeddings');
+      const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer secret-key');
+    });
+
+    it('skips a custom provider whose endpoint key was deleted', async () => {
+      // key_id points at a non-existent api_keys row → no usable endpoint.
+      getDb().prepare(`
+        INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
+        VALUES ('orphan', 'custom', 'orphan', 'Orphan', 768, NULL, 1, 1, 'custom endpoint', 9999)
+      `).run();
+      globalThis.fetch = vi.fn(async () => okEmbeddingResponse(768)) as any;
+
+      await expect(runEmbeddings('orphan', ['hello'])).rejects.toMatchObject({ status: 502 });
+    });
+
     it("logs requests tagged request_type='embedding' so chat budgets ignore them", async () => {
       addKey('nvidia');
       addKey('openrouter');

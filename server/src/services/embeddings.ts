@@ -21,6 +21,9 @@ export interface EmbeddingModelRow {
   priority: number;
   enabled: number;
   quota_label: string;
+  // Set for custom OpenAI-compatible providers: binds this row to the api_keys
+  // row carrying its endpoint (base_url). NULL for built-in platforms.
+  key_id: number | null;
 }
 
 export interface EmbeddingsResult {
@@ -60,13 +63,32 @@ export function resolveFamily(model: string | undefined): string | null {
   return byModelId?.family ?? null;
 }
 
-function getPlatformKey(platform: string): string | null {
-  const row = getDb().prepare(
+interface ResolvedKey {
+  key: string;
+  baseUrl: string | null; // endpoint for custom providers; null for built-ins
+}
+
+// Resolve the usable credential for a provider row. Custom rows bind to a
+// specific api_keys row (by key_id) so we read THAT endpoint's key + base_url;
+// built-in platforms take the first healthy key for their platform name.
+function getProviderKey(row: EmbeddingModelRow): ResolvedKey | null {
+  if (row.key_id != null) {
+    const r = getDb().prepare(
+      "SELECT encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')",
+    ).get(row.key_id) as { encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
+    if (!r || !r.base_url) return null;
+    try {
+      return { key: decrypt(r.encrypted_key, r.iv, r.auth_tag), baseUrl: r.base_url };
+    } catch {
+      return null;
+    }
+  }
+  const r = getDb().prepare(
     "SELECT encrypted_key, iv, auth_tag FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id LIMIT 1",
-  ).get(platform) as { encrypted_key: string; iv: string; auth_tag: string } | undefined;
-  if (!row) return null;
+  ).get(row.platform) as { encrypted_key: string; iv: string; auth_tag: string } | undefined;
+  if (!r) return null;
   try {
-    return decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    return { key: decrypt(r.encrypted_key, r.iv, r.auth_tag), baseUrl: null };
   } catch {
     return null;
   }
@@ -111,8 +133,13 @@ async function openAiStyleEmbed(
   };
 }
 
-async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[]): Promise<ProviderCallResult> {
+async function callProvider(row: EmbeddingModelRow, key: string, baseUrl: string | null, inputs: string[]): Promise<ProviderCallResult> {
   switch (row.platform) {
+    case 'custom':
+      // User-configured OpenAI-compatible endpoint (#117). base_url already has
+      // any trailing slash stripped when the endpoint was registered.
+      if (!baseUrl) throw new EmbeddingsError('custom embedding provider has no base_url', 500);
+      return openAiStyleEmbed(`${baseUrl}/embeddings`, key, row.model_id, inputs);
     case 'google':
       return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs);
     case 'nvidia':
@@ -188,6 +215,18 @@ function logEmbeddingRequest(
   }
 }
 
+/** Probe a custom OpenAI-compatible endpoint with a tiny request to discover
+ * its embedding dimension. Used at registration time so the user doesn't have
+ * to hand-enter the vector length. Throws EmbeddingsError on any failure. */
+export async function probeEmbeddingDimensions(baseUrl: string, key: string, modelId: string): Promise<number> {
+  const out = await openAiStyleEmbed(`${baseUrl}/embeddings`, key, modelId, ['probe']);
+  const dims = out.vectors[0]?.length;
+  if (!dims || dims < 1) {
+    throw new EmbeddingsError('endpoint returned no usable embedding vector', 502);
+  }
+  return dims;
+}
+
 /** Embed `inputs` via the family's provider chain, failing over within the
  * family on any provider error. Throws EmbeddingsError when the chain is dry. */
 export async function runEmbeddings(model: string | undefined, inputs: string[]): Promise<EmbeddingsResult> {
@@ -207,11 +246,11 @@ export async function runEmbeddings(model: string | undefined, inputs: string[])
 
   let lastError: EmbeddingsError | null = null;
   for (const row of chain) {
-    const key = getPlatformKey(row.platform);
-    if (!key) continue; // no usable key for this provider — try the next one
+    const resolved = getProviderKey(row);
+    if (!resolved) continue; // no usable key/endpoint for this provider — try the next one
     const started = Date.now();
     try {
-      const out = await callProvider(row, key, inputs);
+      const out = await callProvider(row, resolved.key, resolved.baseUrl, inputs);
       if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
         throw new EmbeddingsError('upstream returned malformed embeddings', 502);
       }

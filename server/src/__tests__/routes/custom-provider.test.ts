@@ -278,3 +278,39 @@ describe('POST /api/keys/custom (#117)', () => {
     });
   });
 });
+
+describe('DELETE /api/models/custom/:id', () => {
+  let app: Express;
+
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    app = createApp();
+    dashToken = mintDashboardToken();
+  });
+
+  it('removes one custom model and its fallback entry but keeps the endpoint key', async () => {
+    // Two models on one endpoint → one shared key.
+    await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:9/v1', model: 'keep-me', apiKey: 'sk-x' });
+    const second = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:9/v1', model: 'drop-me' });
+    const db = getDb();
+    const dropId = (db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = 'drop-me'").get() as any).id;
+    expect(second.status).toBe(201);
+
+    const { status } = await del(app, `/api/models/custom/${dropId}`);
+    expect(status).toBe(200);
+
+    // The model and its fallback row are gone…
+    expect(db.prepare("SELECT id FROM models WHERE id = ?").get(dropId)).toBeUndefined();
+    expect(db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(dropId)).toBeUndefined();
+    // …the sibling model and the shared endpoint key remain.
+    expect((db.prepare("SELECT model_id FROM models WHERE platform = 'custom'").all() as any[]).map(r => r.model_id)).toEqual(['keep-me']);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:9/v1'").get() as any).n).toBe(1);
+  });
+
+  it('404s on a built-in (non-custom) model id', async () => {
+    const builtin = getDb().prepare("SELECT id FROM models WHERE platform != 'custom' LIMIT 1").get() as any;
+    const { status } = await del(app, `/api/models/custom/${builtin.id}`);
+    expect(status).toBe(404);
+  });
+});
