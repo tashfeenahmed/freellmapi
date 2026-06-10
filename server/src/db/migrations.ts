@@ -32,6 +32,7 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
   migrateModelsV25ZenDeadPromos(db);
+  migrateModelsV26RecurringFreeAudit(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -1703,6 +1704,7 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%nemotron-nano-12b-v2-vl%' -- unlike the 30B nano: live-probed structured tool_calls (V23, 2026-06-07)
         OR LOWER(model_id) LIKE '%nemotron-3-ultra%' -- structured tool_calls live-verified via Zen's dedicated endpoint (V24, 2026-06-07); covers the disabled OR row too
         OR LOWER(model_id) LIKE '%minimax-m3%'       -- finish_reason:tool_calls live-verified on Zen (V24)
+        OR LOWER(model_id) LIKE '%north-mini-code%'  -- structured tool_calls + reasoning_content live-verified on Zen (V26, 2026-06-10)
       )
     `).run();
   });
@@ -1864,6 +1866,93 @@ function migrateModelsV25ZenDeadPromos(db: Database.Database) {
   apply();
 }
 
+/**
+ * V26 (June 2026): recurring-free audit, pass 2 — deep-verified every shipped
+ * platform's free tier against primary docs (2026-06-10) plus live probes.
+ *
+ * Corrections to stale beliefs:
+ *   - NVIDIA NIM: the credit system was DISCONTINUED (~Sept 2025, confirmed by
+ *     NVIDIA staff on the dev forums) and replaced by a recurring 40 RPM rate
+ *     limit per account. Budget labels updated from "(credits)" — the old
+ *     'nvidia-credits-based' quirk is replaced in migrateQuirksV1 and its
+ *     stale row deleted here. ToS caution (evaluation-only) still applies and
+ *     stays in the quirk body.
+ *   - Cerebras: free tier now exposes exactly two models (gpt-oss-120b,
+ *     zai-glm-4.7), each 5 RPM / 30K TPM / 1M TPD as a continuously-refilling
+ *     token bucket (no fixed daily reset, so rpd is null).
+ *   - LLM7: anonymous tightened to 60 req/hr (100/hr with the free
+ *     token.llm7.io token, 5M tokens/day rolling).
+ *
+ * Additions:
+ *   - opencode/north-mini-code-free — new Zen promo, live-probed 2026-06-10
+ *     with the production key: structured tool_calls, reasoning_content.
+ *     (qwen3.6-plus-free still appears in Zen's /models but returns "Free
+ *     promotion has ended" — never shipped, nothing to disable.)
+ *   - 'ovh' platform (OVHcloud AI Endpoints, keyless anonymous tier) — four
+ *     chat models. rpm_limit 2 mirrors the documented anonymous limit
+ *     (2 req/min per IP per model); live probes suggest the effective anon
+ *     budget is shared across models, so treat it as a trickle tier that
+ *     mainly adds breadth to fallback chains.
+ *
+ * Evaluated and rejected (for the record): Vercel AI Gateway ($5/mo recurring
+ * but card verification required to unlock it — fails no-card; any top-up
+ * permanently forfeits the credit), SiliconFlow (China real-name ID),
+ * Together/Fireworks/Hyperbolic/DeepInfra/Novita/Lambda (one-time credits or
+ * dead), Scaleway (card-gated), Hack Club AI (ToS bans proxies), Netlify AI
+ * Gateway (platform-locked), xAI ($150/mo data-sharing program ended ~May
+ * 2025), AI/ML API (free tier paused), Targon/Galadriel (pivoted away).
+ * Idempotent: INSERT OR IGNORE + absolute UPDATEs, safe to re-run.
+ */
+function migrateModelsV26RecurringFreeAudit(db: Database.Database) {
+  const apply = db.transaction(() => {
+    // Cerebras free-tier table (inference-docs.cerebras.ai/support/rate-limits,
+    // fetched 2026-06-10): 5 RPM / 30K TPM / 1M TPD, continuously replenishing.
+    db.prepare(`
+      UPDATE models SET rpm_limit = 5, rpd_limit = NULL, tpm_limit = 30000,
+                        tpd_limit = 1000000, monthly_token_budget = '~30M'
+       WHERE platform = 'cerebras' AND model_id IN ('gpt-oss-120b', 'zai-glm-4.7')
+    `).run();
+
+    // NVIDIA NIM is rate-limited (40 RPM), not credit-depleting.
+    db.prepare(`
+      UPDATE models SET monthly_token_budget = 'free · 40 RPM'
+       WHERE platform = 'nvidia'
+    `).run();
+
+    // LLM7 anonymous tier tightened (docs.llm7.io/limits, 2026-06-10).
+    db.prepare(`
+      UPDATE models SET monthly_token_budget = '~2M (60-100/hr)'
+       WHERE platform = 'llm7'
+    `).run();
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, supports_vision, supports_tools)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null, number, number, number]> = [
+      ['opencode', 'north-mini-code-free',         'North Mini Code Free (OpenCode Zen)', 13, 4, 'Medium',   20,   200,  null, null, 'promo (trial)',      131072, 1, 0, 1],
+      ['ovh',      'Qwen3.5-397B-A17B',            'Qwen3.5 397B (OVH)',                   5, 9, 'Frontier',  2,   null, null, null, 'free · 2/min per IP', 262144, 1, 0, 1],
+      ['ovh',      'gpt-oss-120b',                 'GPT-OSS 120B (OVH)',                   6, 9, 'Large',     2,   null, null, null, 'free · 2/min per IP', 131072, 1, 0, 1],
+      ['ovh',      'Meta-Llama-3_3-70B-Instruct',  'Llama 3.3 70B (OVH)',                 17, 9, 'Medium',    2,   null, null, null, 'free · 2/min per IP', 131072, 1, 0, 1],
+      ['ovh',      'Qwen3-Coder-30B-A3B-Instruct', 'Qwen3-Coder 30B (OVH)',               19, 9, 'Medium',    2,   null, null, null, 'free · 2/min per IP', 262144, 1, 0, 1],
+    ];
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+
+    // The old credits quirk is superseded by 'nvidia-rate-limited' (seeded in
+    // migrateQuirksV1). Delete the stale slug — targets cascade. On a fresh DB
+    // the quirks table doesn't exist yet (migrateQuirksV1 runs after the model
+    // migrations), so guard the delete.
+    const hasQuirks = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'quirks'")
+      .get();
+    if (hasQuirks) {
+      db.prepare("DELETE FROM quirks WHERE slug = 'nvidia-credits-based'").run();
+    }
+  });
+  apply();
+}
+
 // Embeddings V1 (2026-06): per-family embedding catalog. A "family" is one
 // model identity + dimension — vectors from different families live in
 // incompatible spaces, so /v1/embeddings only ever fails over WITHIN a family
@@ -1985,7 +2074,35 @@ function migrateQuirksV1(db: Database.Database) {
       title: 'No API key required',
       body: 'Routes anonymously — the catalog ships a keyless sentinel row and calls work with no account or key.',
       severity: 'info',
-      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'pollinations' }],
+      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'pollinations' }, { platform: 'ovh' }],
+    },
+    {
+      slug: 'ovh-anon-trickle',
+      title: 'Anonymous tier is 2 req/min',
+      body: 'OVH AI Endpoints anonymous mode is documented at 2 req/min per IP per model (observed even stricter across models). The 400 req/min authenticated tier requires a Public Cloud project with a payment method, so the catalog ships the keyless path. Treat as a breadth/fallback tier, not a throughput tier.',
+      severity: 'warning',
+      targets: [{ platform: 'ovh' }],
+    },
+    {
+      slug: 'pollinations-degraded',
+      title: 'Anon tier degraded (1 concurrent)',
+      body: 'Pollinations’ legacy text API is deprecated for authenticated users (replacement enter.pollinations.ai is pay-as-you-go), but anonymous access is explicitly unaffected. Anon is queue-limited to 1 concurrent request per IP and serves a single model (openai-fast); expect 429 "Queue full" under any parallelism. Live-probed 2026-06-10.',
+      severity: 'warning',
+      targets: [{ platform: 'pollinations' }],
+    },
+    {
+      slug: 'or-free-cap-account-wide',
+      title: 'Daily :free cap is account-wide',
+      body: 'OpenRouter’s :free daily cap (50/day, or 1000/day once you have ever bought $10 of credits) is shared across ALL :free models on the account, not per model. Per-row rpd values here are therefore optimistic; the router’s cooldown handling absorbs the shared 429s.',
+      severity: 'info',
+      targets: [{ platform: 'openrouter', modelGlob: '*:free' }],
+    },
+    {
+      slug: 'zen-promo-roster',
+      title: 'Limited-time promo, roster rotates',
+      body: 'OpenCode Zen free models are explicitly limited-time promotional access ("available for a limited time" per the docs), not a recurring quota. The roster rotates: qwen3.6-plus and minimax-m3 promos already ended. Expect any row here to die without notice; prompts/outputs may be used for model improvement.',
+      severity: 'warning',
+      targets: [{ platform: 'opencode' }],
     },
     {
       slug: 'cloudflare-key-format',
@@ -1995,10 +2112,14 @@ function migrateQuirksV1(db: Database.Database) {
       targets: [{ platform: 'cloudflare' }],
     },
     {
-      slug: 'nvidia-credits-based',
-      title: 'Credit-based, not recurring-free',
-      body: 'NVIDIA NIM moved to a credit model in 2025; the free allotment is a depleting trial, not a recurring monthly tier. Disabled by default.',
-      severity: 'warning',
+      // Replaces 'nvidia-credits-based' (deleted in V26): NVIDIA staff
+      // confirmed on the dev forums (~Sept 2025) that the credit system was
+      // discontinued in favor of per-account rate limits, so NIM IS
+      // recurring-free again. The ToS caution survives the correction.
+      slug: 'nvidia-rate-limited',
+      title: 'Recurring free, 40 RPM, eval-only ToS',
+      body: 'NVIDIA NIM replaced its depleting trial credits with a recurring per-account rate limit (40 RPM default, varies by model), verified June 2026. The trial ToS still scopes usage to evaluation/prototyping, not production.',
+      severity: 'info',
       targets: [{ platform: 'nvidia' }],
     },
     {
