@@ -20,12 +20,15 @@ async function request(app: Express, path: string) {
   return { status: res.status, body: data };
 }
 
-function insertRequest(createdAt: string) {
+function insertRequest(createdAt: string, opts?: { status?: string; error?: string | null; modelId?: string }) {
   const db = getDb();
+  const status = opts?.status ?? 'success';
+  const error = opts?.error ?? null;
+  const modelId = opts?.modelId ?? 'test-model';
   db.prepare(`
     INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error, created_at)
-    VALUES ('test', 'test-model', 'success', 1, 2, 3, NULL, ?)
-  `).run(createdAt);
+    VALUES ('test', ?, ?, 1, 2, 3, ?, ?)
+  `).run(modelId, status, error, createdAt);
 }
 
 function insertTokensRequest(
@@ -88,6 +91,23 @@ describe('Analytics API', () => {
 
     expect(status).toBe(200);
     expect(body.totalRequests).toBe(2);
+  });
+
+  it('returns the last 100 live requests with optional errors-only filter', async () => {
+    insertRequest('2026-05-29 10:00:00', { status: 'success', modelId: 'model-a' });
+    insertRequest('2026-05-29 10:01:00', { status: 'error', error: '502 Bad Gateway', modelId: 'model-b' });
+    insertRequest('2026-05-29 10:02:00', { status: 'error', error: '429 Rate Limit', modelId: 'model-c' });
+
+    const all = await request(app, '/api/analytics/live-requests?range=24h');
+    expect(all.status).toBe(200);
+    expect(all.body).toHaveLength(3);
+    expect(all.body[0].status).toBe('error');
+    expect(all.body[0].displayName).toBe('model-c');
+
+    const errorsOnly = await request(app, '/api/analytics/live-requests?range=24h&errorsOnly=true');
+    expect(errorsOnly.status).toBe(200);
+    expect(errorsOnly.body).toHaveLength(2);
+    expect(errorsOnly.body.every((r: any) => r.status === 'error')).toBe(true);
   });
 
   it('prices savings at the served model paid-equivalent rate', async () => {

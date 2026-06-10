@@ -7,13 +7,15 @@ export const analyticsRouter = Router();
 
 // Format UTC timestamps the same way SQLite stores created_at text values.
 const toSqliteDateTime = (timestamp: number) =>
-    new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ');
+  new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ');
 
 // Return the rolling cutoff timestamp for the selected analytics range.
 function getSinceTimestamp(range: string): string {
   const now = Date.now();
 
   switch (range) {
+    case '1h':
+      return toSqliteDateTime(now - 60 * 60 * 1000);
     case '24h':
       return toSqliteDateTime(now - 24 * 60 * 60 * 1000);
     case '30d':
@@ -86,6 +88,8 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
       r.platform,
       r.model_id,
       m.display_name,
+      m.input_cost_per_1m,
+      m.output_cost_per_1m,
       COUNT(*) as requests,
       SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate,
       AVG(r.latency_ms) as avg_latency_ms,
@@ -151,12 +155,12 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
 // Timeline data
 analyticsRouter.get('/timeline', (req: Request, res: Response) => {
   const range = (req.query.range as string) ?? '7d';
-  const interval = (req.query.interval as string) ?? (range === '24h' ? 'hour' : 'day');
+  const interval = (req.query.interval as string) ?? (range === '1h' ? 'minute' : range === '24h' ? 'hour' : 'day');
   const since = getSinceTimestamp(range);
   const db = getDb();
 
   // dateFormat is a hardcoded whitelist — never user-controlled.
-  const dateFormat = interval === 'hour' ? '%Y-%m-%dT%H:00:00' : '%Y-%m-%d';
+  const dateFormat = interval === 'minute' ? '%Y-%m-%dT%H:%M:00' : interval === 'hour' ? '%Y-%m-%dT%H:00:00' : '%Y-%m-%d';
 
   const rows = db.prepare(`
     SELECT
@@ -176,6 +180,47 @@ analyticsRouter.get('/timeline', (req: Request, res: Response) => {
     successCount: r.success_count,
     failureCount: r.failure_count,
   })));
+});
+
+// Per-model timeline data
+analyticsRouter.get('/by-model-timeline', (req: Request, res: Response) => {
+  const range = (req.query.range as string) ?? '7d';
+  const interval = (req.query.interval as string) ?? (range === '1h' ? 'minute' : range === '24h' ? 'hour' : 'day');
+  const since = getSinceTimestamp(range);
+  const db = getDb();
+
+  const dateFormat = interval === 'minute' ? '%Y-%m-%dT%H:%M:00' : interval === 'hour' ? '%Y-%m-%dT%H:00:00' : '%Y-%m-%d';
+
+  const rows = db.prepare(`
+    SELECT
+      strftime('${dateFormat}', r.created_at) as timestamp,
+      r.platform,
+      r.model_id,
+      m.input_cost_per_1m,
+      m.output_cost_per_1m,
+      COUNT(*) as requests,
+      SUM(r.input_tokens) as total_input_tokens,
+      SUM(r.output_tokens) as total_output_tokens
+    FROM requests r
+    LEFT JOIN models m ON m.platform = r.platform AND m.model_id = r.model_id
+    WHERE r.created_at >= ?
+    GROUP BY strftime('${dateFormat}', r.created_at), r.platform, r.model_id
+    ORDER BY timestamp ASC
+  `).all(since) as any[];
+
+  res.json(rows.map(r => {
+    const inputCost = ((r.total_input_tokens ?? 0) / 1_000_000) * (r.input_cost_per_1m ?? 3);
+    const outputCost = ((r.total_output_tokens ?? 0) / 1_000_000) * (r.output_cost_per_1m ?? 15);
+    return {
+      timestamp: r.timestamp,
+      platform: r.platform,
+      modelId: r.model_id,
+      requests: r.requests,
+      totalInputTokens: r.total_input_tokens ?? 0,
+      totalOutputTokens: r.total_output_tokens ?? 0,
+      estimatedCost: Math.round((inputCost + outputCost) * 100) / 100,
+    };
+  }));
 });
 
 // Error distribution (grouped by error type and platform)
@@ -262,6 +307,42 @@ analyticsRouter.get('/errors', (req: Request, res: Response) => {
     modelId: r.model_id,
     error: r.error,
     latencyMs: r.latency_ms,
+    createdAt: r.created_at,
+  })));
+});
+
+// Live request log (last N requests, optionally errors only)
+analyticsRouter.get('/live-requests', (req: Request, res: Response) => {
+  const range = (req.query.range as string) ?? '7d';
+  const errorsOnly = req.query.errorsOnly === 'true';
+  const since = getSinceTimestamp(range);
+  const db = getDb();
+
+  const rows = db.prepare(`
+    SELECT
+      r.id,
+      r.platform,
+      r.model_id,
+      COALESCE(m.display_name, r.model_id) as display_name,
+      r.status,
+      r.latency_ms,
+      r.error,
+      r.created_at
+    FROM requests r
+    LEFT JOIN models m ON m.platform = r.platform AND m.model_id = r.model_id
+    WHERE r.created_at >= ? ${errorsOnly ? "AND r.status = 'error'" : ''}
+    ORDER BY r.created_at DESC
+    LIMIT 100
+  `).all(since) as any[];
+
+  res.json(rows.map(r => ({
+    id: r.id,
+    platform: r.platform,
+    modelId: r.model_id,
+    displayName: r.display_name,
+    status: r.status,
+    latencyMs: r.latency_ms,
+    error: r.error,
     createdAt: r.created_at,
   })));
 });

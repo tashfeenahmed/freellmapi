@@ -24,7 +24,6 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
-import { ModelsTabs } from '@/components/models-tabs'
 import { Tooltip } from '@/components/tooltip'
 
 interface FallbackEntry {
@@ -210,7 +209,7 @@ const platformColors: Record<string, string> = {
   ollama:      '#000000',
   kilo:        '#7c3aed',
   pollinations: '#a855f7',
-  llm7:        '#0ea5e9',
+  llm7: '#0ea5e9',
   huggingface: '#ff9d00',
 }
 
@@ -538,7 +537,6 @@ export default function FallbackPage() {
         title="Models"
         description="Pick a routing strategy. In Manual mode you drag to set the order; the other strategies route by live score across reliability, speed and intelligence."
         divider={false}
-        actions={<ModelsTabs />}
       />
 
       <div className="space-y-6">
