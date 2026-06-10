@@ -31,6 +31,7 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV22Tools(db);
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
+  migrateModelsV25ZenDeadPromos(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -1830,6 +1831,34 @@ function migrateModelsV24ZenRefresh(db: Database.Database) {
       UPDATE models SET enabled = 0
        WHERE platform = 'nvidia' AND model_id = 'google/gemma-4-31b-it'
     `).run();
+  });
+  apply();
+}
+
+/**
+ * V25 (2026-06-09): retire two OpenCode Zen free models that went dead.
+ * Observed on the production proxy — together they accounted for ~55% of a
+ * day's error rows, each 401ing on every route attempt (a 401 is non-retryable,
+ * so when one was picked first it hard-failed the request, not just logged):
+ *   - nemotron-3-super-free → `401: Model nemotron-3-super-free is not supported`.
+ *     V24 kept it enabled with "prune if it starts billing or 402s"; Zen has now
+ *     removed it outright.
+ *   - minimax-m3-free → `401: Free promotion has ended for MiniMax M3 Free`.
+ *     Added in V24 while its promo was live; the promo has since lapsed (same
+ *     fate qwen3.6-plus-free hit). These are server-side, account-independent
+ *     verdicts — dead for everyone, not a per-key issue.
+ * Disabled, not removed (row kept so fallback history survives and a future
+ * promo can re-enable). Idempotent: re-asserted each boot like the V13/V24
+ * disables.
+ */
+function migrateModelsV25ZenDeadPromos(db: Database.Database) {
+  const disable = db.prepare(`UPDATE models SET enabled = 0 WHERE platform = ? AND model_id = ?`);
+  const disables: Array<[string, string]> = [
+    ['opencode', 'nemotron-3-super-free'],
+    ['opencode', 'minimax-m3-free'],
+  ];
+  const apply = db.transaction(() => {
+    for (const [p, m] of disables) disable.run(p, m);
   });
   apply();
 }

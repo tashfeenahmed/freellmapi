@@ -139,6 +139,10 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];
+  // The model's thinking trace on an assistant turn. Some thinking models
+  // (DeepSeek on OpenCode Zen) require it to be replayed verbatim on the next
+  // turn or they 400; the proxy preserves and forwards it. See issue #255.
+  reasoning_content?: string;
 }
 
 export interface ChatCompletionRequest {

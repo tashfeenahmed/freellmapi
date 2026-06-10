@@ -92,6 +92,45 @@ describe('OpenAICompatProvider', () => {
     expect(capturedBody.parallel_tool_calls).toBe(true);
   });
 
+  describe('forceSingleToolCall (NVIDIA NIM single-tool-call 400 — issue #255)', () => {
+    const nim = () => new OpenAICompatProvider({
+      platform: 'nvidia',
+      name: 'NVIDIA NIM',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      forceSingleToolCall: true,
+    });
+    const okResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'x', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as any;
+    const tools = [{ type: 'function' as const, function: { name: 'f', description: 'd', parameters: { type: 'object', properties: {} } } }];
+
+    it('pins parallel_tool_calls to false when tools are present, even if the caller asked for true', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await nim().chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', { tools, parallel_tool_calls: true });
+      expect(body.parallel_tool_calls).toBe(false);
+    });
+
+    it('leaves parallel_tool_calls untouched when there are no tools', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await nim().chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', {});
+      expect(body.parallel_tool_calls).toBeUndefined();
+    });
+
+    it('does not affect providers without the flag (parallel_tool_calls passes through)', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', { tools, parallel_tool_calls: true });
+      expect(body.parallel_tool_calls).toBe(true);
+    });
+  });
+
   it('should throw on error response', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: false,

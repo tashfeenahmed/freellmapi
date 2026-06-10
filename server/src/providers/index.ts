@@ -33,11 +33,14 @@ register(new OpenAICompatProvider({
 // credit (expires in 3 months); once it lapses, every chat call 402s
 // "payment method required" with no recurring no-card path back.
 
-// NVIDIA NIM - OpenAI-compatible
+// NVIDIA NIM - OpenAI-compatible. Several NIM models reject parallel tool calls
+// ("This model only supports single tool-calls at once!"), so pin
+// parallel_tool_calls to false when tools are present. See issue #255.
 register(new OpenAICompatProvider({
   platform: 'nvidia',
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
+  forceSingleToolCall: true,
 }));
 
 // Mistral - OpenAI-compatible

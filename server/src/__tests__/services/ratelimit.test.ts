@@ -12,6 +12,7 @@ import {
   providerDailyRequestCount,
   getProviderDailyRequestCap,
 } from '../../services/ratelimit.js';
+import { parseRetryAfterMs } from '../../providers/base.js';
 
 function removeDbFile(dbPath: string) {
   for (const suffix of ['', '-shm', '-wal']) {
@@ -227,5 +228,46 @@ describe('Rate Limiter', () => {
       recordRequest('openrouter', 'model-c', testId);
       expect(canUseProvider('openrouter', testId)).toBe(false); // 3 >= 3
     });
+  });
+});
+
+describe('Cooldown duration with upstream Retry-After', () => {
+  const noLimits = { rpd: null, tpd: null };
+  let testId: number;
+  beforeEach(() => { testId = Math.floor(Math.random() * 1_000_000); });
+
+  it('uses the transient cooldown when no Retry-After is given', () => {
+    expect(getCooldownDurationForLimit('groq', 'm', testId, noLimits)).toBe(90_000);
+  });
+
+  it('never benches shorter than the heuristic (ignores a shorter Retry-After)', () => {
+    expect(getCooldownDurationForLimit('groq', 'm', testId, noLimits, 30_000)).toBe(90_000);
+  });
+
+  it('honors a Retry-After longer than the heuristic', () => {
+    expect(getCooldownDurationForLimit('groq', 'm', testId, noLimits, 300_000)).toBe(300_000);
+  });
+
+  it('caps an absurd Retry-After at a day', () => {
+    expect(getCooldownDurationForLimit('groq', 'm', testId, noLimits, 5 * 86_400_000)).toBe(86_400_000);
+  });
+});
+
+describe('parseRetryAfterMs', () => {
+  it('parses delta-seconds', () => {
+    expect(parseRetryAfterMs('120')).toBe(120_000);
+    expect(parseRetryAfterMs('0')).toBe(0);
+  });
+
+  it('parses an HTTP-date into a positive future delay', () => {
+    const ms = parseRetryAfterMs(new Date(Date.now() + 60_000).toUTCString());
+    expect(ms).toBeGreaterThan(50_000);
+    expect(ms).toBeLessThanOrEqual(60_000);
+  });
+
+  it('returns undefined for absent or unparseable values', () => {
+    expect(parseRetryAfterMs(null)).toBeUndefined();
+    expect(parseRetryAfterMs('')).toBeUndefined();
+    expect(parseRetryAfterMs('soon')).toBeUndefined();
   });
 });

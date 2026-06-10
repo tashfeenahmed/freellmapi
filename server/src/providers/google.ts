@@ -7,7 +7,7 @@ import type {
   ChatToolDefinition,
   TokenUsage,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
 import { contentToString } from '../lib/content.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -350,7 +350,7 @@ export class GoogleProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
     const data = await res.json() as GeminiResponse;
@@ -413,7 +413,7 @@ export class GoogleProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
     const reader = res.body?.getReader();
