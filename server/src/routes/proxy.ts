@@ -953,7 +953,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), null, pinnedModelId);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
             return;
           }
           // Headers never sent — bubble to the outer retry handler, which
