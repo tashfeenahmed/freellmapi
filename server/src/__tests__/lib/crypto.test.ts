@@ -28,6 +28,14 @@ describe('Crypto', () => {
     expect(() => decrypt(encrypted, iv, 'a'.repeat(32))).toThrow();
   });
 
+  it('should reject truncated auth tags (< 16 bytes) to block forgery brute-force', () => {
+    const { encrypted, iv, authTag } = encrypt('test-key');
+    for (const truncatedBytes of [4, 8, 12, 13, 14, 15]) {
+      const truncated = authTag.slice(0, truncatedBytes * 2);
+      expect(() => decrypt(encrypted, iv, truncated)).toThrow();
+    }
+  });
+
   describe('maskKey', () => {
     it('should mask long keys', () => {
       expect(maskKey('gsk_test1234567890abcdef')).toBe('gsk_...cdef');
