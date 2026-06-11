@@ -48,7 +48,7 @@ async function del(app: Express, path: string) {
   return { status: res.status, body: data };
 }
 
-describe('resolveProvider (#117)', () => {
+describe('Custom Provider Endpoints', () => {
   it('builds a custom provider bound to the supplied base URL', () => {
     const p = resolveProvider('custom', 'http://127.0.0.1:8080/v1');
     expect(p).toBeDefined();
@@ -66,15 +66,17 @@ describe('resolveProvider (#117)', () => {
   });
 });
 
-describe('POST /api/keys/custom (#117)', () => {
-  let app: Express;
-
-  beforeAll(() => {
-    process.env.ENCRYPTION_KEY = '0'.repeat(64);
-    initDb(':memory:');
-    app = createApp();
-    dashToken = mintDashboardToken();
-  });
+  describe('POST /api/keys/custom (#117)', () => {
+    let app: Express;
+  
+    beforeAll(() => {
+      process.env.ENCRYPTION_KEY = '0'.repeat(64);
+      initDb(':memory:');
+      // Isolate tests to use global fallback_config
+      getDb().prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
+      app = createApp();
+      dashToken = mintDashboardToken();
+    });
 
   it('rejects an invalid base URL', async () => {
     const { status } = await post(app, '/api/keys/custom', { baseUrl: 'not-a-url', model: 'm' });
@@ -217,7 +219,8 @@ describe('POST /api/keys/custom (#117)', () => {
       const db = getDb();
       db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
       db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
-      db.prepare("DELETE FROM api_keys WHERE platform = 'custom'").run();
+      db.prepare('DELETE FROM api_keys').run();
+      db.prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
 
       const a = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:11434/v1', model: 'llama3:8b', label: 'Ollama box' });
       const b = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:1234/v1', model: 'qwen3:4b', label: 'LM Studio' });

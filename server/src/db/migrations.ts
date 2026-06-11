@@ -46,6 +46,7 @@ export function migrateDbSchema(db: Database.Database) {
   migrateEmbeddingsV1(db);
   migrateQuirksV1(db);
   ensureUnifiedKey(db);
+  migrateProfilesInit(db);
 }
 
 function createTables(db: Database.Database) {
@@ -121,6 +122,28 @@ function createTables(db: Database.Database) {
       priority INTEGER NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       UNIQUE(model_db_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      type TEXT NOT NULL DEFAULT 'custom',
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      auto_sort TEXT,
+      layout_config TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS profile_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      model_db_id INTEGER NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+      priority INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(profile_id, model_db_id)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -2142,3 +2165,53 @@ function ensureUnifiedKey(db: Database.Database) {
     console.log(`\n  Your unified API key: ${key}\n`);
   }
 }
+
+/**
+ * Migration helper to ensure Default profile exists, legacy profiles converted, 
+ * and fallback_config synced.
+ */
+function migrateProfilesInit(db: Database.Database) {
+  // 1. Convert any legacy built-in profiles to custom profiles (type = 'custom')
+  db.prepare(`
+    UPDATE profiles
+    SET type = 'custom'
+    WHERE type = 'builtin'
+  `).run();
+
+  // 2. Ensure Default profile exists
+  const hasDefault = db.prepare("SELECT COUNT(*) as cnt FROM profiles WHERE type = 'default'").get() as { cnt: number };
+  if (hasDefault.cnt === 0) {
+    const minOrder = (db.prepare('SELECT COALESCE(MIN(sort_order), 0) AS mn FROM profiles').get() as { mn: number }).mn;
+    const targetOrder = Math.min(-1, minOrder - 1);
+
+    const result = db.prepare(
+      "INSERT INTO profiles (name, emoji, color, type, sort_order) VALUES ('Default', '⚙️', '#6366f1', 'default', ?)"
+    ).run(targetOrder);
+
+    const profileId = result.lastInsertRowid as number;
+
+    // Seed profile models from fallback_config
+    db.prepare(`
+      INSERT INTO profile_models (profile_id, model_db_id, priority, enabled)
+      SELECT ?, model_db_id, priority, enabled
+      FROM fallback_config
+      ORDER BY priority ASC
+    `).run(profileId);
+
+    // Make it the active profile if none is set
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('active_profile_id', ?)
+      ON CONFLICT(key) DO NOTHING
+    `).run(String(profileId));
+
+    console.log('Created Default profile');
+  } else {
+    // If it exists, ensure its emoji is '⚙️'
+    db.prepare(`
+      UPDATE profiles
+      SET emoji = '⚙️'
+      WHERE type = 'default' AND emoji != '⚙️'
+    `).run();
+  }
+}
+

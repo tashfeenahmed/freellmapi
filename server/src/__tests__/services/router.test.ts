@@ -20,6 +20,8 @@ describe('Router', () => {
     // bandit (now the default strategy) doesn't reorder by score.
     setRoutingStrategy('priority');
     db.prepare('DELETE FROM api_keys').run();
+    // Disable active profile so the router falls back to fallback_config
+    db.prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
     // Reset fallback order to intelligence ranking
     const models = db.prepare('SELECT id, intelligence_rank FROM models ORDER BY intelligence_rank ASC').all() as any[];
     const update = db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
