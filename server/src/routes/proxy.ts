@@ -118,27 +118,40 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     return;
   }
 
+  // By default we return the WHOLE catalog (one row per model id), each tagged
+  // with whether it is currently usable, so a client can see everything and know
+  // what's connected vs. disabled/keyless (#242). `?available=true` (alias
+  // `?connected=true`) narrows the list to only models that can serve a request
+  // right now — the previous default behavior. `available` is computed as
+  // "enabled AND an enabled key can serve it"; dedup prefers an available
+  // instance of a model id over a disabled/keyless one.
+  const availableExpr = `
+    (CASE WHEN m.enabled = 1 AND EXISTS (
+        SELECT 1 FROM api_keys k
+        WHERE k.platform = m.platform
+          AND k.enabled = 1
+          AND (m.key_id IS NULL OR k.id = m.key_id)
+      ) THEN 1 ELSE 0 END)`;
   const db = getDb();
   const models = db.prepare(`
-    SELECT platform, model_id, display_name, context_window
+    SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id
     FROM (
-      SELECT platform, model_id, display_name, context_window, intelligence_rank, id,
+      SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id,
+             m.enabled AS enabled,
+             ${availableExpr} AS available,
              ROW_NUMBER() OVER (
-               PARTITION BY model_id
-               ORDER BY intelligence_rank ASC, id ASC
+               PARTITION BY m.model_id
+               ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
              ) AS rn
       FROM models m
-      WHERE m.enabled = 1
-        AND EXISTS (
-          SELECT 1 FROM api_keys k
-          WHERE k.platform = m.platform
-            AND k.enabled = 1
-            AND (m.key_id IS NULL OR k.id = m.key_id)
-        )
     )
     WHERE rn = 1
-    ORDER BY intelligence_rank ASC, id ASC
+    ORDER BY available DESC, enabled DESC, intelligence_rank ASC, id ASC
   `).all() as ModelListRow[];
+
+  const q = String(req.query.available ?? req.query.connected ?? '').toLowerCase();
+  const onlyAvailable = q === '1' || q === 'true' || q === 'yes';
+  const listed = onlyAvailable ? models.filter(m => m.available === 1) : models;
 
   res.json({
     object: 'list',
@@ -150,14 +163,19 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         owned_by: 'freellmapi',
         name: 'Auto (router picks the best available model)',
         context_window: null,
+        available: true,
+        unavailable_reason: null,
       },
-      ...models.map(m => ({
+      ...listed.map(m => ({
         id: m.model_id,
         object: 'model',
         created: 0,
         owned_by: m.platform,
         name: m.display_name,
         context_window: m.context_window,
+        // Non-standard but additive: OpenAI clients ignore unknown fields.
+        available: m.available === 1,
+        unavailable_reason: m.available === 1 ? null : (m.enabled === 1 ? 'no_key' : 'disabled'),
       })),
     ],
   });
@@ -310,6 +328,7 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
+    || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
     || msg.includes('503') || msg.includes('unavailable')
     || msg.includes('500') || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
@@ -933,7 +952,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), null, pinnedModelId);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
             return;
           }
           // Headers never sent — bubble to the outer retry handler, which

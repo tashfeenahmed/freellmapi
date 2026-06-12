@@ -98,9 +98,15 @@ export function encrypt(text: string): { encrypted: string; iv: string; authTag:
   };
 }
 
+// AUTH_TAG_BYTES pins the GCM tag length to 16 bytes. Without this option Node
+// will accept any tag of length 4–16 bytes (RFC 5116 §3.2), which lets anyone
+// who can rewrite a row in `api_keys` swap in a 4-byte tag and start brute-
+// forcing forgeries at 2^32 attempts. Pinning closes that truncation path.
+const AUTH_TAG_BYTES = 16;
+
 export function decrypt(encrypted: string, iv: string, authTag: string): string {
   const key = getEncryptionKey();
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'));
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'), { authTagLength: AUTH_TAG_BYTES });
   decipher.setAuthTag(Buffer.from(authTag, 'hex'));
 
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');

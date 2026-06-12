@@ -1,5 +1,5 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
-import { getProvider, resolveProvider } from '../providers/index.js';
+import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider } from './ratelimit.js';
 import {
@@ -9,7 +9,16 @@ import {
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import type { BaseProvider } from '../providers/base.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 import type { Database } from 'better-sqlite3';
+
+class RouteError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 interface KeyRow {
   id: number;
@@ -589,8 +598,8 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
 
     // Check if we have a provider for this platform
-    const provider = getProvider(entry.platform as any);
-    if (!provider) continue;
+    if (!hasProvider(entry.platform as Platform)) continue;
+    const provider = getProvider(entry.platform as Platform)!;
 
     // Get enabled keys that have not already failed validation or decryption.
     const keys = db.prepare(
@@ -676,9 +685,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // in the sortedChain for THIS specific request.
   }
 
-  const err = new Error('All models exhausted. Add more API keys or wait for rate limits to reset.') as any;
-  err.status = 429;
-  throw err;
+  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429);
 }
 
 /**

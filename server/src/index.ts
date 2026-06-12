@@ -1,7 +1,8 @@
 import './env.js';
 import { createApp } from './app.js';
-import { initDb } from './db/index.js';
+import { initDb, getSetting } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
+import { applyProxyUrl, applyProxyEnabled, applyProxyBypass } from './lib/proxy.js';
 import { startCatalogSync } from './services/catalog-sync.js';
 
 const PORT = process.env.PORT ?? 3001;
@@ -12,6 +13,13 @@ const HOST = process.env.HOST ?? '::';
 
 async function main() {
   initDb();
+
+  // Load the persisted proxy settings from the DB (env var wins if set).
+  // Must happen after initDb so the settings table is ready.
+  applyProxyUrl(getSetting('proxy_url') ?? '');
+  applyProxyEnabled(getSetting('proxy_enabled') !== '0'); // default: enabled
+  applyProxyBypass(getSetting('proxy_bypass') ?? '');
+
   const app = createApp();
 
   const onReady = (host: string) => () => {

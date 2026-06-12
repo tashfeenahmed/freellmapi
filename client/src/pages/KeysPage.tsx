@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
-import { Pencil, ExternalLink } from 'lucide-react'
+import { Pencil, ExternalLink, Globe } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 
 // Small "Get API key" external link shown next to a provider (#137).
@@ -172,6 +173,112 @@ function UnifiedKeySection() {
   )
 }
 
+function ProxySettingsSection() {
+  const queryClient = useQueryClient()
+  const [proxyUrl, setProxyUrl] = useState('')
+
+  const { data, isError } = useQuery<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>({
+    queryKey: ['proxy-url'],
+    queryFn: () => apiFetch('/api/settings/proxy'),
+  })
+
+  // Sync from server when the query refetches; keep the user's typed value
+  // in between (controlled input).
+  useEffect(() => {
+    if (data) setProxyUrl(data.proxyUrl)
+  }, [data?.proxyUrl])
+
+  const saveProxy = useMutation({
+    mutationFn: (body: { proxyUrl?: string; enabled?: boolean; bypassPlatforms?: string[] }) =>
+      apiFetch<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>('/api/settings/proxy', { method: 'PUT', body: JSON.stringify(body) }),
+    onSuccess: (result: { proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }) => {
+      queryClient.invalidateQueries({ queryKey: ['proxy-url'] })
+      setProxyUrl(result.proxyUrl)
+    },
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    saveProxy.mutate({ proxyUrl })
+  }
+
+  const enabled = data?.enabled ?? true
+  const active = data?.active ?? false
+
+  return (
+    <section className="rounded-3xl border bg-card p-5">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div>
+          <h2 className="text-sm font-medium flex items-center gap-2">
+            <Globe className="size-3.5 text-muted-foreground" />
+            Outbound proxy
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Route outbound LLM requests through a proxy. Supports SOCKS5, HTTP, and HTTPS.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={enabled}
+            onCheckedChange={(checked) => saveProxy.mutate({ enabled: checked })}
+            disabled={saveProxy.isPending || !data}
+          />
+          {active && enabled && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+              Active
+            </span>
+          )}
+        </div>
+      </div>
+
+      {isError ? (
+        <p className="text-xs text-muted-foreground">Could not load proxy settings.</p>
+      ) : (
+        <form onSubmit={submit} className="flex items-end gap-3">
+          <div className="space-y-1.5 flex-1">
+            <Label className="text-xs">Proxy URL</Label>
+            <Input
+              value={proxyUrl}
+              onChange={e => setProxyUrl(e.target.value)}
+              placeholder="socks5://127.0.0.1:1080"
+              className="font-mono text-xs"
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={saveProxy.isPending}>
+            {saveProxy.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </form>
+      )}
+
+      {saveProxy.isError && (
+        <p className="text-destructive text-xs mt-2">{(saveProxy.error as Error).message}</p>
+      )}
+
+      <div className="mt-3 text-[11px] text-muted-foreground">
+        <p>
+          Also configurable via the <code className="font-mono">PROXY_URL</code> environment variable
+          (takes precedence). Leave blank to disable. Examples:
+        </p>
+        <ul className="list-disc list-inside mt-1 space-y-0.5">
+          <li><code className="font-mono">socks5://127.0.0.1:1080</code></li>
+          <li><code className="font-mono">http://proxy.corp.com:8080</code></li>
+          <li><code className="font-mono">socks5://user:pass@proxy:1080</code></li>
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+// Split a free-text model field on commas / newlines into a clean id list,
+// dropping blanks and duplicates so one endpoint can take several models. (#281)
+function parseModelList(raw: string): string[] {
+  const seen = new Set<string>()
+  return raw
+    .split(/[\n,]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !seen.has(s) && seen.add(s))
+}
+
 function CustomProviderSection() {
   const queryClient = useQueryClient()
   const [baseUrl, setBaseUrl] = useState('')
@@ -179,8 +286,11 @@ function CustomProviderSection() {
   const [displayName, setDisplayName] = useState('')
   const [apiKey, setApiKey] = useState('')
 
+  const models = parseModelList(model)
+  const multiple = models.length > 1
+
   const addCustom = useMutation({
-    mutationFn: (body: { baseUrl: string; model: string; displayName?: string; apiKey?: string }) =>
+    mutationFn: (body: { baseUrl: string; models: string[]; displayName?: string; apiKey?: string }) =>
       apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
@@ -194,8 +304,15 @@ function CustomProviderSection() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!baseUrl || !model) return
-    addCustom.mutate({ baseUrl, model, displayName: displayName || undefined, apiKey: apiKey || undefined })
+    if (!baseUrl || models.length === 0) return
+    // A single display name only makes sense for a lone model; with several
+    // ids the server names each model after its own id.
+    addCustom.mutate({
+      baseUrl,
+      models,
+      displayName: !multiple ? (displayName || undefined) : undefined,
+      apiKey: apiKey || undefined,
+    })
   }
 
   return (
@@ -203,8 +320,8 @@ function CustomProviderSection() {
       <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
       <p className="text-xs text-muted-foreground mb-3">
         Point at any OpenAI-compatible endpoint: llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
-        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
-        (most local servers don't need one).
+        gateway. List one model per line (or comma-separated) to add several at once; they all share the
+        one endpoint. The API key is optional (most local servers don't need one).
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
         <div className="space-y-1.5 flex-1 min-w-[240px]">
@@ -217,12 +334,13 @@ function CustomProviderSection() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Model</Label>
-          <Input
+          <Label className="text-xs">Models</Label>
+          <Textarea
             value={model}
             onChange={e => setModel(e.target.value)}
-            placeholder="qwen3:4b"
-            className="w-[180px] font-mono text-xs"
+            placeholder={'qwen3:4b\nllama3:8b'}
+            rows={2}
+            className="w-[200px] font-mono text-xs"
           />
         </div>
         <div className="space-y-1.5">
@@ -230,7 +348,8 @@ function CustomProviderSection() {
           <Input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
-            placeholder="optional"
+            placeholder={multiple ? 'per-model' : 'optional'}
+            disabled={multiple}
             className="w-[150px]"
           />
         </div>
@@ -244,8 +363,8 @@ function CustomProviderSection() {
             className="w-[150px] font-mono text-xs"
           />
         </div>
-        <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
-          {addCustom.isPending ? 'Adding…' : 'Add model'}
+        <Button type="submit" size="sm" disabled={!baseUrl || models.length === 0 || addCustom.isPending}>
+          {addCustom.isPending ? 'Adding…' : multiple ? `Add ${models.length} models` : 'Add model'}
         </Button>
       </form>
       {addCustom.isError && (
@@ -263,6 +382,7 @@ export default function KeysPage() {
   const [label, setLabel] = useState('')
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
@@ -378,6 +498,24 @@ export default function KeysPage() {
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
 
+  // Proxy bypass: shared query with ProxySettingsSection (same queryKey).
+  const { data: proxyData } = useQuery<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>({
+    queryKey: ['proxy-url'],
+    queryFn: () => apiFetch('/api/settings/proxy'),
+  })
+  const bypassPlatforms = proxyData?.bypassPlatforms ?? []
+  const proxyEnabled = proxyData?.enabled ?? true
+
+  const toggleBypass = useMutation({
+    mutationFn: (platform: string) => {
+      const next = bypassPlatforms.includes(platform)
+        ? bypassPlatforms.filter(p => p !== platform)
+        : [...bypassPlatforms, platform]
+      return apiFetch('/api/settings/proxy', { method: 'PUT', body: JSON.stringify({ bypassPlatforms: next }) })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proxy-url'] }),
+  })
+
   const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
@@ -399,6 +537,8 @@ export default function KeysPage() {
 
       <div className="space-y-8">
         <UnifiedKeySection />
+
+        <ProxySettingsSection />
 
         <section>
           <h2 className="text-sm font-medium mb-3">Add a provider key</h2>
@@ -493,6 +633,16 @@ export default function KeysPage() {
                         disabled={togglePlatform.isPending}
                       />
                       <h3 className="text-sm font-medium">{group.label}</h3>
+                      {proxyEnabled && (
+                        <div className="inline-flex items-center gap-1.5 ml-1">
+                          <span className="text-[10px] text-muted-foreground">proxy</span>
+                          <Switch
+                            checked={!bypassPlatforms.includes(group.value)}
+                            onCheckedChange={() => toggleBypass.mutate(group.value)}
+                            disabled={toggleBypass.isPending}
+                          />
+                        </div>
+                      )}
                       <GetKeyLink url={group.url} />
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
@@ -542,8 +692,22 @@ export default function KeysPage() {
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                             Check
                           </Button>
-                          <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" onClick={() => deleteKey.mutate(k.id)} disabled={deleteKey.isPending}>
-                            Remove
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className={confirmDeleteId === k.id ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}
+                            onClick={() => {
+                              if (confirmDeleteId === k.id) {
+                                deleteKey.mutate(k.id)
+                                setConfirmDeleteId(null)
+                              } else {
+                                setConfirmDeleteId(k.id)
+                                setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
+                              }
+                            }}
+                            disabled={deleteKey.isPending}
+                          >
+                            {confirmDeleteId === k.id ? 'Confirm?' : 'Remove'}
                           </Button>
                         </div>
                       )

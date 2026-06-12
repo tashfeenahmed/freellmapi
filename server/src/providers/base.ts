@@ -6,6 +6,7 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
+import { proxyFetch } from '../lib/proxy.js';
 
 /** A provider HTTP error carrying the upstream status and, when the response
  *  included a Retry-After header, the parsed delay so the router can bench the
@@ -84,7 +85,7 @@ export abstract class BaseProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, { ...init, signal: controller.signal });
+      return await proxyFetch(url, { ...init, signal: controller.signal }, this.platform);
     } finally {
       clearTimeout(timeout);
     }

@@ -89,6 +89,44 @@ describe('GoogleProvider', () => {
     expect(await provider.validateKey('invalid-key')).toBe(false);
   });
 
+  // #268: Google reports a bad key as HTTP 400 INVALID_ARGUMENT / API_KEY_INVALID,
+  // not 401/403. A confirmed-bad key must return false (→ auto-disable counter).
+  it('validateKey returns false for a genuinely invalid key (HTTP 400 API_KEY_INVALID)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({
+        error: {
+          code: 400,
+          message: 'API key not valid. Please pass a valid API key.',
+          status: 'INVALID_ARGUMENT',
+          details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID' }],
+        },
+      }),
+    } as any);
+    expect(await provider.validateKey('bad-key')).toBe(false);
+  });
+
+  // #268: a permission/region/restriction 403 (e.g. API not enabled on the project,
+  // or an IP/API-key restriction on the proxy host) must NOT auto-disable a key that
+  // may still work for generateContent elsewhere — validateKey throws so health.ts
+  // records status='error' instead of incrementing the disable counter.
+  it('validateKey throws (does not return false) on a permission/region 403', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: () => Promise.resolve({
+        error: {
+          code: 403,
+          message: 'Generative Language API has not been used in project before or it is disabled.',
+          status: 'PERMISSION_DENIED',
+          details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED' }],
+        },
+      }),
+    } as any);
+    await expect(provider.validateKey('region-blocked-key')).rejects.toThrow(/inconclusive/i);
+  });
+
   it('should translate system messages to systemInstruction', async () => {
     let capturedBody: any;
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
@@ -156,6 +194,61 @@ describe('GoogleProvider', () => {
     expect(capturedBody.tools[0].functionDeclarations[0].name).toBe('get_weather');
     expect(capturedBody.toolConfig.functionCallingConfig.mode).toBe('ANY');
     expect(capturedBody.toolConfig.functionCallingConfig.allowedFunctionNames).toEqual(['get_weather']);
+  });
+
+  it('maps a google_search tool to Gemini grounding, not a function declaration (#59)', async () => {
+    let capturedBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: 'grounded answer' }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Who won the match today?' }],
+      'gemini-2.5-flash',
+      { tools: [{ type: 'function', function: { name: 'google_search', description: '', parameters: {} } }] },
+    );
+
+    expect(capturedBody.tools).toEqual([{ google_search: {} }]);
+    // Grounding-only requests must not carry a functionCallingConfig.
+    expect(capturedBody.toolConfig).toBeUndefined();
+  });
+
+  it('combines google_search grounding with real function tools (#59)', async () => {
+    let capturedBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Weather plus latest news?' }],
+      'gemini-2.5-pro',
+      {
+        tools: [
+          { type: 'function', function: { name: 'google_search', description: '', parameters: {} } },
+          { type: 'function', function: { name: 'get_weather', description: 'Get weather', parameters: { type: 'object', properties: { city: { type: 'string' } } } } },
+        ],
+      },
+    );
+
+    expect(capturedBody.tools).toContainEqual({ google_search: {} });
+    const decls = capturedBody.tools.find((t: any) => t.functionDeclarations);
+    expect(decls.functionDeclarations[0].name).toBe('get_weather');
   });
 
   it('should translate Gemini functionCall response to OpenAI tool_calls', async () => {
