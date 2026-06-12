@@ -134,10 +134,17 @@ register(new OpenAICompatProvider({
 // endpoint lives at `/openai/v1/chat/completions` (NOT `/v1/...` — the
 // `/openai` prefix is mandatory). Public model list returns one anonymous
 // model (`openai-fast` = GPT-OSS 20B on OVH, tools=true).
+// Registered keyless (June 2026): the legacy text API is deprecated for
+// AUTHENTICATED users (replacement enter.pollinations.ai is pay-as-you-go
+// "pollen"), while anonymous access is explicitly unaffected — so the anon
+// path is the only recurring-free one left. Anon is queue-limited to 1
+// concurrent request per IP (429 "Queue full" on overlap; live-probed
+// 2026-06-10).
 register(new OpenAICompatProvider({
   platform: 'pollinations',
   name: 'Pollinations',
   baseUrl: 'https://text.pollinations.ai/openai/v1',
+  keyless: true,
 }));
 
 // LLM7.io — OpenAI-compatible aggregator. 100 req/hr free; anonymous access
@@ -160,6 +167,21 @@ register(new OpenAICompatProvider({
   platform: 'opencode',
   name: 'OpenCode Zen',
   baseUrl: 'https://opencode.ai/zen/v1',
+}));
+
+// OVHcloud AI Endpoints — OpenAI-compatible. Two free modes: anonymous
+// (documented 2 req/min per IP per model — observed even stricter across
+// models in practice) and authenticated (400 req/min), but an API key
+// requires a Public Cloud project with a payment method on file, so the
+// keyless row is the no-card path this catalog ships. Live-probed keyless
+// 2026-06-10: structured tool_calls on gpt-oss-120b and
+// Meta-Llama-3_3-70B-Instruct. OVH reserves the right to add token caps;
+// individual models get deprecated on notice. See migrateModelsV26.
+register(new OpenAICompatProvider({
+  platform: 'ovh',
+  name: 'OVH AI Endpoints',
+  baseUrl: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1',
+  keyless: true,
 }));
 
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key

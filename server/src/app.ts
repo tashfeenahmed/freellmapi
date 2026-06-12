@@ -8,10 +8,12 @@ import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
 import { responsesRouter } from './routes/responses.js';
 import { fallbackRouter } from './routes/fallback.js';
+import { profilesRouter } from './routes/profiles.js';
 import { embeddingsRouter } from './routes/embeddings.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
+import { premiumRouter } from './routes/premium.js';
 import { authRouter } from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter } from './middleware/rateLimit.js';
@@ -63,11 +65,13 @@ export function createApp() {
   // API routes — all admin endpoints sit behind requireAuth.
   app.use('/api/keys', requireAuth, keysRouter);
   app.use('/api/models', requireAuth, modelsRouter);
+  app.use('/api/profiles', requireAuth, profilesRouter);
   app.use('/api/fallback', requireAuth, fallbackRouter);
   app.use('/api/embeddings', requireAuth, embeddingsRouter);
   app.use('/api/analytics', requireAuth, analyticsRouter);
   app.use('/api/health', requireAuth, healthRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
+  app.use('/api/premium', requireAuth, premiumRouter);
 
   // OpenAI-compatible proxy. Per-IP rate limiting (#35 item #6) runs first so
   // it throttles unauthenticated brute-force / flood attempts before any

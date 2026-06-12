@@ -9,8 +9,44 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
 import { contentToString } from '../lib/content.js';
+import { proxyFetch } from '../lib/proxy.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+// Gemini 3 REQUIRES the `thoughtSignature` that accompanied a function call to
+// be echoed back whenever that call appears in conversation history, or it
+// rejects the request with 400 "Function call is missing a thought_sig". But
+// OpenAI-format clients (the API surface we expose) have no field to carry a
+// provider-specific signature, so it's dropped on the round-trip and every
+// multi-turn tool conversation through Gemini fails. To bridge this without a
+// schema change, cache each signature we emit keyed by tool-call id and
+// re-attach it when the same call comes back without one. Strictly additive: a
+// cache miss yields exactly the previous behavior (the request may 400 and fail
+// over, as before). Bounded with a TTL so it can't grow unbounded.
+const THOUGHT_SIG_TTL_MS = 30 * 60 * 1000; // 30 min — longer than any single tool loop
+const THOUGHT_SIG_MAX = 5000;
+const thoughtSigCache = new Map<string, { sig: string; exp: number }>();
+
+function rememberThoughtSig(callId: string | undefined, sig: string | undefined): void {
+  if (!callId || !sig) return;
+  // Cheap eviction: when full, drop the oldest insertion (Map preserves order).
+  if (thoughtSigCache.size >= THOUGHT_SIG_MAX) {
+    const oldest = thoughtSigCache.keys().next().value;
+    if (oldest !== undefined) thoughtSigCache.delete(oldest);
+  }
+  thoughtSigCache.set(callId, { sig, exp: Date.now() + THOUGHT_SIG_TTL_MS });
+}
+
+function recallThoughtSig(callId: string | undefined): string | undefined {
+  if (!callId) return undefined;
+  const hit = thoughtSigCache.get(callId);
+  if (!hit) return undefined;
+  if (hit.exp < Date.now()) {
+    thoughtSigCache.delete(callId);
+    return undefined;
+  }
+  return hit.sig;
+}
 
 interface GeminiPart {
   text?: string;
@@ -109,16 +145,37 @@ export function sanitizeForGemini(schema: unknown): unknown {
   return schema;
 }
 
-function toGeminiTools(tools?: ChatToolDefinition[]): Array<{ functionDeclarations: Array<Record<string, unknown>> }> | undefined {
+// OpenAI clients can't express Gemini's native Google Search grounding, so we
+// treat a tool named `google_search` (a few spellings) as the signal to enable
+// it. It maps to Gemini's `{ google_search: {} }` tool rather than a function
+// declaration, and can ride alongside real function tools in the same array. (#59)
+const GROUNDING_TOOL_NAMES = new Set(['google_search', 'googlesearch', 'google_search_retrieval']);
+
+function toGeminiTools(tools?: ChatToolDefinition[]): Array<Record<string, unknown>> | undefined {
   if (!tools || tools.length === 0) return undefined;
 
-  return [{
-    functionDeclarations: tools.map(t => ({
+  const functionDeclarations: Array<Record<string, unknown>> = [];
+  let grounding = false;
+  for (const t of tools) {
+    if (GROUNDING_TOOL_NAMES.has(t.function.name.toLowerCase())) {
+      grounding = true;
+      continue;
+    }
+    functionDeclarations.push({
       name: t.function.name,
       description: t.function.description,
       parameters: sanitizeForGemini(t.function.parameters),
-    })),
-  }];
+    });
+  }
+
+  const out: Array<Record<string, unknown>> = [];
+  if (grounding) out.push({ google_search: {} });
+  if (functionDeclarations.length > 0) out.push({ functionDeclarations });
+  return out.length > 0 ? out : undefined;
+}
+
+function hasFunctionDeclarations(tools?: Array<Record<string, unknown>>): boolean {
+  return tools?.some(t => 'functionDeclarations' in t) ?? false;
 }
 
 function toGeminiToolConfig(toolChoice?: ChatToolChoice): { functionCallingConfig: Record<string, unknown> } | undefined {
@@ -171,7 +228,7 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
   }
   if (/^https?:\/\//i.test(url)) {
     try {
-      const res = await fetch(url);
+      const res = await proxyFetch(url, undefined, 'google');
       if (!res.ok) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
@@ -235,8 +292,12 @@ async function toGeminiContents(messages: ChatMessage[]) {
         }
 
         for (const call of m.tool_calls ?? []) {
+          // Prefer a signature the client preserved; otherwise recover the one
+          // we cached when this call was first produced (OpenAI-format clients
+          // drop the field, so this is the common path for Gemini multi-turn).
+          const sig = call.thought_signature ?? recallThoughtSig(call.id);
           parts.push({
-            thoughtSignature: call.thought_signature,
+            thoughtSignature: sig,
             functionCall: {
               id: call.id,
               name: call.function.name,
@@ -295,6 +356,10 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
     if (!part.functionCall?.name) continue;
 
     const id = part.functionCall.id ?? `call_${Date.now()}_${fallbackIndex++}`;
+    // Cache the signature keyed by the id we hand the client, so when the client
+    // echoes this call back (without the signature, as OpenAI format requires)
+    // we can re-attach it and Gemini accepts the history.
+    rememberThoughtSig(id, part.thoughtSignature);
     calls.push({
       id,
       type: 'function',
@@ -329,6 +394,7 @@ export class GoogleProvider extends BaseProvider {
   ): Promise<ChatCompletionResponse> {
     const { contents, systemInstruction } = await toGeminiContents(messages);
 
+    const tools = toGeminiTools(options?.tools);
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
@@ -336,8 +402,10 @@ export class GoogleProvider extends BaseProvider {
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
       },
-      tools: toGeminiTools(options?.tools),
-      toolConfig: toGeminiToolConfig(options?.tool_choice),
+      tools,
+      // functionCallingConfig is only valid when real function tools are present;
+      // a grounding-only request (just google_search) must omit it. (#59)
+      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
     };
     if (systemInstruction) body.systemInstruction = systemInstruction;
 
@@ -392,6 +460,7 @@ export class GoogleProvider extends BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk> {
     const { contents, systemInstruction } = await toGeminiContents(messages);
 
+    const tools = toGeminiTools(options?.tools);
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
@@ -399,8 +468,8 @@ export class GoogleProvider extends BaseProvider {
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
       },
-      tools: toGeminiTools(options?.tools),
-      toolConfig: toGeminiToolConfig(options?.tool_choice),
+      tools,
+      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
     };
     if (systemInstruction) body.systemInstruction = systemInstruction;
 
@@ -530,12 +599,48 @@ export class GoogleProvider extends BaseProvider {
 
   async validateKey(apiKey: string): Promise<boolean> {
     // Transport errors propagate — health.ts marks status='error' without
-    // counting toward auto-disable. Only confirmed 401/403 disables a key.
+    // counting toward auto-disable.
     const res = await this.fetchWithTimeout(
       `${API_BASE}/models?key=${apiKey}`,
       { method: 'GET' },
       10000,
     );
-    return res.status !== 401 && res.status !== 403;
+    if (res.ok) return true;
+
+    // Google's error taxonomy is NOT the usual 401/403-means-bad-key (#268):
+    //   - bad/expired key            → HTTP 400 INVALID_ARGUMENT / reason API_KEY_INVALID
+    //   - API not enabled on project → HTTP 403 PERMISSION_DENIED / reason SERVICE_DISABLED
+    //   - IP / referrer / API-key restriction, or empty key → HTTP 403 PERMISSION_DENIED
+    //   - unsupported region         → HTTP 400 FAILED_PRECONDITION ("User location is not supported")
+    // The old check (`status !== 401 && status !== 403`) had this exactly
+    // backwards: it marked a genuinely-bad 400 key as HEALTHY, and auto-disabled
+    // a perfectly good key that merely hit a permission/region/restriction 403 on
+    // the host running the proxy (the key still works for generateContent from
+    // another network). So only a CONFIRMED bad credential returns false (which
+    // counts toward auto-disable); every other non-2xx is inconclusive and throws
+    // so health.ts records status='error' WITHOUT disabling a usable key.
+    type GoogleErrorBody = { error?: { message?: unknown; status?: unknown; details?: unknown } };
+    let body: GoogleErrorBody | null = null;
+    try { body = (await res.json()) as GoogleErrorBody; } catch { /* non-JSON error body */ }
+    const err = body?.error;
+    const details = Array.isArray(err?.details) ? err!.details as Array<{ reason?: unknown }> : [];
+    const reason = details.find(d => typeof d?.reason === 'string')?.reason as string | undefined;
+    const message = typeof err?.message === 'string' ? err.message : '';
+    const gStatus = typeof err?.status === 'string' ? err.status : undefined;
+
+    const badCredentials =
+      res.status === 401 ||
+      reason === 'API_KEY_INVALID' ||
+      /API key not valid|API key expired|API_KEY_INVALID/i.test(message);
+    if (badCredentials) {
+      console.warn(`[Google] validateKey: key rejected as invalid (HTTP ${res.status}${reason ? ` ${reason}` : ''})`);
+      return false;
+    }
+
+    console.warn(
+      `[Google] validateKey: inconclusive HTTP ${res.status} (${gStatus ?? 'UNKNOWN'}${reason ? `/${reason}` : ''}): ${message.slice(0, 200)} ` +
+      `— treating as 'error', not auto-disabling (the key may be valid but blocked by region/permission/restriction on this host).`,
+    );
+    throw new Error(`Google key validation inconclusive (HTTP ${res.status}${gStatus ? ` ${gStatus}` : ''})`);
   }
 }

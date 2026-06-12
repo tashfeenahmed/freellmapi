@@ -31,11 +31,22 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV22Tools(db);
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
+  migrateModelsV25ZenDeadPromos(db);
+  // V25 is the LAST model-data migration. Since the Premium live catalog
+  // shipped (June 2026), model/limit DATA is maintained in the published
+  // catalog (served signed by the catalog service) and reaches installs via
+  // catalog-sync — premium on the live tier within ~12h, free at the monthly
+  // promote. Shipping model data as a
+  // migration would hand it to free users on their next binary update,
+  // bypassing the tier gate. Migrations from here on are baseline/code-level
+  // only (schema, family rules, provider plumbing, quirk-seed corrections).
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
   migrateEmbeddingsV1(db);
+  migrateQuirksV1(db);
   ensureUnifiedKey(db);
+  migrateProfilesInit(db);
 }
 
 function createTables(db: Database.Database) {
@@ -111,6 +122,28 @@ function createTables(db: Database.Database) {
       priority INTEGER NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       UNIQUE(model_db_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      type TEXT NOT NULL DEFAULT 'custom',
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      auto_sort TEXT,
+      layout_config TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS profile_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      model_db_id INTEGER NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+      priority INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(profile_id, model_db_id)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -1701,6 +1734,7 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%nemotron-nano-12b-v2-vl%' -- unlike the 30B nano: live-probed structured tool_calls (V23, 2026-06-07)
         OR LOWER(model_id) LIKE '%nemotron-3-ultra%' -- structured tool_calls live-verified via Zen's dedicated endpoint (V24, 2026-06-07); covers the disabled OR row too
         OR LOWER(model_id) LIKE '%minimax-m3%'       -- finish_reason:tool_calls live-verified on Zen (V24)
+        OR LOWER(model_id) LIKE '%north-mini-code%'  -- structured tool_calls + reasoning_content live-verified on Zen (V26, 2026-06-10)
       )
     `).run();
   });
@@ -1834,6 +1868,45 @@ function migrateModelsV24ZenRefresh(db: Database.Database) {
   apply();
 }
 
+/**
+ * V25 (2026-06-09): retire two OpenCode Zen free models that went dead.
+ * Observed on the production proxy — together they accounted for ~55% of a
+ * day's error rows, each 401ing on every route attempt (a 401 is non-retryable,
+ * so when one was picked first it hard-failed the request, not just logged):
+ *   - nemotron-3-super-free → `401: Model nemotron-3-super-free is not supported`.
+ *     V24 kept it enabled with "prune if it starts billing or 402s"; Zen has now
+ *     removed it outright.
+ *   - minimax-m3-free → `401: Free promotion has ended for MiniMax M3 Free`.
+ *     Added in V24 while its promo was live; the promo has since lapsed (same
+ *     fate qwen3.6-plus-free hit). These are server-side, account-independent
+ *     verdicts — dead for everyone, not a per-key issue.
+ * Disabled, not removed (row kept so fallback history survives and a future
+ * promo can re-enable). Idempotent: re-asserted each boot like the V13/V24
+ * disables.
+ */
+function migrateModelsV25ZenDeadPromos(db: Database.Database) {
+  const disable = db.prepare(`UPDATE models SET enabled = 0 WHERE platform = ? AND model_id = ?`);
+  const disables: Array<[string, string]> = [
+    ['opencode', 'nemotron-3-super-free'],
+    ['opencode', 'minimax-m3-free'],
+  ];
+  const apply = db.transaction(() => {
+    for (const [p, m] of disables) disable.run(p, m);
+  });
+  apply();
+}
+
+// V26 NOTE (June 2026, recurring-free audit pass 2): the model-data changes
+// from this audit (4 OVH rows, opencode/north-mini-code-free, Cerebras
+// 5 RPM/30K TPM/1M TPD limits, NVIDIA "free · 40 RPM" labels, LLM7 60-100/hr
+// label) were briefly shipped as a data migration and then MOVED to the
+// published catalog — catalog data is distributed via catalog-sync, never
+// via migrations, so the premium tier gate holds. What remains in code from that audit: the 'ovh'
+// keyless provider, Pollinations keyless, the V22 north-mini-code tools rule,
+// and the corrected quirk seeds in migrateQuirksV1 (incl. the
+// 'nvidia-credits-based' → 'nvidia-rate-limited' replacement; the stale slug
+// is cleaned up below in migrateQuirksV1 itself).
+
 // Embeddings V1 (2026-06): per-family embedding catalog. A "family" is one
 // model identity + dimension — vectors from different families live in
 // incompatible spaces, so /v1/embeddings only ever fails over WITHIN a family
@@ -1894,6 +1967,181 @@ function migrateEmbeddingsV1(db: Database.Database) {
   }
 }
 
+/**
+ * Quirks V1 (June 2026): promote the catalog's free-form "quirks" out of code
+ * comments into structured, reusable data so the catalog server can ship them.
+ *
+ * A quirk is defined ONCE (slug, title, body, severity) and applied to models
+ * by SELECTOR PARAMETERS rather than hand-attached per model — because one
+ * quirk routinely covers many models (a whole platform's keyless access, an
+ * entire model family that hangs upstream, etc.). Each row in quirk_targets is
+ * one selector; a NULL field is a wildcard:
+ *
+ *   platform NULL, model_glob NULL  -> every model (global note)
+ *   platform set,  model_glob NULL  -> every model on that platform
+ *   platform set,  model_glob set   -> that platform's models whose id GLOBs
+ *   platform NULL, model_glob set   -> any model whose id GLOBs (cross-platform)
+ *
+ * Resolution (see services/quirks.ts) is therefore:
+ *   (platform IS NULL OR platform = m.platform)
+ *   AND (model_glob IS NULL OR m.model_id GLOB model_glob)
+ *
+ * GLOB (not LIKE) so the selectors read like the model-family rules elsewhere
+ * in this file ('*nemotron-3-ultra*'). Severity drives client display:
+ * 'info' (neutral note), 'warning' (works but caveated), 'blocker' (knowingly
+ * unusable / disabled). Idempotent: tables are IF NOT EXISTS and the seed is a
+ * reset-then-insert of the curated set, so editing a seeded quirk in code wins
+ * on next boot while operator-added quirks (new slugs) are left untouched.
+ */
+function migrateQuirksV1(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quirks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      severity TEXT NOT NULL DEFAULT 'info',
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS quirk_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quirk_id INTEGER NOT NULL REFERENCES quirks(id) ON DELETE CASCADE,
+      platform TEXT,
+      model_glob TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_quirk_targets_quirk ON quirk_targets(quirk_id);
+  `);
+
+  // Superseded curated slugs: removed from the seed below, so the upsert no
+  // longer refreshes them — but the old rows would linger as (apparently)
+  // operator-added quirks. Drop them explicitly; targets cascade.
+  // 'nvidia-credits-based' → replaced by 'nvidia-rate-limited' (June 2026:
+  // NVIDIA dropped the credit system for per-account rate limits).
+  db.prepare("DELETE FROM quirks WHERE slug = 'nvidia-credits-based'").run();
+
+  // Curated seed — each entry is one quirk plus the selector parameters that
+  // apply it. Sourced from the catalog's existing code comments (V20–V24).
+  type Seed = {
+    slug: string;
+    title: string;
+    body: string;
+    severity: 'info' | 'warning' | 'blocker';
+    targets: Array<{ platform?: string; modelGlob?: string }>;
+  };
+  const seeds: Seed[] = [
+    {
+      slug: 'keyless-anonymous',
+      title: 'No API key required',
+      body: 'Routes anonymously — the catalog ships a keyless sentinel row and calls work with no account or key.',
+      severity: 'info',
+      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'pollinations' }, { platform: 'ovh' }],
+    },
+    {
+      slug: 'ovh-anon-trickle',
+      title: 'Anonymous tier is 2 req/min',
+      body: 'OVH AI Endpoints anonymous mode is documented at 2 req/min per IP per model (observed even stricter across models). The 400 req/min authenticated tier requires a Public Cloud project with a payment method, so the catalog ships the keyless path. Treat as a breadth/fallback tier, not a throughput tier.',
+      severity: 'warning',
+      targets: [{ platform: 'ovh' }],
+    },
+    {
+      slug: 'pollinations-degraded',
+      title: 'Anon tier degraded (1 concurrent)',
+      body: 'Pollinations’ legacy text API is deprecated for authenticated users (replacement enter.pollinations.ai is pay-as-you-go), but anonymous access is explicitly unaffected. Anon is queue-limited to 1 concurrent request per IP and serves a single model (openai-fast); expect 429 "Queue full" under any parallelism. Live-probed 2026-06-10.',
+      severity: 'warning',
+      targets: [{ platform: 'pollinations' }],
+    },
+    {
+      slug: 'or-free-cap-account-wide',
+      title: 'Daily :free cap is account-wide',
+      body: 'OpenRouter’s :free daily cap (50/day, or 1000/day once you have ever bought $10 of credits) is shared across ALL :free models on the account, not per model. Per-row rpd values here are therefore optimistic; the router’s cooldown handling absorbs the shared 429s.',
+      severity: 'info',
+      targets: [{ platform: 'openrouter', modelGlob: '*:free' }],
+    },
+    {
+      slug: 'zen-promo-roster',
+      title: 'Limited-time promo, roster rotates',
+      body: 'OpenCode Zen free models are explicitly limited-time promotional access ("available for a limited time" per the docs), not a recurring quota. The roster rotates: qwen3.6-plus and minimax-m3 promos already ended. Expect any row here to die without notice; prompts/outputs may be used for model improvement.',
+      severity: 'warning',
+      targets: [{ platform: 'opencode' }],
+    },
+    {
+      slug: 'cloudflare-key-format',
+      title: 'Key is account_id:token',
+      body: 'Cloudflare Workers AI authenticates with a combined credential in the form "account_id:token", not a bare token.',
+      severity: 'info',
+      targets: [{ platform: 'cloudflare' }],
+    },
+    {
+      // Replaces 'nvidia-credits-based' (deleted in V26): NVIDIA staff
+      // confirmed on the dev forums (~Sept 2025) that the credit system was
+      // discontinued in favor of per-account rate limits, so NIM IS
+      // recurring-free again. The ToS caution survives the correction.
+      slug: 'nvidia-rate-limited',
+      title: 'Recurring free, 40 RPM, eval-only ToS',
+      body: 'NVIDIA NIM replaced its depleting trial credits with a recurring per-account rate limit (40 RPM default, varies by model), verified June 2026. The trial ToS still scopes usage to evaluation/prototyping, not production.',
+      severity: 'info',
+      targets: [{ platform: 'nvidia' }],
+    },
+    {
+      slug: 'nim-gemma-hung',
+      title: 'NIM gemma route hangs',
+      body: 'The NVIDIA NIM gemma endpoint is listed but hangs (capacity starvation plus an upstream FlashAttention bug). Paused; probe with a 120s timeout before re-enabling.',
+      severity: 'blocker',
+      targets: [{ platform: 'nvidia', modelGlob: '*gemma*' }],
+    },
+    {
+      slug: 'or-ultra-hangs',
+      title: 'OpenRouter ultra route hangs',
+      body: 'nemotron-3-ultra (550B) on OpenRouter takes 180s+ even on trivial prompts (heavily congested), so its OR row is seeded disabled. Use the OpenCode Zen route instead.',
+      severity: 'warning',
+      targets: [{ platform: 'openrouter', modelGlob: '*nemotron-3-ultra*' }],
+    },
+    {
+      slug: 'zen-serves-ultra-fast',
+      title: 'Zen serves the 550B fast',
+      body: 'OpenCode Zen serves nemotron-3-ultra in ~2s with working tool calls where the OpenRouter route hangs — the live-verified path for this model.',
+      severity: 'info',
+      targets: [{ platform: 'opencode', modelGlob: '*nemotron-3-ultra*' }],
+    },
+    {
+      slug: 'zhipu-shared-key',
+      title: 'Works with existing Zhipu key',
+      body: 'glm-4.6v-flash is listed Free on Z.AI and answers 200 with the existing bigmodel.cn key; vision and structured tool calls both live-verified.',
+      severity: 'info',
+      targets: [{ platform: 'zhipu', modelGlob: '*glm-4.6v*' }],
+    },
+  ];
+
+  const now = Date.now();
+  const upsertQuirk = db.prepare(`
+    INSERT INTO quirks (slug, title, body, severity, created_at_ms, updated_at_ms)
+    VALUES (@slug, @title, @body, @severity, @now, @now)
+    ON CONFLICT(slug) DO UPDATE SET
+      title = excluded.title,
+      body = excluded.body,
+      severity = excluded.severity,
+      updated_at_ms = excluded.updated_at_ms
+  `);
+  const getId = db.prepare('SELECT id FROM quirks WHERE slug = ?');
+  const clearTargets = db.prepare('DELETE FROM quirk_targets WHERE quirk_id = ?');
+  const addTarget = db.prepare(
+    'INSERT INTO quirk_targets (quirk_id, platform, model_glob) VALUES (?, ?, ?)',
+  );
+
+  const apply = db.transaction(() => {
+    for (const s of seeds) {
+      upsertQuirk.run({ slug: s.slug, title: s.title, body: s.body, severity: s.severity, now });
+      const { id } = getId.get(s.slug) as { id: number };
+      // Reset the curated quirk's selectors so edits in code take effect, but
+      // leave quirks/targets with unknown slugs (operator-added) alone.
+      clearTargets.run(id);
+      for (const t of s.targets) addTarget.run(id, t.platform ?? null, t.modelGlob ?? null);
+    }
+  });
+  apply();
+}
+
 /** Append any models not yet in the fallback chain, lowest priority, ordered by
  * intelligence_rank. Shared by the recent model migrations (V18–V20). */
 function backfillFallback(db: Database.Database) {
@@ -1917,3 +2165,53 @@ function ensureUnifiedKey(db: Database.Database) {
     console.log(`\n  Your unified API key: ${key}\n`);
   }
 }
+
+/**
+ * Migration helper to ensure Default profile exists, legacy profiles converted, 
+ * and fallback_config synced.
+ */
+function migrateProfilesInit(db: Database.Database) {
+  // 1. Convert any legacy built-in profiles to custom profiles (type = 'custom')
+  db.prepare(`
+    UPDATE profiles
+    SET type = 'custom'
+    WHERE type = 'builtin'
+  `).run();
+
+  // 2. Ensure Default profile exists
+  const hasDefault = db.prepare("SELECT COUNT(*) as cnt FROM profiles WHERE type = 'default'").get() as { cnt: number };
+  if (hasDefault.cnt === 0) {
+    const minOrder = (db.prepare('SELECT COALESCE(MIN(sort_order), 0) AS mn FROM profiles').get() as { mn: number }).mn;
+    const targetOrder = Math.min(-1, minOrder - 1);
+
+    const result = db.prepare(
+      "INSERT INTO profiles (name, emoji, color, type, sort_order) VALUES ('Default', '⚙️', '#6366f1', 'default', ?)"
+    ).run(targetOrder);
+
+    const profileId = result.lastInsertRowid as number;
+
+    // Seed profile models from fallback_config
+    db.prepare(`
+      INSERT INTO profile_models (profile_id, model_db_id, priority, enabled)
+      SELECT ?, model_db_id, priority, enabled
+      FROM fallback_config
+      ORDER BY priority ASC
+    `).run(profileId);
+
+    // Make it the active profile if none is set
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('active_profile_id', ?)
+      ON CONFLICT(key) DO NOTHING
+    `).run(String(profileId));
+
+    console.log('Created Default profile');
+  } else {
+    // If it exists, ensure its emoji is '⚙️'
+    db.prepare(`
+      UPDATE profiles
+      SET emoji = '⚙️'
+      WHERE type = 'default' AND emoji != '⚙️'
+    `).run();
+  }
+}
+

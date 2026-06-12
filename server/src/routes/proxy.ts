@@ -3,7 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
+import { routeRequest, resolveRoutingChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
@@ -12,6 +12,7 @@ import { contentToString, messageHasImage, normalizeOutboundContent } from '../l
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 
 export const proxyRouter = Router();
 
@@ -22,7 +23,9 @@ export const proxyRouter = Router();
 const AUTO_MODEL_ID = 'auto';
 
 function isAutoModel(modelId: string | undefined): boolean {
-  return modelId === AUTO_MODEL_ID;
+  if (!modelId) return true;
+  const lower = modelId.toLowerCase();
+  return lower === AUTO_MODEL_ID || lower.startsWith(`${AUTO_MODEL_ID}:`);
 }
 
 // Constant-time string comparison for the unified API key. Plain `===` leaks
@@ -61,34 +64,24 @@ export function extractApiToken(req: Request): string | undefined {
 const stickySessionMap = new Map<string, { modelDbId: number; lastUsed: number }>();
 const STICKY_TTL_MS = 30 * 60 * 1000; // 30 min session TTL
 
-function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string): string {
-  // Explicit session pinning: clients that manage their own conversation ids
-  // (agent harnesses especially) can send X-Session-Id and get exact
-  // affinity regardless of how their message history mutates. (#231)
-  if (sessionIdHeader) return `hdr:${sessionIdHeader}`;
+function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): string {
+  if (sessionIdHeader) {
+    return strategyKey ? `hdr:${sessionIdHeader}::${strategyKey}` : `hdr:${sessionIdHeader}`;
+  }
 
-  // Otherwise the first user message identifies the session — clients re-send
-  // the full conversation each turn, so it is stable across turns. Flatten
-  // array-of-blocks content before hashing: opencode-style agents send
-  // [{type:'text',...}] even for plain text, and the old string-only check
-  // silently disabled stickiness for them, re-routing every turn (#231 audit:
-  // observed a rank-2 → rank-11 mid-conversation flip). No turn-count suffix:
-  // the old ':single'/':multi' split guaranteed a sticky MISS on turn 2,
-  // exactly where agents replay the assistant's tool-call dialect and a model
-  // switch causes cross-dialect contamination.
   const firstUser = messages.find(m => m.role === 'user');
   if (!firstUser) return '';
   const text = contentToString(firstUser.content ?? '');
   if (!text) return '';
-  return crypto.createHash('sha1').update(text).digest('hex');
+  const payload = strategyKey ? `${text}::${strategyKey}` : text;
+  return crypto.createHash('sha1').update(payload).digest('hex');
 }
 
-export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string): number | undefined {
-  // Only apply sticky for multi-turn (has assistant messages = continuation)
+export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): number | undefined {
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
 
-  const key = getSessionKey(messages, sessionIdHeader);
+  const key = getSessionKey(messages, sessionIdHeader, strategyKey);
   if (!key) return undefined;
 
   const entry = stickySessionMap.get(key);
@@ -101,8 +94,8 @@ export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string
   return entry.modelDbId;
 }
 
-export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessionIdHeader?: string) {
-  const key = getSessionKey(messages, sessionIdHeader);
+export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessionIdHeader?: string, strategyKey?: string) {
+  const key = getSessionKey(messages, sessionIdHeader, strategyKey);
   if (!key) return;
   stickySessionMap.set(key, { modelDbId, lastUsed: Date.now() });
 
@@ -125,27 +118,40 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     return;
   }
 
+  // By default we return the WHOLE catalog (one row per model id), each tagged
+  // with whether it is currently usable, so a client can see everything and know
+  // what's connected vs. disabled/keyless (#242). `?available=true` (alias
+  // `?connected=true`) narrows the list to only models that can serve a request
+  // right now — the previous default behavior. `available` is computed as
+  // "enabled AND an enabled key can serve it"; dedup prefers an available
+  // instance of a model id over a disabled/keyless one.
+  const availableExpr = `
+    (CASE WHEN m.enabled = 1 AND EXISTS (
+        SELECT 1 FROM api_keys k
+        WHERE k.platform = m.platform
+          AND k.enabled = 1
+          AND (m.key_id IS NULL OR k.id = m.key_id)
+      ) THEN 1 ELSE 0 END)`;
   const db = getDb();
   const models = db.prepare(`
-    SELECT platform, model_id, display_name, context_window
+    SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id
     FROM (
-      SELECT platform, model_id, display_name, context_window, intelligence_rank, id,
+      SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id,
+             m.enabled AS enabled,
+             ${availableExpr} AS available,
              ROW_NUMBER() OVER (
-               PARTITION BY model_id
-               ORDER BY intelligence_rank ASC, id ASC
+               PARTITION BY m.model_id
+               ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
              ) AS rn
       FROM models m
-      WHERE m.enabled = 1
-        AND EXISTS (
-          SELECT 1 FROM api_keys k
-          WHERE k.platform = m.platform
-            AND k.enabled = 1
-            AND (m.key_id IS NULL OR k.id = m.key_id)
-        )
     )
     WHERE rn = 1
-    ORDER BY intelligence_rank ASC, id ASC
+    ORDER BY available DESC, enabled DESC, intelligence_rank ASC, id ASC
   `).all() as ModelListRow[];
+
+  const q = String(req.query.available ?? req.query.connected ?? '').toLowerCase();
+  const onlyAvailable = q === '1' || q === 'true' || q === 'yes';
+  const listed = onlyAvailable ? models.filter(m => m.available === 1) : models;
 
   res.json({
     object: 'list',
@@ -157,14 +163,19 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         owned_by: 'freellmapi',
         name: 'Auto (router picks the best available model)',
         context_window: null,
+        available: true,
+        unavailable_reason: null,
       },
-      ...models.map(m => ({
+      ...listed.map(m => ({
         id: m.model_id,
         object: 'model',
         created: 0,
         owned_by: m.platform,
         name: m.display_name,
         context_window: m.context_window,
+        // Non-standard but additive: OpenAI clients ignore unknown fields.
+        available: m.available === 1,
+        unavailable_reason: m.available === 1 ? null : (m.enabled === 1 ? 'no_key' : 'disabled'),
       })),
     ],
   });
@@ -317,6 +328,7 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
+    || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
     || msg.includes('503') || msg.includes('unavailable')
     || msg.includes('500') || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
@@ -623,14 +635,36 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
 
+  let resolvedChain: ResolvedChain | undefined;
+  let strategyKey: string | undefined;
+
+  if (isAutoModel(requestedModel)) {
+    resolvedChain = resolveRoutingChain(requestedModel);
+    strategyKey = resolvedChain.strategyKey;
+  }
+
+  // Context handoff only applies to auto-routed requests. Pinned-model requests
+  // are deliberate client choices; injecting "you are taking over" there would
+  // be semantically wrong.
+  const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
+  const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
+  const sessionKey = handoffMode !== 'off' ? getSessionKey(messages, sessionIdHeader, strategyKey) : '';
+  if (handoffMode !== 'off' && sessionKey) {
+    recordIncomingMessages(sessionKey, messages);
+  }
+  // A handoff can only fire when a prior model is on record for this session.
+  // Check after recordIncomingMessages, which clears the prior model on a
+  // fresh conversation. Stable across the retry loop (the prior model only
+  // changes on a success, which returns), so compute it once here.
+  const handoffPossible = handoffMode !== 'off' && !!sessionKey && hasPriorModel(sessionKey);
+
   // Explicit `model` field pins routing. If the catalog has no enabled row
   // matching the requested id, return 400 — silently auto-routing to a
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
   if (isAutoModel(requestedModel)) {
-    // Explicit "auto" → behave exactly like an omitted model field.
-    preferredModel = getStickyModel(messages, sessionIdHeader);
+    preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
   } else if (requestedModel) {
     const db = getDb();
     const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
@@ -649,7 +683,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
   } else {
-    preferredModel = getStickyModel(messages, sessionIdHeader);
+    preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
   }
 
   // For analytics: the model id the client pinned, null when auto-routed
@@ -665,7 +699,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
+      // When a handoff could fire this turn, pad the token estimate so the router's
+      // context-window and TPM checks account for the extra system message overhead.
+      // We don't know the selected model key until after routeRequest() returns, so
+      // the padding is conservative on turns where injection is *possible* (a prior
+      // model is on record). Turns where injection can't happen — every turn 1, and
+      // sessions that never switched — pay no headroom tax.
+      const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
+      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, resolvedChain?.chain);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -682,6 +723,20 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         });
       }
       return;
+    }
+
+    const modelKey = `${route.platform}:${route.modelId}`;
+    let outboundMessages = messages;
+    // Extra input tokens the injected handoff adds on this turn (0 when not
+    // injected). Folded into the streaming success accounting, where token
+    // counts are estimated; the non-stream path uses the provider's usage,
+    // which already counts the injected message.
+    let injectedHandoffTokens = 0;
+    if (handoffMode !== 'off' && sessionKey) {
+      const handoff = maybeInjectContextHandoff({ mode: handoffMode, sessionKey, messages, selectedModelKey: modelKey });
+      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${sessionKey.slice(0, 8)}…, model switch detected)`);
+      outboundMessages = handoff.messages;
+      injectedHandoffTokens = handoff.injectedTokens;
     }
 
     try {
@@ -740,7 +795,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         try {
           const gen = route.provider.streamChatCompletion(
-            route.apiKey, messages, route.modelId,
+            route.apiKey, outboundMessages, route.modelId,
             { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
           );
 
@@ -883,10 +938,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.end();
 
           recordRequest(route.platform, route.modelId, route.keyId);
-          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
+          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + injectedHandoffTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
-          setStickyModel(messages, route.modelDbId, sessionIdHeader);
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
+          setStickyModel(messages, route.modelDbId, sessionIdHeader, strategyKey);
+          if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens + injectedHandoffTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
         } catch (streamErr: any) {
           if (headerSent) {
@@ -896,7 +952,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), null, pinnedModelId);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
             return;
           }
           // Headers never sent — bubble to the outer retry handler, which
@@ -907,7 +963,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
       } else {
         const result = await route.provider.chatCompletion(
-          route.apiKey, messages, route.modelId,
+          route.apiKey, outboundMessages, route.modelId,
           { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
 
@@ -953,7 +1009,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         recordRequest(route.platform, route.modelId, route.keyId);
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId, sessionIdHeader);
+        setStickyModel(messages, route.modelDbId, sessionIdHeader, strategyKey);
+        if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));

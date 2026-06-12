@@ -9,6 +9,7 @@
 // cross-provider redundancy for free.
 import { getDb, getSetting } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
+import { proxyFetch } from '../lib/proxy.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -91,7 +92,7 @@ async function openAiStyleEmbed(
   inputs: string[],
   extra: Record<string, unknown> = {},
 ): Promise<ProviderCallResult> {
-  const r = await fetch(url, {
+  const r = await proxyFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ model: modelId, input: inputs, ...extra }),
@@ -114,15 +115,15 @@ async function openAiStyleEmbed(
 async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[]): Promise<ProviderCallResult> {
   switch (row.platform) {
     case 'google':
-      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs);
+      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs, {});
     case 'nvidia':
       // NeMo Retriever NIMs require input_type; 'query' is the symmetric-safe
       // choice for a gateway that can't know whether this is index or query time.
       return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', key, row.model_id, inputs, { input_type: 'query' });
     case 'openrouter':
-      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', key, row.model_id, inputs);
+      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', key, row.model_id, inputs, {});
     case 'github':
-      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', key, row.model_id, inputs);
+      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', key, row.model_id, inputs, {});
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');
@@ -131,12 +132,12 @@ async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[
       const token = key.slice(sep + 1);
       return openAiStyleEmbed(
         `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
-        token, row.model_id, inputs,
+        token, row.model_id, inputs, {},
       );
     }
     case 'huggingface': {
       // HF serves embeddings as the feature-extraction task, not /v1/embeddings.
-      const r = await fetch(
+      const r = await proxyFetch(
         `https://router.huggingface.co/hf-inference/models/${row.model_id}/pipeline/feature-extraction`,
         {
           method: 'POST',
@@ -151,7 +152,7 @@ async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[
       return { vectors, inputTokens: null };
     }
     case 'cohere': {
-      const r = await fetch('https://api.cohere.com/v2/embed', {
+      const r = await proxyFetch('https://api.cohere.com/v2/embed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({

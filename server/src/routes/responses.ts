@@ -18,6 +18,7 @@ import {
   isRetryableError,
   isPaymentRequiredError,
   isModelNotFoundError,
+  isModelAccessForbiddenError,
   timingSafeStringEqual,
   extractApiToken,
   getStickyModel,
@@ -661,7 +662,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       if (isRetryableError(err)) {
         // Model-level 404: rule out the whole model for this request — its
         // other keys would 404 the same way. (PR #111, credits @barbotkonv.)
-        if (isModelNotFoundError(err)) skipModels.add(route.modelDbId);
+        if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
         setCooldown(route.platform, route.modelId, route.keyId, isPaymentRequiredError(err)
           ? PAYMENT_REQUIRED_COOLDOWN_MS

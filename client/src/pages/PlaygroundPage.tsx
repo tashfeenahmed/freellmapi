@@ -186,7 +186,7 @@ export default function PlaygroundPage() {
         description="Send a chat completion through the router and see which provider serves it."
         actions={
           <>
-            <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v ?? 'auto')}>
+            <Select value={selectedModel} onValueChange={(v) => { const m = v ?? 'auto'; setSelectedModel(m); localStorage.setItem('playground.model', m) }}>
               <SelectTrigger className="w-[260px]">
                 <SelectValue />
               </SelectTrigger>
@@ -200,6 +200,13 @@ export default function PlaygroundPage() {
                     </span>
                   </SelectItem>
                 ))}
+                {availableModels.length === 0 && (
+                  // Models only appear once a platform has an enabled key. Without
+                  // one, the list is just "Auto" and looks broken — say why. (#269)
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    No models yet. Add an API key on the Keys page to populate this list.
+                  </div>
+                )}
               </SelectContent>
             </Select>
             {messages.length > 0 && (
@@ -227,7 +234,7 @@ export default function PlaygroundPage() {
               {messages.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`group relative max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
@@ -254,6 +261,13 @@ export default function PlaygroundPage() {
                       <Markdown>{msg.content}</Markdown>
                     ) : (
                       <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
+                    {msg.role === 'assistant' && msg.content && (
+                      <CopyButton
+                        text={msg.content}
+                        label="Copy reply"
+                        className="absolute right-1.5 top-1.5 size-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                      />
                     )}
                     {msg.meta && (
                       <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] opacity-70 tabular-nums">

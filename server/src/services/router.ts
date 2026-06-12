@@ -1,5 +1,5 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
-import { getProvider, resolveProvider } from '../providers/index.js';
+import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider } from './ratelimit.js';
 import {
@@ -9,7 +9,16 @@ import {
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import type { BaseProvider } from '../providers/base.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 import type { Database } from 'better-sqlite3';
+
+class RouteError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
 
 interface KeyRow {
   id: number;
@@ -386,14 +395,39 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
  * @param requireVision - only consider models that accept image input (#118)
  * @param requireTools - only consider models that emit structured tool_calls
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>): RouteResult {
-  const db = getDb();
+export interface ResolvedChain {
+  chain: ChainRow[];
+  strategyKey: string;
+}
 
-  const strategy = getRoutingStrategy();
-  if (strategy !== 'priority') refreshStatsCache(db);
+const GLOBAL_SORT_ALIASES: Record<string, string> = {
+  smart: 'smart', smartest: 'smart', intelligence: 'smart',
+  fast: 'fast', fastest: 'fast', speed: 'fast',
+  cheap: 'cheap', cheapest: 'cheap', price: 'cheap', budget: 'cheap',
+  reliable: 'reliable', reliability: 'reliable',
+  balanced: 'balanced',
+};
 
-  // Get the enabled fallback chain joined with the fields the scorer needs.
-  const chain = db.prepare(`
+function getActiveChain(db: Database): ChainRow[] {
+  const activeProfileSetting = db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as { value: string } | undefined;
+  if (activeProfileSetting) {
+    const profileId = parseInt(activeProfileSetting.value, 10);
+    const chain = db.prepare(`
+      SELECT pm.model_db_id, pm.priority, pm.enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id
+      FROM profile_models pm
+      JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+      WHERE pm.profile_id = ?
+      ORDER BY pm.priority ASC
+    `).all(profileId) as ChainRow[];
+    
+    if (chain.length > 0) return chain;
+  }
+
+  return db.prepare(`
     SELECT fc.model_db_id, fc.priority, fc.enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
@@ -401,17 +435,130 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
            m.supports_tools, m.context_window, m.key_id
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
-    WHERE fc.enabled = 1
+    ORDER BY fc.priority ASC
   `).all() as ChainRow[];
+}
+
+function getChainByProfileName(db: Database, name: string): ChainRow[] | null {
+  const profile = db.prepare("SELECT id FROM profiles WHERE LOWER(name) = ?").get(name.toLowerCase()) as { id: number } | undefined;
+  if (!profile) return null;
+
+  return db.prepare(`
+    SELECT pm.model_db_id, pm.priority, pm.enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM profile_models pm
+    JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+    WHERE pm.profile_id = ?
+    ORDER BY pm.priority ASC
+  `).all(profile.id) as ChainRow[];
+}
+
+function getChainByGlobalSort(db: Database, globalAxis: string): ChainRow[] {
+  const allEnabled = db.prepare(`
+    SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM models m
+    WHERE m.enabled = 1
+  `).all() as ChainRow[];
+
+  const strategyMap: Record<string, RoutingStrategy> = {
+    'smart': 'smartest',
+    'fast': 'fastest',
+    'cheap': 'balanced',
+    'reliable': 'reliable',
+    'balanced': 'balanced'
+  };
+  const strat = strategyMap[globalAxis] || 'balanced';
+  
+  return orderChain(allEnabled, strat);
+}
+
+export function resolveRoutingChain(modelString: string | undefined): ResolvedChain {
+  const db = getDb();
+
+  if (!modelString || modelString.toLowerCase() === 'auto') {
+    return { chain: getActiveChain(db), strategyKey: 'auto' };
+  }
+
+  const lower = modelString.toLowerCase();
+  if (!lower.startsWith('auto:')) {
+    return { chain: getActiveChain(db), strategyKey: 'auto' };
+  }
+
+  const suffix = lower.slice('auto:'.length).trim();
+  if (!suffix) {
+    return { chain: getActiveChain(db), strategyKey: 'auto' };
+  }
+
+  const globalAxis = GLOBAL_SORT_ALIASES[suffix];
+  if (globalAxis) {
+    const chain = getChainByGlobalSort(db, globalAxis);
+    if (chain.length === 0) {
+      const err = new Error(`No enabled models available for global sort '${suffix}'`) as any;
+      err.status = 400;
+      throw err;
+    }
+    return { chain, strategyKey: `auto:${globalAxis}` };
+  }
+
+  const chain = getChainByProfileName(db, suffix);
+  if (!chain) {
+    const err = new Error(`Profile '${suffix}' not found. Use 'auto' for the default profile, or call /v1/models for available options.`) as any;
+    err.status = 400;
+    throw err;
+  }
+
+  const enabledModels = chain.filter(e => e.enabled);
+  if (enabledModels.length === 0) {
+    const err = new Error(`Profile '${suffix}' has no enabled models. Add models to this profile in the dashboard.`) as any;
+    err.status = 400;
+    throw err;
+  }
+
+  return { chain, strategyKey: `auto:${suffix}` };
+}
+
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {
+  const db = getDb();
+
+  const strategy = getRoutingStrategy();
+  if (strategy !== 'priority') refreshStatsCache(db);
+
+  const chain = prefetchedChain ?? getActiveChain(db).filter(e => e.enabled);
 
   const sortedChain = orderChain(chain, strategy);
 
-  // Sticky session: move preferred model to front of chain
+  // Sticky session / Explicit pinning: move preferred model to front of chain
   if (preferredModelDbId) {
     const idx = sortedChain.findIndex(e => e.model_db_id === preferredModelDbId);
-    if (idx > 0) {
-      const [preferred] = sortedChain.splice(idx, 1);
-      sortedChain.unshift(preferred);
+    if (idx >= 0) {
+      if (idx > 0) {
+        const [preferred] = sortedChain.splice(idx, 1);
+        sortedChain.unshift(preferred);
+      }
+    } else {
+      // The requested model is not in the current routing chain (e.g. it's a
+      // custom model or not added to the active profile). We must fulfill the
+      // explicit request by injecting it at the front.
+      const pinnedRow = db.prepare(`
+        SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
+               m.platform, m.model_id, m.display_name, m.intelligence_rank,
+               m.size_label, m.monthly_token_budget,
+               m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+               m.supports_tools, m.context_window, m.key_id
+        FROM models m
+        WHERE m.id = ? AND m.enabled = 1
+      `).get(preferredModelDbId) as ChainRow | undefined;
+      
+      if (pinnedRow) {
+        sortedChain.unshift(pinnedRow);
+      }
     }
   }
 
@@ -451,8 +598,8 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
 
     // Check if we have a provider for this platform
-    const provider = getProvider(entry.platform as any);
-    if (!provider) continue;
+    if (!hasProvider(entry.platform as Platform)) continue;
+    const provider = getProvider(entry.platform as Platform)!;
 
     // Get enabled keys that have not already failed validation or decryption.
     const keys = db.prepare(
@@ -538,9 +685,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // in the sortedChain for THIS specific request.
   }
 
-  const err = new Error('All models exhausted. Add more API keys or wait for rate limits to reset.') as any;
-  err.status = 429;
-  throw err;
+  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429);
 }
 
 /**

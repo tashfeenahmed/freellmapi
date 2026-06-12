@@ -26,6 +26,9 @@ export type Platform =
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
   // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
   | 'opencode'
+  // OVHcloud AI Endpoints — OpenAI-compatible, keyless anonymous tier
+  // (2 req/min per IP per model); see migrateModelsV26.
+  | 'ovh'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';
@@ -49,11 +52,32 @@ export interface Model {
   supportsTools: boolean;
 }
 
+// ---- Quirks ----
+// Structured, reusable notes about catalog models. One quirk is applied to many
+// models via selector parameters (see quirk_targets / services/quirks.ts).
+export type QuirkSeverity = 'info' | 'warning' | 'blocker';
+
+export interface Quirk {
+  slug: string;
+  title: string;
+  body: string;
+  severity: QuirkSeverity;
+}
+
+export interface QuirkTarget {
+  platform: Platform | null;
+  modelGlob: string | null;
+}
+
 export interface ModelListRow {
   platform: string;
   model_id: string;
   display_name: string;
   context_window: number | null;
+  // 1 when the catalog row is enabled. 1 when an enabled key can serve it
+  // (enabled AND a matching enabled api_key exists). SQLite returns 0/1.
+  enabled: number;
+  available: number;
 }
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';

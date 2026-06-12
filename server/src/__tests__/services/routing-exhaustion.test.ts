@@ -51,6 +51,12 @@ describe('Routing Key Exhaustion', () => {
     // models that share the 'google' platform.
     setRoutingStrategy('priority');
     const db = getDb();
+    
+    // Clear seeded DB data to isolate this test's routing logic
+    db.prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
+    db.prepare("DELETE FROM fallback_config").run();
+    db.prepare("DELETE FROM profile_models").run();
+    db.prepare("DELETE FROM models").run();
 
     // Setup: 2 models (Pro and Flash)
     // Pro is higher priority (priority 1), Flash is lower (priority 2)
