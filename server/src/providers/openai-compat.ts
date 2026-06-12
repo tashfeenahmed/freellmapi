@@ -2,9 +2,12 @@ import type {
   ChatMessage,
   ChatCompletionResponse,
   ChatCompletionChunk,
+  ChatToolCall,
   Platform,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { rescueInlineToolCalls } from '../lib/tool-call-rescue.js';
+import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 
 /**
  * Generic provider for platforms that use an OpenAI-compatible API.
@@ -55,6 +58,31 @@ export class OpenAICompatProvider extends BaseProvider {
     return options?.parallel_tool_calls;
   }
 
+  /** Some providers (Groq especially) reject a model's tool call with a 400
+   * `tool_use_failed` when the model emitted it as inline DIALECT TEXT
+   * (`<function=NAME{...}</function>`, Hermes/Qwen XML, etc.) that the provider's
+   * own parser couldn't convert — but they hand back the raw text in
+   * `error.failed_generation`. Weaker tool models (e.g. groq llama-3.3-70b) hit
+   * this constantly, dead-ending an agent's whole turn even though the call is
+   * perfectly recoverable. Reuse the same inline-dialect rescue the proxy already
+   * applies to streamed text: parse `failed_generation` into structured
+   * tool_calls so the turn succeeds instead of failing over (or exhausting the
+   * chain when every enabled tool model behaves the same way). See issue #264. */
+  private rescueFailedGeneration(errBody: unknown, options?: CompletionOptions): ChatToolCall[] | null {
+    const failed = (errBody as { error?: { failed_generation?: unknown } })?.error?.failed_generation;
+    if (typeof failed !== 'string' || failed.length === 0) return null;
+    const toolNames = new Set((options?.tools ?? []).map(t => t.function.name));
+    if (toolNames.size === 0) return null;
+    const rescue = rescueInlineToolCalls(failed, toolNames);
+    if (!rescue.detected || !rescue.calls?.length) return null;
+    const schemas = toolSchemaMap(options?.tools);
+    return rescue.calls.map((c, i) => ({
+      id: `call_rescued_${i + 1}`,
+      type: 'function' as const,
+      function: { name: c.name, arguments: repairToolArguments(c.arguments, schemas.get(c.name)) },
+    }));
+  }
+
   /** Keyless providers (Kilo's anonymous free tier) must send NO Authorization
    * header — a stored sentinel like `Bearer no-key` could be treated as an
    * invalid key. Everyone else sends the bearer as usual. */
@@ -89,6 +117,20 @@ export class OpenAICompatProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      const rescued = this.rescueFailedGeneration(err, options);
+      if (rescued) {
+        console.log(`[${this.name}] Rescued ${rescued.length} inline tool call(s) from a ${res.status} tool_use_failed (#264)`);
+        const out: ChatCompletionResponse = {
+          id: `chatcmpl-rescued-${Date.now()}`,
+          object: 'chat.completion',
+          created: Math.floor(Date.now() / 1000),
+          model: modelId,
+          choices: [{ index: 0, message: { role: 'assistant', content: null as unknown as string, tool_calls: rescued }, finish_reason: 'tool_calls' }],
+          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        };
+        out._routed_via = { platform: this.platform, model: modelId };
+        return out;
+      }
       throw providerHttpError(res, `${this.name} API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
@@ -138,6 +180,15 @@ export class OpenAICompatProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      const rescued = this.rescueFailedGeneration(err, options);
+      if (rescued) {
+        console.log(`[${this.name}] Rescued ${rescued.length} inline tool call(s) from a ${res.status} tool_use_failed (stream, #264)`);
+        const base = { id: `chatcmpl-rescued-${Date.now()}`, object: 'chat.completion.chunk' as const, created: Math.floor(Date.now() / 1000), model: modelId };
+        yield { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+        yield { ...base, choices: [{ index: 0, delta: { tool_calls: rescued.map((c, i) => ({ index: i, ...c })) as unknown as ChatToolCall[] }, finish_reason: null }] };
+        yield { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] };
+        return;
+      }
       throw providerHttpError(res, `${this.name} API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 

@@ -74,6 +74,10 @@ export interface ModelListRow {
   model_id: string;
   display_name: string;
   context_window: number | null;
+  // 1 when the catalog row is enabled. 1 when an enabled key can serve it
+  // (enabled AND a matching enabled api_key exists). SQLite returns 0/1.
+  enabled: number;
+  available: number;
 }
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
