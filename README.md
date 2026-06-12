@@ -485,7 +485,7 @@ Stacking free tiers has real trade-offs. Be honest with yourself about them:
 
 ## Contributing
 
-Contributors very welcome! Good first PRs:
+Contributors very welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop, PR expectations, and the policy on AI/LLM-assisted contributions (short version: welcome, same quality bar as any other PR). Good first PRs:
 
 - **Add a provider** — copy `server/src/providers/openai-compat.ts` as a template, wire it into `server/src/providers/index.ts`, seed its models in `server/src/db/index.ts`, add a test in `server/src/__tests__/providers/`.
 - **Add an endpoint** — images, moderations, audio. The provider base class can grow new methods; adapters declare which they support.
