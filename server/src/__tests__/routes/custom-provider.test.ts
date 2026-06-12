@@ -277,4 +277,53 @@ describe('POST /api/keys/custom (#117)', () => {
       expect(keys[0].base_url).toBe('http://127.0.0.1:1234/v1');
     });
   });
+
+  // #281: one submit can bind several model ids to a single endpoint, instead
+  // of forcing one POST per model.
+  describe('multiple models per endpoint (#281)', () => {
+    beforeAll(() => {
+      const db = getDb();
+      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
+      db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+      db.prepare("DELETE FROM api_keys WHERE platform = 'custom'").run();
+    });
+
+    it('registers every model in the models array against one endpoint key', async () => {
+      const { status, body } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:9999/v1',
+        models: ['gemma3:1b', { model: 'phi4:14b', displayName: 'Phi 4' }],
+        label: 'Multi box',
+      });
+      expect(status).toBe(201);
+      // Back-compat fields echo the first model; `models` carries the full set.
+      expect(body.model).toBe('gemma3:1b');
+      expect(body.models).toHaveLength(2);
+      expect(body.models.map((m: any) => m.model).sort()).toEqual(['gemma3:1b', 'phi4:14b']);
+      expect(body.models.find((m: any) => m.model === 'phi4:14b').displayName).toBe('Phi 4');
+
+      const db = getDb();
+      const keys = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:9999/v1'").all();
+      expect(keys.length).toBe(1); // one endpoint, one key
+      const models = db.prepare("SELECT model_id FROM models WHERE platform = 'custom' AND key_id = ?").all((keys[0] as any).id) as any[];
+      expect(models.map(m => m.model_id).sort()).toEqual(['gemma3:1b', 'phi4:14b']);
+      for (const m of body.models) {
+        expect(db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(m.modelDbId)).toBeDefined();
+      }
+    });
+
+    it('dedupes repeated ids and ignores blanks', async () => {
+      const { status, body } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:9999/v1',
+        models: ['dupe:1', 'dupe:1', '   '],
+      });
+      expect(status).toBe(201);
+      expect(body.models).toHaveLength(1);
+      expect(body.models[0].model).toBe('dupe:1');
+    });
+
+    it('rejects a submit with neither model nor models', async () => {
+      const { status } = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:9999/v1' });
+      expect(status).toBe(400);
+    });
+  });
 });
