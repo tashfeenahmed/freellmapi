@@ -4,12 +4,14 @@
 
 **One OpenAI-compatible endpoint. Sixteen free LLM providers. ~1.7B tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, and OpenCode Zen — plus any custom OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, local Ollama) — behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, and OpenCode Zen — plus any custom OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, local Ollama) — behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
+
+**[freellmapi.co](https://freellmapi.co)** — browse the live model catalog
 
 ![Fallback chain with per-provider token budget](repo-assets/fallback-chain.png)
 
@@ -26,9 +28,11 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 - [Quick start](#quick-start)
 - [Docker](#docker)
 - [Desktop app](#desktop-app)
+- [Premium (live catalog)](#premium-live-catalog)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
+- [Context Handoff](#context-handoff)
 - [Limitations](#limitations)
 - [Contributing](#contributing)
 - [Terms of Service review](#terms-of-service-review)
@@ -38,7 +42,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 
 Every serious AI lab now offers a free tier — a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **1.7 billion tokens per month** of working inference capacity, across 100+ models from small-and-fast to reasonably capable.
 
-The problem is that stacking them by hand is painful: sixteen different SDKs, sixteen different rate limits, sixteen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
+The problem is that stacking them by hand is painful: seventeen different SDKs, seventeen different rate limits, seventeen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
 
 ## Supported providers
 
@@ -58,7 +62,7 @@ The problem is that stacking them by hand is painful: sixteen different SDKs, si
 <tr>
 <td align="center"><a href="https://cohere.com"><b>Cohere</b><br/>Command R+ · Command-A (trial)</a></td>
 <td align="center"><a href="https://docs.z.ai"><b>Z.ai (Zhipu)</b><br/>GLM-4.5 · GLM-4.7 Flash</a></td>
-<td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM (disabled by default)</a></td>
+<td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM · 40 RPM free (eval-only ToS)</a></td>
 <td align="center"><a href="https://huggingface.co/docs/inference-providers"><b>HuggingFace</b><br/>Router → DeepSeek V4 · Kimi K2.6 · Qwen3</a></td>
 </tr>
 <tr>
@@ -66,6 +70,12 @@ The problem is that stacking them by hand is painful: sixteen different SDKs, si
 <td align="center"><a href="https://kilo.ai"><b>Kilo Gateway</b><br/>:free routes (anon ok)</a></td>
 <td align="center"><a href="https://pollinations.ai"><b>Pollinations</b><br/>GPT-OSS 20B (anon ok)</a></td>
 <td align="center"><a href="https://llm7.io"><b>LLM7</b><br/>GPT-OSS · Llama 3.1 · GLM (anon ok)</a></td>
+</tr>
+<tr>
+<td align="center"><a href="https://endpoints.ai.cloud.ovh.net"><b>OVH AI Endpoints</b><br/>Qwen3.5 397B · GPT-OSS · Llama 3.3 (anon ok)</a></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
 </tr>
 </table>
 
@@ -87,6 +97,7 @@ Plus a **custom** provider — point at any OpenAI-compatible endpoint (llama.cp
 - **Health checks** — Periodic probes mark keys as `healthy`, `rate_limited`, `invalid`, or `error` so the router skips dead ones automatically.
 - **Admin dashboard** — React + Vite UI to manage keys, reorder the fallback chain, inspect analytics, and run prompts in a playground. Dark mode included.
 - **Analytics** — Per-request logging with latency, token counts, success rate, and per-provider breakdowns.
+- **Context handoff on model switch** — Optional. When a session falls over to a different model, injects one compact system message so the new model knows it is continuing an existing task. Disabled by default; enable with `FREELLMAPI_CONTEXT_HANDOFF=on_model_switch`. See [Context Handoff](#context-handoff).
 - **Runs anywhere Node 20+ runs** — Windows, macOS, Linux servers, or a small ARM SBC (Raspberry Pi included). ~40 MB RSS at idle behind PM2 / systemd / whatever supervisor you prefer.
 
 ## Not yet supported
@@ -107,10 +118,10 @@ PRs that add any of these are very welcome. See [Contributing](#contributing).
 **One-liner** (Docker required — sets up `~/freellmapi`, generates an encryption key, pulls the image, and starts the container):
 
 ```bash
-curl -fsSL https://tashfeenahmed.github.io/freellmapi/install.sh | bash
+curl -fsSL https://freellmapi.co/install.sh | bash
 ```
 
-Prefer to read before you pipe to bash? [The script is here](docs/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
+Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
 **Or manually with Docker Compose.** It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
 
@@ -201,7 +212,7 @@ request stats.
 
 ![FreeLLMAPI desktop app](repo-assets/desktop.png)
 
-No published binaries — it builds from this repo in a few minutes:
+**[Download the macOS app from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**, or build it from this repo in a few minutes:
 
 ```bash
 npm install
@@ -211,6 +222,24 @@ npm run desktop:dist:win    # Windows installer
 
 > **Windows:** the build config is in place but not tested yet — if you try it,
 > a quick report (working or not) in an issue would be much appreciated.
+
+## Premium (live catalog)
+
+The router keeps its model catalog fresh on its own: it pulls a signed catalog
+from [freellmapi.co](https://freellmapi.co) twice a day and applies new models,
+quota changes, and provider quirk fixes to your local DB (your own enable/disable
+choices and custom providers are never touched; every download is verified
+against a pinned Ed25519 key before it is applied).
+
+- **Free** installs follow a **monthly snapshot** — zero cost, forever.
+- **[Premium](https://freellmapi.co/#pricing)** ($19/yr or $49 lifetime) follows
+  the **live feed**, refreshed every 2-3 days, so new free models are in your
+  router the moment they exist. One key covers all your devices; activate it in
+  the dashboard under **Premium**. Cancel or manage billing self-serve at
+  [freellmapi.co/manage](https://freellmapi.co/manage).
+
+The catalog server never sees your prompts, completions, or provider keys — the
+router stays fully self-hosted either way.
 
 Locally built apps launch without Gatekeeper/SmartScreen warnings — no code
 signing involved. Full instructions in [desktop/README.md](./desktop/README.md).
@@ -299,6 +328,19 @@ final = client.chat.completions.create(
     tools=tools,
 )
 print(final.choices[0].message.content)
+```
+
+**Gemini Google Search grounding**
+
+Google's models can ground their answers in live Google Search results. Since the OpenAI wire format has no way to express that, request a tool named `google_search` and the Google provider translates it into Gemini's native grounding tool. It can be sent on its own or alongside your normal function tools.
+
+```python
+resp = client.chat.completions.create(
+    model="gemini-2.5-flash",  # pin a Google model so the request routes there
+    messages=[{"role": "user", "content": "Who won the F1 race this weekend?"}],
+    tools=[{"type": "function", "function": {"name": "google_search", "parameters": {}}}],
+)
+print(resp.choices[0].message.content)
 ```
 
 **Vision / image input**
@@ -411,6 +453,38 @@ Request volume, success rate, tokens in and out, average latency, and per-provid
 - **Dashboard** (`client/`) — React + Vite + shadcn/ui admin surface.
 - **Storage** — SQLite (`better-sqlite3`) with AES-256-GCM envelope encryption for keys.
 
+## Context Handoff
+
+When FreeLLMAPI falls over to a different model mid-conversation (quota, rate limit, cooldown), the new model has no idea it is picking up someone else's task. **Context handoff** adds a single compact `system` message to the outbound request that tells the new model exactly that:
+
+```
+FreeLLMAPI context handoff:
+You are taking over an ongoing conversation from another model (groq:llama-3 → google:gemini-flash).
+Continue the user's task using the conversation context already provided in this request.
+Do not restart the task, re-ask already answered setup questions, or discard prior tool results.
+Respect the user's latest message as the highest-priority instruction.
+
+Recent session summary:
+User: …
+Assistant: …
+```
+
+**Enable it in `.env`:**
+
+```env
+FREELLMAPI_CONTEXT_HANDOFF=on_model_switch
+```
+
+**How it works:**
+
+- Messages per session are stored in memory (TTL: 3 hours).
+- Only injected when the selected model changes for a given session key.
+- Not injected on the first request, on same-model continuations, or if a handoff message is already present.
+- Session key: `X-Session-Id` header if present, otherwise SHA-1 of the first user message (same as sticky sessions).
+- Storage is in-memory only. Nothing is written to disk or logged.
+
+> **Important:** Context Handoff improves continuity for conversations routed through FreeLLMAPI. It cannot recover provider-internal hidden state or messages that were never sent to the proxy.
+
 ## Limitations
 
 Stacking free tiers has real trade-offs. Be honest with yourself about them:
@@ -424,7 +498,7 @@ Stacking free tiers has real trade-offs. Be honest with yourself about them:
 
 ## Contributing
 
-Contributors very welcome! Good first PRs:
+Contributors very welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop, PR expectations, and the policy on AI/LLM-assisted contributions (short version: welcome, same quality bar as any other PR). Good first PRs:
 
 - **Add a provider** — copy `server/src/providers/openai-compat.ts` as a template, wire it into `server/src/providers/index.ts`, seed its models in `server/src/db/index.ts`, add a test in `server/src/__tests__/providers/`.
 - **Add an endpoint** — images, moderations, audio. The provider base class can grow new methods; adapters declare which they support.
@@ -476,6 +550,14 @@ PRs should include a test, keep the existing test suite green, and match the `.e
 <a href="https://github.com/Naster17"><img src="https://images.weserv.nl/?url=github.com/Naster17.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@Naster17" /></a>
 <a href="https://github.com/StealthTensor"><img src="https://images.weserv.nl/?url=github.com/StealthTensor.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@StealthTensor" /></a>
 <a href="https://github.com/EmranAhmed"><img src="https://images.weserv.nl/?url=github.com/EmranAhmed.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@EmranAhmed" /></a>
+<a href="https://github.com/itsfuad"><img src="https://images.weserv.nl/?url=github.com/itsfuad.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@itsfuad" /></a>
+<a href="https://github.com/RobinHoodO"><img src="https://images.weserv.nl/?url=github.com/RobinHoodO.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@RobinHoodO" /></a>
+<a href="https://github.com/hmm183"><img src="https://images.weserv.nl/?url=github.com/hmm183.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@hmm183" /></a>
+<a href="https://github.com/duemilionidieuro-bot"><img src="https://images.weserv.nl/?url=github.com/duemilionidieuro-bot.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@duemilionidieuro-bot" /></a>
+<a href="https://github.com/hjhhoni"><img src="https://images.weserv.nl/?url=github.com/hjhhoni.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@hjhhoni" /></a>
+<a href="https://github.com/immanuelsavio"><img src="https://images.weserv.nl/?url=github.com/immanuelsavio.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@immanuelsavio" /></a>
+<a href="https://github.com/Slyker"><img src="https://images.weserv.nl/?url=github.com/Slyker.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@Slyker" /></a>
+<a href="https://github.com/wells1013"><img src="https://images.weserv.nl/?url=github.com/wells1013.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@wells1013" /></a>
 
 ## Terms of Service review
 
@@ -489,12 +571,13 @@ A self-hosted, single-user, personal-use setup was re-reviewed against each prov
 | Mistral | ✅ Likely OK | APIs allowed for personal/internal business use. |
 | OpenRouter | ✅ Likely OK | April 2026 ToS sharpens the no-resale / no-competing-service clause; private single-user proxy still fine. |
 | Cloudflare Workers AI | ⚠️ Ambiguous | No anti-proxy clause; covered by general Self-Serve Subscription Agreement. |
-| NVIDIA NIM | ⚠️ Caution | Trial ToS §1.2 / §1.4: *"evaluation only, not production."* Disabled in default catalog. |
+| NVIDIA NIM | ⚠️ Caution | Trial ToS §1.2 / §1.4: *"evaluation only, not production."* Free access is a recurring 40 RPM rate limit (the 2025 credit system was discontinued), but the evaluation-only scope stands. |
 | GitHub Models | ⚠️ Caution | Free tier explicitly scoped to *"experimentation"* and *"prototyping."* |
 | Cohere | ❌ Avoid | Terms §14 still forbids *"personal, family or household purposes."* |
 | Zhipu (open.bigmodel.cn) | ✅ Likely OK | Personal/non-commercial research carve-out still in the platform docs. |
 | Z.ai (api.z.ai) | ⚠️ Caution | New row — Singapore entity (distinct from Zhipu CN). §III.3(l) anti-traffic-redirect clause could plausibly be read against a proxy; no explicit personal-use carve-out. |
 | Ollama Cloud | ✅ Likely OK | New row — Free plan permits cloud-model access (1 concurrent, 5-hour session caps). No anti-proxy / anti-resale clauses found. *(Integration tracked in #14.)* |
+| OVH AI Endpoints | ✅ Likely OK | New row (June 2026) — anonymous access is officially documented (2 req/min per IP per model). OVH reserves the right to introduce token/consumption caps. |
 
 Rules of thumb that keep most providers happy: **one account per provider**, **no reselling**, **no sharing your endpoint with other humans**, **don't hammer a free tier as a paid production backend**. This is informational, not legal advice — read each provider's ToS and make your own call.
 

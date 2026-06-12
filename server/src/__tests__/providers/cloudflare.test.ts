@@ -54,6 +54,66 @@ describe('CloudflareProvider', () => {
     ).rejects.toThrow(/account_id:api_token/);
   });
 
+  describe('validateKey', () => {
+    it('validates via /user/tokens/verify when the token is user-scoped', async () => {
+      const calls: string[] = [];
+      vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
+        calls.push(url as string);
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, result: { status: 'active' } }),
+        } as any;
+      });
+
+      expect(await provider.validateKey('acc123:tok')).toBe(true);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toBe('https://api.cloudflare.com/client/v4/user/tokens/verify');
+    });
+
+    it('falls back to the account-scoped endpoint when /user 403s (#297)', async () => {
+      const calls: string[] = [];
+      vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
+        calls.push(url as string);
+        if ((url as string).includes('/user/tokens/verify')) {
+          return { ok: false, status: 403, json: () => Promise.resolve({}) } as any;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, result: { status: 'active' } }),
+        } as any;
+      });
+
+      expect(await provider.validateKey('acc123:tok')).toBe(true);
+      expect(calls).toHaveLength(2);
+      expect(calls[1]).toBe('https://api.cloudflare.com/client/v4/accounts/acc123/tokens/verify');
+    });
+
+    it('returns false only when both scopes reject the token', async () => {
+      vi.spyOn(global, 'fetch').mockImplementation(async () => {
+        return { ok: false, status: 403, json: () => Promise.resolve({}) } as any;
+      });
+
+      expect(await provider.validateKey('acc123:tok')).toBe(false);
+    });
+
+    it('returns false when the account scope reports an inactive token', async () => {
+      vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
+        if ((url as string).includes('/user/tokens/verify')) {
+          return { ok: false, status: 403, json: () => Promise.resolve({}) } as any;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, result: { status: 'disabled' } }),
+        } as any;
+      });
+
+      expect(await provider.validateKey('acc123:tok')).toBe(false);
+    });
+  });
+
   it('should convert null assistant content to empty string (CF rejects null)', async () => {
     let capturedBody: any = null;
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {

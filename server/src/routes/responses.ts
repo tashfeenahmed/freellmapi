@@ -24,6 +24,7 @@ import {
   setStickyModel,
   logRequest,
 } from './proxy.js';
+import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 
 export const responsesRouter = Router();
 
@@ -359,7 +360,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     } catch (err: any) {
       const status = lastError ? 429 : (err.status ?? 503);
       const message = lastError
-        ? `All models rate-limited. Last error: ${lastError.message}`
+        ? `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`
         : err.message;
       const type = lastError ? 'rate_limit_error' : 'routing_error';
       if (streamStarted) {
@@ -370,8 +371,6 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       }
       return;
     }
-
-    recordRequest(route.platform, route.modelId, route.keyId);
 
     try {
       if (stream) {
@@ -586,6 +585,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         sse('response.completed', { response: finalResponse });
         res.end();
 
+        recordRequest(route.platform, route.modelId, route.keyId);
         recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
         recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
@@ -630,6 +630,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           continue;
         }
 
+        recordRequest(route.platform, route.modelId, route.keyId);
         recordTokens(route.platform, route.modelId, route.keyId, result.usage?.total_tokens ?? 0);
         recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
@@ -647,7 +648,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       }
     } catch (err: any) {
       const latency = Date.now() - start;
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, err.message);
+      const safeError = sanitizeProviderErrorMessage(err.message);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
 
       // Mid-stream failures can't be retried (bytes already sent) — close cleanly.
       if (stream && streamStarted) {
@@ -669,7 +671,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         continue;
       }
 
-      res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${err.message}`, type: 'provider_error' } });
+      res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${safeError}`, type: 'provider_error' } });
       return;
     }
   }

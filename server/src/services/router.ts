@@ -79,6 +79,8 @@ export function recordRateLimitHit(modelDbId: number) {
   const existing = rateLimitPenalties.get(modelDbId);
   const now = Date.now();
   if (existing) {
+    const decaySteps = Math.floor((now - existing.lastHit) / DECAY_INTERVAL_MS);
+    existing.penalty = Math.max(0, existing.penalty - decaySteps * DECAY_AMOUNT);
     existing.count++;
     existing.lastHit = now;
     existing.penalty = Math.min(existing.penalty + PENALTY_PER_429, MAX_PENALTY);
@@ -102,25 +104,22 @@ export function recordSuccess(modelDbId: number) {
 
 /**
  * Get the current penalty for a model (with time-based decay).
+ * Pure read — does not mutate the entry; decay is applied lazily only when
+ * recording a new hit (recordRateLimitHit) so the clock isn't reset on every
+ * routing call.
  */
 function getPenalty(modelDbId: number): number {
   const entry = rateLimitPenalties.get(modelDbId);
   if (!entry) return 0;
 
-  // Apply time-based decay
-  const now = Date.now();
-  const elapsed = now - entry.lastHit;
+  const elapsed = Date.now() - entry.lastHit;
   const decaySteps = Math.floor(elapsed / DECAY_INTERVAL_MS);
-  if (decaySteps > 0) {
-    entry.penalty = Math.max(0, entry.penalty - (decaySteps * DECAY_AMOUNT));
-    entry.lastHit = now; // reset so we don't double-decay
-    if (entry.penalty === 0) {
-      rateLimitPenalties.delete(modelDbId);
-      return 0;
-    }
+  const decayed = Math.max(0, entry.penalty - decaySteps * DECAY_AMOUNT);
+  if (decayed === 0) {
+    rateLimitPenalties.delete(modelDbId);
+    return 0;
   }
-
-  return entry.penalty;
+  return decayed;
 }
 
 /**
@@ -444,6 +443,12 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // guard. If every model is too small, the loop falls through and the caller
     // gets the normal "all models exhausted" error rather than a wasted sweep.
     if (entry.context_window != null && estimatedTokens > entry.context_window) continue;
+
+    // Same guard for a model with a small per-minute token budget: a single
+    // request that alone exceeds tpm_limit can never fit one minute of quota and
+    // returns a guaranteed 413 (e.g. Groq gpt-oss-120b: 131k context but 8k TPM).
+    // estimatedTokens already includes reserved output, mirroring the check above.
+    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
 
     // Check if we have a provider for this platform
     const provider = getProvider(entry.platform as any);

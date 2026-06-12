@@ -92,6 +92,45 @@ describe('OpenAICompatProvider', () => {
     expect(capturedBody.parallel_tool_calls).toBe(true);
   });
 
+  describe('forceSingleToolCall (NVIDIA NIM single-tool-call 400 — issue #255)', () => {
+    const nim = () => new OpenAICompatProvider({
+      platform: 'nvidia',
+      name: 'NVIDIA NIM',
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      forceSingleToolCall: true,
+    });
+    const okResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'x', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as any;
+    const tools = [{ type: 'function' as const, function: { name: 'f', description: 'd', parameters: { type: 'object', properties: {} } } }];
+
+    it('pins parallel_tool_calls to false when tools are present, even if the caller asked for true', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await nim().chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', { tools, parallel_tool_calls: true });
+      expect(body.parallel_tool_calls).toBe(false);
+    });
+
+    it('leaves parallel_tool_calls untouched when there are no tools', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await nim().chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', {});
+      expect(body.parallel_tool_calls).toBeUndefined();
+    });
+
+    it('does not affect providers without the flag (parallel_tool_calls passes through)', async () => {
+      let body: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => { body = JSON.parse((init as any).body); return okResponse; });
+      await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm', { tools, parallel_tool_calls: true });
+      expect(body.parallel_tool_calls).toBe(true);
+    });
+  });
+
   it('should throw on error response', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: false,
@@ -286,4 +325,66 @@ describe('OpenAICompatProvider - platform instances', () => {
       expect(result._routed_via?.platform).toBe(p.platform);
     });
   }
+
+  // #264: Groq (and others) reject a model's inline tool-call dialect with a 400
+  // `tool_use_failed`, handing back the raw text in `error.failed_generation`.
+  // We rescue it into structured tool_calls instead of dead-ending the turn.
+  describe('tool_use_failed rescue (#264)', () => {
+    let provider: OpenAICompatProvider;
+    beforeEach(() => {
+      provider = new OpenAICompatProvider({ platform: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' });
+    });
+    const tools = [{
+      type: 'function' as const,
+      function: { name: 'read', description: 'read a file', parameters: { type: 'object', properties: { file_path: { type: 'string' } }, required: ['file_path'] } },
+    }];
+    const failBody = {
+      error: {
+        message: 'Failed to call a function. Please adjust your prompt. See \'failed_generation\' for more details.',
+        type: 'invalid_request_error',
+        code: 'tool_use_failed',
+        failed_generation: '<function=read={"file_path": "sample.txt"}</function>',
+      },
+    };
+
+    it('non-stream: rescues failed_generation into structured tool_calls', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: false, status: 400, statusText: 'Bad Request',
+        json: () => Promise.resolve(failBody),
+      } as any);
+
+      const r = await provider.chatCompletion('key', [{ role: 'user', content: 'read sample.txt' }], 'llama-3.3-70b-versatile', { tools, tool_choice: 'auto' });
+      expect(r.choices[0].finish_reason).toBe('tool_calls');
+      const tc = r.choices[0].message.tool_calls;
+      expect(tc?.length).toBe(1);
+      expect(tc![0].function.name).toBe('read');
+      expect(JSON.parse(tc![0].function.arguments)).toEqual({ file_path: 'sample.txt' });
+    });
+
+    it('stream: yields a synthesized tool_calls turn instead of throwing', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: false, status: 400, statusText: 'Bad Request',
+        json: () => Promise.resolve(failBody),
+      } as any);
+
+      const chunks: any[] = [];
+      for await (const c of provider.streamChatCompletion('key', [{ role: 'user', content: 'read sample.txt' }], 'llama-3.3-70b-versatile', { tools, tool_choice: 'auto' })) {
+        chunks.push(c);
+      }
+      const calls = chunks.flatMap(c => c.choices[0].delta.tool_calls ?? []);
+      expect(calls.length).toBe(1);
+      expect(calls[0].function.name).toBe('read');
+      expect(chunks.some(c => c.choices[0].finish_reason === 'tool_calls')).toBe(true);
+    });
+
+    it('still throws when there is no failed_generation to rescue', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: false, status: 400, statusText: 'Bad Request',
+        json: () => Promise.resolve({ error: { message: 'bad request', code: 'invalid_request' } }),
+      } as any);
+      await expect(
+        provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'm', { tools }),
+      ).rejects.toThrow(/API error 400/);
+    });
+  });
 });

@@ -258,7 +258,9 @@ describe('Migration idempotency', () => {
        ORDER BY model_id
     `).all() as { model_id: string; enabled: number; supports_tools: number }[];
     expect(zen.map(r => [r.model_id, r.enabled, r.supports_tools])).toEqual([
-      ['minimax-m3-free',       1, 1],
+      // minimax-m3-free was seeded enabled here in V24, then retired in V25 when
+      // its free promo ended (now enabled=0). nemotron-3-ultra-free is still live.
+      ['minimax-m3-free',       0, 1],
       ['nemotron-3-ultra-free', 1, 1],
     ]);
 
@@ -268,6 +270,21 @@ describe('Migration idempotency', () => {
       SELECT enabled FROM models WHERE platform = 'nvidia' AND model_id = 'google/gemma-4-31b-it'
     `).get() as { enabled: number };
     expect(gemma.enabled).toBe(0);
+  });
+
+  it('V25: dead OpenCode Zen free promos (nemotron-3-super-free, minimax-m3-free) are disabled', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const dead = db.prepare(`
+      SELECT model_id, enabled FROM models
+       WHERE platform = 'opencode' AND model_id IN ('nemotron-3-super-free', 'minimax-m3-free')
+       ORDER BY model_id
+    `).all() as { model_id: string; enabled: number }[];
+    expect(dead.map(r => [r.model_id, r.enabled])).toEqual([
+      ['minimax-m3-free',       0],
+      ['nemotron-3-super-free', 0],
+    ]);
   });
 
   it('all enabled catalog platforms have a registered provider', async () => {

@@ -3,7 +3,7 @@ import type {
   ChatCompletionResponse,
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
 import { flattenMessageContent } from '../lib/content.js';
 
 const API_BASE = 'https://api.cohere.ai/compatibility/v1';
@@ -39,7 +39,7 @@ export class CohereProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
     const data = await res.json() as ChatCompletionResponse;
@@ -75,7 +75,7 @@ export class CohereProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Cohere API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`);
     }
 
     yield* this.readSseStream(res);

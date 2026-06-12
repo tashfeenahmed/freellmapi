@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
+import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
@@ -12,6 +12,7 @@ import { contentToString, messageHasImage, normalizeOutboundContent } from '../l
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 
 export const proxyRouter = Router();
 
@@ -29,13 +30,14 @@ function isAutoModel(modelId: string | undefined): boolean {
 // length and per-character timing, which a network attacker could in principle
 // use to recover the key one byte at a time.
 export function timingSafeStringEqual(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  // Compare against a same-length buffer regardless of input length so the
-  // comparison itself runs in constant time; the explicit length check at the
-  // end is what actually decides equality when lengths differ.
-  const compareA = a.length === b.length ? a : Buffer.alloc(b.length);
-  return crypto.timingSafeEqual(compareA, b) && a.length === b.length;
+  // Use HMAC to produce fixed-length digests so timingSafeEqual always
+  // receives same-length buffers regardless of input length. This eliminates
+  // both the per-character timing leak and the length-branch timing leak that
+  // the Buffer.alloc-on-mismatch approach had.
+  const key = Buffer.alloc(32);
+  const a = crypto.createHmac('sha256', key).update(provided).digest();
+  const b = crypto.createHmac('sha256', key).update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 // Extract the unified API key from an incoming request. Accepts both the
@@ -114,7 +116,8 @@ export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessi
   }
 }
 
-// OpenAI-compatible /models endpoint (used by Hermes for metadata)
+// OpenAI-compatible /models endpoint (used by Hermes for metadata) 
+// shows API models which is linked by the user
 proxyRouter.get('/models', (req: Request, res: Response) => {
   const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
@@ -123,21 +126,40 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     return;
   }
 
+  // By default we return the WHOLE catalog (one row per model id), each tagged
+  // with whether it is currently usable, so a client can see everything and know
+  // what's connected vs. disabled/keyless (#242). `?available=true` (alias
+  // `?connected=true`) narrows the list to only models that can serve a request
+  // right now — the previous default behavior. `available` is computed as
+  // "enabled AND an enabled key can serve it"; dedup prefers an available
+  // instance of a model id over a disabled/keyless one.
+  const availableExpr = `
+    (CASE WHEN m.enabled = 1 AND EXISTS (
+        SELECT 1 FROM api_keys k
+        WHERE k.platform = m.platform
+          AND k.enabled = 1
+          AND (m.key_id IS NULL OR k.id = m.key_id)
+      ) THEN 1 ELSE 0 END)`;
   const db = getDb();
   const models = db.prepare(`
-    SELECT platform, model_id, display_name, context_window
+    SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id
     FROM (
-      SELECT platform, model_id, display_name, context_window, intelligence_rank, id,
+      SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id,
+             m.enabled AS enabled,
+             ${availableExpr} AS available,
              ROW_NUMBER() OVER (
-               PARTITION BY model_id
-               ORDER BY intelligence_rank ASC, id ASC
+               PARTITION BY m.model_id
+               ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
              ) AS rn
-      FROM models
-      WHERE enabled = 1
+      FROM models m
     )
     WHERE rn = 1
-    ORDER BY intelligence_rank ASC, id ASC
+    ORDER BY available DESC, enabled DESC, intelligence_rank ASC, id ASC
   `).all() as ModelListRow[];
+
+  const q = String(req.query.available ?? req.query.connected ?? '').toLowerCase();
+  const onlyAvailable = q === '1' || q === 'true' || q === 'yes';
+  const listed = onlyAvailable ? models.filter(m => m.available === 1) : models;
 
   res.json({
     object: 'list',
@@ -149,18 +171,24 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         owned_by: 'freellmapi',
         name: 'Auto (router picks the best available model)',
         context_window: null,
+        available: true,
+        unavailable_reason: null,
       },
-      ...models.map(m => ({
+      ...listed.map(m => ({
         id: m.model_id,
         object: 'model',
         created: 0,
         owned_by: m.platform,
         name: m.display_name,
         context_window: m.context_window,
+        // Non-standard but additive: OpenAI clients ignore unknown fields.
+        available: m.available === 1,
+        unavailable_reason: m.available === 1 ? null : (m.enabled === 1 ? 'no_key' : 'disabled'),
       })),
     ],
   });
 });
+
 
 const MAX_RETRIES = 20;
 
@@ -229,6 +257,11 @@ const assistantMessageSchema = z.object({
   // no-tool assistant turns — aionrs (AionUI's engine) writes it into every
   // session-resumed assistant echo. Treated as absent. (#200)
   tool_calls: z.array(toolCallSchema).nullable().optional(),
+  // Thinking trace echoed back by a client. DeepSeek thinking models on
+  // OpenCode Zen 400 ("reasoning_content in thinking mode must be passed back")
+  // unless the prior turn's reasoning_content is replayed, so keep it through
+  // validation instead of stripping it. See issue #255.
+  reasoning_content: z.string().nullable().optional(),
 });
 
 // Tool results may arrive with null/missing content (a tool that returned
@@ -303,6 +336,7 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
+    || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
     || msg.includes('503') || msg.includes('unavailable')
     || msg.includes('500') || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
@@ -313,6 +347,13 @@ export function isRetryableError(err: any): boolean {
     // for a model that's been pulled). Rotate to the next model in the chain —
     // setCooldown + the health checker will avoid this model on subsequent requests.
     || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    // 403: the key is valid (it passed validateKey, and the health checker
+    // disables truly-forbidden keys) but this specific model is off-limits to
+    // the key's tier — e.g. gpt-4o on GitHub Models' free tier, subscription-only
+    // models on Cloudflare. Another model in the chain is reachable, so fail over
+    // instead of 502-ing the whole request. Paired with isModelAccessForbiddenError
+    // to rule the model out for this request and a day-long bench. See issue #256.
+    || isModelAccessForbiddenError(err)
     // 400: one provider may reject parameters another accepts (e.g. max_tokens
     // limits, unsupported params). The matching pattern is "api error 400"
     // which comes from the OpenAI-compat provider's error formatting, not
@@ -352,6 +393,18 @@ export function isPaymentRequiredError(err: any): boolean {
 export function isModelNotFoundError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
   return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
+}
+
+// A 403 Forbidden returned for a specific model behind an otherwise-valid key.
+// Drives the same whole-model skip as a 404: every key on this platform's tier
+// would be forbidden the same model, so rule it out for the rest of the request
+// rather than trying it again with a sibling key. Distinct from a dead key —
+// validateKey returns false on 401/403, so the health checker disables genuinely
+// forbidden keys; a 403 reaching here is model-not-on-this-tier. See issue #256.
+export function isModelAccessForbiddenError(err: any): boolean {
+  if (err?.status === 403) return true;
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('403') || msg.includes('forbidden');
 }
 
 // Pull the incremental text out of a streaming chunk for token counting.
@@ -479,6 +532,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         role: 'assistant',
         content: assistantContent,
         ...(m.name ? { name: m.name } : {}),
+        // Replay the thinking trace verbatim. DeepSeek thinking models on
+        // OpenCode Zen reject a follow-up turn that drops it; other providers
+        // ignore the unknown field. Same round-trip rationale as
+        // thought_signature below. (#255)
+        ...(typeof m.reasoning_content === 'string' && m.reasoning_content.length > 0
+          ? { reasoning_content: m.reasoning_content }
+          : {}),
         // hasToolCalls (not a bare truthiness check) so null AND empty-array
         // tool_calls are dropped rather than forwarded — strict upstreams
         // reject both shapes. (#200)
@@ -583,6 +643,21 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
 
+  // Context handoff only applies to auto-routed requests. Pinned-model requests
+  // are deliberate client choices; injecting "you are taking over" there would
+  // be semantically wrong.
+  const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
+  const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
+  const sessionKey = handoffMode !== 'off' ? getSessionKey(messages, sessionIdHeader) : '';
+  if (handoffMode !== 'off' && sessionKey) {
+    recordIncomingMessages(sessionKey, messages);
+  }
+  // A handoff can only fire when a prior model is on record for this session.
+  // Check after recordIncomingMessages, which clears the prior model on a
+  // fresh conversation. Stable across the retry loop (the prior model only
+  // changes on a success, which returns), so compute it once here.
+  const handoffPossible = handoffMode !== 'off' && !!sessionKey && hasPriorModel(sessionKey);
+
   // Explicit `model` field pins routing. If the catalog has no enabled row
   // matching the requested id, return 400 — silently auto-routing to a
   // different model would be surprising to OpenAI-compatible clients.
@@ -625,7 +700,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
+      // When a handoff could fire this turn, pad the token estimate so the router's
+      // context-window and TPM checks account for the extra system message overhead.
+      // We don't know the selected model key until after routeRequest() returns, so
+      // the padding is conservative on turns where injection is *possible* (a prior
+      // model is on record). Turns where injection can't happen — every turn 1, and
+      // sessions that never switched — pay no headroom tax.
+      const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
+      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -644,7 +726,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return;
     }
 
-    recordRequest(route.platform, route.modelId, route.keyId);
+    const modelKey = `${route.platform}:${route.modelId}`;
+    let outboundMessages = messages;
+    // Extra input tokens the injected handoff adds on this turn (0 when not
+    // injected). Folded into the streaming success accounting, where token
+    // counts are estimated; the non-stream path uses the provider's usage,
+    // which already counts the injected message.
+    let injectedHandoffTokens = 0;
+    if (handoffMode !== 'off' && sessionKey) {
+      const handoff = maybeInjectContextHandoff({ mode: handoffMode, sessionKey, messages, selectedModelKey: modelKey });
+      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${sessionKey.slice(0, 8)}…, model switch detected)`);
+      outboundMessages = handoff.messages;
+      injectedHandoffTokens = handoff.injectedTokens;
+    }
 
     try {
       if (stream) {
@@ -702,7 +796,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         try {
           const gen = route.provider.streamChatCompletion(
-            route.apiKey, messages, route.modelId,
+            route.apiKey, outboundMessages, route.modelId,
             { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
           );
 
@@ -775,7 +869,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const probe = heldText.trimStart();
             if (startsWithDialectMarker(probe)) {
               mode = 'dialect';
-            } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+            } else if (!couldBecomeDialectMarker(probe) || probe.length > 256) {
               mode = 'passthrough';
               flushHeaders();
               writeChunk(mkChunk({ content: heldText }, null));
@@ -828,7 +922,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           flushHeaders();
           if (heldText.length > 0) {
             writeChunk(mkChunk({ content: heldText }, null));
-            totalOutputTokens += Math.ceil(heldText.length / 4);
           }
           if (completedCalls.length > 0) {
             writeChunk(mkChunk({ tool_calls: completedCalls.map((c, i) => ({ index: i, ...c })) }, null));
@@ -845,10 +938,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.write('data: [DONE]\n\n');
           res.end();
 
-          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
+          recordRequest(route.platform, route.modelId, route.keyId);
+          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + injectedHandoffTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId, sessionIdHeader);
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
+          if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens + injectedHandoffTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
         } catch (streamErr: any) {
           if (headerSent) {
@@ -869,7 +964,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
       } else {
         const result = await route.provider.chatCompletion(
-          route.apiKey, messages, route.modelId,
+          route.apiKey, outboundMessages, route.modelId,
           { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
         );
 
@@ -912,9 +1007,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
 
         const totalTokens = result.usage?.total_tokens ?? 0;
+        recordRequest(route.platform, route.modelId, route.keyId);
         recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
         recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
+        if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
         if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
@@ -951,7 +1048,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // out for the rest of this request — its other keys would 404 the same
         // way. The per-key cooldown below still applies, so cross-request
         // behavior (#66/#76) is unchanged. (PR #111, credits @barbotkonv.)
-        if (isModelNotFoundError(err)) skipModels.add(route.modelDbId);
+        // 404 (removed upstream) and 403 (model off-limits to this key's tier)
+        // both rule the model out: a sibling key on the same platform would
+        // fail it identically, so skip it for the rest of this request.
+        if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
 
         // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
@@ -962,10 +1062,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.keyId,
           isPaymentRequiredError(err)
             ? PAYMENT_REQUIRED_COOLDOWN_MS
+            // A 403 won't clear on the next window (it's a tier/subscription gate,
+            // not a transient limit), so bench this model+key for a day like a 402
+            // instead of re-trying it every request. See issue #256.
+            : isModelAccessForbiddenError(err)
+            ? MODEL_FORBIDDEN_COOLDOWN_MS
             : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, {
                 rpd: route.rpdLimit,
                 tpd: route.tpdLimit,
-              }),
+              }, err.retryAfterMs),
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;

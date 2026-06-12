@@ -12,6 +12,7 @@ import type { Server } from 'node:http';
 import { createApp } from '../../server/src/app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../server/src/db/index.js';
 import { startHealthChecker } from '../../server/src/services/health.js';
+import { startCatalogSync } from '../../server/src/services/catalog-sync.js';
 import { userCount, createUser, createSession } from '../../server/src/services/auth.js';
 
 export { getDb, getUnifiedApiKey };
@@ -34,6 +35,7 @@ export async function startServer(opts: StartOptions): Promise<ServerHandle> {
   const app = createApp();
   const { server, port } = await listenWithScan(app, opts.host, opts.preferredPort);
   startHealthChecker();
+  startCatalogSync();
   return { server, port };
 }
 
