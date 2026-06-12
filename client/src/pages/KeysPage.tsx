@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -268,6 +269,16 @@ function ProxySettingsSection() {
   )
 }
 
+// Split a free-text model field on commas / newlines into a clean id list,
+// dropping blanks and duplicates so one endpoint can take several models. (#281)
+function parseModelList(raw: string): string[] {
+  const seen = new Set<string>()
+  return raw
+    .split(/[\n,]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !seen.has(s) && seen.add(s))
+}
+
 function CustomProviderSection() {
   const queryClient = useQueryClient()
   const [baseUrl, setBaseUrl] = useState('')
@@ -275,8 +286,11 @@ function CustomProviderSection() {
   const [displayName, setDisplayName] = useState('')
   const [apiKey, setApiKey] = useState('')
 
+  const models = parseModelList(model)
+  const multiple = models.length > 1
+
   const addCustom = useMutation({
-    mutationFn: (body: { baseUrl: string; model: string; displayName?: string; apiKey?: string }) =>
+    mutationFn: (body: { baseUrl: string; models: string[]; displayName?: string; apiKey?: string }) =>
       apiFetch('/api/keys/custom', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
@@ -290,8 +304,15 @@ function CustomProviderSection() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!baseUrl || !model) return
-    addCustom.mutate({ baseUrl, model, displayName: displayName || undefined, apiKey: apiKey || undefined })
+    if (!baseUrl || models.length === 0) return
+    // A single display name only makes sense for a lone model; with several
+    // ids the server names each model after its own id.
+    addCustom.mutate({
+      baseUrl,
+      models,
+      displayName: !multiple ? (displayName || undefined) : undefined,
+      apiKey: apiKey || undefined,
+    })
   }
 
   return (
@@ -299,8 +320,8 @@ function CustomProviderSection() {
       <h2 className="text-sm font-medium mb-1">Add a custom OpenAI-compatible model</h2>
       <p className="text-xs text-muted-foreground mb-3">
         Point at any OpenAI-compatible endpoint: llama.cpp, LM Studio, vLLM, a local Ollama, or a remote
-        gateway. Add each model you want routed; they all share the one endpoint. The API key is optional
-        (most local servers don't need one).
+        gateway. List one model per line (or comma-separated) to add several at once; they all share the
+        one endpoint. The API key is optional (most local servers don't need one).
       </p>
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
         <div className="space-y-1.5 flex-1 min-w-[240px]">
@@ -313,12 +334,13 @@ function CustomProviderSection() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Model</Label>
-          <Input
+          <Label className="text-xs">Models</Label>
+          <Textarea
             value={model}
             onChange={e => setModel(e.target.value)}
-            placeholder="qwen3:4b"
-            className="w-[180px] font-mono text-xs"
+            placeholder={'qwen3:4b\nllama3:8b'}
+            rows={2}
+            className="w-[200px] font-mono text-xs"
           />
         </div>
         <div className="space-y-1.5">
@@ -326,7 +348,8 @@ function CustomProviderSection() {
           <Input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
-            placeholder="optional"
+            placeholder={multiple ? 'per-model' : 'optional'}
+            disabled={multiple}
             className="w-[150px]"
           />
         </div>
@@ -340,8 +363,8 @@ function CustomProviderSection() {
             className="w-[150px] font-mono text-xs"
           />
         </div>
-        <Button type="submit" size="sm" disabled={!baseUrl || !model || addCustom.isPending}>
-          {addCustom.isPending ? 'Adding…' : 'Add model'}
+        <Button type="submit" size="sm" disabled={!baseUrl || models.length === 0 || addCustom.isPending}>
+          {addCustom.isPending ? 'Adding…' : multiple ? `Add ${models.length} models` : 'Add model'}
         </Button>
       </form>
       {addCustom.isError && (

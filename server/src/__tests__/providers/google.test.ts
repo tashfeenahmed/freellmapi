@@ -196,6 +196,61 @@ describe('GoogleProvider', () => {
     expect(capturedBody.toolConfig.functionCallingConfig.allowedFunctionNames).toEqual(['get_weather']);
   });
 
+  it('maps a google_search tool to Gemini grounding, not a function declaration (#59)', async () => {
+    let capturedBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: 'grounded answer' }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Who won the match today?' }],
+      'gemini-2.5-flash',
+      { tools: [{ type: 'function', function: { name: 'google_search', description: '', parameters: {} } }] },
+    );
+
+    expect(capturedBody.tools).toEqual([{ google_search: {} }]);
+    // Grounding-only requests must not carry a functionCallingConfig.
+    expect(capturedBody.toolConfig).toBeUndefined();
+  });
+
+  it('combines google_search grounding with real function tools (#59)', async () => {
+    let capturedBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Weather plus latest news?' }],
+      'gemini-2.5-pro',
+      {
+        tools: [
+          { type: 'function', function: { name: 'google_search', description: '', parameters: {} } },
+          { type: 'function', function: { name: 'get_weather', description: 'Get weather', parameters: { type: 'object', properties: { city: { type: 'string' } } } } },
+        ],
+      },
+    );
+
+    expect(capturedBody.tools).toContainEqual({ google_search: {} });
+    const decls = capturedBody.tools.find((t: any) => t.functionDeclarations);
+    expect(decls.functionDeclarations[0].name).toBe('get_weather');
+  });
+
   it('should translate Gemini functionCall response to OpenAI tool_calls', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
