@@ -158,6 +158,13 @@ export default function PlaygroundPage() {
                     </span>
                   </SelectItem>
                 ))}
+                {availableModels.length === 0 && (
+                  // Models only appear once a platform has an enabled key. Without
+                  // one, the list is just "Auto" and looks broken — say why. (#269)
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    No models yet. Add an API key on the Keys page to populate this list.
+                  </div>
+                )}
               </SelectContent>
             </Select>
             {messages.length > 0 && (

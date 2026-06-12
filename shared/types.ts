@@ -5,11 +5,12 @@
 // Moonshot and MiniMax direct integrations were dropped in migrateModelsV4
 // (see server/src/db/index.ts). HuggingFace was dropped in V4 and re-added
 // in V13 via the router.huggingface.co Inference Providers meta-router.
+// SambaNova was dropped in V23 (free tier permanently retired — 402
+// "payment method required" once the one-time $5 trial credit lapses).
 export type Platform =
   | 'google'
   | 'groq'
   | 'cerebras'
-  | 'sambanova'
   | 'nvidia'
   | 'mistral'
   | 'openrouter'
@@ -25,6 +26,9 @@ export type Platform =
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
   // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
   | 'opencode'
+  // OVHcloud AI Endpoints — OpenAI-compatible, keyless anonymous tier
+  // (2 req/min per IP per model); see migrateModelsV26.
+  | 'ovh'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';
@@ -48,11 +52,32 @@ export interface Model {
   supportsTools: boolean;
 }
 
+// ---- Quirks ----
+// Structured, reusable notes about catalog models. One quirk is applied to many
+// models via selector parameters (see quirk_targets / services/quirks.ts).
+export type QuirkSeverity = 'info' | 'warning' | 'blocker';
+
+export interface Quirk {
+  slug: string;
+  title: string;
+  body: string;
+  severity: QuirkSeverity;
+}
+
+export interface QuirkTarget {
+  platform: Platform | null;
+  modelGlob: string | null;
+}
+
 export interface ModelListRow {
   platform: string;
   model_id: string;
   display_name: string;
   context_window: number | null;
+  // 1 when the catalog row is enabled. 1 when an enabled key can serve it
+  // (enabled AND a matching enabled api_key exists). SQLite returns 0/1.
+  enabled: number;
+  available: number;
 }
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
@@ -138,6 +163,10 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ChatToolCall[];
+  // The model's thinking trace on an assistant turn. Some thinking models
+  // (DeepSeek on OpenCode Zen) require it to be replayed verbatim on the next
+  // turn or they 400; the proxy preserves and forwards it. See issue #255.
+  reasoning_content?: string;
 }
 
 export interface ChatCompletionRequest {

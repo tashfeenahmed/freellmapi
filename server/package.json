@@ -7,8 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run --pool=forks --poolOptions.forks.singleFork=true --no-file-parallelism",
-    "test:watch": "vitest"
+    "test": "vitest run --pool=forks --fileParallelism=false",
+    "test:watch": "vitest",
+    "export-catalog": "tsx src/scripts/export-catalog.ts"
   },
   "dependencies": {
     "@freellmapi/shared": "*",
@@ -18,6 +19,8 @@
     "drizzle-orm": "^0.44.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
+    "socks-proxy-agent": "^10.0.0",
+    "undici": "^6.21.0",
     "zod": "^3.24.4"
   },
   "devDependencies": {

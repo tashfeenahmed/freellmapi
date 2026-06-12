@@ -3,7 +3,7 @@ import type {
   ChatCompletionResponse,
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
 import { contentToString } from '../lib/content.js';
 
 /**
@@ -58,7 +58,7 @@ export class CloudflareProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
     }
 
     const data = await res.json() as ChatCompletionResponse;
@@ -96,7 +96,7 @@ export class CloudflareProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
+      throw providerHttpError(res, `Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`);
     }
 
     yield* this.readSseStream(res);
@@ -105,13 +105,36 @@ export class CloudflareProvider extends BaseProvider {
   async validateKey(apiKey: string): Promise<boolean> {
     // Transport errors propagate — health.ts marks status='error' without
     // counting toward auto-disable. Only confirmed bad/inactive tokens disable.
-    const { token } = this.parseKey(apiKey);
-    const res = await this.fetchWithTimeout(
+    const { accountId, token } = this.parseKey(apiKey);
+
+    // Account-scoped Workers AI tokens 403 on /user/tokens/verify; they can only
+    // self-verify via /accounts/{id}/tokens/verify. User-scoped tokens are the
+    // opposite. Try the self-verify endpoint first, then fall back to the
+    // account-scoped one before treating an auth failure as a bad key. (#297)
+    const userResult = await this.verifyAt(
       'https://api.cloudflare.com/client/v4/user/tokens/verify',
+      token,
+    );
+    if (userResult !== 'auth-failed') return userResult;
+
+    const accountResult = await this.verifyAt(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/tokens/verify`,
+      token,
+    );
+    if (accountResult === 'auth-failed') return false;
+    return accountResult;
+  }
+
+  // Hits a Cloudflare token-verify endpoint. Returns true/false for a definitive
+  // active/inactive verdict, or 'auth-failed' when the token lacks access to
+  // THIS endpoint (401/403) so the caller can try the other scope.
+  private async verifyAt(url: string, token: string): Promise<boolean | 'auth-failed'> {
+    const res = await this.fetchWithTimeout(
+      url,
       { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } },
       10000,
     );
-    if (res.status === 401 || res.status === 403) return false;
+    if (res.status === 401 || res.status === 403) return 'auth-failed';
     if (!res.ok) return true; // unexpected non-2xx that isn't auth — don't disable
     const data = await res.json() as any;
     return data.success === true && data.result?.status === 'active';

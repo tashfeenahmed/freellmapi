@@ -54,7 +54,7 @@ describe('intelligence tier audit (migrateModelsV17)', () => {
   });
 
   it('demotes weak models to Small', () => {
-    expect(tier('sambanova', 'gemma-3-12b-it')).toBe('Small');     // AA 9
+    expect(tier('groq', 'llama-3.1-8b-instant')).toBe('Small');    // AA ~10 (sambanova gemma-3-12b row dropped in V23)
     expect(tier('mistral', 'codestral-latest')).toBe('Small');     // AA 8
     expect(tier('cohere', 'command-r-08-2024')).toBe('Small');     // legacy
   });

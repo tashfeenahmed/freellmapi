@@ -181,4 +181,43 @@ describe('Proxy tool-calling support', () => {
     expect(providerBody.messages[2].tool_call_id).toBe('call_weather_1');
     expect(body.choices[0].message.content).toContain('30C');
   });
+
+  it('round-trips assistant reasoning_content on follow-up turns (DeepSeek thinking — #255)', async () => {
+    const origFetch = global.fetch;
+    let providerBody: any = null;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        providerBody = JSON.parse((init as any).body);
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-r', object: 'chat.completion', created: 1, model: 'm',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'done' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status } = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [
+        { role: 'user', content: 'think then answer' },
+        {
+          role: 'assistant',
+          content: 'partial',
+          // What a DeepSeek thinking model returned last turn and the client
+          // replayed. Stripping it makes OpenCode Zen 400 on this request.
+          reasoning_content: 'Let me reason about this step by step...',
+        },
+        { role: 'user', content: 'continue' },
+      ],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(providerBody.messages[1].role).toBe('assistant');
+    expect(providerBody.messages[1].reasoning_content).toBe('Let me reason about this step by step...');
+  });
 });

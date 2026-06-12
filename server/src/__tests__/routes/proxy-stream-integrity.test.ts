@@ -54,7 +54,7 @@ function mockUpstream(script: Array<{ body: string; status?: number }>) {
     const urlStr = typeof url === 'string' ? url : url.toString();
     // Only intercept provider upstreams; the test's own localhost request
     // and anything else goes through.
-    if (!/api\.groq\.com|openrouter\.ai|api\.cohere|generativelanguage|integrate\.api\.nvidia|api\.cerebras|api\.mistral|router\.huggingface|api\.sambanova|llm\.chutes|api\.cloudflare|models\.github|open\.bigmodel|api\.llm7|api\.kilo|text\.pollinations|ollama\.com|opencode\.ai/.test(urlStr)) {
+    if (!/api\.groq\.com|openrouter\.ai|api\.cohere|generativelanguage|integrate\.api\.nvidia|api\.cerebras|api\.mistral|router\.huggingface|api\.cloudflare|models\.github|open\.bigmodel|api\.llm7|api\.kilo|text\.pollinations|ollama\.com|opencode\.ai/.test(urlStr)) {
       return origFetch(url as any, init);
     }
     const reqBody = JSON.parse(String((init as RequestInit).body));

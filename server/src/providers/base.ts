@@ -6,6 +6,37 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
+import { proxyFetch } from '../lib/proxy.js';
+
+/** A provider HTTP error carrying the upstream status and, when the response
+ *  included a Retry-After header, the parsed delay so the router can bench the
+ *  key for at least that long. */
+export interface ProviderHttpError extends Error {
+  status?: number;
+  retryAfterMs?: number;
+}
+
+/** Parse an HTTP `Retry-After` header (delta-seconds or an HTTP-date) into a
+ *  millisecond delay. Returns undefined when absent or unparseable. */
+export function parseRetryAfterMs(value: string | null | undefined): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const when = Date.parse(trimmed);
+  if (!Number.isNaN(when)) return Math.max(0, when - Date.now());
+  return undefined;
+}
+
+/** Build an error for a non-OK upstream response, capturing the status and any
+ *  Retry-After hint. Used by every provider adapter so the proxy can honor a
+ *  provider's explicit back-off when it sets the cooldown. */
+export function providerHttpError(res: Response, message: string): ProviderHttpError {
+  const err = new Error(message) as ProviderHttpError;
+  err.status = res.status;
+  const retryAfterMs = parseRetryAfterMs(res.headers?.get('retry-after'));
+  if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
+  return err;
+}
 
 export interface CompletionOptions {
   model?: string;
@@ -15,6 +46,10 @@ export interface CompletionOptions {
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
+  /** Per-call HTTP timeout override. Not part of the OpenAI wire format (it is
+   * stripped before the request body is built); used by the probe script so
+   * NVIDIA's 15-60s serverless cold starts don't read as failures. */
+  timeoutMs?: number;
 }
 
 export abstract class BaseProvider {
@@ -50,7 +85,7 @@ export abstract class BaseProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, { ...init, signal: controller.signal });
+      return await proxyFetch(url, { ...init, signal: controller.signal }, this.platform);
     } finally {
       clearTimeout(timeout);
     }
