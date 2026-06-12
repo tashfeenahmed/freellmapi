@@ -330,6 +330,19 @@ final = client.chat.completions.create(
 print(final.choices[0].message.content)
 ```
 
+**Gemini Google Search grounding**
+
+Google's models can ground their answers in live Google Search results. Since the OpenAI wire format has no way to express that, request a tool named `google_search` and the Google provider translates it into Gemini's native grounding tool. It can be sent on its own or alongside your normal function tools.
+
+```python
+resp = client.chat.completions.create(
+    model="gemini-2.5-flash",  # pin a Google model so the request routes there
+    messages=[{"role": "user", "content": "Who won the F1 race this weekend?"}],
+    tools=[{"type": "function", "function": {"name": "google_search", "parameters": {}}}],
+)
+print(resp.choices[0].message.content)
+```
+
 **Vision / image input**
 
 Send images with the standard OpenAI `image_url` content blocks (base64 `data:` URLs or `http(s)` URLs). When a request contains an image, the router restricts itself to **vision-capable models** and ignores text-only ones. Vision models are tagged with a **Vision** badge on the Fallback Chain page; the current set includes Gemini (2.5 / 3.x), Llama 4 Scout/Maverick (Groq, NVIDIA), GLM-4.6V Flash (Z.ai), Nemotron Nano 12B VL (OpenRouter), and GitHub's GPT-4o / GPT-4.1.
