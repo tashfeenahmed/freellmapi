@@ -21,6 +21,7 @@ import {
   isModelAccessForbiddenError,
   timingSafeStringEqual,
   extractApiToken,
+  getRequestGroupId,
   getStickyModel,
   setStickyModel,
   logRequest,
@@ -264,6 +265,8 @@ export function buildResponseObject(opts: {
 
 responsesRouter.post('/responses', async (req: Request, res: Response) => {
   const start = Date.now();
+  const requestGroupId = getRequestGroupId(req);
+  res.setHeader('X-Request-ID', requestGroupId);
 
   // Same unified-key auth as the proxy (accepts Bearer or x-api-key).
   const token = extractApiToken(req);
@@ -510,7 +513,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
             : { detected: false as const, calls: null, cleanText: heldText };
           if (rescue.detected && !rescue.calls) {
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, `unparseable inline tool-call dialect: ${heldText.slice(0, 120)}`);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, `unparseable inline tool-call dialect: ${heldText.slice(0, 120)}`, requestGroupId, attempt);
             skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
             setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
             recordRateLimitHit(route.modelDbId);
@@ -551,7 +554,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         // skeletons are out), so it's safe to fail over to the next model on
         // the same SSE stream.
         if (msgText.length === 0 && toolAcc.size === 0) {
-          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', requestGroupId, attempt);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
           recordRateLimitHit(route.modelDbId);
@@ -590,7 +593,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
         recordSuccess(route.modelDbId);
         setStickyModel(messages, route.modelDbId, sessionIdHeader);
-        logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+        logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, requestGroupId, attempt);
         return;
       } else {
         const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, completionOpts);
@@ -623,7 +626,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
 
         // Empty completion → fail over (see the streaming-path comment above).
         if (!text && toolCalls.length === 0) {
-          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
+          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', requestGroupId, attempt);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
           recordRateLimitHit(route.modelDbId);
@@ -644,13 +647,13 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         }));
 
         logRequest(route.platform, route.modelId, route.keyId, 'success',
-          promptTokens, completionTokens, Date.now() - start, null);
+          promptTokens, completionTokens, Date.now() - start, null, requestGroupId, attempt);
         return;
       }
     } catch (err: any) {
       const latency = Date.now() - start;
       const safeError = sanitizeProviderErrorMessage(err.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, requestGroupId, attempt);
 
       // Mid-stream failures can't be retried (bytes already sent) — close cleanly.
       if (stream && streamStarted) {
