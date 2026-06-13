@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Moon, Sun } from 'lucide-react'
@@ -12,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { AuthGate } from '@/components/auth-gate'
+import { LanguageToggle } from '@/components/language-toggle'
 import { logout } from '@/lib/api'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
@@ -22,13 +24,16 @@ import PremiumPage from '@/pages/PremiumPage'
 
 const queryClient = new QueryClient()
 
-const navItems = [
-  { to: '/models', label: 'Models' },
-  { to: '/playground', label: 'Playground' },
-  { to: '/keys', label: 'Keys' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/premium', label: 'Premium' },
-]
+function useNavItems() {
+  const { t } = useTranslation()
+  return [
+    { to: '/models', label: t('nav.models') },
+    { to: '/playground', label: t('nav.playground') },
+    { to: '/keys', label: t('nav.keys') },
+    { to: '/analytics', label: t('nav.analytics') },
+    { to: '/premium', label: t('nav.premium') },
+  ]
+}
 
 function getPreferredDarkMode() {
   if (typeof window === 'undefined') {
@@ -75,12 +80,13 @@ function useDarkMode() {
 }
 
 function DarkModeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  const { t } = useTranslation()
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onToggle}
-      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+      aria-label={dark ? t('nav.switchToLight') : t('nav.switchToDark')}
     >
       {dark ? <Sun /> : <Moon />}
     </Button>
@@ -110,6 +116,8 @@ if (isDesktopApp) {
 }
 
 function Navbar() {
+  const { t } = useTranslation()
+  const navItems = useNavItems()
   const { dark, toggle } = useDarkMode()
   const location = useLocation()
   const navigate = useNavigate()
@@ -144,18 +152,20 @@ function Navbar() {
           className="ml-auto hidden items-center gap-1 md:flex"
           style={isDesktopApp ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
         >
+          <LanguageToggle />
           <DarkModeToggle dark={dark} onToggle={toggle} />
           {!isDesktopApp && (
             <Button variant="ghost" size="sm" onClick={() => logout()}>
-              Sign out
+              {t('nav.signOut')}
             </Button>
           )}
         </div>
-        <div className="ml-auto md:hidden">
+        <div className="ml-auto flex items-center gap-1 md:hidden">
+          <LanguageToggle />
           <DropdownMenu>
             <DropdownMenuTrigger
               className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-              aria-label="Open navigation menu"
+              aria-label={t('nav.openMenu')}
             >
               <Menu />
             </DropdownMenuTrigger>
@@ -174,11 +184,11 @@ function Navbar() {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem onClick={toggle} className="justify-between">
-                  <span>Theme</span>
+                  <span>{t('nav.theme')}</span>
                   {dark ? <Sun /> : <Moon />}
                 </DropdownMenuItem>
                 {!isDesktopApp && (
-                  <DropdownMenuItem onClick={() => logout()}>Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
                 )}
               </DropdownMenuGroup>
             </DropdownMenuContent>

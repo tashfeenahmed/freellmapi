@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, RefreshCw, Sparkles } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { PageHeader } from '@/components/page-header'
@@ -34,13 +35,13 @@ interface PremiumStatus {
   siteUrl: string
 }
 
-const PLAN_LABEL: Record<string, string> = {
-  annual: 'Premium Annual',
-  lifetime: 'Premium Lifetime',
+const PLAN_KEYS: Record<string, string> = {
+  annual: 'premium.planAnnual',
+  lifetime: 'premium.planLifetime',
 }
 
-function fmtWhen(ms: number | null): string {
-  if (!ms) return 'never'
+function fmtWhen(ms: number | null, neverLabel: string): string {
+  if (!ms) return neverLabel
   return new Date(ms).toLocaleString()
 }
 
@@ -50,6 +51,7 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function PremiumPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [keyInput, setKeyInput] = useState('')
 
@@ -93,8 +95,8 @@ export default function PremiumPage() {
   if (isLoading || !data) {
     return (
       <div>
-        <PageHeader title="Premium" description="The live model catalog, on every device." />
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <PageHeader title={t('premium.title')} description={t('premium.description')} />
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>
     )
   }
@@ -106,74 +108,69 @@ export default function PremiumPage() {
   return (
     <div>
       <PageHeader
-        title="Premium"
-        description="The live model catalog, on every device."
+        title={t('premium.title')}
+        description={t('premium.description')}
         actions={
           <Button variant="outline" size="sm" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
             <RefreshCw className={syncNow.isPending ? 'animate-spin' : ''} />
-            {syncNow.isPending ? 'Syncing…' : 'Check for updates'}
+            {syncNow.isPending ? t('premium.syncing') : t('premium.checkUpdates')}
           </Button>
         }
       />
 
       <div className="space-y-8">
-        {/* Catalog feed state */}
         <section>
-          <h2 className="text-sm font-medium mb-3">Catalog feed</h2>
+          <h2 className="text-sm font-medium mb-3">{t('premium.catalogFeed')}</h2>
           <div className="rounded-3xl border bg-card p-5">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="flex items-center gap-2">
                 <span className={`inline-block size-2 rounded-full ${live ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
-                <span className="text-sm font-medium">{live ? 'Live feed' : 'Monthly snapshot'}</span>
+                <span className="text-sm font-medium">{live ? t('premium.liveFeed') : t('premium.monthlySnapshot')}</span>
                 <Badge variant="outline" className="font-mono text-[11px]">
-                  {catalog.appliedVersion ?? 'bundled'}
+                  {catalog.appliedVersion ?? t('premium.bundled')}
                 </Badge>
               </div>
-              <span className="text-xs text-muted-foreground">Last checked: {fmtWhen(catalog.lastSyncMs)}</span>
+              <span className="text-xs text-muted-foreground">{t('premium.lastChecked', { when: fmtWhen(catalog.lastSyncMs, t('premium.never')) })}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              {live
-                ? 'New free models, quota changes, and quirk fixes land here within hours of being shipped. The app checks automatically twice a day; nothing to do.'
-                : 'Free tier: the catalog refreshes from a monthly snapshot, checked automatically twice a day. Premium switches this to the live feed, updated every 2-3 days.'}
+              {live ? t('premium.liveDesc') : t('premium.freeDesc')}
             </p>
             {catalog.lastError && (
-              <p className="text-destructive text-xs mt-2">Last sync problem: {catalog.lastError}</p>
+              <p className="text-destructive text-xs mt-2">{t('premium.lastSyncProblem', { error: catalog.lastError })}</p>
             )}
           </div>
         </section>
 
-        {/* License */}
         <section>
-          <h2 className="text-sm font-medium mb-3">License</h2>
+          <h2 className="text-sm font-medium mb-3">{t('premium.license')}</h2>
           {hasKey ? (
             <div className="rounded-3xl border bg-card p-5 space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-sm">{maskedKey}</span>
                 {licensed ? (
                   <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-transparent">
-                    {PLAN_LABEL[license?.plan ?? ''] ?? 'Premium'}
+                    {license?.plan && PLAN_KEYS[license.plan] ? t(PLAN_KEYS[license.plan]) : t('premium.premium')}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-destructive border-destructive/40">
-                    {license?.reason === 'expired' ? 'Expired' : 'Inactive'}
+                    {license?.reason === 'expired' ? t('premium.expired') : t('premium.inactive')}
                   </Badge>
                 )}
               </div>
 
               <p className="text-xs text-muted-foreground">
-                {licensed && license?.plan === 'lifetime' && 'Lifetime license: never expires.'}
+                {licensed && license?.plan === 'lifetime' && t('premium.lifetimeDesc')}
                 {licensed && license?.plan === 'annual' && !license.cancelAtPeriodEnd && license.expiresAt &&
-                  `Renews on ${fmtDate(license.expiresAt)}.`}
+                  t('premium.renewsOn', { date: fmtDate(license.expiresAt) })}
                 {licensed && license?.plan === 'annual' && license.cancelAtPeriodEnd && license.expiresAt &&
-                  `Will not renew. Premium until ${fmtDate(license.expiresAt)}, then this install falls back to the free monthly catalog.`}
-                {!licensed &&
-                  'This key is no longer active. The app keeps working on the free monthly catalog.'}
+                  t('premium.cancelAtEnd', { date: fmtDate(license.expiresAt) })}
+                {!licensed && t('premium.inactiveDesc')}
               </p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => openPortal.mutate()} disabled={openPortal.isPending}>
                   <ExternalLink />
-                  {openPortal.isPending ? 'Opening…' : 'Manage subscription'}
+                  {openPortal.isPending ? t('premium.opening') : t('premium.manageSubscription')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -182,12 +179,11 @@ export default function PremiumPage() {
                   disabled={removeKey.isPending}
                   className="text-muted-foreground"
                 >
-                  Remove key from this device
+                  {t('premium.removeKey')}
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Manage subscription opens Stripe&apos;s billing portal: cancel, update your card, or download
-                invoices. Removing the key only deactivates this device; your purchase is untouched.
+                {t('premium.stripeHint')}
               </p>
               {openPortal.isError && (
                 <p className="text-destructive text-xs">{(openPortal.error as Error).message}</p>
@@ -203,7 +199,7 @@ export default function PremiumPage() {
                 }}
               >
                 <div className="space-y-1.5 flex-1 min-w-[260px]">
-                  <Label className="text-xs">License key</Label>
+                  <Label className="text-xs">{t('premium.licenseKey')}</Label>
                   <Input
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value)}
@@ -213,16 +209,16 @@ export default function PremiumPage() {
                   />
                 </div>
                 <Button type="submit" size="sm" disabled={!keyInput.trim() || activate.isPending}>
-                  {activate.isPending ? 'Activating…' : 'Activate'}
+                  {activate.isPending ? t('premium.activating') : t('premium.activate')}
                 </Button>
               </form>
               {activate.isError && (
                 <p className="text-destructive text-xs">{(activate.error as Error).message}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Your key is in your purchase email and on the post-checkout page. Lost it?{' '}
+                {t('premium.recoverHint')}{' '}
                 <a className="underline hover:text-foreground" href={`${siteUrl}/manage.html`} target="_blank" rel="noopener noreferrer">
-                  Recover it on the website
+                  {t('premium.recoverLink')}
                 </a>
                 .
               </p>
@@ -237,10 +233,9 @@ export default function PremiumPage() {
               <div className="flex items-start gap-3">
                 <Sparkles className="size-4 mt-0.5 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Go live for $19 a year</p>
+                  <p className="text-sm font-medium">{t('premium.upsellTitle')}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    New free models the moment they exist, instead of on the 1st of the month. One key, every
-                    device. Cancel anytime; the router stays free forever.
+                    {t('premium.upsellDesc')}
                   </p>
                 </div>
               </div>
@@ -251,7 +246,7 @@ export default function PremiumPage() {
                 className="shrink-0"
               >
                 <Button size="sm">
-                  Go Premium
+                  {t('premium.goPremium')}
                   <ExternalLink />
                 </Button>
               </a>

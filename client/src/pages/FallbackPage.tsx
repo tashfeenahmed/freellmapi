@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useRef, useMemo, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation, Trans } from 'react-i18next'
 import {
   DndContext,
   closestCenter,
@@ -73,21 +74,13 @@ interface RoutingData {
 // A merged row: fallback-chain metadata + live bandit scores.
 type Row = FallbackEntry & Partial<RoutingScore>
 
-const STRATEGIES: { key: RoutingStrategy; label: string; blurb: string }[] = [
-  { key: 'priority', label: 'Manual', blurb: 'Route in the exact order you set below. Drag the handles to reorder. No scoring; the chain is followed top-to-bottom.' },
-  { key: 'balanced', label: 'Balanced', blurb: 'Reliability leads (50%), with speed and intelligence weighted equally (25% each). A sensible all-round default.' },
-  { key: 'smartest', label: 'Smartest', blurb: 'Prefer the most capable model that still works. Intelligence 55%, reliability 35%, speed 10%.' },
-  { key: 'fastest', label: 'Fastest', blurb: 'Prefer the fastest model that still works. Speed 55%, reliability 35%, intelligence 10%.' },
-  { key: 'reliable', label: 'Most reliable', blurb: 'Maximize success rate above all. Reliability 70%, speed and intelligence 15% each.' },
-  { key: 'custom', label: 'Custom', blurb: 'Set your own balance of reliability, speed and intelligence with sliders. Same engine as the presets, just your weights.' },
-]
-
-// Slider axes share the colors used by the score table columns below.
-const WEIGHT_AXES: { key: keyof RoutingWeights; label: string; color: string }[] = [
-  { key: 'reliability', label: 'Reliability', color: '#22c55e' },
-  { key: 'speed', label: 'Speed', color: '#3b82f6' },
-  { key: 'intelligence', label: 'Intelligence', color: '#a855f7' },
-]
+const STRATEGY_KEYS: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom']
+const WEIGHT_KEYS: (keyof RoutingWeights)[] = ['reliability', 'speed', 'intelligence']
+const WEIGHT_COLORS: Record<keyof RoutingWeights, string> = {
+  reliability: '#22c55e',
+  speed: '#3b82f6',
+  intelligence: '#a855f7',
+}
 
 // Slider popover for the 'custom' strategy. Sliders are independent (0-100)
 // and the server renormalizes any vector, so we just show each axis's
@@ -97,6 +90,12 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
   onSave: (w: RoutingWeights) => void
   saving: boolean
 }) {
+  const { t } = useTranslation()
+  const weightAxes = useMemo(() => WEIGHT_KEYS.map(key => ({
+    key,
+    label: t(`fallback.weights.${key}`),
+    color: WEIGHT_COLORS[key],
+  })), [t])
   const [values, setValues] = useState<RoutingWeights>(() => fromSaved(saved))
   const [dirty, setDirty] = useState(false)
 
@@ -133,17 +132,17 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
     <Popover onOpenChange={open => { if (open) { setValues(fromSaved(saved)); setDirty(false) } }}>
       <PopoverTrigger className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
         <SlidersHorizontal className="size-3.5" />
-        Adjust
+        {t('fallback.adjust')}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-medium">Custom weights</h3>
+            <h3 className="text-sm font-medium">{t('fallback.customWeights')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Sliders are independent; shares auto-balance to 100%.
+              {t('fallback.customWeightsDesc')}
             </p>
           </div>
-          {WEIGHT_AXES.map(axis => {
+          {weightAxes.map(axis => {
             const share = sum > 0 ? Math.round((values[axis.key] / sum) * 100) : 0
             return (
               <div key={axis.key}>
@@ -163,14 +162,14 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
                   onChange={e => update(axis.key, Number(e.target.value))}
                   className="w-full cursor-pointer"
                   style={{ accentColor: axis.color }}
-                  aria-label={`${axis.label} weight`}
+                  aria-label={t('fallback.weights.weight', { label: axis.label })}
                 />
               </div>
             )
           })}
           {sum <= 0 && (
             <p className="text-xs text-amber-600 dark:text-amber-500">
-              At least one weight must be above zero.
+              {t('fallback.weightAboveZero')}
             </p>
           )}
           <Button
@@ -179,7 +178,7 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
             disabled={!dirty || sum <= 0 || saving}
             onClick={apply}
           >
-            {saving ? 'Applying…' : dirty ? 'Apply' : 'Applied'}
+            {saving ? t('fallback.applying') : dirty ? t('fallback.apply') : t('fallback.applied')}
           </Button>
         </div>
       </PopoverContent>
@@ -237,6 +236,7 @@ function AxisBar({ value, color }: { value: number | undefined; color: string })
 const LEGEND_COLLAPSED_PX = 126
 
 function TokenUsageBar({ data }: { data: TokenUsageData }) {
+  const { t } = useTranslation()
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
   const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
@@ -267,11 +267,11 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   return (
     <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-medium">Monthly token budget</h2>
+        <h2 className="text-sm font-medium">{t('fallback.monthlyBudget')}</h2>
         <span className="text-xs text-muted-foreground tabular-nums">
-          <span className="text-foreground font-medium">{formatTokens(remaining)}</span> remaining
+          <span className="text-foreground font-medium">{t('fallback.remaining', { amount: formatTokens(remaining) })}</span>
           <span className="mx-1.5">·</span>
-          {remainingPct}% of {formatTokens(totalBudget)}
+          {t('fallback.percentOf', { pct: remainingPct, total: formatTokens(totalBudget) })}
         </span>
       </div>
 
@@ -279,7 +279,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         {modelsWithWidth.map((m, i) => (
           <div
             key={i}
-            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} remaining`}
+            title={t('fallback.modelRemaining', { name: m.displayName, platform: m.platform, amount: formatTokens(m.remainingTokens) })}
             style={{
               width: `${m.widthPct}%`,
               backgroundColor: platformColors[m.platform] ?? '#94a3b8',
@@ -288,7 +288,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         ))}
         {totalUsed > 0 && (
           <div
-            title={`Used: ${formatTokens(totalUsed)}`}
+            title={t('fallback.usedTitle', { amount: formatTokens(totalUsed) })}
             className="bg-muted-foreground/30"
             style={{ width: `${usedPct}%` }}
           />
@@ -320,7 +320,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
           onClick={() => setExpanded(e => !e)}
           className="mt-2 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          {expanded ? 'Show less' : `Show all ${models.length} models`}
+          {expanded ? t('fallback.showLess') : t('fallback.showAllModels', { count: models.length })}
           <ChevronDown className={`size-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       )}
@@ -342,6 +342,7 @@ function RowContent({
   dragHandle?: ReactNode
   onToggle: (modelDbId: number, enabled: boolean) => void
 }) {
+  const { t } = useTranslation()
   const guard = (row.headroom ?? 1) * (row.rateLimit ?? 1)
   return (
     <>
@@ -355,31 +356,31 @@ function RowContent({
           <span className="text-xs text-muted-foreground">{row.platform}</span>
           {row.supportsVision && (
             <span
-              title="Accepts image input"
+              title={t('fallback.visionTitle')}
               className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400"
             >
-              Vision
+              {t('fallback.vision')}
             </span>
           )}
           {row.supportsTools && (
             <span
-              title="Emits structured tool calls, so it is eligible for tool-bearing requests"
+              title={t('fallback.toolsTitle')}
               className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400"
             >
-              Tools
+              {t('fallback.tools')}
             </span>
           )}
           {(row.penalty ?? 0) > 0 && (
-            <span className="text-[10px] text-amber-600 dark:text-amber-400">−{row.penalty} penalty</span>
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">{t('fallback.penalty', { count: row.penalty })}</span>
           )}
           {row.totalRequests !== undefined && row.totalRequests > 0 && (
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">{row.totalRequests} obs</span>
+            <span className="text-[10px] text-muted-foreground/60 tabular-nums">{t('fallback.observations', { count: row.totalRequests })}</span>
           )}
         </div>
         <div className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
-          {row.monthlyTokenBudget} tok/mo
-          {row.rpmLimit ? ` · ${row.rpmLimit} rpm` : ''}
-          {row.rpdLimit ? ` · ${row.rpdLimit} rpd` : ''}
+          {row.monthlyTokenBudget} {t('fallback.tokensPerMonth')}
+          {row.rpmLimit ? ` · ${t('fallback.rpm', { count: row.rpmLimit })}` : ''}
+          {row.rpdLimit ? ` · ${t('fallback.rpd', { count: row.rpdLimit })}` : ''}
         </div>
       </td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
@@ -399,13 +400,14 @@ function RowContent({
 }
 
 function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
+  const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
   const handle = (
     <button
       {...attributes}
       {...listeners}
       className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
-      aria-label="Drag to reorder"
+      aria-label={t('fallback.dragToReorder')}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
         <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
@@ -426,7 +428,13 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
 }
 
 export default function FallbackPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const strategies = useMemo(() => STRATEGY_KEYS.map(key => ({
+    key,
+    label: t(`fallback.strategy.${key}.label`),
+    blurb: t(`fallback.strategy.${key}.blurb`),
+  })), [t])
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
@@ -511,27 +519,27 @@ export default function FallbackPage() {
       <tr className="text-left text-muted-foreground border-b">
         <th className="py-2 pl-3 pr-1 w-6"></th>
         <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
-        <th className="py-2 pr-3 font-medium">Model</th>
+        <th className="py-2 pr-3 font-medium">{t('fallback.table.model')}</th>
         <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />Reliability</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />{t('fallback.table.reliability')}</span>
         </th>
         <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />Speed</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />{t('fallback.table.speed')}</span>
         </th>
         <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />{t('fallback.table.intelligence')}</span>
         </th>
         <th className="py-2 pr-3 font-medium">
-          <Tooltip text="Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.">
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">Guardrails</span>
+          <Tooltip text={t('fallback.table.guardrailsTip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('fallback.table.guardrails')}</span>
           </Tooltip>
         </th>
         <th className="py-2 pr-3 font-medium text-right">
-          <Tooltip text="Final routing score = weighted average of the three axes, multiplied by the guardrails. Higher routes first.">
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">Score</span>
+          <Tooltip text={t('fallback.table.scoreTip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('fallback.table.score')}</span>
           </Tooltip>
         </th>
-        <th className="py-2 pr-3 font-medium text-right">On</th>
+        <th className="py-2 pr-3 font-medium text-right">{t('fallback.table.on')}</th>
       </tr>
     </thead>
   )
@@ -539,8 +547,8 @@ export default function FallbackPage() {
   return (
     <div>
       <PageHeader
-        title="Models"
-        description="Pick a routing strategy. In Manual mode you drag to set the order; the other strategies route by live score across reliability, speed and intelligence."
+        title={t('fallback.title')}
+        description={t('fallback.description')}
         divider={false}
         actions={<ModelsTabs />}
       />
@@ -552,18 +560,20 @@ export default function FallbackPage() {
         {/* Strategy selector */}
         <section className="rounded-3xl border bg-card p-5">
           <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-sm font-medium">Routing strategy</h2>
+            <h2 className="text-sm font-medium">{t('fallback.routingStrategy')}</h2>
             {routing?.weights && (
               <span className="text-xs text-muted-foreground tabular-nums">
-                reliability {Math.round(routing.weights.reliability * 100)}% ·
-                {' '}speed {Math.round(routing.weights.speed * 100)}% ·
-                {' '}intelligence {Math.round(routing.weights.intelligence * 100)}%
+                {t('fallback.weightSummary', {
+                  r: Math.round(routing.weights.reliability * 100),
+                  s: Math.round(routing.weights.speed * 100),
+                  i: Math.round(routing.weights.intelligence * 100),
+                })}
               </span>
             )}
           </div>
 
           <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border p-1">
-            {STRATEGIES.map(s => (
+            {strategies.map(s => (
               <Tooltip key={s.key} text={s.blurb}>
                 <button
                   disabled={strategyMutation.isPending}
@@ -588,19 +598,20 @@ export default function FallbackPage() {
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            {isManual
-              ? 'Manual mode: requests follow the order below, top-to-bottom. Drag to reorder.'
-              : 'Scores update from live traffic. The order below is how requests are routed right now.'}
+            {isManual ? t('fallback.manualHint') : t('fallback.scoreHint')}
           </p>
         </section>
 
         {/* Unified routing / fallback table */}
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : ordered.length === 0 ? (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No models available. Add API keys on the <a href="/keys" className="underline text-foreground">Keys page</a> first.
+              <Trans
+                i18nKey="fallback.noModels"
+                components={{ link: <a href="/keys" className="underline text-foreground" /> }}
+              />
             </p>
           </div>
         ) : (
@@ -640,15 +651,15 @@ export default function FallbackPage() {
             {/* Floating action bar — fixed to the viewport so it's always visible,
                 sliding up when there are unsaved changes and back down on save/discard. */}
             <FloatingBar show={hasChanges}>
-              <span className="text-xs text-muted-foreground">Unsaved changes</span>
-              <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>Discard</Button>
+              <span className="text-xs text-muted-foreground">{t('common.unsavedChanges')}</span>
+              <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>{t('common.discard')}</Button>
               <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+                {saveMutation.isPending ? t('common.saving') : t('common.saveChanges')}
               </Button>
             </FloatingBar>
 
             {unconfiguredPlatforms.length > 0 && (
-              <p className="text-xs text-muted-foreground">Hidden (no keys): {unconfiguredPlatforms.join(', ')}</p>
+              <p className="text-xs text-muted-foreground">{t('fallback.hiddenNoKeys', { platforms: unconfiguredPlatforms.join(', ') })}</p>
             )}
           </>
         )}
