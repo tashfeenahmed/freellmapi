@@ -88,7 +88,7 @@ export function traceRouteEvent(
 ) {
   const parts = [
     `[${scope}]`,
-    new Date().toISOString(),
+    new Date().toISOString().slice(11, 19),
     opts.event,
     shortRequestId(opts.requestId),
     `a${opts.attempt}`,
