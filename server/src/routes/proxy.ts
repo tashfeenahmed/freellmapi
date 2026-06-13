@@ -65,6 +65,45 @@ export function getRequestGroupId(req: Request): string {
   return trimmed || crypto.randomUUID();
 }
 
+function shortRequestId(requestId: string): string {
+  return requestId.replace(/-/g, '').slice(0, 6);
+}
+
+type TraceEvent = 'start' | 'next' | 'ok' | 'fail';
+
+export function traceRouteEvent(
+  scope: 'Proxy' | 'Responses',
+  opts: {
+    event: TraceEvent;
+    requestId: string;
+    attempt: number;
+    platform: string;
+    model: string;
+    requestedModel?: string;
+    latencyMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    error?: string;
+  },
+) {
+  const parts = [
+    `[${scope}]`,
+    new Date().toISOString(),
+    opts.event,
+    shortRequestId(opts.requestId),
+    `a${opts.attempt}`,
+    opts.platform,
+    '-',
+    opts.model,
+  ];
+  if (opts.requestedModel) parts.push(`req=${opts.requestedModel}`);
+  if (opts.latencyMs != null) parts.push(`lat=${opts.latencyMs}ms`);
+  if (opts.inputTokens != null) parts.push(`in=${opts.inputTokens}`);
+  if (opts.outputTokens != null) parts.push(`out=${opts.outputTokens}`);
+  if (opts.error) parts.push(`err=${JSON.stringify(opts.error)}`);
+  console.log(parts.join(' '));
+}
+
 // Sticky sessions: track which model served each "session"
 // Key: hash of first user message → model_db_id
 // This prevents model switching mid-conversation which causes hallucination
@@ -493,6 +532,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }
 
   const { model: requestedModel, temperature, top_p, stream } = parsed.data;
+  const requestedModelLabel = requestedModel ?? 'auto';
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
@@ -735,6 +775,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
 
     const modelKey = `${route.platform}:${route.modelId}`;
+    traceRouteEvent('Proxy', {
+      event: attempt === 0 ? 'start' : 'next',
+      requestId: requestGroupId,
+      attempt,
+      platform: route.platform,
+      model: route.modelId,
+      requestedModel: attempt === 0 ? requestedModelLabel : undefined,
+    });
     let outboundMessages = messages;
     // Extra input tokens the injected handoff adds on this turn (0 when not
     // injected). Folded into the streaming success accounting, where token
@@ -822,7 +870,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               console.error(`[Proxy] In-band error frame from ${route.displayName} mid-stream:`, msg);
               writeChunk({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(String(msg))}`, type: 'stream_error' } });
               try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-              logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, requestGroupId, attempt, ttfbMs, pinnedModelId);
+              traceRouteEvent('Proxy', {
+                event: 'fail',
+                requestId: requestGroupId,
+                attempt,
+                platform: route.platform,
+                model: route.modelId,
+                latencyMs: Date.now() - start,
+                error: sanitizeProviderErrorMessage(String(msg)),
+              });
               return;
             }
 
@@ -951,7 +1007,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId, sessionIdHeader, strategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens + injectedHandoffTokens, totalOutputTokens, Date.now() - start, null, requestGroupId, attempt, ttfbMs, pinnedModelId);
+          traceRouteEvent('Proxy', {
+            event: 'ok',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            inputTokens: estimatedInputTokens + injectedHandoffTokens,
+            outputTokens: totalOutputTokens,
+          });
           return;
         } catch (streamErr: any) {
           if (headerSent) {
@@ -961,7 +1026,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), requestGroupId, attempt, ttfbMs, pinnedModelId);
+            traceRouteEvent('Proxy', {
+              event: 'fail',
+              requestId: requestGroupId,
+              attempt,
+              platform: route.platform,
+              model: route.modelId,
+              latencyMs: Date.now() - start,
+              error: sanitizeProviderErrorMessage(streamErr.message),
+            });
             return;
           }
           // Headers never sent — bubble to the outer retry handler, which
@@ -982,7 +1055,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const respMsg = result.choices?.[0]?.message;
         const respText = contentToString(respMsg?.content ?? '');
         if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
-          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', requestGroupId, attempt, null, pinnedModelId);
+          traceRouteEvent('Proxy', {
+            event: 'fail',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            error: 'empty completion',
+          });
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
           recordRateLimitHit(route.modelDbId);
@@ -1038,18 +1119,30 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Normalize array-shaped message.content to a string on the way out (#166).
         res.json(normalizeOutboundContent(result));
 
-        logRequest(
-          route.platform, route.modelId, route.keyId, 'success',
-          result.usage?.prompt_tokens ?? 0,
-          result.usage?.completion_tokens ?? 0,
-          Date.now() - start, null, requestGroupId, attempt, null, pinnedModelId,
-        );
+        traceRouteEvent('Proxy', {
+          event: 'ok',
+          requestId: requestGroupId,
+          attempt,
+          platform: route.platform,
+          model: route.modelId,
+          latencyMs: Date.now() - start,
+          inputTokens: result.usage?.prompt_tokens ?? 0,
+          outputTokens: result.usage?.completion_tokens ?? 0,
+        });
         return;
       }
     } catch (err: any) {
       const latency = Date.now() - start;
       const safeError = sanitizeProviderErrorMessage(err.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, requestGroupId, attempt, null, pinnedModelId);
+      traceRouteEvent('Proxy', {
+        event: 'fail',
+        requestId: requestGroupId,
+        attempt,
+        platform: route.platform,
+        model: route.modelId,
+        latencyMs: latency,
+        error: safeError,
+      });
 
       if (isRetryableError(err)) {
         // Model-level 404 (removed/deprecated upstream): rule the whole model
@@ -1082,7 +1175,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
-        console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES}, request ${requestGroupId})`);
         continue;
       }
 
@@ -1115,8 +1207,6 @@ export function logRequest(
   outputTokens: number,
   latencyMs: number,
   error: string | null,
-  requestGroupId: string,
-  attemptNumber: number,
   ttfbMs: number | null = null,
   // The model id the client pinned; null for auto-routed requests. Lets
   // analytics split pinned vs auto traffic and detect failover overrides
@@ -1126,9 +1216,9 @@ export function logRequest(
   try {
     const db = getDb();
     db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_group_id, attempt_number, ttfb_ms, requested_model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, requestGroupId, attemptNumber, ttfbMs, requestedModel);
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel);
     pruneRequestAnalytics({ db });
   } catch (e) {
     console.error('Failed to log request:', e);

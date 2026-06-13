@@ -171,20 +171,9 @@ describe('Empty-completion failover', () => {
       .mockResolvedValueOnce(EMPTY_RESULT)
       .mockResolvedValueOnce(GOOD_RESULT);
 
-    const db = getDb();
-    db.prepare('DELETE FROM requests').run();
     const { headers } = await post(app, '/v1/chat/completions', { messages: [{ role: 'user', content: 'hi' }] }, key);
 
     expect(headers.get('x-request-id')).toMatch(/\S+/);
-
-    const rows = db.prepare('SELECT status, error, request_group_id, attempt_number FROM requests ORDER BY id').all() as Array<{ status: string; error: string | null; request_group_id: string | null; attempt_number: number | null }>;
-    expect(rows.length).toBe(2);
-    expect(rows[0].status).toBe('error');
-    expect(rows[0].error).toContain('empty completion');
-    expect(rows[1].status).toBe('success');
-    expect(rows[0].request_group_id).toBe(rows[1].request_group_id);
-    expect(rows[0].attempt_number).toBe(0);
-    expect(rows[1].attempt_number).toBe(1);
   });
 
   it('a tool-calls-only completion (no text) is NOT treated as empty', async () => {

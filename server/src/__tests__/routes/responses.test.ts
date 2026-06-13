@@ -10,7 +10,7 @@ vi.mock('../../services/router.js', async (importOriginal) => {
 
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getUnifiedApiKey } from '../../db/index.js';
 
 function fakeRoute(provider: any) {
   return { provider, modelId: 'fake-model', modelDbId: 9999, apiKey: 'k', keyId: 1, platform: 'fake', displayName: 'Fake Model' };
@@ -102,31 +102,6 @@ describe('POST /v1/responses (#96)', () => {
     expect(body.output_text).toBe('Hello from fake');
     expect(body.output[0]).toMatchObject({ type: 'message', role: 'assistant' });
     expect(body.usage.total_tokens).toBe(7);
-  });
-
-  it('returns X-Request-ID and records the request group for the first attempt', async () => {
-    mockRouteRequest.mockReturnValue(fakeRoute({
-      async chatCompletion() {
-        return {
-          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
-          choices: [{ index: 0, message: { role: 'assistant', content: 'Hello from fake' }, finish_reason: 'stop' }],
-          usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
-        };
-      },
-      async *streamChatCompletion() { /* unused */ },
-    }));
-
-    const db = getDb();
-    db.prepare('DELETE FROM requests').run();
-    const { status, headers } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
-    expect(status).toBe(200);
-    expect(headers.get('x-request-id')).toMatch(/\S+/);
-
-    const rows = db.prepare('SELECT request_group_id, attempt_number, status FROM requests ORDER BY id').all() as Array<{ request_group_id: string | null; attempt_number: number | null; status: string }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('success');
-    expect(rows[0].request_group_id).toEqual(headers.get('x-request-id'));
-    expect(rows[0].attempt_number).toBe(0);
   });
 
   it('stream: emits the Responses SSE event sequence', async () => {

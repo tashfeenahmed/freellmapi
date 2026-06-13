@@ -112,14 +112,6 @@ describe('proxy stream turn-integrity', () => {
     expect(fs.some(f => f.choices?.[0]?.delta?.content?.includes('All good'))).toBe(true);
     expect(fs.some(f => f.error)).toBe(false);
     expect(r.headers.get('x-request-id')).toMatch(/\S+/);
-    // The dead turn is recorded as an error, not a success.
-    const rows = getDb().prepare("SELECT status, error, request_group_id, attempt_number FROM requests ORDER BY id").all() as any[];
-    expect(rows[0].status).toBe('error');
-    expect(rows[0].error).toMatch(/in-band provider error/);
-    expect(rows[1].status).toBe('success');
-    expect(rows[0].request_group_id).toBe(rows[1].request_group_id);
-    expect(rows[0].attempt_number).toBe(0);
-    expect(rows[1].attempt_number).toBe(1);
   });
 
   it('synthesizes finish_reason tool_calls and ids for a stream that ends without a terminal reason', async () => {
@@ -197,9 +189,6 @@ describe('proxy stream turn-integrity', () => {
     expect(r.status).toBe(200);
     expect(up.calls()).toBe(2);
     expect(frames(r.text).some(f => f.choices?.[0]?.delta?.content?.includes('Second model'))).toBe(true);
-    const rows = getDb().prepare("SELECT status, error FROM requests ORDER BY id").all() as any[];
-    expect(rows[0].status).toBe('error');
-    expect(rows[0].error).toMatch(/stream ended unexpectedly/);
   });
 
   it('surfaces an honest error frame when truncation happens after payload reached the client', async () => {
@@ -213,8 +202,6 @@ describe('proxy stream turn-integrity', () => {
     const fs = frames(r.text);
     expect(fs.some(f => f.choices?.[0]?.delta?.content === 'Partial ans')).toBe(true);
     expect(fs.some(f => f.error?.type === 'stream_error')).toBe(true);
-    const rows = getDb().prepare("SELECT status FROM requests ORDER BY id").all() as any[];
-    expect(rows[0].status).toBe('error'); // truncation is never a success
   });
 
   it('fails over a stream that completes with no content and no tool calls', async () => {
