@@ -284,21 +284,26 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
 
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
         {modelsWithWidth.map((m, i) => (
-          <div
-            key={i}
-            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} remaining`}
-            style={{
-              width: `${m.widthPct}%`,
-              backgroundColor: platformColors[m.platform] ?? '#94a3b8',
-            }}
-          />
+          <div key={i} style={{ width: `${m.widthPct}%`, height: '100%' }}>
+            <Tooltip
+              className="h-full flex"
+              text={`${m.displayName} · ${m.platform}${m.remainingTokens > 0 ? ` · ${formatTokens(m.remainingTokens)} remaining` : ''}${m.budget > 0 ? ` · ${formatTokens(m.budget)} quota` : ''}`}
+            >
+              <div
+                className="h-full flex-1"
+                style={{
+                  backgroundColor: platformColors[m.platform] ?? '#94a3b8',
+                }}
+              />
+            </Tooltip>
+          </div>
         ))}
         {totalUsed > 0 && (
-          <div
-            title={`Used: ${formatTokens(totalUsed)}`}
-            className="bg-muted-foreground/30"
-            style={{ width: `${usedPct}%` }}
-          />
+          <div style={{ width: `${usedPct}%`, height: '100%' }}>
+            <Tooltip className="h-full flex" text={`Used: ${formatTokens(totalUsed)}`}>
+              <div className="bg-muted-foreground/30 h-full flex-1" />
+            </Tooltip>
+          </div>
         )}
       </div>
 
