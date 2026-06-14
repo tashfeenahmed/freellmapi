@@ -58,6 +58,52 @@ export function extractApiToken(req: Request): string | undefined {
   return trimmed || undefined;
 }
 
+export function getRequestGroupId(req: Request): string {
+  const raw = req.headers['x-request-id'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const trimmed = value?.trim();
+  return trimmed || crypto.randomUUID();
+}
+
+function shortRequestId(requestId: string): string {
+  return requestId.replace(/-/g, '').slice(0, 6);
+}
+
+type TraceEvent = 'start' | 'next' | 'ok' | 'fail';
+
+export function traceRouteEvent(
+  scope: 'Proxy' | 'Responses',
+  opts: {
+    event: TraceEvent;
+    requestId: string;
+    attempt: number;
+    platform: string;
+    model: string;
+    requestedModel?: string;
+    latencyMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    error?: string;
+  },
+) {
+  const parts = [
+    `[${scope}]`,
+    new Date().toISOString().slice(11, 19),
+    opts.event,
+    shortRequestId(opts.requestId),
+    `a${opts.attempt}`,
+    opts.platform,
+    '-',
+    opts.model,
+  ];
+  if (opts.requestedModel) parts.push(`req=${opts.requestedModel}`);
+  if (opts.latencyMs != null) parts.push(`lat=${opts.latencyMs}ms`);
+  if (opts.inputTokens != null) parts.push(`in=${opts.inputTokens}`);
+  if (opts.outputTokens != null) parts.push(`out=${opts.outputTokens}`);
+  if (opts.error) parts.push(`err=${JSON.stringify(opts.error)}`);
+  console.log(parts.join(' '));
+}
+
 // Sticky sessions: track which model served each "session"
 // Key: hash of first user message → model_db_id
 // This prevents model switching mid-conversation which causes hallucination
@@ -469,6 +515,8 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
+  const requestGroupId = getRequestGroupId(req);
+  res.setHeader('X-Request-ID', requestGroupId);
 
   // Authenticate with the unified API key for every proxy request, including
   // loopback callers. Browser pages can reach localhost, so socket locality is
@@ -503,6 +551,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }
 
   const { model: requestedModel, temperature, top_p, stream } = parsed.data;
+  const requestedModelLabel = requestedModel ?? 'auto';
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
@@ -745,6 +794,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
 
     const modelKey = `${route.platform}:${route.modelId}`;
+    traceRouteEvent('Proxy', {
+      event: attempt === 0 ? 'start' : 'next',
+      requestId: requestGroupId,
+      attempt,
+      platform: route.platform,
+      model: route.modelId,
+      requestedModel: attempt === 0 ? requestedModelLabel : undefined,
+    });
     let outboundMessages = messages;
     // Extra input tokens the injected handoff adds on this turn (0 when not
     // injected). Folded into the streaming success accounting, where token
@@ -832,6 +889,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               console.error(`[Proxy] In-band error frame from ${route.displayName} mid-stream:`, msg);
               writeChunk({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(String(msg))}`, type: 'stream_error' } });
               try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+              traceRouteEvent('Proxy', {
+                event: 'fail',
+                requestId: requestGroupId,
+                attempt,
+                platform: route.platform,
+                model: route.modelId,
+                latencyMs: Date.now() - start,
+                error: sanitizeProviderErrorMessage(String(msg)),
+              });
               logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, ttfbMs, pinnedModelId);
               return;
             }
@@ -961,6 +1027,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordSuccess(route.modelDbId);
           setStickyModel(messages, route.modelDbId, sessionIdHeader, strategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
+          traceRouteEvent('Proxy', {
+            event: 'ok',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            inputTokens: estimatedInputTokens + injectedHandoffTokens,
+            outputTokens: totalOutputTokens,
+          });
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens + injectedHandoffTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;
         } catch (streamErr: any) {
@@ -971,6 +1047,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
             try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+            traceRouteEvent('Proxy', {
+              event: 'fail',
+              requestId: requestGroupId,
+              attempt,
+              platform: route.platform,
+              model: route.modelId,
+              latencyMs: Date.now() - start,
+              error: sanitizeProviderErrorMessage(streamErr.message),
+            });
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
             return;
           }
@@ -992,6 +1077,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const respMsg = result.choices?.[0]?.message;
         const respText = contentToString(respMsg?.content ?? '');
         if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
+          traceRouteEvent('Proxy', {
+            event: 'fail',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            error: 'empty completion',
+          });
           logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
@@ -1048,17 +1142,31 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Normalize array-shaped message.content to a string on the way out (#166).
         res.json(normalizeOutboundContent(result));
 
-        logRequest(
-          route.platform, route.modelId, route.keyId, 'success',
-          result.usage?.prompt_tokens ?? 0,
-          result.usage?.completion_tokens ?? 0,
-          Date.now() - start, null, null, pinnedModelId,
-        );
+        traceRouteEvent('Proxy', {
+          event: 'ok',
+          requestId: requestGroupId,
+          attempt,
+          platform: route.platform,
+          model: route.modelId,
+          latencyMs: Date.now() - start,
+          inputTokens: result.usage?.prompt_tokens ?? 0,
+          outputTokens: result.usage?.completion_tokens ?? 0,
+        });
+        logRequest(route.platform, route.modelId, route.keyId, 'success', result.usage?.prompt_tokens ?? 0, result.usage?.completion_tokens ?? 0, Date.now() - start, null, null, pinnedModelId);
         return;
       }
     } catch (err: any) {
       const latency = Date.now() - start;
       const safeError = sanitizeProviderErrorMessage(err.message);
+      traceRouteEvent('Proxy', {
+        event: 'fail',
+        requestId: requestGroupId,
+        attempt,
+        platform: route.platform,
+        model: route.modelId,
+        latencyMs: latency,
+        error: safeError,
+      });
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
 
       if (isRetryableError(err)) {
@@ -1092,7 +1200,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         );
         recordRateLimitHit(route.modelDbId);
         lastError = err;
-        console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
       }
 

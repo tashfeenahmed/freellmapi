@@ -26,7 +26,7 @@ async function post(app: Express, path: string, body: any, key?: string) {
   });
   const text = await res.text();
   server.close();
-  return { status: res.status, text, contentType: res.headers.get('content-type') ?? '' };
+  return { status: res.status, text, contentType: res.headers.get('content-type') ?? '', headers: res.headers };
 }
 
 describe('POST /v1/responses (#96)', () => {
@@ -92,8 +92,10 @@ describe('POST /v1/responses (#96)', () => {
       async *streamChatCompletion() { /* unused */ },
     }));
 
-    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    const { status, text, contentType } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
     expect(status).toBe(200);
+    expect(contentType).toContain('application/json');
+    expect(text.length).toBeGreaterThan(0);
     const body = JSON.parse(text);
     expect(body.object).toBe('response');
     expect(body.status).toBe('completed');
