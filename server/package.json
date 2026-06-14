@@ -9,7 +9,13 @@
     "start": "node dist/index.js",
     "test": "vitest run --pool=forks --fileParallelism=false",
     "test:watch": "vitest",
-    "export-catalog": "tsx src/scripts/export-catalog.ts"
+    "test:migrations": "vitest run --pool=forks --fileParallelism=false src/__tests__/db/migrate/roundtrip.test.ts",
+    "export-catalog": "tsx src/scripts/export-catalog.ts",
+    "db:migration:up": "tsx src/db/migrate/cli.ts up",
+    "db:migration:down": "tsx src/db/migrate/cli.ts down",
+    "db:migration:fresh": "tsx src/db/migrate/cli.ts fresh",
+    "db:migration:status": "tsx src/db/migrate/cli.ts status",
+    "db:migration:create": "tsx src/db/migrate/cli.ts create"
   },
   "dependencies": {
     "@freellmapi/shared": "*",

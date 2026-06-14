@@ -6,9 +6,10 @@ Contributors are very welcome. This project is a local-first aggregator for free
 
 ```bash
 npm install
-npm run dev      # server on :3001, dashboard on :5173, both with HMR
-npm test         # server vitest; also runs client tests if present
-npm run build    # compile server and dashboard
+npm run dev             # server on :3001, dashboard on :5173, both with HMR
+npm run db:migration:up # apply all the migrations to your local database
+npm test                # server vitest; also runs client tests if present
+npm run build           # compile server and dashboard
 ```
 
 Every PR should:
@@ -17,6 +18,19 @@ Every PR should:
 - Match the `.editorconfig` and tsconfig defaults already in the repo.
 - Stay scoped to one change. Smaller PRs get reviewed and merged faster.
 - Avoid adding paid or card-gated services. This catalog only lists tiers that are genuinely free to start using without a credit card.
+
+## Database migrations
+
+Schema changes must use file-per-migration files under
+`server/src/db/migrations/`. Do not edit previously applied migration files.
+
+Control database migrations with ([db/README.md](server/src/db/README.md)):
+
+```bash
+npm run db:migration:create --name=add_embedding_index
+npm run db:migration:up
+npm run db:migration:down
+```
 
 ## AI and LLM-assisted contributions
 

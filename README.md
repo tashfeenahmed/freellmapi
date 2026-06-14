@@ -500,7 +500,7 @@ Stacking free tiers has real trade-offs. Be honest with yourself about them:
 
 Contributors very welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop, PR expectations, and the policy on AI/LLM-assisted contributions (short version: welcome, same quality bar as any other PR). Good first PRs:
 
-- **Add a provider** — copy `server/src/providers/openai-compat.ts` as a template, wire it into `server/src/providers/index.ts`, seed its models in `server/src/db/index.ts`, add a test in `server/src/__tests__/providers/`.
+- **Add a provider** — copy `server/src/providers/openai-compat.ts` as a template, wire it into `server/src/providers/index.ts`, add its built-in models with a migration, add a test in `server/src/__tests__/providers/`.
 - **Add an endpoint** — images, moderations, audio. The provider base class can grow new methods; adapters declare which they support.
 - **Improve the router** — cost-aware routing (cheapest-healthy-fastest tradeoffs), better latency-weighted priority, regional pinning.
 - **Dashboard polish** — charts on the Analytics page, key rotation UX, batch import of keys from `.env`.
@@ -515,7 +515,17 @@ npm test         # server vitest; also runs client tests if the workspace adds t
 npm run build    # compile server and dashboard
 ```
 
-PRs should include a test, keep the existing test suite green, and match the `.editorconfig` / tsconfig defaults already in the repo. Issues and discussions are open.
+PRs should include a test, keep the existing test suite green, and match the `.editorconfig` / tsconfig defaults already in the repo. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contributor workflow.
+
+### Database Migrations
+
+In local development, apply pending migrations with:
+
+```bash
+NODE_ENV=development npm run db:migration:up
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full migration CLI and workflow.
 
 ### Contributors
 

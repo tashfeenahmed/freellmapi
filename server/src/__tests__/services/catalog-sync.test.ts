@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { initDb, getDb, setSetting, getSetting } from '../../db/index.js';
 import { applyCatalog, reapplyCachedCatalog, MIN_CATALOG_VERSION } from '../../services/catalog-sync.js';
-import { migrateDbSchema } from '../../db/migrations.js';
+import { runMigrationsSync } from '../../db/migrate/runner.js';
 
 // applyCatalog is the write path between the published catalog and the live
 // router DB. These tests lock its contract: catalog metadata always wins, the
@@ -210,7 +210,8 @@ describe('reapplyCachedCatalog', () => {
     ).toBeUndefined();
 
     // Simulate a restart: migrations re-insert the baseline model.
-    migrateDbSchema(getDb());
+    getDb().exec('DROP TABLE migrations');
+    runMigrationsSync(getDb(), 'up');
     expect(
       getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(victim.platform, victim.modelId),
     ).toBeDefined();

@@ -12,9 +12,15 @@
     "test": "npm run test -w server && npm run test -w client --if-present",
     "build": "npm run build -w server && npm run build -w client",
     "build:server": "npm run build -w server",
+    "test:migrations": "npm run test:migrations -w server",
     "desktop:dev": "npm run build -w client && npm --prefix desktop run dev",
     "desktop:dist": "npm run build -w client && npm --prefix desktop run dist",
-    "desktop:dist:win": "npm run build -w client && npm --prefix desktop run dist:win"
+    "desktop:dist:win": "npm run build -w client && npm --prefix desktop run dist:win",
+    "db:migration:up": "npm run db:migration:up -w server",
+    "db:migration:down": "npm run db:migration:down -w server",
+    "db:migration:fresh": "npm run db:migration:fresh -w server",
+    "db:migration:status": "npm run db:migration:status -w server",
+    "db:migration:create": "npm run db:migration:create -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
