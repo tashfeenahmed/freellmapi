@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRetryableError, isPaymentRequiredError } from '../../routes/proxy.js';
+import { isRetryableError, isPaymentRequiredError, isProviderAuthFailoverError } from '../../routes/proxy.js';
 
 describe('isRetryableError', () => {
   describe('413 Payload Too Large', () => {
@@ -91,6 +91,19 @@ describe('isRetryableError', () => {
       // expect(isRetryableError(new Error('403 Forbidden'))).toBe(false);
       expect(isRetryableError(new Error('400 Bad Request'))).toBe(false);
       expect(isRetryableError(new Error('Invalid API key'))).toBe(false);
+    });
+  });
+
+  describe('provider auth failover', () => {
+    it('treats upstream provider auth failures as failover-safe', () => {
+      expect(isProviderAuthFailoverError(new Error('Cloudflare API error 401: Authentication error'))).toBe(true);
+      expect(isProviderAuthFailoverError(new Error('Groq API error 403: Access forbidden'))).toBe(true);
+      expect(isProviderAuthFailoverError(new Error('OpenAI API error 401: Invalid authentication'))).toBe(true);
+    });
+
+    it('does not reclassify local request validation/auth errors', () => {
+      expect(isProviderAuthFailoverError(new Error('400 Bad Request'))).toBe(false);
+      expect(isProviderAuthFailoverError(new Error('Request body too large'))).toBe(false);
     });
   });
 });

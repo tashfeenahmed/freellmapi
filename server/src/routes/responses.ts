@@ -24,6 +24,7 @@ import {
 import {
   isRetryableError,
   isPaymentRequiredError,
+  isProviderAuthFailoverError,
   timingSafeStringEqual,
   extractApiToken,
   getStickyModel,
@@ -616,12 +617,16 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         return;
       }
 
-      if (isRetryableError(err)) {
+      if (isRetryableError(err) || isProviderAuthFailoverError(err)) {
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
         setCooldown(route.platform, route.modelId, route.keyId, isPaymentRequiredError(err)
           ? PAYMENT_REQUIRED_COOLDOWN_MS
+          : isProviderAuthFailoverError(err)
+            ? 15 * 60 * 1000
           : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-        recordRateLimitHit(route.modelDbId);
+        if (!isProviderAuthFailoverError(err)) {
+          recordRateLimitHit(route.modelDbId);
+        }
         lastError = err;
         continue;
       }

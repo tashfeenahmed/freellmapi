@@ -269,6 +269,18 @@ export function isPaymentRequiredError(err: any): boolean {
     || msg.includes('insufficient balance');
 }
 
+export function isProviderAuthFailoverError(err: any): boolean {
+  const msg = (err.message ?? '').toLowerCase();
+  return msg.includes('api error 401')
+    || msg.includes('api error 403')
+    || msg.includes('authentication error')
+    || msg.includes('unauthorized')
+    || msg.includes('invalid api key')
+    || msg.includes('invalid authentication')
+    || msg.includes('invalid token')
+    || msg.includes('access forbidden');
+}
+
 // Pull the incremental text out of a streaming chunk for token counting.
 // Must tolerate chunks that carry no `choices` array at all: some providers
 // (e.g. Groq) emit usage/keepalive frames shaped like `{usage:{...}}` with no
@@ -652,7 +664,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       markModelUnavailableFromError(route.platform, route.modelId, err);
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
 
-      if (isRetryableError(err)) {
+      if (isRetryableError(err) || isProviderAuthFailoverError(err)) {
         // Put this model+key on cooldown and try the next one
         const skipId = `${route.platform}:${route.modelId}:${route.keyId}`;
         skipKeys.add(skipId);
@@ -662,12 +674,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           route.keyId,
           isPaymentRequiredError(err)
             ? PAYMENT_REQUIRED_COOLDOWN_MS
+            : isProviderAuthFailoverError(err)
+              ? 15 * 60 * 1000
             : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, {
                 rpd: route.rpdLimit,
                 tpd: route.tpdLimit,
               }),
         );
-        recordRateLimitHit(route.modelDbId);
+        if (!isProviderAuthFailoverError(err)) {
+          recordRateLimitHit(route.modelDbId);
+        }
         lastError = err;
         console.log(`[Proxy] ${safeError.slice(0, 60)} from ${route.displayName}, falling back (attempt ${attempt + 1}/${MAX_RETRIES})`);
         continue;
