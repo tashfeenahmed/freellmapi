@@ -184,6 +184,22 @@ register(new OpenAICompatProvider({
   keyless: true,
 }));
 
+// Agnes AI (Sapiens AI) — OpenAI-compatible, backed by LiteLLM + vLLM. Its
+// proprietary Agnes models are currently served at $0/token: live-probed
+// 2026-06-15, the LiteLLM cost headers (x-litellm-response-cost-original) come
+// back 0.0 with no credit drain, so usage is genuinely free rather than a
+// one-time signup-credit grant. The $0 is promotional ("previously $X" /
+// "during this period"), and there is a paid Token/Unlimited subscription
+// underneath, so watch for reversion to paid. ~30 concurrent requests succeed
+// before 429s (no documented RPM/RPD). Free key from platform.agnes-ai.com,
+// no card. Catalog rows live in the catalog (premium → age into free); not
+// shipped as freeapi model migrations.
+register(new OpenAICompatProvider({
+  platform: 'agnes',
+  name: 'Agnes AI',
+  baseUrl: 'https://apihub.agnes-ai.com/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
