@@ -215,6 +215,11 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
     }
 
     // Remove catalog-managed models that the catalog no longer lists.
+    // A platform is "catalog-managed" once the catalog contains at least one model
+    // for it. Platforms that the catalog doesn't know about yet keep their
+    // migration-seeded models (see migrateModelsV27Agnes) — the catalog takes over
+    // once it ships its first model for that platform.
+    const catalogPlatforms = new Set(catalog.models.map(m => m.platform));
     const candidates = db
       .prepare(`SELECT id, platform, model_id FROM models WHERE platform != 'custom' AND key_id IS NULL`)
       .all() as { id: number; platform: string; model_id: string }[];
@@ -222,6 +227,8 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
     const deleteModel = db.prepare('DELETE FROM models WHERE id = ?');
     for (const c of candidates) {
       if (!hasProvider(c.platform as Platform)) continue; // not catalog-managed by this binary
+      // Preserve migration-seeded models when the catalog doesn't yet cover this platform.
+      if (!catalogPlatforms.has(c.platform)) continue;
       if (!inCatalog.has(`${c.platform}:${c.model_id}`)) {
         deleteFb.run(c.id);
         deleteModel.run(c.id);
