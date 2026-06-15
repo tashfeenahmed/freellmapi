@@ -11,7 +11,7 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 import { contentToString } from '../lib/content.js';
 import { proxyFetch } from '../lib/proxy.js';
 
-const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Gemini 3 REQUIRES the `thoughtSignature` that accompanied a function call to
 // be echoed back whenever that call appears in conversation history, or it
