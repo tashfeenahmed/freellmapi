@@ -8,6 +8,88 @@ import { parseBudget } from '../lib/budget.js';
 
 export const fallbackRouter = Router();
 
+type TokenBudgetRow = {
+  platform: string;
+  model_id: string;
+  display_name: string;
+  monthly_token_budget: string;
+  priority: number;
+};
+
+type TokenBudgetGroup = {
+  displayName: string;
+  platform: string;
+  budget: number;
+  sourceCount: number;
+  quotaPoolKey: string;
+};
+
+function quotaPoolKey(row: TokenBudgetRow): string {
+  if (row.platform === 'openrouter' && row.model_id.endsWith(':free')) return 'openrouter::free';
+  if (row.platform === 'openrouter' && row.monthly_token_budget.startsWith('~')) return `openrouter::${row.model_id}`;
+
+  if (['mistral', 'cerebras', 'sambanova', 'cloudflare', 'cohere', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'nvidia', 'opencode'].includes(row.platform)) {
+    return `${row.platform}::shared`;
+  }
+
+  return `${row.platform}::${row.model_id}`;
+}
+
+function poolDisplayName(platform: string, fallbackName: string, sourceCount: number): string {
+  if (sourceCount <= 1) return fallbackName;
+
+  const labels: Record<string, string> = {
+    openrouter: 'OpenRouter free pool',
+    mistral: 'Mistral experiment pool',
+    cerebras: 'Cerebras free pool',
+    sambanova: 'SambaNova free pool',
+    cloudflare: 'Cloudflare Workers AI pool',
+    cohere: 'Cohere trial pool',
+    zhipu: 'Z.ai free pool',
+    ollama: 'Ollama Cloud free pool',
+    kilo: 'Kilo anonymous pool',
+    pollinations: 'Pollinations anonymous pool',
+    llm7: 'LLM7 anonymous pool',
+    huggingface: 'HuggingFace free credit pool',
+    nvidia: 'NVIDIA credit pool',
+    opencode: 'OpenCode free pool',
+  };
+
+  return labels[platform] ?? `${platform} shared pool`;
+}
+
+function groupTokenBudgets(rows: TokenBudgetRow[]): TokenBudgetGroup[] {
+  const groups = new Map<string, TokenBudgetGroup & { priority: number }>();
+
+  for (const row of rows) {
+    const budget = parseBudget(row.monthly_token_budget);
+    if (budget <= 0) continue;
+
+    const key = quotaPoolKey(row);
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, {
+        displayName: row.display_name,
+        platform: row.platform,
+        budget,
+        sourceCount: 1,
+        quotaPoolKey: key,
+        priority: row.priority,
+      });
+      continue;
+    }
+
+    existing.sourceCount += 1;
+    existing.budget = Math.max(existing.budget, budget);
+    existing.priority = Math.min(existing.priority, row.priority);
+    existing.displayName = poolDisplayName(row.platform, existing.displayName, existing.sourceCount);
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => a.priority - b.priority)
+    .map(({ priority: _priority, ...group }) => group);
+}
+
 // ── Bandit routing strategy ─────────────────────────────────────────────────
 // GET  /routing → active strategy, preset weights, and the per-model score
 //                 breakdown (reliability / speed / intelligence + guardrails).
@@ -148,7 +230,7 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   res.json({ success: true, preset });
 });
 
-// Token usage per model for the stacked bar
+// Estimated token usage per quota pool for the stacked bar.
 fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   const db = getDb();
 
@@ -160,7 +242,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   `).all() as { platform: string }[];
   const platformSet = new Set(platforms.map(p => p.platform));
 
-  // Get monthly budget per model, ordered by fallback priority
+  // Get monthly budget labels ordered by fallback priority.
   const models = db.prepare(`
     SELECT m.platform, m.model_id, m.display_name, m.monthly_token_budget,
            fc.priority
@@ -168,16 +250,12 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     JOIN fallback_config fc ON fc.model_db_id = m.id
     WHERE m.enabled = 1
     ORDER BY fc.priority ASC
-  `).all() as { platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number }[];
+  `).all() as TokenBudgetRow[];
 
-  // Build per-model breakdown (only platforms with keys)
-  const modelBudgets = models
-    .filter(m => platformSet.has(m.platform))
-    .map(m => ({
-      displayName: m.display_name,
-      platform: m.platform,
-      budget: parseBudget(m.monthly_token_budget),
-    }));
+  // Build a conservative quota-pool breakdown. Many catalog rows share the
+  // same upstream free pool, so each inferred pool contributes only its largest
+  // budget label instead of multiplying by model count.
+  const modelBudgets = groupTokenBudgets(models.filter(m => platformSet.has(m.platform)));
 
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
 

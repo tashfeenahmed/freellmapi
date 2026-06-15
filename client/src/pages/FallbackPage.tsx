@@ -94,7 +94,7 @@ function formatPercent(value: number): string {
 interface TokenUsageData {
   totalBudget: number
   totalUsed: number
-  models: { displayName: string; platform: string; budget: number }[]
+  models: { displayName: string; platform: string; budget: number; sourceCount?: number; quotaPoolKey?: string }[]
 }
 
 const platformColors: Record<string, string> = {
@@ -206,9 +206,9 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   return (
     <section className="rounded-3xl border bg-card p-5">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-sm font-medium">Monthly token budget</h2>
+        <h2 className="text-sm font-medium">Estimated monthly budget</h2>
         <span className="text-xs text-muted-foreground tabular-nums">
-          <span className="text-foreground font-medium">{formatTokens(remaining)}</span> remaining
+          <span className="text-foreground font-medium">{formatTokens(remaining)}</span> estimated remaining
           <span className="mx-1.5">·</span>
           {formatTokens(totalUsed)} used
           <span className="mx-1.5">·</span>
@@ -216,14 +216,14 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         </span>
       </div>
       <p className="mb-3 text-[11px] text-muted-foreground">
-        Counts only models whose provider currently has at least one enabled key, so the total can drop when a platform is disabled or auto-paused.
+        Estimated from catalog quota labels, not live provider balance. Shared free pools are counted once, and only providers with an enabled key are included.
       </p>
 
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
         {modelsWithWidth.map((m, i) => (
           <div
             key={i}
-            title={`${m.displayName} (${m.platform}) — ${formatTokens(m.remainingTokens)} remaining`}
+            title={`${m.displayName} (${m.platform}) — ${formatTokens(m.remainingTokens)} estimated remaining`}
             style={{
               width: `${m.widthPct}%`,
               backgroundColor: platformColors[m.platform] ?? '#94a3b8',
@@ -252,6 +252,9 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
                 style={{ backgroundColor: platformColors[m.platform] ?? '#94a3b8' }}
               />
               <span className="truncate">{m.displayName}</span>
+              {m.sourceCount && m.sourceCount > 1 && (
+                <span className="text-muted-foreground/70">({m.sourceCount} models)</span>
+              )}
               <span className="flex-1" />
               <span className="font-mono text-muted-foreground">{formatTokens(m.remainingTokens)}</span>
             </div>

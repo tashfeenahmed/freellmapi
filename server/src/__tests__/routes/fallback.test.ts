@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb } from '../../db/index.js';
+import { getDb, initDb } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -55,6 +55,35 @@ describe('Fallback API', () => {
     expect(first).toHaveProperty('platform');
     expect(first).toHaveProperty('displayName');
     expect(first).toHaveProperty('intelligenceRank');
+  });
+
+  it('GET /api/fallback/token-usage groups shared free pools instead of summing every model row', async () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('openrouter', 'test', 'encrypted', 'iv', 'tag', 'healthy', 1)
+    `).run();
+
+    const freeRows = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM models
+      WHERE platform = 'openrouter'
+        AND model_id LIKE '%:free'
+        AND enabled = 1
+        AND monthly_token_budget = '~6M'
+    `).get() as { count: number };
+
+    const { status, body } = await request(app, 'GET', '/api/fallback/token-usage');
+    expect(status).toBe(200);
+
+    const freePool = body.models.find((m: any) => m.quotaPoolKey === 'openrouter::free');
+    expect(freeRows.count).toBeGreaterThan(1);
+    expect(freePool).toMatchObject({
+      displayName: 'OpenRouter free pool',
+      platform: 'openrouter',
+      budget: 6_000_000,
+    });
+    expect(freePool.sourceCount).toBe(freeRows.count);
   });
 
   it('PUT /api/fallback updates order', async () => {
