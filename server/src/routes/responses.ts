@@ -405,7 +405,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             streamStarted = true;
           }
 
-          const delta = chunk.choices[0]?.delta;
+          const delta = chunk?.choices?.[0]?.delta;
           if (!delta) continue;
 
           // Text deltas → output_text events on a single message item.

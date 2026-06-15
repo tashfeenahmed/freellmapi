@@ -84,6 +84,13 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return '0%'
+  if (value === 0 || value === 100) return `${value.toFixed(0)}%`
+  if (value > 99 || value < 1) return `${value.toFixed(2)}%`
+  return `${value.toFixed(1)}%`
+}
+
 interface TokenUsageData {
   totalBudget: number
   totalUsed: number
@@ -171,7 +178,7 @@ const LEGEND_COLLAPSED_PX = 126
 function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
-  const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
+  const remainingPct = totalBudget > 0 ? (remaining / totalBudget) * 100 : 0
 
   // Collapse the per-model legend to a few rows; the chevron reveals the rest.
   // The toggle only appears when the legend actually overflows the collapsed
@@ -203,7 +210,9 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         <span className="text-xs text-muted-foreground tabular-nums">
           <span className="text-foreground font-medium">{formatTokens(remaining)}</span> remaining
           <span className="mx-1.5">·</span>
-          {remainingPct}% of {formatTokens(totalBudget)}
+          {formatTokens(totalUsed)} used
+          <span className="mx-1.5">·</span>
+          {formatPercent(remainingPct)} of {formatTokens(totalBudget)}
         </span>
       </div>
       <p className="mb-3 text-[11px] text-muted-foreground">
@@ -372,6 +381,7 @@ export default function FallbackPage() {
   const { data: tokenUsage } = useQuery<TokenUsageData>({
     queryKey: ['fallback', 'token-usage'],
     queryFn: () => apiFetch('/api/fallback/token-usage'),
+    refetchInterval: 15_000,
   })
 
   const { data: routing } = useQuery<RoutingData>({

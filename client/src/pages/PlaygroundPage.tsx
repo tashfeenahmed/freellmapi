@@ -69,6 +69,7 @@ export default function PlaygroundPage() {
 
       const body: any = {
         messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+        stream: true,
       }
       if (selectedModel !== 'auto') body.model = selectedModel
 
@@ -93,16 +94,15 @@ export default function PlaygroundPage() {
         return
       }
 
-      const data = await res.json()
-      const content = data.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2)
-      const via = data._routed_via ?? (routedVia ? {
+      const via = routedVia ? {
         platform: routedVia.split('/')[0],
         model: routedVia.split('/').slice(1).join('/'),
-      } : undefined)
+      } : undefined
 
+      const assistantIndex = newMessages.length
       setMessages([...newMessages, {
         role: 'assistant',
-        content,
+        content: '',
         meta: {
           platform: via?.platform,
           model: via?.model,
@@ -110,11 +110,82 @@ export default function PlaygroundPage() {
           fallbackAttempts: fallbackAttempts ? parseInt(fallbackAttempts) : undefined,
         },
       }])
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('Streaming response body is unavailable')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let content = ''
+      let pending = ''
+      let lastFlush = 0
+
+      const flush = (force = false) => {
+        const now = Date.now()
+        if (!pending || (!force && now - lastFlush < 50)) return
+        content += pending
+        pending = ''
+        lastFlush = now
+        setMessages(current => {
+          const next = [...current]
+          if (next[assistantIndex]) next[assistantIndex] = { ...next[assistantIndex], content }
+          return next
+        })
+      }
+
+      const appendDelta = (value: unknown) => {
+        if (typeof value === 'string') {
+          pending += value
+        } else if (Array.isArray(value)) {
+          pending += value.map(part => typeof part?.text === 'string' ? part.text : '').join('')
+        }
+        flush()
+      }
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        let eventEnd = buffer.indexOf('\n\n')
+        while (eventEnd !== -1) {
+          const rawEvent = buffer.slice(0, eventEnd)
+          buffer = buffer.slice(eventEnd + 2)
+          for (const line of rawEvent.split(/\r?\n/)) {
+            if (!line.startsWith('data:')) continue
+            const payload = line.slice(5).trim()
+            if (!payload || payload === '[DONE]') continue
+            const chunk = JSON.parse(payload)
+            if (chunk.error?.message) throw new Error(chunk.error.message)
+            appendDelta(chunk.choices?.[0]?.delta?.content)
+          }
+          eventEnd = buffer.indexOf('\n\n')
+        }
+      }
+      flush(true)
+
+      if (!content.trim()) {
+        setMessages(current => {
+          const next = [...current]
+          if (next[assistantIndex]) {
+            next[assistantIndex] = { ...next[assistantIndex], content: 'No text returned by the provider.' }
+          }
+          return next
+        })
+      }
     } catch (err: any) {
-      setMessages([...newMessages, {
-        role: 'assistant',
-        content: `Error: ${err.message}`,
-      }])
+      setMessages(current => {
+        const next = [...current]
+        const last = next[next.length - 1]
+        if (last?.role === 'assistant' && !last.content.trim()) {
+          next[next.length - 1] = { ...last, content: `Error: ${err.message}` }
+          return next
+        }
+        return [...newMessages, {
+          role: 'assistant',
+          content: `Error: ${err.message}`,
+        }]
+      })
     } finally {
       setLoading(false)
       setTimeout(() => inputRef.current?.focus(), 0)
