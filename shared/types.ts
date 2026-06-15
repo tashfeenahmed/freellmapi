@@ -16,6 +16,10 @@ export type Platform =
   | 'openrouter'
   | 'github'
   | 'cohere'
+  // Agnes AI — OpenAI-compatible free gateway by Sapiens AI (June 2026).
+  // Free tier: 20 RPM, no card required. Flagship agnes-2.0-flash supports
+  // 256K context, vision, and tool calling. See migrateModelsV27Agnes.
+  | 'agnes'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'

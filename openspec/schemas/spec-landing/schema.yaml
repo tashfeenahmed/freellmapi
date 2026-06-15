@@ -1,0 +1,371 @@
+name: spec-landing
+version: 1
+description: >
+  团队定制 SDD 工作流 - explore → proposal → specs → design → tasks → apply → verify。
+  所有与用户的对话、进度汇报、问题确认均使用中文。
+  产物正文使用中文，但 Requirement/Scenario 标题保留英文以通过 validate。
+principles:
+  - 所有产物必须结构化输出，不用散文替代章节。
+  - 先完成 exlore，再进入 proposal specs/design/tasks；未形成 proposal 前不得直接实施。
+  - 每个阶段都要说明输入来源、关键决策、证据和未确认推断。
+  - 需求、设计、任务和实现必须可追溯：业务目标 → capability → requirement/scenario → design decision → task。
+  - 未在 tasks 中声明的工作不得实现；不得顺手重构、顺手优化或扩大范围。
+  - 每次进入下一阶段前必须做一致性自检，发现冲突先更新 artifacts，再继续。
+artifacts:
+  - id: explore
+    generates: explore.md
+    description: 前置需求探索与工程边界分析
+    template: explore.md
+    instruction: |
+      产出前置探索文档，目标不是直接给出实现方案，而是把业务需求拆解为当前工程可落地的改动点。
+
+      核心要求：
+      - 从原始业务需求中提炼本工程真正需要负责的范围
+      - 明确当前工程的职责边界、上下游依赖、现有实现入口和约束
+      - 将业务语言逐步拆解到工程改动点，但不要直接写详细技术实现
+      - 明确哪些是已确认事实，哪些是推断，哪些是待确认问题
+      - 尽量引用现有代码、文档、接口、调用链作为证据
+      - 输出业务目标到 capability 候选的追踪关系，供 proposal 继续收敛
+
+      文档章节：
+      - 输入需求与原始上下文：原始需求、来源、目标用户/业务方
+      - 业务目标与成功标准：为什么做、做成后如何判断成功
+      - 当前工程职责边界：纳入范围 / 不纳入范围
+      - 现状调研与证据：现有模块、入口、上下游、约束、问题现状
+      - 改动点拆解：按业务流程或能力拆出具体改动点
+      - 风险、未知项与待确认问题：明确阻塞点和不确定点
+      - Knowledge 使用情况：已参考哪些 knowledge，是否足够支撑后续阶段
+      - Knowledge 缺口与回写预估：哪些 knowledge 缺失、过期、需要新增或更新
+      - Capability 候选草案：为 proposal 阶段提供新增 / 修改 capability 草案
+      - 阶段自检：范围、证据、待确认项和追踪关系是否完整
+
+      产物目标：
+      - 让 proposal 阶段能够基于此文档稳定完成“需求转化”
+      - 不要把 explore 写成 design.md
+    requires: []
+  - id: proposal
+    generates: proposal.md
+    description: 需求转化文档，完成业务语义到工程语义的映射
+    template: proposal.md
+    instruction: >
+      基于 explore.md 产出 proposal.md。proposal 的职责不是复述需求，而是完成“需求转化”：
+
+      把一份完整需求文档，拆成当前工程真正要做的内容，并明确边界、能力划分和影响面。
+
+
+      核心要求：
+
+      - 说明为什么要做，以及本工程承担哪一部分
+
+      - 明确纳入范围 / 不纳入范围，避免把非本工程内容混入
+
+      - 将业务语义拆解成工程可理解的技术语义
+
+      - 输出 capability 列表，作为 specs 阶段的输入契约
+
+      - proposal 关注“做什么、做到哪里、为什么这么拆”，不展开详细技术实现
+
+      - 输出可追溯关系：业务目标 / 改动点 / capability / 影响面
+
+
+      文档章节：
+
+      - 需求摘要：问题、机会、为什么现在要做
+
+      - 当前工程范围与边界：本工程负责什么，不负责什么
+
+      - 业务语义拆解：业务对象、业务规则、场景边界
+
+      - 技术语义映射：把业务概念映射到系统能力、模块、接口、数据对象
+
+      - 变更清单：本次变更点清单
+
+      - Capabilities：
+        - 新增 Capabilities：新增 capability，使用 kebab-case，后续生成 `specs/<name>/spec.md`
+        - 修改 Capabilities：已有 capability 的 requirement 发生变化，使用已有 spec 名称
+        - 移除 Capabilities：整项能力或能力入口被废弃时列出
+      - 复杂度判定：明确结论、判定依据，以及 design 是否必需
+
+      - Knowledge 使用与影响：本次引用了哪些 knowledge、影响哪些 knowledge、是否需要新增 knowledge 文档
+
+      - 影响评估：受影响代码、接口、依赖、系统、链路
+
+      - 非目标与后续议题：本期不做什么，后续再讨论什么
+
+      - 阶段自检：确认边界、capability、复杂度、knowledge 影响和待确认项
+
+
+      IMPORTANT:
+
+      - capability 不要只是模块名列表，要体现能力边界
+
+      - 只有当对外行为/规范发生变化时，才进入“修改 Capabilities”
+
+      - 详细技术实现属于 design.md，不属于 proposal.md
+
+      - 如果 proposal 无法清楚说明本工程负责什么，不得进入 specs/tasks
+    requires:
+      - explore
+  - id: specs
+    generates: specs/**/*.md
+    description: 增量规格说明，定义系统应该对外展示的正确内容，并沉淀回主 Spec
+    template: spec.md
+    instruction: >
+      基于 proposal.md 产出 specs。specs 的职责是定义系统应该做什么，而不是如何实现。
+
+      每个 capability 对应一个 spec 文件，表达系统应该对外展示的正确内容，供后续归档回主 Spec。
+
+
+      为 proposal 的每个 capability 创建一个对应 spec 文件：
+
+      - 新增 capability：使用 proposal 中的 kebab-case 名称，写入
+      `specs/<capability>/spec.md`
+
+      - 修改 capability：使用已有主 Spec 对应目录名，产出 delta spec
+
+      - 移除 capability：如整项能力下线，使用已有主 Spec 目录名并在 delta 中说明
+
+
+      说明：以下几个区块标题和 requirement/scenario 标记属于 OpenSpec 解析器硬依赖，必须保留英文原样：
+
+      - `## ADDED Requirements`
+
+      - `## MODIFIED Requirements`
+
+      - `## REMOVED Requirements`
+
+      - `## RENAMED Requirements`
+
+      - `### Requirement: <名称>`
+
+      - `#### Scenario: <名称>`
+
+      - `FROM:` / `TO:`
+
+
+      格式要求：
+
+      - 每个 requirement 使用：`### Requirement: <名称>`
+
+      - requirement 内容描述系统应有行为，使用 SHALL/MUST 等规范性表达
+
+      - 每个 scenario 使用：`#### Scenario: <名称>`
+
+      - Scenario 必须使用 4 个 #，否则 archive / validate 可能无法正确处理
+
+      - 每个 requirement 至少有一个 scenario
+
+      - scenario 应尽量可测试、可验收
+
+      - 每个 requirement 必须能追溯到 proposal 中的 capability 或变更点
+
+      - 每个 scenario 必须描述可观察行为，不写内部实现步骤
+
+      - 如果无法判断是 ADDED 还是 MODIFIED，先回到 proposal 确认能力边界
+
+
+      MODIFIED requirement 工作流：
+
+      1. 在 `openspec/specs/<capability>/spec.md` 中定位既有 requirement
+
+      2. 复制完整 requirement block（从 `### Requirement:` 到所有 scenario）
+
+      3. 放到 `## MODIFIED Requirements` 下并修改为最新正确内容
+
+      4. requirement 标题保持一致（忽略空白差异）
+
+
+      写作原则：
+
+      - specs 描述“系统正确行为”，不要写方法实现细节
+
+      - specs 面向长期沉淀，不要写成一次性技术说明
+
+      - 如果只是实现层改造、对外行为不变，不要滥用 MODIFIED
+
+      - 如果是在原有行为基础上新增约束或补充场景，优先判断是 ADDED 还是 MODIFIED
+
+      - 写完后必须自检：格式可 validate、每个 requirement 有 scenario、每个 scenario 可验收
+    requires:
+      - proposal
+  - id: design
+    generates: design.md
+    description: 面向 Coding Agent 的详细技术设计文档（复杂需求必备）
+    template: design.md
+    instruction: |
+      design.md 用于承接 proposal.md 和 specs，输出可供 Coding Agent 直接执行的详细技术设计。
+
+      design 何时必需：
+      - 跨模块 / 跨服务 / 跨层改动
+      - 引入新依赖、数据结构变化、接口协议变化
+      - 存在安全、性能、迁移、灰度、回滚复杂度
+      - 需要明确分层职责、调用链、异常处理、边界条件
+      - 仅依靠 proposal + specs 仍不足以稳定拆出 tasks
+
+      design 何时可选：
+      - 单模块、小范围改动
+      - 不引入新依赖，不改数据结构，不改接口协议
+      - 不涉及复杂迁移、灰度、回滚、安全、性能权衡
+      - proposal + specs 已足够支撑稳定拆解 tasks，并能直接指导实施
+
+      换句话说：如果“如何实现”已经简单到不需要单独展开详细技术设计，design 可以省略；
+      如果实现方案稍有歧义，或者存在多层改动/多种实现路径，就必须补 design。
+
+      必备章节：
+      - 一、背景知识：业务背景、技术背景、现有知识沉淀
+      - 二、名词解释：业务语言、技术自然语言、技术代码语言映射
+      - 三、业务流程设计（纵向）：系统相关现状、领域划分、数据结构、主要业务流程、本次新增改动
+      - 四、技术实现设计（横向）：client / app / domain / infrastructure 分层设计
+      - 五、风险与权衡：关键风险、取舍、缓解策略
+      - 六、技术决策记录：关键选择、备选方案、取舍依据
+      - 七、迁移 / 灰度 / 回滚方案：如何上线、灰度、失败时如何回退
+      - 八、测试与验证方案：单测、集成测试、联调、验收口径
+      - 九、Knowledge 回写计划：哪些 knowledge 要新增、更新、补索引
+      - 十、开放问题：仍待确认的问题
+      - 十一、阶段自检：与 proposal/specs 是否一致，是否足以拆 tasks
+
+      写作原则：
+      - 尽量结构化，不用模糊词
+      - 对关键流程、接口、数据结构、调用链、异常处理要写全
+      - 对需要修改的代码位置，尽量给出模块、类、方法、文件路径级别的说明
+      - design 应足够具体，以便 tasks 能拆成原子级 checkbox
+      - design 只写方案和边界，不写实现代码
+      - 不允许把未在 proposal/specs 中出现的需求偷偷加入 design
+    requires:
+      - proposal
+      - specs
+  - id: tasks
+    generates: tasks.md
+    description: 实际修改方案拆分，沉淀为可执行的 checkbox 任务清单
+    template: tasks.md
+    instruction: >
+      基于 proposal.md、specs 以及（如果存在）design.md 产出 tasks.md。tasks
+      的职责不是罗列待办，而是给出可执行、可追踪、可验收的工程修改方案。
+
+
+      重要：apply 阶段依赖 checkbox 格式跟踪进度。每个任务必须使用 `- [ ]`。
+
+
+      核心要求：
+
+      - 按执行依赖顺序拆解
+
+      - 每个 task 应足够小，单次实现可以完成
+
+      - 每组任务说明关联规格、涉及文件/模块、验收方式
+
+      - task 描述尽量包含动作 + 对象 + 位置
+
+      - 涉及文档回写、测试补充、联调验证的工作要显式列出，不要默认省略
+
+      - 如果需求复杂但 design.md 缺失，应先暂停并补 design，再继续拆 tasks
+
+      - 在 tasks 开头显式写出复杂度结论、design 是否存在、是否允许直接进入任务拆解
+
+      - 如果 knowledge 受影响，必须显式列出 knowledge 更新任务，不要默认为 archive 时自动完成
+
+      - 必须显式列出“不允许做的事”：未声明范围、顺手重构、顺手优化、无关格式化等
+
+
+      推荐结构：
+
+      - 先写 `## 0. 执行前判断`
+
+      - 再写 `## 0.1 Knowledge 更新任务`
+
+      - 再写 `## 0.2 禁止事项与范围锁定`
+
+      - 再用 `## 1. / ## 2.` 进行任务分组
+
+      - 每组包含：关联规格、涉及文件 / 模块、验收方式
+
+      - 每个 checkbox 使用：`- [ ] X.Y 任务描述`
+
+
+      任务拆解原则：
+
+      - 先准备和结构改造，再核心实现，再测试验证，再文档回写/收尾
+
+      - task 应可验证完成，不要写成空泛目标
+
+      - 如果 design 中存在开放问题或阻塞条件，要在 tasks 中显式标记
+
+      - 如执行过程中发现与 specs/design 不一致，应先暂停并进行 Reverse Sync，再继续实施
+
+      - 每个任务必须能追溯到 requirement、design decision 或 knowledge 更新项
+    requires:
+      - proposal
+      - specs
+  - id: verify
+    generates: verify.md
+    description: 实施后验证文档，确认代码实现与 artifacts 一致且功能正确
+    template: verify.md
+    instruction: |
+      基于 proposal.md、specs、tasks.md 以及（如果存在）design.md 产出 verify.md。
+      verify 的职责是系统性验证实施结果是否与 artifacts 一致，功能是否正确，是否引入回归。
+
+      核心要求：
+      - 先检查 artifact 完整性：proposal → spec → tasks 的追溯链是否完整、无矛盾
+      - 检查代码变更范围是否与 tasks.md 声明一致，无遗漏、无超范围改动
+      - 按 capability 分组验证功能正确性，每个 requirement 至少有一个验证场景
+      - 覆盖边界和异常场景
+      - 记录测试执行证据（命令、输出摘要）
+      - 检查非功能项：安全、性能、迁移、兼容性
+      - 回归验证：相关模块已有功能未被破坏
+      - 输出明确结论：通过 / 有条件通过 / 不通过
+      - 遗留问题需分类定级，标明是否阻塞
+
+      验证原则：
+      - 每个 capability 的核心场景都必须验证，不得跳过
+      - tasks.md 中声明的验收方式必须执行，不得替换为更宽松的方式
+      - 验证应基于实际运行结果，不要仅靠代码审查代替功能验证
+      - 发现的新知识应记录并回写
+      - verify 是归档前的最后关卡，结论不通过则不得进入 archive
+    requires:
+      - tasks
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md
+  instruction: >
+    执行前，先完整阅读 explore.md、proposal.md、specs、tasks.md，以及（如果存在）design.md。
+
+    如果 proposal / design / tasks 中引用了 knowledge，也应同步阅读 `config.yaml` 中
+    `knowledge.sources` 配置的相关知识来源，并记录证据标识、可信度、
+    未证实推断和写回建议。
+
+
+    进入 apply 的前提：
+
+    - 如果需求复杂而 design.md 缺失，不得继续执行
+
+    - 如果需求简单，可直接基于 proposal.md + specs + tasks.md 进入执行
+
+
+    需求复杂度判断规则：
+
+    - 命中任一项即可判定为复杂需求：
+      1. 涉及两个及以上模块、服务或分层
+      2. 涉及接口协议、数据结构、存储模型变化
+      3. 涉及迁移、灰度、回滚、兼容处理
+      4. 涉及安全、性能、并发、缓存、幂等等专项权衡
+      5. 仅依靠 proposal + specs 无法稳定拆出 tasks
+    - 全部不命中时，可视为简单需求
+
+
+    执行要求：
+
+    - 严格按 tasks.md 的顺序完成 pending tasks
+
+    - 每完成一项，立即勾选 checkbox
+
+    - 只实现 tasks.md 明确声明的内容；不得顺手重构、顺手优化、扩大范围或修改无关文件
+
+    - 若发现 specs / design / tasks 与实际代码冲突，不要直接绕过；先暂停并进行 Reverse Sync
+
+    - 若遇到阻塞、依赖缺失、边界不清，暂停并汇总问题
+
+    - 如果 tasks 中声明需要更新 knowledge，则必须同步完成 knowledge 更新或产出 change 级 knowledge 草稿
+
+    - 完成后输出：变更摘要、任务完成情况、修改文件列表、验证结果、未完成项、剩余风险、回滚方式、是否具备归档条件，以及 knowledge 是否已完成更新
+

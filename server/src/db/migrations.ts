@@ -32,7 +32,12 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
   migrateModelsV25ZenDeadPromos(db);
-  // V25 is the LAST model-data migration. Since the Premium live catalog
+  // V26 was a catalog-only update (OVH keyless, Pollinations keyless, quirk
+  // seeds). See the V26 NOTE above for details.
+  // V27 (June 2026): seed AGNES AI baseline model so the platform is usable
+  // out of the box. Future AGNES model updates ship via catalog-sync.
+  migrateModelsV27Agnes(db);
+  // After all model migrations: add/refresh paid-equivalent pricing
   // shipped (June 2026), model/limit DATA is maintained in the published
   // catalog (served signed by the catalog service) and reaches installs via
   // catalog-sync — premium on the live tier within ~12h, free at the monthly
@@ -1892,6 +1897,32 @@ function migrateModelsV25ZenDeadPromos(db: Database.Database) {
   ];
   const apply = db.transaction(() => {
     for (const [p, m] of disables) disable.run(p, m);
+  });
+  apply();
+}
+
+/**
+ * V27 (June 2026): seed AGNES AI baseline model.
+ *
+ * AGNES AI is a free OpenAI-compatible gateway by Sapiens AI (Singapore).
+ * Flagship model agnes-2.0-flash supports 256K context, vision, and tool
+ * calling. Free tier: 20 RPM, no card required. Key from platform.agnes-ai.com.
+ *
+ * Uses INSERT OR IGNORE + backfillFallback so the model is usable immediately
+ * on the free tier. Future AGNES model updates ship via catalog-sync.
+ */
+function migrateModelsV27Agnes(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, supports_vision, supports_tools)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null, number, number]> = [
+    ['agnes', 'agnes-2.0-flash', 'Agnes 2.0 Flash', 4, 2, 'Frontier', 20, 200, null, null, 'free (promo)', 262144, 1, 1],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
   });
   apply();
 }

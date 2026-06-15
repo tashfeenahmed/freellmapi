@@ -14,6 +14,15 @@ function register(provider: BaseProvider) {
 // Google - unique Gemini API format
 register(new GoogleProvider());
 
+// Agnes AI — OpenAI-compatible free gateway by Sapiens AI (June 2026).
+// Free tier: 20 RPM, no card required. Flagship agnes-2.0-flash supports
+// 256K context, vision, and tool calling. See migrateModelsV27Agnes.
+register(new OpenAICompatProvider({
+  platform: 'agnes',
+  name: 'Agnes AI',
+  baseUrl: 'https://apihub.agnes-ai.com/v1',
+}));
+
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
   platform: 'groq',
