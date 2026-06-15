@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
+import { hydrateSecretsToRemote } from '../services/remote-secrets.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 
@@ -89,6 +90,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     const existing = db.prepare('SELECT id FROM api_keys WHERE platform = ? LIMIT 1').get(platform) as { id: number } | undefined;
     if (existing) {
       db.prepare("UPDATE api_keys SET enabled = 1, status = 'unknown' WHERE id = ?").run(existing.id);
+      hydrateSecretsToRemote(db);
       res.status(200).json({
         id: existing.id,
         platform,
@@ -106,6 +108,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
     VALUES (?, ?, ?, ?, ?, 'unknown', 1)
   `).run(platform, label ?? '', encrypted, iv, authTag);
+  hydrateSecretsToRemote(db);
 
   res.status(201).json({
     id: result.lastInsertRowid,
@@ -185,6 +188,7 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   });
 
   const { keyId, modelDbId } = upsert();
+  hydrateSecretsToRemote(db);
   res.status(201).json({
     success: true,
     keyId,
@@ -228,6 +232,7 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
     }
   });
   remove();
+  hydrateSecretsToRemote(db);
 
   res.json({ success: true });
 });
@@ -248,6 +253,7 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
 
   const db = getDb();
   const result = db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform);
+  hydrateSecretsToRemote(db);
 
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
@@ -283,6 +289,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
 
   const db = getDb();
   const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  hydrateSecretsToRemote(db);
 
   if (result.changes === 0) {
     res.status(404).json({ error: { message: 'Key not found' } });

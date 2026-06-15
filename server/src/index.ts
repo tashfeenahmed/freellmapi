@@ -5,6 +5,7 @@ import { resolveDbPathEnv } from './env.js';
 import { createApp } from './app.js';
 import { initDb } from './db/index.js';
 import { hardenDatabase } from './db/hardening.js';
+import { hasRemoteSecretsStore } from './services/remote-secrets.js';
 import { startHealthChecker } from './services/health.js';
 
 const PORT = process.env.PORT ?? 3001;
@@ -38,6 +39,11 @@ async function main() {
   };
 
   const server = app.listen(Number(PORT), HOST, onReady(HOST));
+  if (hasRemoteSecretsStore()) {
+    console.log('[db] Remote secret mirror is enabled via DATABASE_URL (Neon/Postgres).');
+  } else {
+    console.log('[db] Running in SQLite-only mode. Set DATABASE_URL to mirror settings/api keys to Neon/Postgres.');
+  }
   server.on('error', (err: NodeJS.ErrnoException) => {
     // The default '::' bind fails where IPv6 is disabled (kernel
     // ipv6.disable=1 and the like) — retry IPv4-only rather than dying.

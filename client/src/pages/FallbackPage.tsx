@@ -206,6 +206,9 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
           {remainingPct}% of {formatTokens(totalBudget)}
         </span>
       </div>
+      <p className="mb-3 text-[11px] text-muted-foreground">
+        Counts only models whose provider currently has at least one enabled key, so the total can drop when a platform is disabled or auto-paused.
+      </p>
 
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
         {modelsWithWidth.map((m, i) => (

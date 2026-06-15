@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { getDb } from '../db/index.js';
 import { checkKeyHealth, checkAllKeys } from '../services/health.js';
 import { hasProvider } from '../providers/index.js';
+import { hydrateSecretsToRemote } from '../services/remote-secrets.js';
 
 export const healthRouter = Router();
 
@@ -63,11 +64,13 @@ healthRouter.post('/check/:keyId', async (req: Request, res: Response) => {
   }
 
   const status = await checkKeyHealth(keyId);
+  hydrateSecretsToRemote(getDb());
   res.json({ keyId, status });
 });
 
 // Check all keys
 healthRouter.post('/check-all', async (_req: Request, res: Response) => {
   await checkAllKeys();
+  hydrateSecretsToRemote(getDb());
   res.json({ success: true });
 });

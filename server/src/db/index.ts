@@ -2,11 +2,11 @@ import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { resolveDefaultDbPath } from '../env.js';
 import { initEncryptionKey } from '../lib/crypto.js';
+import { hasRemoteSecretsStore, hydrateSecretsFromRemote, hydrateSecretsToRemote, remoteSecretCounts } from '../services/remote-secrets.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
+const DB_PATH = resolveDefaultDbPath();
 
 let db: Database.Database;
 
@@ -33,6 +33,13 @@ export function initDb(dbPath?: string): Database.Database {
   db.pragma('foreign_keys = ON');
 
   createTables(db);
+  if (hasRemoteSecretsStore()) {
+    const counts = remoteSecretCounts();
+    if (counts && (counts.settings > 0 || counts.apiKeys > 0)) {
+      hydrateSecretsFromRemote(db);
+      console.log('[db] Loaded secret state from remote Postgres/Neon before local bootstrap.');
+    }
+  }
   initEncryptionKey(db);
   seedModels(db);
   migrateModels(db);
@@ -59,6 +66,11 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV22Tools(db);
   migrateEmbeddingsV1(db);
   ensureUnifiedKey(db);
+
+  if (hasRemoteSecretsStore()) {
+    hydrateSecretsToRemote(db);
+    console.log('[db] Mirrored secret state to remote Postgres/Neon.');
+  }
 
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
@@ -1785,6 +1797,7 @@ export function regenerateUnifiedKey(): string {
   const db = getDb();
   const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
   db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
+  hydrateSecretsToRemote(db);
   return key;
 }
 
@@ -1801,4 +1814,5 @@ export function setSetting(key: string, value: string): void {
     INSERT INTO settings (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(key, value);
+  hydrateSecretsToRemote(db);
 }

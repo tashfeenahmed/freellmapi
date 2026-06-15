@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadProjectEnv, resolveDbPathEnv } from '../env.js';
+import { loadProjectEnv, resolveDbPathEnv, resolveDatabaseUrlEnv, resolveDefaultDbPath } from '../env.js';
 
 const tempDirs: string[] = [];
 
@@ -44,5 +44,16 @@ describe('env loading', () => {
     expect(resolveDbPathEnv({ DB_PATH: 'modern.db', DATABASE_PATH: 'legacy.db' } as NodeJS.ProcessEnv)).toBe('modern.db');
     expect(resolveDbPathEnv({ DATABASE_PATH: 'legacy.db' } as NodeJS.ProcessEnv)).toBe('legacy.db');
     expect(resolveDbPathEnv({} as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+
+  it('resolves DATABASE_URL when present', () => {
+    expect(resolveDatabaseUrlEnv({ DATABASE_URL: 'postgres://example' } as NodeJS.ProcessEnv)).toBe('postgres://example');
+    expect(resolveDatabaseUrlEnv({} as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+
+  it('builds the default sqlite path under the workspace server/data directory', () => {
+    const projectRoot = makeTempProject();
+    const dbPath = resolveDefaultDbPath(projectRoot);
+    expect(dbPath).toBe(path.join(projectRoot, 'server', 'data', 'freeapi.db'));
   });
 });
