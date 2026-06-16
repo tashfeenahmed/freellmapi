@@ -172,6 +172,18 @@ function createTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup ON rate_limit_usage(platform, model_id, key_id, kind, created_at_ms);
     CREATE INDEX IF NOT EXISTS idx_rate_limit_cooldowns_expires ON rate_limit_cooldowns(expires_at_ms);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
+
+    -- Cooldown hit history for escalating cooldowns (persists across restarts).
+    -- Key: platform:model_id:key_id. Timestamps stored as ms since epoch.
+    CREATE TABLE IF NOT EXISTS rate_limit_cooldown_hits (
+      platform TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      hit_at_ms INTEGER NOT NULL,
+      PRIMARY KEY (platform, model_id, key_id, hit_at_ms)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_cooldown_hits_lookup
+      ON rate_limit_cooldown_hits(platform, model_id, key_id, hit_at_ms);
   `);
 
   ensureRequestKeyIdColumn(db);
