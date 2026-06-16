@@ -66,7 +66,9 @@
   "models": {
     "title": "Models",
     "chatModelsTab": "Chat models",
+    "fusionTab": "Fusion",
     "embeddingsTab": "Embeddings",
+    "newBadge": "New",
     "monthlyTokenBudget": "Monthly token budget",
     "remaining": "remaining",
     "of": "of",
@@ -240,6 +242,7 @@
     "title": "Playground",
     "description": "Send a chat completion through the router and see which provider serves it.",
     "autoModel": "Auto (fallback chain)",
+    "fusionModel": "Fusion (multi-model synthesis)",
     "send": "Send",
     "sending": "Sending…",
     "clear": "Clear",
@@ -250,6 +253,11 @@
     "copyReply": "Copy reply",
     "fallback": "fallback",
     "fallbacks": "fallbacks",
+    "fusionPanel": "Panel",
+    "fusionJudge": "Judge",
+    "fusionTrace": "{count} model responses",
+    "fusionFailed": "no response",
+    "fusionJudgeSynth": "synthesized the final answer",
     "errorPrefix": "Error:"
   },
   "embeddings": {
@@ -266,6 +274,37 @@
     "saveChanges": "Save changes",
     "savingChanges": "Saving…",
     "tokMax": "{tokens} tok max"
+  },
+  "fusion": {
+    "title": "Fusion",
+    "description": "A panel of models answers in parallel, then a judge synthesizes one stronger answer. Use it by calling the API with model \"fusion\".",
+    "panelSource": "Panel source",
+    "panelSourceHelp": "Where the panel models come from when a request doesn't specify its own.",
+    "mode": {
+      "auto": "Auto (Fallback Chain)",
+      "autoHelp": "Pick a diverse set of models from your Fallback Chain, ranked by your active routing strategy.",
+      "explicit": "Explicit panel",
+      "explicitHelp": "Always use the specific models you choose below."
+    },
+    "panelModels": "Panel models",
+    "selectedCount": "{count} of {max} selected",
+    "noModels": "No models are connected yet. Add an API key, then enable models in the Fallback Chain.",
+    "panelSize": "Panel size",
+    "panelSizeHelp": "How many diverse models to pick automatically (1–{max}).",
+    "judge": "Judge model",
+    "judgeHelp": "The model that synthesizes the panel's answers into one. Auto uses your top-ranked available model.",
+    "judgeAuto": "Auto (top-ranked available)",
+    "strategy": "Strategy",
+    "strategySynthesize": "Synthesize — blend the panel into one answer",
+    "strategyBestOf": "Best of — return the single strongest answer (no judge call)",
+    "strategySynthesizeShort": "Synthesize",
+    "strategyBestOfShort": "Best of",
+    "exposePanel": "Expose panel details",
+    "exposePanelHelp": "Attach each model's answer and the judge metadata under an x_fusion field in the response.",
+    "howToUse": "How to use",
+    "howToUseHelp": "Send a normal chat request with model \"fusion\". These settings are the default; any request can override them with a \"fusion\" field.",
+    "unsavedChanges": "Unsaved changes",
+    "save": "Save"
   },
   "premium": {
     "title": "Premium",

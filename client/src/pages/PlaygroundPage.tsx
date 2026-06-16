@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { ChevronRight } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -27,7 +28,81 @@ interface ChatMessage {
     model?: string
     latency?: number
     fallbackAttempts?: number
+    // Fusion responses: the panel models (with their answers, for the
+    // collapsible trace) and the judge that synthesized them (null when not
+    // synthesized — single survivor / best_of). `fusionStreaming` is true while
+    // panel/judge frames are still arriving.
+    fusionPanel?: FusionPanelEntry[]
+    fusionJudge?: { platform: string; model: string } | null
+    fusionStreaming?: boolean
   }
+}
+
+interface FusionPanelEntry {
+  platform: string
+  model: string
+  status?: 'ok' | 'failed'
+  content?: string
+  error?: string
+}
+
+// Render a fusion panel/judge entry as "platform/model", but avoid doubling
+// the provider when the model id already carries it (e.g. openrouter/owl-alpha,
+// groq/compound) — those would otherwise read "openrouter/openrouter/owl-alpha".
+function fusionRouteLabel(p: { platform: string; model: string }): string {
+  return p.model.startsWith(`${p.platform}/`) ? p.model : `${p.platform}/${p.model}`
+}
+
+// Collapsible, minimal-font trace shown OUTSIDE the main answer bubble: each
+// panel model's raw answer as it streamed in, plus the judge that synthesized
+// the final answer. Default-open so you can watch it work; collapse to tuck away.
+function FusionTrace({ panel, judge, streaming, answerStarted }: {
+  panel: FusionPanelEntry[]
+  judge?: { platform: string; model: string } | null
+  streaming?: boolean
+  answerStarted?: boolean
+}) {
+  const { t } = useI18n()
+  // Open while the panel streams in so you can watch it work; auto-collapse the
+  // moment the final answer STARTS streaming (first token in the bubble), so it
+  // tucks away as the answer takes over — unless the user manually toggled it.
+  const [open, setOpen] = useState(true)
+  const touched = useRef(false)
+  useEffect(() => {
+    if (answerStarted && !touched.current) setOpen(false)
+  }, [answerStarted])
+  return (
+    <div className="w-full text-[10px] leading-snug text-muted-foreground/80">
+      <button
+        type="button"
+        onClick={() => { touched.current = true; setOpen(o => !o) }}
+        className="inline-flex items-center gap-1 font-mono hover:text-foreground transition-colors"
+      >
+        <ChevronRight className={`size-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {t('playground.fusionTrace', { count: panel.length })}{streaming ? ' …' : ''}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-2 border-l border-border/60 pl-2.5">
+          {panel.map((p, i) => (
+            <div key={i} className="space-y-0.5">
+              <span className="font-mono font-medium">{fusionRouteLabel(p)}</span>
+              {p.status === 'failed'
+                ? <span className="ml-1.5 text-amber-600 dark:text-amber-400">{t('playground.fusionFailed')}{p.error ? `: ${p.error}` : ''}</span>
+                : p.content
+                  ? <div className="whitespace-pre-wrap opacity-80">{p.content}</div>
+                  : <span className="ml-1.5 opacity-60">…</span>}
+            </div>
+          ))}
+          {judge && (
+            <div className="pt-1.5 border-t border-border/60">
+              <span className="font-mono font-medium">{fusionRouteLabel(judge)}</span>
+              <span className="ml-1.5 opacity-70">{t('playground.fusionJudgeSynth')}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function PlaygroundPage() {
@@ -57,6 +132,58 @@ export default function PlaygroundPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Read a fusion SSE stream, updating the assistant message in place as panel
+  // answers + the judge arrive (additive `_fusion` frames) and the final answer
+  // streams as content deltas.
+  const streamFusion = async (stream: ReadableStream<Uint8Array>, baseMessages: ChatMessage[], start: number) => {
+    const reader = stream.getReader()
+    const dec = new TextDecoder()
+    let buf = ''
+    let finalContent = ''
+    const panel: FusionPanelEntry[] = []
+    let judge: { platform: string; model: string } | null = null
+
+    const flush = (streaming: boolean) => {
+      setMessages([...baseMessages, {
+        role: 'assistant',
+        content: finalContent,
+        meta: { latency: Date.now() - start, fusionPanel: [...panel], fusionJudge: judge, fusionStreaming: streaming },
+      }])
+    }
+    flush(true)
+
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += dec.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        const tl = line.trim()
+        if (!tl.startsWith('data:')) continue
+        const d = tl.slice(5).trim()
+        if (d === '[DONE]') continue
+        let obj: any
+        try { obj = JSON.parse(d) } catch { continue }
+        if (obj._fusion) {
+          if (obj._fusion.event === 'panel') {
+            panel.push({ platform: obj._fusion.platform, model: obj._fusion.model, status: obj._fusion.status, content: obj._fusion.content, error: obj._fusion.error })
+          } else if (obj._fusion.event === 'judge') {
+            judge = { platform: obj._fusion.platform, model: obj._fusion.model }
+          }
+          flush(true)
+        } else if (obj.error) {
+          finalContent = `${t('playground.errorPrefix')} ${obj.error.message}`
+          flush(true)
+        } else if (obj.choices) {
+          const delta = obj.choices[0]?.delta?.content
+          if (delta) { finalContent += delta; flush(true) }
+        }
+      }
+    }
+    flush(false)
+  }
+
   const handleSend = async () => {
     const text = input.trim()
     if (!text || loading) return
@@ -72,10 +199,14 @@ export default function PlaygroundPage() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (keyData?.apiKey) headers['Authorization'] = `Bearer ${keyData.apiKey}`
 
+      const isFusion = selectedModel === 'fusion'
       const body: any = {
         messages: newMessages.map(m => ({ role: m.role, content: m.content })),
       }
       if (selectedModel !== 'auto') body.model = selectedModel
+      // Fusion streams its panel + judge trace; ask for a stream so the
+      // Playground can show the other models arriving before the final answer.
+      if (isFusion) body.stream = true
 
       const base = import.meta.env.BASE_URL.replace(/\/$/, '')
       const start = Date.now()
@@ -98,12 +229,24 @@ export default function PlaygroundPage() {
         return
       }
 
+      if (isFusion && res.body) {
+        await streamFusion(res.body, newMessages, start)
+        return
+      }
+
       const data = await res.json()
       const content = data.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2)
       const via = data._routed_via ?? (routedVia ? {
         platform: routedVia.split('/')[0],
         model: routedVia.split('/').slice(1).join('/'),
       } : undefined)
+
+      // Fusion responses carry a structured routing summary so we can show the
+      // panel models that replied + the judge, rather than parsing the compact
+      // X-Routed-Via string.
+      const fusion = data._fusion as
+        | { panel: { platform: string; model: string }[]; judge: { platform: string; model: string } | null }
+        | undefined
 
       setMessages([...newMessages, {
         role: 'assistant',
@@ -113,6 +256,8 @@ export default function PlaygroundPage() {
           model: via?.model,
           latency,
           fallbackAttempts: fallbackAttempts ? parseInt(fallbackAttempts) : undefined,
+          fusionPanel: fusion?.panel,
+          fusionJudge: fusion?.judge,
         },
       }])
     } catch (err: any) {
@@ -140,6 +285,8 @@ export default function PlaygroundPage() {
 
   const activeModelLabel = selectedModel === 'auto'
     ? t('playground.autoModel')
+    : selectedModel === 'fusion'
+    ? t('playground.fusionModel')
     : availableModels.find(m => m.modelId === selectedModel)?.displayName ?? selectedModel
 
   return (
@@ -155,6 +302,12 @@ export default function PlaygroundPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">{t('playground.autoModel')}</SelectItem>
+                <SelectItem value="fusion">
+                  <span className="flex items-center gap-2">
+                    <span>{t('playground.fusionModel')}</span>
+                    <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">{t('models.newBadge')}</span>
+                  </span>
+                </SelectItem>
                 {availableModels.map(m => (
                   <SelectItem key={m.modelDbId} value={m.modelId}>
                     <span className="flex items-center gap-2">
@@ -194,41 +347,78 @@ export default function PlaygroundPage() {
             </div>
           ) : (
             <>
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`group relative max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    {msg.role === 'assistant' ? (
-                      <Markdown>{msg.content}</Markdown>
-                    ) : (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
-                    )}
-                    {msg.role === 'assistant' && msg.content && (
-                      <CopyButton
-                        text={msg.content}
-                        label={t('playground.copyReply')}
-                        className="absolute right-1.5 top-1.5 size-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                      />
-                    )}
-                    {msg.meta && (
-                      <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] opacity-70 tabular-nums">
-                        {msg.meta.platform && <span>{msg.meta.platform}</span>}
-                        {msg.meta.model && <span className="font-mono">· {msg.meta.model}</span>}
-                        {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
-                        {msg.meta.fallbackAttempts != null && msg.meta.fallbackAttempts > 0 && (
-                          <span>· {msg.meta.fallbackAttempts} {msg.meta.fallbackAttempts > 1 ? t('playground.fallbacks') : t('playground.fallback')}</span>
-                        )}
-                      </div>
-                    )}
+              {messages.map((msg, i) => {
+                const fusionPanel = msg.meta?.fusionPanel
+                const okPanel = fusionPanel?.filter(p => p.status !== 'failed') ?? []
+                // Skip an empty assistant bubble while the fusion trace is still
+                // streaming in (no final answer yet) — the trace shows below.
+                const showBubble = msg.role === 'user' || msg.content.length > 0
+                return (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex flex-col gap-1 max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      {showBubble && (
+                        <div
+                          className={`group relative rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                          }`}
+                        >
+                          {msg.role === 'assistant' ? (
+                            <Markdown>{msg.content}</Markdown>
+                          ) : (
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          )}
+                          {msg.role === 'assistant' && msg.content && (
+                            <CopyButton
+                              text={msg.content}
+                              label={t('playground.copyReply')}
+                              className="absolute right-1.5 top-1.5 size-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                            />
+                          )}
+                          {msg.meta && (
+                            <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] opacity-70 tabular-nums">
+                              {(fusionPanel || msg.meta.fusionStreaming) ? (
+                                <>
+                                  {okPanel.length > 0 && (
+                                    <span>
+                                      {t('playground.fusionPanel')}:{' '}
+                                      <span className="font-mono">{okPanel.map(fusionRouteLabel).join(', ')}</span>
+                                    </span>
+                                  )}
+                                  {msg.meta.fusionJudge && (
+                                    <span>
+                                      · {t('playground.fusionJudge')}:{' '}
+                                      <span className="font-mono">{fusionRouteLabel(msg.meta.fusionJudge)}</span>
+                                    </span>
+                                  )}
+                                  {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
+                                </>
+                              ) : (
+                                <>
+                                  {msg.meta.platform && <span>{msg.meta.platform}</span>}
+                                  {msg.meta.model && <span className="font-mono">· {msg.meta.model}</span>}
+                                  {msg.meta.latency != null && <span>· {msg.meta.latency} ms</span>}
+                                  {msg.meta.fallbackAttempts != null && msg.meta.fallbackAttempts > 0 && (
+                                    <span>· {msg.meta.fallbackAttempts} {msg.meta.fallbackAttempts > 1 ? t('playground.fallbacks') : t('playground.fallback')}</span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {msg.role === 'assistant' && fusionPanel && fusionPanel.length > 0 && (
+                        <FusionTrace
+                          panel={fusionPanel}
+                          judge={msg.meta?.fusionJudge}
+                          streaming={msg.meta?.fusionStreaming}
+                          answerStarted={msg.content.length > 0}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {loading && (
+                )
+              })}
+              {loading && !messages[messages.length - 1]?.meta?.fusionStreaming && (
                 <div className="flex justify-start">
                   <div className="bg-muted rounded-2xl px-4 py-3">
                     <div className="flex gap-1">

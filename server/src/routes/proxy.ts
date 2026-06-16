@@ -5,7 +5,6 @@ import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
-import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
@@ -13,6 +12,9 @@ import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
+import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
+import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError } from '../lib/error-classify.js';
+import { logRequest } from '../lib/request-log.js';
 
 export const proxyRouter = Router();
 
@@ -184,6 +186,18 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         available: true,
         unavailable_reason: null,
       },
+      {
+        id: FUSION_MODEL_ID,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: 'Fusion (panel of models answer in parallel, a judge synthesizes one answer)',
+        context_window: autoContextWindow,
+        context_length: autoContextWindow,
+        // Available whenever auto is — fusion needs at least one routable model.
+        available: autoContextWindow != null,
+        unavailable_reason: autoContextWindow != null ? null : 'no_models',
+      },
       ...listed.map(m => ({
         id: m.model_id,
         object: 'model',
@@ -339,84 +353,16 @@ const chatCompletionSchema = z.object({
   tools: z.array(toolDefinitionSchema).nullable().optional(),
   tool_choice: toolChoiceSchema.nullable().optional(),
   parallel_tool_calls: z.boolean().nullable().optional(),
+  // Fusion config — only meaningful when `model` is the virtual "fusion" id.
+  // Ignored for every other model. See services/fusion.ts.
+  fusion: fusionConfigSchema.optional(),
 });
 
-export function isRetryableError(err: any): boolean {
-  const msg = (err.message ?? '').toLowerCase();
-  return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
-    || msg.includes('quota') || msg.includes('resource_exhausted')
-    || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
-    || msg.includes('econnrefused') || msg.includes('econnreset')
-    || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
-    || msg.includes('503') || msg.includes('unavailable')
-    || msg.includes('500') || msg.includes('internal server error')
-    // 413: this model's payload limit is too small for the request, but another
-    // provider in the fallback chain may have a larger limit. Same reasoning as 503.
-    || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
-    || msg.includes('request entity too large') || msg.includes('content too large')
-    // 404: model deprecated/removed upstream (e.g. OpenRouter's "no endpoints found"
-    // for a model that's been pulled). Rotate to the next model in the chain —
-    // setCooldown + the health checker will avoid this model on subsequent requests.
-    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
-    // 403: the key is valid (it passed validateKey, and the health checker
-    // disables truly-forbidden keys) but this specific model is off-limits to
-    // the key's tier — e.g. gpt-4o on GitHub Models' free tier, subscription-only
-    // models on Cloudflare. Another model in the chain is reachable, so fail over
-    // instead of 502-ing the whole request. Paired with isModelAccessForbiddenError
-    // to rule the model out for this request and a day-long bench. See issue #256.
-    || isModelAccessForbiddenError(err)
-    // 400: one provider may reject parameters another accepts (e.g. max_tokens
-    // limits, unsupported params). The matching pattern is "api error 400"
-    // which comes from the OpenAI-compat provider's error formatting, not
-    // a bare "400" which is deliberately non-retryable for validation errors.
-    || msg.includes('api error 400')
-    // 402: this provider/key is out of credits (e.g. HuggingFace Router
-    // "API error 402: Payment required"). The SAME model often lives on another
-    // provider (Kimi K2.6 is on HF + Cloudflare + NVIDIA), so fail over instead
-    // of killing the workflow. Paired with a long cooldown (isPaymentRequiredError)
-    // so we don't re-hammer the broke key every retry.
-    || isPaymentRequiredError(err)
-    // Dead-turn classes from the stream turn-integrity layer (#231 audit):
-    // all thrown before any byte reached the client, so another model can
-    // serve the request invisibly.
-    || msg.includes('empty completion')
-    || msg.includes('in-band provider error')
-    || msg.includes('stream ended unexpectedly')
-    || msg.includes('stream stalled')
-    || msg.includes('unparseable inline tool-call dialect');
-}
-
-// A 402 Payment Required / out-of-credits error. Distinct from a transient 429:
-// it won't recover on the next window, so the caller benches the model+key with
-// PAYMENT_REQUIRED_COOLDOWN_MS (a full day) rather than the 90s transient cooldown.
-export function isPaymentRequiredError(err: any): boolean {
-  const msg = (err.message ?? '').toLowerCase();
-  return msg.includes('402') || msg.includes('payment required')
-    || msg.includes('insufficient_quota') || msg.includes('insufficient credit')
-    || msg.includes('insufficient balance');
-}
-
-// A 404 "model removed/deprecated upstream" error. It's a MODEL-level failure,
-// not a key-level one: every key for the platform will 404 the same way, so the
-// retry loop skips the entire model for the rest of the request instead of
-// burning one fallback attempt per key on the same dead route.
-// (PR #111, credits @barbotkonv.)
-export function isModelNotFoundError(err: any): boolean {
-  const msg = (err.message ?? '').toLowerCase();
-  return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
-}
-
-// A 403 Forbidden returned for a specific model behind an otherwise-valid key.
-// Drives the same whole-model skip as a 404: every key on this platform's tier
-// would be forbidden the same model, so rule it out for the rest of the request
-// rather than trying it again with a sibling key. Distinct from a dead key —
-// validateKey returns false on 401/403, so the health checker disables genuinely
-// forbidden keys; a 403 reaching here is model-not-on-this-tier. See issue #256.
-export function isModelAccessForbiddenError(err: any): boolean {
-  if (err?.status === 403) return true;
-  const msg = (err?.message ?? '').toLowerCase();
-  return msg.includes('403') || msg.includes('forbidden');
-}
+// Upstream-error classifiers live in lib/error-classify.ts so the fusion
+// service can share them without an import cycle; imported above for internal
+// use and re-exported here for existing importers (routes/responses.ts,
+// proxy-retry.test.ts) that pull them from this module.
+export { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError };
 
 // Pull the incremental text out of a streaming chunk for token counting.
 // Must tolerate chunks that carry no `choices` array at all: some providers
@@ -645,6 +591,94 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         code: 'no_tools_model',
       },
     });
+    return;
+  }
+
+  // ── Fusion: multi-model synthesis ──────────────────────────────────────────
+  // The virtual "fusion" model fans the prompt out to a panel of diverse models
+  // in parallel, then a judge synthesizes one answer. It routes each panel/judge
+  // sub-call through the normal path (cooldowns, quotas, analytics), so it
+  // behaves like a normal model from the client's side — just K+1x the tokens.
+  // v1 has no tools/vision/streaming-panel; reject the first two up front and
+  // replay the synthesized answer as a single SSE turn when stream is set.
+  if (isFusionModel(requestedModel)) {
+    if (hasImage) {
+      res.status(422).json({ error: { message: 'Fusion does not support image input yet. Use a vision model directly.', type: 'invalid_request_error', code: 'fusion_no_vision' } });
+      return;
+    }
+    if (wantsTools) {
+      res.status(422).json({ error: { message: 'Fusion does not support tool calling yet. Use a tool-capable model directly.', type: 'invalid_request_error', code: 'fusion_no_tools' } });
+      return;
+    }
+    const fusionOptions = { temperature, max_tokens, top_p };
+    const fusionConfig = parsed.data.fusion ?? {};
+
+    if (stream) {
+      // Streaming fusion: open the SSE response immediately and emit additive
+      // `_fusion` frames (no `choices`, so standard OpenAI clients skip them) as
+      // each panel model settles and when the judge runs — the Playground shows
+      // these arriving in a collapsible trace. The final synthesized answer is
+      // then streamed as normal content deltas, so plain clients still get it.
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      const writeFrame = (o: unknown) => { try { res.write(`data: ${JSON.stringify(o)}\n\n`); } catch { /* socket gone */ } };
+      const streamId = `fusion-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+      const base = { id: streamId, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: FUSION_MODEL_ID };
+      // Track whether the judge already streamed content so we don't re-emit it.
+      let answerStarted = false;
+      try {
+        const { response } = await runFusion({
+          messages,
+          config: fusionConfig,
+          options: fusionOptions,
+          estimatedTokens: estimatedTotal,
+          hooks: {
+            // `a` already carries a sanitized error for failed slots; content is
+            // the model's own answer and is forwarded as-is.
+            onPanel: (a) => writeFrame({ _fusion: { event: 'panel', ...a } }),
+            onJudge: (j) => writeFrame({ _fusion: { event: 'judge', ...j } }),
+            // Stream the judge's synthesis live as standard content deltas, so
+            // the final answer appears as it's written instead of after the wait.
+            onJudgeDelta: (delta) => {
+              if (!answerStarted) { writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] }); answerStarted = true; }
+              writeFrame({ ...base, choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] });
+            },
+          },
+        });
+        // best_of / single-survivor / judge-fell-back-to-best-of never streamed
+        // a delta — emit the final answer as one chunk in that case.
+        if (!answerStarted) {
+          const finalText = contentToString(response.choices[0]?.message?.content ?? '');
+          writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
+          writeFrame({ ...base, choices: [{ index: 0, delta: { content: finalText }, finish_reason: null }] });
+        }
+        writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: response.usage });
+      } catch (err: any) {
+        const message = err instanceof FusionError ? err.message : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
+        const type = err instanceof FusionError && err.status === 429 ? 'rate_limit_error' : 'server_error';
+        writeFrame({ error: { message, type } });
+      }
+      try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+      return;
+    }
+
+    try {
+      const { response, routedVia } = await runFusion({
+        messages,
+        config: fusionConfig,
+        options: fusionOptions,
+        estimatedTokens: estimatedTotal,
+      });
+      res.setHeader('X-Routed-Via', routedVia);
+      res.json(response);
+    } catch (err: any) {
+      if (err instanceof FusionError) {
+        res.status(err.status).json({ error: { message: err.message, type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error' } });
+      } else {
+        res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' } });
+      }
+    }
     return;
   }
 
@@ -1116,29 +1150,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
 });
 
-export function logRequest(
-  platform: string,
-  modelId: string,
-  keyId: number,
-  status: string,
-  inputTokens: number,
-  outputTokens: number,
-  latencyMs: number,
-  error: string | null,
-  ttfbMs: number | null = null,
-  // The model id the client pinned; null for auto-routed requests. Lets
-  // analytics split pinned vs auto traffic and detect failover overrides
-  // (requested_model set but != model_id).
-  requestedModel: string | null = null,
-) {
-  try {
-    const db = getDb();
-    db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel);
-    pruneRequestAnalytics({ db });
-  } catch (e) {
-    console.error('Failed to log request:', e);
-  }
-}
+// logRequest moved to lib/request-log.ts (shared with the fusion service to
+// avoid an import cycle); imported above for internal use and re-exported here
+// for routes/responses.ts which imports it from this module.
+export { logRequest };
