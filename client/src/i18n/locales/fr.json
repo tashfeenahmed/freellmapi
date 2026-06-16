@@ -66,7 +66,9 @@
   "models": {
     "title": "Modèles",
     "chatModelsTab": "Modèles de chat",
+    "fusionTab": "Fusion",
     "embeddingsTab": "Embeddings",
+    "newBadge": "Nouveau",
     "monthlyTokenBudget": "Budget mensuel de tokens",
     "remaining": "restant",
     "of": "sur",
@@ -240,6 +242,7 @@
     "title": "Bac à sable",
     "description": "Envoyez une complétion de chat via le routeur et voyez quel fournisseur la traite.",
     "autoModel": "Auto (chaîne de repli)",
+    "fusionModel": "Fusion (synthèse multi-modèles)",
     "send": "Envoyer",
     "sending": "Envoi…",
     "clear": "Effacer",
@@ -250,6 +253,11 @@
     "copyReply": "Copier la réponse",
     "fallback": "repli",
     "fallbacks": "replis",
+    "fusionPanel": "Panel",
+    "fusionJudge": "Juge",
+    "fusionTrace": "{count} réponses de modèles",
+    "fusionFailed": "aucune réponse",
+    "fusionJudgeSynth": "a synthétisé la réponse finale",
     "errorPrefix": "Erreur :"
   },
   "embeddings": {
@@ -266,6 +274,37 @@
     "saveChanges": "Enregistrer les modifications",
     "savingChanges": "Enregistrement…",
     "tokMax": "{tokens} tok max."
+  },
+  "fusion": {
+    "title": "Fusion",
+    "description": "Un panel de modèles répond en parallèle, puis un juge synthétise une réponse plus solide. Utilisez-la en appelant l’API avec le modèle « fusion ».",
+    "panelSource": "Source du panel",
+    "panelSourceHelp": "D’où proviennent les modèles du panel lorsqu’une requête n’en spécifie pas.",
+    "mode": {
+      "auto": "Auto (chaîne de repli)",
+      "autoHelp": "Sélectionne un ensemble varié de modèles depuis votre chaîne de repli, classés selon votre stratégie de routage active.",
+      "explicit": "Panel explicite",
+      "explicitHelp": "Toujours utiliser les modèles spécifiques que vous choisissez ci-dessous."
+    },
+    "panelModels": "Modèles du panel",
+    "selectedCount": "{count} sur {max} sélectionnés",
+    "noModels": "Aucun modèle connecté pour l’instant. Ajoutez une clé API, puis activez des modèles dans la chaîne de repli.",
+    "panelSize": "Taille du panel",
+    "panelSizeHelp": "Nombre de modèles variés à sélectionner automatiquement (1–{max}).",
+    "judge": "Modèle juge",
+    "judgeHelp": "Le modèle qui synthétise les réponses du panel en une seule. « Auto » utilise votre meilleur modèle disponible.",
+    "judgeAuto": "Auto (meilleur disponible)",
+    "strategy": "Stratégie",
+    "strategySynthesize": "Synthèse : fusionne le panel en une seule réponse",
+    "strategyBestOf": "Meilleure réponse : renvoie la réponse la plus solide (sans appel au juge)",
+    "strategySynthesizeShort": "Synthèse",
+    "strategyBestOfShort": "Meilleure réponse",
+    "exposePanel": "Exposer les détails du panel",
+    "exposePanelHelp": "Joint la réponse de chaque modèle et les métadonnées du juge dans un champ x_fusion de la réponse.",
+    "howToUse": "Comment l’utiliser",
+    "howToUseHelp": "Envoyez une requête de chat normale avec le modèle « fusion ». Ces réglages sont les valeurs par défaut ; toute requête peut les remplacer via un champ « fusion ».",
+    "unsavedChanges": "Modifications non enregistrées",
+    "save": "Enregistrer"
   },
   "premium": {
     "title": "Premium",

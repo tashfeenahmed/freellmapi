@@ -66,7 +66,9 @@
   "models": {
     "title": "Modelos",
     "chatModelsTab": "Modelos de chat",
+    "fusionTab": "Fusión",
     "embeddingsTab": "Embeddings",
+    "newBadge": "Nuevo",
     "monthlyTokenBudget": "Presupuesto mensual de tokens",
     "remaining": "restante",
     "of": "de",
@@ -240,6 +242,7 @@
     "title": "Entorno de pruebas",
     "description": "Envía una finalización de chat a través del enrutador y observa qué proveedor la atiende.",
     "autoModel": "Auto (cadena de reserva)",
+    "fusionModel": "Fusión (síntesis multimodelo)",
     "send": "Enviar",
     "sending": "Enviando…",
     "clear": "Limpiar",
@@ -250,6 +253,11 @@
     "copyReply": "Copiar respuesta",
     "fallback": "reserva",
     "fallbacks": "reservas",
+    "fusionPanel": "Panel",
+    "fusionJudge": "Juez",
+    "fusionTrace": "{count} respuestas de modelos",
+    "fusionFailed": "sin respuesta",
+    "fusionJudgeSynth": "sintetizó la respuesta final",
     "errorPrefix": "Error:"
   },
   "embeddings": {
@@ -266,6 +274,37 @@
     "saveChanges": "Guardar cambios",
     "savingChanges": "Guardando…",
     "tokMax": "{tokens} tok máx."
+  },
+  "fusion": {
+    "title": "Fusión",
+    "description": "Un panel de modelos responde en paralelo y luego un juez sintetiza una respuesta más sólida. Úsala llamando a la API con el modelo «fusion».",
+    "panelSource": "Origen del panel",
+    "panelSourceHelp": "De dónde provienen los modelos del panel cuando una solicitud no especifica los suyos.",
+    "mode": {
+      "auto": "Auto (cadena de reserva)",
+      "autoHelp": "Elige un conjunto diverso de modelos de tu cadena de reserva, ordenados según tu estrategia de enrutamiento activa.",
+      "explicit": "Panel explícito",
+      "explicitHelp": "Usar siempre los modelos específicos que elijas a continuación."
+    },
+    "panelModels": "Modelos del panel",
+    "selectedCount": "{count} de {max} seleccionados",
+    "noModels": "Aún no hay modelos conectados. Añade una clave API y luego activa modelos en la cadena de reserva.",
+    "panelSize": "Tamaño del panel",
+    "panelSizeHelp": "Cuántos modelos diversos seleccionar automáticamente (1–{max}).",
+    "judge": "Modelo juez",
+    "judgeHelp": "El modelo que sintetiza las respuestas del panel en una sola. «Auto» usa tu mejor modelo disponible.",
+    "judgeAuto": "Auto (mejor disponible)",
+    "strategy": "Estrategia",
+    "strategySynthesize": "Síntesis: combina el panel en una sola respuesta",
+    "strategyBestOf": "Mejor respuesta: devuelve la respuesta más sólida (sin llamar al juez)",
+    "strategySynthesizeShort": "Síntesis",
+    "strategyBestOfShort": "Mejor respuesta",
+    "exposePanel": "Exponer detalles del panel",
+    "exposePanelHelp": "Adjunta la respuesta de cada modelo y los metadatos del juez en un campo x_fusion de la respuesta.",
+    "howToUse": "Cómo usarlo",
+    "howToUseHelp": "Envía una solicitud de chat normal con el modelo «fusion». Estos ajustes son los predeterminados; cualquier solicitud puede anularlos con un campo «fusion».",
+    "unsavedChanges": "Cambios sin guardar",
+    "save": "Guardar"
   },
   "premium": {
     "title": "Premium",

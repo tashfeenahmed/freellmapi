@@ -66,7 +66,9 @@
   "models": {
     "title": "模型",
     "chatModelsTab": "对话模型",
+    "fusionTab": "融合",
     "embeddingsTab": "嵌入模型",
+    "newBadge": "新",
     "monthlyTokenBudget": "每月令牌额度",
     "remaining": "剩余",
     "of": "共",
@@ -240,6 +242,7 @@
     "title": "试玩台",
     "description": "通过路由器发送一次对话补全请求,看看是哪个提供商在服务。",
     "autoModel": "自动(回退链)",
+    "fusionModel": "融合(多模型综合)",
     "send": "发送",
     "sending": "发送中…",
     "clear": "清空",
@@ -250,6 +253,11 @@
     "copyReply": "复制回复",
     "fallback": "次回退",
     "fallbacks": "次回退",
+    "fusionPanel": "模型组",
+    "fusionJudge": "评审",
+    "fusionTrace": "{count} 个模型的回答",
+    "fusionFailed": "无回应",
+    "fusionJudgeSynth": "综合出最终答案",
     "errorPrefix": "错误:"
   },
   "embeddings": {
@@ -266,6 +274,37 @@
     "saveChanges": "保存修改",
     "savingChanges": "保存中…",
     "tokMax": "最多 {tokens} tok"
+  },
+  "fusion": {
+    "title": "融合",
+    "description": "由一组模型并行作答，再由评审模型综合出更优的答案。在调用 API 时将 model 设为 “fusion” 即可使用。",
+    "panelSource": "模型组来源",
+    "panelSourceHelp": "当请求未自行指定时，模型组所采用的来源。",
+    "mode": {
+      "auto": "自动(回退链)",
+      "autoHelp": "从你的回退链中挑选一组多样化的模型，并按当前启用的路由策略排序。",
+      "explicit": "指定模型组",
+      "explicitHelp": "始终使用你在下方选择的特定模型。"
+    },
+    "panelModels": "组内模型",
+    "selectedCount": "已选择 {count} / {max}",
+    "noModels": "尚未连接任何模型。请先添加 API 密钥，然后在回退链中启用模型。",
+    "panelSize": "模型组规模",
+    "panelSizeHelp": "自动挑选的多样化模型数量(1–{max})。",
+    "judge": "评审模型",
+    "judgeHelp": "将模型组的回答综合为一个答案的模型。“自动”会使用你排名最高的可用模型。",
+    "judgeAuto": "自动(排名最高的可用模型)",
+    "strategy": "策略",
+    "strategySynthesize": "综合：将模型组的回答融合为一个答案",
+    "strategyBestOf": "择优：返回单个最强的答案(不调用评审)",
+    "strategySynthesizeShort": "综合",
+    "strategyBestOfShort": "择优",
+    "exposePanel": "暴露模型组细节",
+    "exposePanelHelp": "在响应的 x_fusion 字段中附上每个模型的回答以及评审的元数据。",
+    "howToUse": "如何使用",
+    "howToUseHelp": "发送普通的对话请求，并将 model 设为 “fusion”。这些设置为默认值；任何请求都可以通过 “fusion” 字段覆盖它们。",
+    "unsavedChanges": "有未保存的更改",
+    "save": "保存"
   },
   "premium": {
     "title": "高级版",

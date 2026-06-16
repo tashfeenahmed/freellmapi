@@ -66,7 +66,9 @@
   "models": {
     "title": "Modelos",
     "chatModelsTab": "Modelos de chat",
+    "fusionTab": "Fusão",
     "embeddingsTab": "Embeddings",
+    "newBadge": "Novo",
     "monthlyTokenBudget": "Orçamento mensal de tokens",
     "remaining": "restante",
     "of": "de",
@@ -240,6 +242,7 @@
     "title": "Playground",
     "description": "Envie uma conclusão de chat pelo roteador e veja qual provedor a atende.",
     "autoModel": "Auto (cadeia de fallback)",
+    "fusionModel": "Fusão (síntese multimodelo)",
     "send": "Enviar",
     "sending": "Enviando…",
     "clear": "Limpar",
@@ -250,6 +253,11 @@
     "copyReply": "Copiar resposta",
     "fallback": "fallback",
     "fallbacks": "fallbacks",
+    "fusionPanel": "Painel",
+    "fusionJudge": "Juiz",
+    "fusionTrace": "{count} respostas de modelos",
+    "fusionFailed": "sem resposta",
+    "fusionJudgeSynth": "sintetizou a resposta final",
     "errorPrefix": "Erro:"
   },
   "embeddings": {
@@ -266,6 +274,37 @@
     "saveChanges": "Salvar alterações",
     "savingChanges": "Salvando…",
     "tokMax": "{tokens} tok máx."
+  },
+  "fusion": {
+    "title": "Fusão",
+    "description": "Um painel de modelos responde em paralelo e, em seguida, um juiz sintetiza uma resposta mais forte. Use-a chamando a API com o modelo \"fusion\".",
+    "panelSource": "Origem do painel",
+    "panelSourceHelp": "De onde vêm os modelos do painel quando uma requisição não especifica os seus.",
+    "mode": {
+      "auto": "Auto (cadeia de fallback)",
+      "autoHelp": "Escolhe um conjunto diverso de modelos da sua cadeia de fallback, ordenados pela sua estratégia de roteamento ativa.",
+      "explicit": "Painel explícito",
+      "explicitHelp": "Sempre usar os modelos específicos que você escolher abaixo."
+    },
+    "panelModels": "Modelos do painel",
+    "selectedCount": "{count} de {max} selecionados",
+    "noModels": "Nenhum modelo conectado ainda. Adicione uma chave de API e depois ative modelos na cadeia de fallback.",
+    "panelSize": "Tamanho do painel",
+    "panelSizeHelp": "Quantos modelos diversos selecionar automaticamente (1–{max}).",
+    "judge": "Modelo juiz",
+    "judgeHelp": "O modelo que sintetiza as respostas do painel em uma só. \"Auto\" usa o seu melhor modelo disponível.",
+    "judgeAuto": "Auto (melhor disponível)",
+    "strategy": "Estratégia",
+    "strategySynthesize": "Síntese: combina o painel em uma única resposta",
+    "strategyBestOf": "Melhor resposta: retorna a resposta mais forte (sem chamar o juiz)",
+    "strategySynthesizeShort": "Síntese",
+    "strategyBestOfShort": "Melhor resposta",
+    "exposePanel": "Expor detalhes do painel",
+    "exposePanelHelp": "Anexa a resposta de cada modelo e os metadados do juiz em um campo x_fusion na resposta.",
+    "howToUse": "Como usar",
+    "howToUseHelp": "Envie uma requisição de chat normal com o modelo \"fusion\". Estas configurações são o padrão; qualquer requisição pode sobrescrevê-las com um campo \"fusion\".",
+    "unsavedChanges": "Alterações não salvas",
+    "save": "Salvar"
   },
   "premium": {
     "title": "Premium",
