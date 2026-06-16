@@ -180,25 +180,14 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
 
   const db = getDb();
   const upsert = db.transaction(() => {
-    // One 'custom' key row PER ENDPOINT (matched on base_url). Re-submitting
-    // the same endpoint updates its key/label; a new base_url gets its own
-    // row instead of clobbering the previous provider. (#212)
-    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = ? LIMIT 1")
-      .get(baseUrl) as { id: number } | undefined;
-    let keyId: number;
-    if (existing) {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      db.prepare("UPDATE api_keys SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-        .run(label, encrypted, iv, authTag, existing.id);
-      keyId = existing.id;
-    } else {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      const r = db.prepare(`
-        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
-        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label, encrypted, iv, authTag, baseUrl);
-      keyId = Number(r.lastInsertRowid);
-    }
+    // Every custom submission creates a new key row so users can have
+    // multiple keys for the same base_url (like every other platform).
+    const { encrypted, iv, authTag } = encrypt(rawKey);
+    const r = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+      VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
+    `).run(label, encrypted, iv, authTag, baseUrl);
+    const keyId = Number(r.lastInsertRowid);
 
     const registered: { modelDbId: number; model: string; displayName: string }[] = [];
     for (const { modelId, displayName } of entries) {
@@ -206,6 +195,11 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
       // rate limits and sort last in the intelligence preset (size_label tier).
       // Re-registering an existing model id re-binds it (model ids are unique
       // per platform, so one id can't live on two endpoints at once).
+      // Prefixed model_id keeps different keys' models distinct under
+      // UNIQUE(platform, model_id). Re-registering the same model on the
+      // same key updates the existing row (ON CONFLICT); a new key creates
+      // a fresh row with no conflict.
+      const scopedModelId = `${keyId}-${modelId}`;
       db.prepare(`
         INSERT INTO models
           (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
@@ -213,9 +207,9 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
         VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
         ON CONFLICT(platform, model_id)
         DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
-      `).run(modelId, displayName, keyId);
+      `).run(scopedModelId, displayName, keyId);
 
-      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
+      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(scopedModelId) as { id: number };
 
       // Append to the fallback chain if not already present.
       const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);

@@ -326,6 +326,7 @@ function scoreChainEntry(
   intelMin: number,
   intelMax: number,
   sampled: boolean,
+  keyCounts?: Map<string, number>,
 ): ScoredEntry {
   const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
   const successes = stats?.successes ?? 0;
@@ -344,7 +345,11 @@ function scoreChainEntry(
     intelligenceComposite(entry.size_label, entry.intelligence_rank), intelMin, intelMax,
   );
 
-  const budget = parseBudget(entry.monthly_token_budget);
+  // Custom models bind to exactly one key each, so their budget shouldn't
+  // be multiplied by the platform key count. Other platforms' budgets scale
+  // with the number of enabled keys.
+  const keyCount = entry.platform === 'custom' ? 1 : (keyCounts?.get(entry.platform) ?? 1);
+  const budget = parseBudget(entry.monthly_token_budget) * keyCount;
   const headroom = headroomFactor(stats?.monthlyUsedTokens ?? 0, budget);
   const rl = rateLimitFactor(getPenalty(entry.model_db_id));
 
@@ -358,7 +363,7 @@ function scoreChainEntry(
  *  - bandit strategy      → Thompson-sampled convex score, manual priority as
  *                           the deterministic tiebreaker for (near-)equal scores.
  */
-function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
+function orderChain(chain: ChainRow[], strategy: RoutingStrategy, keyCounts?: Map<string, number>): ChainRow[] {
   const weights = weightsFor(strategy);
   if (!weights) {
     // Legacy priority mode: base priority + 429 penalty, ascending.
@@ -373,7 +378,7 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
   const intelMax = composites.length ? Math.max(...composites) : 0;
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true, keyCounts).score }))
     // Higher score first; manual priority breaks ties so the chain still matters.
     .sort((a, b) => b.s - a.s || a.e.priority - b.e.priority)
     .map(x => x.e);
@@ -532,7 +537,15 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
   const chain = prefetchedChain ?? getActiveChain(db).filter(e => e.enabled);
 
-  const sortedChain = orderChain(chain, strategy);
+  // Per-platform enabled key count — used to scale monthly_token_budget
+  // so headroom protection reflects real available quota with multiple keys.
+  const keyCounts = new Map<string, number>();
+  const cntRows = db.prepare(
+    "SELECT platform, COUNT(*) as cnt FROM api_keys WHERE enabled = 1 GROUP BY platform",
+  ).all() as Array<{ platform: string; cnt: number }>;
+  for (const row of cntRows) keyCounts.set(row.platform, row.cnt);
+
+  const sortedChain = orderChain(chain, strategy, keyCounts);
 
   // Sticky session / Explicit pinning: move preferred model to front of chain
   if (preferredModelDbId) {
@@ -731,8 +744,14 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   const intelMin = composites.length ? Math.min(...composites) : 0;
   const intelMax = composites.length ? Math.max(...composites) : 0;
 
+  const kcRows = db.prepare(
+    "SELECT platform, COUNT(*) as cnt FROM api_keys WHERE enabled = 1 GROUP BY platform",
+  ).all() as Array<{ platform: string; cnt: number }>;
+  const kc = new Map<string, number>();
+  for (const row of kcRows) kc.set(row.platform, row.cnt);
+
   const scores: RoutingScore[] = chain.map(entry => {
-    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false);
+    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false, kc);
     const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
     return {
       modelDbId: entry.model_db_id,
