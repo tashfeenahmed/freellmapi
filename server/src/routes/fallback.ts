@@ -228,16 +228,34 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
 
   if (activeProfile) {
-    // Profile mode: use profile_models chain (all models in profile, checked against enabled)
-    rawModels = db.prepare(`
+    // Profile mode: include both the user's profile models AND all fallback_config
+    // models (token budget is about the total model pool, not just the active
+    // profile). Deduplicate by model_db_id — profile rows take priority for
+    // the `enabled` and `priority` fields.
+    const profileModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
              pm.priority, pm.enabled,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id
       WHERE pm.profile_id = ? AND m.enabled = 1
-      ORDER BY pm.priority ASC
     `).all(activeProfileId) as any[];
+
+    const fallbackModels = db.prepare(`
+      SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
+             fc.priority, fc.enabled,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
+      FROM fallback_config fc
+      JOIN models m ON m.id = fc.model_db_id
+      WHERE m.enabled = 1
+    `).all() as any[];
+
+    const seen = new Set<number>();
+    rawModels = [];
+    for (const m of profileModels) { seen.add(m.model_db_id); rawModels.push(m); }
+    for (const m of fallbackModels) {
+      if (!seen.has(m.model_db_id)) { seen.add(m.model_db_id); rawModels.push(m); }
+    }
   } else {
     // Default mode: use fallback_config (only include enabled models)
     rawModels = db.prepare(`

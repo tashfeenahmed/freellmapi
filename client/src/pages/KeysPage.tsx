@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
-import { Pencil, ExternalLink, Globe } from 'lucide-react'
+import { Pencil, ExternalLink, Globe, Download, Upload } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -386,7 +386,45 @@ export default function KeysPage() {
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [importing, setImporting] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleExport() {
+    try {
+      const data = await apiFetch<{ version: number; exportedAt: string; keys: unknown[] }>('/api/keys/export')
+      const json = JSON.stringify(data, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const today = new Date().toISOString().slice(0, 10)
+      a.download = `freellmapi-keys-${today}.json`
+      a.href = url
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+    }
+  }
+
+  async function handleImport(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const result = await apiFetch<{ imported: number; updated: number }>('/api/keys/import', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      alert(`Imported: ${result.imported}, Updated: ${result.updated}`)
+    } catch (e) {
+      alert(`Import failed: ${e instanceof Error ? e.message : 'Invalid file'}`)
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -530,11 +568,30 @@ export default function KeysPage() {
         title={t('keys.pageTitle')}
         description={t('keys.pageDescription')}
         actions={
-          keys.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
-              {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
+          <div className="flex items-center gap-2">
+            {keys.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="size-3.5 mr-1" />
+                Export
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              <Upload className="size-3.5 mr-1" />
+              {importing ? 'Importing...' : 'Import'}
             </Button>
-          )
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = '' }}
+            />
+            {keys.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
+                {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
+              </Button>
+            )}
+          </div>
         }
       />
 

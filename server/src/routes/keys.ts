@@ -304,6 +304,93 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
 
+// ── Export / Import API keys ──────────────────────────────────────────────
+
+// GET /export → decrypt all keys and return as downloadable JSON.
+keysRouter.get('/export', (_req: Request, res: Response) => {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT platform, label, encrypted_key, iv, auth_tag, enabled, created_at FROM api_keys ORDER BY platform, created_at',
+  ).all() as any[];
+
+  const keys = rows.map(row => {
+    let key = '';
+    try {
+      key = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    } catch {
+      key = '[decrypt failed]';
+    }
+    return {
+      platform: row.platform,
+      label: row.label,
+      key,
+      enabled: row.enabled === 1,
+      createdAt: row.created_at,
+    };
+  });
+
+  const now = new Date().toISOString();
+  const filename = `freellmapi-keys-${now.slice(0, 10)}.json`;
+
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.json({ version: 1, exportedAt: now, keys });
+});
+
+// POST /import → accept JSON, encrypt and upsert keys by platform + label.
+const importKeyEntrySchema = z.object({
+  platform: z.string(),
+  label: z.string(),
+  key: z.string(),
+  enabled: z.boolean().optional(),
+});
+
+const importKeysSchema = z.object({
+  version: z.number().optional(),
+  keys: z.array(importKeyEntrySchema),
+});
+
+keysRouter.post('/import', (req: Request, res: Response) => {
+  const parsed = importKeysSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  const db = getDb();
+  let imported = 0;
+  let updated = 0;
+
+  const upsert = db.transaction(() => {
+    const findByPlatformLabel = db.prepare(
+      'SELECT id FROM api_keys WHERE platform = ? AND label = ? LIMIT 1',
+    );
+    const insertStmt = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+    `);
+    const updateStmt = db.prepare(
+      'UPDATE api_keys SET encrypted_key = ?, iv = ?, auth_tag = ?, enabled = ? WHERE id = ?',
+    );
+
+    for (const entry of parsed.data.keys) {
+      const { encrypted, iv, authTag } = encrypt(entry.key);
+      const existing = findByPlatformLabel.get(entry.platform, entry.label) as { id: number } | undefined;
+
+      if (existing) {
+        updateStmt.run(encrypted, iv, authTag, entry.enabled !== false ? 1 : 0, existing.id);
+        updated++;
+      } else {
+        insertStmt.run(entry.platform, entry.label, encrypted, iv, authTag, entry.enabled !== false ? 1 : 0);
+        imported++;
+      }
+    }
+  });
+
+  upsert();
+
+  res.json({ imported, updated, skipped: 0 });
+});
+
 // Update key (toggle enable/disable or edit label)
 keysRouter.patch('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
