@@ -1,0 +1,22 @@
+{
+  "name": "@freellmapi/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "diff": "^7.0.0",
+    "openai": "^4.85.4",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/diff": "^6.0.0",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
