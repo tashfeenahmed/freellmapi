@@ -1,6 +1,6 @@
 services:
   freellmapi:
-    image: ghcr.io/tashfeenahmed/freellmapi:latest
+    image: ghcr.io/wangzhenhui1992/freellmapi:latest
     build:
       context: .
       dockerfile: Dockerfile
