@@ -50,3 +50,44 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
 
   res.json(result);
 });
+
+// Delete a custom model (only custom models can be deleted by the user)
+modelsRouter.delete('/:id', (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: { message: 'Invalid ID' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT platform, key_id FROM models WHERE id = ?").get(id) as { platform: string; key_id: number | null } | undefined;
+  
+  if (!row) {
+    res.status(404).json({ error: { message: 'Model not found' } });
+    return;
+  }
+
+  if (row.platform !== 'custom') {
+    res.status(403).json({ error: { message: 'Only custom models can be deleted' } });
+    return;
+  }
+
+  const remove = db.transaction(() => {
+    // 1. Remove from fallback_config
+    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+    
+    // 2. Remove from models
+    db.prepare('DELETE FROM models WHERE id = ?').run(id);
+    
+    // 3. Clean up the parent api_key if it was the last model using it
+    if (row.key_id != null) {
+      const remainingModels = db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'custom' AND key_id = ?").get(row.key_id) as { n: number };
+      if (remainingModels.n === 0) {
+        db.prepare('DELETE FROM api_keys WHERE id = ?').run(row.key_id);
+      }
+    }
+  });
+  
+  remove();
+  res.json({ success: true });
+});

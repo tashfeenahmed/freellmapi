@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
-import { Pencil, ExternalLink, Globe } from 'lucide-react'
+import { Pencil, ExternalLink, Globe, Trash2 } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -385,7 +385,18 @@ export default function KeysPage() {
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteModelId, setConfirmDeleteModelId] = useState<number | null>(null)
+  const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
   const editInputRef = useRef<HTMLInputElement>(null)
+
+  const toggleExpanded = (id: number) => {
+    setExpandedKeyIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -445,6 +456,15 @@ export default function KeysPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+  })
+
+  const deleteModel = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/models/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
   })
@@ -658,7 +678,16 @@ export default function KeysPage() {
                       const lastChecked = h?.lastCheckedAt
                       const isEditing = editingKeyId === k.id
                       return (
-                        <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <Fragment key={k.id}>
+                          <div 
+                            className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${k.models && k.models.length > 0 ? 'cursor-pointer' : ''}`}
+                            onClick={(e) => {
+                              if ((e.target as HTMLElement).closest('button, input')) return;
+                              if (k.models && k.models.length > 0) {
+                                toggleExpanded(k.id)
+                              }
+                            }}
+                          >
                           <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
                           <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
                           {isEditing ? (
@@ -676,7 +705,8 @@ export default function KeysPage() {
                             />
                           ) : (
                             <>
-                              {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                              {k.label && <span className="text-xs text-muted-foreground font-medium">{k.label}</span>}
+                              {k.baseUrl && <span className="text-xs text-muted-foreground font-mono ml-2 truncate max-w-[200px]" title={k.baseUrl}>{k.baseUrl}</span>}
                             </>
                           )}
                           <span className="text-xs text-muted-foreground">{statusLabelKey[status] ? t(statusLabelKey[status]) : status}</span>
@@ -704,16 +734,42 @@ export default function KeysPage() {
                                 setConfirmDeleteId(null)
                               } else {
                                 setConfirmDeleteId(k.id)
-                                setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
+                                setTimeout(() => setConfirmDeleteId(null), 3000)
                               }
                             }}
                             disabled={deleteKey.isPending}
                           >
-                            {confirmDeleteId === k.id ? t('keys.confirmRemove') : t('common.remove')}
+                            {confirmDeleteId === k.id ? t('common.confirm') : <Trash2 className="size-3" />}
                           </Button>
                         </div>
-                      )
-                    })}
+                        {k.models && k.models.length > 0 && expandedKeyIds.has(k.id) && (
+                          <div className="px-4 py-2 bg-muted/20 border-t flex flex-wrap gap-2">
+                            {k.models.map(m => (
+                              <div key={m.id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border bg-background text-[11px] text-muted-foreground">
+                                <span className="font-medium" title={m.modelId}>{m.displayName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirmDeleteModelId === m.id) {
+                                      deleteModel.mutate(m.id)
+                                      setConfirmDeleteModelId(null)
+                                    } else {
+                                      setConfirmDeleteModelId(m.id)
+                                      setTimeout(() => setConfirmDeleteModelId(null), 3000)
+                                    }
+                                  }}
+                                  disabled={deleteModel.isPending}
+                                  className={confirmDeleteModelId === m.id ? 'text-destructive font-medium ml-1 transition-colors' : 'text-muted-foreground/50 hover:text-destructive transition-colors ml-1'}
+                                >
+                                  {confirmDeleteModelId === m.id ? t('common.confirm') : <Trash2 className="size-2.5" />}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </Fragment>
+                    )
+                  })}
                   </div>
                 </div>
               ))}

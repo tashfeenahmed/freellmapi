@@ -37,6 +37,19 @@ keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[];
 
+  // Attach custom models to their respective keys so the frontend can display and manage them
+  const customModels = db.prepare("SELECT id, model_id, display_name, key_id FROM models WHERE platform = 'custom'").all() as any[];
+  const modelsByKeyId = new Map<number, any[]>();
+  for (const m of customModels) {
+    if (m.key_id == null) continue;
+    let list = modelsByKeyId.get(m.key_id);
+    if (!list) {
+      list = [];
+      modelsByKeyId.set(m.key_id, list);
+    }
+    list.push({ id: m.id, modelId: m.model_id, displayName: m.display_name });
+  }
+
   const keys = rows.map(row => {
     let maskedKey = '****';
     try {
@@ -55,6 +68,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       enabled: row.enabled === 1,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
+      models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) || []) : undefined,
     };
   });
 
