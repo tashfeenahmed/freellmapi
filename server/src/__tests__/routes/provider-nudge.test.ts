@@ -45,4 +45,27 @@ describe('provider key-nudge routes', () => {
     expect(body.unconfiguredProviders.some((p: any) => p.platform === 'groq')).toBe(true);
     expect(body.nudgeState).toEqual({ disabled: false, muted: [], snoozed: [] });
   });
+
+  it('POST /api/keys/nudge mute adds a platform; reflected in nudgeState', async () => {
+    const r = await request(app, 'POST', '/api/keys/nudge', { scope: 'mute', platform: 'groq' });
+    expect(r.status).toBe(200);
+    const { body } = await request(app, 'GET', '/api/health');
+    expect(body.nudgeState.muted).toContain('groq');
+  });
+
+  it('POST /api/keys/nudge disable sets the flag', async () => {
+    await request(app, 'POST', '/api/keys/nudge', { scope: 'disable' });
+    const { body } = await request(app, 'GET', '/api/health');
+    expect(body.nudgeState.disabled).toBe(true);
+  });
+
+  it('POST /api/keys/nudge mute without platform → 400', async () => {
+    const r = await request(app, 'POST', '/api/keys/nudge', { scope: 'mute' });
+    expect(r.status).toBe(400);
+  });
+
+  it('POST /api/keys/nudge with unknown scope → 400', async () => {
+    const r = await request(app, 'POST', '/api/keys/nudge', { scope: 'bogus' });
+    expect(r.status).toBe(400);
+  });
 });
