@@ -4,8 +4,30 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { dismissNudge, pruneNudgeState } from '../services/provider-nudge.js';
 
 export const keysRouter = Router();
+
+const nudgeSchema = z.object({
+  scope: z.enum(['snooze', 'mute', 'disable']),
+  platform: z.string().min(1).optional(),
+});
+
+// Dismiss the unconfigured-provider nudge. Body: { scope, platform? }.
+keysRouter.post('/nudge', (req: Request, res: Response) => {
+  const parsed = nudgeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+  const { scope, platform } = parsed.data;
+  if (scope === 'mute' && !platform) {
+    res.status(400).json({ error: { message: 'platform is required to mute' } });
+    return;
+  }
+  dismissNudge(scope, platform);
+  res.json({ ok: true });
+});
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
