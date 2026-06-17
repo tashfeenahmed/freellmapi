@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
-import { getUnconfiguredProviders } from '../../services/provider-nudge.js';
+import {
+  getUnconfiguredProviders,
+  getNudgeState,
+  dismissNudge,
+  pruneNudgeState,
+} from '../../services/provider-nudge.js';
 
 describe('getUnconfiguredProviders', () => {
   beforeEach(() => {
@@ -29,5 +34,49 @@ describe('getUnconfiguredProviders', () => {
       "INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, enabled) VALUES ('bogus','m','M',1,1,1)",
     ).run();
     expect(getUnconfiguredProviders().some(p => p.platform === 'bogus')).toBe(false);
+  });
+});
+
+describe('nudge state', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  it('defaults to empty/disabled-false', () => {
+    expect(getNudgeState()).toEqual({ disabled: false, muted: [], snoozed: [] });
+  });
+
+  it('mute adds one platform; disable sets the flag', () => {
+    dismissNudge('mute', 'groq');
+    expect(getNudgeState().muted).toEqual(['groq']);
+    dismissNudge('disable');
+    expect(getNudgeState().disabled).toBe(true);
+  });
+
+  it('mute without a platform throws', () => {
+    expect(() => dismissNudge('mute')).toThrow();
+  });
+
+  it('snooze snapshots raw-unconfigured minus muted', () => {
+    dismissNudge('mute', 'groq');
+    dismissNudge('snooze');
+    const { snoozed } = getNudgeState();
+    expect(snoozed).not.toContain('groq');   // excluded (muted)
+    expect(snoozed).toContain('cerebras');   // a seeded unconfigured provider
+  });
+
+  it('pruneNudgeState clears a platform from muted and snoozed', () => {
+    dismissNudge('mute', 'groq');
+    dismissNudge('snooze'); // snoozes cerebras et al.
+    pruneNudgeState('cerebras');
+    expect(getNudgeState().snoozed).not.toContain('cerebras');
+    pruneNudgeState('groq');
+    expect(getNudgeState().muted).not.toContain('groq');
+  });
+
+  it('corrupt settings JSON degrades to empty arrays', () => {
+    getDb().prepare("INSERT INTO settings (key, value) VALUES ('nudge_muted_platforms', 'not json')").run();
+    expect(getNudgeState().muted).toEqual([]);
   });
 });
