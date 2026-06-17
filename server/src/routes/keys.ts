@@ -112,6 +112,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     const existing = db.prepare('SELECT id FROM api_keys WHERE platform = ? LIMIT 1').get(platform) as { id: number } | undefined;
     if (existing) {
       db.prepare("UPDATE api_keys SET enabled = 1, status = 'unknown' WHERE id = ?").run(existing.id);
+      pruneNudgeState(platform);
       res.status(200).json({
         id: existing.id,
         platform,
@@ -130,6 +131,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     VALUES (?, ?, ?, ?, ?, 'unknown', 1)
   `).run(platform, label ?? '', encrypted, iv, authTag);
 
+  pruneNudgeState(platform);
   res.status(201).json({
     id: result.lastInsertRowid,
     platform,

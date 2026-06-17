@@ -68,4 +68,17 @@ describe('provider key-nudge routes', () => {
     const r = await request(app, 'POST', '/api/keys/nudge', { scope: 'bogus' });
     expect(r.status).toBe(400);
   });
+
+  it('adding a key prunes the provider from snooze + drops it from unconfigured', async () => {
+    await request(app, 'POST', '/api/keys/nudge', { scope: 'snooze' });
+    let health = (await request(app, 'GET', '/api/health')).body;
+    expect(health.nudgeState.snoozed).toContain('groq');
+
+    const add = await request(app, 'POST', '/api/keys', { platform: 'groq', key: 'k_groq_nudge', label: 'x' });
+    expect(add.status).toBe(201);
+
+    health = (await request(app, 'GET', '/api/health')).body;
+    expect(health.nudgeState.snoozed).not.toContain('groq'); // pruned
+    expect(health.unconfiguredProviders.some((p: any) => p.platform === 'groq')).toBe(false); // now has a key
+  });
 });
