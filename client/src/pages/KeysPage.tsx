@@ -571,7 +571,7 @@ export default function KeysPage() {
               <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                 {t('keys.nudgeAddKey')}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-auto">
                 {bannerProviders.map(p => (
                   <DropdownMenuItem
                     key={p.platform}
@@ -589,7 +589,7 @@ export default function KeysPage() {
               <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                 {t('keys.nudgeDismiss')}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-auto">
                 <DropdownMenuItem onClick={() => dismissNudge.mutate({ scope: 'snooze' })}>
                   {t('keys.nudgeSnooze')}
                 </DropdownMenuItem>
@@ -624,7 +624,7 @@ export default function KeysPage() {
                 <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder={t('keys.selectPlatform')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-auto min-w-[220px]">
                   {PLATFORMS.map(p => {
                     const models = unconfiguredByPlatform.get(p.value)
                     return (
