@@ -205,6 +205,19 @@ register(new OpenAICompatProvider({
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
 // non-zero balance, which conflicts with the project's no-card criterion.
 
+// Reka — OpenAI-compatible (api.reka.ai/v1). Live-probed 2026-06-17: free via a
+// recurring monthly credit grant (no card; key from platform.reka.ai), billed
+// calls succeed with no 402. The OpenAI-compatible /v1/models lists two models:
+// reka-flash-3 (text reasoning) and reka-edge-2603 (natively multimodal —
+// accepts image/video input). Balance is dashboard-only (no credits API).
+// Catalog rows live in the catalog (premium → age into free); they are NOT
+// shipped as freeapi model migrations.
+register(new OpenAICompatProvider({
+  platform: 'reka',
+  name: 'Reka',
+  baseUrl: 'https://api.reka.ai/v1',
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.

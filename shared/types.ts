@@ -33,6 +33,10 @@ export type Platform =
   // its own proprietary Agnes models; the free key comes from
   // platform.agnes-ai.com (no card).
   | 'agnes'
+  // Reka — OpenAI-compatible. Native multimodal models (reka-edge takes
+  // image/video); free via a recurring monthly credit grant, key from
+  // platform.reka.ai (no card).
+  | 'reka'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

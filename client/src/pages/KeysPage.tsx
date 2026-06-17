@@ -55,6 +55,7 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'huggingface', label: 'HuggingFace Router', url: 'https://huggingface.co/settings/tokens' },
   { value: 'opencode', label: 'OpenCode Zen (free key)', url: 'https://opencode.ai/auth' },
   { value: 'agnes', label: 'Agnes AI (free key)', url: 'https://platform.agnes-ai.com' },
+  { value: 'reka', label: 'Reka (free key)', url: 'https://platform.reka.ai' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the
