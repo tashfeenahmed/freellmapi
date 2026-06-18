@@ -101,6 +101,9 @@ describe('Custom Provider Endpoints', () => {
     expect(key.base_url).toBe('http://127.0.0.1:11434/v1');
     const model = db.prepare("SELECT * FROM models WHERE platform = 'custom' AND model_id = ?").get(`${body.keyId}-qwen3:4b`) as any;
     expect(model).toBeDefined();
+    // #custom-platform-model-management — every custom model is maintainer-
+    // authored, so the row must carry source='user' to unlock PATCH/DELETE.
+    expect(model.source).toBe('user');
     const fc = db.prepare('SELECT * FROM fallback_config WHERE model_db_id = ?').get(model.id);
     expect(fc).toBeDefined();
   });

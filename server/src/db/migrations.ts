@@ -40,6 +40,10 @@ export function migrateDbSchema(db: Database.Database) {
   // V28 (June 2026): introduce `models.source` to distinguish the three write
   // paths (migration / catalog / user). Idempotent ALTER; safe on every run.
   ensureModelsSourceColumn(db);
+  // #custom-platform-model-management — every platform='custom' row is user-
+  // authored (catalog-sync never touches them), so backfill source='user' on
+  // any pre-existing rows so PATCH/DELETE work uniformly. Idempotent.
+  migrateCustomModelsSourceUser(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // shipped (June 2026), model/limit DATA is maintained in the published
   // catalog (served signed by the catalog service) and reaches installs via
@@ -55,6 +59,9 @@ export function migrateDbSchema(db: Database.Database) {
   migrateQuirksV1(db);
   ensureUnifiedKey(db);
   migrateProfilesInit(db);
+  // Drop legacy premium-tier settings rows left behind by older installs.
+  // Idempotent; safe on every boot.
+  migrateRemovePremiumSettings(db);
 }
 
 function createTables(db: Database.Database) {
@@ -259,6 +266,16 @@ function ensureModelsSourceColumn(db: Database.Database) {
   if (!columns.some(col => col.name === 'source')) {
     db.prepare(`ALTER TABLE models ADD COLUMN source TEXT NOT NULL DEFAULT 'migration'`).run();
   }
+}
+
+// #custom-platform-model-management — every custom row was authored by the
+// maintainer at POST /api/keys/custom time (catalog-sync never sees
+// platform='custom'). Pre-existing rows from before this change shipped
+// carry source='migration' from the V28 default backfill; rewrite them so
+// PATCH/DELETE on /api/models treats them like user rows. Idempotent: the
+// WHERE clause means a second run flips zero rows.
+function migrateCustomModelsSourceUser(db: Database.Database) {
+  db.prepare("UPDATE models SET source = 'user' WHERE platform = 'custom' AND source != 'user'").run();
 }
 
 function seedModels(db: Database.Database) {
@@ -2264,5 +2281,11 @@ function migrateProfilesInit(db: Database.Database) {
       WHERE type = 'default' AND emoji != '⚙️'
     `).run();
   }
+}
+
+function migrateRemovePremiumSettings(db: Database.Database) {
+  db.prepare(
+    "DELETE FROM settings WHERE key IN ('premium_license_key','premium_license_status','catalog_applied_tier')"
+  ).run();
 }
 

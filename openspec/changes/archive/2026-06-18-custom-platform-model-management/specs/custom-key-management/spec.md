@@ -1,42 +1,10 @@
-## Purpose
+<!-- 注意：以下英文区块标题与标记为 OpenSpec 解析器硬依赖，不能改成中文。正文内容请全部使用中文。 -->
 
-Custom API key management allows users to register OpenAI-compatible endpoints and bind models to specific keys. Each custom key independently holds its own model registrations.
-
-## Requirements
-
-### Requirement: Custom 平台支持同 base_url 多 key
-
-系统 SHALL 允许用户为同一个 `base_url` 添加多个独立的 API key，每次提交创建一个新的 key 行，不覆盖已有 key。
-
-#### Scenario: 同一 base_url 添加第二个 key
-- **WHEN** 用户已有 `base_url=http://localhost:11434/v1` 的 custom key，再提交相同 base_url 但不同 apiKey 的 custom 请求
-- **THEN** 系统创建一个新的 `api_keys` 行（新的 id、新的 encrypted_key），两个 key 互不覆盖
-
-#### Scenario: 同一 base_url 添加相同 key 值
-- **WHEN** 用户提交与已有 key 完全相同的 base_url 和 apiKey
-- **THEN** 系统仍然创建一个新的 `api_keys` 行（不检查 apiKey 重复）
-
-### Requirement: 不同 key 注册的同名 model 互不冲突
-
-系统 SHALL 确保不同 custom key 注册的同名 model（如两个 key 都注册 `qwen3:4b`）在 `models` 表中各自拥有独立的行，互不覆盖对方的 `key_id` 绑定。
-
-#### Scenario: 两个 key 注册同名 model
-- **WHEN** key A 注册了 model `qwen3:4b`，key B（同 base_url 不同 key）也注册 model `qwen3:4b`
-- **THEN** `models` 表中有两条 `platform='custom'`、不同 model_id 的行，各自绑定到正确的 key_id
-
-#### Scenario: 同一个 key 重新注册已存在的 model
-- **WHEN** key A 重新提交之前已注册的 model `qwen3:4b`（同 key_id、同原名）
-- **THEN** 系统更新该 model 行的 `display_name`、`key_id` 和 `enabled`，不创建新行
-
-### Requirement: 删除 custom key 仅影响自身绑定的 model
-
-系统 SHALL 在删除 custom key 时仅删除该 key 绑定的 model 行，不同 base_url 或同 base_url 的其他 key 的 model 不受影响。
-
-#### Scenario: 删除一个 key，兄弟 key 的 model 保持完整
-- **WHEN** 同 base_url 下存在 key A（注册了 model-a）和 key B（注册了 model-b），用户删除 key A
-- **THEN** model-a 被删除，model-b 继续存在且绑定到 key B
+## ADDED Requirements
 
 ### Requirement: Custom 模型创建路径标记 source='user'
+
+The system SHALL set `source = 'user'` when inserting or updating model rows via `POST /api/keys/custom`, and SHALL provide an idempotent backfill migration for existing `platform = 'custom'` rows.
 
 `POST /api/keys/custom` 在向 `models` 表插入或更新模型行时，SHALL 显式设置 `source = 'user'`。系统 SHALL 提供一次性数据回填 migration，将历史已存在的所有 `platform = 'custom'` 行的 `source` 字段更新为 `'user'`，且该 migration MUST 是幂等的（重复运行不产生差异）。
 
@@ -52,7 +20,11 @@ Custom API key management allows users to register OpenAI-compatible endpoints a
 - **WHEN** 升级 migration 运行第二次
 - **THEN** 没有任何行被修改（changes count = 0）
 
+---
+
 ### Requirement: POST /api/models 多 key 写入 custom 模型
+
+The system SHALL accept `{ keyIds: number[], modelId: string, displayName?: string }` on `POST /api/models` and SHALL write one model row per keyId in a single transaction, using UPDATE-on-conflict that only touches `display_name`.
 
 `POST /api/models` SHALL 接受新形态的请求体 `{ keyIds: number[], modelId: string, displayName?: string }`，用于一次性向同一 base_url 下多个 custom key 注册同名 model。系统 SHALL 在单个数据库事务内对每个 keyId 执行 INSERT；当 `(platform='custom', model_id='${keyId}-${modelId}')` 已存在时 SHALL 执行 UPDATE 仅覆盖 `display_name` 字段（不改 `enabled`、`key_id`、`source` 等其他字段）。响应体 SHALL 区分 `created: number[]`（新插入行的 id）与 `updated: number[]`（被覆盖 display_name 的已有行 id）。
 
@@ -88,7 +60,11 @@ Custom API key management allows users to register OpenAI-compatible endpoints a
 - **WHEN** keys [99] 属于 `platform='groq'`，用户 POST `{ keyIds: [99], modelId: 'X' }`
 - **THEN** 响应 SHALL 返回 400
 
+---
+
 ### Requirement: KeysPage 按 base_url 聚合 custom keys
+
+KeysPage SHALL group custom-platform keys by `base_url` into independent endpoint groups, each with header `Custom · ${base_url}`, and SHALL still render `CustomProviderSection` when no custom keys exist.
 
 `KeysPage` SHALL 在渲染 custom platform 的 keys 时，按 `base_url` 字段二次分组：每个唯一 `base_url` 渲染为一个独立的 group，header 显示 `Custom · ${base_url}`，下挂该 base_url 下所有 key 对应的 `KeyCard`。所有 custom endpoint groups SHALL 排在所有非 custom platform groups 之后。当用户没有任何 custom key 时，KeysPage SHALL 仍然显示 `CustomProviderSection`（创建 custom key 的表单）。
 
@@ -104,7 +80,11 @@ Custom API key management allows users to register OpenAI-compatible endpoints a
 - **WHEN** 用户尚未创建任何 custom key
 - **THEN** KeysPage SHALL 仍显示 `CustomProviderSection`（base URL + models textarea + apiKey 输入框 + 提交按钮）
 
+---
+
 ### Requirement: ManageModelsDrawer 支持 customEndpoint 模式
+
+ManageModelsDrawer props SHALL be a discriminated union type supporting both `kind: 'platform'` and `kind: 'customEndpoint'` modes. The customEndpoint mode SHALL render models grouped by `key_id`, showing only rows for the keys belonging to the given base_url.
 
 `ManageModelsDrawer` 的 props SHALL 是判别联合类型，至少包含 `kind: 'platform'`（普通 provider 模式）与 `kind: 'customEndpoint'`（custom 模式）两种形态。custom 模式下，Drawer SHALL 接受 `baseUrl: string` 与 `keys: ApiKey[]` 两个字段；列表 SHALL 仅展示 `platform = 'custom'` 且 `key_id IN keys.map(k => k.id)` 的 model 行；列表渲染 SHALL 按 `key_id` 分小段，每段 header 显示该 key 的 label。`KeysPage` SHALL 在以下三处入口打开同一个 Drawer 的 customEndpoint 模式：custom endpoint group header 上的「管理模型」按钮、该 group 下任一 KeyCard 上的「管理模型」按钮 —— 三处入口的 Drawer 内容 SHALL 完全相同（按 base_url 维度过滤）。
 
@@ -120,7 +100,11 @@ Custom API key management allows users to register OpenAI-compatible endpoints a
 - **WHEN** Drawer 渲染含 2 keys（key#11、key#12）的 customEndpoint
 - **THEN** 列表 SHALL 出现两个 section，section header 分别显示 key#11 与 key#12 的 label；同一 modelId 在两个 key 上注册时 SHALL 在各自的 section 内各显示一行（不去重合并）
 
+---
+
 ### Requirement: ManageModelsDrawer 添加模型双入口
+
+The customEndpoint mode of ManageModelsDrawer SHALL provide two equivalent add-model entry points (drawer-top and per-key-section), both opening the same `AddCustomModelDialog` component, differentiated by `defaultSelectedKeyIds`.
 
 `ManageModelsDrawer` 的 customEndpoint 模式 SHALL 提供两处对等的「添加模型」入口：① Drawer 顶部一个全局「添加模型」按钮；② 每个 key section 内一个「添加模型」按钮。两处入口 MUST 打开同一个 `AddCustomModelDialog` 对话框组件，且 SHALL 通过 `defaultSelectedKeyIds` prop 控制 keys 多选 checklist 的初始勾选状态：顶部入口默认勾选该 base_url 下**全部** keys，section 内入口默认仅勾选**该 section 对应的 key**。对话框 SHALL 包含「全选 / 全不选」便捷按钮。提交后调用 `POST /api/models` 并向用户披露 `created` 与 `updated` 行数（toast 或类似反馈）。
 

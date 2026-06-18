@@ -200,13 +200,16 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
       // same key updates the existing row (ON CONFLICT); a new key creates
       // a fresh row with no conflict.
       const scopedModelId = `${keyId}-${modelId}`;
+      // source='user' (#custom-platform-model-management) — every custom model
+      // is maintainer-added by definition, so PATCH/DELETE on it goes through
+      // the user-managed-models semantics (catalog-sync never touches platform=custom).
       db.prepare(`
         INSERT INTO models
           (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
-        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
+           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id, source)
+        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?, 'user')
         ON CONFLICT(platform, model_id)
-        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
+        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1, source = 'user'
       `).run(scopedModelId, displayName, keyId);
 
       const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(scopedModelId) as { id: number };

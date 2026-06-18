@@ -107,7 +107,116 @@ describe('Models API', () => {
     });
     expect(status).toBe(400);
     expect(body.error).toMatch(/custom/i);
+    expect(body.error).toMatch(/keyIds/);
   });
+
+  // ----------- POST keyIds[] form (custom multi-key write) ----------------
+  // #custom-platform-model-management. The same handler accepts
+  //   { keyIds: number[], modelId, displayName? }
+  // for platform='custom', writing one row per keyId.
+  describe('POST keyIds[] form', () => {
+    function createCustomKey(baseUrl: string, label = 'k') {
+      const db = getDb();
+      const r = db
+        .prepare(
+          `INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+           VALUES ('custom', ?, 'x', 'x', 'x', 'unknown', 1, ?)`,
+        )
+        .run(label, baseUrl);
+      return Number(r.lastInsertRowid);
+    }
+
+    it('creates one models row per keyId, all source=user', async () => {
+      const baseUrl = 'http://127.0.0.1:11434/v1';
+      const k1 = createCustomKey(baseUrl, 'A');
+      const k2 = createCustomKey(baseUrl, 'B');
+      const { status, body } = await request(app, 'POST', '/api/models', {
+        keyIds: [k1, k2],
+        modelId: 'qwen3:8b',
+        displayName: 'Qwen3 8B',
+      });
+      expect(status).toBe(200);
+      expect(body.created).toHaveLength(2);
+      expect(body.updated).toEqual([]);
+      const rows = getDb()
+        .prepare("SELECT id, source, key_id, display_name FROM models WHERE platform='custom' AND model_id IN (?, ?)")
+        .all(`${k1}-qwen3:8b`, `${k2}-qwen3:8b`) as { id: number; source: string; key_id: number; display_name: string }[];
+      expect(rows).toHaveLength(2);
+      for (const r of rows) {
+        expect(r.source).toBe('user');
+        expect(r.display_name).toBe('Qwen3 8B');
+      }
+      // Each new row gets a fallback_config entry.
+      for (const r of rows) {
+        expect(getDb().prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(r.id)).toBeTruthy();
+      }
+    });
+
+    it('UPDATEs existing rows on repeat submit and only touches display_name', async () => {
+      const baseUrl = 'http://127.0.0.1:11500/v1';
+      const k1 = createCustomKey(baseUrl);
+      const k2 = createCustomKey(baseUrl);
+      await request(app, 'POST', '/api/models', { keyIds: [k1, k2], modelId: 'm', displayName: 'M v1' });
+      // Disable one row to verify ON CONFLICT does not flip enabled back to 1.
+      getDb().prepare("UPDATE models SET enabled=0 WHERE platform='custom' AND model_id = ?").run(`${k1}-m`);
+
+      const { status, body } = await request(app, 'POST', '/api/models', { keyIds: [k1, k2], modelId: 'm', displayName: 'M v2' });
+      expect(status).toBe(200);
+      expect(body.created).toEqual([]);
+      expect(body.updated).toHaveLength(2);
+      const rows = getDb()
+        .prepare("SELECT model_id, display_name, enabled FROM models WHERE platform='custom' AND model_id IN (?, ?)")
+        .all(`${k1}-m`, `${k2}-m`) as { model_id: string; display_name: string; enabled: number }[];
+      for (const r of rows) {
+        expect(r.display_name).toBe('M v2');
+      }
+      const disabled = rows.find(r => r.model_id === `${k1}-m`)!;
+      expect(disabled.enabled).toBe(0); // not revived
+    });
+
+    it('partial existence yields mixed created/updated', async () => {
+      const baseUrl = 'http://127.0.0.1:11600/v1';
+      const k1 = createCustomKey(baseUrl);
+      const k2 = createCustomKey(baseUrl);
+      await request(app, 'POST', '/api/models', { keyIds: [k1], modelId: 'mix' });
+      const { status, body } = await request(app, 'POST', '/api/models', { keyIds: [k1, k2], modelId: 'mix' });
+      expect(status).toBe(200);
+      expect(body.created).toHaveLength(1);
+      expect(body.updated).toHaveLength(1);
+    });
+
+    it('rejects keyIds spanning multiple base_urls', async () => {
+      const k1 = createCustomKey('http://127.0.0.1:11434/v1');
+      const k2 = createCustomKey('http://127.0.0.1:9999/v1');
+      const { status, body } = await request(app, 'POST', '/api/models', { keyIds: [k1, k2], modelId: 'X' });
+      expect(status).toBe(400);
+      expect(body.error).toMatch(/multiple base_urls/);
+    });
+
+    it('rejects keyIds for non-custom platform', async () => {
+      const db = getDb();
+      const r = db
+        .prepare(
+          `INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+           VALUES ('groq', 'g', 'x', 'x', 'x', 'unknown', 1)`,
+        )
+        .run();
+      const { status, body } = await request(app, 'POST', '/api/models', {
+        keyIds: [Number(r.lastInsertRowid)],
+        modelId: 'X',
+      });
+      expect(status).toBe(400);
+      expect(body.error).toMatch(/custom/);
+    });
+
+    it('rejects keyIds with invalid (unknown) ids', async () => {
+      const { status, body } = await request(app, 'POST', '/api/models', { keyIds: [9999999], modelId: 'X' });
+      expect(status).toBe(400);
+      expect(body.invalidIds).toContain(9999999);
+    });
+  });
+
+  // ----------- POST keys.ts custom path tags source='user' ---------------
 
   it('POST rejects an unregistered platform', async () => {
     const { status, body } = await request(app, 'POST', '/api/models', {

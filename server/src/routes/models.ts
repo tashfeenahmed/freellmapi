@@ -63,8 +63,20 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
 // so the router never sees a half-registered model. The source='user' tag is
 // what protects this row from catalog-sync's delete pass and from /api/models
 // DELETE on catalog/migration rows.
+//
+// Two body shapes (mutually exclusive):
+//   A. { platform, modelId, ... }                — built-in providers (legacy)
+//   B. { keyIds: number[], modelId, displayName? } — custom multi-key write
+// keyIds non-empty array → form B (#custom-platform-model-management).
 modelsRouter.post('/', (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
+  const rawKeyIds = body.keyIds;
+
+  // ---------- Form B: custom multi-key write -------------------------------
+  if (Array.isArray(rawKeyIds) && rawKeyIds.length > 0) {
+    return handleCustomKeyIdsWrite(req, res, body, rawKeyIds);
+  }
+
   const platform = typeof body.platform === 'string' ? body.platform : '';
   const modelId = typeof body.modelId === 'string' ? body.modelId : '';
 
@@ -72,7 +84,9 @@ modelsRouter.post('/', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'platform and modelId are required' });
   }
   if (platform === 'custom') {
-    return res.status(400).json({ error: 'Use POST /api/keys/custom for custom providers' });
+    return res.status(400).json({
+      error: "platform='custom' requires keyIds[] form. Use { keyIds, modelId, displayName? }.",
+    });
   }
   if (!hasProvider(platform as any)) {
     return res.status(400).json({ error: `Unknown platform: ${platform}` });
@@ -125,6 +139,112 @@ modelsRouter.post('/', (req: Request, res: Response) => {
     source: 'user',
   });
 });
+
+// Form B handler: bind one modelId to several custom-platform keys in a single
+// transaction. ON CONFLICT(platform, model_id) DO UPDATE only touches
+// display_name — enabled / key_id / source are left intact so prior PATCH
+// {enabled:false} cannot be undone by re-submitting through this path.
+// All keyIds MUST share the same base_url (UI never spans endpoints; curl
+// callers get a clear 400 instead of producing odd cross-endpoint rows).
+function handleCustomKeyIdsWrite(
+  _req: Request,
+  res: Response,
+  body: Record<string, unknown>,
+  rawKeyIds: unknown[],
+) {
+  const modelId = typeof body.modelId === 'string' ? body.modelId.trim() : '';
+  if (!modelId) {
+    return res.status(400).json({ error: 'modelId is required' });
+  }
+  if (modelId.length > 200) {
+    return res.status(400).json({ error: 'modelId must be ≤ 200 characters' });
+  }
+  // Disallow accidental form-mixing — caller passed both `platform` and `keyIds`.
+  if (typeof body.platform === 'string' && body.platform.length > 0 && body.platform !== 'custom') {
+    return res.status(400).json({
+      error: "keyIds[] is reserved for platform='custom'; remove `platform` or set it to 'custom'",
+    });
+  }
+
+  // Coerce + de-dupe keyIds; reject any non-finite-positive-integer entry.
+  const keyIds: number[] = [];
+  for (const v of rawKeyIds) {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isInteger(n) || n <= 0) {
+      return res.status(400).json({ error: `keyIds must be positive integers; got ${JSON.stringify(v)}` });
+    }
+    if (!keyIds.includes(n)) keyIds.push(n);
+  }
+  if (keyIds.length === 0) {
+    return res.status(400).json({ error: 'keyIds must be non-empty for custom platform' });
+  }
+
+  const displayName = typeof body.displayName === 'string' && body.displayName.length > 0
+    ? body.displayName
+    : modelId;
+
+  const db = getDb();
+  // Validate every keyId resolves to a custom-platform row sharing one base_url.
+  const placeholders = keyIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT id, platform, base_url FROM api_keys WHERE id IN (${placeholders})`)
+    .all(...keyIds) as { id: number; platform: string; base_url: string | null }[];
+  if (rows.length !== keyIds.length) {
+    const found = new Set(rows.map(r => r.id));
+    const missing = keyIds.filter(id => !found.has(id));
+    return res.status(400).json({ error: 'keyIds contains invalid ids', invalidIds: missing });
+  }
+  const nonCustom = rows.filter(r => r.platform !== 'custom').map(r => r.id);
+  if (nonCustom.length > 0) {
+    return res.status(400).json({
+      error: "keyIds must all belong to platform='custom'",
+      invalidIds: nonCustom,
+    });
+  }
+  const baseUrls = new Set(rows.map(r => r.base_url));
+  if (baseUrls.size > 1) {
+    return res.status(400).json({
+      error: 'keyIds span multiple base_urls',
+      baseUrls: Array.from(baseUrls),
+    });
+  }
+
+  // Single transaction: each keyId either INSERTs a fresh row (and a fallback
+  // entry) or UPDATEs the existing row's display_name. We pre-probe each row's
+  // existence (better-sqlite3's RUN result lacks a portable insert-vs-update
+  // signal once ON CONFLICT … DO UPDATE fires).
+  const created: number[] = [];
+  const updated: number[] = [];
+  const tx = db.transaction(() => {
+    const probeStmt = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?");
+    const upsertStmt = db.prepare(`
+      INSERT INTO models
+        (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id, source)
+      VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?, 'user')
+      ON CONFLICT(platform, model_id)
+      DO UPDATE SET display_name = excluded.display_name
+    `);
+    const fbInsert = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
+
+    for (const keyId of keyIds) {
+      const scopedModelId = `${keyId}-${modelId}`;
+      const before = probeStmt.get(scopedModelId) as { id: number } | undefined;
+      upsertStmt.run(scopedModelId, displayName, keyId);
+      const after = probeStmt.get(scopedModelId) as { id: number };
+      if (before) {
+        updated.push(after.id);
+      } else {
+        created.push(after.id);
+        const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
+        fbInsert.run(after.id, max.m + 1);
+      }
+    }
+  });
+  tx();
+
+  return res.status(200).json({ created, updated });
+}
 
 // Edit a model row. Allowed fields are PATCH_ALLOWED_FIELDS — anything else
 // (platform, modelId, source, ranks, limits, monthly_token_budget) is rejected

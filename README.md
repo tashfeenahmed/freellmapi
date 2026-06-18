@@ -28,7 +28,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 - [Quick start](#quick-start)
 - [Docker](#docker)
 - [Desktop app](#desktop-app)
-- [Premium (live catalog)](#premium-live-catalog)
+- [Catalog sync](#catalog-sync)
 - [Using the API](#using-the-api)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -223,20 +223,13 @@ npm run desktop:dist:win    # Windows installer
 > **Windows:** the build config is in place but not tested yet — if you try it,
 > a quick report (working or not) in an issue would be much appreciated.
 
-## Premium (live catalog)
+## Catalog sync
 
 The router keeps its model catalog fresh on its own: it pulls a signed catalog
 from [freellmapi.co](https://freellmapi.co) twice a day and applies new models,
 quota changes, and provider quirk fixes to your local DB (your own enable/disable
 choices and custom providers are never touched; every download is verified
 against a pinned Ed25519 key before it is applied).
-
-- **Free** installs follow a **monthly snapshot** — zero cost, forever.
-- **[Premium](https://freellmapi.co/#pricing)** ($19/yr or $49 lifetime) follows
-  the **live feed**, refreshed every 2-3 days, so new free models are in your
-  router the moment they exist. One key covers all your devices; activate it in
-  the dashboard under **Premium**. Cancel or manage billing self-serve at
-  [freellmapi.co/manage](https://freellmapi.co/manage).
 
 The catalog server never sees your prompts, completions, or provider keys — the
 router stays fully self-hosted either way.

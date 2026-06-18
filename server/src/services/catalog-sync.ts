@@ -8,16 +8,14 @@ import type { Platform } from '@freellmapi/shared/types.js';
  * catalog-sync — keeps the local model catalog in step with the published one.
  *
  * Twice a day (and on demand) the server pulls the signed catalog from the
- * catalog service. A valid Premium license key (Bearer) gets the live tier,
- * refreshed every 2-3 days; everyone else gets the monthly snapshot — so free
- * installs still self-heal, just on a slower cadence. The response is verified
- * against a pinned Ed25519 public key over the exact bytes received; anything
- * unsigned or tampered with is discarded, which means a compromised CDN or
- * MITM cannot inject models or quirks into the router.
+ * catalog service. The response is verified against a pinned Ed25519 public
+ * key over the exact bytes received; anything unsigned or tampered with is
+ * discarded, which means a compromised CDN or MITM cannot inject models or
+ * quirks into the router.
  *
  * The bundled migrations remain the baseline: a fetched catalog is applied
  * only when it is NEWER than what the binary shipped with (MIN_CATALOG_VERSION
- * below), so a stale monthly snapshot can never roll back models that a newer
+ * below), so a stale snapshot can never roll back models that a newer
  * app version added via migrations.
  */
 
@@ -40,10 +38,7 @@ const BOOT_DELAY_MS = 10 * 1000; // let the server settle before first sync
 const FETCH_TIMEOUT_MS = 20 * 1000;
 
 // settings table keys
-export const SETTING_LICENSE_KEY = 'premium_license_key';
-export const SETTING_LICENSE_STATUS = 'premium_license_status'; // JSON LicenseStatus
 const SETTING_APPLIED_VERSION = 'catalog_applied_version';
-const SETTING_APPLIED_TIER = 'catalog_applied_tier';
 const SETTING_APPLIED_JSON = 'catalog_applied_json';
 const SETTING_LAST_SYNC_MS = 'catalog_last_sync_ms';
 const SETTING_LAST_ERROR = 'catalog_last_error';
@@ -55,16 +50,6 @@ export function catalogBaseUrl(): string {
 function catalogPublicKey(): crypto.KeyObject {
   const pem = process.env.CATALOG_PUBKEY ? process.env.CATALOG_PUBKEY.replace(/\\n/g, '\n') : PINNED_CATALOG_PUBKEY;
   return crypto.createPublicKey({ key: pem, format: 'pem' });
-}
-
-export interface LicenseStatus {
-  valid: boolean;
-  plan: 'annual' | 'lifetime' | null;
-  status: string | null;
-  expiresAt: string | null;
-  cancelAtPeriodEnd?: boolean;
-  reason?: string;
-  checkedAtMs: number;
 }
 
 interface CatalogQuirk {
@@ -102,7 +87,6 @@ export interface SyncResult {
   ok: boolean;
   action: 'applied' | 'up_to_date' | 'skipped_older' | 'error';
   version?: string;
-  tier?: string;
   detail?: string;
   counts?: { updated: number; inserted: number; removed: number; skippedUnknownPlatform: number; quirks: number };
 }
@@ -263,17 +247,14 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
 
 /**
  * Fetch the catalog, verify its signature, and apply it if it moves us forward.
- * `force` skips the `since` short-circuit — used right after a license key is
- * added or removed, where the tier can change without the version changing.
+ * `force` skips the `since` short-circuit.
  */
 export async function syncCatalog(force = false): Promise<SyncResult> {
   const db = getDb();
-  const key = getSetting(SETTING_LICENSE_KEY);
   const applied = getSetting(SETTING_APPLIED_VERSION);
 
   try {
     const headers: Record<string, string> = {};
-    if (key) headers.Authorization = `Bearer ${key}`;
     const url = new URL(`${catalogBaseUrl()}/v1/latest`);
     if (applied && !force) url.searchParams.set('since', applied);
 
@@ -301,33 +282,32 @@ export async function syncCatalog(force = false): Promise<SyncResult> {
       // app release) — applying it would roll back migrations. Wait it out.
       setSetting(SETTING_LAST_SYNC_MS, String(Date.now()));
       setSetting(SETTING_LAST_ERROR, '');
-      return { ok: true, action: 'skipped_older', version: catalog.version, tier: catalog.tier };
+      return { ok: true, action: 'skipped_older', version: catalog.version };
     }
 
-    const sameAsApplied = applied === catalog.version && getSetting(SETTING_APPLIED_TIER) === catalog.tier;
+    const sameAsApplied = applied === catalog.version;
     if (!sameAsApplied) {
       const counts = applyCatalog(db, catalog);
       setSetting(SETTING_APPLIED_VERSION, catalog.version);
-      setSetting(SETTING_APPLIED_TIER, catalog.tier);
       // Cache the verified document so boots can re-apply it offline (see
       // reapplyCachedCatalog). Stored post-verification: anything that could
       // tamper this row could tamper the models table directly, so the cache
       // adds no new trust surface.
       setSetting(SETTING_APPLIED_JSON, bytes.toString('utf8'));
       console.log(
-        `[catalog-sync] applied ${catalog.tier} v${catalog.version}: ` +
+        `[catalog-sync] applied v${catalog.version}: ` +
           `${counts.updated} updated, ${counts.inserted} new, ${counts.removed} removed, ` +
           `${counts.quirks} quirks` +
           (counts.skippedUnknownPlatform ? `, ${counts.skippedUnknownPlatform} skipped (unknown platform)` : ''),
       );
       setSetting(SETTING_LAST_SYNC_MS, String(Date.now()));
       setSetting(SETTING_LAST_ERROR, '');
-      return { ok: true, action: 'applied', version: catalog.version, tier: catalog.tier, counts };
+      return { ok: true, action: 'applied', version: catalog.version, counts };
     }
 
     setSetting(SETTING_LAST_SYNC_MS, String(Date.now()));
     setSetting(SETTING_LAST_ERROR, '');
-    return { ok: true, action: 'up_to_date', version: catalog.version, tier: catalog.tier };
+    return { ok: true, action: 'up_to_date', version: catalog.version };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[catalog-sync] ${message}`);
@@ -336,42 +316,9 @@ export async function syncCatalog(force = false): Promise<SyncResult> {
   }
 }
 
-/** Revalidate the stored license against the catalog service and cache the result. */
-export async function refreshLicenseStatus(): Promise<LicenseStatus | null> {
-  const key = getSetting(SETTING_LICENSE_KEY);
-  if (!key) return null;
-  try {
-    const res = await fetch(`${catalogBaseUrl()}/v1/license/check`, {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok && res.status !== 401) throw new Error(`HTTP ${res.status}`);
-    const body = (await res.json()) as Omit<LicenseStatus, 'checkedAtMs'>;
-    const status: LicenseStatus = { ...body, checkedAtMs: Date.now() };
-    setSetting(SETTING_LICENSE_STATUS, JSON.stringify(status));
-    return status;
-  } catch (err) {
-    // Offline or service down: keep the cached status. Entitlement is enforced
-    // server-side at /v1/latest anyway — this cache is informational UI state.
-    console.warn(`[catalog-sync] license check unreachable: ${err instanceof Error ? err.message : err}`);
-    return getCachedLicenseStatus();
-  }
-}
-
-export function getCachedLicenseStatus(): LicenseStatus | null {
-  const raw = getSetting(SETTING_LICENSE_STATUS);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as LicenseStatus;
-  } catch {
-    return null;
-  }
-}
-
 export interface CatalogSyncState {
   baseUrl: string;
   appliedVersion: string | null;
-  appliedTier: string | null;
   lastSyncMs: number | null;
   lastError: string | null;
 }
@@ -380,7 +327,6 @@ export function getSyncState(): CatalogSyncState {
   return {
     baseUrl: catalogBaseUrl(),
     appliedVersion: getSetting(SETTING_APPLIED_VERSION) ?? null,
-    appliedTier: getSetting(SETTING_APPLIED_TIER) ?? null,
     lastSyncMs: Number(getSetting(SETTING_LAST_SYNC_MS)) || null,
     lastError: getSetting(SETTING_LAST_ERROR) || null,
   };
@@ -433,7 +379,6 @@ export function startCatalogSync(): void {
   }
   reapplyCachedCatalog();
   const run = () => {
-    void refreshLicenseStatus();
     void syncCatalog();
   };
   bootTimer = setTimeout(run, BOOT_DELAY_MS);

@@ -101,6 +101,9 @@ export interface ApiKey {
   platform: Platform;
   label: string;
   maskedKey: string;
+  // Endpoint URL for platform='custom' keys (one base_url per OpenAI-compatible
+  // server). NULL for every built-in platform — they use their hardcoded URL.
+  baseUrl?: string | null;
   status: KeyStatus;
   enabled: boolean;
   createdAt: string;

@@ -60,12 +60,7 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the
-// generic key dropdown — but it still appears in the grouped provider list.
-const CUSTOM_GROUP: { value: Platform; label: string; url: string } = {
-  value: 'custom',
-  label: 'Custom (OpenAI-compatible)',
-  url: '',
-}
+// generic key dropdown. Each base_url renders its own group at runtime.
 
 const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
@@ -388,10 +383,15 @@ export default function KeysPage() {
   const [editingLabel, setEditingLabel] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [importing, setImporting] = useState(false)
-  // Single Drawer instance: both entry points (provider header + each KeyCard)
-  // open the same component, scoped by platform — see Task 6.5 / spec
-  // "KeysPage 提供两处对等的'管理模型'入口".
-  const [drawerPlatform, setDrawerPlatform] = useState<Platform | null>(null)
+  // Single Drawer instance: every entry point (provider header + each KeyCard +
+  // custom-endpoint group) writes the same drawerState. Two modes covered by
+  // the union — see ManageModelsDrawerProps.
+  // (#custom-platform-model-management)
+  type DrawerState =
+    | { kind: 'platform'; platform: Platform; platformLabel: string }
+    | { kind: 'customEndpoint'; baseUrl: string; keys: ApiKey[] }
+    | null
+  const [drawerState, setDrawerState] = useState<DrawerState>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -562,10 +562,44 @@ export default function KeysPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proxy-url'] }),
   })
 
-  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
-    ...p,
-    keys: keys.filter(k => k.platform === p.value),
-  })).filter(p => p.keys.length > 0)
+  // Built-in platforms render with a flat key list. Custom keys are split by
+  // `base_url` so multiple OpenAI-compatible endpoints (Ollama / SiliconFlow /
+  // self-hosted vLLM …) each get their own group with its own header + manage-
+  // models entry point. (#custom-platform-model-management)
+  type GroupItem =
+    | { kind: 'platform'; value: Platform; label: string; url: string; keys: ApiKey[] }
+    | { kind: 'customEndpoint'; value: string; label: string; baseUrl: string; keys: ApiKey[] }
+
+  const platformGroups: GroupItem[] = PLATFORMS
+    .map(p => ({
+      kind: 'platform' as const,
+      value: p.value,
+      label: p.label,
+      url: p.url,
+      keys: keys.filter(k => k.platform === p.value),
+    }))
+    .filter(g => g.keys.length > 0)
+
+  // groupBy custom keys on base_url; sort base_urls alphabetically for stable order.
+  const customByBaseUrl = new Map<string, ApiKey[]>()
+  for (const k of keys) {
+    if (k.platform !== 'custom') continue
+    const base = k.baseUrl ?? ''
+    const arr = customByBaseUrl.get(base) ?? []
+    arr.push(k)
+    customByBaseUrl.set(base, arr)
+  }
+  const customEndpointGroups: GroupItem[] = Array.from(customByBaseUrl.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([baseUrl, ks]) => ({
+      kind: 'customEndpoint' as const,
+      value: `custom:${baseUrl}`,
+      label: `Custom · ${baseUrl}`,
+      baseUrl,
+      keys: ks,
+    }))
+
+  const grouped: GroupItem[] = [...platformGroups, ...customEndpointGroups]
 
   return (
     <div>
@@ -672,8 +706,6 @@ export default function KeysPage() {
           )}
         </section>
 
-        <CustomProviderSection />
-
         <section>
           <h2 className="text-sm font-medium mb-3">{t('keys.configuredProviders')}</h2>
           {isLoading ? (
@@ -686,14 +718,21 @@ export default function KeysPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {grouped.map(group => (
+              {grouped.map(group => {
+                // For platform-level toggle / proxy-bypass, customEndpoint
+                // groups all share the underlying 'custom' platform name (the
+                // backend has no per-base_url toggle). Toggling one custom
+                // group flips every custom key — matches the prior single-
+                // CUSTOM_GROUP behavior so users don't lose the on/off lever.
+                const togglePlatformName = group.kind === 'platform' ? group.value : 'custom'
+                return (
                 <div key={group.value}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={group.keys.some(k => k.enabled)}
                         onCheckedChange={(checked) =>
-                          togglePlatform.mutate({ platform: group.value, enabled: checked })
+                          togglePlatform.mutate({ platform: togglePlatformName, enabled: checked })
                         }
                         disabled={togglePlatform.isPending}
                       />
@@ -702,24 +741,28 @@ export default function KeysPage() {
                         <div className="inline-flex items-center gap-1.5 ml-1">
                           <span className="text-[10px] text-muted-foreground">{t('keys.proxyToggleLabel')}</span>
                           <Switch
-                            checked={!bypassPlatforms.includes(group.value)}
-                            onCheckedChange={() => toggleBypass.mutate(group.value)}
+                            checked={!bypassPlatforms.includes(togglePlatformName)}
+                            onCheckedChange={() => toggleBypass.mutate(togglePlatformName)}
                             disabled={toggleBypass.isPending}
                           />
                         </div>
                       )}
-                      <GetKeyLink url={group.url} />
-                      {group.value !== 'custom' && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          className="text-muted-foreground hover:text-foreground"
-                          onClick={() => setDrawerPlatform(group.value)}
-                        >
-                          <Settings2 className="size-3 mr-1" />
-                          {t('models.manage')}
-                        </Button>
-                      )}
+                      {group.kind === 'platform' && <GetKeyLink url={group.url} />}
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          if (group.kind === 'platform') {
+                            setDrawerState({ kind: 'platform', platform: group.value, platformLabel: group.label })
+                          } else {
+                            setDrawerState({ kind: 'customEndpoint', baseUrl: group.baseUrl, keys: group.keys })
+                          }
+                        }}
+                      >
+                        <Settings2 className="size-3 mr-1" />
+                        {t('models.manage')}
+                      </Button>
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {t(group.keys.length === 1 ? 'keys.keyCountOne' : 'keys.keyCountOther', { count: group.keys.length })}
@@ -785,37 +828,57 @@ export default function KeysPage() {
                           >
                             {confirmDeleteId === k.id ? t('keys.confirmRemove') : t('common.remove')}
                           </Button>
-                          {group.value !== 'custom' && (
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={() => setDrawerPlatform(group.value)}
-                              aria-label={t('models.manage')}
-                            >
-                              <Settings2 className="size-3" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              if (group.kind === 'platform') {
+                                setDrawerState({ kind: 'platform', platform: group.value, platformLabel: group.label })
+                              } else {
+                                setDrawerState({ kind: 'customEndpoint', baseUrl: group.baseUrl, keys: group.keys })
+                              }
+                            }}
+                            aria-label={t('models.manage')}
+                          >
+                            <Settings2 className="size-3" />
+                          </Button>
                         </div>
                       )
                     })}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>
+
+        {/* Always-visible "create custom key" form. Shown after every group so
+            new users with no keys still see the form, and users with custom
+            endpoints can add another endpoint without scrolling.
+            (#custom-platform-model-management) */}
+        <CustomProviderSection />
       </div>
-      <ManageModelsDrawer
-        open={drawerPlatform !== null}
-        onClose={() => setDrawerPlatform(null)}
-        platform={(drawerPlatform ?? 'groq') as Platform}
-        platformLabel={
-          drawerPlatform
-            ? [...PLATFORMS, CUSTOM_GROUP].find(p => p.value === drawerPlatform)?.label ?? drawerPlatform
-            : ''
-        }
-      />
+      {drawerState === null ? (
+        <ManageModelsDrawer open={false} onClose={() => setDrawerState(null)} />
+      ) : drawerState.kind === 'platform' ? (
+        <ManageModelsDrawer
+          open={true}
+          onClose={() => setDrawerState(null)}
+          kind="platform"
+          platform={drawerState.platform}
+          platformLabel={drawerState.platformLabel}
+        />
+      ) : (
+        <ManageModelsDrawer
+          open={true}
+          onClose={() => setDrawerState(null)}
+          kind="customEndpoint"
+          baseUrl={drawerState.baseUrl}
+          keys={drawerState.keys}
+        />
+      )}
     </div>
   )
 }
