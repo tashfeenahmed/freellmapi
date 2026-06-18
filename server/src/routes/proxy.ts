@@ -497,9 +497,21 @@ async function handleRequest(req: Request, res: Response) {
     preferredModel = getStickyModel(messages);
   } else if (requestedModel) {
     const db = getDb();
-    let modelRow = db.prepare('SELECT id, enabled FROM models WHERE model_id = ?').get(requestedModel) as { id: number; enabled: number } | undefined;
+    let modelRow = db.prepare(`
+      SELECT m.id, m.enabled
+      FROM models m
+      LEFT JOIN api_keys k ON k.platform = m.platform AND k.enabled = 1 AND k.status IN ('healthy', 'unknown')
+      WHERE m.model_id = ?
+      ORDER BY (k.id IS NOT NULL) DESC, m.id ASC
+    `).get(requestedModel) as { id: number; enabled: number } | undefined;
     if (!modelRow) {
-      modelRow = db.prepare('SELECT id, enabled FROM models WHERE (model_id LIKE ? OR model_id = ?)').get(`%/${requestedModel}`, requestedModel) as { id: number; enabled: number } | undefined;
+      modelRow = db.prepare(`
+        SELECT m.id, m.enabled
+        FROM models m
+        LEFT JOIN api_keys k ON k.platform = m.platform AND k.enabled = 1 AND k.status IN ('healthy', 'unknown')
+        WHERE (m.model_id LIKE ? OR m.model_id = ?)
+        ORDER BY (k.id IS NOT NULL) DESC, m.id ASC
+      `).get(`%/${requestedModel}`, requestedModel) as { id: number; enabled: number } | undefined;
     }
 
     if (!modelRow) {
