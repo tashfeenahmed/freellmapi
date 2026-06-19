@@ -90,7 +90,16 @@
     "noModelsBefore": "Nenhum modelo disponível. Adicione chaves de API na ",
     "keysPageLink": "página Chaves",
     "noModelsAfter": " primeiro.",
-    "hiddenNoKeys": "Ocultos (sem chave): {platforms}"
+    "hiddenNoKeys": "Ocultos (sem chave): {platforms}",
+    "searchPlaceholder": "Buscar modelos ou provedores…",
+    "clearSearch": "Limpar busca",
+    "ctxAny": "Qualquer contexto",
+    "ctxBadge": "{size} ctx",
+    "ctxTitle": "Janela de contexto",
+    "copyModelId": "Copiar id do modelo",
+    "showingCount": "{shown} de {total} modelos",
+    "clearFilters": "Limpar filtros",
+    "noMatches": "Nenhum modelo corresponde aos seus filtros."
   },
   "strategies": {
     "title": "Estratégia de roteamento",

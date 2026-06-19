@@ -17,11 +17,12 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal, Search, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { CopyButton } from '@/components/copy-button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
@@ -48,6 +49,9 @@ export interface FallbackEntry {
   // Parsed token count from the server (single source of truth — see
   // server/src/lib/budget.ts). Optional only because the dev mock omits it.
   monthlyTokenBudgetTokens?: number
+  // Max context length in tokens (catalog value), or null when unrecorded.
+  // Drives the catalog context-window filter on the Models page.
+  contextWindow?: number | null
   supportsVision: boolean
   supportsTools: boolean
   keyCount: number
@@ -208,6 +212,28 @@ export function formatTokens(n: number): string {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
 }
+
+// Compact context-window label (whole-number K/M, base 1000): 8000 → "8K",
+// 128000 → "128K", 1_000_000 → "1M". Used by the catalog context badge/filter.
+function formatContext(n: number): string {
+  if (n >= 1_000_000) return `${Math.round(n / 1_000_000)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`
+  return String(n)
+}
+
+// The largest context window across a logical model's providers.
+function groupMaxContext(members: Row[]): number {
+  return Math.max(0, ...members.map(m => m.contextWindow ?? 0))
+}
+
+// Minimum-context filter buckets for the Models page toolbar. `key` is the token
+// threshold (0 = no filter); numeric labels are not localized (they're numbers).
+const CTX_BUCKETS: { key: number; label?: string; tKey?: string }[] = [
+  { key: 0, tKey: 'ctxAny' },
+  { key: 32_000, label: '32K+' },
+  { key: 128_000, label: '128K+' },
+  { key: 1_000_000, label: '1M+' },
+]
 
 // For models with no monthly token budget, surface their rate quota instead.
 // Strips the catalog's decorative bits ("free · ", " per IP", "~", "?") so e.g.
@@ -547,33 +573,48 @@ function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
   const vision = group.members.some(m => m.supportsVision)
   const tools = group.members.some(m => m.supportsTools)
   const quota = groupQuotaBadge(group.members, t)
+  const maxCtx = groupMaxContext(group.members)
   // The model name links to its own page, which lists every provider that serves
   // it (replaces the old inline expansion).
   const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
+  // The unified model string to paste into .env / API payloads (#343 quick-copy).
+  const copyId = group.members[0].canonicalId ?? group.members[0].modelId
   return (
     <>
       <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
       <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
       <td className="py-2 pr-3 align-middle">
-        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left">
-          <span className="font-medium text-sm">{group.label}</span>
-          {solo
-            ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
-            : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
-                <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>
-              </Tooltip>}
-          {quota && (
-            <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
-              {quota.text}
-            </span>
-          )}
-          {vision && (
-            <span title={t('models.visionTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>
-          )}
-          {tools && (
-            <span title={t('models.toolsTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>
-          )}
-        </Link>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left min-w-0">
+            <span className="font-medium text-sm">{group.label}</span>
+            {solo
+              ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
+              : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
+                  <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>
+                </Tooltip>}
+            {quota && (
+              <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+                {quota.text}
+              </span>
+            )}
+            {maxCtx > 0 && (
+              <span title={t('models.ctxTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+                {t('models.ctxBadge', { size: formatContext(maxCtx) })}
+              </span>
+            )}
+            {vision && (
+              <span title={t('models.visionTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>
+            )}
+            {tools && (
+              <span title={t('models.toolsTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>
+            )}
+          </Link>
+          {/* Quick-copy the unified model id (#343). Stop propagation so it neither
+              follows the model link nor triggers the row's navigate-on-click. */}
+          <span onClick={e => e.stopPropagation()} className="shrink-0">
+            <CopyButton text={copyId} className="size-6" label={t('models.copyModelId')} />
+          </span>
+        </div>
       </td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={best.reliability} color="#22c55e" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={best.speed} color="#3b82f6" /></td>
@@ -625,6 +666,12 @@ export default function FallbackPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
+
+  // Catalog search + filter state (#343).
+  const [search, setSearch] = useState('')
+  const [filterVision, setFilterVision] = useState(false)
+  const [filterTools, setFilterTools] = useState(false)
+  const [minContext, setMinContext] = useState(0)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
     queryKey: ['fallback'],
@@ -684,6 +731,37 @@ export default function FallbackPage() {
   // ── Model unification: a model served by several providers is always shown as
   // one logical row that links to its own page (the on/off toggle was removed). ─
   const orderedGroups = buildGroups(rows, isManual)
+
+  // Catalog search + filters (#343). Filtering operates on whole logical-model
+  // groups; rank stays the model's position in the full chain so the numbers
+  // don't renumber as you filter. Drag-to-reorder is only offered over the full,
+  // unfiltered manual chain (reordering a filtered subset would be ambiguous).
+  const rankByKey = new Map(orderedGroups.map((g, i) => [g.key, i + 1]))
+  const query = search.trim().toLowerCase()
+  const filtersActive = query !== '' || filterVision || filterTools || minContext > 0
+  const visibleGroups = orderedGroups.filter(g => {
+    if (filterVision && !g.members.some(m => m.supportsVision)) return false
+    if (filterTools && !g.members.some(m => m.supportsTools)) return false
+    if (minContext > 0 && groupMaxContext(g.members) < minContext) return false
+    if (query) {
+      const hay = [
+        g.label,
+        g.members[0].canonicalId ?? '',
+        ...g.members.map(m => m.platform),
+        ...g.members.map(m => m.displayName),
+        ...g.members.map(m => m.modelId),
+      ].join(' ').toLowerCase()
+      if (!hay.includes(query)) return false
+    }
+    return true
+  })
+  const draggable = isManual && !filtersActive
+  function clearFilters() {
+    setSearch('')
+    setFilterVision(false)
+    setFilterTools(false)
+    setMinContext(0)
+  }
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
     const ids = new Set(memberIds)
@@ -780,17 +858,78 @@ export default function FallbackPage() {
           </div>
         ) : (
           <>
+            {/* Catalog toolbar: search + capability/context filters (#343) */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder={t('models.searchPlaceholder')}
+                  aria-label={t('models.searchPlaceholder')}
+                  className="w-full rounded-xl border bg-card py-1.5 pl-9 pr-8 text-sm outline-none transition-colors focus:border-foreground/30"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    aria-label={t('models.clearSearch')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setFilterVision(v => !v)}
+                  aria-pressed={filterVision}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${filterVision ? 'bg-foreground text-background border-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  {t('models.vision')}
+                </button>
+                <button
+                  onClick={() => setFilterTools(v => !v)}
+                  aria-pressed={filterTools}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${filterTools ? 'bg-foreground text-background border-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  {t('models.tools')}
+                </button>
+                <div className="inline-flex items-center gap-1 rounded-xl border p-1" role="group" aria-label={t('models.ctxTitle')}>
+                  {CTX_BUCKETS.map(b => (
+                    <button
+                      key={b.key}
+                      onClick={() => setMinContext(b.key)}
+                      className={`px-2.5 py-1 text-xs rounded-lg transition-colors tabular-nums ${minContext === b.key ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                    >
+                      {b.tKey ? t(`models.${b.tKey}`) : b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {filtersActive && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t('models.showingCount', { shown: visibleGroups.length, total: orderedGroups.length })}</span>
+                <button onClick={clearFilters} className="underline hover:text-foreground">{t('models.clearFilters')}</button>
+              </div>
+            )}
+
             {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
                 live-region <div>s, which are invalid as direct <table> children. */}
-            {isManual ? (
+            {visibleGroups.length === 0 ? (
+              <div className="rounded-3xl border border-dashed p-8 text-center">
+                <p className="text-sm text-muted-foreground">{t('models.noMatches')}</p>
+              </div>
+            ) : draggable ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
                     <ModelTableHead />
-                    <SortableContext items={orderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={visibleGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
                       <tbody>
-                        {orderedGroups.map((g, gi) => (
-                          <SortableGroupRow key={g.key} group={g} rank={gi + 1} onToggleGroup={handleGroupToggle} />
+                        {visibleGroups.map(g => (
+                          <SortableGroupRow key={g.key} group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -802,13 +941,13 @@ export default function FallbackPage() {
                 <table className="w-full text-sm">
                   <ModelTableHead />
                   <tbody>
-                    {orderedGroups.map((g, gi) => (
+                    {visibleGroups.map(g => (
                       <tr
                         key={g.key}
                         onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
                         className={`border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
                       >
-                        <GroupHeaderCells group={g} rank={gi + 1} onToggleGroup={handleGroupToggle} />
+                        <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} />
                       </tr>
                     ))}
                   </tbody>

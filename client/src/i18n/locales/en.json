@@ -107,7 +107,16 @@
     "noModelsBefore": "No models available. Add API keys on the ",
     "keysPageLink": "Keys page",
     "noModelsAfter": " first.",
-    "hiddenNoKeys": "Hidden (no keys): {platforms}"
+    "hiddenNoKeys": "Hidden (no keys): {platforms}",
+    "searchPlaceholder": "Search models or providers…",
+    "clearSearch": "Clear search",
+    "ctxAny": "Any context",
+    "ctxBadge": "{size} ctx",
+    "ctxTitle": "Context window",
+    "copyModelId": "Copy model id",
+    "showingCount": "{shown} of {total} models",
+    "clearFilters": "Clear filters",
+    "noMatches": "No models match your filters."
   },
   "strategies": {
     "title": "Routing strategy",

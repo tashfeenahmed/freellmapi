@@ -55,6 +55,9 @@ describe('Fallback API', () => {
     expect(first).toHaveProperty('platform');
     expect(first).toHaveProperty('displayName');
     expect(first).toHaveProperty('intelligenceRank');
+    // contextWindow powers the dashboard catalog filter (#343); present even when
+    // the catalog has no value for a model (null).
+    expect(first).toHaveProperty('contextWindow');
   });
 
   // Regression: GET /routing must always carry customWeights, even before the

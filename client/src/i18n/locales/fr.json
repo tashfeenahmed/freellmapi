@@ -90,7 +90,16 @@
     "noModelsBefore": "Aucun modèle disponible. Ajoutez des clés API sur la ",
     "keysPageLink": "page Clés",
     "noModelsAfter": " au préalable.",
-    "hiddenNoKeys": "Masqués (aucune clé) : {platforms}"
+    "hiddenNoKeys": "Masqués (aucune clé) : {platforms}",
+    "searchPlaceholder": "Rechercher un modèle ou un fournisseur…",
+    "clearSearch": "Effacer la recherche",
+    "ctxAny": "Tout contexte",
+    "ctxBadge": "{size} ctx",
+    "ctxTitle": "Fenêtre de contexte",
+    "copyModelId": "Copier l'identifiant du modèle",
+    "showingCount": "{shown} sur {total} modèles",
+    "clearFilters": "Effacer les filtres",
+    "noMatches": "Aucun modèle ne correspond à vos filtres."
   },
   "strategies": {
     "title": "Stratégie de routage",

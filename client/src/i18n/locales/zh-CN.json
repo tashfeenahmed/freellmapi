@@ -90,7 +90,16 @@
     "noModelsBefore": "暂无可用模型。请先在",
     "keysPageLink": "密钥页面",
     "noModelsAfter": "添加 API 密钥。",
-    "hiddenNoKeys": "已隐藏（无密钥）：{platforms}"
+    "hiddenNoKeys": "已隐藏（无密钥）：{platforms}",
+    "searchPlaceholder": "搜索模型或提供商…",
+    "clearSearch": "清除搜索",
+    "ctxAny": "任意上下文",
+    "ctxBadge": "{size} 上下文",
+    "ctxTitle": "上下文窗口",
+    "copyModelId": "复制模型 ID",
+    "showingCount": "{total} 个模型中的 {shown} 个",
+    "clearFilters": "清除筛选",
+    "noMatches": "没有符合筛选条件的模型。"
   },
   "strategies": {
     "title": "路由策略",
