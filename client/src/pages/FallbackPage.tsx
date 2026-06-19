@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -17,7 +17,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,7 @@ import { ModelsTabs } from '@/components/models-tabs'
 import { CombinedModelsNote } from '@/components/combined-models-note'
 import { Tooltip } from '@/components/tooltip'
 
-interface FallbackEntry {
+export interface FallbackEntry {
   modelDbId: number
   priority: number
   effectivePriority: number
@@ -62,7 +63,7 @@ type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'relia
 
 type RoutingWeights = { reliability: number; speed: number; intelligence: number }
 
-interface RoutingScore {
+export interface RoutingScore {
   modelDbId: number
   reliability: number
   speed: number
@@ -73,7 +74,7 @@ interface RoutingScore {
   totalRequests: number
 }
 
-interface RoutingData {
+export interface RoutingData {
   strategy: RoutingStrategy
   weights: RoutingWeights | null
   customWeights: RoutingWeights
@@ -81,7 +82,7 @@ interface RoutingData {
 }
 
 // A merged row: fallback-chain metadata + live bandit scores.
-type Row = FallbackEntry & Partial<RoutingScore>
+export type Row = FallbackEntry & Partial<RoutingScore>
 
 // `tKey` is the i18n suffix under `strategies.*` (label) and `strategies.*Blurb`.
 // It differs from the routing `key` for Manual, whose strategy id is 'priority'.
@@ -202,7 +203,7 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
   )
 }
 
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
@@ -213,7 +214,7 @@ function formatTokens(n: number): string {
 // Strips the catalog's decorative bits ("free · ", " per IP", "~", "?") so e.g.
 // "free · 40 RPM" → "40 RPM", "free · 200/hr per IP" → "200/hr", "~? (anon)" →
 // "anon". Returns null when nothing meaningful remains.
-function cleanQuotaLabel(s: string | undefined): string | null {
+export function cleanQuotaLabel(s: string | undefined): string | null {
   if (!s) return null
   let c = s
     .replace(/free\s*·\s*/ig, '')
@@ -223,6 +224,25 @@ function cleanQuotaLabel(s: string | undefined): string | null {
     .trim()
   c = c.replace(/^\(([^()]*)\)$/, '$1').trim()
   return c || null
+}
+
+// The quota badge for a logical model: its summed monthly token budget when it
+// has one (you can spend all providers' budgets via failover), else the best
+// rate cap (RPM/RPD, or the catalog's rate label) for rate-limited providers.
+// Shared by the Models-page group header and the per-model detail page.
+export function groupQuotaBadge(
+  members: Row[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { text: string; title: string } | null {
+  const totalBudget = members.reduce((sum, m) => sum + (m.monthlyTokenBudgetTokens ?? 0), 0)
+  const maxRpm = Math.max(0, ...members.map(m => m.rpmLimit ?? 0))
+  const maxRpd = Math.max(0, ...members.map(m => m.rpdLimit ?? 0))
+  const rateLabelText = members.map(m => cleanQuotaLabel(m.monthlyTokenBudget)).find(Boolean) ?? null
+  if (totalBudget > 0) return { text: t('models.aggregateBudget', { count: formatTokens(totalBudget) }), title: t('models.aggregateBudgetTitle') }
+  if (maxRpm > 0) return { text: t('models.rateRpm', { count: maxRpm }), title: t('models.rateTitle') }
+  if (maxRpd > 0) return { text: t('models.rateRpd', { count: maxRpd }), title: t('models.rateTitle') }
+  if (rateLabelText) return { text: rateLabelText, title: t('models.rateTitle') }
+  return null
 }
 
 interface TokenUsageData {
@@ -250,7 +270,7 @@ const platformColors: Record<string, string> = {
 }
 
 // A 0..1 value as a thin horizontal bar with the number beside it.
-function AxisBar({ value, color }: { value: number | undefined; color: string }) {
+export function AxisBar({ value, color }: { value: number | undefined; color: string }) {
   const v = value ?? 0
   return (
     <div className="flex items-center gap-1.5">
@@ -360,8 +380,43 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   )
 }
 
+// The shared table header for the unified model/provider table — used by the
+// Models page and the per-model detail page so their columns line up.
+export function ModelTableHead() {
+  const { t } = useI18n()
+  return (
+    <thead>
+      <tr className="text-left text-muted-foreground border-b">
+        <th className="py-2 pl-3 pr-1 w-6"></th>
+        <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
+        <th className="py-2 pr-3 font-medium">{t('models.columnModel')}</th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />{t('strategies.weightReliability')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />{t('strategies.weightSpeed')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />{t('strategies.weightIntelligence')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <Tooltip text={t('strategies.guardrailsTooltip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.guardrails')}</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">
+          <Tooltip text={t('strategies.scoreTooltip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.scoreColumn')}</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">{t('models.columnOn')}</th>
+      </tr>
+    </thead>
+  )
+}
+
 // ── One row of the unified table ────────────────────────────────────────────
-function RowContent({
+export function RowContent({
   row,
   rank,
   draggable,
@@ -435,34 +490,6 @@ function RowContent({
   )
 }
 
-function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
-  const { t } = useI18n()
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
-  const handle = (
-    <button
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
-      aria-label={t('models.dragToReorder')}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
-        <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-        <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
-      </svg>
-    </button>
-  )
-  return (
-    <tr
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
-    >
-      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
-    </tr>
-  )
-}
-
 // ── Grouped (unified) rendering ──────────────────────────────────────────────
 // One logical model and the provider rows that serve it.
 interface ModelGroupRow {
@@ -507,11 +534,9 @@ const dragDots = (
 // The collapsed header row for a logical-model group: name, provider count,
 // union vision/tools badges, the best member's axis bars + score, and a single
 // switch that enables/disables every provider in the group.
-function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, onToggleGroup }: {
+function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
   group: ModelGroupRow
   rank: number
-  expanded: boolean
-  onToggleExpand: () => void
   dragHandle?: ReactNode
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
 }) {
@@ -522,36 +547,22 @@ function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, o
   const guard = (best.headroom ?? 1) * (best.rateLimit ?? 1)
   const vision = group.members.some(m => m.supportsVision)
   const tools = group.members.some(m => m.supportsTools)
-  // Quota badge beside the name: the aggregated monthly token budget when the
-  // group has one (summed across providers — you can spend all of them via
-  // failover), otherwise the model's rate cap (RPM/RPD, or the catalog's rate
-  // label) for rate-limited providers like NVIDIA.
-  const totalBudget = group.members.reduce((sum, m) => sum + (m.monthlyTokenBudgetTokens ?? 0), 0)
-  const maxRpm = Math.max(0, ...group.members.map(m => m.rpmLimit ?? 0))
-  const maxRpd = Math.max(0, ...group.members.map(m => m.rpdLimit ?? 0))
-  const rateLabelText = group.members.map(m => cleanQuotaLabel(m.monthlyTokenBudget)).find(Boolean) ?? null
-  // A summed monthly token budget if the group has one, else a rate cap (RPM/RPD,
-  // or the catalog's rate label) for rate-limited providers like NVIDIA.
-  function quotaBadge(): { text: string; title: string } | null {
-    if (totalBudget > 0) return { text: t('models.aggregateBudget', { count: formatTokens(totalBudget) }), title: t('models.aggregateBudgetTitle') }
-    if (maxRpm > 0) return { text: t('models.rateRpm', { count: maxRpm }), title: t('models.rateTitle') }
-    if (maxRpd > 0) return { text: t('models.rateRpd', { count: maxRpd }), title: t('models.rateTitle') }
-    if (rateLabelText) return { text: rateLabelText, title: t('models.rateTitle') }
-    return null
-  }
-  const quota = quotaBadge()
+  const quota = groupQuotaBadge(group.members, t)
+  // The model name links to its own page, which lists every provider that serves
+  // it (replaces the old inline expansion).
+  const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
   return (
     <>
       <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
       <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
       <td className="py-2 pr-3 align-middle">
-        <button type="button" onClick={onToggleExpand} className="flex items-center gap-2 flex-wrap text-left" aria-expanded={expanded}>
-          <ChevronDown className={`size-4 flex-shrink-0 text-muted-foreground transition-transform ${expanded ? '' : '-rotate-90'}`} />
+        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} className="group/m flex items-center gap-2 flex-wrap text-left hover:text-foreground">
+          <ChevronRight className="size-4 flex-shrink-0 text-muted-foreground/60 group-hover/m:text-foreground transition-colors" />
           <span className="font-medium text-sm">{group.label}</span>
           {solo
             ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
             : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
-                <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground cursor-help">{t('models.providerCount', { count: group.members.length })}</span>
+                <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>
               </Tooltip>}
           {quota && (
             <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
@@ -564,7 +575,7 @@ function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, o
           {tools && (
             <span title={t('models.toolsTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>
           )}
-        </button>
+        </Link>
       </td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={best.reliability} color="#22c55e" /></td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={best.speed} color="#3b82f6" /></td>
@@ -578,11 +589,9 @@ function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, o
   )
 }
 
-function SortableGroupRow({ group, rank, expanded, onToggleExpand, onToggleGroup }: {
+function SortableGroupRow({ group, rank, onToggleGroup }: {
   group: ModelGroupRow
   rank: number
-  expanded: boolean
-  onToggleExpand: () => void
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
 }) {
   const { t } = useI18n()
@@ -604,7 +613,7 @@ function SortableGroupRow({ group, rank, expanded, onToggleExpand, onToggleGroup
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
-      <GroupHeaderCells group={group} rank={rank} expanded={expanded} onToggleExpand={onToggleExpand} dragHandle={handle} onToggleGroup={onToggleGroup} />
+      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} />
     </tr>
   )
 }
@@ -657,33 +666,11 @@ export default function FallbackPage() {
   // Entry fields win on overlap: the routing snapshot also carries `enabled`
   // (and identity fields), which would otherwise clobber unsaved local toggles.
   const rows: Row[] = configured.map(e => ({ ...(scoreById.get(e.modelDbId) ?? {}), ...e }))
-  // Manual → the order you set (by priority). Bandit → ranked by live score.
-  const ordered = isManual
-    ? [...rows].sort((a, b) => a.priority - b.priority)
-    : [...rows].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = ordered.findIndex(e => e.modelDbId === active.id)
-    const newIndex = ordered.findIndex(e => e.modelDbId === over.id)
-    const reorderedVisible = arrayMove(ordered, oldIndex, newIndex)
-    const unconfigured = allEntries.filter(e => e.keyCount === 0)
-    const merged: FallbackEntry[] = [
-      ...reorderedVisible.map((e, i) => ({ ...(e as FallbackEntry), priority: i + 1 })),
-      ...unconfigured.map((e, i) => ({ ...e, priority: reorderedVisible.length + i + 1 })),
-    ]
-    setLocalEntries(merged)
-  }
-
-  function handleToggle(modelDbId: number, enabled: boolean) {
-    setLocalEntries(allEntries.map(e => (e.modelDbId === modelDbId ? { ...e, enabled } : e)))
-  }
 
   function handleSave() {
     saveMutation.mutate(allEntries.map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled: e.enabled })))
@@ -691,30 +678,9 @@ export default function FallbackPage() {
 
   const hasChanges = localEntries !== null
 
-  // ── Model unification (group the same model across providers) ──────────────
-  const { data: unify } = useQuery<{ enabled: boolean }>({
-    queryKey: ['unify'],
-    queryFn: () => apiFetch('/api/settings/unify'),
-  })
-  const unifyOn = unify?.enabled ?? true
-  const unifyMutation = useMutation({
-    mutationFn: (enabled: boolean) => apiFetch('/api/settings/unify', { method: 'PUT', body: JSON.stringify({ enabled }) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unify'] })
-      queryClient.invalidateQueries({ queryKey: ['fallback'] })
-    },
-  })
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
+  // ── Model unification: a model served by several providers is always shown as
+  // one logical row that links to its own page (the on/off toggle was removed). ─
   const orderedGroups = buildGroups(rows, isManual)
-
-  function toggleExpand(key: string) {
-    setExpandedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
     const ids = new Set(memberIds)
@@ -731,61 +697,16 @@ export default function FallbackPage() {
     setLocalEntries(allEntries.map(e => ({ ...e, priority: prio.get(e.modelDbId) ?? e.priority })))
   }
 
+  // Reorder models (the failover priority order). Providers within a model are
+  // ordered by the active strategy and managed on the model's own page.
   function handleGroupedDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const a = String(active.id)
-    const o = String(over.id)
-    if (a.startsWith('grp:')) {
-      if (!o.startsWith('grp:')) return // a group dropped on a member row — ignore
-      const oldI = orderedGroups.findIndex(g => `grp:${g.key}` === a)
-      const newI = orderedGroups.findIndex(g => `grp:${g.key}` === o)
-      if (oldI < 0 || newI < 0) return
-      persistGroupOrder(arrayMove(orderedGroups, oldI, newI))
-    } else {
-      // Member reorder, constrained to within its own group.
-      const activeId = Number(a)
-      const overId = Number(o)
-      const gi = orderedGroups.findIndex(g => g.members.some(m => m.modelDbId === activeId))
-      if (gi < 0) return
-      const members = orderedGroups[gi].members
-      const oldI = members.findIndex(m => m.modelDbId === activeId)
-      const newI = members.findIndex(m => m.modelDbId === overId)
-      if (newI < 0) return // dropped outside its group — ignore
-      const next = orderedGroups.map((g, i) => (i === gi ? { ...g, members: arrayMove(g.members, oldI, newI) } : g))
-      persistGroupOrder(next)
-    }
+    const oldI = orderedGroups.findIndex(g => `grp:${g.key}` === String(active.id))
+    const newI = orderedGroups.findIndex(g => `grp:${g.key}` === String(over.id))
+    if (oldI < 0 || newI < 0) return
+    persistGroupOrder(arrayMove(orderedGroups, oldI, newI))
   }
-
-  const tableHead = (
-    <thead>
-      <tr className="text-left text-muted-foreground border-b">
-        <th className="py-2 pl-3 pr-1 w-6"></th>
-        <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
-        <th className="py-2 pr-3 font-medium">{t('models.columnModel')}</th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />{t('strategies.weightReliability')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />{t('strategies.weightSpeed')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />{t('strategies.weightIntelligence')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <Tooltip text={t('strategies.guardrailsTooltip')}>
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.guardrails')}</span>
-          </Tooltip>
-        </th>
-        <th className="py-2 pr-3 font-medium text-right">
-          <Tooltip text={t('strategies.scoreTooltip')}>
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.scoreColumn')}</span>
-          </Tooltip>
-        </th>
-        <th className="py-2 pr-3 font-medium text-right">{t('models.columnOn')}</th>
-      </tr>
-    </thead>
-  )
 
   return (
     <div>
@@ -798,7 +719,7 @@ export default function FallbackPage() {
 
       <div className="space-y-6">
         {/* Explain the unified-model behavior the first time (dismissible). */}
-        {unifyOn && <CombinedModelsNote />}
+        <CombinedModelsNote />
 
         {/* Monthly token budget — moved to the top */}
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
@@ -848,20 +769,10 @@ export default function FallbackPage() {
           </p>
         </section>
 
-        {/* Unify duplicate models — collapse the same model served by several
-            providers into one expandable row (and one /v1/models entry). */}
-        <section className="flex items-center justify-between rounded-3xl border bg-card p-5">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-sm font-medium">{t('models.unifyToggle')}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t('models.unifyToggleHint')}</p>
-          </div>
-          <Switch checked={unifyOn} onCheckedChange={(c) => unifyMutation.mutate(c)} disabled={unifyMutation.isPending} />
-        </section>
-
         {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-        ) : ordered.length === 0 ? (
+        ) : orderedGroups.length === 0 ? (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
               {t('models.noModelsBefore')}<a href="/keys" className="underline text-foreground">{t('models.keysPageLink')}</a>{t('models.noModelsAfter')}
@@ -871,73 +782,15 @@ export default function FallbackPage() {
           <>
             {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
                 live-region <div>s, which are invalid as direct <table> children. */}
-            {unifyOn ? (
-              isManual ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
-                  <div className="rounded-2xl border overflow-x-auto">
-                    <table className="w-full text-sm">
-                      {tableHead}
-                      <SortableContext items={orderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
-                        <tbody>
-                          {orderedGroups.map((g, gi) => (
-                            <Fragment key={g.key}>
-                              <SortableGroupRow
-                                group={g}
-                                rank={gi + 1}
-                                expanded={expandedGroups.has(g.key)}
-                                onToggleExpand={() => toggleExpand(g.key)}
-                                onToggleGroup={handleGroupToggle}
-                              />
-                              {expandedGroups.has(g.key) && (
-                                <SortableContext items={g.members.map(m => m.modelDbId)} strategy={verticalListSortingStrategy}>
-                                  {g.members.map((m, mi) => (
-                                    <SortableRow key={m.modelDbId} row={m} rank={mi + 1} onToggle={handleToggle} />
-                                  ))}
-                                </SortableContext>
-                              )}
-                            </Fragment>
-                          ))}
-                        </tbody>
-                      </SortableContext>
-                    </table>
-                  </div>
-                </DndContext>
-              ) : (
+            {isManual ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
-                    {tableHead}
-                    <tbody>
-                      {orderedGroups.map((g, gi) => (
-                        <Fragment key={g.key}>
-                          <tr className={`border-b last:border-0 ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}>
-                            <GroupHeaderCells
-                              group={g}
-                              rank={gi + 1}
-                              expanded={expandedGroups.has(g.key)}
-                              onToggleExpand={() => toggleExpand(g.key)}
-                              onToggleGroup={handleGroupToggle}
-                            />
-                          </tr>
-                          {expandedGroups.has(g.key) && g.members.map((m, mi) => (
-                            <tr key={m.modelDbId} className={`border-b last:border-0 bg-muted/20 ${m.enabled ? '' : 'opacity-50'}`}>
-                              <RowContent row={m} rank={mi + 1} draggable={false} onToggle={handleToggle} />
-                            </tr>
-                          ))}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            ) : isManual ? (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <div className="rounded-2xl border overflow-x-auto">
-                  <table className="w-full text-sm">
-                    {tableHead}
-                    <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
+                    <ModelTableHead />
+                    <SortableContext items={orderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
                       <tbody>
-                        {ordered.map((row, i) => (
-                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} />
+                        {orderedGroups.map((g, gi) => (
+                          <SortableGroupRow key={g.key} group={g} rank={gi + 1} onToggleGroup={handleGroupToggle} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -947,11 +800,11 @@ export default function FallbackPage() {
             ) : (
               <div className="rounded-2xl border overflow-x-auto">
                 <table className="w-full text-sm">
-                  {tableHead}
+                  <ModelTableHead />
                   <tbody>
-                    {ordered.map((row, i) => (
-                      <tr key={row.modelDbId} className={`border-b last:border-0 ${row.enabled ? '' : 'opacity-50'}`}>
-                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} />
+                    {orderedGroups.map((g, gi) => (
+                      <tr key={g.key} className={`border-b last:border-0 ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}>
+                        <GroupHeaderCells group={g} rank={gi + 1} onToggleGroup={handleGroupToggle} />
                       </tr>
                     ))}
                   </tbody>

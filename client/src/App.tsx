@@ -22,6 +22,7 @@ import { logout } from '@/lib/api'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
+import ModelDetailPage from '@/pages/ModelDetailPage'
 import FusionPage from '@/pages/FusionPage'
 import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
@@ -237,6 +238,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models/chat" element={<FallbackPage />} />
+                <Route path="/models/chat/:id" element={<ModelDetailPage />} />
                 <Route path="/models/fusion" element={<FusionPage />} />
                 <Route path="/models/embeddings" element={<EmbeddingsPage />} />
                 <Route path="/playground" element={<PlaygroundPage />} />

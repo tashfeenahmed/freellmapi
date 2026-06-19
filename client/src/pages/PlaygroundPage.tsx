@@ -131,15 +131,13 @@ export default function PlaygroundPage() {
     queryFn: () => apiFetch('/api/fallback'),
   })
 
-  const { data: unify } = useQuery<{ enabled: boolean }>({
-    queryKey: ['unify'],
-    queryFn: () => apiFetch('/api/settings/unify'),
-  })
-  const unifyOn = unify?.enabled ?? true
+  // Unification is always on now (the on/off toggle was removed), so the picker
+  // always collapses a model's providers into one option.
+  const unifyOn = true
 
   const availableModels = fallbackEntries.filter(e => e.keyCount > 0 && e.enabled)
-  // When unify is on, collapse the same model from multiple providers into one
-  // option (value = canonical id, which the proxy resolves to the whole group).
+  // Collapse the same model from multiple providers into one option (value =
+  // canonical id, which the proxy resolves to the whole group).
   const modelOptions = buildModelOptions(availableModels, unifyOn)
 
   useEffect(() => {

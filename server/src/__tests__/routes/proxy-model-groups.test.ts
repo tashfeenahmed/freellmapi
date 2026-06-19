@@ -210,14 +210,17 @@ describe('Model unification (group the same model across providers)', () => {
     expect(body.choices).toBeUndefined(); // no answer from any model
   });
 
-  it('with unify OFF, /v1/models lists each provider separately again', async () => {
+  it('unification is always on: the toggle was removed, so /v1/models stays collapsed even after setUnifyEnabled(false)', async () => {
+    // The unify on/off switch was removed from the product; isUnifyEnabled() now
+    // always returns true, so writing the old setting has no effect.
     setUnifyEnabled(false);
     const { status, body } = await request(app, 'GET', '/v1/models', undefined, authHeaders());
     expect(status).toBe(200);
-    const groq = body.data.find((m: any) => m.id === 'tum-groq');
-    const cerebras = body.data.find((m: any) => m.id === 'tum-cerebras');
-    expect(groq?.owned_by).toBe('groq');
-    expect(cerebras?.owned_by).toBe('cerebras');
-    expect(body.data.some((m: any) => m.id === 'test-unify-model')).toBe(false);
+    const ours = body.data.filter((m: any) => m.name === 'Test Unify Model');
+    expect(ours).toHaveLength(1);
+    expect(ours[0].id).toBe('test-unify-model');
+    expect(ours[0].owned_by).toBe('freellmapi');
+    // The raw per-provider ids are never advertised anymore.
+    expect(body.data.some((m: any) => m.id === 'tum-groq' || m.id === 'tum-cerebras')).toBe(false);
   });
 });

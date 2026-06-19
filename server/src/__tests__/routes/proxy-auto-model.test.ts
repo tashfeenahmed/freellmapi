@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
-import { setUnifyEnabled } from '../../services/model-groups.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -43,11 +42,10 @@ describe('Virtual "auto" model', () => {
 
   beforeEach(async () => {
     const db = getDb();
-    // This suite asserts the legacy per-provider /v1/models catalog semantics
-    // (#242/#282 — one entry per model_id, owned_by = provider). Model
-    // unification (default ON) collapses those into logical-model groups, which
-    // is covered separately in proxy-model-groups.test.ts; pin it OFF here.
-    setUnifyEnabled(false);
+    // Unification is always on: /v1/models lists one entry per logical model
+    // (owned_by = freellmapi, id = canonical slug) that aggregates availability
+    // across its providers. This suite asserts the availability tagging (#242)
+    // and context-window advertising (#282) under that unified shape.
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM requests').run();
 
@@ -106,10 +104,12 @@ describe('Virtual "auto" model', () => {
       if (m.available) expect(m.unavailable_reason).toBeNull();
       else expect(['no_key', 'disabled']).toContain(m.unavailable_reason);
     }
-    // Only a groq key is seeded: a groq model is available; a non-groq model is
-    // listed but unavailable for lack of a key.
-    expect(models.some((m: any) => m.owned_by === 'groq' && m.available)).toBe(true);
-    expect(models.some((m: any) => m.owned_by !== 'groq' && !m.available && m.unavailable_reason === 'no_key')).toBe(true);
+    // Every logical model is owned_by freellmapi (unified). Only a groq key is
+    // seeded, so at least one model is available (served by groq) and at least
+    // one model with no provider key is listed but unavailable.
+    expect(models.every((m: any) => m.owned_by === 'freellmapi')).toBe(true);
+    expect(models.some((m: any) => m.available)).toBe(true);
+    expect(models.some((m: any) => !m.available && m.unavailable_reason === 'no_key')).toBe(true);
   });
 
   it('?available=true narrows to only connected models (#242)', async () => {
@@ -125,19 +125,20 @@ describe('Virtual "auto" model', () => {
     expect(allModels.length).toBeGreaterThan(filteredModels.length);
   });
 
-  it('marks a disabled model with unavailable_reason "disabled" (#242)', async () => {
+  it('marks a fully-disabled model with unavailable_reason "disabled" (#242)', async () => {
     const db = getDb();
-    const row = db.prepare("SELECT model_id FROM models WHERE platform='groq' AND enabled=1 LIMIT 1").get() as { model_id: string } | undefined;
+    const row = db.prepare("SELECT display_name FROM models WHERE platform='groq' AND enabled=1 LIMIT 1").get() as { display_name: string } | undefined;
     expect(row).toBeDefined();
-    db.prepare('UPDATE models SET enabled=0 WHERE model_id=?').run(row!.model_id);
+    // A unified model stays available while ANY of its providers is enabled, so
+    // disable every provider that serves this logical model (same display_name).
+    db.prepare('UPDATE models SET enabled=0 WHERE display_name=?').run(row!.display_name);
     try {
       const { body } = await request(app, 'GET', '/v1/models', undefined, authHeaders());
-      const entry = body.data.find((m: any) => m.id === row!.model_id);
-      expect(entry).toBeDefined();
-      expect(entry.available).toBe(false);
-      expect(entry.unavailable_reason).toBe('disabled');
+      const disabled = body.data.filter((m: any) => m.id !== 'auto' && m.unavailable_reason === 'disabled');
+      expect(disabled.length).toBeGreaterThan(0);
+      expect(disabled.every((m: any) => m.available === false)).toBe(true);
     } finally {
-      db.prepare('UPDATE models SET enabled=1 WHERE model_id=?').run(row!.model_id);
+      db.prepare('UPDATE models SET enabled=1 WHERE display_name=?').run(row!.display_name);
     }
   });
 

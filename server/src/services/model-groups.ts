@@ -58,10 +58,13 @@ export interface ModelGroup {
 }
 
 // ── Settings accessors ───────────────────────────────────────────────────────
+// Unification is now always on: a model served by several providers is always
+// shown as one logical model that fails over across its providers. The on/off
+// toggle was removed from the UI, so a user who previously turned it off is
+// still unified. (setUnifyEnabled + the stored setting remain only so the
+// settings endpoint stays backward-compatible; the value is ignored here.)
 export function isUnifyEnabled(): boolean {
-  const raw = getSetting(UNIFY_ENABLED_KEY);
-  if (raw == null) return true; // default ON
-  return raw === '1' || raw.toLowerCase() === 'true';
+  return true;
 }
 
 export function setUnifyEnabled(on: boolean): void {
