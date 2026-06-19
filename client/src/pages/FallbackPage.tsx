@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -555,8 +555,8 @@ function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
       <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
       <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
       <td className="py-2 pr-3 align-middle">
-        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} className="group/m flex items-center gap-2 flex-wrap text-left">
-          <span className="font-medium text-sm group-hover/m:underline underline-offset-2 decoration-muted-foreground/50">{group.label}</span>
+        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left">
+          <span className="font-medium text-sm">{group.label}</span>
           {solo
             ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
             : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
@@ -580,7 +580,7 @@ function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
       <td className="py-2 pr-3 align-middle"><AxisBar value={best.intelligence} color="#a855f7" /></td>
       <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">{guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}</td>
       <td className="py-2 pr-3 align-middle text-right font-mono text-xs font-medium tabular-nums">{best.score !== undefined ? best.score.toFixed(3) : '–'}</td>
-      <td className="py-2 pr-3 align-middle text-right">
+      <td className="py-2 pr-3 align-middle text-right" onClick={e => e.stopPropagation()}>
         <Switch checked={anyEnabled} onCheckedChange={(c) => onToggleGroup(group.members.map(m => m.modelDbId), c)} />
       </td>
     </>
@@ -595,10 +595,13 @@ function SortableGroupRow({ group, rank, onToggleGroup }: {
   const { t } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
   const anyEnabled = group.members.some(m => m.enabled)
+  const navigate = useNavigate()
+  const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
   const handle = (
     <button
       {...attributes}
       {...listeners}
+      onClick={e => e.stopPropagation()}
       className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
       aria-label={t('models.dragToReorderGroup')}
     >
@@ -609,7 +612,8 @@ function SortableGroupRow({ group, rank, onToggleGroup }: {
     <tr
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
+      onClick={() => navigate(`/models/chat/${detailId}`)}
+      className={`border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
       <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} />
     </tr>
@@ -618,6 +622,7 @@ function SortableGroupRow({ group, rank, onToggleGroup }: {
 
 export default function FallbackPage() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
 
@@ -798,7 +803,11 @@ export default function FallbackPage() {
                   <ModelTableHead />
                   <tbody>
                     {orderedGroups.map((g, gi) => (
-                      <tr key={g.key} className={`border-b last:border-0 ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}>
+                      <tr
+                        key={g.key}
+                        onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
+                        className={`border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
+                      >
                         <GroupHeaderCells group={g} rank={gi + 1} onToggleGroup={handleGroupToggle} />
                       </tr>
                     ))}
