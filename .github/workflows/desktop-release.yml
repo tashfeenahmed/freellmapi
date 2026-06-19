@@ -31,7 +31,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          # Pinned to windows-2022 (VS 2022): node-gyp can't yet parse the VS "18"
+          # toolset on windows-latest, which breaks the better-sqlite3 native build.
+          - os: windows-2022
             script: desktop:dist:win
             artifact: windows-installer
             glob: desktop/dist-electron/*.exe
