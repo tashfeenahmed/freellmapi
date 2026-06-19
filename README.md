@@ -117,19 +117,13 @@ PRs that add any of these are very welcome. See [Contributing](#contributing).
 
 **One-liner** (Docker required — sets up `~/freellmapi`, generates an encryption key, pulls the image, and starts the container):
 
-macOS / Linux:
-
 ```bash
 curl -fsSL https://freellmapi.co/install.sh | bash
 ```
 
-Windows (PowerShell):
+Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
-```powershell
-iwr -useb https://freellmapi.co/install.ps1 | iex
-```
-
-Prefer to read before you pipe? Here are the scripts: [install.sh](https://freellmapi.co/install.sh) · [install.ps1](https://freellmapi.co/install.ps1). Re-running is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
+On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** (below); the Docker steps work in WSL or any bash shell.
 
 **Or manually with Docker Compose.** It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
 
