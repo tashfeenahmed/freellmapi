@@ -34,11 +34,11 @@ jobs:
           # Pinned to windows-2022 (VS 2022): node-gyp can't yet parse the VS "18"
           # toolset on windows-latest, which breaks the better-sqlite3 native build.
           - os: windows-2022
-            script: desktop:dist:win
+            ebArgs: --win --x64
             artifact: windows-installer
             glob: desktop/dist-electron/*.exe
           - os: macos-latest
-            script: desktop:dist
+            ebArgs: --mac --arm64
             artifact: macos-dmg
             glob: desktop/dist-electron/*.dmg
     steps:
@@ -54,19 +54,30 @@ jobs:
       - name: Install desktop dependencies
         run: npm --prefix desktop install
 
-      # electron-builder (on Windows) walks up to the repo root and errors on the
-      # parent .dockerignore ("must be under .../desktop/"). It's irrelevant to the
-      # desktop installer, so drop it from this ephemeral checkout before building.
-      - name: Remove repo-root .dockerignore (electron-builder path quirk)
+      - name: Build client + desktop bundles
         shell: bash
-        run: rm -f .dockerignore
+        run: |
+          npm run build -w client
+          npm --prefix desktop run build:all
 
-      - name: Build installer
-        run: npm run ${{ matrix.script }}
+      - name: Package installer
+        shell: bash
         env:
           # No signing certs in CI — build unsigned rather than failing on a
           # missing identity. (The app already ships unsigned; see README.)
           CSC_IDENTITY_AUTODISCOVERY: 'false'
+        run: |
+          set -e
+          # Run electron-builder with desktop/ as its own project root. Invoked
+          # from the monorepo root (e.g. via `npm --prefix desktop run`), it walks
+          # up, treats the repo root as the project, and on Windows pulls parent
+          # files (.dockerignore, .env.example, …) into the asar — failing with
+          # "<file> must be under …/desktop/". Running from desktop/ and hiding the
+          # root package.json (whose `workspaces` field triggers the upward scan)
+          # makes desktop/ the detected project root.
+          mv package.json "$RUNNER_TEMP/root-package.json"
+          cd desktop
+          npx --no-install electron-builder ${{ matrix.ebArgs }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
