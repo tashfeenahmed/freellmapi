@@ -11,8 +11,11 @@ asar: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/better-sqlite3/build/Release/**"
+# client-dist is staged into desktop/ by `npm run stage:client` (scripts/stage-client.mjs).
+# It MUST stay a path inside desktop/: a `../` source makes electron-builder treat the
+# repo root as a copy base and reject every root file ("must be under .../desktop/").
 extraResources:
-  - from: ../client/dist
+  - from: client-dist
     to: client-dist
 mac:
   category: public.app-category.developer-tools

@@ -59,6 +59,10 @@ jobs:
         run: |
           npm run build -w client
           npm --prefix desktop run build:all
+          # Stage client/dist into desktop/ so electron-builder's extraResources
+          # source stays inside desktop/ (no `../`). Belt-and-suspenders with the
+          # root-hiding below; also makes local `desktop:dist:win` work on Windows.
+          npm --prefix desktop run stage:client
 
       - name: Package installer
         shell: bash
