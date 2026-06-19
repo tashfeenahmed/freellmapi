@@ -117,11 +117,19 @@ PRs that add any of these are very welcome. See [Contributing](#contributing).
 
 **One-liner** (Docker required — sets up `~/freellmapi`, generates an encryption key, pulls the image, and starts the container):
 
+macOS / Linux:
+
 ```bash
 curl -fsSL https://freellmapi.co/install.sh | bash
 ```
 
-Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
+Windows (PowerShell):
+
+```powershell
+iwr -useb https://freellmapi.co/install.ps1 | iex
+```
+
+Prefer to read before you pipe? Here are the scripts: [install.sh](https://freellmapi.co/install.sh) · [install.ps1](https://freellmapi.co/install.ps1). Re-running is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
 **Or manually with Docker Compose.** It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
 
@@ -212,16 +220,16 @@ request stats.
 
 ![FreeLLMAPI desktop app](repo-assets/desktop.png)
 
-**[Download the macOS app from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**, or build it from this repo in a few minutes:
+**[Download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
 
 ```bash
 npm install
-npm run desktop:dist        # macOS: desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:win    # Windows installer
+npm run desktop:dist        # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
+npm run desktop:dist:win    # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
 ```
 
-> **Windows:** the build config is in place but not tested yet — if you try it,
-> a quick report (working or not) in an issue would be much appreciated.
+> Locally built apps are unsigned, so Windows SmartScreen may warn on first run
+> ("More info" → "Run anyway"); the macOS build launches without Gatekeeper prompts.
 
 ## Premium (live catalog)
 

@@ -1,0 +1,73 @@
+name: Desktop release
+
+# Builds the menu-bar desktop app installers (Windows .exe + macOS .dmg) and,
+# on a version tag, attaches them to the GitHub Release. Closes #318 — the
+# dist:win build config already existed; this is the missing publish step.
+#
+# Triggers:
+#   - workflow_dispatch        manual build (artifacts only)
+#   - push tags 'v*'           build + attach the installers to the release
+#   - pull_request (desktop)   build-only smoke test so the Windows build can't
+#                              silently rot (only when desktop/CI files change)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: desktop:dist:win
+            artifact: windows-installer
+            glob: desktop/dist-electron/*.exe
+          - os: macos-latest
+            script: desktop:dist
+            artifact: macos-dmg
+            glob: desktop/dist-electron/*.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Install desktop dependencies
+        run: npm --prefix desktop install
+
+      - name: Build installer
+        run: npm run ${{ matrix.script }}
+        env:
+          # No signing certs in CI — build unsigned rather than failing on a
+          # missing identity. (The app already ships unsigned; see README.)
+          CSC_IDENTITY_AUTODISCOVERY: 'false'
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.glob }}
