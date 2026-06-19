@@ -26,6 +26,11 @@ describe('isModelNotFoundError (drives whole-model skip within a request)', () =
     expect(isModelNotFoundError(new Error('No endpoints found for openrouter/minimax/minimax-m2.5:free'))).toBe(true);
   });
 
+  it('flags 410 Gone (model pulled upstream) by message or attached status — #339', () => {
+    expect(isModelNotFoundError(new Error('Ollama Cloud API error 410: Gone'))).toBe(true);
+    expect(isModelNotFoundError(Object.assign(new Error('Gone'), { status: 410 }))).toBe(true);
+  });
+
   it('does not flag rate limits, 5xx, or payment errors', () => {
     expect(isModelNotFoundError(new Error('429 Too Many Requests'))).toBe(false);
     expect(isModelNotFoundError(new Error('503 Service Unavailable'))).toBe(false);
@@ -117,6 +122,37 @@ describe('isRetryableError', () => {
       expect(isPaymentRequiredError(new Error('HuggingFace Router API error 402: Payment required'))).toBe(true);
       expect(isPaymentRequiredError(new Error('429 Too Many Requests'))).toBe(false);
       expect(isPaymentRequiredError(new Error('503 Service Unavailable'))).toBe(false);
+    });
+  });
+
+  describe('410 Gone & un-enumerated upstream statuses fail over instead of 502 (#337/#339)', () => {
+    // The headline bug: a provider error whose HTTP status the substring allowlist
+    // never enumerated (410 Gone, 502, 504, 408 …) used to abort the whole chain
+    // with a 502 — stranding the healthy paid routes still queued later in the
+    // fallback order. It must rotate to the next route instead.
+    it('treats an Ollama "410: Gone" as retryable, by message and by attached status', () => {
+      // openai-compat throws via providerHttpError, so the real error carries both.
+      expect(isRetryableError(new Error('Ollama Cloud API error 410: Gone'))).toBe(true);
+      expect(isRetryableError(Object.assign(new Error('Ollama Cloud API error 410: Gone'), { status: 410 }))).toBe(true);
+    });
+
+    it('fails over on any 5xx the substring rules never listed, via the structured status', () => {
+      // No '502'/'504'/'507' substring rule exists; the err.status catch-all covers them.
+      expect(isRetryableError(Object.assign(new Error('Bad Gateway'), { status: 502 }))).toBe(true);
+      expect(isRetryableError(Object.assign(new Error('Gateway Timeout'), { status: 504 }))).toBe(true);
+      expect(isRetryableError(Object.assign(new Error('Insufficient Storage'), { status: 507 }))).toBe(true);
+    });
+
+    it('fails over on 408 request-timeout / 409 conflict by status', () => {
+      expect(isRetryableError(Object.assign(new Error('Request Timeout'), { status: 408 }))).toBe(true);
+      expect(isRetryableError(Object.assign(new Error('Conflict'), { status: 409 }))).toBe(true);
+    });
+
+    it('still treats genuinely-fatal 400/401 as NON-retryable even with an attached status', () => {
+      // The structured catch-all must not swallow client-fatal errors — they fail on
+      // every provider identically, so aborting the request is the correct behavior.
+      expect(isRetryableError(Object.assign(new Error('Bad Request'), { status: 400 }))).toBe(false);
+      expect(isRetryableError(Object.assign(new Error('Unauthorized'), { status: 401 }))).toBe(false);
     });
   });
 
