@@ -54,6 +54,13 @@ jobs:
       - name: Install desktop dependencies
         run: npm --prefix desktop install
 
+      # electron-builder (on Windows) walks up to the repo root and errors on the
+      # parent .dockerignore ("must be under .../desktop/"). It's irrelevant to the
+      # desktop installer, so drop it from this ephemeral checkout before building.
+      - name: Remove repo-root .dockerignore (electron-builder path quirk)
+        shell: bash
+        run: rm -f .dockerignore
+
       - name: Build installer
         run: npm run ${{ matrix.script }}
         env:
