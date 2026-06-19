@@ -177,7 +177,6 @@ function createTables(db: Database.Database) {
   ensureRequestKeyIdColumn(db);
   ensureApiKeysBaseUrlColumn(db);
   ensureModelsKeyIdColumn(db);
-  ensureRequestGroupIdAndAttempt(db);
   ensureRequestTtfbColumn(db);
   ensureRequestRequestedModelColumn(db);
 }
@@ -190,19 +189,6 @@ function ensureRequestRequestedModelColumn(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
   if (!columns.some(col => col.name === 'requested_model')) {
     db.prepare('ALTER TABLE requests ADD COLUMN requested_model TEXT').run();
-  }
-}
-
-// Request tracing uses one group id per inbound request and the current retry
-// loop index for each logged attempt. Both are nullable so older rows remain
-// valid, but new rows can carry chronological trace metadata.
-function ensureRequestGroupIdAndAttempt(db: Database.Database) {
-  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
-  if (!columns.some(col => col.name === 'request_group_id')) {
-    db.prepare('ALTER TABLE requests ADD COLUMN request_group_id TEXT').run();
-  }
-  if (!columns.some(col => col.name === 'attempt_number')) {
-    db.prepare('ALTER TABLE requests ADD COLUMN attempt_number INTEGER').run();
   }
 }
 
