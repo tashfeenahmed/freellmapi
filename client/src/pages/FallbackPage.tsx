@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
@@ -27,7 +27,6 @@ import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
-import { CombinedModelsNote } from '@/components/combined-models-note'
 import { Tooltip } from '@/components/tooltip'
 
 export interface FallbackEntry {
@@ -556,9 +555,8 @@ function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
       <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
       <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
       <td className="py-2 pr-3 align-middle">
-        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} className="group/m flex items-center gap-2 flex-wrap text-left hover:text-foreground">
-          <ChevronRight className="size-4 flex-shrink-0 text-muted-foreground/60 group-hover/m:text-foreground transition-colors" />
-          <span className="font-medium text-sm">{group.label}</span>
+        <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} className="group/m flex items-center gap-2 flex-wrap text-left">
+          <span className="font-medium text-sm group-hover/m:underline underline-offset-2 decoration-muted-foreground/50">{group.label}</span>
           {solo
             ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
             : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
@@ -718,9 +716,6 @@ export default function FallbackPage() {
       />
 
       <div className="space-y-6">
-        {/* Explain the unified-model behavior the first time (dismissible). */}
-        <CombinedModelsNote />
-
         {/* Monthly token budget — moved to the top */}
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
