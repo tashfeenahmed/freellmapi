@@ -123,6 +123,55 @@ describe('Model unification (group the same model across providers)', () => {
     expect(headers.get('x-routed-via')).toContain('cerebras');
   });
 
+  it('a group-pinned non-streaming session sticks to the last successful provider next turn (#341 sticky-key)', async () => {
+    const db = getDb();
+    const realFetch = global.fetch;
+    const sess = { ...authHeaders(), 'x-session-id': 'sticky-test-1' };
+    const groqId = db.prepare("SELECT id FROM models WHERE model_id = 'tum-groq'").get() as { id: number };
+    const cerebrasId = db.prepare("SELECT id FROM models WHERE model_id = 'tum-cerebras'").get() as { id: number };
+    const setPriority = (modelDbId: number, p: number) =>
+      db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?').run(p, modelDbId);
+    // Both providers stay healthy throughout, so the only thing that can move the
+    // route between turns is stickiness — never a cooldown.
+    vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+      const u = String(url);
+      if (u.includes('api.groq.com')) return completion('tum-groq', 'from groq');
+      if (u.includes('api.cerebras.ai')) return completion('tum-cerebras', 'from cerebras');
+      return realFetch(url, init);
+    });
+
+    // Turn 1: make Cerebras priority 1 so it wins outright (no failover), recording
+    // it as the sticky provider for this pinned-model session.
+    setPriority(cerebrasId.id, 1);
+    setPriority(groqId.id, 2);
+    const turn1 = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'test-unify-model', messages: [{ role: 'user', content: 'first' }],
+    }, sess);
+    expect(turn1.status).toBe(200);
+    expect(turn1.headers.get('x-routed-via')).toContain('cerebras');
+
+    // Flip priority so plain routing would now prefer Groq — sticky must override.
+    setPriority(groqId.id, 1);
+    setPriority(cerebrasId.id, 2);
+
+    // Turn 2: same session, now a multi-turn conversation (getStickyModel only
+    // engages once the session has an assistant turn). Pure priority would pick
+    // Groq, but the sticky entry from turn 1 keeps it on Cerebras. This passes
+    // only when turn 1 wrote the sticky model under the pinned-id key
+    // (stickyStrategyKey); the non-streaming bug wrote it under the (undefined)
+    // global strategyKey, so this read missed and Groq won.
+    const turn2 = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'test-unify-model',
+      messages: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'from cerebras' },
+        { role: 'user', content: 'second' },
+      ],
+    }, sess);
+    expect(turn2.status).toBe(200);
+    expect(turn2.headers.get('x-routed-via')).toContain('cerebras');
+  });
+
   it('an old per-provider model_id still routes and now fails over within the group', async () => {
     const orig = global.fetch;
     vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {

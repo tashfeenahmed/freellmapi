@@ -5,6 +5,20 @@
 
 export function isRetryableError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
+  // Trust the upstream HTTP status the provider attached to the error first
+  // (providerHttpError in providers/base.ts sets err.status on every adapter).
+  // This structured check is the robust primary signal; the message-substring
+  // rules below are the fallback for errors that carry a code in their text but
+  // no numeric status. It's the fix for #337/#339: an Ollama "410 Gone", or any
+  // upstream 5xx the substring allowlist never enumerated (502/504/507…), used to
+  // fall through to a 502 and STRAND the healthy paid routes still queued later in
+  // the chain — because the old code matched specific substrings and ignored
+  // err.status for every code except 403. 408 (request timeout), 409 (conflict),
+  // 410 (model pulled upstream), 429 (rate limit) and all 5xx are transient or
+  // fail-over-able; 400/401 stay fatal (status 0 here, handled by the absence of a
+  // matching rule) and 403 is handled by isModelAccessForbiddenError below.
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  if (status === 408 || status === 409 || status === 410 || status === 429 || status >= 500) return true;
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
@@ -20,6 +34,12 @@ export function isRetryableError(err: any): boolean {
     // for a model that's been pulled). Rotate to the next model in the chain —
     // setCooldown + the health checker will avoid this model on subsequent requests.
     || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    // 410: the model/endpoint was permanently removed upstream (e.g. Ollama Cloud
+    // "API error 410: Gone", #339). Like a 404 it won't return on this provider, so
+    // rotate to the next route; isModelNotFoundError benches the whole model. The
+    // structured status check above already catches the 410 when the provider
+    // attaches err.status — this is the text fallback for errors that don't.
+    || msg.includes('410') || msg.includes('gone')
     // 403: the key is valid (it passed validateKey, and the health checker
     // disables truly-forbidden keys) but this specific model is off-limits to
     // the key's tier — e.g. gpt-4o on GitHub Models' free tier, subscription-only
@@ -64,8 +84,14 @@ export function isPaymentRequiredError(err: any): boolean {
 // burning one fallback attempt per key on the same dead route.
 // (PR #111, credits @barbotkonv.)
 export function isModelNotFoundError(err: any): boolean {
-  const msg = (err.message ?? '').toLowerCase();
-  return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found');
+  // 404 (removed/deprecated) and 410 (permanently Gone) are both MODEL-level: every
+  // key for the platform fails the same way, so skip the whole model for the rest
+  // of the request instead of burning one fallback attempt per sibling key. 410
+  // added for #339 (Ollama Cloud "Gone"); prefer the structured status when present.
+  if (err?.status === 404 || err?.status === 410) return true;
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    || msg.includes('410') || msg.includes('gone');
 }
 
 // A 403 Forbidden returned for a specific model behind an otherwise-valid key.
