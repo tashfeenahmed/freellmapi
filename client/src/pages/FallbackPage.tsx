@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
+import { CombinedModelsNote } from '@/components/combined-models-note'
 import { Tooltip } from '@/components/tooltip'
 
 interface FallbackEntry {
@@ -549,7 +550,9 @@ function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, o
           <span className="font-medium text-sm">{group.label}</span>
           {solo
             ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
-            : <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>}
+            : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
+                <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground cursor-help">{t('models.providerCount', { count: group.members.length })}</span>
+              </Tooltip>}
           {quota && (
             <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
               {quota.text}
@@ -794,6 +797,9 @@ export default function FallbackPage() {
       />
 
       <div className="space-y-6">
+        {/* Explain the unified-model behavior the first time (dismissible). */}
+        {unifyOn && <CombinedModelsNote />}
+
         {/* Monthly token budget — moved to the top */}
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 

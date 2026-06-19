@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { buildModelOptions } from '@/lib/model-groups'
+import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { Markdown } from '@/components/markdown'
 import { CopyButton } from '@/components/copy-button'
@@ -18,6 +19,7 @@ interface FallbackEntry {
   modelId: string
   displayName: string
   sizeLabel: string
+  intelligenceRank: number
   keyCount: number
 }
 
@@ -295,24 +297,32 @@ export default function PlaygroundPage() {
     inputRef.current?.focus()
   }
 
-  // Searchable picker options: auto + fusion pinned at the top, then every
-  // model sorted alphabetically A–Z by name.
+  // Searchable picker options: auto + fusion pinned at the top, then every model
+  // ordered BY INTELLIGENCE — size tier first (Frontier→Small), then the catalog
+  // rank within the tier, name as the final tiebreaker. (Raw intelligence_rank is
+  // per-provider, not global, so tier-first matches the server's preset; #135.)
   const pickerOptions = [
-    { value: 'auto', label: t('playground.autoModel'), sub: '', isNew: false },
-    { value: 'fusion', label: t('playground.fusionModel'), sub: '', isNew: true },
+    { value: 'auto', label: t('playground.autoModel'), sub: '', isNew: false, platforms: [] as string[] },
+    { value: 'fusion', label: t('playground.fusionModel'), sub: '', isNew: true, platforms: [] as string[] },
     ...modelOptions
+      .slice()
+      .sort((a, b) =>
+        a.sizeTier - b.sizeTier ||
+        a.intelligenceRank - b.intelligenceRank ||
+        a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
       .map(o => ({
         value: o.value,
         label: o.label,
         sub: o.providerCount > 1 ? t('models.providerCount', { count: o.providerCount }) : o.platform,
         isNew: false,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })),
+        // Provider names for the multi-provider hover + search; empty when solo.
+        platforms: o.providerCount > 1 ? o.platforms : [],
+      })),
   ]
-  // Literal, case-insensitive substring match against name, provider, and id.
+  // Literal, case-insensitive substring match against name, providers, and id.
   const modelQ = modelQuery.trim().toLowerCase()
   const filteredOptions = modelQ
-    ? pickerOptions.filter(o => `${o.label} ${o.sub} ${o.value}`.toLowerCase().includes(modelQ))
+    ? pickerOptions.filter(o => `${o.label} ${o.sub} ${o.value} ${o.platforms.join(' ')}`.toLowerCase().includes(modelQ))
     : pickerOptions
 
   function pickModel(v: string) {
@@ -368,7 +378,9 @@ export default function PlaygroundPage() {
                         <Check className={`size-4 shrink-0 ${o.value === selectedModel ? 'opacity-100' : 'opacity-0'}`} />
                         <span className="min-w-0 flex-1 truncate">{o.label}</span>
                         {o.isNew && <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">{t('models.newBadge')}</span>}
-                        {o.sub && <span className="shrink-0 text-xs text-muted-foreground">{o.sub}</span>}
+                        {o.sub && (o.platforms.length > 1
+                          ? <Tooltip text={t('models.servedBy', { providers: o.platforms.join(', ') })}><span className="shrink-0 text-xs text-muted-foreground underline decoration-dotted underline-offset-2">{o.sub}</span></Tooltip>
+                          : <span className="shrink-0 text-xs text-muted-foreground">{o.sub}</span>)}
                       </button>
                     ))
                   )}
