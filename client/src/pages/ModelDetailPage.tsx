@@ -108,15 +108,6 @@ export default function ModelDetailPage() {
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
             </div>
 
-            {/* Ready-to-run snippet that references this model by its unified id. */}
-            <div className="overflow-hidden rounded-2xl border bg-card">
-              <div className="flex items-center gap-2 border-b px-3 py-2">
-                <CopyButton text={snippet} className="size-7 shrink-0" label={t('common.copy')} />
-                <span className="text-xs font-medium">{t('models.codeSnippetHeading')}</span>
-              </div>
-              <pre className="overflow-x-auto px-4 py-3 text-[11px] leading-relaxed"><code className="font-mono">{snippet}</code></pre>
-            </div>
-
             {/* Per-provider stats (same columns as the Models table) */}
             <div className="rounded-2xl border overflow-x-auto">
               <table className="w-full text-sm">
@@ -144,6 +135,15 @@ export default function ModelDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Ready-to-run snippet that references this model by its unified id. */}
+            <div className="overflow-hidden rounded-2xl border bg-card">
+              <div className="flex items-center gap-2 border-b px-3 py-2">
+                <CopyButton text={snippet} className="size-7 shrink-0" label={t('common.copy')} />
+                <span className="text-xs font-medium">{t('models.codeSnippetHeading')}</span>
+              </div>
+              <pre className="overflow-x-auto px-4 py-3 text-[11px] leading-relaxed"><code className="font-mono">{snippet}</code></pre>
             </div>
           </>
         )}
