@@ -91,6 +91,7 @@
     "viewProviders": "View providers",
     "backToModels": "Back to models",
     "providersHeading": "Providers serving this model",
+    "codeSnippetHeading": "Use this model",
     "modelNotFound": "This model is not available, or it has no configured providers.",
     "providerIdsHeading": "Provider model ids",
     "providerIdsHint": "Send the unified model id to fail over across every provider, or a provider-specific id to pin one provider.",

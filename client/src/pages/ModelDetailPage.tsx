@@ -32,6 +32,10 @@ export default function ModelDetailPage() {
     queryKey: ['fallback', 'routing'],
     queryFn: () => apiFetch('/api/fallback/routing'),
   })
+  const { data: keyData } = useQuery<{ apiKey: string }>({
+    queryKey: ['unified-key'],
+    queryFn: () => apiFetch('/api/settings/api-key'),
+  })
 
   // Toggling a provider persists immediately (no save bar on this page): send the
   // full entries list with this one flipped, then refresh.
@@ -64,6 +68,21 @@ export default function ModelDetailPage() {
   const vision = members.some(m => m.supportsVision)
   const tools = members.some(m => m.supportsTools)
 
+  // A ready-to-run request referencing this model by its unified id, so it fails
+  // over across every provider above. Same base-URL derivation as the Keys page.
+  const baseUrl = import.meta.env.DEV
+    ? `http://${window.location.hostname}:${__SERVER_PORT__}/v1`
+    : `${window.location.origin}/v1`
+  const snippet = `curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer ${keyData?.apiKey || 'YOUR_API_KEY'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${canonicalId}",
+    "messages": [
+      { "role": "user", "content": "Hello!" }
+    ]
+  }'`
+
   return (
     <div>
       <PageHeader title={label} description={t('models.providersHeading')} divider={false} actions={<ModelsTabs />} />
@@ -87,6 +106,15 @@ export default function ModelDetailPage() {
               {quota && <span title={quota.title} className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground tabular-nums">{quota.text}</span>}
               {vision && <span title={t('models.visionTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>}
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
+            </div>
+
+            {/* Ready-to-run snippet that references this model by its unified id. */}
+            <div className="overflow-hidden rounded-2xl border bg-card">
+              <div className="flex items-center gap-2 border-b px-3 py-2">
+                <CopyButton text={snippet} className="size-7 shrink-0" label={t('common.copy')} />
+                <span className="text-xs font-medium">{t('models.codeSnippetHeading')}</span>
+              </div>
+              <pre className="overflow-x-auto px-4 py-3 text-[11px] leading-relaxed"><code className="font-mono">{snippet}</code></pre>
             </div>
 
             {/* Per-provider stats (same columns as the Models table) */}
