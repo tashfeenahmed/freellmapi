@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Layers } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { buildModelOptions } from '@/lib/model-groups'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -53,11 +54,21 @@ export default function FusionPage() {
     queryFn: () => apiFetch('/api/fallback'),
   })
 
+  const { data: unify } = useQuery<{ enabled: boolean }>({
+    queryKey: ['unify'],
+    queryFn: () => apiFetch('/api/settings/unify'),
+  })
+  const unifyOn = unify?.enabled ?? true
+
   // Models that can actually serve a request right now (enabled + a key).
   const availableModels = useMemo(
     () => fallbackEntries.filter(e => e.keyCount > 0 && e.enabled),
     [fallbackEntries],
   )
+  // When unify is on, the panel/judge pickers offer ONE option per logical
+  // model (value = canonical id); the fusion service resolves it to the group's
+  // best member. When off, one option per provider row, as before.
+  const modelOptions = useMemo(() => buildModelOptions(availableModels, unifyOn), [availableModels, unifyOn])
 
   const [mode, setMode] = useState<Mode>('auto')
   const [models, setModels] = useState<string[]>([])
@@ -151,19 +162,19 @@ export default function FusionPage() {
                 <h2 className="text-sm font-medium">{t('fusion.panelModels')}</h2>
                 <span className="text-xs text-muted-foreground">{t('fusion.selectedCount', { count: models.length, max: maxK })}</span>
               </div>
-              {availableModels.length === 0 ? (
+              {modelOptions.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t('fusion.noModels')}</p>
               ) : (
                 <div className="max-h-80 overflow-y-auto rounded-xl border divide-y">
-                  {availableModels.map(m => {
-                    const selected = models.includes(m.modelId)
+                  {modelOptions.map(o => {
+                    const selected = models.includes(o.value)
                     const atCap = !selected && models.length >= maxK
                     return (
                       <button
-                        key={m.modelDbId}
+                        key={o.value}
                         type="button"
                         disabled={atCap}
-                        onClick={() => toggleModel(m.modelId)}
+                        onClick={() => toggleModel(o.value)}
                         className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                           selected ? 'bg-muted/50' : atCap ? 'opacity-40' : 'hover:bg-muted/30'
                         }`}
@@ -172,10 +183,12 @@ export default function FusionPage() {
                           {selected && <Check className="size-3" />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="text-sm font-medium">{m.displayName}</span>
-                          <span className="ml-2 font-mono text-[11px] text-muted-foreground">{m.modelId}</span>
+                          <span className="text-sm font-medium">{o.label}</span>
+                          <span className="ml-2 font-mono text-[11px] text-muted-foreground">{o.value}</span>
                         </span>
-                        <Badge variant="secondary" className="text-[10px]">{m.platform}</Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {o.providerCount > 1 ? t('models.providerCount', { count: o.providerCount }) : o.platform}
+                        </Badge>
                       </button>
                     )
                   })}
@@ -206,16 +219,18 @@ export default function FusionPage() {
                 <SelectValue>
                   {(v: string) => (!v || v === JUDGE_AUTO)
                     ? t('fusion.judgeAuto')
-                    : (availableModels.find(m => m.modelId === v)?.displayName ?? v)}
+                    : (modelOptions.find(o => o.value === v)?.label ?? v)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={JUDGE_AUTO}>{t('fusion.judgeAuto')}</SelectItem>
-                {availableModels.map(m => (
-                  <SelectItem key={m.modelDbId} value={m.modelId}>
+                {modelOptions.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
                     <span className="flex items-center gap-2">
-                      <span>{m.displayName}</span>
-                      <span className="text-xs text-muted-foreground">{m.platform}</span>
+                      <span>{o.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {o.providerCount > 1 ? t('models.providerCount', { count: o.providerCount }) : o.platform}
+                      </span>
                     </span>
                   </SelectItem>
                 ))}

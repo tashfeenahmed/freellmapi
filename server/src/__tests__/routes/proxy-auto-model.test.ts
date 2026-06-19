@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { setUnifyEnabled } from '../../services/model-groups.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -42,6 +43,11 @@ describe('Virtual "auto" model', () => {
 
   beforeEach(async () => {
     const db = getDb();
+    // This suite asserts the legacy per-provider /v1/models catalog semantics
+    // (#242/#282 — one entry per model_id, owned_by = provider). Model
+    // unification (default ON) collapses those into logical-model groups, which
+    // is covered separately in proxy-model-groups.test.ts; pin it OFF here.
+    setUnifyEnabled(false);
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM requests').run();
 

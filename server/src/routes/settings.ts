@@ -3,8 +3,36 @@ import type { Request, Response } from 'express';
 import { getUnifiedApiKey, regenerateUnifiedKey, getSetting, setSetting } from '../db/index.js';
 import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, isProxyActive, getProxyUrl, isProxyEnabled, getProxyBypassPlatforms } from '../lib/proxy.js';
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
+import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
+import { z } from 'zod';
 
 export const settingsRouter = Router();
+
+// Get the model-unification setting: the global toggle (default ON) plus any
+// merge/split overrides. Governs the dashboard grouping, /v1/models grouping,
+// and cross-provider pin failover.
+settingsRouter.get('/unify', (_req: Request, res: Response) => {
+  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides() });
+});
+
+const unifyPutSchema = z.object({
+  enabled: z.boolean().optional(),
+  overrides: unifyOverridesSchema.optional(),
+});
+
+// Update the unify toggle and/or overrides. Partial: send just `enabled` to
+// flip the switch, or `overrides` to adjust grouping, or both.
+settingsRouter.put('/unify', (req: Request, res: Response) => {
+  const parsed = unifyPutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const detail = parsed.error.errors.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
+    res.status(400).json({ error: { message: `Invalid unify settings: ${detail}`, type: 'invalid_request_error' } });
+    return;
+  }
+  if (parsed.data.enabled !== undefined) setUnifyEnabled(parsed.data.enabled);
+  if (parsed.data.overrides) setUnifyOverrides(parsed.data.overrides);
+  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides() });
+});
 
 // Get the saved fusion default config (panel mode, models, judge, k, strategy).
 settingsRouter.get('/fusion', (_req: Request, res: Response) => {

@@ -8,6 +8,7 @@ import {
   speedScore, intelligenceScore, headroomFactor, rateLimitFactor, combineScore,
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
+import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from './model-groups.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Database } from 'better-sqlite3';
@@ -645,6 +646,45 @@ export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skip
   return selectKeyForModel(entry, estimatedTokens, skipKeys);
 }
 
+/**
+ * Resolve a logical model group's member db ids to an ordered ChainRow[] for
+ * strict group-pin routing (the "unify" feature). Each enabled member is
+ * hydrated as a ChainRow carrying its REAL fallback_config.priority, then
+ * ordered by the active strategy via orderChain — so 'priority' honors the
+ * manual within-group order and scored strategies use live scores (priority as
+ * the tiebreaker). Members disabled in the chain (fallback_config.enabled = 0)
+ * are dropped.
+ *
+ * Pass the result to routeRequest() as `prefetchedChain` and DO NOT pass a
+ * `preferredModelDbId` that isn't already one of these rows — otherwise the
+ * preferred-model injection in routeRequest would unshift an off-group model and
+ * the pin would no longer be strict (it could answer with a different model).
+ */
+export function resolveModelGroupCandidates(memberDbIds: number[]): ChainRow[] {
+  const db = getDb();
+  const strategy = getRoutingStrategy();
+  if (strategy !== 'priority') refreshStatsCache(db);
+
+  const selectMember = db.prepare(`
+    SELECT m.id as model_db_id, COALESCE(fc.priority, 0) as priority,
+           COALESCE(fc.enabled, 1) as enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM models m
+    LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+    WHERE m.id = ? AND m.enabled = 1
+  `);
+
+  const rows: ChainRow[] = [];
+  for (const id of memberDbIds) {
+    const row = selectMember.get(id) as ChainRow | undefined;
+    if (row && row.enabled) rows.push(row);
+  }
+  return orderChain(rows, strategy);
+}
+
 // A panel candidate surfaced to the fusion layer: enough to pick a diverse set
 // and resolve each to a pinned dispatch.
 export interface FusionCandidate {
@@ -731,16 +771,40 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
     model_db_id: number; platform: string; model_id: string; display_name: string;
     size_label: string; supports_vision: number; supports_tools: number;
   } | undefined;
-  if (!row) return null;
-  return {
-    modelDbId: row.model_db_id,
-    platform: row.platform,
-    modelId: row.model_id,
-    displayName: row.display_name,
-    sizeLabel: row.size_label,
-    supportsVision: row.supports_vision,
-    supportsTools: row.supports_tools,
-  };
+  if (row) {
+    return {
+      modelDbId: row.model_db_id,
+      platform: row.platform,
+      modelId: row.model_id,
+      displayName: row.display_name,
+      sizeLabel: row.size_label,
+      supportsVision: row.supports_vision,
+      supportsTools: row.supports_tools,
+    };
+  }
+
+  // Unify ON: a fusion picker value may be a canonical GROUP id rather than a
+  // raw model_id. Resolve it to the group's best-ordered enabled member so
+  // saved fusion configs that use canonical ids keep working. Exact model_id
+  // match above always wins first, so OFF mode and legacy configs are untouched.
+  if (isUnifyEnabled()) {
+    const members = resolveRequestedIdToMembers(modelId, getModelGroups());
+    if (members && members.length > 0) {
+      const top = resolveModelGroupCandidates(members)[0];
+      if (top) {
+        return {
+          modelDbId: top.model_db_id,
+          platform: top.platform,
+          modelId: top.model_id,
+          displayName: top.display_name,
+          sizeLabel: top.size_label,
+          supportsVision: top.supports_vision,
+          supportsTools: top.supports_tools,
+        };
+      }
+    }
+  }
+  return null;
 }
 
 export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {

@@ -117,6 +117,34 @@ export interface FallbackEntry {
   speedRank: number;
   priority: number;
   enabled: boolean;
+  // Present when model unification is enabled — identifies the logical model
+  // this provider row belongs to so the dashboard can render grouped rows.
+  groupKey?: string;
+  canonicalId?: string;
+  groupLabel?: string;
+}
+
+// ---- Model Grouping (unify the same model across providers) ----
+// One logical model can be served by several providers (rows in the `models`
+// table). When unification is enabled, those rows collapse into a single group
+// keyed by a normalized display name; see server/src/services/model-groups.ts.
+export interface ModelGroupInfo {
+  groupKey: string;     // normalized display name — the grouping identity
+  canonicalId: string;  // stable slug advertised on /v1/models
+  groupLabel: string;   // human label (suffix-stripped display name)
+}
+
+export interface UnifyOverrides {
+  // Coalesce several normalized display-names (or exact "platform:model_id"
+  // members) into one group keyed by `into`.
+  merges: { into: string; keys: string[] }[];
+  // Force a specific "platform:model_id" row out of its computed group.
+  splits: { member: string; groupKey?: string }[];
+}
+
+export interface UnifySettings {
+  enabled: boolean;
+  overrides: UnifyOverrides;
 }
 
 // ---- OpenAI-Compatible Types ----

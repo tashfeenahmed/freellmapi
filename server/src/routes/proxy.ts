@@ -3,7 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
-import { routeRequest, resolveRoutingChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain } from '../services/router.js';
+import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
@@ -15,6 +15,7 @@ import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandof
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
+import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from '../services/model-groups.js';
 
 export const proxyRouter = Router();
 
@@ -135,25 +136,67 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
           AND (m.key_id IS NULL OR k.id = m.key_id)
       ) THEN 1 ELSE 0 END)`;
   const db = getDb();
-  const models = db.prepare(`
-    SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id
-    FROM (
-      SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id,
-             m.enabled AS enabled,
-             ${availableExpr} AS available,
-             ROW_NUMBER() OVER (
-               PARTITION BY m.model_id
-               ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
-             ) AS rn
+
+  // A normalized listing row, whether we're grouping (unify ON) or not (OFF).
+  let allListed: {
+    id: string; name: string; ownedBy: string;
+    available: number; enabled: number; contextWindow: number | null; intel: number;
+  }[];
+
+  if (isUnifyEnabled()) {
+    // Unify ON: one entry per logical model group. Pull per-row availability +
+    // context keyed by db id, then aggregate over each group's members.
+    type AvailRow = { id: number; platform: string; intelligence_rank: number; context_window: number | null; enabled: number; available: number };
+    const rows = db.prepare(`
+      SELECT m.id, m.platform, m.intelligence_rank, m.context_window,
+             m.enabled AS enabled, ${availableExpr} AS available
       FROM models m
-    )
-    WHERE rn = 1
-    ORDER BY available DESC, enabled DESC, intelligence_rank ASC, id ASC
-  `).all() as ModelListRow[];
+    `).all() as AvailRow[];
+    const byId = new Map(rows.map(r => [r.id, r]));
+    allListed = getModelGroups().map(g => {
+      const infos = g.members.map(m => byId.get(m.model_db_id)).filter(Boolean) as AvailRow[];
+      const ctxs = infos.map(i => i.context_window).filter((c): c is number => c != null);
+      return {
+        id: g.canonicalId,
+        name: g.groupLabel,
+        ownedBy: 'freellmapi',
+        available: infos.some(i => i.available === 1) ? 1 : 0,
+        enabled: infos.some(i => i.enabled === 1) ? 1 : 0,
+        contextWindow: ctxs.length ? Math.max(...ctxs) : null,
+        intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
+      };
+    });
+  } else {
+    // Unify OFF: today's behavior — one entry per model_id (dedup picks the
+    // available, smartest representative row).
+    const models = db.prepare(`
+      SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id
+      FROM (
+        SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id,
+               m.enabled AS enabled,
+               ${availableExpr} AS available,
+               ROW_NUMBER() OVER (
+                 PARTITION BY m.model_id
+                 ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
+               ) AS rn
+        FROM models m
+      )
+      WHERE rn = 1
+    `).all() as (ModelListRow & { intelligence_rank: number; id: number })[];
+    allListed = models.map(m => ({
+      id: m.model_id, name: m.display_name, ownedBy: m.platform,
+      available: m.available, enabled: m.enabled, contextWindow: m.context_window,
+      intel: m.intelligence_rank,
+    }));
+  }
+
+  // Stable order: usable first, then enabled, then smartest, then name.
+  allListed.sort((a, b) =>
+    (b.available - a.available) || (b.enabled - a.enabled) || (a.intel - b.intel) || a.name.localeCompare(b.name));
 
   const q = String(req.query.available ?? req.query.connected ?? '').toLowerCase();
   const onlyAvailable = q === '1' || q === 'true' || q === 'yes';
-  const listed = onlyAvailable ? models.filter(m => m.available === 1) : models;
+  const listed = onlyAvailable ? allListed.filter(m => m.available === 1) : allListed;
 
   // "auto" routes to whichever model fits, so its honest ceiling is the largest
   // context window among models that can serve a request right now. Advertising
@@ -162,9 +205,9 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
   // before they ever reach us (#282). Computed over currently-available models
   // (not the query-filtered `listed`) so the ceiling is honest even on the
   // default unfiltered list; null only when nothing is connected.
-  const availableContextWindows = models
-    .filter(m => m.available === 1 && m.context_window != null)
-    .map(m => m.context_window as number);
+  const availableContextWindows = allListed
+    .filter(m => m.available === 1 && m.contextWindow != null)
+    .map(m => m.contextWindow as number);
   const autoContextWindow = availableContextWindows.length > 0
     ? Math.max(...availableContextWindows)
     : null;
@@ -199,13 +242,13 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         unavailable_reason: autoContextWindow != null ? null : 'no_models',
       },
       ...listed.map(m => ({
-        id: m.model_id,
+        id: m.id,
         object: 'model',
         created: 0,
-        owned_by: m.platform,
-        name: m.display_name,
-        context_window: m.context_window,
-        context_length: m.context_window,
+        owned_by: m.ownedBy,
+        name: m.name,
+        context_window: m.contextWindow,
+        context_length: m.contextWindow,
         // Non-standard but additive: OpenAI clients ignore unknown fields.
         available: m.available === 1,
         unavailable_reason: m.available === 1 ? null : (m.enabled === 1 ? 'no_key' : 'disabled'),
@@ -716,24 +759,64 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
+  // When the pinned model is a unified group, this holds the group's ordered
+  // members and is passed to routeRequest as the STRICT chain (no other model
+  // is ever reached). Undefined for auto and legacy single-row pins.
+  let groupChain: ChainRow[] | undefined;
+  // Sticky scope: auto requests bucket by routing strategy; a unified group pin
+  // buckets by the canonical id the client sent, so the group prefers its last
+  // successful provider without leaking stickiness across groups.
+  let stickyStrategyKey: string | undefined = strategyKey;
+
   if (isAutoModel(requestedModel)) {
     preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
   } else if (requestedModel) {
     const db = getDb();
-    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
-    if (enabled) {
-      preferredModel = enabled.id;
+    // Unify ON: a requested id (canonical slug OR any provider's model_id) maps
+    // to the whole logical-model group, and we route STRICTLY across only its
+    // providers — failing over between them, never to a different model (#335).
+    const members = isUnifyEnabled() ? resolveRequestedIdToMembers(requestedModel, getModelGroups()) : null;
+    if (members && members.length > 0) {
+      groupChain = resolveModelGroupCandidates(members);
+      if (groupChain.length === 0) {
+        // Distinguish a catalog-disabled model from one whose providers are
+        // present but unusable (chain-disabled / no key), so the 400 stays
+        // actionable and matches the legacy single-row "is disabled" wording.
+        const placeholders = members.map(() => '?').join(',');
+        const anyEnabled = db.prepare(`SELECT 1 FROM models WHERE id IN (${placeholders}) AND enabled = 1 LIMIT 1`).get(...members);
+        const reason = anyEnabled ? 'has no providers with an enabled key' : 'is disabled';
+        res.status(400).json({
+          error: {
+            message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            type: 'invalid_request_error',
+            code: 'model_not_found',
+          },
+        });
+        return;
+      }
+      stickyStrategyKey = requestedModel;
+      const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+      // Only prefer the sticky member if it's actually IN this group — passing a
+      // non-member as preferredModelDbId would make routeRequest inject an
+      // off-group model and break strict pinning.
+      preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
     } else {
-      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
-      const reason = disabled ? 'is disabled' : 'is not in the catalog';
-      res.status(400).json({
-        error: {
-          message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
-          type: 'invalid_request_error',
-          code: 'model_not_found',
-        },
-      });
-      return;
+      // Unify OFF, or an id that isn't in the catalog: legacy single-row pin.
+      const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
+      if (enabled) {
+        preferredModel = enabled.id;
+      } else {
+        const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
+        const reason = disabled ? 'is disabled' : 'is not in the catalog';
+        res.status(400).json({
+          error: {
+            message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            type: 'invalid_request_error',
+            code: 'model_not_found',
+          },
+        });
+        return;
+      }
     }
   } else {
     preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
@@ -759,7 +842,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // model is on record). Turns where injection can't happen — every turn 1, and
       // sessions that never switched — pay no headroom tax.
       const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
-      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, resolvedChain?.chain);
+      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, groupChain ?? resolvedChain?.chain);
     } catch (err: any) {
       // No more models available
       if (lastError) {
@@ -993,7 +1076,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           recordRequest(route.platform, route.modelId, route.keyId);
           recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + injectedHandoffTokens + totalOutputTokens);
           recordSuccess(route.modelDbId);
-          setStickyModel(messages, route.modelDbId, sessionIdHeader, strategyKey);
+          setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens + injectedHandoffTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
           return;

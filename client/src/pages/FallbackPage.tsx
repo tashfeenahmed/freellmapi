@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, useRef, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -44,9 +44,17 @@ interface FallbackEntry {
   rpmLimit: number | null
   rpdLimit: number | null
   monthlyTokenBudget: string
+  // Parsed token count from the server (single source of truth — see
+  // server/src/lib/budget.ts). Optional only because the dev mock omits it.
+  monthlyTokenBudgetTokens?: number
   supportsVision: boolean
   supportsTools: boolean
   keyCount: number
+  // Logical-model grouping (sent by the server when unify is relevant). Absent
+  // for ungrouped rows; the UI falls back to a per-row "solo" group then.
+  groupKey?: string
+  canonicalId?: string
+  groupLabel?: string
 }
 
 type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom'
@@ -198,6 +206,22 @@ function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+// For models with no monthly token budget, surface their rate quota instead.
+// Strips the catalog's decorative bits ("free · ", " per IP", "~", "?") so e.g.
+// "free · 40 RPM" → "40 RPM", "free · 200/hr per IP" → "200/hr", "~? (anon)" →
+// "anon". Returns null when nothing meaningful remains.
+function cleanQuotaLabel(s: string | undefined): string | null {
+  if (!s) return null
+  let c = s
+    .replace(/free\s*·\s*/ig, '')
+    .replace(/\s*per ip\s*/ig, '')
+    .replace(/[~?]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  c = c.replace(/^\(([^()]*)\)$/, '$1').trim()
+  return c || null
 }
 
 interface TokenUsageData {
@@ -385,9 +409,13 @@ function RowContent({
           )}
         </div>
         <div className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
-          {t('models.tokPerMonth', { count: row.monthlyTokenBudget })}
-          {row.rpmLimit ? ` · ${t('models.rpmLimit', { count: row.rpmLimit })}` : ''}
-          {row.rpdLimit ? ` · ${t('models.rpdLimit', { count: row.rpdLimit })}` : ''}
+          {/* Token budget only when it's a real token count; rate-limited models
+              (NVIDIA's "free · 40 RPM") show their rate, not "… tok/mo". */}
+          {[
+            (row.monthlyTokenBudgetTokens ?? 0) > 0 ? t('models.tokPerMonth', { count: row.monthlyTokenBudget }) : null,
+            row.rpmLimit ? t('models.rpmLimit', { count: row.rpmLimit }) : null,
+            row.rpdLimit ? t('models.rpdLimit', { count: row.rpdLimit }) : null,
+          ].filter(Boolean).join(' · ') || cleanQuotaLabel(row.monthlyTokenBudget) || '—'}
         </div>
       </td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
@@ -430,6 +458,150 @@ function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle
       className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
     >
       <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
+    </tr>
+  )
+}
+
+// ── Grouped (unified) rendering ──────────────────────────────────────────────
+// One logical model and the provider rows that serve it.
+interface ModelGroupRow {
+  key: string
+  label: string
+  members: Row[]
+}
+
+// Group merged rows by their server-assigned groupKey (or a per-row "solo" key
+// when ungrouped). Members are ordered like the flat chain — by manual priority
+// under the priority strategy, by live score otherwise — and groups inherit the
+// best member's position so the unified order matches the flat order.
+function buildGroups(rows: Row[], isManual: boolean): ModelGroupRow[] {
+  const map = new Map<string, Row[]>()
+  for (const r of rows) {
+    const key = r.groupKey ?? `solo:${r.modelDbId}`
+    const arr = map.get(key)
+    if (arr) arr.push(r)
+    else map.set(key, [r])
+  }
+  const groups = [...map.entries()].map(([key, members]) => ({
+    key,
+    label: members[0].groupLabel ?? members[0].displayName,
+    members: [...members].sort((a, b) => (isManual ? a.priority - b.priority : (b.score ?? 0) - (a.score ?? 0))),
+  }))
+  groups.sort((a, b) =>
+    isManual
+      ? Math.min(...a.members.map(m => m.priority)) - Math.min(...b.members.map(m => m.priority))
+      : Math.max(...b.members.map(m => m.score ?? 0)) - Math.max(...a.members.map(m => m.score ?? 0)),
+  )
+  return groups
+}
+
+const dragDots = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+    <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+    <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+  </svg>
+)
+
+// The collapsed header row for a logical-model group: name, provider count,
+// union vision/tools badges, the best member's axis bars + score, and a single
+// switch that enables/disables every provider in the group.
+function GroupHeaderCells({ group, rank, expanded, onToggleExpand, dragHandle, onToggleGroup }: {
+  group: ModelGroupRow
+  rank: number
+  expanded: boolean
+  onToggleExpand: () => void
+  dragHandle?: ReactNode
+  onToggleGroup: (memberIds: number[], enabled: boolean) => void
+}) {
+  const { t } = useI18n()
+  const anyEnabled = group.members.some(m => m.enabled)
+  const solo = group.members.length === 1
+  const best = group.members.reduce((b, m) => ((m.score ?? -1) > (b.score ?? -1) ? m : b), group.members[0])
+  const guard = (best.headroom ?? 1) * (best.rateLimit ?? 1)
+  const vision = group.members.some(m => m.supportsVision)
+  const tools = group.members.some(m => m.supportsTools)
+  // Quota badge beside the name: the aggregated monthly token budget when the
+  // group has one (summed across providers — you can spend all of them via
+  // failover), otherwise the model's rate cap (RPM/RPD, or the catalog's rate
+  // label) for rate-limited providers like NVIDIA.
+  const totalBudget = group.members.reduce((sum, m) => sum + (m.monthlyTokenBudgetTokens ?? 0), 0)
+  const maxRpm = Math.max(0, ...group.members.map(m => m.rpmLimit ?? 0))
+  const maxRpd = Math.max(0, ...group.members.map(m => m.rpdLimit ?? 0))
+  const rateLabelText = group.members.map(m => cleanQuotaLabel(m.monthlyTokenBudget)).find(Boolean) ?? null
+  // A summed monthly token budget if the group has one, else a rate cap (RPM/RPD,
+  // or the catalog's rate label) for rate-limited providers like NVIDIA.
+  function quotaBadge(): { text: string; title: string } | null {
+    if (totalBudget > 0) return { text: t('models.aggregateBudget', { count: formatTokens(totalBudget) }), title: t('models.aggregateBudgetTitle') }
+    if (maxRpm > 0) return { text: t('models.rateRpm', { count: maxRpm }), title: t('models.rateTitle') }
+    if (maxRpd > 0) return { text: t('models.rateRpd', { count: maxRpd }), title: t('models.rateTitle') }
+    if (rateLabelText) return { text: rateLabelText, title: t('models.rateTitle') }
+    return null
+  }
+  const quota = quotaBadge()
+  return (
+    <>
+      <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
+      <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
+      <td className="py-2 pr-3 align-middle">
+        <button type="button" onClick={onToggleExpand} className="flex items-center gap-2 flex-wrap text-left" aria-expanded={expanded}>
+          <ChevronDown className={`size-4 flex-shrink-0 text-muted-foreground transition-transform ${expanded ? '' : '-rotate-90'}`} />
+          <span className="font-medium text-sm">{group.label}</span>
+          {solo
+            ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
+            : <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>}
+          {quota && (
+            <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+              {quota.text}
+            </span>
+          )}
+          {vision && (
+            <span title={t('models.visionTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>
+          )}
+          {tools && (
+            <span title={t('models.toolsTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>
+          )}
+        </button>
+      </td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.reliability} color="#22c55e" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.speed} color="#3b82f6" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.intelligence} color="#a855f7" /></td>
+      <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">{guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}</td>
+      <td className="py-2 pr-3 align-middle text-right font-mono text-xs font-medium tabular-nums">{best.score !== undefined ? best.score.toFixed(3) : '–'}</td>
+      <td className="py-2 pr-3 align-middle text-right">
+        <Switch checked={anyEnabled} onCheckedChange={(c) => onToggleGroup(group.members.map(m => m.modelDbId), c)} />
+      </td>
+    </>
+  )
+}
+
+function SortableGroupRow({ group, rank, expanded, onToggleExpand, onToggleGroup }: {
+  group: ModelGroupRow
+  rank: number
+  expanded: boolean
+  onToggleExpand: () => void
+  onToggleGroup: (memberIds: number[], enabled: boolean) => void
+}) {
+  const { t } = useI18n()
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
+  const anyEnabled = group.members.some(m => m.enabled)
+  const handle = (
+    <button
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+      aria-label={t('models.dragToReorderGroup')}
+    >
+      {dragDots}
+    </button>
+  )
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
+    >
+      <GroupHeaderCells group={group} rank={rank} expanded={expanded} onToggleExpand={onToggleExpand} dragHandle={handle} onToggleGroup={onToggleGroup} />
     </tr>
   )
 }
@@ -515,6 +687,72 @@ export default function FallbackPage() {
   }
 
   const hasChanges = localEntries !== null
+
+  // ── Model unification (group the same model across providers) ──────────────
+  const { data: unify } = useQuery<{ enabled: boolean }>({
+    queryKey: ['unify'],
+    queryFn: () => apiFetch('/api/settings/unify'),
+  })
+  const unifyOn = unify?.enabled ?? true
+  const unifyMutation = useMutation({
+    mutationFn: (enabled: boolean) => apiFetch('/api/settings/unify', { method: 'PUT', body: JSON.stringify({ enabled }) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unify'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+    },
+  })
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
+  const orderedGroups = buildGroups(rows, isManual)
+
+  function toggleExpand(key: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function handleGroupToggle(memberIds: number[], enabled: boolean) {
+    const ids = new Set(memberIds)
+    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+  }
+
+  // Serialize the displayed group order (group-major, member-minor) to the flat
+  // priority list PUT /api/fallback expects; keyless rows keep their tail spot.
+  function persistGroupOrder(groups: ModelGroupRow[]) {
+    const order: number[] = []
+    for (const g of groups) for (const m of g.members) order.push(m.modelDbId)
+    const unconfigured = allEntries.filter(e => e.keyCount === 0).map(e => e.modelDbId)
+    const prio = new Map([...order, ...unconfigured].map((id, i) => [id, i + 1]))
+    setLocalEntries(allEntries.map(e => ({ ...e, priority: prio.get(e.modelDbId) ?? e.priority })))
+  }
+
+  function handleGroupedDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const a = String(active.id)
+    const o = String(over.id)
+    if (a.startsWith('grp:')) {
+      if (!o.startsWith('grp:')) return // a group dropped on a member row — ignore
+      const oldI = orderedGroups.findIndex(g => `grp:${g.key}` === a)
+      const newI = orderedGroups.findIndex(g => `grp:${g.key}` === o)
+      if (oldI < 0 || newI < 0) return
+      persistGroupOrder(arrayMove(orderedGroups, oldI, newI))
+    } else {
+      // Member reorder, constrained to within its own group.
+      const activeId = Number(a)
+      const overId = Number(o)
+      const gi = orderedGroups.findIndex(g => g.members.some(m => m.modelDbId === activeId))
+      if (gi < 0) return
+      const members = orderedGroups[gi].members
+      const oldI = members.findIndex(m => m.modelDbId === activeId)
+      const newI = members.findIndex(m => m.modelDbId === overId)
+      if (newI < 0) return // dropped outside its group — ignore
+      const next = orderedGroups.map((g, i) => (i === gi ? { ...g, members: arrayMove(g.members, oldI, newI) } : g))
+      persistGroupOrder(next)
+    }
+  }
 
   const tableHead = (
     <thead>
@@ -604,6 +842,16 @@ export default function FallbackPage() {
           </p>
         </section>
 
+        {/* Unify duplicate models — collapse the same model served by several
+            providers into one expandable row (and one /v1/models entry). */}
+        <section className="flex items-center justify-between rounded-3xl border bg-card p-5">
+          <div className="min-w-0 pr-4">
+            <h2 className="text-sm font-medium">{t('models.unifyToggle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('models.unifyToggleHint')}</p>
+          </div>
+          <Switch checked={unifyOn} onCheckedChange={(c) => unifyMutation.mutate(c)} disabled={unifyMutation.isPending} />
+        </section>
+
         {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -617,7 +865,65 @@ export default function FallbackPage() {
           <>
             {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
                 live-region <div>s, which are invalid as direct <table> children. */}
-            {isManual ? (
+            {unifyOn ? (
+              isManual ? (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
+                  <div className="rounded-2xl border overflow-x-auto">
+                    <table className="w-full text-sm">
+                      {tableHead}
+                      <SortableContext items={orderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
+                        <tbody>
+                          {orderedGroups.map((g, gi) => (
+                            <Fragment key={g.key}>
+                              <SortableGroupRow
+                                group={g}
+                                rank={gi + 1}
+                                expanded={expandedGroups.has(g.key)}
+                                onToggleExpand={() => toggleExpand(g.key)}
+                                onToggleGroup={handleGroupToggle}
+                              />
+                              {expandedGroups.has(g.key) && (
+                                <SortableContext items={g.members.map(m => m.modelDbId)} strategy={verticalListSortingStrategy}>
+                                  {g.members.map((m, mi) => (
+                                    <SortableRow key={m.modelDbId} row={m} rank={mi + 1} onToggle={handleToggle} />
+                                  ))}
+                                </SortableContext>
+                              )}
+                            </Fragment>
+                          ))}
+                        </tbody>
+                      </SortableContext>
+                    </table>
+                  </div>
+                </DndContext>
+              ) : (
+                <div className="rounded-2xl border overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {tableHead}
+                    <tbody>
+                      {orderedGroups.map((g, gi) => (
+                        <Fragment key={g.key}>
+                          <tr className={`border-b last:border-0 ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}>
+                            <GroupHeaderCells
+                              group={g}
+                              rank={gi + 1}
+                              expanded={expandedGroups.has(g.key)}
+                              onToggleExpand={() => toggleExpand(g.key)}
+                              onToggleGroup={handleGroupToggle}
+                            />
+                          </tr>
+                          {expandedGroups.has(g.key) && g.members.map((m, mi) => (
+                            <tr key={m.modelDbId} className={`border-b last:border-0 bg-muted/20 ${m.enabled ? '' : 'opacity-50'}`}>
+                              <RowContent row={m} rank={mi + 1} draggable={false} onToggle={handleToggle} />
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : isManual ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
