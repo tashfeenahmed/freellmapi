@@ -31,6 +31,7 @@ export abstract class BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    context?: unknown,
   ): Promise<ChatCompletionResponse>;
 
   abstract streamChatCompletion(
@@ -38,6 +39,7 @@ export abstract class BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    context?: unknown,
   ): AsyncGenerator<ChatCompletionChunk>;
 
   abstract validateKey(apiKey: string): Promise<boolean>;

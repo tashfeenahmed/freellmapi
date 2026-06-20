@@ -68,6 +68,7 @@ export class OpenAICompatProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): Promise<ChatCompletionResponse> {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -115,6 +116,7 @@ export class OpenAICompatProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): AsyncGenerator<ChatCompletionChunk> {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',

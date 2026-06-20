@@ -326,6 +326,7 @@ export class GoogleProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): Promise<ChatCompletionResponse> {
     const { contents, systemInstruction } = await toGeminiContents(messages);
 
@@ -389,6 +390,7 @@ export class GoogleProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): AsyncGenerator<ChatCompletionChunk> {
     const { contents, systemInstruction } = await toGeminiContents(messages);
 

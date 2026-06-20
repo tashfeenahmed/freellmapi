@@ -17,6 +17,7 @@ export class CohereProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): Promise<ChatCompletionResponse> {
     const body: Record<string, unknown> = {
       model: modelId,
@@ -52,6 +53,7 @@ export class CohereProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): AsyncGenerator<ChatCompletionChunk> {
     const body: Record<string, unknown> = {
       model: modelId,

@@ -307,6 +307,7 @@ const TRANSIENT_COOLDOWN_MS = 90 * 1000;
 // other providers instead of re-hammering a dead key every retry. Re-escalates
 // on the next 402 after expiry if still unpaid; a restart re-benches on first hit.
 export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
+export const MODEL_FORBIDDEN_COOLDOWN_MS = 6 * HOUR;
 
 // Decide how long to bench a model+key after an upstream 429. Escalate to the
 // long quarantine (getNextCooldownDuration, up to 24h) ONLY when the model is
@@ -326,7 +327,11 @@ export function getCooldownDurationForLimit(
   modelId: string,
   keyId: number,
   limits: { rpd: number | null; tpd: number | null },
+  retryAfterMs?: number,
 ): number {
+  if (retryAfterMs != null && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    return retryAfterMs;
+  }
   const now = Date.now();
   const rpdExhausted =
     limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;

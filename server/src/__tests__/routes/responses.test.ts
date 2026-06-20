@@ -10,7 +10,7 @@ vi.mock('../../services/router.js', async (importOriginal) => {
 
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 
 function fakeRoute(provider: any) {
   return { provider, modelId: 'fake-model', modelDbId: 9999, apiKey: 'k', keyId: 1, platform: 'fake', displayName: 'Fake Model' };
@@ -65,9 +65,34 @@ describe('POST /v1/responses (#96)', () => {
     expect(JSON.parse(text).error.code).toBe('no_vision_model');
   });
 
+  it('treats built-in agent tools as tool-bearing requests too', async () => {
+    const db = getDb();
+    db.prepare('UPDATE models SET enabled = 0 WHERE supports_tools = 1').run();
+
+    const { status } = await post(app, '/v1/responses', {
+      input: 'update the plan',
+      tools: [{ type: 'web_search', name: 'web_search' }],
+    }, key);
+
+    expect(status).toBe(422);
+
+    db.prepare('UPDATE models SET enabled = 1 WHERE supports_tools = 1').run();
+  });
+
   // #103: the x-api-key header (Anthropic wire format) must authenticate here
   // too, not just on /v1/chat/completions.
   it('accepts the unified key via the x-api-key header', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'Hello from fake' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
     const server = app.listen(0);
     const addr = server.address() as any;
     const res = await fetch(`http://127.0.0.1:${addr.port}/v1/responses`, {
@@ -106,7 +131,6 @@ describe('POST /v1/responses (#96)', () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() { throw new Error('should not be called'); },
       async *streamChatCompletion() {
-        yield { usage: { prompt_tokens: 1, completion_tokens: 0 } };
         yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { role: 'assistant', content: 'Hel' }, finish_reason: null }] };
         yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }] };
         yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };

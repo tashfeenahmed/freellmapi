@@ -1,49 +1,11 @@
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { resolveDefaultDbPath } from '../env.js';
 import { initEncryptionKey } from '../lib/crypto.js';
-import { hasRemoteSecretsStore, hydrateSecretsFromRemote, hydrateSecretsToRemote, remoteSecretCounts, scheduleHydrateSecretsToRemote } from '../services/remote-secrets.js';
 import { applyModelPricing } from './model-pricing.js';
-import { ensurePersistenceSchema } from './persistence-schema.js';
 import { refreshModelIntentFlags } from '../services/model-intent.js';
 
-const DB_PATH = resolveDefaultDbPath();
-
-let db: Database.Database;
-
-export function getDb(): Database.Database {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDb() first.');
-  }
-  return db;
-}
-
-export function initDb(dbPath?: string): Database.Database {
-  const resolvedPath = dbPath ?? DB_PATH;
-  const isMemory = resolvedPath === ':memory:';
-
-  if (!isMemory) {
-    const dataDir = path.dirname(resolvedPath);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-  }
-
-  db = new Database(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
+export function migrateDbSchema(db: Database.Database) {
   createTables(db);
-  ensurePersistenceSchema(db);
-  if (hasRemoteSecretsStore()) {
-    const counts = remoteSecretCounts();
-    if (counts && (counts.settings > 0 || counts.apiKeys > 0)) {
-      hydrateSecretsFromRemote(db);
-      console.log('[db] Loaded secret state from remote Postgres/Neon before local bootstrap.');
-    }
-  }
   initEncryptionKey(db);
   seedModels(db);
   migrateModels(db);
@@ -68,20 +30,26 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
   migrateModelsV22Tools(db);
+  migrateModelsV23FreeTierAudit(db);
+  migrateModelsV24ZenRefresh(db);
+  migrateModelsV25ZenDeadPromos(db);
+  migrateModelsV26IntentBias(db);
+  refreshModelIntentFlags(db);
+  // V25 is the LAST model-data migration. Since the Premium live catalog
+  // shipped (June 2026), model/limit DATA is maintained in the published
+  // catalog (served signed by the catalog service) and reaches installs via
+  // catalog-sync — premium on the live tier within ~12h, free at the monthly
+  // promote. Shipping model data as a
+  // migration would hand it to free users on their next binary update,
+  // bypassing the tier gate. Migrations from here on are baseline/code-level
+  // only (schema, family rules, provider plumbing, quirk-seed corrections).
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
   migrateEmbeddingsV1(db);
+  migrateQuirksV1(db);
   ensureUnifiedKey(db);
-  refreshModelIntentFlags(db);
-
-  if (hasRemoteSecretsStore()) {
-    scheduleHydrateSecretsToRemote(db);
-    console.log('[db] Mirrored secret state to remote Postgres/Neon.');
-  }
-
-  console.log(`Database initialized at ${resolvedPath}`);
-  return db;
+  migrateProfilesInit(db);
 }
 
 function createTables(db: Database.Database) {
@@ -105,7 +73,6 @@ function createTables(db: Database.Database) {
       coding_bias INTEGER NOT NULL DEFAULT 0,
       research_bias INTEGER NOT NULL DEFAULT 0,
       chat_bias INTEGER NOT NULL DEFAULT 0,
-      key_id INTEGER,
       UNIQUE(platform, model_id)
     );
 
@@ -127,7 +94,6 @@ function createTables(db: Database.Database) {
       platform TEXT NOT NULL,
       model_id TEXT NOT NULL,
       key_id INTEGER,
-      requested_model TEXT,
       status TEXT NOT NULL,
       input_tokens INTEGER NOT NULL DEFAULT 0,
       output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -164,6 +130,28 @@ function createTables(db: Database.Database) {
       UNIQUE(model_db_id)
     );
 
+    CREATE TABLE IF NOT EXISTS profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      type TEXT NOT NULL DEFAULT 'custom',
+      is_favorite INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      auto_sort TEXT,
+      layout_config TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS profile_models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      model_db_id INTEGER NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+      priority INTEGER NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(profile_id, model_db_id)
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -190,13 +178,68 @@ function createTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_lookup ON rate_limit_usage(platform, model_id, key_id, kind, created_at_ms);
     CREATE INDEX IF NOT EXISTS idx_rate_limit_cooldowns_expires ON rate_limit_cooldowns(expires_at_ms);
     CREATE INDEX IF NOT EXISTS idx_api_keys_platform ON api_keys(platform);
+
+    CREATE TABLE IF NOT EXISTS provider_quota_state (
+      platform TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      quota_pool_key TEXT NOT NULL,
+      metric TEXT NOT NULL,
+      limit_value INTEGER,
+      remaining_value INTEGER,
+      reset_at TEXT,
+      reset_strategy TEXT NOT NULL DEFAULT 'unknown',
+      source TEXT NOT NULL DEFAULT 'probe',
+      confidence REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      observed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (platform, key_id, quota_pool_key, metric)
+    );
+    CREATE INDEX IF NOT EXISTS idx_provider_quota_state_platform ON provider_quota_state(platform, key_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_provider_quota_state_reset_at ON provider_quota_state(reset_at);
+
+    CREATE TABLE IF NOT EXISTS provider_quota_observations (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      key_id INTEGER NOT NULL,
+      provider_account_id TEXT,
+      model_id TEXT,
+      quota_pool_key TEXT NOT NULL,
+      metric TEXT NOT NULL,
+      status_code INTEGER,
+      limit_value INTEGER,
+      remaining_value INTEGER,
+      reset_at TEXT,
+      retry_after_ms INTEGER,
+      reset_strategy TEXT NOT NULL DEFAULT 'unknown',
+      source TEXT NOT NULL DEFAULT 'probe',
+      confidence REAL NOT NULL DEFAULT 0,
+      notes TEXT,
+      raw_json TEXT,
+      endpoint TEXT,
+      observed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_provider_quota_observations_platform ON provider_quota_observations(platform, key_id, observed_at);
+    CREATE INDEX IF NOT EXISTS idx_provider_quota_observations_reset_at ON provider_quota_observations(reset_at);
   `);
 
   ensureRequestKeyIdColumn(db);
   ensureApiKeysBaseUrlColumn(db);
+  ensureModelsKeyIdColumn(db);
   ensureRequestTtfbColumn(db);
   ensureRequestRequestedModelColumn(db);
-  ensureModelsKeyIdColumn(db);
+}
+
+// `requested_model` is the model id the CLIENT pinned in the request body.
+// NULL when the request was auto-routed ('auto' or omitted model field).
+// requested_model = model_id means the pin was honored; a different model_id
+// means rate limits or failures forced a failover to another model.
+function ensureRequestRequestedModelColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'requested_model')) {
+    db.prepare('ALTER TABLE requests ADD COLUMN requested_model TEXT').run();
+  }
 }
 
 // `ttfb_ms` is the time-to-first-byte for streaming responses (ms from dispatch
@@ -209,13 +252,6 @@ function ensureRequestTtfbColumn(db: Database.Database) {
   }
 }
 
-function ensureRequestRequestedModelColumn(db: Database.Database) {
-  const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
-  if (!columns.some(col => col.name === 'requested_model')) {
-    db.prepare('ALTER TABLE requests ADD COLUMN requested_model TEXT').run();
-  }
-}
-
 function ensureRequestKeyIdColumn(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(requests)').all() as { name: string }[];
   if (!columns.some(col => col.name === 'key_id')) {
@@ -224,19 +260,29 @@ function ensureRequestKeyIdColumn(db: Database.Database) {
   db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_key_id ON requests(key_id)').run();
 }
 
-function ensureModelsKeyIdColumn(db: Database.Database) {
-  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
-  if (!columns.some(col => col.name === 'key_id')) {
-    db.prepare('ALTER TABLE models ADD COLUMN key_id INTEGER').run();
-  }
-}
-
 // `base_url` is the upstream endpoint for the user-configured 'custom' provider
 // (#117). NULL for every built-in platform — they use their hardcoded base URL.
 function ensureApiKeysBaseUrlColumn(db: Database.Database) {
   const columns = db.prepare('PRAGMA table_info(api_keys)').all() as { name: string }[];
   if (!columns.some(col => col.name === 'base_url')) {
     db.prepare('ALTER TABLE api_keys ADD COLUMN base_url TEXT').run();
+  }
+}
+
+// `key_id` binds a custom model to the api_keys row that carries ITS endpoint,
+// so several custom providers can coexist (#212). NULL for built-in platforms
+// (any key of the platform serves any of its models).
+function ensureModelsKeyIdColumn(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'key_id')) {
+    db.prepare('ALTER TABLE models ADD COLUMN key_id INTEGER').run();
+    // Backfill: bind pre-existing custom models to the (single) legacy custom
+    // endpoint key so they keep routing to the URL they were created for.
+    db.prepare(`
+      UPDATE models
+         SET key_id = (SELECT id FROM api_keys WHERE platform = 'custom' ORDER BY id LIMIT 1)
+       WHERE platform = 'custom' AND key_id IS NULL
+    `).run();
   }
 }
 
@@ -1408,6 +1454,14 @@ function migrateModelsV16Vision(db: Database.Database) {
       WHERE platform = 'github'
         AND (model_id LIKE '%gpt-4o%' OR model_id LIKE '%gpt-4.1%' OR model_id LIKE '%gpt-5%')
     `).run();
+    // V23 vision additions, both live-probed 2026-06-07 (answered a color
+    // question about an inline data-URL PNG): Zhipu's free GLM-4.6V Flash and
+    // NVIDIA's Nemotron Nano 12B v2 VL (via OpenRouter).
+    db.prepare(`
+      UPDATE models SET supports_vision = 1
+      WHERE LOWER(model_id) LIKE '%glm-4.6v%'
+         OR LOWER(model_id) LIKE '%nemotron-nano-12b-v2-vl%'
+    `).run();
   });
   apply();
 }
@@ -1705,7 +1759,8 @@ function migrateModelsV22Tools(db: Database.Database) {
       WHERE (
            LOWER(model_id) LIKE '%gpt-oss%'        -- groq/OR/cerebras/CF/sambanova/ollama; incl. safeguard (tool-tuned)
         OR ((LOWER(model_id) LIKE '%llama-3%' OR LOWER(model_id) LIKE '%llama-4%')
-            AND LOWER(model_id) NOT LIKE '%hermes%') -- Llama 3.x/4 native tools; hermes-3-llama emits text tool calls
+            AND LOWER(model_id) NOT LIKE '%hermes%'   -- hermes-3-llama emits text tool calls
+            AND LOWER(model_id) NOT LIKE '%llama-3.2%') -- 3B route declares no tool support (V23)
         OR LOWER(model_id) LIKE '%gemini-%'        -- every Gemini; gemma intentionally NOT matched
         OR LOWER(model_id) LIKE '%glm-%'           -- GLM 4.5+/5.x are agentic-tuned (zai/zhipu/CF/ollama)
         OR LOWER(model_id) LIKE '%qwen3%'
@@ -1726,11 +1781,194 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%gpt-4.1%'
         OR LOWER(model_id) LIKE '%gpt-5%'
         OR LOWER(model_id) LIKE '%nemotron-3-super%' -- benchmarked #8 with real tool calls; nano stays excluded
+        OR LOWER(model_id) LIKE '%nemotron-nano-12b-v2-vl%' -- unlike the 30B nano: live-probed structured tool_calls (V23, 2026-06-07)
+        OR LOWER(model_id) LIKE '%nemotron-3-ultra%' -- structured tool_calls live-verified via Zen's dedicated endpoint (V24, 2026-06-07); covers the disabled OR row too
+        OR LOWER(model_id) LIKE '%minimax-m3%'       -- finish_reason:tool_calls live-verified on Zen (V24)
+        OR LOWER(model_id) LIKE '%north-mini-code%'  -- structured tool_calls + reasoning_content live-verified on Zen (V26, 2026-06-10)
       )
     `).run();
   });
   apply();
 }
+
+function migrateModelsV26IntentBias(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'coding_bias')) {
+    db.prepare('ALTER TABLE models ADD COLUMN coding_bias INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!columns.some(col => col.name === 'research_bias')) {
+    db.prepare('ALTER TABLE models ADD COLUMN research_bias INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!columns.some(col => col.name === 'chat_bias')) {
+    db.prepare('ALTER TABLE models ADD COLUMN chat_bias INTEGER NOT NULL DEFAULT 0').run();
+  }
+}
+
+/**
+ * V23 (June 2026): recurring-free audit — drop SambaNova + Chutes, add
+ * live-verified free models (all probed 2026-06-07 with production keys).
+ *
+ * Removed platforms (models, fallback rows, AND key rows; earlier migrations
+ * re-insert the model rows on every boot, so this later DELETE is what keeps
+ * them out — same pattern as V21):
+ *   - sambanova: free tier is gone for good. The always-free tier was retired
+ *     in early 2025 ("We do not have any current plans to maintain the free
+ *     tier in any state" — staff, community.sambanova.ai/t/847) in favor of a
+ *     one-time $5 trial credit that expires in 3 months. Once it lapses with
+ *     no card on file, every chat call 402s "payment method required" — live
+ *     probe confirmed on all 6 models, while /v1/models still 200s (billing
+ *     gate, not a key problem). No recurring no-card path remains.
+ *   - chutes: never a registered provider — rows were hand-added during the
+ *     V11 evaluation. The Early Access free plan (200 req/day) fully retired
+ *     2026-03-15 (chutes.ai/news/community-announcement-february); PAYG and
+ *     paid subs only now, so V11's drop verdict is permanent.
+ *
+ * Added:
+ *   - openrouter kimi-k2.6:free — chat probed 200; tools flagged via the V22
+ *     %kimi-k2% family rule (the tool probe itself only hit upstream 429s —
+ *     it's a popular new route — but K2 is tool-native everywhere we run it).
+ *   - openrouter nemotron-nano-12b-v2-vl:free — structured tool_calls AND
+ *     vision both live-verified; V16/V22 rules added.
+ *   - zhipu glm-4.6v-flash — listed "Free" on Z.AI pricing; 200 with our
+ *     existing bigmodel.cn key; structured tool_calls + vision verified.
+ *   - openrouter nemotron-3-ultra-550b-a55b:free — 1M ctx, currently the
+ *     biggest free model anywhere, but generation takes 180s+ even on trivial
+ *     prompts (heavily congested), so it's seeded enabled=0. Flip it on when
+ *     it serves sanely. (Tools were unverifiable on the OR route while it
+ *     hangs; V24 verified the model family's structured tool_calls via Zen's
+ *     dedicated endpoint and added the V22 rule, so this seed is now 1.)
+ *   - openrouter llama-3.2-3b-instruct:free and
+ *     dolphin-mistral-24b-venice-edition:free — both heavily contended
+ *     (persistent upstream 429s at probe time) but real routes; no tools.
+ *   - NOT added: nvidia/nemotron-3.5-content-safety:free — it's a safety
+ *     classifier, not a chat model: probe returned content:null with a "User
+ *     Safety: safe/unsafe" verdict in reasoning, which would surface as empty
+ *     responses whenever the fallback chain landed on it.
+ *
+ * Idempotent: DELETEs re-run harmlessly; INSERT OR IGNORE means the ultra
+ * row's enabled=0 is seed-only, so a dashboard re-enable sticks across boots.
+ * vision/tools seeds match the V16/V22 rules (which re-assert next boot);
+ * tiers match V17's bands.
+ */
+function migrateModelsV23FreeTierAudit(db: Database.Database) {
+  const apply = db.transaction(() => {
+    for (const platform of ['sambanova', 'chutes']) {
+      db.prepare(`
+        DELETE FROM fallback_config WHERE model_db_id IN (
+          SELECT id FROM models WHERE platform = ?
+        )
+      `).run(platform);
+      db.prepare('DELETE FROM models WHERE platform = ?').run(platform);
+      db.prepare('DELETE FROM api_keys WHERE platform = ?').run(platform);
+    }
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, supports_vision, supports_tools)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null, number, number, number]> = [
+      ['openrouter', 'moonshotai/kimi-k2.6:free',                                     'Kimi K2.6 (OR free)',                 3, 9,  'Frontier', 20, 200, null, null, '~6M',  262144,  1, 0, 1],
+      ['openrouter', 'nvidia/nemotron-3-ultra-550b-a55b:free',                        'Nemotron 3 Ultra 550B (free, slow)',  7, 11, 'Frontier', 20, 200, null, null, '~6M',  1000000, 0, 0, 1],
+      ['openrouter', 'nvidia/nemotron-nano-12b-v2-vl:free',                           'Nemotron Nano 12B VL (free)',        26, 9,  'Medium',   20, 200, null, null, '~6M',  128000,  1, 1, 1],
+      ['openrouter', 'meta-llama/llama-3.2-3b-instruct:free',                         'Llama 3.2 3B (free)',                30, 9,  'Small',    20, 200, null, null, '~6M',  131072,  1, 0, 0],
+      ['openrouter', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', 'Dolphin Mistral 24B Venice (free)',  25, 9,  'Medium',   20, 200, null, null, '~6M',  32768,   1, 0, 0],
+      ['zhipu',      'glm-4.6v-flash',                                                'GLM-4.6V Flash',                     21, 4,  'Large',    null, null, null, null, '~30M', 131072,  1, 1, 1],
+    ];
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+  });
+  apply();
+}
+
+/**
+ * V24 (June 2026): OpenCode Zen roster refresh + NIM gemma pause. All claims
+ * live-probed 2026-06-07 with a real Zen account key through the gateway.
+ *
+ * Zen's promo roster rotated since V18:
+ *   - ADDED nemotron-3-ultra-free — newly docs-confirmed free, and unlike the
+ *     OpenRouter ultra route (which hangs: 0 tokens in 140s even streaming),
+ *     Zen serves it from a dedicated vLLM endpoint in ~2s WITH structured
+ *     tool_calls. Currently the biggest usable free model anywhere.
+ *   - ADDED minimax-m3-free — requested in #242 (thanks @Naster17). Live
+ *     probe: 2s chat, finish_reason:tool_calls. CAVEAT: not in Zen's docs
+ *     free table (same undocumented status qwen3.6-plus-free had before its
+ *     promo ended), so it may transition without notice — watchlist.
+ *   - qwen3.6-plus-free now errors "Free promotion has ended" — confirms the
+ *     docs-confirmed-only bar; never added, nothing to remove.
+ *   - nemotron-3-super-free DROPPED OUT of Zen's docs free table but still
+ *     serves (routes to the same congested NVIDIA :free upstream as
+ *     OpenRouter, ~15s). Kept enabled; prune if it starts billing or 402s.
+ *   - big-pickle unmasked: responses report model "deepseek-v4-flash".
+ *
+ * Also pauses nvidia/google/gemma-4-31b-it: still listed on NIM's /v1/models
+ * (only gemma-4 there) but every chat probe hangs 90s+ even on tiny prompts —
+ * NIM free-tier serverless capacity starvation (forum 504 reports, May–Jun
+ * 2026) compounded by a known gemma-4-31b dense Flash-Attention prefill
+ * deadlock upstream. Disabled like the V13 disables (re-asserted each boot);
+ * re-enable via a future migration when NIM serves it again. Gemma-4 coverage
+ * remains via google/openrouter/cloudflare rows.
+ *
+ * Idempotent: INSERT OR IGNORE + always-run UPDATEs, safe to re-run.
+ */
+function migrateModelsV24ZenRefresh(db: Database.Database) {
+  const apply = db.transaction(() => {
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, supports_vision, supports_tools)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null, number, number, number]> = [
+      ['opencode', 'nemotron-3-ultra-free', 'Nemotron 3 Ultra Free (OpenCode Zen)',  7, 4, 'Frontier', 20, 200, null, null, 'promo (trial)', 131072, 1, 0, 1],
+      ['opencode', 'minimax-m3-free',       'MiniMax M3 Free (OpenCode Zen)',        4, 4, 'Frontier', 20, 200, null, null, 'promo (trial)', 131072, 1, 0, 1],
+    ];
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+
+    db.prepare(`
+      UPDATE models SET enabled = 0
+       WHERE platform = 'nvidia' AND model_id = 'google/gemma-4-31b-it'
+    `).run();
+  });
+  apply();
+}
+
+/**
+ * V25 (2026-06-09): retire two OpenCode Zen free models that went dead.
+ * Observed on the production proxy — together they accounted for ~55% of a
+ * day's error rows, each 401ing on every route attempt (a 401 is non-retryable,
+ * so when one was picked first it hard-failed the request, not just logged):
+ *   - nemotron-3-super-free → `401: Model nemotron-3-super-free is not supported`.
+ *     V24 kept it enabled with "prune if it starts billing or 402s"; Zen has now
+ *     removed it outright.
+ *   - minimax-m3-free → `401: Free promotion has ended for MiniMax M3 Free`.
+ *     Added in V24 while its promo was live; the promo has since lapsed (same
+ *     fate qwen3.6-plus-free hit). These are server-side, account-independent
+ *     verdicts — dead for everyone, not a per-key issue.
+ * Disabled, not removed (row kept so fallback history survives and a future
+ * promo can re-enable). Idempotent: re-asserted each boot like the V13/V24
+ * disables.
+ */
+function migrateModelsV25ZenDeadPromos(db: Database.Database) {
+  const disable = db.prepare(`UPDATE models SET enabled = 0 WHERE platform = ? AND model_id = ?`);
+  const disables: Array<[string, string]> = [
+    ['opencode', 'nemotron-3-super-free'],
+    ['opencode', 'minimax-m3-free'],
+  ];
+  const apply = db.transaction(() => {
+    for (const [p, m] of disables) disable.run(p, m);
+  });
+  apply();
+}
+
+// V26 NOTE (June 2026, recurring-free audit pass 2): the model-data changes
+// from this audit (4 OVH rows, opencode/north-mini-code-free, Cerebras
+// 5 RPM/30K TPM/1M TPD limits, NVIDIA "free · 40 RPM" labels, LLM7 60-100/hr
+// label) were briefly shipped as a data migration and then MOVED to the
+// published catalog — catalog data is distributed via catalog-sync, never
+// via migrations, so the premium tier gate holds. What remains in code from that audit: the 'ovh'
+// keyless provider, Pollinations keyless, the V22 north-mini-code tools rule,
+// and the corrected quirk seeds in migrateQuirksV1 (incl. the
+// 'nvidia-credits-based' → 'nvidia-rate-limited' replacement; the stale slug
+// is cleaned up below in migrateQuirksV1 itself).
 
 // Embeddings V1 (2026-06): per-family embedding catalog. A "family" is one
 // model identity + dimension — vectors from different families live in
@@ -1792,6 +2030,181 @@ function migrateEmbeddingsV1(db: Database.Database) {
   }
 }
 
+/**
+ * Quirks V1 (June 2026): promote the catalog's free-form "quirks" out of code
+ * comments into structured, reusable data so the catalog server can ship them.
+ *
+ * A quirk is defined ONCE (slug, title, body, severity) and applied to models
+ * by SELECTOR PARAMETERS rather than hand-attached per model — because one
+ * quirk routinely covers many models (a whole platform's keyless access, an
+ * entire model family that hangs upstream, etc.). Each row in quirk_targets is
+ * one selector; a NULL field is a wildcard:
+ *
+ *   platform NULL, model_glob NULL  -> every model (global note)
+ *   platform set,  model_glob NULL  -> every model on that platform
+ *   platform set,  model_glob set   -> that platform's models whose id GLOBs
+ *   platform NULL, model_glob set   -> any model whose id GLOBs (cross-platform)
+ *
+ * Resolution (see services/quirks.ts) is therefore:
+ *   (platform IS NULL OR platform = m.platform)
+ *   AND (model_glob IS NULL OR m.model_id GLOB model_glob)
+ *
+ * GLOB (not LIKE) so the selectors read like the model-family rules elsewhere
+ * in this file ('*nemotron-3-ultra*'). Severity drives client display:
+ * 'info' (neutral note), 'warning' (works but caveated), 'blocker' (knowingly
+ * unusable / disabled). Idempotent: tables are IF NOT EXISTS and the seed is a
+ * reset-then-insert of the curated set, so editing a seeded quirk in code wins
+ * on next boot while operator-added quirks (new slugs) are left untouched.
+ */
+function migrateQuirksV1(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quirks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      severity TEXT NOT NULL DEFAULT 'info',
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS quirk_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quirk_id INTEGER NOT NULL REFERENCES quirks(id) ON DELETE CASCADE,
+      platform TEXT,
+      model_glob TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_quirk_targets_quirk ON quirk_targets(quirk_id);
+  `);
+
+  // Superseded curated slugs: removed from the seed below, so the upsert no
+  // longer refreshes them — but the old rows would linger as (apparently)
+  // operator-added quirks. Drop them explicitly; targets cascade.
+  // 'nvidia-credits-based' → replaced by 'nvidia-rate-limited' (June 2026:
+  // NVIDIA dropped the credit system for per-account rate limits).
+  db.prepare("DELETE FROM quirks WHERE slug = 'nvidia-credits-based'").run();
+
+  // Curated seed — each entry is one quirk plus the selector parameters that
+  // apply it. Sourced from the catalog's existing code comments (V20–V24).
+  type Seed = {
+    slug: string;
+    title: string;
+    body: string;
+    severity: 'info' | 'warning' | 'blocker';
+    targets: Array<{ platform?: string; modelGlob?: string }>;
+  };
+  const seeds: Seed[] = [
+    {
+      slug: 'keyless-anonymous',
+      title: 'No API key required',
+      body: 'Routes anonymously — the catalog ships a keyless sentinel row and calls work with no account or key.',
+      severity: 'info',
+      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'pollinations' }, { platform: 'ovh' }],
+    },
+    {
+      slug: 'ovh-anon-trickle',
+      title: 'Anonymous tier is 2 req/min',
+      body: 'OVH AI Endpoints anonymous mode is documented at 2 req/min per IP per model (observed even stricter across models). The 400 req/min authenticated tier requires a Public Cloud project with a payment method, so the catalog ships the keyless path. Treat as a breadth/fallback tier, not a throughput tier.',
+      severity: 'warning',
+      targets: [{ platform: 'ovh' }],
+    },
+    {
+      slug: 'pollinations-degraded',
+      title: 'Anon tier degraded (1 concurrent)',
+      body: 'Pollinations’ legacy text API is deprecated for authenticated users (replacement enter.pollinations.ai is pay-as-you-go), but anonymous access is explicitly unaffected. Anon is queue-limited to 1 concurrent request per IP and serves a single model (openai-fast); expect 429 "Queue full" under any parallelism. Live-probed 2026-06-10.',
+      severity: 'warning',
+      targets: [{ platform: 'pollinations' }],
+    },
+    {
+      slug: 'or-free-cap-account-wide',
+      title: 'Daily :free cap is account-wide',
+      body: 'OpenRouter’s :free daily cap (50/day, or 1000/day once you have ever bought $10 of credits) is shared across ALL :free models on the account, not per model. Per-row rpd values here are therefore optimistic; the router’s cooldown handling absorbs the shared 429s.',
+      severity: 'info',
+      targets: [{ platform: 'openrouter', modelGlob: '*:free' }],
+    },
+    {
+      slug: 'zen-promo-roster',
+      title: 'Limited-time promo, roster rotates',
+      body: 'OpenCode Zen free models are explicitly limited-time promotional access ("available for a limited time" per the docs), not a recurring quota. The roster rotates: qwen3.6-plus and minimax-m3 promos already ended. Expect any row here to die without notice; prompts/outputs may be used for model improvement.',
+      severity: 'warning',
+      targets: [{ platform: 'opencode' }],
+    },
+    {
+      slug: 'cloudflare-key-format',
+      title: 'Key is account_id:token',
+      body: 'Cloudflare Workers AI authenticates with a combined credential in the form "account_id:token", not a bare token.',
+      severity: 'info',
+      targets: [{ platform: 'cloudflare' }],
+    },
+    {
+      // Replaces 'nvidia-credits-based' (deleted in V26): NVIDIA staff
+      // confirmed on the dev forums (~Sept 2025) that the credit system was
+      // discontinued in favor of per-account rate limits, so NIM IS
+      // recurring-free again. The ToS caution survives the correction.
+      slug: 'nvidia-rate-limited',
+      title: 'Recurring free, 40 RPM, eval-only ToS',
+      body: 'NVIDIA NIM replaced its depleting trial credits with a recurring per-account rate limit (40 RPM default, varies by model), verified June 2026. The trial ToS still scopes usage to evaluation/prototyping, not production.',
+      severity: 'info',
+      targets: [{ platform: 'nvidia' }],
+    },
+    {
+      slug: 'nim-gemma-hung',
+      title: 'NIM gemma route hangs',
+      body: 'The NVIDIA NIM gemma endpoint is listed but hangs (capacity starvation plus an upstream FlashAttention bug). Paused; probe with a 120s timeout before re-enabling.',
+      severity: 'blocker',
+      targets: [{ platform: 'nvidia', modelGlob: '*gemma*' }],
+    },
+    {
+      slug: 'or-ultra-hangs',
+      title: 'OpenRouter ultra route hangs',
+      body: 'nemotron-3-ultra (550B) on OpenRouter takes 180s+ even on trivial prompts (heavily congested), so its OR row is seeded disabled. Use the OpenCode Zen route instead.',
+      severity: 'warning',
+      targets: [{ platform: 'openrouter', modelGlob: '*nemotron-3-ultra*' }],
+    },
+    {
+      slug: 'zen-serves-ultra-fast',
+      title: 'Zen serves the 550B fast',
+      body: 'OpenCode Zen serves nemotron-3-ultra in ~2s with working tool calls where the OpenRouter route hangs — the live-verified path for this model.',
+      severity: 'info',
+      targets: [{ platform: 'opencode', modelGlob: '*nemotron-3-ultra*' }],
+    },
+    {
+      slug: 'zhipu-shared-key',
+      title: 'Works with existing Zhipu key',
+      body: 'glm-4.6v-flash is listed Free on Z.AI and answers 200 with the existing bigmodel.cn key; vision and structured tool calls both live-verified.',
+      severity: 'info',
+      targets: [{ platform: 'zhipu', modelGlob: '*glm-4.6v*' }],
+    },
+  ];
+
+  const now = Date.now();
+  const upsertQuirk = db.prepare(`
+    INSERT INTO quirks (slug, title, body, severity, created_at_ms, updated_at_ms)
+    VALUES (@slug, @title, @body, @severity, @now, @now)
+    ON CONFLICT(slug) DO UPDATE SET
+      title = excluded.title,
+      body = excluded.body,
+      severity = excluded.severity,
+      updated_at_ms = excluded.updated_at_ms
+  `);
+  const getId = db.prepare('SELECT id FROM quirks WHERE slug = ?');
+  const clearTargets = db.prepare('DELETE FROM quirk_targets WHERE quirk_id = ?');
+  const addTarget = db.prepare(
+    'INSERT INTO quirk_targets (quirk_id, platform, model_glob) VALUES (?, ?, ?)',
+  );
+
+  const apply = db.transaction(() => {
+    for (const s of seeds) {
+      upsertQuirk.run({ slug: s.slug, title: s.title, body: s.body, severity: s.severity, now });
+      const { id } = getId.get(s.slug) as { id: number };
+      // Reset the curated quirk's selectors so edits in code take effect, but
+      // leave quirks/targets with unknown slugs (operator-added) alone.
+      clearTargets.run(id);
+      for (const t of s.targets) addTarget.run(id, t.platform ?? null, t.modelGlob ?? null);
+    }
+  });
+  apply();
+}
+
 /** Append any models not yet in the fallback chain, lowest priority, ordered by
  * intelligence_rank. Shared by the recent model migrations (V18–V20). */
 function backfillFallback(db: Database.Database) {
@@ -1816,32 +2229,52 @@ function ensureUnifiedKey(db: Database.Database) {
   }
 }
 
-export function getUnifiedApiKey(): string {
-  const db = getDb();
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'unified_api_key'").get() as { value: string };
-  return row.value;
-}
-
-export function regenerateUnifiedKey(): string {
-  const db = getDb();
-  const key = `freellmapi-${crypto.randomBytes(24).toString('hex')}`;
-  db.prepare("UPDATE settings SET value = ? WHERE key = 'unified_api_key'").run(key);
-  scheduleHydrateSecretsToRemote(db);
-  return key;
-}
-
-// Generic key/value settings accessors (used by routing strategy, etc.).
-export function getSetting(key: string): string | undefined {
-  const db = getDb();
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
-  return row?.value;
-}
-
-export function setSetting(key: string, value: string): void {
-  const db = getDb();
+/**
+ * Migration helper to ensure Default profile exists, legacy profiles converted, 
+ * and fallback_config synced.
+ */
+function migrateProfilesInit(db: Database.Database) {
+  // 1. Convert any legacy built-in profiles to custom profiles (type = 'custom')
   db.prepare(`
-    INSERT INTO settings (key, value) VALUES (?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(key, value);
-  scheduleHydrateSecretsToRemote(db);
+    UPDATE profiles
+    SET type = 'custom'
+    WHERE type = 'builtin'
+  `).run();
+
+  // 2. Ensure Default profile exists
+  const hasDefault = db.prepare("SELECT COUNT(*) as cnt FROM profiles WHERE type = 'default'").get() as { cnt: number };
+  if (hasDefault.cnt === 0) {
+    const minOrder = (db.prepare('SELECT COALESCE(MIN(sort_order), 0) AS mn FROM profiles').get() as { mn: number }).mn;
+    const targetOrder = Math.min(-1, minOrder - 1);
+
+    const result = db.prepare(
+      "INSERT INTO profiles (name, emoji, color, type, sort_order) VALUES ('Default', '⚙️', '#6366f1', 'default', ?)"
+    ).run(targetOrder);
+
+    const profileId = result.lastInsertRowid as number;
+
+    // Seed profile models from fallback_config
+    db.prepare(`
+      INSERT INTO profile_models (profile_id, model_db_id, priority, enabled)
+      SELECT ?, model_db_id, priority, enabled
+      FROM fallback_config
+      ORDER BY priority ASC
+    `).run(profileId);
+
+    // Make it the active profile if none is set
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('active_profile_id', ?)
+      ON CONFLICT(key) DO NOTHING
+    `).run(String(profileId));
+
+    console.log('Created Default profile');
+  } else {
+    // If it exists, ensure its emoji is '⚙️'
+    db.prepare(`
+      UPDATE profiles
+      SET emoji = '⚙️'
+      WHERE type = 'default' AND emoji != '⚙️'
+    `).run();
+  }
 }
+

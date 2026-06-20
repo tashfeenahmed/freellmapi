@@ -34,6 +34,7 @@ export class CloudflareProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): Promise<ChatCompletionResponse> {
     const { accountId, token } = this.parseKey(apiKey);
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
@@ -71,6 +72,7 @@ export class CloudflareProvider extends BaseProvider {
     messages: ChatMessage[],
     modelId: string,
     options?: CompletionOptions,
+    _context?: unknown,
   ): AsyncGenerator<ChatCompletionChunk> {
     const { accountId, token } = this.parseKey(apiKey);
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
