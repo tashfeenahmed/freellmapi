@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { repairToolArguments, toolSchemaMap } from '../../lib/tool-args.js';
+import { repairToolArguments, toolSchemaMap, stripSchemaKeys } from '../../lib/tool-args.js';
 
 const PLAN_SCHEMA = {
   type: 'object',
@@ -80,5 +80,72 @@ describe('toolSchemaMap', () => {
 
   it('handles undefined tools', () => {
     expect(toolSchemaMap(undefined).size).toBe(0);
+  });
+});
+
+describe('stripSchemaKeys', () => {
+  const keys = new Set(['additionalProperties', '$schema']);
+
+  it('removes the listed keys at the top level', () => {
+    const input = {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      additionalProperties: false,
+      properties: { city: { type: 'string' } },
+    };
+    expect(stripSchemaKeys(input, keys)).toEqual({
+      type: 'object',
+      properties: { city: { type: 'string' } },
+    });
+  });
+
+  it('removes the listed keys recursively in nested properties and arrays', () => {
+    const input = {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        nested: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { n: { type: 'number' } },
+        },
+        list: {
+          type: 'array',
+          items: { type: 'object', additionalProperties: false, properties: {} },
+        },
+      },
+      anyOf: [{ type: 'string', additionalProperties: false }],
+    };
+    expect(stripSchemaKeys(input, keys)).toEqual({
+      type: 'object',
+      properties: {
+        nested: { type: 'object', properties: { n: { type: 'number' } } },
+        list: { type: 'array', items: { type: 'object', properties: {} } },
+      },
+      anyOf: [{ type: 'string' }],
+    });
+  });
+
+  it('does not mutate the input (chain-shared schema safety)', () => {
+    const input = { type: 'object', additionalProperties: false, properties: {} };
+    const copy = JSON.parse(JSON.stringify(input));
+    stripSchemaKeys(input, keys);
+    expect(input).toEqual(copy);
+  });
+
+  it('passes non-object values through unchanged', () => {
+    expect(stripSchemaKeys('hi', keys)).toBe('hi');
+    expect(stripSchemaKeys(42, keys)).toBe(42);
+    expect(stripSchemaKeys(null, keys)).toBe(null);
+    expect(stripSchemaKeys(undefined, keys)).toBe(undefined);
+  });
+
+  it('keeps a property literally named like a stripped key only when it is a value, not a key', () => {
+    // A property whose *value* mentions additionalProperties is untouched;
+    // only object KEYS named additionalProperties are removed.
+    const input = { type: 'object', properties: { additionalProperties: { type: 'boolean' } } };
+    // Here `additionalProperties` is a property NAME nested under `properties`,
+    // so it is a schema key and gets stripped — documenting the known limitation.
+    expect(stripSchemaKeys(input, keys)).toEqual({ type: 'object', properties: {} });
   });
 });

@@ -9,7 +9,7 @@ import type {
   ChatToolChoice,
 } from '@freellmapi/shared/types.js';
 import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
+import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -736,6 +736,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           ? PAYMENT_REQUIRED_COOLDOWN_MS
           : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
         recordRateLimitHit(route.modelDbId);
+        // Learn a provider-reported ceiling (e.g. a 413 TPM limit) so the next
+        // request's pre-check fails over before the 413. Mirrors the chat path.
+        learnLimitFromError(route.modelDbId, err);
         lastError = err;
         continue;
       }

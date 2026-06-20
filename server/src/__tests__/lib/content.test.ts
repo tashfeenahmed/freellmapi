@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { contentToString, flattenMessageContent, messageHasImage, normalizeOutboundContent } from '../../lib/content.js';
+import { contentToString, flattenMessageContent, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../../lib/content.js';
 
 describe('contentToString', () => {
   it('passes strings through', () => {
@@ -122,5 +122,54 @@ describe('normalizeOutboundContent (#166)', () => {
     expect(() => normalizeOutboundContent({ usage: { prompt_tokens: 1 } })).not.toThrow();
     expect(() => normalizeOutboundContent(null as unknown)).not.toThrow();
     expect(() => normalizeOutboundContent({} as unknown)).not.toThrow();
+  });
+});
+
+describe('sanitizeResponse', () => {
+  it('defaults a missing choice finish_reason to null', () => {
+    const result = { choices: [{ index: 0, message: { role: 'assistant', content: 'hi' } }] };
+    const out = sanitizeResponse(result) as any;
+    expect(out.choices[0].finish_reason).toBeNull();
+  });
+
+  it('leaves an existing finish_reason untouched', () => {
+    const result = { choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'hi' } }] };
+    expect((sanitizeResponse(result) as any).choices[0].finish_reason).toBe('stop');
+  });
+
+  it('deletes a literal tool_calls: null on message and delta (the #200 mirror)', () => {
+    const nonStream = { choices: [{ message: { role: 'assistant', content: 'hi', tool_calls: null } }] };
+    const out1 = sanitizeResponse(nonStream) as any;
+    expect('tool_calls' in out1.choices[0].message).toBe(false);
+
+    const stream = { choices: [{ delta: { content: 'hi', tool_calls: null } }] };
+    const out2 = sanitizeResponse(stream) as any;
+    expect('tool_calls' in out2.choices[0].delta).toBe(false);
+  });
+
+  it('preserves a real tool_calls array', () => {
+    const result = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'f', arguments: '{}' } }] } }] };
+    const out = sanitizeResponse(result) as any;
+    expect(out.choices[0].message.tool_calls).toHaveLength(1);
+    expect(out.choices[0].message.tool_calls[0].id).toBe('c1');
+  });
+
+  it('coerces a non-string model to a string', () => {
+    expect((sanitizeResponse({ model: 123, choices: [] }) as any).model).toBe('123');
+    expect((sanitizeResponse({ model: 'gpt', choices: [] }) as any).model).toBe('gpt');
+    expect((sanitizeResponse({ choices: [] }) as any).model).toBeUndefined();
+  });
+
+  it('does not touch content or reasoning_content', () => {
+    const result = { choices: [{ message: { role: 'assistant', content: 'answer', reasoning_content: 'thinking' } }] };
+    const out = sanitizeResponse(result) as any;
+    expect(out.choices[0].message.content).toBe('answer');
+    expect(out.choices[0].message.reasoning_content).toBe('thinking');
+  });
+
+  it('tolerates frames with no choices / non-objects', () => {
+    expect(() => sanitizeResponse({ usage: { prompt_tokens: 1 } })).not.toThrow();
+    expect(() => sanitizeResponse(null as unknown)).not.toThrow();
+    expect(() => sanitizeResponse({} as unknown)).not.toThrow();
   });
 });

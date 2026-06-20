@@ -4,6 +4,7 @@ import { initDb, getSetting } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
 import { applyProxyUrl, applyProxyEnabled, applyProxyBypass } from './lib/proxy.js';
 import { startCatalogSync } from './services/catalog-sync.js';
+import { installProcessSafetyNet } from './lib/process-safety-net.js';
 
 const PORT = process.env.PORT ?? 3001;
 // Dual-stack ('::') by default so the dashboard is reachable over both IPv4
@@ -12,6 +13,10 @@ const PORT = process.env.PORT ?? 3001;
 const HOST = process.env.HOST ?? '::';
 
 async function main() {
+  // Install first so a late provider socket reset (undici HTTP/2 error with no
+  // listener) can't take the proxy down. Genuine bugs still exit 1.
+  installProcessSafetyNet();
+
   initDb();
 
   // Load the persisted proxy settings from the DB (env var wins if set).

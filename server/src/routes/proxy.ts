@@ -4,10 +4,10 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
+import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
-import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
+import { contentToString, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
@@ -1042,6 +1042,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
 
             normalizeOutboundContent(chunk);
+            sanitizeResponse(chunk);
             const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
 
             if (text.length === 0) {
@@ -1262,7 +1263,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           }
         }
         // Normalize array-shaped message.content to a string on the way out (#166).
-        res.json(normalizeOutboundContent(result));
+        res.json(sanitizeResponse(normalizeOutboundContent(result)));
 
         traceRouteEvent('Proxy', {
           event: 'ok',
@@ -1321,6 +1322,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               }, err.retryAfterMs),
         );
         recordRateLimitHit(route.modelDbId);
+        // Self-correct the catalog: if the provider reported its real ceiling in
+        // the error body (e.g. a Groq 413 "tokens per minute (TPM): Limit 30000"),
+        // persist it so the next request's pre-check fails over BEFORE the 413
+        // instead of re-discovering it. No-op for errors with no parseable limit.
+        learnLimitFromError(route.modelDbId, err);
         lastError = err;
         continue;
       }
