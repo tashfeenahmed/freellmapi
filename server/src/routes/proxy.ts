@@ -6,6 +6,7 @@ import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { runImageGeneration, runSpeech, MediaError } from '../services/media.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -499,6 +500,89 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
     res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type } });
+  }
+});
+
+// OpenAI-compatible image generation. Routed through the media catalog (its own
+// table, never the chat router): `model: "auto"` (or omitted) tries every enabled
+// image provider in order; a provider model id pins to that one. Failover is
+// across providers, never across modalities. See services/media.ts.
+const ImageBody = z.object({
+  model: z.string().optional(),
+  prompt: z.string().min(1),
+  n: z.number().int().positive().max(4).optional(),
+  size: z.string().optional(),
+  response_format: z.enum(['url', 'b64_json']).optional(),
+});
+
+function mediaErrorType(status: number): string {
+  if (status === 400) return 'invalid_request_error';
+  if (status === 401) return 'authentication_error';
+  if (status === 429) return 'rate_limit_error';
+  return 'server_error';
+}
+
+proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+  const parsed = ImageBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid request: `prompt` is required', type: 'invalid_request_error' } });
+    return;
+  }
+  try {
+    const result = await runImageGeneration(parsed.data.model, {
+      prompt: parsed.data.prompt, n: parsed.data.n, size: parsed.data.size,
+    });
+    res.json({
+      created: Math.floor(Date.now() / 1000),
+      data: result.images,
+      model: result.modelId,
+      provider: result.platform,
+    });
+  } catch (err: any) {
+    const status = err instanceof MediaError ? err.status : 502;
+    const httpStatus = status >= 400 && status < 600 ? status : 502;
+    res.status(httpStatus).json({ error: { message: `image generation error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
+  }
+});
+
+// OpenAI-compatible text-to-speech. Returns raw audio bytes (OpenAI's /audio/speech
+// shape). Same media-catalog routing as images.
+const SpeechBody = z.object({
+  model: z.string().optional(),
+  input: z.string().min(1),
+  voice: z.string().optional(),
+  response_format: z.string().optional(),
+});
+
+proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+  const parsed = SpeechBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
+    return;
+  }
+  try {
+    const result = await runSpeech(parsed.data.model, {
+      input: parsed.data.input, voice: parsed.data.voice, format: parsed.data.response_format,
+    });
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('X-Provider', result.platform);
+    res.send(result.audio);
+  } catch (err: any) {
+    const status = err instanceof MediaError ? err.status : 502;
+    const httpStatus = status >= 400 && status < 600 ? status : 502;
+    res.status(httpStatus).json({ error: { message: `speech error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
   }
 });
 

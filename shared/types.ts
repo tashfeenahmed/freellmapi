@@ -37,6 +37,10 @@ export type Platform =
   // image/video); free via a recurring monthly credit grant, key from
   // platform.reka.ai (no card).
   | 'reka'
+  // SiliconFlow — OpenAI-compatible. Registered for its FREE generative-media
+  // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
+  // chat is supported too. Key from siliconflow.com (no card).
+  | 'siliconflow'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

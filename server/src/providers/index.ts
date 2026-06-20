@@ -218,6 +218,17 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.reka.ai/v1',
 }));
 
+// SiliconFlow — OpenAI-compatible (api.siliconflow.com/v1). Registered mainly
+// for its FREE generative-media models (FLUX.1-schnell image, CosyVoice2 TTS),
+// which route via services/media.ts; OpenAI-compatible chat is supported too.
+// Key from siliconflow.com, no card; validateKey uses GET /v1/models (200 with
+// a valid key). Catalog rows live in the catalog (premium → age into free).
+register(new OpenAICompatProvider({
+  platform: 'siliconflow',
+  name: 'SiliconFlow',
+  baseUrl: 'https://api.siliconflow.com/v1',
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.
