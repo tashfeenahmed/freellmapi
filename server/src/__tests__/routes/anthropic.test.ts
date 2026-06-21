@@ -307,6 +307,21 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(body.error.type).toBe('invalid_request_error');
   });
 
+  it('accepts a system role inlined in the messages array (does not 400; folds into system)', async () => {
+    const captured = mockJson(textCompletion('ok'));
+    const { status } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 32,
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'system', content: 'You are concise.' },
+        { role: 'user', content: [{ type: 'text', text: 'continue' }] },
+      ],
+    }, anthropicHeaders());
+    expect(status).toBe(200); // previously 400: "messages.1.role ... received 'system'"
+    const sys = captured.body.messages.filter((m: any) => m.role === 'system')
+    expect(sys.some((m: any) => m.content === 'You are concise.')).toBe(true);
+  });
+
   it('GET /v1/models returns the Anthropic shape for Anthropic clients', async () => {
     const { status, body } = await send(app, 'GET', '/v1/models', undefined, anthropicHeaders());
     expect(status).toBe(200);

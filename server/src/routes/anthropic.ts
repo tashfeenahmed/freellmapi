@@ -54,7 +54,11 @@ const IMAGE_TOKEN_ESTIMATE = 1000;
 const contentBlockSchema = z.object({ type: z.string() }).passthrough();
 
 const anthropicMessageSchema = z.object({
-  role: z.enum(['user', 'assistant']),
+  // Anthropic's own API only allows user/assistant here, but real clients
+  // (Claude Code, routers) sometimes inline a `system` turn in the messages
+  // array. Accept it and fold it into the system context rather than 400-ing —
+  // same tolerance philosophy as the OpenAI route's developer/function roles.
+  role: z.enum(['user', 'assistant', 'system']),
   content: z.union([z.string(), z.array(contentBlockSchema)]),
 }).passthrough();
 
@@ -195,6 +199,17 @@ function convertRequest(input: AnthropicRequest): ConvertedRequest {
   if (system) messages.push({ role: 'system', content: system });
 
   for (const message of input.messages) {
+    // A `system` turn inlined in the messages array → fold into system context
+    // (flatten text blocks). Anthropic clients occasionally send this; the real
+    // API rejects it, but we'd rather route the request than 400.
+    if (message.role === 'system') {
+      const sysText = typeof message.content === 'string'
+        ? message.content
+        : message.content.map(b => (typeof (b as any).text === 'string' ? (b as any).text : '')).filter(Boolean).join('\n');
+      if (sysText) messages.push({ role: 'system', content: sysText });
+      continue;
+    }
+
     if (typeof message.content === 'string') {
       messages.push({ role: message.role, content: message.content });
       continue;
