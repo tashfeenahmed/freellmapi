@@ -5,6 +5,8 @@ import type {
   ChatToolDefinition,
   ChatToolChoice,
   Platform,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
 } from '@freellmapi/shared/types.js';
 import { proxyFetch } from '../lib/proxy.js';
 
@@ -76,6 +78,18 @@ export abstract class BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk>;
 
   abstract validateKey(apiKey: string): Promise<boolean>;
+
+  /** Optional: image generation. Default throws so providers opt-in by override.
+   * Routes check supportsImages() before dispatching. */
+  async generateImage(
+    _apiKey: string,
+    _req: ImageGenerationRequest,
+  ): Promise<ImageGenerationResponse> {
+    throw new Error(`${this.name} does not support image generation`);
+  }
+
+  /** Override to true in providers that implement generateImage(). */
+  supportsImages(): boolean { return false; }
 
   protected async fetchWithTimeout(
     url: string,

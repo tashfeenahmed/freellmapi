@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { PollinationsImageProvider } from './pollinations-image.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -140,6 +141,10 @@ register(new OpenAICompatProvider({
 // path is the only recurring-free one left. Anon is queue-limited to 1
 // concurrent request per IP (429 "Queue full" on overlap; live-probed
 // 2026-06-10).
+// Pollinations image generation — keyless, separate platform from text.
+// See server/src/providers/pollinations-image.ts.
+register(new PollinationsImageProvider());
+
 register(new OpenAICompatProvider({
   platform: 'pollinations',
   name: 'Pollinations',

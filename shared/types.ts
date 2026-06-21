@@ -21,6 +21,9 @@ export type Platform =
   | 'ollama'
   | 'kilo'
   | 'pollinations'
+  // Image generation via Pollinations (no key). Separate platform so the
+  // text and image catalogs stay independent.
+  | 'pollinations-image'
   | 'llm7'
   | 'huggingface'
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
@@ -311,4 +314,31 @@ export interface RateLimitStatus {
   tpm: { used: number; limit: number | null };
   available: boolean;
   nextResetAt: string | null;
+}
+
+// ---- Image Generation ----
+// OpenAI-compatible image generation request/response. Mirrors the
+// /v1/images/generations wire format. Kept intentionally narrow — only fields
+// the proxy actually forwards. Provider-specific extras (seed, quality, style)
+// pass through via the index signature.
+export interface ImageGenerationRequest {
+  prompt: string;
+  model?: string;
+  n?: number;
+  size?: string;             // e.g. "1024x1024"
+  response_format?: 'url' | 'b64_json';
+  user?: string;
+  [key: string]: unknown;
+}
+
+export interface ImageGenerationResponseItem {
+  url?: string;
+  b64_json?: string;
+  revised_prompt?: string;
+}
+
+export interface ImageGenerationResponse {
+  created: number;
+  data: ImageGenerationResponseItem[];
+  _routed_via?: { platform: string; model: string };
 }

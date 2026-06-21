@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { keysRouter } from './routes/keys.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
+import { imagesRouter } from './routes/images.js';
 import { responsesRouter } from './routes/responses.js';
 import { fallbackRouter } from './routes/fallback.js';
 import { profilesRouter } from './routes/profiles.js';
@@ -80,6 +81,7 @@ export function createApp() {
   // routing work. Tune via PROXY_RATE_LIMIT_RPM; 0 disables it.
   app.use('/v1', createProxyRateLimiter());
   app.use('/v1', proxyRouter);
+  app.use('/v1', imagesRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
   app.use('/v1', responsesRouter);
 

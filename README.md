@@ -30,6 +30,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 - [Desktop app](#desktop-app)
 - [Premium (live catalog)](#premium-live-catalog)
 - [Using the API](#using-the-api)
+- [Image Generation](#image-generation)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Context Handoff](#context-handoff)
@@ -87,6 +88,7 @@ Plus a **custom** provider — point at any OpenAI-compatible endpoint (llama.cp
 - **Responses API** — `POST /v1/responses` (the wire format current Codex CLI versions require) is implemented as a translating shim over the same router, with full streaming events and tool calls.
 - **Streaming and non-streaming** — Server-Sent Events for `stream: true`, JSON response otherwise. Every provider adapter implements both.
 - **Tool calling** — OpenAI-style `tools` / `tool_choice` requests are passed through, and assistant `tool_calls` + `tool` role follow-up messages round-trip across providers.
+- **Image generation** — `POST /v1/images/generations` via Pollinations (keyless, anonymous tier). Returns `url` or `b64_json` per the OpenAI spec. `n>1` is rejected — see [Image Generation](#image-generation).
 - **Embeddings** — `/v1/embeddings` with family-based routing: failover only ever happens between providers serving the *same* model (vectors from different models are incompatible), never across models. See [Embeddings](#embeddings).
 - **Automatic fallover** — If the chosen provider returns a 429, 5xx, or times out, the router skips it, puts the key on a short cooldown, and retries on the next model in your fallback chain (up to 20 attempts).
 - **Per-key rate tracking** — RPM, RPD, TPM, and TPD counters per `(platform, model, key)` so the router always picks a key that's under its caps.
@@ -104,7 +106,6 @@ Plus a **custom** provider — point at any OpenAI-compatible endpoint (llama.cp
 
 The scope is deliberately narrow. If a feature isn't on this list and isn't below, assume it isn't there yet.
 
-- **Image generation** (`/v1/images/*`)
 - **Audio / speech** (`/v1/audio/*`)
 - **Legacy completions** (`/v1/completions`) — only the chat endpoint is implemented
 - **Moderation** (`/v1/moderations`)
@@ -369,7 +370,28 @@ Works with `stream=True` as well — you'll get `delta.tool_calls` chunks follow
 
 Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served each call. If a request fell over between providers, you'll also see `X-Fallback-Attempts: N`.
 
-### Embeddings
+## Image Generation
+
+`/v1/images/generations` is OpenAI-compatible and routes to the [Pollinations](https://pollinations.ai) image API (keyless, anonymous tier, no credit card). The only model on the anonymous `/models` list as of 2026-06-16 is `sana` — that is the default when no model is specified.
+
+```bash
+curl http://localhost:3001/v1/images/generations \
+  -H "Authorization: Bearer $FREELLMAPI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "a red panda coding on a laptop, watercolor",
+    "size": "1024x1024",
+    "response_format": "url"
+  }'
+```
+
+Notes on the upstream:
+
+- **`n=1` only.** Pollinations' anonymous tier is 1-concurrent per IP; server-side fan-out for `n>1` would hit HTTP 402 ("Payment Required") on the second image, so requests with `n>1` are rejected with a 400 and a clear message. Loop multiple single-image calls from the client if you need more than one.
+- **`response_format: "url"`** (default) builds a deterministic URL locally and returns it without calling Pollinations — the browser/client fetches on demand. **`"b64_json"`** downloads the image proxy-side and base64-encodes it (60s timeout — `sana` cold starts can be slow).
+- **Concurrent requests return 402** from upstream; the proxy maps that to OpenAI's `rate_limit_error` type so existing clients retry it correctly.
+
+## Embeddings
 
 `/v1/embeddings` is OpenAI-compatible, with one deliberate difference from chat routing: **failover never crosses models.** Vectors from different models live in incompatible spaces — silently switching models would corrupt any vector store built on top of the proxy. So embeddings route by **family** (one model identity + dimension), and failover only walks the providers serving that same family.
 
