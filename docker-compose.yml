@@ -9,6 +9,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
       MCP_PORT: ${MCP_PORT:-4001}
       MCP_TOKEN: ${MCP_TOKEN:-}
     # Bound to localhost by default — FreeLLMAPI is single-user and must not be

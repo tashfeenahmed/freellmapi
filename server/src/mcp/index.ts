@@ -7,6 +7,7 @@ import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js
 import { registerMcpTools } from './tools.js';
 
 const MCP_TOKEN = process.env.MCP_TOKEN?.trim();
+const MCP_HOST = process.env.MCP_HOST ?? '0.0.0.0';
 const MCP_PORT = parseInt(process.env.MCP_PORT ?? '4001', 10);
 
 /** Start the MCP server on MCP_PORT if MCP_TOKEN is configured. */
@@ -24,7 +25,7 @@ export async function startMcpServer() {
   };
 
   // ── Express app ──────────────────────────────────────────────────────
-  const app = createMcpExpressApp({ host: '127.0.0.1' });
+  const app = createMcpExpressApp({ host: MCP_HOST });
 
   // ── MCP transport ────────────────────────────────────────────────────
   const transport = new StreamableHTTPServerTransport({
@@ -57,7 +58,7 @@ export async function startMcpServer() {
   };
 
   // ── Listen ───────────────────────────────────────────────────────────
-  app.listen(MCP_PORT, '127.0.0.1', () => {
-    console.log(`[mcp] MCP server listening on http://127.0.0.1:${MCP_PORT}/mcp`);
+  app.listen(MCP_PORT, MCP_HOST, () => {
+    console.log(`[mcp] MCP server listening on http://${MCP_HOST}:${MCP_PORT}/mcp`);
   });
 }
