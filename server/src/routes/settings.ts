@@ -4,6 +4,7 @@ import { getUnifiedApiKey, regenerateUnifiedKey, getSetting, setSetting } from '
 import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, isProxyActive, getProxyUrl, isProxyEnabled, getProxyBypassPlatforms } from '../lib/proxy.js';
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
+import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
 import { z } from 'zod';
 
 export const settingsRouter = Router();
@@ -50,6 +51,26 @@ settingsRouter.put('/fusion', (req: Request, res: Response) => {
   }
   const saved = setSavedFusionConfig(parsed.data);
   res.json({ config: saved, maxK: getFusionMaxK() });
+});
+
+// Get the Claude Code model map (opus/sonnet/haiku/default → 'auto' | model_id).
+// Drives how the Anthropic /v1/messages route resolves Claude Code's built-in
+// model names against the free pool.
+settingsRouter.get('/anthropic-map', (_req: Request, res: Response) => {
+  res.json({ map: getClaudeModelMap() });
+});
+
+// Update the Claude Code model map. Partial: send just the families you want to
+// change; each value is 'auto' or a catalog model_id.
+settingsRouter.put('/anthropic-map', (req: Request, res: Response) => {
+  try {
+    res.json({ map: setClaudeModelMap(req.body) });
+  } catch (err: any) {
+    const detail = err?.errors
+      ? err.errors.map((e: any) => (e.path?.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ')
+      : (err?.message ?? 'invalid');
+    res.status(400).json({ error: { message: `Invalid anthropic model map: ${detail}`, type: 'invalid_request_error' } });
+  }
 });
 
 // Get the unified API key

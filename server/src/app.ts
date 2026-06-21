@@ -7,6 +7,7 @@ import { keysRouter } from './routes/keys.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
 import { responsesRouter } from './routes/responses.js';
+import { anthropicRouter } from './routes/anthropic.js';
 import { fallbackRouter } from './routes/fallback.js';
 import { profilesRouter } from './routes/profiles.js';
 import { embeddingsRouter } from './routes/embeddings.js';
@@ -79,6 +80,12 @@ export function createApp() {
   // it throttles unauthenticated brute-force / flood attempts before any
   // routing work. Tune via PROXY_RATE_LIMIT_RPM; 0 disables it.
   app.use('/v1', createProxyRateLimiter());
+  // Anthropic-compatible Messages API (`POST /v1/messages`, `/count_tokens`) for
+  // Claude Code and anything else speaking the Anthropic SDK. Mounted BEFORE the
+  // OpenAI router so it can content-negotiate `GET /v1/models` (Anthropic shape
+  // when the caller sends `anthropic-version`, else it falls through). All other
+  // paths it doesn't own fall through to the OpenAI router untouched.
+  app.use('/v1', anthropicRouter);
   app.use('/v1', proxyRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
   app.use('/v1', responsesRouter);
