@@ -474,9 +474,17 @@ function AnthropicSection() {
   )
 }
 
+type KeysTab = 'providers' | 'apiKey' | 'anthropic'
+const KEYS_TABS: { id: KeysTab; labelKey: string }[] = [
+  { id: 'providers', labelKey: 'keys.tabProviders' },
+  { id: 'apiKey', labelKey: 'keys.tabApiKey' },
+  { id: 'anthropic', labelKey: 'keys.tabAnthropic' },
+]
+
 export default function KeysPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
+  const [tab, setTab] = useState<KeysTab>('providers')
   const [platform, setPlatform] = useState<Platform | ''>('')
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
@@ -628,21 +636,42 @@ export default function KeysPage() {
         title={t('keys.pageTitle')}
         description={t('keys.pageDescription')}
         actions={
-          keys.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
-              {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
-            </Button>
-          )
+          <>
+            {tab === 'providers' && keys.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
+                {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
+              </Button>
+            )}
+            <div className="inline-flex gap-1 rounded-xl border p-1">
+              {KEYS_TABS.map(tb => (
+                <button
+                  key={tb.id}
+                  type="button"
+                  onClick={() => setTab(tb.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                    tab === tb.id ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t(tb.labelKey)}
+                </button>
+              ))}
+            </div>
+          </>
         }
       />
 
       <div className="space-y-8">
-        <UnifiedKeySection />
+        {tab === 'apiKey' && (
+          <>
+            <UnifiedKeySection />
+            <ProxySettingsSection />
+          </>
+        )}
 
-        <AnthropicSection />
+        {tab === 'anthropic' && <AnthropicSection />}
 
-        <ProxySettingsSection />
-
+        {tab === 'providers' && (
+        <>
         <section>
           <h2 className="text-sm font-medium mb-3">{t('keys.addProvider')}</h2>
           <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 rounded-3xl border p-4 bg-card">
@@ -821,6 +850,8 @@ export default function KeysPage() {
             </div>
           )}
         </section>
+        </>
+        )}
       </div>
     </div>
   )

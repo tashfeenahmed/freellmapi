@@ -142,6 +142,9 @@
   "keys": {
     "pageTitle": "Clés",
     "pageDescription": "Les identifiants des fournisseurs et la clé API unifiée à laquelle vos applications se connectent.",
+    "tabProviders": "Fournisseurs",
+    "tabApiKey": "Clé d'API unifiée",
+    "tabAnthropic": "Anthropic",
     "unifiedKey": "Votre clé API unifiée",
     "regenerate": "Régénérer",
     "showKey": "Afficher",

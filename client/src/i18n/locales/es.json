@@ -142,6 +142,9 @@
   "keys": {
     "pageTitle": "Claves",
     "pageDescription": "Las credenciales de los proveedores y la clave API unificada con la que se conectan tus aplicaciones.",
+    "tabProviders": "Proveedores",
+    "tabApiKey": "Clave de API unificada",
+    "tabAnthropic": "Anthropic",
     "unifiedKey": "Tu clave API unificada",
     "regenerate": "Regenerar",
     "showKey": "Mostrar",

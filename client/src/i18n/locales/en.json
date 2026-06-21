@@ -103,6 +103,7 @@
     "modelNotFound": "This model is not available, or it has no configured providers.",
     "providerIdsHeading": "Provider model ids",
     "providerIdsHint": "Send the unified model id to fail over across every provider, or a provider-specific id to pin one provider.",
+    "copyModelName": "Copy model name",
     "aggregateBudget": "{count}/mo",
     "aggregateBudgetTitle": "Total free tokens per month across this model's providers",
     "rateRpm": "{count} RPM",
@@ -159,6 +160,9 @@
   "keys": {
     "pageTitle": "Keys",
     "pageDescription": "Provider credentials and the unified API key your apps connect with.",
+    "tabProviders": "Providers",
+    "tabApiKey": "Unified API key",
+    "tabAnthropic": "Anthropic",
     "unifiedKey": "Your unified API key",
     "regenerate": "Regenerate",
     "showKey": "Show",
