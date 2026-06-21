@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { useI18n } from '@/i18n'
 
-interface MediaModel {
+export interface MediaModel {
   id: number
   platform: string
   modelId: string
@@ -17,10 +18,33 @@ interface MediaModel {
 }
 interface MediaData { models: MediaModel[] }
 
-// Shared list view for the Image and Audio dashboard tabs. Mirrors the
-// Embeddings tab: a flat list of catalog media models with a per-row enable
-// toggle (saved immediately). Rows arrive from the signed catalog via
-// catalog-sync, so the list self-populates once a media catalog is applied.
+export interface MediaGroup {
+  label: string
+  slug: string
+  members: MediaModel[]
+}
+
+// Consolidate media rows into logical models — the same idea the chat Models page
+// uses (one logical model, several providers underneath). Group by displayName so
+// e.g. "FLUX.1 [schnell]" served by nvidia + cloudflare + siliconflow is one row.
+export function groupMedia(models: MediaModel[]): MediaGroup[] {
+  const map = new Map<string, MediaModel[]>()
+  for (const m of models) {
+    const arr = map.get(m.displayName)
+    if (arr) arr.push(m)
+    else map.set(m.displayName, [m])
+  }
+  return [...map.entries()]
+    .map(([label, members]) => ({ label, slug: encodeURIComponent(label), members }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// Shared list view for the Image and Audio dashboard tabs. Mirrors the chat
+// Models page: media models are consolidated into one logical-model group per
+// name (with a "N providers" badge), each linking to its own detail page, and a
+// per-provider enable toggle (saved immediately). Rows arrive from the signed
+// catalog via catalog-sync, so the list self-populates once a media catalog is
+// applied.
 export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -36,7 +60,7 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['media'] }),
   })
 
-  const models = (data?.models ?? []).filter(m => m.modality === modality)
+  const groups = groupMedia((data?.models ?? []).filter(m => m.modality === modality))
   const title = modality === 'image' ? t('models.imageTitle') : t('models.audioTitle')
   const description = modality === 'image' ? t('models.imageDesc') : t('models.audioDesc')
   const endpoint = modality === 'image' ? '/v1/images/generations' : '/v1/audio/speech'
@@ -52,34 +76,52 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-        ) : models.length === 0 ? (
+        ) : groups.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('models.mediaEmpty')}</p>
         ) : (
-          <section className="rounded-3xl border bg-card p-5">
-            <div className="divide-y">
-              {models.map(m => (
-                <div key={m.id} className={`flex items-center gap-3 py-2 ${m.enabled ? '' : 'opacity-50'}`}>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{m.displayName}</span>
-                      <span className="text-xs text-muted-foreground">{m.platform}</span>
-                      {m.keyCount === 0 && (
-                        <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-amber-600/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-400">
-                          {t('models.noKey')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="truncate font-mono text-[11px] text-muted-foreground">{m.modelId}</div>
-                    {m.quotaLabel && <div className="text-[11px] text-muted-foreground/70">{m.quotaLabel}</div>}
-                  </div>
-                  <Switch
-                    checked={m.enabled}
-                    onCheckedChange={(c) => toggle.mutate({ id: m.id, enabled: c })}
-                  />
+          groups.map(g => {
+            const anyEnabled = g.members.some(m => m.enabled)
+            const quota = g.members.map(m => m.quotaLabel).find(Boolean)
+            return (
+              <section key={g.slug} className={`rounded-3xl border bg-card p-5 ${anyEnabled ? '' : 'opacity-60'}`}>
+                <div className="mb-3 flex items-center gap-2 flex-wrap">
+                  <Link to={`/models/${modality}/${g.slug}`} className="text-sm font-medium hover:underline">{g.label}</Link>
+                  {g.members.length > 1 ? (
+                    <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">
+                      {t('models.providerCount', { count: g.members.length })}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{g.members[0].platform}</span>
+                  )}
+                  {quota && (
+                    <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">{quota}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          </section>
+
+                <div className="divide-y">
+                  {g.members.map(m => (
+                    <div key={m.id} className={`flex items-center gap-3 py-2 ${m.enabled ? '' : 'opacity-50'}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{m.platform}</span>
+                          {m.keyCount === 0 && (
+                            <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-amber-600/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-400">
+                              {t('models.noKey')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="truncate font-mono text-[11px] text-muted-foreground">{m.modelId}</div>
+                      </div>
+                      <Switch
+                        checked={m.enabled}
+                        onCheckedChange={(c) => toggle.mutate({ id: m.id, enabled: c })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )
+          })
         )}
       </div>
     </div>

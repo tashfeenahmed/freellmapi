@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
@@ -133,7 +134,7 @@ export default function EmbeddingsPage() {
               <section key={f.family} className={`rounded-3xl border bg-card p-5 ${noKeys ? 'opacity-60' : ''}`}>
                 <div className="flex items-baseline justify-between gap-4 mb-3 flex-wrap">
                   <div className="flex items-baseline gap-2.5 min-w-0">
-                    <h2 className="text-sm font-medium font-mono truncate">{f.family}</h2>
+                    <Link to={`/models/embeddings/${encodeURIComponent(f.family)}`} className="text-sm font-medium font-mono truncate hover:underline">{f.family}</Link>
                     <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
                       {f.dimensions}d
                     </span>

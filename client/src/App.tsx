@@ -27,6 +27,8 @@ import FusionPage from '@/pages/FusionPage'
 import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import ImagePage from '@/pages/ImagePage'
 import AudioPage from '@/pages/AudioPage'
+import MediaDetailPage from '@/pages/MediaDetailPage'
+import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 import PremiumPage from '@/pages/PremiumPage'
 
@@ -243,8 +245,11 @@ function App() {
                 <Route path="/models/chat/:id" element={<ModelDetailPage />} />
                 <Route path="/models/fusion" element={<FusionPage />} />
                 <Route path="/models/embeddings" element={<EmbeddingsPage />} />
+                <Route path="/models/embeddings/:id" element={<EmbeddingDetailPage />} />
                 <Route path="/models/image" element={<ImagePage />} />
+                <Route path="/models/image/:id" element={<MediaDetailPage modality="image" />} />
                 <Route path="/models/audio" element={<AudioPage />} />
+                <Route path="/models/audio/:id" element={<MediaDetailPage modality="audio" />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
