@@ -62,6 +62,13 @@ export function listMediaModels(modality: MediaModality): MediaModelRow[] {
     .all(modality) as MediaModelRow[];
 }
 
+/** All media models (both modalities, including disabled) for the dashboard. */
+export function listAllMediaModels(): MediaModelRow[] {
+  return getDb()
+    .prepare('SELECT * FROM media_models ORDER BY modality, priority, id')
+    .all() as MediaModelRow[];
+}
+
 function getPlatformKey(platform: string): string | null {
   const row = getDb()
     .prepare("SELECT encrypted_key, iv, auth_tag FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id LIMIT 1")
