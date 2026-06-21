@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform } from '../../../shared/types'
@@ -93,9 +94,14 @@ interface HealthPlatform {
   unknownKeys: number
 }
 
+interface UnconfiguredProvider { platform: string; name: string; models: number }
+interface NudgeState { disabled: boolean; muted: string[]; snoozed: string[] }
+
 interface HealthData {
   platforms: HealthPlatform[]
   keys: { id: number; platform: string; status: string; lastCheckedAt: string | null }[]
+  unconfiguredProviders?: UnconfiguredProvider[]
+  nudgeState?: NudgeState
 }
 
 function UnifiedKeySection() {
@@ -414,6 +420,12 @@ export default function KeysPage() {
     },
   })
 
+  const dismissNudge = useMutation({
+    mutationFn: (body: { scope: 'snooze' | 'mute' | 'disable'; platform?: string }) =>
+      apiFetch('/api/keys/nudge', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['health'] }),
+  })
+
   const deleteKey = useMutation({
     mutationFn: (id: number) => apiFetch(`/api/keys/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -525,6 +537,17 @@ export default function KeysPage() {
     keys: keys.filter(k => k.platform === p.value),
   })).filter(p => p.keys.length > 0)
 
+  // Unconfigured-provider nudge. The raw list drives the permanent dropdown hint
+  // (survives "Don't ask again"); the banner shows the dismiss-filtered subset.
+  const nudge = healthData?.nudgeState
+  const unconfiguredByPlatform = new Map(
+    (healthData?.unconfiguredProviders ?? []).map(p => [p.platform, p.models]),
+  )
+  const bannerProviders = (healthData?.unconfiguredProviders ?? []).filter(
+    p => !nudge?.muted.includes(p.platform) && !nudge?.snoozed.includes(p.platform),
+  )
+  const showBanner = !nudge?.disabled && bannerProviders.length > 0
+
   return (
     <div>
       <PageHeader
@@ -538,6 +561,56 @@ export default function KeysPage() {
           )
         }
       />
+
+      {showBanner && (
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
+          <div className="mb-2 text-foreground">
+            {t('keys.unconfiguredTitle', { count: bannerProviders.length })} —{' '}
+            {bannerProviders.map(p => t('keys.unconfiguredModelCount', { name: p.name, count: p.models })).join(', ')}.
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                {t('keys.nudgeAddKey')}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-auto">
+                {bannerProviders.map(p => (
+                  <DropdownMenuItem
+                    key={p.platform}
+                    onClick={() => {
+                      setPlatform(p.platform as Platform)
+                      document.querySelector('form')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                  >
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                {t('keys.nudgeDismiss')}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-auto">
+                <DropdownMenuItem onClick={() => dismissNudge.mutate({ scope: 'snooze' })}>
+                  {t('keys.nudgeSnooze')}
+                </DropdownMenuItem>
+                {bannerProviders.map(p => (
+                  <DropdownMenuItem
+                    key={p.platform}
+                    onClick={() => dismissNudge.mutate({ scope: 'mute', platform: p.platform })}
+                  >
+                    {t('keys.nudgeMute', { name: p.name })}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={() => dismissNudge.mutate({ scope: 'disable' })}>
+                  {t('keys.nudgeDisable')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-8">
         <UnifiedKeySection />
@@ -553,10 +626,16 @@ export default function KeysPage() {
                 <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder={t('keys.selectPlatform')} />
                 </SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map(p => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                  ))}
+                <SelectContent className="w-auto min-w-[220px]">
+                  {PLATFORMS.map(p => {
+                    const models = unconfiguredByPlatform.get(p.value)
+                    return (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                        {models ? ` ${t('keys.dropdownNoKeyHint', { count: models })}` : ''}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
               {(() => {
