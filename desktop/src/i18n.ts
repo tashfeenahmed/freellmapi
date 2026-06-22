@@ -3,7 +3,7 @@
 // built in the main process; the popover is a file:// page), so they can't read
 // the dashboard's i18n. The active locale is mirrored from the dashboard via the
 // `freeapi:locale-changed` IPC (preload watches <html lang>) and persisted in
-// config, exactly like the theme. Keep these keys in sync with the five locales
+// config, exactly like the theme. Keep these keys in sync with the six locales
 // shipped by the client (client/src/i18n/locales).
 
 export const NATIVE_LOCALES = ['en', 'zh-CN', 'fr', 'es', 'pt-BR', 'it'] as const;
