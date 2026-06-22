@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { BarChart, Bar, Cell, XAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
 import {
   DndContext,
   closestCenter,
@@ -17,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal, Search, X } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal, Search, X, Plus, Minus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
@@ -25,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/copy-button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
@@ -230,10 +232,131 @@ function groupMaxContext(members: Row[]): number {
 // threshold (0 = no filter); numeric labels are not localized (they're numbers).
 const CTX_BUCKETS: { key: number; label?: string; tKey?: string }[] = [
   { key: 0, tKey: 'ctxAny' },
-  { key: 32_000, label: '32K+' },
   { key: 128_000, label: '128K+' },
+  { key: 256_000, label: '256K+' },
   { key: 1_000_000, label: '1M+' },
 ]
+
+// Number of log-spaced bars in the advanced context histogram.
+const CTX_BINS = 24
+
+interface CtxBin {
+  start: number       // bin lower bound (tokens)
+  end: number         // bin upper bound (tokens)
+  count: number       // logical models in this bin
+  labels: string[]    // their display names (for the hover tooltip)
+}
+
+// Hover card listing the models that fall in a bar's bin (or just the count
+// when there are too many to show).
+function CtxHistTooltip({
+  active, payload, t,
+}: {
+  active?: boolean
+  payload?: { payload: CtxBin }[]
+  t: (key: string, vars?: Record<string, string | number>) => string
+}) {
+  if (!active || !payload?.length) return null
+  const bin = payload[0].payload
+  if (bin.count === 0) return null
+  const shown = bin.labels.slice(0, 8)
+  const extra = bin.count - shown.length
+  return (
+    <div className="max-w-56 rounded-xl border bg-popover px-3 py-2 text-xs shadow-md">
+      <div className="mb-1 font-medium text-popover-foreground tabular-nums">
+        {formatContext(bin.start)}–{formatContext(bin.end)} · {t('models.ctxModelsCount', { count: bin.count })}
+      </div>
+      <ul className="space-y-0.5 text-muted-foreground">
+        {shown.map((l, i) => <li key={i} className="truncate">{l}</li>)}
+        {extra > 0 && <li className="text-foreground/70">{t('models.ctxTooltipMore', { count: extra })}</li>}
+      </ul>
+    </div>
+  )
+}
+
+// Advanced context filter: a log-scaled histogram of the catalog's context
+// windows with a continuous two-thumb range slider underneath. `range` is the
+// selected [min, max] in tokens; bars overlapping it are highlighted, the rest
+// muted. Mirrors a date-range picker. The slider works in normalized [0,1]
+// position space (log-mapped to tokens) so dragging is smooth and aligns with
+// the evenly-spaced bars.
+function ContextRangeFilter({
+  bins, min, max, range, onChange, t,
+}: {
+  bins: CtxBin[]
+  min: number
+  max: number
+  range: [number, number]
+  onChange: (range: [number, number]) => void
+  t: (key: string, vars?: Record<string, string | number>) => string
+}) {
+  const logMin = Math.log(min)
+  const logMax = Math.log(max)
+  const posToToken = (p: number) => Math.round(Math.exp(logMin + p * (logMax - logMin)))
+  const tokenToPos = (tok: number) => (Math.log(tok) - logMin) / (logMax - logMin)
+  const [lo, hi] = range
+  const sliderValue: [number, number] = [
+    Math.max(0, Math.min(1, tokenToPos(lo))),
+    Math.max(0, Math.min(1, tokenToPos(hi))),
+  ]
+  // ~6 evenly spaced X-axis ticks.
+  const tickStep = Math.max(1, Math.ceil(bins.length / 6))
+
+  return (
+    <div className="rounded-3xl border bg-card p-4">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-sm font-medium">{t('models.ctxTitle')}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {lo <= min && hi >= max ? t('models.ctxAny') : `${formatContext(lo)} – ${formatContext(hi)}`}
+        </span>
+      </div>
+      <div className="h-24 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={bins} margin={{ top: 4, right: 6, left: 6, bottom: 0 }} barCategoryGap={2}>
+            <defs>
+              <linearGradient id="ctxGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity={1} />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.45} />
+              </linearGradient>
+            </defs>
+            <XAxis
+              dataKey="start"
+              interval={tickStep - 1}
+              tickFormatter={(v: number) => formatContext(v)}
+              tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <RechartsTooltip
+              cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+              content={<CtxHistTooltip t={t} />}
+            />
+            <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+              {bins.map((b, i) => (
+                <Cell key={i} fill={b.end > lo && b.start < hi ? 'url(#ctxGrad)' : 'var(--muted)'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="px-1.5 pt-5">
+        <Slider
+          value={sliderValue}
+          min={0}
+          max={1}
+          step={0.005}
+          minStepsBetweenValues={0}
+          aria-label={t('models.ctxRangeLabel')}
+          onValueChange={v => {
+            const [a, b] = v as number[]
+            onChange([posToToken(a), posToToken(b)])
+          }}
+          formatLabel={idx => formatContext(posToToken(sliderValue[idx]))}
+        />
+      </div>
+    </div>
+  )
+}
 
 // For models with no monthly token budget, surface their rate quota instead.
 // Strips the catalog's decorative bits ("free · ", " per IP", "~", "?") so e.g.
@@ -671,7 +794,10 @@ export default function FallbackPage() {
   const [search, setSearch] = useState('')
   const [filterVision, setFilterVision] = useState(false)
   const [filterTools, setFilterTools] = useState(false)
-  const [minContext, setMinContext] = useState(0)
+  // Context-window filter as an index range `[lo, hi]` into `ctxValues` (the
+  // sorted distinct context sizes), or null when no context filter is applied.
+  const [ctxRange, setCtxRange] = useState<[number, number] | null>(null)
+  const [ctxAdvanced, setCtxAdvanced] = useState(false)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
     queryKey: ['fallback'],
@@ -738,11 +864,73 @@ export default function FallbackPage() {
   // unfiltered manual chain (reordering a filtered subset would be ambiguous).
   const rankByKey = new Map(orderedGroups.map((g, i) => [g.key, i + 1]))
   const query = search.trim().toLowerCase()
-  const filtersActive = query !== '' || filterVision || filterTools || minContext > 0
+
+  // Context-window distribution as a log-scaled histogram: the domain [ctxMin,
+  // ctxMax] is split into `CTX_BINS` equal-width bins in log space, so models
+  // spanning several orders of magnitude (8K → 1M+) spread out evenly. Each bin
+  // carries its model count and labels (for the hover tooltip). Recomputed only
+  // when the groups change so the slider scale stays stable while you filter.
+  const ctxHist = useMemo(() => {
+    const sizes: { c: number; label: string }[] = []
+    for (const g of orderedGroups) {
+      const c = groupMaxContext(g.members)
+      if (c > 0) sizes.push({ c, label: g.label })
+    }
+    const min = Math.min(...sizes.map(s => s.c))
+    const max = Math.max(...sizes.map(s => s.c))
+    if (sizes.length === 0 || !(max > min)) {
+      return { min: min || 0, max: max || 0, bins: [] as CtxBin[] }
+    }
+    const logMin = Math.log(min)
+    const logMax = Math.log(max)
+    const edge = (k: number) => Math.exp(logMin + ((logMax - logMin) * k) / CTX_BINS)
+    const bins: CtxBin[] = Array.from({ length: CTX_BINS }, (_, k) => ({
+      start: edge(k), end: edge(k + 1), count: 0, labels: [] as string[],
+    }))
+    for (const s of sizes) {
+      let k = Math.floor(((Math.log(s.c) - logMin) / (logMax - logMin)) * CTX_BINS)
+      if (k >= CTX_BINS) k = CTX_BINS - 1
+      if (k < 0) k = 0
+      bins[k].count++
+      bins[k].labels.push(s.label)
+    }
+    return { min, max, bins }
+  }, [orderedGroups])
+
+  const ctxMin = ctxHist.min
+  const ctxMax = ctxHist.max
+  const ctxHasRange = ctxHist.bins.length > 0 // false when all models share one size
+  const ctxFilterActive = ctxRange !== null
+  const activeRange: [number, number] = ctxRange ?? [ctxMin, ctxMax]
+
+  // Quick-filter buckets ("X+") select [key, ctxMax] in token space.
+  function bucketToRange(key: number): [number, number] {
+    if (key <= 0) return [ctxMin, ctxMax]
+    return [Math.max(key, ctxMin), ctxMax]
+  }
+  // Commit a token range, collapsing back to null (= no filter) when it spans
+  // the whole domain.
+  function commitRange(r: [number, number]) {
+    if (!ctxHasRange || (r[0] <= ctxMin && r[1] >= ctxMax)) setCtxRange(null)
+    else setCtxRange(r)
+  }
+  // A bucket is "active" only when the current range exactly matches it; any
+  // drag of the slider breaks the equality and visually deselects the buttons.
+  function bucketIsActive(key: number): boolean {
+    if (key <= 0) return !ctxFilterActive
+    if (!ctxFilterActive) return false
+    const [lo, hi] = bucketToRange(key)
+    return activeRange[0] === lo && activeRange[1] === hi
+  }
+
+  const filtersActive = query !== '' || filterVision || filterTools || ctxFilterActive
   const visibleGroups = orderedGroups.filter(g => {
     if (filterVision && !g.members.some(m => m.supportsVision)) return false
     if (filterTools && !g.members.some(m => m.supportsTools)) return false
-    if (minContext > 0 && groupMaxContext(g.members) < minContext) return false
+    if (ctxFilterActive) {
+      const c = groupMaxContext(g.members)
+      if (c < activeRange[0] || c > activeRange[1]) return false
+    }
     if (query) {
       const hay = [
         g.label,
@@ -760,7 +948,7 @@ export default function FallbackPage() {
     setSearch('')
     setFilterVision(false)
     setFilterTools(false)
-    setMinContext(0)
+    setCtxRange(null)
   }
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
@@ -898,15 +1086,37 @@ export default function FallbackPage() {
                   {CTX_BUCKETS.map(b => (
                     <button
                       key={b.key}
-                      onClick={() => setMinContext(b.key)}
-                      className={`px-2.5 py-1 text-xs rounded-lg transition-colors tabular-nums ${minContext === b.key ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                      onClick={() => commitRange(bucketToRange(b.key))}
+                      className={`px-2.5 py-1 text-xs rounded-lg transition-colors tabular-nums ${bucketIsActive(b.key) ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
                     >
                       {b.tKey ? t(`models.${b.tKey}`) : b.label}
                     </button>
                   ))}
+                  {ctxHasRange && (
+                    <button
+                      onClick={() => setCtxAdvanced(v => !v)}
+                      aria-expanded={ctxAdvanced}
+                      aria-label={t('models.ctxAdvanced')}
+                      title={t('models.ctxAdvanced')}
+                      className={`flex items-center justify-center size-6 rounded-lg transition-colors ${ctxAdvanced ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                    >
+                      {ctxAdvanced ? <Minus className="size-3.5" /> : <Plus className="size-3.5" />}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+
+            {ctxAdvanced && ctxHasRange && (
+              <ContextRangeFilter
+                bins={ctxHist.bins}
+                min={ctxMin}
+                max={ctxMax}
+                range={activeRange}
+                onChange={commitRange}
+                t={t}
+              />
+            )}
 
             {filtersActive && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
