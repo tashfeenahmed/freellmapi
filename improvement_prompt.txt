@@ -1,0 +1,33 @@
+Investigate catalog synchronization logic that populates the `media_models` table.
+
+Observed behavior:
+
+* `POST /api/debug/seed-media` successfully inserts:
+
+  * platform='google'
+  * model_id='gemini-2.5-flash-preview-tts'
+  * modality='audio'
+
+* Immediately after server startup:
+
+  * `[catalog-sync] re-applied cached monthly ...`
+  * `media_models` becomes empty again.
+
+Goal:
+
+Find where catalog sync replaces or clears `media_models`.
+
+Requirements:
+
+1. Identify all code paths that write to `media_models`.
+2. Find the exact statement that deletes, truncates, replaces, or upserts rows during catalog sync.
+3. Explain why manually seeded audio models disappear after startup.
+4. Propose a fix so locally seeded media models survive catalog sync.
+5. Prefer one of:
+
+   * Preserve manually seeded rows.
+   * Add a `source='manual'` flag and exclude those rows from sync cleanup.
+   * Add a dedicated debug seed mechanism executed after sync.
+6. Show exact files involved.
+7. Show full git diff for the recommended fix.
+8. Explain impact on image models, audio models, and future STT models.

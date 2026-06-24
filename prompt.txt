@@ -1,0 +1,99 @@
+You are working inside the FreeLLMAPI codebase.
+
+Goal:
+Create a temporary admin/debug endpoint that seeds default media models into the SQLite `media_models` table so that TTS can be tested without requiring the Premium catalog.
+
+Context:
+
+* Root cause identified:
+
+  * `media_models` table starts empty.
+  * Free/monthly catalog does not contain image/audio models.
+  * `/v1/audio/speech` fails because `resolveMediaChain('audio')` returns zero rows.
+* We want a temporary endpoint to manually populate media models.
+
+Requirements:
+
+1. Create a new authenticated route:
+
+POST /api/debug/seed-media
+
+2. Route must:
+
+* Insert the following row if it does not already exist:
+
+platform='google'
+model_id='gemini-2.5-flash-preview-tts'
+display_name='Gemini 2.5 Flash TTS'
+modality='audio'
+priority=1
+enabled=1
+quota_label='Keyless'
+
+3. Use:
+
+INSERT OR IGNORE
+
+so the endpoint is idempotent.
+
+4. After insertion return:
+
+{
+"success": true,
+"rowsInserted": <count>,
+"mediaModelsCount": <count>,
+"audioModelsCount": <count>
+}
+
+5. Use existing database helpers:
+
+* getDb()
+* existing SQLite patterns already used throughout the codebase.
+
+6. Register the route inside app.ts behind:
+
+requireAuth
+
+same as other /api routes.
+
+7. Also add a GET endpoint:
+
+GET /api/debug/media-status
+
+Return:
+
+{
+"totalMediaModels": number,
+"audioModels": number,
+"imageModels": number,
+"transcriptionModels": number,
+"models": [...]
+}
+
+8. Follow existing project conventions:
+
+* Express Router
+* TypeScript
+* No new dependencies
+* No schema migrations
+* No catalog-sync modifications
+
+9. Show:
+
+* Exact files modified
+* Full git diff
+* Full source code for new route file
+* app.ts registration changes
+
+10. After implementation explain how to test:
+
+POST /api/debug/seed-media
+GET /api/debug/media-status
+POST /v1/audio/speech
+
+Expected outcome:
+After seeding, `/v1/audio/speech` should no longer throw:
+
+"No enabled audio providers configured"
+
+and should proceed to the Google TTS adapter.

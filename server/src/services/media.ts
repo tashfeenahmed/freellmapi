@@ -13,12 +13,12 @@ import { proxyFetch } from '../lib/proxy.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'groq']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
 const KEYLESS_CAPABLE = new Set(['pollinations']);
 
-export type MediaModality = 'image' | 'audio';
+export type MediaModality = 'image' | 'audio' | 'transcription';
 
 export interface MediaModelRow {
   id: number;
@@ -361,4 +361,109 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
     }
   }
   throw chainError('audio', lastError);
+}
+
+export interface TranscriptionParams {
+  fileBuffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  language?: string;
+  prompt?: string;
+  temperature?: number;
+  responseFormat?: string;
+}
+
+export interface TranscriptionResult {
+  platform: string;
+  modelId: string;
+  text: string;
+}
+
+async function callTranscriptionProvider(
+  row: MediaModelRow,
+  key: string | null,
+  p: TranscriptionParams,
+): Promise<{ text: string }> {
+  switch (row.platform) {
+    case 'groq': {
+      const formData = new FormData();
+      const fileBlob = new Blob([p.fileBuffer], { type: p.mimeType });
+      formData.append('file', fileBlob, p.fileName);
+      formData.append('model', row.model_id);
+      if (p.language) formData.append('language', p.language);
+      if (p.prompt) formData.append('prompt', p.prompt);
+      if (p.temperature != null) formData.append('temperature', String(p.temperature));
+      if (p.responseFormat) formData.append('response_format', p.responseFormat);
+
+      const r = await mediaFetch('https://api.groq.com/openai/v1/audio/transcriptions', 'groq', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        body: formData,
+      });
+      const j = await r.json() as { text?: string };
+      return { text: j.text ?? '' };
+    }
+    case 'cloudflare': {
+      const { accountId, token } = parseCfKey(key);
+      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+        body: p.fileBuffer,
+      });
+      const j = await r.json() as { result?: { text?: string } };
+      return { text: j.result?.text ?? '' };
+    }
+    case 'google': {
+      const r = await mediaFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${row.model_id}:generateContent?key=${encodeURIComponent(key ?? '')}`,
+        'google',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { inlineData: { mimeType: p.mimeType, data: p.fileBuffer.toString('base64') } },
+                { text: p.prompt ? `Context / prompt: ${p.prompt}\n\nTranscribe the audio accurately. Output only the transcript without comments.` : "Transcribe the audio accurately. Output only the transcript without comments." }
+              ]
+            }],
+            generationConfig: {
+              temperature: p.temperature ?? 0.0,
+            }
+          }),
+        }
+      );
+      const j = await r.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const text = j.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      return { text: text.trim() };
+    }
+    default:
+      throw new MediaError(`no transcription adapter for platform '${row.platform}'`, 500);
+  }
+}
+
+/** Transcribe audio, failing over across providers serving the modality. */
+export async function runTranscription(
+  model: string | undefined,
+  params: TranscriptionParams,
+): Promise<TranscriptionResult> {
+  const chain = resolveMediaChain(model, 'transcription');
+  let lastError: MediaError | null = null;
+  for (const row of chain) {
+    const keyless = KEYLESS_CAPABLE.has(row.platform);
+    const key = keyless ? null : getPlatformKey(row.platform);
+    if (!keyless && !key) continue;
+    const started = Date.now();
+    try {
+      const out = await callTranscriptionProvider(row, key, params);
+      if (out.text === undefined) throw new MediaError('upstream returned invalid response', 502);
+      logMedia(row, 'success', Date.now() - started, null);
+      return { platform: row.platform, modelId: row.model_id, text: out.text };
+    } catch (err: any) {
+      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+      logMedia(row, 'error', Date.now() - started, e.message.slice(0, 300));
+      lastError = e;
+    }
+  }
+  throw chainError('transcription', lastError);
 }

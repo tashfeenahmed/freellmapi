@@ -7,7 +7,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 
 // Generative-media modalities are routed into the separate media_models table
 // (see services/media.ts), never into the chat `models` table.
-const MEDIA_MODALITIES = new Set(['image', 'audio']);
+const MEDIA_MODALITIES = new Set(['image', 'audio', 'transcription']);
 
 /**
  * catalog-sync — keeps the local model catalog in step with the published one.

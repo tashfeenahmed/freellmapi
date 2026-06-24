@@ -18,5 +18,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "@rolldown/binding-win32-x64-msvc": "^1.1.3"
   }
 }

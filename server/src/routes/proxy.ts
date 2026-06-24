@@ -1,12 +1,13 @@
 import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
-import { runImageGeneration, runSpeech, MediaError } from '../services/media.js';
+import { runImageGeneration, runSpeech, runTranscription, MediaError } from '../services/media.js';
 import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -525,6 +526,57 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
     const status = err instanceof MediaError ? err.status : 502;
     const httpStatus = status >= 400 && status < 600 ? status : 502;
     res.status(httpStatus).json({ error: { message: `speech error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
+  }
+});
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+proxyRouter.post('/audio/transcriptions', upload.single('file'), async (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({ error: { message: 'Invalid request: `file` is required', type: 'invalid_request_error' } });
+    return;
+  }
+
+  const model = typeof req.body.model === 'string' ? req.body.model : undefined;
+  const language = typeof req.body.language === 'string' ? req.body.language : undefined;
+  const prompt = typeof req.body.prompt === 'string' ? req.body.prompt : undefined;
+  const temperature = req.body.temperature != null ? Number(req.body.temperature) : undefined;
+  const responseFormat = typeof req.body.response_format === 'string' ? req.body.response_format : undefined;
+
+  try {
+    const result = await runTranscription(model, {
+      fileBuffer: req.file.buffer,
+      fileName: req.file.originalname || 'audio.mp3',
+      mimeType: req.file.mimetype || 'audio/mpeg',
+      language,
+      prompt,
+      temperature,
+      responseFormat,
+    });
+
+    res.setHeader('X-Provider', result.platform);
+
+    const format = (responseFormat || 'json').toLowerCase();
+    if (format === 'json' || format === 'verbose_json') {
+      res.json({ text: result.text });
+    } else {
+      res.setHeader('Content-Type', 'text/plain');
+      res.send(result.text);
+    }
+  } catch (err: any) {
+    const status = err instanceof MediaError ? err.status : 502;
+    const httpStatus = status >= 400 && status < 600 ? status : 502;
+    res.status(httpStatus).json({ error: { message: `transcription error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
   }
 });
 
