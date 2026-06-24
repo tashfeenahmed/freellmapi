@@ -4,6 +4,7 @@ import {
   classifyProcessError,
   handleProcessError,
 } from '../../lib/process-safety-net.js';
+import type { SafetyNetHooks } from '../../lib/process-safety-net.js';
 
 describe('isTransportError', () => {
   it('matches Node socket error codes', () => {
@@ -44,6 +45,19 @@ describe('classifyProcessError', () => {
   it('swallows transport errors and is fatal for everything else', () => {
     expect(classifyProcessError(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBe('swallow');
     expect(classifyProcessError(new Error('real bug'))).toBe('fatal');
+  });
+});
+
+describe('installProcessSafetyNet', () => {
+  it('skips process.on registration when hasProcessHooks is false', async () => {
+    vi.resetModules();
+    const spy = vi.spyOn(process, 'on');
+    const { installProcessSafetyNet } = await import('../../lib/process-safety-net.js');
+    installProcessSafetyNet({ hasProcessHooks: false } satisfies SafetyNetHooks);
+    expect(spy).not.toHaveBeenCalledWith('uncaughtException', expect.any(Function));
+    expect(spy).not.toHaveBeenCalledWith('unhandledRejection', expect.any(Function));
+    spy.mockRestore();
+    vi.resetModules();
   });
 });
 
