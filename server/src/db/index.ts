@@ -17,11 +17,19 @@ export function getDb(): Database.Database {
   return db;
 }
 
-export function connectDb(dbPath?: string): Database.Database {
+export function connectDb(
+  dbPath?: string,
+  opts?: {
+    /** Create the parent directory if absent. Default: true. Set false in
+     *  environments that do not have a writable local filesystem. */
+    ensureDir?: boolean;
+  },
+): Database.Database {
   const resolvedPath = dbPath ?? DB_PATH;
   const isMemory = resolvedPath === ':memory:';
+  const ensureDir = opts?.ensureDir ?? true;
 
-  if (!isMemory) {
+  if (!isMemory && ensureDir) {
     const dataDir = path.dirname(resolvedPath);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
@@ -36,8 +44,11 @@ export function connectDb(dbPath?: string): Database.Database {
   return db;
 }
 
-export function initDb(dbPath?: string): Database.Database {
-  const db = connectDb(dbPath);
+export function initDb(
+  dbPath?: string,
+  opts?: { ensureDir?: boolean },
+): Database.Database {
+  const db = connectDb(dbPath, opts);
 
   if (process.env.NODE_ENV !== 'development') {
     runMigrationsSync(db, 'up');

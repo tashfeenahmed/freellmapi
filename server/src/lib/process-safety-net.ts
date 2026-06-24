@@ -72,6 +72,9 @@ function describeError(err: unknown): string {
 export interface SafetyNetHooks {
   log?: (...args: unknown[]) => void;
   exit?: (code: number) => void;
+  /** Set false to skip registering process.on() handlers (e.g. in test environments
+   *  or runtimes that do not expose a Node process). Default: true. */
+  hasProcessHooks?: boolean;
 }
 
 /** Decide and act on a process-level error. Returns the decision so callers and
@@ -96,10 +99,12 @@ export function handleProcessError(
 let installed = false;
 
 /** Install the global handlers once. Idempotent. Call as early as possible at
- *  boot (before the server starts taking traffic). */
+ *  boot (before the server starts taking traffic). Pass `hasProcessHooks: false`
+ *  to skip handler registration without changing other hook behaviour. */
 export function installProcessSafetyNet(hooks: SafetyNetHooks = {}): void {
   if (installed) return;
   installed = true;
+  if (hooks.hasProcessHooks === false) return;
   process.on('uncaughtException', (err) => handleProcessError('uncaughtException', err, hooks));
   process.on('unhandledRejection', (reason) => handleProcessError('unhandledRejection', reason, hooks));
 }
