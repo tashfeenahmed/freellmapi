@@ -42,6 +42,10 @@ export type Platform =
   // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
   // chat is supported too. Key from siliconflow.com (no card).
   | 'siliconflow'
+  // Alibaba Cloud Model Studio (DashScope) — OpenAI-compatible. Qwen and
+  // third-party models; key from modelstudio.console.alibabacloud.com (region-
+  // specific — Singapore intl endpoint below). See providers/index.ts.
+  | 'alibaba'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

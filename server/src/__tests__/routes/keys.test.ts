@@ -80,6 +80,16 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
+  it('POST /api/keys accepts alibaba platform', async () => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform: 'alibaba',
+      key: 'sk-test-alibaba-key',
+      label: 'DashScope Singapore',
+    });
+    expect(status).toBe(201);
+    expect(body.platform).toBe('alibaba');
+  });
+
   it('POST /api/keys rejects missing key', async () => {
     const { status } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',

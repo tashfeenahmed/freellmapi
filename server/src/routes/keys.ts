@@ -4,6 +4,13 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import {
+  DYNAMIC_MODEL_PLATFORMS,
+  deleteModelsForKey,
+  scheduleProviderModelSync,
+  syncProviderModels,
+} from '../services/provider-model-sync.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 
 export const keysRouter = Router();
 
@@ -14,7 +21,7 @@ export const keysRouter = Router();
 const PLATFORMS = [
   'google', 'groq', 'cerebras', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
-  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow', 'custom',
+  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow', 'alibaba', 'custom',
 ] as const;
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added
@@ -90,6 +97,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
     const existing = db.prepare('SELECT id FROM api_keys WHERE platform = ? LIMIT 1').get(platform) as { id: number } | undefined;
     if (existing) {
       db.prepare("UPDATE api_keys SET enabled = 1, status = 'unknown' WHERE id = ?").run(existing.id);
+      scheduleProviderModelSync(existing.id, platform);
       res.status(200).json({
         id: existing.id,
         platform,
@@ -107,6 +115,9 @@ keysRouter.post('/', (req: Request, res: Response) => {
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
     VALUES (?, ?, ?, ?, ?, 'unknown', 1)
   `).run(platform, label ?? '', encrypted, iv, authTag);
+
+  const keyId = Number(result.lastInsertRowid);
+  scheduleProviderModelSync(keyId, platform);
 
   res.status(201).json({
     id: result.lastInsertRowid,
@@ -247,6 +258,39 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   });
 });
 
+// Fetch + evaluate models from the provider's own /v1/models (Alibaba Model Studio, etc.).
+keysRouter.post('/:id/sync-models', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: { message: 'Invalid key ID' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(id) as {
+    id: number; platform: string; encrypted_key: string; iv: string; auth_tag: string; base_url?: string | null;
+  } | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: 'Key not found' } });
+    return;
+  }
+
+  const platform = row.platform as Platform;
+  if (!DYNAMIC_MODEL_PLATFORMS.has(platform)) {
+    res.status(400).json({ error: { message: `Platform '${platform}' does not support model sync from its endpoint` } });
+    return;
+  }
+
+  try {
+    const apiKey = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    const result = await syncProviderModels(platform, apiKey, id, { baseUrl: row.base_url });
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: { message } });
+  }
+});
+
 // Delete a key
 keysRouter.delete('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
@@ -263,6 +307,9 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   }
 
   const remove = db.transaction(() => {
+    if (DYNAMIC_MODEL_PLATFORMS.has(row.platform as Platform)) {
+      deleteModelsForKey(db, row.platform as Platform, id);
+    }
     db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
     // Custom models exist only because POST /custom registered them alongside
     // their endpoint key (#117) — they can't route without it. Cascade away

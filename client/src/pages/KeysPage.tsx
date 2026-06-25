@@ -11,6 +11,8 @@ import { PageHeader } from '@/components/page-header'
 import type { ApiKey, Platform, ProviderQuotaState } from '../../../shared/types'
 import { Pencil, ExternalLink, Globe } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
+import { apiBaseUrl, apiOrigin } from '@/lib/api-base-url'
+import { ApiUsageBlock } from '@/components/api-usage'
 import { useI18n } from '@/i18n'
 
 // Claude (Anthropic) model families the mapping editor exposes. Anthropic
@@ -49,6 +51,8 @@ function GetKeyLink({ url }: { url: string }) {
 // `keyless: true` providers (Kilo's anonymous free tier) need no API key — the
 // form disables the key field and submits a sentinel the backend stores so
 // routing treats the platform as configured.
+const DYNAMIC_MODEL_PLATFORMS: Platform[] = ['alibaba']
+
 const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean }[] = [
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
   { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
@@ -70,6 +74,7 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'agnes', label: 'Agnes AI (free key)', url: 'https://platform.agnes-ai.com' },
   { value: 'reka', label: 'Reka (free key)', url: 'https://platform.reka.ai' },
   { value: 'siliconflow', label: 'SiliconFlow (image + TTS)', url: 'https://siliconflow.com' },
+  { value: 'alibaba', label: 'Alibaba Model Studio', url: 'https://modelstudio.console.alibabacloud.com/ap-southeast-1?tab=api' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the
@@ -178,9 +183,17 @@ function UnifiedKeySection() {
 
   const apiKey = data?.apiKey ?? ''
   const masked = apiKey ? apiKey.slice(0, 13) + '•'.repeat(32) : '…'
-  const baseUrl = import.meta.env.DEV
-    ? `http://${window.location.hostname}:${__SERVER_PORT__}/v1`
-    : `${window.location.origin}/v1`
+  const baseUrl = apiBaseUrl()
+  const origin = apiOrigin()
+  const snippet = `curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer ${apiKey || 'YOUR_API_KEY'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto",
+    "messages": [
+      { "role": "user", "content": "Hello!" }
+    ]
+  }'`
 
   function copy() {
     navigator.clipboard.writeText(apiKey)
@@ -229,13 +242,18 @@ function UnifiedKeySection() {
         <span className="text-muted-foreground">{t('keys.baseUrl')}</span>
         <code className="font-mono">{baseUrl}</code>
         <span className="text-muted-foreground">{t('keys.endpointChat')}</span>
-        <code className="font-mono">/v1/chat/completions</code>
+        <code className="font-mono">/chat/completions</code>
         <span className="text-muted-foreground">{t('keys.endpointResponses')}</span>
-        <code className="font-mono">/v1/responses</code>
+        <code className="font-mono">/responses</code>
         <span className="text-muted-foreground">{t('keys.endpointMessages')}</span>
-        <code className="font-mono">/v1/messages <span className="text-muted-foreground">({t('keys.endpointMessagesHint')})</span></code>
+        <code className="font-mono">{origin}/v1/messages <span className="text-muted-foreground">({t('keys.endpointMessagesHint')})</span></code>
         <span className="text-muted-foreground">{t('keys.endpointEmbeddings')}</span>
-        <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">({t('keys.endpointEmbeddingsHint')})</span></code>
+        <code className="font-mono">/embeddings <span className="text-muted-foreground">({t('keys.endpointEmbeddingsHint')})</span></code>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{t('keys.endpointPathsHint')}</p>
+
+      <div className="mt-4">
+        <ApiUsageBlock snippet={snippet} />
       </div>
     </section>
   )
@@ -449,9 +467,7 @@ function AnthropicSection() {
 
   // Anthropic clients append `/v1/messages` to the base URL, so they want the
   // bare origin (OpenAI clients use origin + /v1, shown in the key section).
-  const origin = import.meta.env.DEV
-    ? `http://${window.location.hostname}:${__SERVER_PORT__}`
-    : window.location.origin
+  const origin = apiOrigin()
 
   const { data: mapData } = useQuery<{ map: AnthropicMap }>({
     queryKey: ['anthropic-map'],
@@ -561,6 +577,7 @@ export default function KeysPage() {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
       setPlatform('')
       setApiKey('')
       setAccountId('')
@@ -573,6 +590,8 @@ export default function KeysPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
   })
 
@@ -589,6 +608,15 @@ export default function KeysPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+    },
+  })
+
+  const syncModels = useMutation({
+    mutationFn: (keyId: number) => apiFetch(`/api/keys/${keyId}/sync-models`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
     },
   })
 
@@ -875,6 +903,16 @@ export default function KeysPage() {
                           <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                             {t('common.check')}
                           </Button>
+                          {DYNAMIC_MODEL_PLATFORMS.includes(k.platform as Platform) && (
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => syncModels.mutate(k.id)}
+                              disabled={syncModels.isPending}
+                            >
+                              {syncModels.isPending && syncModels.variables === k.id ? t('keys.syncingModels') : t('keys.syncModels')}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="xs"

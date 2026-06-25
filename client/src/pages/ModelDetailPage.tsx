@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
+import { apiBaseUrl } from '@/lib/api-base-url'
 import { CopyButton } from '@/components/copy-button'
 import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
@@ -71,9 +72,7 @@ export default function ModelDetailPage() {
 
   // A ready-to-run request referencing this model by its unified id, so it fails
   // over across every provider above. Same base-URL derivation as the Keys page.
-  const baseUrl = import.meta.env.DEV
-    ? `http://${window.location.hostname}:${__SERVER_PORT__}/v1`
-    : `${window.location.origin}/v1`
+  const baseUrl = apiBaseUrl()
   const snippet = `curl ${baseUrl}/chat/completions \\
   -H "Authorization: Bearer ${keyData?.apiKey || 'YOUR_API_KEY'}" \\
   -H "Content-Type: application/json" \\

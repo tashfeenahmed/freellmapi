@@ -176,6 +176,7 @@
     "endpointEmbeddingsHint": "model: \"auto\" or a family from the Embeddings tab",
     "endpointMessages": "Messages",
     "endpointMessagesHint": "Anthropic-compatible (Claude)",
+    "endpointPathsHint": "OpenAI paths are appended to the Base URL above (e.g. …/v1/chat/completions). Do not add another /v1. Use the unified key above — not your provider keys.",
     "anthropicTitle": "Claude (Anthropic) models",
     "anthropicDesc": "Point a Claude or Anthropic SDK client at this server. Anthropic clients send Claude model names — map each to Auto (the router picks a free model) or pin a specific one.",
     "anthropicBaseUrl": "Base URL",
@@ -237,7 +238,9 @@
     "keyCountOther": "{count} keys",
     "proxyEnvHintBefore": "Also configurable via the ",
     "proxyEnvHintAfter": " environment variable (takes precedence). Leave blank to disable. Examples:",
-    "confirmRemove": "Confirm?"
+    "confirmRemove": "Confirm?",
+    "syncModels": "Sync models",
+    "syncingModels": "Syncing…"
   },
   "status": {
     "healthy": "healthy",

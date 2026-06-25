@@ -229,6 +229,23 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.siliconflow.com/v1',
 }));
 
+// Alibaba Cloud Model Studio (DashScope) — OpenAI-compatible. Serves the Qwen
+// series and third-party models via the compatible-mode Chat Completions API.
+// API keys are region-specific and not interchangeable across endpoints; this
+// registration targets the Singapore (intl) region — the default in Alibaba's
+// docs for international users. Beijing: dashscope.aliyuncs.com; US:
+// dashscope-us.aliyuncs.com. Key from modelstudio.console.alibabacloud.com.
+//
+// Frontier / thinking models (qwen3.7-max, deepseek-v4-pro, etc.) can exceed
+// the default 15s cloud timeout from high-latency regions; bump to 120s like
+// Ollama Cloud so a slow first byte doesn't abort and burn a fallback slot.
+register(new OpenAICompatProvider({
+  platform: 'alibaba',
+  name: 'Alibaba Model Studio',
+  baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+  timeoutMs: 120000,
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.

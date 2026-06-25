@@ -242,6 +242,31 @@ export class OpenAICompatProvider extends BaseProvider {
     });
     return res.status !== 401 && res.status !== 403;
   }
+
+  /** List model ids from the provider's OpenAI-compatible GET /v1/models. */
+  async listModels(apiKey: string, quotaContext?: QuotaObservationContext): Promise<string[]> {
+    const url = this.validateUrl ?? `${this.baseUrl}/models`;
+    const res = await this.fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        ...this.authHeader(apiKey),
+        ...this.extraHeaders,
+      },
+    }, 30000);
+    recordQuotaObservationsFromResponse(res, {
+      platform: this.platform,
+      keyId: quotaContext?.keyId,
+      providerAccountId: quotaContext?.providerAccountId,
+      quotaPoolKey: quotaContext?.quotaPoolKey,
+      endpoint: 'models',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw providerHttpError(res, `${this.name} /models error ${res.status}: ${(err as { error?: { message?: string } }).error?.message ?? res.statusText}`);
+    }
+    const body = await res.json() as { data?: { id: string }[] };
+    return (body.data ?? []).map(m => m.id).filter(Boolean);
+  }
 }
 
 /**

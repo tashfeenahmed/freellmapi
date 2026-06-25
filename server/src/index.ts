@@ -4,6 +4,7 @@ import { initDb, getSetting } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
 import { applyProxyUrl, applyProxyEnabled, applyProxyBypass } from './lib/proxy.js';
 import { startCatalogSync } from './services/catalog-sync.js';
+import { scheduleMissingDynamicProviderSync } from './services/provider-model-sync.js';
 import { installProcessSafetyNet } from './lib/process-safety-net.js';
 
 const PORT = process.env.PORT ?? 3001;
@@ -33,6 +34,7 @@ async function main() {
     console.log(`Proxy endpoint: http://${display}:${PORT}/v1/chat/completions`);
     startHealthChecker();
     startCatalogSync();
+    scheduleMissingDynamicProviderSync();
   };
 
   const server = app.listen(Number(PORT), HOST, onReady(HOST));
