@@ -313,7 +313,9 @@
     "fusionTrace": "{count} model responses",
     "fusionFailed": "no response",
     "fusionJudgeSynth": "synthesized the final answer",
-    "errorPrefix": "Error:"
+    "errorPrefix": "Error:",
+    "systemPromptLabel": "System prompt",
+    "systemPromptPlaceholder": "Optional. Sent as a system message before your chat."
   },
   "embeddings": {
     "title": "Models",

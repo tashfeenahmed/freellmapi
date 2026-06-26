@@ -292,7 +292,9 @@
     "fusionTrace": "{count} 个模型的回答",
     "fusionFailed": "无回应",
     "fusionJudgeSynth": "综合出最终答案",
-    "errorPrefix": "错误:"
+    "errorPrefix": "错误:",
+    "systemPromptLabel": "系统提示词",
+    "systemPromptPlaceholder": "可选。作为系统消息在你的对话之前发送。"
   },
   "embeddings": {
     "title": "模型",

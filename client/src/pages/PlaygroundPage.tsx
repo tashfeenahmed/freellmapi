@@ -111,6 +111,19 @@ function FusionTrace({ panel, judge, streaming, answerStarted }: {
 export default function PlaygroundPage() {
   const { t } = useI18n()
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Optional system prompt for this Playground session. Client-side only:
+  // when set, it's prepended as a `system` message to the request. Persisted
+  // to localStorage so it survives reloads.
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    () => localStorage.getItem('playground.systemPrompt') ?? '',
+  )
+  const [systemPromptOpen, setSystemPromptOpen] = useState<boolean>(
+    () => !!localStorage.getItem('playground.systemPrompt'),
+  )
+  const updateSystemPrompt = (v: string) => {
+    setSystemPrompt(v)
+    localStorage.setItem('playground.systemPrompt', v)
+  }
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(
@@ -212,8 +225,12 @@ export default function PlaygroundPage() {
       if (keyData?.apiKey) headers['Authorization'] = `Bearer ${keyData.apiKey}`
 
       const isFusion = selectedModel === 'fusion'
+      const sysPrompt = systemPrompt.trim()
       const body: any = {
-        messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+        messages: [
+          ...(sysPrompt ? [{ role: 'system', content: sysPrompt }] : []),
+          ...newMessages.map(m => ({ role: m.role, content: m.content })),
+        ],
       }
       if (selectedModel !== 'auto') body.model = selectedModel
       // Fusion streams its panel + judge trace; ask for a stream so the
@@ -500,6 +517,26 @@ export default function PlaygroundPage() {
         </div>
 
         <div className="border-t bg-background/50 p-3">
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={() => setSystemPromptOpen(o => !o)}
+              className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronRight className={`size-3.5 transition-transform ${systemPromptOpen ? 'rotate-90' : ''}`} />
+              {t('playground.systemPromptLabel')}
+              {systemPrompt.trim() && <span className="ml-1 size-1.5 rounded-full bg-primary/70" />}
+            </button>
+            {systemPromptOpen && (
+              <textarea
+                value={systemPrompt}
+                onChange={e => updateSystemPrompt(e.target.value)}
+                placeholder={t('playground.systemPromptPlaceholder')}
+                rows={2}
+                className="mt-1.5 w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 min-h-[44px] max-h-[160px]"
+              />
+            )}
+          </div>
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
