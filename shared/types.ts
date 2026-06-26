@@ -53,6 +53,14 @@ export type Platform =
   // ~10M tokens/month free allocation (no card); quota unverified. Key from
   // ainative.studio.
   | 'ainative'
+  // AgentRouter (agentrouter.org) — non-profit OpenAI-compatible gateway aimed
+  // at CLI coding tools. Its "New API" backend enforces a client allowlist:
+  // only a Claude Code-style User-Agent (`claude-cli/<ver> (external…)`) is
+  // accepted; any other client 401s "unauthorized client detected" — so the
+  // provider pins that UA via extraHeaders (see providers/index.ts). Free key
+  // from agentrouter.org/console/token; the free token here is provisioned for
+  // glm-5.2 only and is tightly TPM-limited (fork-local addition).
+  | 'agentrouter'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

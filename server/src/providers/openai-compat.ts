@@ -242,6 +242,37 @@ export class OpenAICompatProvider extends BaseProvider {
     });
     return res.status !== 401 && res.status !== 403;
   }
+
+  /**
+   * Discover the model ids this key can actually serve by reading the upstream
+   * `GET /v1/models` catalog. Gateways that scope a token to a subset of models
+   * (AgentRouter's per-token "model restrictions", New API's `该令牌无权访问模型`)
+   * return ONLY the permitted ids here, so the dashboard can register exactly
+   * what the token unlocks instead of guessing. Sends the same auth + extra
+   * headers (e.g. the required User-Agent) as every other call. Throws on a
+   * non-2xx so the caller can surface "couldn't read your models — check the
+   * key", and tolerates either `{ data: [{ id }] }` or a bare `[{ id }]`.
+   */
+  async listModels(apiKey: string): Promise<string[]> {
+    const url = this.validateUrl ?? `${this.baseUrl}/models`;
+    const res = await this.fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        ...this.authHeader(apiKey),
+        ...this.extraHeaders,
+      },
+    }, 30000);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw providerHttpError(res, `${this.name} model listing failed (${res.status}): ${(err as any).error?.message ?? res.statusText}`);
+    }
+    const body = await res.json().catch(() => null) as { data?: unknown[] } | unknown[] | null;
+    const rows = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+    const ids = rows
+      .map(r => (typeof r === 'string' ? r : (r as { id?: unknown })?.id))
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    return Array.from(new Set(ids));
+  }
 }
 
 /**

@@ -75,12 +75,17 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'ainative', label: 'AINative Studio (free key)', url: 'https://ainative.studio' },
 ]
 
-// 'custom' is configured through its own form (base URL + model), not the
-// generic key dropdown — but it still appears in the grouped provider list.
+// 'custom' and 'agentrouter' are configured through their own forms, not the
+// generic key dropdown — but they still appear in the grouped provider list.
 const CUSTOM_GROUP: { value: Platform; label: string; url: string } = {
   value: 'custom',
   label: 'Custom (OpenAI-compatible)',
   url: '',
+}
+const AGENTROUTER_GROUP: { value: Platform; label: string; url: string } = {
+  value: 'agentrouter',
+  label: 'AgentRouter',
+  url: 'https://agentrouter.org/console/token',
 }
 
 const statusDot: Record<string, string> = {
@@ -444,6 +449,100 @@ function CustomProviderSection() {
   )
 }
 
+// AgentRouter (agentrouter.org): a built-in OpenAI-compatible gateway whose key
+// is scoped to a user-chosen set of models. "Fetch models" reads the token's
+// GET /v1/models (which returns exactly that set) and fills the editable list;
+// the user can trim it before adding. Its own section, like custom, because the
+// generic dropdown can't carry the per-token model selection.
+function AgentRouterSection() {
+  const { t } = useI18n()
+  const queryClient = useQueryClient()
+  const [apiKey, setApiKey] = useState('')
+  const [model, setModel] = useState('')
+
+  const models = parseModelList(model)
+  const multiple = models.length > 1
+
+  const discover = useMutation({
+    mutationFn: (key: string) =>
+      apiFetch<{ models: string[] }>('/api/keys/agentrouter/discover', { method: 'POST', body: JSON.stringify({ apiKey: key }) }),
+    onSuccess: (data) => {
+      // Auto-fill the discovered ids; the user can trim/edit before adding.
+      setModel((data.models ?? []).join('\n'))
+    },
+  })
+
+  const addAgentRouter = useMutation({
+    mutationFn: (body: { apiKey: string; models: string[] }) =>
+      apiFetch('/api/keys/agentrouter', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      setModel('')
+      setApiKey('')
+    },
+  })
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!apiKey || models.length === 0) return
+    addAgentRouter.mutate({ apiKey, models })
+  }
+
+  return (
+    <section>
+      <h2 className="text-sm font-medium mb-1">{t('keys.addAgentRouter')}</h2>
+      <p className="text-xs text-muted-foreground mb-3">
+        {t('keys.addAgentRouterDescription')}
+      </p>
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
+        <div className="space-y-1.5 flex-1 min-w-[240px]">
+          <Label className="text-xs">{t('keys.customApiKey')}</Label>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="sk-…"
+              className="font-mono text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={!apiKey || discover.isPending}
+              onClick={() => discover.mutate(apiKey)}
+            >
+              {discover.isPending ? t('keys.agentRouterDiscovering') : t('keys.agentRouterFetchModels')}
+            </Button>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">{t('keys.customModels')}</Label>
+          <Textarea
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            placeholder={'glm-5.2\nclaude-opus-4-8'}
+            rows={2}
+            className="w-[220px] font-mono text-xs"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={!apiKey || models.length === 0 || addAgentRouter.isPending}>
+          {addAgentRouter.isPending ? t('keys.addingCustom') : multiple ? t('keys.addModels', { count: models.length }) : t('keys.addModel')}
+        </Button>
+      </form>
+      {discover.isError && (
+        <p className="text-destructive text-xs mt-2">{(discover.error as Error).message}</p>
+      )}
+      {addAgentRouter.isError && (
+        <p className="text-destructive text-xs mt-2">{(addAgentRouter.error as Error).message}</p>
+      )}
+    </section>
+  )
+}
+
 // Claude (Anthropic) model mapping: point a Claude / Anthropic SDK client at
 // this server and decide how its built-in model names route into the free pool.
 function AnthropicSection() {
@@ -677,7 +776,7 @@ export default function KeysPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proxy-url'] }),
   })
 
-  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
+  const grouped = [...PLATFORMS, CUSTOM_GROUP, AGENTROUTER_GROUP].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
   })).filter(p => p.keys.length > 0)
@@ -794,6 +893,8 @@ export default function KeysPage() {
         </section>
 
         <CustomProviderSection />
+
+        <AgentRouterSection />
 
         <section>
           <h2 className="text-sm font-medium mb-3">{t('keys.configuredProviders')}</h2>

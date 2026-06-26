@@ -2,7 +2,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
-import { resolveProvider } from '../providers/index.js';
+import { resolveProvider, getProvider } from '../providers/index.js';
+import type { OpenAICompatProvider } from '../providers/openai-compat.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 
 export const keysRouter = Router();
@@ -15,7 +16,7 @@ const PLATFORMS = [
   'google', 'groq', 'cerebras', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'custom',
+  'routeway', 'bazaarlink', 'ainative', 'agentrouter', 'custom',
 ] as const;
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added
@@ -145,6 +146,67 @@ const customProviderSchema = z.object({
   { message: 'model or models is required' },
 );
 
+type ModelEntry = z.infer<typeof modelEntrySchema>;
+
+// Flatten singular `model`/`displayName` + plural `models` into a deduped,
+// blank-stripped list. The singular `displayName` only applies to a lone
+// `model` (it can't sensibly fan out across many ids). Shared by the custom
+// (#281) and AgentRouter add flows.
+function collectModelEntries(
+  model: string | undefined,
+  models: ModelEntry[] | undefined,
+  displayName: string | undefined,
+): { modelId: string; displayName: string }[] {
+  const entries: { modelId: string; displayName: string }[] = [];
+  const seen = new Set<string>();
+  const addEntry = (rawId: string, rawDisplay?: string) => {
+    const modelId = rawId.trim();
+    if (!modelId || seen.has(modelId)) return;
+    seen.add(modelId);
+    entries.push({ modelId, displayName: (rawDisplay?.trim() || modelId) });
+  };
+  if (model?.trim()) addEntry(model, displayName);
+  for (const m of models ?? []) {
+    if (typeof m === 'string') addEntry(m);
+    else addEntry(m.model, m.displayName);
+  }
+  return entries;
+}
+
+// Register model entries bound to an api_keys row (models.key_id) and append any
+// new ones to the fallback chain. Used by both 'custom' endpoints and
+// 'agentrouter' tokens — neither has a seeded catalog; their models are
+// user-supplied/discovered per key. Ranks are generic (sort last): we don't
+// fabricate intelligence/speed ranks for models we can't benchmark.
+function registerModelEntries(
+  db: ReturnType<typeof getDb>,
+  keyId: number,
+  platform: string,
+  sizeLabel: string,
+  entries: { modelId: string; displayName: string }[],
+): { modelDbId: number; model: string; displayName: string }[] {
+  const upsert = db.prepare(`
+    INSERT INTO models
+      (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+       rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
+    VALUES (?, ?, ?, 50, 50, ?, NULL, NULL, NULL, NULL, '', NULL, 1, ?)
+    ON CONFLICT(platform, model_id)
+    DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
+  `);
+  const registered: { modelDbId: number; model: string; displayName: string }[] = [];
+  for (const { modelId, displayName } of entries) {
+    upsert.run(platform, modelId, displayName, sizeLabel, keyId);
+    const modelRow = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(platform, modelId) as { id: number };
+    const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
+    if (!inChain) {
+      const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
+      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
+    }
+    registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
+  }
+  return registered;
+}
+
 keysRouter.post('/custom', (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -157,23 +219,7 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   const rawKey = parsed.data.apiKey?.trim() || 'no-key';
   const label = parsed.data.label ?? 'Custom';
 
-  // Flatten singular + plural inputs into one list, dedupe by model id, drop
-  // blanks. The singular `displayName` only applies to a lone `model` (it can't
-  // sensibly fan out across many ids).
-  const entries: { modelId: string; displayName: string }[] = [];
-  const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string) => {
-    const modelId = rawId.trim();
-    if (!modelId || seen.has(modelId)) return;
-    seen.add(modelId);
-    entries.push({ modelId, displayName: (rawDisplay?.trim() || modelId) });
-  };
-  if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
-  for (const m of parsed.data.models ?? []) {
-    if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName);
-  }
-
+  const entries = collectModelEntries(parsed.data.model, parsed.data.models, parsed.data.displayName);
   if (entries.length === 0) {
     res.status(400).json({ error: { message: 'model or models is required' } });
     return;
@@ -201,33 +247,10 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
       keyId = Number(r.lastInsertRowid);
     }
 
-    const registered: { modelDbId: number; model: string; displayName: string }[] = [];
-    for (const { modelId, displayName } of entries) {
-      // Register each model bound to THIS endpoint's key. Custom models carry no
-      // rate limits and sort last in the intelligence preset (size_label tier).
-      // Re-registering an existing model id re-binds it (model ids are unique
-      // per platform, so one id can't live on two endpoints at once).
-      db.prepare(`
-        INSERT INTO models
-          (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
-        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
-        ON CONFLICT(platform, model_id)
-        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
-      `).run(modelId, displayName, keyId);
-
-      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
-
-      // Append to the fallback chain if not already present.
-      const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
-      if (!inChain) {
-        const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
-        db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
-      }
-
-      registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
-    }
-
+    // Each model binds to THIS endpoint's key (models.key_id). Re-registering an
+    // existing id re-binds it — ids are unique per platform, so one can't live
+    // on two endpoints at once.
+    const registered = registerModelEntries(db, keyId, 'custom', 'Custom', entries);
     return { keyId, registered };
   });
 
@@ -241,6 +264,106 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
     modelDbId: first.modelDbId,
     platform: 'custom',
     baseUrl,
+    model: first.model,
+    displayName: first.displayName,
+    models: registered,
+    maskedKey: maskKey(rawKey),
+  });
+});
+
+// ── AgentRouter (agentrouter.org) ─────────────────────────────────────────
+// AgentRouter is a built-in provider (fixed base URL + the required Claude Code
+// User-Agent, set in providers/index.ts), but unlike the seeded catalogs its
+// models are PER TOKEN: a key is scoped to a user-chosen subset in AgentRouter's
+// panel, and GET /v1/models returns exactly that subset. So the dashboard
+// discovers the token's models and registers the selected ones bound to the key
+// (models.key_id), like a custom endpoint. A single AgentRouter key row is kept
+// (one token is the common case); re-submitting replaces its model set.
+
+// Discover the models a token can serve, for the "auto-fill then edit" UI.
+keysRouter.post('/agentrouter/discover', async (req: Request, res: Response) => {
+  const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+  if (!apiKey) {
+    res.status(400).json({ error: { message: 'apiKey is required' } });
+    return;
+  }
+  const provider = getProvider('agentrouter') as OpenAICompatProvider | undefined;
+  if (!provider) {
+    res.status(500).json({ error: { message: 'AgentRouter provider not registered' } });
+    return;
+  }
+  try {
+    const models = await provider.listModels(apiKey);
+    res.json({ models });
+  } catch (e) {
+    res.status(400).json({ error: { message: (e as Error).message || 'Could not list models for this key' } });
+  }
+});
+
+const agentRouterAddSchema = z.object({
+  apiKey: z.string().min(1, 'apiKey is required'),
+  model: z.string().optional(),
+  models: z.array(modelEntrySchema).optional(),
+  label: z.string().optional(),
+}).refine(
+  d => (d.model && d.model.trim().length > 0) || (d.models && d.models.length > 0),
+  { message: 'select at least one model' },
+);
+
+keysRouter.post('/agentrouter', (req: Request, res: Response) => {
+  const parsed = agentRouterAddSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  const rawKey = parsed.data.apiKey.trim();
+  const label = parsed.data.label ?? 'AgentRouter';
+  const entries = collectModelEntries(parsed.data.model, parsed.data.models, undefined);
+  if (entries.length === 0) {
+    res.status(400).json({ error: { message: 'select at least one model' } });
+    return;
+  }
+
+  const db = getDb();
+  const apply = db.transaction(() => {
+    // A single AgentRouter key row (one token is the common case). Re-submitting
+    // updates the key/label and REPLACES its model set, so adding/removing a
+    // model in the dashboard takes effect.
+    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'agentrouter' LIMIT 1").get() as { id: number } | undefined;
+    const { encrypted, iv, authTag } = encrypt(rawKey);
+    let keyId: number;
+    if (existing) {
+      db.prepare("UPDATE api_keys SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
+        .run(label, encrypted, iv, authTag, existing.id);
+      keyId = existing.id;
+    } else {
+      const r = db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+        VALUES ('agentrouter', ?, ?, ?, ?, 'unknown', 1)
+      `).run(label, encrypted, iv, authTag);
+      keyId = Number(r.lastInsertRowid);
+    }
+
+    // Drop models previously bound to this key that aren't in the new selection
+    // (and their fallback rows) so removing a model in the UI deregisters it.
+    const keep = entries.map(e => e.modelId);
+    const placeholders = keep.map(() => '?').join(',');
+    const pruneWhere = `platform = 'agentrouter' AND key_id = ? AND model_id NOT IN (${placeholders})`;
+    db.prepare(`DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE ${pruneWhere})`).run(keyId, ...keep);
+    db.prepare(`DELETE FROM models WHERE ${pruneWhere}`).run(keyId, ...keep);
+
+    const registered = registerModelEntries(db, keyId, 'agentrouter', 'AgentRouter', entries);
+    return { keyId, registered };
+  });
+
+  const { keyId, registered } = apply();
+  const first = registered[0]!;
+  res.status(201).json({
+    success: true,
+    keyId,
+    modelDbId: first.modelDbId,
+    platform: 'agentrouter',
     model: first.model,
     displayName: first.displayName,
     models: registered,
@@ -265,18 +388,19 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
 
   const remove = db.transaction(() => {
     db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
-    // Custom models exist only because POST /custom registered them alongside
-    // their endpoint key (#117) — they can't route without it. Cascade away
-    // the models bound to THIS endpoint (#212); other custom providers keep
-    // theirs. Legacy rows (key_id NULL) are swept once no custom keys remain,
-    // so they never linger in the fallback chain forever (#189).
-    if (row.platform === 'custom') {
-      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
-      db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
-      const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
+    // 'custom' and 'agentrouter' models exist only because their add flow
+    // registered them alongside the key (#117) — they can't route without it.
+    // Cascade away the models bound to THIS key (#212); other keys of the same
+    // platform keep theirs. Legacy rows (key_id NULL) are swept once no keys of
+    // that platform remain, so they never linger in the chain forever (#189).
+    if (row.platform === 'custom' || row.platform === 'agentrouter') {
+      const p = row.platform;
+      db.prepare('DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = ? AND key_id = ?)').run(p, id);
+      db.prepare('DELETE FROM models WHERE platform = ? AND key_id = ?').run(p, id);
+      const remaining = db.prepare('SELECT COUNT(*) AS n FROM api_keys WHERE platform = ?').get(p) as { n: number };
       if (remaining.n === 0) {
-        db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
-        db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+        db.prepare('DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = ?)').run(p);
+        db.prepare('DELETE FROM models WHERE platform = ?').run(p);
       }
     }
   });

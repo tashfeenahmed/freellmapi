@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAICompatProvider } from '../../providers/openai-compat.js';
+import { getProvider } from '../../providers/index.js';
 
 describe('OpenAICompatProvider', () => {
   let provider: OpenAICompatProvider;
@@ -286,6 +287,64 @@ describe('OpenAICompatProvider', () => {
 
     const result = await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm');
     expect(result.choices[0].message.content).toBe('normal answer');
+  });
+
+  // Per-token model discovery: gateways that scope a key to a subset of models
+  // (AgentRouter's "model restrictions") return only the permitted ids on
+  // GET /v1/models, so the dashboard can register exactly what the key unlocks.
+  describe('listModels', () => {
+    const ar = () => new OpenAICompatProvider({
+      platform: 'agentrouter',
+      name: 'AgentRouter',
+      baseUrl: 'https://agentrouter.org/v1',
+      extraHeaders: { 'User-Agent': 'claude-cli/1.0.0 (external, cli)' },
+    });
+
+    it('GETs /models with auth + extra headers and returns the ids', async () => {
+      let url = ''; let method = ''; let headers: Record<string, string> = {};
+      vi.spyOn(global, 'fetch').mockImplementation(async (u, init) => {
+        url = u as string; method = (init as any).method; headers = (init as any).headers;
+        return { ok: true, status: 200, json: () => Promise.resolve({ data: [{ id: 'glm-5.2' }, { id: 'gpt-5.5' }] }) } as any;
+      });
+      const ids = await ar().listModels('sk-token');
+      expect(method).toBe('GET');
+      expect(url).toBe('https://agentrouter.org/v1/models');
+      expect(headers['Authorization']).toBe('Bearer sk-token');
+      expect(headers['User-Agent']).toBe('claude-cli/1.0.0 (external, cli)');
+      expect(ids).toEqual(['glm-5.2', 'gpt-5.5']);
+    });
+
+    it('accepts a bare array body and dedupes ids', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true, status: 200, json: () => Promise.resolve([{ id: 'a' }, { id: 'a' }, { id: 'b' }]),
+      } as any);
+      expect(await ar().listModels('k')).toEqual(['a', 'b']);
+    });
+
+    it('throws with the upstream message on a non-2xx', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: false, status: 401, statusText: 'Unauthorized',
+        json: () => Promise.resolve({ error: { message: 'unauthorized client detected' } }),
+      } as any);
+      await expect(ar().listModels('bad')).rejects.toThrow(/unauthorized client detected/);
+    });
+  });
+});
+
+// The registered AgentRouter provider MUST send a Claude Code-style User-Agent —
+// its New API gateway 401s "unauthorized client detected" otherwise, on both
+// /models and /chat/completions. Guards the registration in providers/index.ts.
+describe('AgentRouter registration', () => {
+  it('pins a claude-cli (external) User-Agent on outgoing calls', async () => {
+    const provider = getProvider('agentrouter') as OpenAICompatProvider | undefined;
+    expect(provider).toBeDefined();
+    let headers: Record<string, string> = {};
+    vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => {
+      headers = (init as any).headers;
+      return { ok: true, status: 200 } as any;
+    });
+    await provider!.validateKey('sk-token');
+    expect(headers['User-Agent']).toMatch(/^claude-cli\/.+\(external/);
   });
 });
 

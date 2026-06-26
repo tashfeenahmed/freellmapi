@@ -267,6 +267,26 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.ainative.studio/api/v1',
 }));
 
+// AgentRouter — non-profit OpenAI-compatible gateway (agentrouter.org/v1) built
+// on "New API". Like Routeway's Cloudflare UA filter, it enforces a CLIENT
+// allowlist: every request whose User-Agent isn't a Claude Code-style
+// `claude-cli/<ver> (external…)` gets `401 "unauthorized client detected"` —
+// on BOTH /models (so validateKey fails → key shows "invalid") and
+// /chat/completions (so chat 502s). Pinning the Claude Code UA below clears
+// both. The matched pattern is case-sensitive and version-agnostic but needs
+// the `/<version>` segment and a lowercase `(external` (live-probed 2026-06-26).
+// Free key from agentrouter.org/console/token. The free token is provisioned
+// for glm-5.2 only (other ids 403 "token has no permission") and is tightly
+// TPM-limited, so per-model limits are left to upstream 429 + failover.
+register(new OpenAICompatProvider({
+  platform: 'agentrouter',
+  name: 'AgentRouter',
+  baseUrl: 'https://agentrouter.org/v1',
+  extraHeaders: {
+    'User-Agent': 'claude-cli/1.0.0 (external, cli)',
+  },
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.

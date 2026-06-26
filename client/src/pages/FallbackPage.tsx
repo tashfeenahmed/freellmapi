@@ -295,6 +295,7 @@ const platformColors: Record<string, string> = {
   routeway:    '#14b8a6',
   bazaarlink:  '#e11d48',
   ainative:    '#22c55e',
+  agentrouter: '#6366f1',
 }
 
 // A 0..1 value as a thin horizontal bar with the number beside it.
