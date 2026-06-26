@@ -229,6 +229,44 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.siliconflow.com/v1',
 }));
 
+// Routeway — OpenAI-compatible aggregator (api.routeway.ai/v1). Free models
+// carry a ':free' suffix and cost $0; the free pool is rate-limited (docs say
+// 20 rpm / 200 rpd, but a live test on 2026-06-26 observed a stricter 5 rpm).
+// Cloudflare in front rejects non-browser User-Agents with error 1010, so a
+// browser-style UA is required. Free key from routeway.ai (no card). Catalog
+// rows live in the catalog (premium → age into free).
+register(new OpenAICompatProvider({
+  platform: 'routeway',
+  name: 'Routeway',
+  baseUrl: 'https://api.routeway.ai/v1',
+  extraHeaders: {
+    'User-Agent': 'Mozilla/5.0 FreeLLMAPI/1.0',
+  },
+}));
+
+// BazaarLink — OpenAI-compatible aggregator (bazaarlink.ai/api/v1). The
+// 'auto:free' route picks a currently-available zero-cost model (routed to
+// deepseek-v4-flash in a 2026-06-26 live test, usage.cost 0); direct model IDs
+// are paid, so only 'auto:free' is cataloged. Free key from bazaarlink.ai
+// (no card, supports agent self-registration). Reasoning models can consume a
+// tiny max_tokens internally, so default to a non-trivial output cap.
+register(new OpenAICompatProvider({
+  platform: 'bazaarlink',
+  name: 'BazaarLink',
+  baseUrl: 'https://bazaarlink.ai/api/v1',
+}));
+
+// AINative Studio — OpenAI-compatible aggregator (api.ainative.studio/api/v1).
+// Advertises a recurring ~10M tokens/month free allocation (no card), though
+// its own pages disagree on scale; treat the quota as unverified until a real
+// account confirms it. Bearer auth works (X-API-Key also accepted). Catalog
+// rows live in the catalog (premium → age into free).
+register(new OpenAICompatProvider({
+  platform: 'ainative',
+  name: 'AINative Studio',
+  baseUrl: 'https://api.ainative.studio/api/v1',
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.

@@ -70,6 +70,9 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'agnes', label: 'Agnes AI (free key)', url: 'https://platform.agnes-ai.com' },
   { value: 'reka', label: 'Reka (free key)', url: 'https://platform.reka.ai' },
   { value: 'siliconflow', label: 'SiliconFlow (image + TTS)', url: 'https://siliconflow.com' },
+  { value: 'routeway', label: 'Routeway (free key)', url: 'https://routeway.ai' },
+  { value: 'bazaarlink', label: 'BazaarLink (free key)', url: 'https://bazaarlink.ai' },
+  { value: 'ainative', label: 'AINative Studio (free key)', url: 'https://ainative.studio' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the

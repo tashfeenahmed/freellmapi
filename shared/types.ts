@@ -42,6 +42,17 @@ export type Platform =
   // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
   // chat is supported too. Key from siliconflow.com (no card).
   | 'siliconflow'
+  // Routeway — OpenAI-compatible aggregator. Free ':free' models ($0) on a
+  // rate-limited pool (~5 rpm observed); requires a browser User-Agent (CF
+  // blocks others). Key from routeway.ai (no card).
+  | 'routeway'
+  // BazaarLink — OpenAI-compatible aggregator. Free 'auto:free' route picks an
+  // available zero-cost model. Key from bazaarlink.ai (no card).
+  | 'bazaarlink'
+  // AINative Studio — OpenAI-compatible aggregator. Advertises a recurring
+  // ~10M tokens/month free allocation (no card); quota unverified. Key from
+  // ainative.studio.
+  | 'ainative'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';
