@@ -2,9 +2,9 @@
 
 # FreeLLMAPI
 
-**One OpenAI-compatible endpoint. Sixteen free LLM providers. ~1.7B tokens per month.**
+**One OpenAI-compatible endpoint. Eighteen free LLM providers. ~1.7B tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, and OpenCode Zen — plus any custom OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, local Ollama) — behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, OpenCode Zen, and DGrid — plus any custom OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, local Ollama) — behind a single `/v1/chat/completions` endpoint. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
@@ -43,7 +43,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 
 Every serious AI lab now offers a free tier — a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **1.7 billion tokens per month** of working inference capacity, across 100+ models from small-and-fast to reasonably capable.
 
-The problem is that stacking them by hand is painful: seventeen different SDKs, seventeen different rate limits, seventeen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
+The problem is that stacking them by hand is painful: eighteen different SDKs, eighteen different rate limits, eighteen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
 
 ## Supported providers
 
@@ -74,11 +74,21 @@ The problem is that stacking them by hand is painful: seventeen different SDKs, 
 </tr>
 <tr>
 <td align="center"><a href="https://endpoints.ai.cloud.ovh.net"><b>OVH AI Endpoints</b><br/>Qwen3.5 397B · GPT-OSS · Llama 3.3 (anon ok)</a></td>
-<td align="center"></td>
+<td align="center"><a href="https://dgrid.ai/models/dgridai/free"><b>DGrid</b><br/>Free Models Router · smart free routing</a></td>
 <td align="center"></td>
 <td align="center"></td>
 </tr>
 </table>
+
+DGrid's `dgridai/free` route is a free intelligent inference gateway that
+dynamically chooses from DGrid's current free model pool based on availability,
+latency, reliability, and task fit. The underlying pool currently includes
+Llama 3.2 1B Instruct, GLM-4.7 Flash, DeepSeek R1 Distill Qwen 32B,
+Llama 3.3 70B Instruct FP8 Fast, Kimi K2.6, and GLM-5.2, with more free
+models expected over time. Default free quota is 10 requests/minute and
+100 requests/day; a one-time $5 lifetime top-up raises it to up to
+20 requests/minute and 1,000 requests/day. DGrid's broader AI Gateway also
+offers a larger paid/mixed model catalog through the same OpenAI-compatible API.
 
 Plus a **custom** provider — point at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway) from the Keys page.
 
@@ -386,7 +396,7 @@ print(resp.choices[0].message.content)
 
 If no vision-capable model is enabled in your Fallback Chain, an image request returns a clear `422` (`code: "no_vision_model"`) rather than silently dropping the image. (Image input on `/v1/responses` isn't supported yet — use `/v1/chat/completions`.)
 
-Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, Mistral, OpenRouter, GitHub Models, HuggingFace, Cloudflare, Cohere compat) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
+Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, Mistral, OpenRouter, GitHub Models, HuggingFace, Cloudflare, Cohere compat, DGrid) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
 
 Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served each call. If a request fell over between providers, you'll also see `X-Fallback-Attempts: N`.
 

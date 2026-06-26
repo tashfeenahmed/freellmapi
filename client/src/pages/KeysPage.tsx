@@ -70,6 +70,7 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'agnes', label: 'Agnes AI (free key)', url: 'https://platform.agnes-ai.com' },
   { value: 'reka', label: 'Reka (free key)', url: 'https://platform.reka.ai' },
   { value: 'siliconflow', label: 'SiliconFlow (image + TTS)', url: 'https://siliconflow.com' },
+  { value: 'dgrid', label: 'DGrid (free router)', url: 'https://dgrid.ai/api-keys' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the
