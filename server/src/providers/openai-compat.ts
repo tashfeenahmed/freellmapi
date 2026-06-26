@@ -17,6 +17,7 @@ export class OpenAICompatProvider extends BaseProvider {
   private readonly baseUrl: string;
   private readonly extraHeaders: Record<string, string>;
   private readonly validateUrl?: string;
+  private readonly model?: string;
   /** Per-provider HTTP timeout override. Cloud APIs finish in ~15s; locally-hosted
    * inference (llama.cpp / vLLM on CPU) can take 30-120s for long prompts. Default 15000. */
   private readonly timeoutMs: number;
@@ -29,6 +30,7 @@ export class OpenAICompatProvider extends BaseProvider {
     validateUrl?: string;
     timeoutMs?: number;
     keyless?: boolean;
+    model?: string;
   }) {
     super();
     this.platform = opts.platform;
@@ -38,6 +40,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.validateUrl = opts.validateUrl;
     this.timeoutMs = opts.timeoutMs ?? 15000;
     this.keyless = opts.keyless ?? false;
+    this.model = opts.model;
   }
 
   /** Keyless providers (Kilo's anonymous free tier) must send NO Authorization
@@ -158,6 +161,23 @@ export class OpenAICompatProvider extends BaseProvider {
     // Note: transport errors (DNS / timeout / TLS) propagate to the caller.
     // health.ts catches them and marks status='error' WITHOUT incrementing
     // the consecutive-failure counter — only confirmed 401/403 disables a key.
+    if (this.model) {
+      const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          ...this.authHeader(apiKey),
+          'Content-Type': 'application/json',
+          ...this.extraHeaders,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1,
+        }),
+      }, 30000);
+      return res.status !== 401 && res.status !== 403;
+    }
+
     const url = this.validateUrl ?? `${this.baseUrl}/models`;
     // 30s (not 10s): some upstreams return a large /v1/models catalog that
     // takes >10s from high-latency regions (e.g. NVIDIA NIM measured ~11.2s
