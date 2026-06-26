@@ -42,6 +42,9 @@ export type Platform =
   // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
   // chat is supported too. Key from siliconflow.com (no card).
   | 'siliconflow'
+  // DGrid AI Gateway — OpenAI-compatible. Free Models Router exposes
+  // `dgridai/free`, a zero-cost smart router over DGrid's free model pool.
+  | 'dgrid'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

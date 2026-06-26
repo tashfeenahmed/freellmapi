@@ -32,14 +32,13 @@ export function migrateDbSchema(db: Database.Database) {
   migrateModelsV23FreeTierAudit(db);
   migrateModelsV24ZenRefresh(db);
   migrateModelsV25ZenDeadPromos(db);
-  // V25 is the LAST model-data migration. Since the Premium live catalog
-  // shipped (June 2026), model/limit DATA is maintained in the published
-  // catalog (served signed by the catalog service) and reaches installs via
-  // catalog-sync — premium on the live tier within ~12h, free at the monthly
-  // promote. Shipping model data as a
-  // migration would hand it to free users on their next binary update,
-  // bypassing the tier gate. Migrations from here on are baseline/code-level
-  // only (schema, family rules, provider plumbing, quirk-seed corrections).
+  migrateModelsV27DGridFreeRouter(db);
+  // Most model/limit DATA is maintained in the published catalog (served signed
+  // by the catalog service) and reaches installs via catalog-sync — premium on
+  // the live tier within ~12h, free at the monthly promote. Avoid shipping broad
+  // catalog refreshes as migrations because that bypasses the tier gate. Narrow
+  // provider bootstrap rows for new recurring-free providers are the exception:
+  // without one, the provider cannot route until the external catalog catches up.
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -1941,6 +1940,49 @@ function migrateModelsV25ZenDeadPromos(db: Database.Database) {
   apply();
 }
 
+/**
+ * V27 (2026-06): DGrid Free Models Router.
+ *
+ * DGrid AI Gateway is OpenAI-compatible at https://api.dgrid.ai/v1. The only
+ * catalog row shipped here is the recurring-free router `dgridai/free`: DGrid
+ * dynamically routes it across its current free model pool, so FreeLLMAPI should
+ * treat it as one upstream model rather than trying to mirror every underlying
+ * free model. The broader DGrid catalog includes paid/mixed models and is left
+ * out of this free-tier seed.
+ *
+ * Default free quota is 10 RPM / 100 RPD. DGrid documents a higher 20 RPM /
+ * 1000 RPD tier after a one-time $5 lifetime top-up, but the router cannot
+ * detect that account state, so the built-in limits stay conservative.
+ */
+function migrateModelsV27DGridFreeRouter(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, supports_vision, supports_tools)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const apply = db.transaction(() => {
+    insert.run(
+      'dgrid',
+      'dgridai/free',
+      'DGrid Free Models Router',
+      8,
+      5,
+      'Large',
+      10,
+      100,
+      null,
+      null,
+      'free · 100/day (1000/day w/ $5 lifetime top-up)',
+      null,
+      1,
+      0,
+      1,
+    );
+    backfillFallback(db);
+  });
+  apply();
+}
+
 // V26 NOTE (June 2026, recurring-free audit pass 2): the model-data changes
 // from this audit (4 OVH rows, opencode/north-mini-code-free, Cerebras
 // 5 RPM/30K TPM/1M TPD limits, NVIDIA "free · 40 RPM" labels, LLM7 60-100/hr
@@ -2288,4 +2330,3 @@ function migrateProfilesInit(db: Database.Database) {
     `).run();
   }
 }
-

@@ -287,6 +287,46 @@ describe('Migration idempotency', () => {
     ]);
   });
 
+  it('V27: DGrid Free Models Router is seeded with conservative free-tier limits', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    const db = initDb(':memory:');
+
+    const row = db.prepare(`
+      SELECT platform, model_id, display_name, rpm_limit, rpd_limit, monthly_token_budget, enabled, supports_tools
+        FROM models
+       WHERE platform = 'dgrid' AND model_id = 'dgridai/free'
+    `).get() as {
+      platform: string;
+      model_id: string;
+      display_name: string;
+      rpm_limit: number;
+      rpd_limit: number;
+      monthly_token_budget: string;
+      enabled: number;
+      supports_tools: number;
+    } | undefined;
+
+    expect(row).toBeDefined();
+    expect(row).toMatchObject({
+      platform: 'dgrid',
+      model_id: 'dgridai/free',
+      display_name: 'DGrid Free Models Router',
+      rpm_limit: 10,
+      rpd_limit: 100,
+      monthly_token_budget: 'free · 100/day (1000/day w/ $5 lifetime top-up)',
+      enabled: 1,
+      supports_tools: 1,
+    });
+
+    const fallback = db.prepare(`
+      SELECT 1 FROM fallback_config
+       WHERE model_db_id = (
+         SELECT id FROM models WHERE platform = 'dgrid' AND model_id = 'dgridai/free'
+       )
+    `).get();
+    expect(fallback).toBeDefined();
+  });
+
   it('all enabled catalog platforms have a registered provider', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getProvider } from '../../providers/index.js';
 import { OpenAICompatProvider } from '../../providers/openai-compat.js';
 
 describe('OpenAICompatProvider', () => {
@@ -10,6 +11,42 @@ describe('OpenAICompatProvider', () => {
       name: 'TestProvider',
       baseUrl: 'https://api.test.com/v1',
       extraHeaders: { 'X-Custom': 'test' },
+    });
+  });
+
+  describe('DGrid provider registration', () => {
+    it('registers DGrid as an OpenAI-compatible provider', async () => {
+      const dgrid = getProvider('dgrid') as OpenAICompatProvider | undefined;
+      expect(dgrid).toBeDefined();
+      expect(dgrid!.platform).toBe('dgrid');
+      expect(dgrid!.name).toBe('DGrid');
+
+      let capturedUrl = '';
+      let capturedHeaders: Record<string, string> = {};
+      let capturedBody: any = null;
+
+      vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+        capturedUrl = url as string;
+        capturedHeaders = (init as any).headers;
+        capturedBody = JSON.parse((init as any).body);
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'dgrid-test',
+            object: 'chat.completion',
+            created: 123,
+            model: 'dgridai/free',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        } as any;
+      });
+
+      await dgrid!.chatCompletion('dg_test_key', [{ role: 'user', content: 'hello' }], 'dgridai/free');
+
+      expect(capturedUrl).toBe('https://api.dgrid.ai/v1/chat/completions');
+      expect(capturedHeaders.Authorization).toBe('Bearer dg_test_key');
+      expect(capturedBody.model).toBe('dgridai/free');
     });
   });
 

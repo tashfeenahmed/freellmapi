@@ -59,6 +59,19 @@ describe('Keys API', () => {
     expect(body.maskedKey).toContain('...');
   });
 
+  it('POST /api/keys accepts a DGrid model API key', async () => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform: 'dgrid',
+      key: 'dg_test123456789',
+      label: 'My DGrid Key',
+    });
+
+    expect(status).toBe(201);
+    expect(body.platform).toBe('dgrid');
+    expect(body.label).toBe('My DGrid Key');
+    expect(body.maskedKey).toContain('...');
+  });
+
   it('GET /api/keys returns the created key', async () => {
     // First create a key
     await request(app, 'POST', '/api/keys', {

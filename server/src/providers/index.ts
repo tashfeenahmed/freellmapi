@@ -229,6 +229,16 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.siliconflow.com/v1',
 }));
 
+// DGrid AI Gateway — OpenAI-compatible. This repo ships only the recurring-free
+// `dgridai/free` smart router row; DGrid's broader paid/mixed catalog stays out
+// of the free-tier catalog unless users add it as a custom provider or a future
+// catalog update explicitly includes eligible free models.
+register(new OpenAICompatProvider({
+  platform: 'dgrid',
+  name: 'DGrid',
+  baseUrl: 'https://api.dgrid.ai/v1',
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.
