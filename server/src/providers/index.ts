@@ -168,6 +168,15 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://opencode.ai/zen/v1',
 }));
 
+// OpenModel — OpenAI-compatible gateway (https://api.openmodel.ai/v1), same
+// adapter as Groq/OpenRouter. Offers free promotional access to models
+// like deepseek-v4-flash.
+register(new OpenAICompatProvider({
+  platform: 'openmodel',
+  name: 'OpenModel',
+  baseUrl: 'https://api.openmodel.ai/v1',
+}));
+
 // Chutes was evaluated for V11 and dropped: probe with a free-tier key
 // returned 402 on every model — "Quota exceeded and account balance is
 // $0.0, please pay with fiat or send tao". The "free" tier requires a

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initEncryptionKey } from '../lib/crypto.js';
+import { initEncryptionKey, encrypt } from '../lib/crypto.js';
 import { applyModelPricing } from './model-pricing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -60,6 +60,8 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV20KiloFree(db);
   migrateModelsV21PruneDead(db);
   migrateModelsV22Tools(db);
+  migrateModelsV23OpenModel(db);
+  migrateModelsV24NewKeys(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -1758,6 +1760,71 @@ function migrateModelsV22Tools(db: Database.Database) {
         OR LOWER(model_id) LIKE '%nemotron-3-super%' -- benchmarked #8 with real tool calls; nano stays excluded
       )
     `).run();
+  });
+  apply();
+}
+
+function migrateModelsV23OpenModel(db: Database.Database) {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (
+      platform, model_id, display_name, intelligence_rank, speed_rank,
+      size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit,
+      monthly_token_budget, context_window, enabled, supports_vision, supports_tools
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 1)
+  `);
+  insert.run(
+    'openmodel',
+    'deepseek-v4-flash',
+    'DeepSeek V4 Flash (OpenModel)',
+    4,
+    4,
+    'Frontier',
+    10,
+    null,
+    100000,
+    null,
+    'free promo (10 RPM)',
+    1000000
+  );
+
+  const apply = db.transaction(() => {
+    backfillFallback(db);
+
+    const envKey = process.env.OPENMODEL_API_KEY;
+    if (envKey) {
+      const { encrypted, iv, authTag } = encrypt(envKey);
+      const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'openmodel' LIMIT 1").get() as { id: number } | undefined;
+      if (existing) {
+        db.prepare("UPDATE api_keys SET encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
+          .run(encrypted, iv, authTag, existing.id);
+      } else {
+        db.prepare("INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled) VALUES ('openmodel', 'OpenModel Env Key', ?, ?, ?, 'unknown', 1)")
+          .run(encrypted, iv, authTag);
+      }
+    }
+  });
+  apply();
+}
+
+function migrateModelsV24NewKeys(db: Database.Database) {
+  function syncEnvKey(platform: string, label: string, envKey: string | undefined) {
+    if (!envKey) return;
+    const { encrypted, iv, authTag } = encrypt(envKey);
+    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = ? LIMIT 1").get(platform) as { id: number } | undefined;
+    if (existing) {
+      db.prepare("UPDATE api_keys SET encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
+        .run(encrypted, iv, authTag, existing.id);
+    } else {
+      db.prepare("INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled) VALUES (?, ?, ?, ?, ?, 'unknown', 1)")
+        .run(platform, label, encrypted, iv, authTag);
+    }
+  }
+
+  const apply = db.transaction(() => {
+    syncEnvKey('groq', 'Groq Env Key', process.env.GROQ_API_KEY);
+    syncEnvKey('cerebras', 'Cerebras Env Key', process.env.CEREBRAS_API_KEY);
+    syncEnvKey('sambanova', 'SambaNova Env Key', process.env.SAMBANOVA_API_KEY);
+    syncEnvKey('mistral', 'Mistral Env Key', process.env.MISTRAL_API_KEY);
   });
   apply();
 }

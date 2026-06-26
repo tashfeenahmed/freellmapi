@@ -51,6 +51,7 @@ const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolea
   { value: 'llm7', label: 'LLM7 (anon ok)', url: 'https://llm7.io' },
   { value: 'huggingface', label: 'HuggingFace Router', url: 'https://huggingface.co/settings/tokens' },
   { value: 'opencode', label: 'OpenCode Zen (free key)', url: 'https://opencode.ai/auth' },
+  { value: 'openmodel', label: 'OpenModel', url: 'https://docs.openmodel.ai/en/docs/event' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the

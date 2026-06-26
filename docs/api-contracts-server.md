@@ -73,7 +73,7 @@ All dashboard endpoints are mounted at `/api`.
 }
 ```
 
-Valid platforms: `google`, `groq`, `cerebras`, `sambanova`, `nvidia`, `mistral`, `openrouter`, `github`, `cohere`, `cloudflare`, `zhipu`, `ollama`, `kilo`, `pollinations`, `llm7`, `huggingface`, `memos`
+Valid platforms: `google`, `groq`, `cerebras`, `sambanova`, `nvidia`, `mistral`, `openrouter`, `github`, `cohere`, `cloudflare`, `zhipu`, `ollama`, `kilo`, `pollinations`, `llm7`, `huggingface`, `memos`, `opencode`, `openmodel`, `custom`
 
 ### Models — `/api/models`
 

@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-FreeLLMAPI is a self-hosted, intelligent LLM API gateway that aggregates 17 free-tier AI provider endpoints behind a single, fully OpenAI-compatible `/v1/chat/completions` interface. It provides stateful failover routing, sliding-window rate-limit tracking, AES-256-GCM encrypted key storage, full-text session search (via SQLite FTS5), and a React dashboard for management — all running locally with a ~40MB idle memory footprint.
+FreeLLMAPI is a self-hosted, intelligent LLM API gateway that aggregates 19 free-tier AI provider endpoints behind a single, fully OpenAI-compatible `/v1/chat/completions` interface. It provides stateful failover routing, sliding-window rate-limit tracking, AES-256-GCM encrypted key storage, full-text session search (via SQLite FTS5), and a React dashboard for management — all running locally with a ~40MB idle memory footprint.
 
 ## Tech Stack Summary
 
@@ -46,11 +46,11 @@ FreeLLMAPI is a self-hosted, intelligent LLM API gateway that aggregates 17 free
 │  └──────┬──────┘  └──────┬──────┘  └────────┬─────────┘ │
 │         │                │                    │           │
 │  ┌──────▼────────────────▼────────────────────▼────────┐ │
-│  │  Providers (17 adapters)                            │ │
+│  │  Providers (19 adapters)                            │ │
 │  │  Google · Groq · Cerebras · SambaNova · NVIDIA      │ │
 │  │  Mistral · OpenRouter · GitHub · Cohere · Cloudflare│ │
-│  │  Zhipu · Ollama · Kilo · Pollinations · LLM7       │ │
-│  │  HuggingFace · MemOS                               │ │
+│  │  Zhipu · Ollama · Kilo · Pollinations · LLM7 · MemOS│ │
+│  │  HuggingFace · OpenCode · OpenModel                 │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │  SQLite (WAL + FTS5)                                │ │
@@ -102,9 +102,9 @@ freellmapi/                  # npm workspace root
 | Source files | 70 |
 | Total lines (TS/TSX) | 10,782 |
 | Test files | 21 |
-| Tests passing | 154 |
-| Schema migrations | 16 (V1–V16) |
-| Provider adapters | 17 |
+| Tests passing | 344 |
+| Schema migrations | 23 (V1–V23) |
+| Provider adapters | 19 |
 | API endpoints | ~25 |
 | Client pages | 4 |
 
