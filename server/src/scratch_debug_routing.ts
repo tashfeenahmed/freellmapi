@@ -23,7 +23,7 @@ console.log('Total fallback chain models:', chain.length);
 const toolModels = chain.filter((m: any) => m.supports_tools === 1);
 console.log('Tool-supporting fallback chain models:', toolModels.map((m: any) => `${m.platform}/${m.model_id} (id: ${m.model_db_id})`));
 
-for (const m of toolModels) {
+for (const m of toolModels as any[]) {
   const keys = db.prepare(
     "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
   ).all(m.platform);

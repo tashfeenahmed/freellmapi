@@ -89,7 +89,7 @@ export class OpenModelProvider extends BaseProvider {
         index: 0,
         message: {
           role: 'assistant',
-          content,
+          content: content || reasoningContent || '',
           ...(reasoningContent ? { reasoning_content: reasoningContent } : {})
         },
         finish_reason: 'stop',

@@ -725,6 +725,7 @@ async function handleRequest(req: Request, res: Response) {
 }
 
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
+  console.log('[DEBUG] Incoming proxy request body:', JSON.stringify(req.body, null, 2));
   await handleRequest(req, res);
 });
 

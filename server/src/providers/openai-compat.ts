@@ -213,9 +213,39 @@ function normalizeChoices(data: ChatCompletionResponse): void {
     };
     // Flatten array content (Mistral magistral) → join text segments.
     if (Array.isArray(msg.content)) {
-      msg.content = (msg.content as Array<{ text?: string; type?: string }>)
-        .map(seg => (typeof seg === 'string' ? seg : (seg.text ?? '')))
-        .join('');
+      let textContent = '';
+      let reasoningContent = '';
+      for (const seg of msg.content) {
+        if (typeof seg === 'string') {
+          textContent += seg;
+        } else if (seg && typeof seg === 'object') {
+          const s = seg as Record<string, unknown>;
+          if (s.type === 'thinking' || s.type === 'reasoning') {
+            const rawThinking = s.thinking ?? s.reasoning;
+            if (typeof rawThinking === 'string') {
+              reasoningContent += rawThinking;
+            } else if (Array.isArray(rawThinking)) {
+              reasoningContent += rawThinking
+                .map(subSeg => (typeof subSeg === 'string' ? subSeg : (subSeg?.text ?? '')))
+                .join('');
+            }
+          } else if (s.type === 'text') {
+            if (typeof s.text === 'string') {
+              textContent += s.text;
+            }
+          } else {
+            // Fallback for other objects (e.g. standard openai-style segments)
+            const textVal = s.text;
+            if (typeof textVal === 'string') {
+              textContent += textVal;
+            }
+          }
+        }
+      }
+      if (reasoningContent) {
+        msg.reasoning_content = reasoningContent;
+      }
+      msg.content = textContent;
     }
     // Fold reasoning into content if content is empty AND there are no
     // tool_calls. With tool_calls present, content=null is the correct OpenAI
