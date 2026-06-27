@@ -192,5 +192,122 @@ describe('embeddings service', () => {
       `).get() as { used: number };
       expect(chatUsed.used).toBe(0);
     });
+
+    describe('dimensions parameter (MRL truncation)', () => {
+      it('forwards dimensions to NVIDIA NeMo NIM in the request body', async () => {
+        addKey('nvidia');
+        const fetchMock = vi.fn(async () => okEmbeddingResponse(1536));
+        globalThis.fetch = fetchMock as any;
+
+        await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'], 1536);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.dimensions).toBe(1536);
+        // The provider-prefixed model id (nvidia/<id>) is what reaches the upstream;
+        // the bare id is used internally for family resolution only.
+        expect(body.model).toBe('nvidia/llama-nemotron-embed-vl-1b-v2');
+        // input_type is still set on nvidia (existing behavior preserved)
+        expect(body.input_type).toBe('query');
+      });
+
+      it('omits dimensions from the upstream body when not requested', async () => {
+        addKey('nvidia');
+        const fetchMock = vi.fn(async () => okEmbeddingResponse(2048));
+        globalThis.fetch = fetchMock as any;
+
+        await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
+
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body).not.toHaveProperty('dimensions');
+      });
+
+      it('returns the truncated dimension reported by the upstream response', async () => {
+        addKey('nvidia');
+        // Mock responds with 1536-dim vector even though model is native 2048.
+        globalThis.fetch = vi.fn(async () => okEmbeddingResponse(1536)) as any;
+
+        const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'], 1536);
+        expect(result.dimensions).toBe(1536);
+        expect(result.vectors[0]).toHaveLength(1536);
+      });
+
+      it('forwards dimensions to the google provider', async () => {
+        // Use a family served by google. gemini-embedding-001 has google in its chain.
+        addKey('google');
+        const fetchMock = vi.fn(async () => okEmbeddingResponse(768));
+        globalThis.fetch = fetchMock as any;
+
+        await runEmbeddings('gemini-embedding-001', ['hello'], 768);
+
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.dimensions).toBe(768);
+        expect(String(fetchMock.mock.calls[0][0])).toContain('generativelanguage.googleapis.com');
+      });
+
+      it('forwards dimensions to the github provider', async () => {
+        addKey('github');
+        const fetchMock = vi.fn(async () => okEmbeddingResponse(512));
+        globalThis.fetch = fetchMock as any;
+
+        await runEmbeddings('text-embedding-3-small', ['hello'], 512);
+
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.dimensions).toBe(512);
+        expect(String(fetchMock.mock.calls[0][0])).toContain('models.github.ai');
+      });
+
+      it('forwards dimensions to the openrouter provider', async () => {
+        addKey('openrouter');
+        const fetchMock = vi.fn(async () => okEmbeddingResponse(1024));
+        globalThis.fetch = fetchMock as any;
+
+        await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'], 1024);
+
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.dimensions).toBe(1024);
+        expect(String(fetchMock.mock.calls[0][0])).toContain('openrouter.ai');
+      });
+
+      it('preserves byte-identical upstream bodies when dimensions is undefined', async () => {
+        // Snapshot the request body that runEmbeddings sends today, then verify
+        // that adding the dimensions parameter does not change ANY other field.
+        addKey('nvidia');
+        const beforeMock = vi.fn(async () => okEmbeddingResponse(2048));
+        globalThis.fetch = beforeMock as any;
+        await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
+        const beforeBody = JSON.parse(beforeMock.mock.calls[0][1].body);
+
+        addKey('nvidia'); // re-seed; previous run consumed nothing
+        const afterMock = vi.fn(async () => okEmbeddingResponse(2048));
+        globalThis.fetch = afterMock as any;
+        await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'], undefined);
+        const afterBody = JSON.parse(afterMock.mock.calls[0][1].body);
+
+        expect(afterBody).toEqual(beforeBody);
+      });
+
+      it('passes dimensions through the family failover chain', async () => {
+        // nvidia is the primary for llama-nemotron-embed-vl-1b-v2; if it 429s,
+        // openrouter takes over. Both should see the dimensions parameter.
+        addKey('nvidia');
+        addKey('openrouter');
+        const fetchMock = vi.fn()
+          .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+          .mockResolvedValueOnce(okEmbeddingResponse(1024));
+        globalThis.fetch = fetchMock as any;
+
+        const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'], 1024);
+        expect(result.platform).toBe('openrouter');
+        expect(result.dimensions).toBe(1024);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        // Both attempts forwarded dimensions
+        const body1 = JSON.parse(fetchMock.mock.calls[0][1].body);
+        const body2 = JSON.parse(fetchMock.mock.calls[1][1].body);
+        expect(body1.dimensions).toBe(1024);
+        expect(body2.dimensions).toBe(1024);
+      });
+    });
   });
 });
