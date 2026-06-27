@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
+import type { ChatMessage, ChatToolCall, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
@@ -1105,18 +1105,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // in parallel, then a judge synthesizes one answer. It routes each panel/judge
   // sub-call through the normal path (cooldowns, quotas, analytics), so it
   // behaves like a normal model from the client's side — just K+1x the tokens.
-  // v1 has no tools/vision/streaming-panel; reject the first two up front and
-  // replay the synthesized answer as a single SSE turn when stream is set.
+  // Vision is still rejected up front; tool requests run on tool-capable panel
+  // members and return the first structured tool call directly.
   if (isFusionModel(requestedModel)) {
     if (hasImage) {
       res.status(422).json({ error: { message: 'Fusion does not support image input yet. Use a vision model directly.', type: 'invalid_request_error', code: 'fusion_no_vision' } });
       return;
     }
-    if (wantsTools) {
-      res.status(422).json({ error: { message: 'Fusion does not support tool calling yet. Use a tool-capable model directly.', type: 'invalid_request_error', code: 'fusion_no_tools' } });
-      return;
-    }
-    const fusionOptions = { temperature, max_tokens, top_p, stop };
+    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls };
     const fusionConfig = parsed.data.fusion ?? {};
 
     if (stream) {
@@ -1142,8 +1138,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           hooks: {
             // `a` already carries a sanitized error for failed slots; content is
             // the model's own answer and is forwarded as-is.
-            onPanel: (a) => writeFrame({ _fusion: { event: 'panel', ...a } }),
-            onJudge: (j) => writeFrame({ _fusion: { event: 'judge', ...j } }),
+            onPanel: (a) => writeFrame({
+              ...base,
+              choices: [{ index: 0, delta: {}, finish_reason: null }],
+              _fusion: { event: 'panel', ...a },
+            }),
+            onJudge: (j) => writeFrame({
+              ...base,
+              choices: [{ index: 0, delta: {}, finish_reason: null }],
+              _fusion: { event: 'judge', ...j },
+            }),
             // Stream the judge's synthesis live as standard content deltas, so
             // the final answer appears as it's written instead of after the wait.
             onJudgeDelta: (delta) => {
@@ -1154,12 +1158,21 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         });
         // best_of / single-survivor / judge-fell-back-to-best-of never streamed
         // a delta — emit the final answer as one chunk in that case.
-        if (!answerStarted) {
-          const finalText = contentToString(response.choices[0]?.message?.content ?? '');
+        const finalMsg = response.choices[0]?.message;
+        const finalToolCalls = (finalMsg as { tool_calls?: ChatToolCall[] } | undefined)?.tool_calls;
+        const hasFinalToolCalls = Array.isArray(finalToolCalls) && finalToolCalls.length > 0;
+        if (hasFinalToolCalls) {
           writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-          writeFrame({ ...base, choices: [{ index: 0, delta: { content: finalText }, finish_reason: null }] });
+          writeFrame({ ...base, choices: [{ index: 0, delta: { tool_calls: finalToolCalls }, finish_reason: null }] });
+          writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: response.usage });
+        } else {
+          if (!answerStarted) {
+            const finalText = contentToString(finalMsg?.content ?? '');
+            writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
+            writeFrame({ ...base, choices: [{ index: 0, delta: { content: finalText }, finish_reason: null }] });
+          }
+          writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: response.usage });
         }
-        writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: response.usage });
       } catch (err: any) {
         const message = err instanceof FusionError ? err.message : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
         const type = err instanceof FusionError && err.status === 429 ? 'rate_limit_error' : 'server_error';
