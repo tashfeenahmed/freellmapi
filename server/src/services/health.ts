@@ -51,7 +51,15 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
     // Transport errors (DNS/timeout/TLS) — provider unreachable, not necessarily
     // a bad key. Mark status='error' but do NOT increment failure counter — auto-
     // disable is reserved for confirmed 401/403 (returned by validateKey as false).
-    console.error(`[Health] Key ${keyId} transport error:`, err.message);
+    // Include platform + base_url so a flapping CloudFront edge or DNS failure is
+    // attributable to the responsible provider in one log read. The leading
+    // "[Health] Key N (" prefix is preserved so the 12-hourly crash watchdog
+    // (cron bff5ae167d28) that scrapes /tmp/freellmapi.log for these lines
+    // continues to match unchanged.
+    console.error(
+      `[Health] Key ${keyId} (${row.platform}, base=${row.base_url ?? 'default'}) ` +
+      `transport error: ${err.message}`,
+    );
     db.prepare("UPDATE api_keys SET status = ?, last_checked_at = datetime('now') WHERE id = ?")
       .run('error', keyId);
     return 'error';
