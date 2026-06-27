@@ -1,0 +1,148 @@
+  ### Files Modified & Created
+  • debug.ts: New router containing endpoints  POST /seed-media  and  GET /media-status .
+  • app.ts: Registered the debug router behind the  requireAuth  dashboard session middleware.
+  • debug.test.ts: New unit test suite verifying route validation, seeding, idempotency, and counts.
+  ──────
+  ### Full Source Code:  server/src/routes/debug.ts
+
+  Here is the complete source file for the new debug router:
+    import { Router } from 'express';
+    import type { Request, Response } from 'express';
+    import { getDb } from '../db/index.js';
+
+    export const debugRouter = Router();
+
+    debugRouter.post('/seed-media', (_req: Request, res: Response) => {
+      const db = getDb();
+
+      const insertStmt = db.prepare(`
+        INSERT OR IGNORE INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+        VALUES ('google', 'gemini-2.5-flash-preview-tts', 'Gemini 2.5 Flash TTS', 'audio', 1, 1, 'Keyless')
+      `);
+
+      const result = insertStmt.run();
+
+      const mediaModelsCountRow = db.prepare('SELECT COUNT(*) AS count FROM media_models').get() as { count: number };
+      const audioModelsCountRow = db.prepare("SELECT COUNT(*) AS count FROM media_models WHERE modality = 'audio'").get() as { count: number };
+
+      res.json({
+        success: true,
+        rowsInserted: result.changes,
+        mediaModelsCount: mediaModelsCountRow.count,
+        audioModelsCount: audioModelsCountRow.count,
+      });
+    });
+
+    debugRouter.get('/media-status', (_req: Request, res: Response) => {
+      const db = getDb();
+
+      const models = db.prepare('SELECT * FROM media_models ORDER BY modality, priority, id').all() as any[];
+
+      const totalMediaModels = models.length;
+      const audioModels = models.filter(m => m.modality === 'audio').length;
+      const imageModels = models.filter(m => m.modality === 'image').length;
+      const transcriptionModels = models.filter(m => m.modality === 'transcription').length;
+
+      res.json({
+        totalMediaModels,
+        audioModels,
+        imageModels,
+        transcriptionModels,
+        models,
+      });
+    });
+    ──────
+  ### App Registration Changes: Git Diff ( server/src/app.ts )
+
+    diff --git a/server/src/app.ts b/server/src/app.ts
+    index 241b6c4..4163531 100644
+    --- a/server/src/app.ts
+    +++ b/server/src/app.ts
+    @@ -12,6 +12,7 @@ import { fallbackRouter } from './routes/fallback.js';
+     import { profilesRouter } from './routes/profiles.js';
+     import { embeddingsRouter } from './routes/embeddings.js';
+     import { mediaRouter } from './routes/media.js';
+    +import { debugRouter } from './routes/debug.js';
+     import { analyticsRouter } from './routes/analytics.js';
+     import { healthRouter } from './routes/health.js';
+     import { settingsRouter } from './routes/settings.js';
+    @@ -71,6 +72,7 @@ export function createApp() {
+       app.use('/api/fallback', requireAuth, fallbackRouter);
+       app.use('/api/embeddings', requireAuth, embeddingsRouter);
+       app.use('/api/media', requireAuth, mediaRouter);
+    +  app.use('/api/debug', requireAuth, debugRouter);
+       app.use('/api/analytics', requireAuth, analyticsRouter);
+       app.use('/api/health', requireAuth, healthRouter);
+       app.use('/api/settings', requireAuth, settingsRouter);
+    ──────
+  ### How to Test the Implementation
+
+  Since the  /api/debug/*  routes sit behind the dashboard's  requireAuth  middleware, you must first obtain a dashboard session JWT.
+
+  #### Step 1: Login / Setup Dashboard Session
+
+  If setting up a fresh local workspace, initialize the admin account:
+
+    curl -X POST http://localhost:3001/api/auth/setup \
+      -H "Content-Type: application/json" \
+      -d '{"email": "admin@example.com", "password": "supersecretpassword"}'
+
+  Note: If the account is already set up, login instead at  /api/auth/login  using the same JSON payload.
+  This returns a JSON containing a  "token"  string. Copy the token.
+
+  #### Step 2: Seed the Media Models Table
+
+  Execute the seed endpoint using your dashboard token:
+
+    curl -X POST http://localhost:3001/api/debug/seed-media \
+      -H "Authorization: Bearer <dashboard_jwt_token>"
+
+  • Expected Response (First Run):
+    { "success": true, "rowsInserted": 1, "mediaModelsCount": 1, "audioModelsCount": 1 }
+
+  • Expected Response (Subsequent Runs due to idempotency):
+    { "success": true, "rowsInserted": 0, "mediaModelsCount": 1, "audioModelsCount": 1 }
+
+
+  #### Step 3: Check Media Status
+
+  Query the seeded entries:
+
+    curl -X GET http://localhost:3001/api/debug/media-status \
+      -H "Authorization: Bearer <dashboard_jwt_token>"
+
+  • Expected Response:
+    {
+      "totalMediaModels": 1,
+      "audioModels": 1,
+      "imageModels": 0,
+      "transcriptionModels": 0,
+      "models": [
+        {
+          "id": 1,
+          "platform": "google",
+          "model_id": "gemini-2.5-flash-preview-tts",
+          "display_name": "Gemini 2.5 Flash TTS",
+          "modality": "audio",
+          "priority": 1,
+          "enabled": 1,
+          "quota_label": "Keyless"
+        }
+      ]
+    }
+
+
+  #### Step 4: Verify Text-to-Speech (TTS)
+
+  Now call the OpenAI-compatible speech endpoint using your unified API token ( freellmapi-... ):
+
+    curl -X POST http://localhost:3001/v1/audio/speech \
+      -H "Authorization: Bearer <unified_api_key>" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "gemini-2.5-flash-preview-tts",
+        "input": "Hello world"
+      }' --output speech.mp3
+
+  • Expected Outcome: The request no longer throws the 503  "No enabled audio providers configured."  error. It successfully retrieves the seeded
+  row and proceeds directly to execute the Google TTS adapter.

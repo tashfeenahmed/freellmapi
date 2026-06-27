@@ -13,7 +13,7 @@ import type { MediaModel } from '@/components/media-models'
 // One generative-media model's page: every provider that serves this logical
 // model (failover routes across them), plus a ready-to-run snippet. Mirrors the
 // chat ModelDetailPage for the image and audio modalities.
-export default function MediaDetailPage({ modality }: { modality: 'image' | 'audio' }) {
+export default function MediaDetailPage({ modality }: { modality: 'image' | 'audio' | 'transcription' }) {
   const { t } = useI18n()
   const { id } = useParams<{ id: string }>()
   const label = id ? decodeURIComponent(id) : ''
@@ -50,13 +50,18 @@ export default function MediaDetailPage({ modality }: { modality: 'image' | 'aud
     "model": "${exampleModel}",
     "prompt": "a red cat"
   }'`
-    : `curl ${base}/audio/speech \\
+    : modality === 'audio'
+      ? `curl ${base}/audio/speech \\
   -H "Authorization: Bearer ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "${exampleModel}",
     "input": "Hello world"
   }' --output speech.mp3`
+      : `curl ${base}/audio/transcriptions \\
+  -H "Authorization: Bearer ${key}" \\
+  -F "model=${exampleModel}" \\
+  -F "file=@audio.mp3"`
 
   return (
     <div>

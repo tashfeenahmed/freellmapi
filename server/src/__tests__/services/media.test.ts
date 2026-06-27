@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { runImageGeneration, runSpeech, MediaError } from '../../services/media.js';
+import { runImageGeneration, runSpeech, runTranscription, MediaError } from '../../services/media.js';
 
 const realFetch = globalThis.fetch;
 
@@ -160,6 +160,50 @@ describe('media service', () => {
       expect(r.audio.subarray(8, 12).toString()).toBe('WAVE');
       // header (44) + 4 PCM bytes
       expect(r.audio.length).toBe(48);
+    });
+  });
+
+  describe('speech-to-text / transcription', () => {
+    it('Groq: multipart/form-data upload -> returns text response', async () => {
+      addMedia('groq', 'whisper-large-v3', 'transcription');
+      addKey('groq');
+      globalThis.fetch = vi.fn(async () => jsonResponse({ text: 'Hello from Groq Whisper' })) as any;
+      const r = await runTranscription('whisper-large-v3', {
+        fileBuffer: Buffer.from('FAKE-AUDIO'),
+        fileName: 'audio.mp3',
+        mimeType: 'audio/mpeg',
+        language: 'en',
+      });
+      expect(r.platform).toBe('groq');
+      expect(r.text).toBe('Hello from Groq Whisper');
+    });
+
+    it('Cloudflare: raw binary upload -> returns result.text', async () => {
+      addMedia('cloudflare', '@cf/openai/whisper', 'transcription');
+      addKey('cloudflare', 'acct:tok');
+      globalThis.fetch = vi.fn(async () => jsonResponse({ result: { text: 'Hello from Cloudflare' } })) as any;
+      const r = await runTranscription('@cf/openai/whisper', {
+        fileBuffer: Buffer.from('FAKE-AUDIO'),
+        fileName: 'audio.wav',
+        mimeType: 'audio/wav',
+      });
+      expect(r.platform).toBe('cloudflare');
+      expect(r.text).toBe('Hello from Cloudflare');
+    });
+
+    it('Google Gemini: generateContent with inlineData -> returns parts[0].text', async () => {
+      addMedia('google', 'gemini-2.5-flash', 'transcription');
+      addKey('google');
+      globalThis.fetch = vi.fn(async () => jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Hello from Gemini' }] } }],
+      })) as any;
+      const r = await runTranscription('gemini-2.5-flash', {
+        fileBuffer: Buffer.from('FAKE-AUDIO'),
+        fileName: 'audio.mp3',
+        mimeType: 'audio/mpeg',
+      });
+      expect(r.platform).toBe('google');
+      expect(r.text).toBe('Hello from Gemini');
     });
   });
 });

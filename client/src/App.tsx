@@ -27,6 +27,7 @@ import FusionPage from '@/pages/FusionPage'
 import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import ImagePage from '@/pages/ImagePage'
 import AudioPage from '@/pages/AudioPage'
+import TranscriptionPage from '@/pages/TranscriptionPage'
 import MediaDetailPage from '@/pages/MediaDetailPage'
 import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
@@ -250,6 +251,8 @@ function App() {
                 <Route path="/models/image/:id" element={<MediaDetailPage modality="image" />} />
                 <Route path="/models/audio" element={<AudioPage />} />
                 <Route path="/models/audio/:id" element={<MediaDetailPage modality="audio" />} />
+                <Route path="/models/transcription" element={<TranscriptionPage />} />
+                <Route path="/models/transcription/:id" element={<MediaDetailPage modality="transcription" />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
