@@ -146,8 +146,15 @@
   }
   .switch.on { background: var(--ok); }
   .switch.on::after { left: 14px; }
+  .version {
+    margin-left: auto;
+    margin-right: 5px;
+    color: var(--fg-faint);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
   .quit {
-    margin-left: auto; background: none; color: var(--fg-dim);
+    background: none; color: var(--fg-dim);
     font-size: 11.5px; padding: 4px 6px; border-radius: 7px;
   }
   .quit:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
@@ -199,6 +206,7 @@
     <div class="foot">
       <div class="switch" id="login"></div>
       <span id="login-label">Start at login</span>
+      <span class="version" id="version"></span>
       <button class="quit" id="quit">Quit</button>
     </div>
   </div>
@@ -260,6 +268,7 @@
     $('tokens').textContent = fmt(s.tokens);
     $('rate').textContent = s.successRate == null ? '' : (S.successSuffix || '{n}% success').replace('{n}', s.successRate);
     $('model').textContent = s.lastModel;
+    $('version').textContent = s.version ? 'v' + s.version : '';
     loginOn = s.loginItem;
     $('login').classList.toggle('on', loginOn);
     drawChart(s.hourly);
