@@ -44,6 +44,7 @@ export interface CompletionOptions {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  stop?: string | string[];
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;

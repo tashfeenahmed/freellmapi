@@ -45,6 +45,7 @@ export class CohereProvider extends BaseProvider {
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
+      stop: options?.stop,
       tools: sanitizeCohereTools(options?.tools),
       tool_choice: options?.tool_choice,
     };
@@ -89,6 +90,7 @@ export class CohereProvider extends BaseProvider {
       temperature: options?.temperature,
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
+      stop: options?.stop,
       tools: sanitizeCohereTools(options?.tools),
       tool_choice: options?.tool_choice,
       stream: true,

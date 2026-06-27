@@ -363,6 +363,13 @@ const toolChoiceSchema = z.union([
   }),
 ]);
 
+const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
+
+function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+  if (!Array.isArray(stop)) return stop;
+  return stop.slice(0, 4);
+}
+
 const chatCompletionSchema = z.object({
   messages: z.array(z.union([
     systemMessageSchema,
@@ -378,6 +385,7 @@ const chatCompletionSchema = z.object({
   // treated as unset on forward. (#200)
   max_tokens: z.number().int().optional(),
   top_p: z.number().min(0).max(1).optional(),
+  stop: stopSchema.optional(),
   stream: z.boolean().optional(),
   // Top-level tool knobs may arrive as explicit nulls from clients that
   // serialize every field of their request struct; all treated as absent
@@ -533,6 +541,380 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
   }
 });
 
+const CompletionBody = z.object({
+  model: z.string().optional(),
+  prompt: z.string(),
+  suffix: z.string().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  max_tokens: z.number().int().optional(),
+  top_p: z.number().min(0).max(1).optional(),
+  stop: stopSchema.optional(),
+  stream: z.boolean().optional(),
+});
+
+function completionPromptToMessages(prompt: string, suffix?: string): ChatMessage[] {
+  const hasSuffix = suffix !== undefined && suffix.length > 0;
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are a code autocomplete engine.',
+        'Complete at the cursor and return only the text to insert.',
+        'Do not include markdown fences, explanations, or repeat surrounding code.',
+      ].join(' '),
+    },
+    {
+      role: 'user',
+      content: hasSuffix
+        ? `Prefix before cursor:\n${prompt}\n\nSuffix after cursor:\n${suffix}\n\nCompletion to insert:`
+        : `Prefix before cursor:\n${prompt}\n\nCompletion to insert:`,
+    },
+  ];
+}
+
+function completionTextFromChat(result: any): string {
+  return contentToString(result?.choices?.[0]?.message?.content ?? '');
+}
+
+function completionIdFromChat(id: string | undefined): string {
+  if (!id) return `cmpl-${Date.now()}`;
+  return id.startsWith('cmpl-') ? id : `cmpl-${id}`;
+}
+
+function legacyCompletionChunk(route: RouteResult, chunk: any, text: string) {
+  return {
+    id: completionIdFromChat(chunk?.id),
+    object: 'text_completion',
+    created: chunk?.created ?? Math.floor(Date.now() / 1000),
+    model: route.modelId,
+    choices: [{
+      text,
+      index: chunk?.choices?.[0]?.index ?? 0,
+      logprobs: null,
+      finish_reason: chunk?.choices?.[0]?.finish_reason ?? null,
+    }],
+  };
+}
+
+// OpenAI-compatible legacy completions endpoint. Editor ghost-text clients
+// (notably Continue autocomplete) still send prompt/suffix requests here; route
+// those through chat models while preserving the legacy text_completion shape.
+proxyRouter.post('/completions', async (req: Request, res: Response) => {
+  const start = Date.now();
+  const requestGroupId = getRequestGroupId(req);
+  res.setHeader('X-Request-ID', requestGroupId);
+
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({
+      error: { message: 'Invalid API key', type: 'authentication_error' },
+    });
+    return;
+  }
+
+  const parsed = CompletionBody.safeParse(req.body);
+  if (!parsed.success) {
+    const detail = parsed.error.errors
+      .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
+      .slice(0, 5)
+      .join(', ');
+    res.status(400).json({
+      error: { message: `Invalid request: ${detail}`, type: 'invalid_request_error' },
+    });
+    return;
+  }
+
+  const { model: requestedModel, prompt, suffix, temperature, top_p, stream } = parsed.data;
+  const requestedModelLabel = requestedModel ?? 'auto';
+  const max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
+    ? parsed.data.max_tokens : 128;
+  const stop = providerSafeStop(parsed.data.stop);
+  const messages = completionPromptToMessages(prompt, suffix);
+  const estimatedInputTokens = messages.reduce((sum, m) => sum + Math.ceil(contentToString(m.content).length / 4), 0);
+  const estimatedTotal = estimatedInputTokens + max_tokens;
+
+  let resolvedChain: ResolvedChain | undefined;
+  if (isAutoModel(requestedModel)) {
+    resolvedChain = resolveRoutingChain(requestedModel);
+  }
+
+  let preferredModel: number | undefined;
+  let groupChain: ChainRow[] | undefined;
+
+  if (!isAutoModel(requestedModel) && requestedModel) {
+    const db = getDb();
+    const members = isUnifyEnabled() ? resolveRequestedIdToMembers(requestedModel, getModelGroups()) : null;
+    if (members && members.length > 0) {
+      groupChain = resolveModelGroupCandidates(members);
+      if (groupChain.length === 0) {
+        const placeholders = members.map(() => '?').join(',');
+        const anyEnabled = db.prepare(`SELECT 1 FROM models WHERE id IN (${placeholders}) AND enabled = 1 LIMIT 1`).get(...members);
+        const reason = anyEnabled ? 'has no providers with an enabled key' : 'is disabled';
+        res.status(400).json({
+          error: {
+            message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            type: 'invalid_request_error',
+            code: 'model_not_found',
+          },
+        });
+        return;
+      }
+    } else {
+      const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
+      if (enabled) {
+        preferredModel = enabled.id;
+      } else {
+        const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
+        const reason = disabled ? 'is disabled' : 'is not in the catalog';
+        res.status(400).json({
+          error: {
+            message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            type: 'invalid_request_error',
+            code: 'model_not_found',
+          },
+        });
+        return;
+      }
+    }
+  }
+
+  const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
+  const skipKeys = new Set<string>();
+  const skipModels = new Set<number>();
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let route: RouteResult;
+    try {
+      route = routeRequest(
+        estimatedTotal,
+        skipKeys.size > 0 ? skipKeys : undefined,
+        preferredModel,
+        false,
+        false,
+        skipModels.size > 0 ? skipModels : undefined,
+        groupChain ?? resolvedChain?.chain,
+      );
+    } catch (err: any) {
+      if (lastError) {
+        res.status(429).json({
+          error: {
+            message: `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`,
+            type: 'rate_limit_error',
+          },
+        });
+      } else {
+        const disposition: string[] = Array.isArray(err.diagnostics) ? err.diagnostics : [];
+        console.warn(
+          `[Proxy] legacy completions routing exhausted (no upstream tried) req=${shortRequestId(requestGroupId)} ` +
+          `requested=${requestedModelLabel} candidates=${disposition.length}` +
+          (disposition.length ? `:\n  ${disposition.join('\n  ')}` : ''),
+        );
+        res.status(err.status ?? 503).json({
+          error: { message: err.message, type: 'routing_error' },
+        });
+      }
+      return;
+    }
+
+    traceRouteEvent('Proxy', {
+      event: attempt === 0 ? 'start' : 'next',
+      requestId: requestGroupId,
+      attempt,
+      platform: route.platform,
+      model: route.modelId,
+      requestedModel: attempt === 0 ? requestedModelLabel : undefined,
+    });
+
+    try {
+      if (stream) {
+        let totalOutputTokens = 0;
+        let headerSent = false;
+        let ttfbMs: number | null = null;
+        let sawText = false;
+        const buffered: unknown[] = [];
+
+        const flushHeaders = () => {
+          if (headerSent) return;
+          ttfbMs = Date.now() - start;
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          headerSent = true;
+          for (const frame of buffered) res.write(`data: ${JSON.stringify(frame)}\n\n`);
+          buffered.length = 0;
+        };
+
+        try {
+          const gen = route.provider.streamChatCompletion(
+            route.apiKey,
+            messages,
+            route.modelId,
+            { temperature, max_tokens, top_p, stop },
+            quotaContextForRoute(route, 'chat/completions'),
+          );
+
+          for await (const chunk of gen) {
+            const text = streamChunkText(chunk);
+            if (text.length > 0) sawText = true;
+            totalOutputTokens += Math.ceil(text.length / 4);
+            const frame = legacyCompletionChunk(route, chunk, text);
+            if (!headerSent && !sawText) {
+              buffered.push(frame);
+              continue;
+            }
+            flushHeaders();
+            res.write(`data: ${JSON.stringify(frame)}\n\n`);
+          }
+
+          if (!sawText) {
+            throw new Error(`empty completion from ${route.displayName} (legacy stream produced no text)`);
+          }
+
+          flushHeaders();
+          res.write('data: [DONE]\n\n');
+          res.end();
+
+          recordRequest(route.platform, route.modelId, route.keyId);
+          recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
+          recordSuccess(route.modelDbId);
+          traceRouteEvent('Proxy', {
+            event: 'ok',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            inputTokens: estimatedInputTokens,
+            outputTokens: totalOutputTokens,
+          });
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
+          return;
+        } catch (streamErr: any) {
+          if (headerSent) {
+            console.error(`[Proxy] Mid-stream legacy completion error from ${route.displayName}:`, streamErr.message);
+            const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
+            try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
+            try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
+            traceRouteEvent('Proxy', {
+              event: 'fail',
+              requestId: requestGroupId,
+              attempt,
+              platform: route.platform,
+              model: route.modelId,
+              latencyMs: Date.now() - start,
+              error: sanitizeProviderErrorMessage(streamErr.message),
+            });
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
+            return;
+          }
+          throw streamErr;
+        }
+      } else {
+        const result = await route.provider.chatCompletion(
+          route.apiKey,
+          messages,
+          route.modelId,
+          { temperature, max_tokens, top_p, stop },
+          quotaContextForRoute(route, 'chat/completions'),
+        );
+
+        const text = completionTextFromChat(result);
+        if (!text) {
+          throw new Error(`empty completion from ${route.displayName}`);
+        }
+
+        const totalTokens = result.usage?.total_tokens ?? 0;
+        recordRequest(route.platform, route.modelId, route.keyId);
+        recordTokens(route.platform, route.modelId, route.keyId, totalTokens);
+        recordSuccess(route.modelDbId);
+
+        res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+        if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+        res.json({
+          id: completionIdFromChat(result.id),
+          object: 'text_completion',
+          created: result.created ?? Math.floor(Date.now() / 1000),
+          model: route.modelId,
+          choices: [{
+            text,
+            index: result.choices?.[0]?.index ?? 0,
+            logprobs: null,
+            finish_reason: result.choices?.[0]?.finish_reason ?? 'stop',
+          }],
+          usage: result.usage,
+        });
+
+        traceRouteEvent('Proxy', {
+          event: 'ok',
+          requestId: requestGroupId,
+          attempt,
+          platform: route.platform,
+          model: route.modelId,
+          latencyMs: Date.now() - start,
+          inputTokens: result.usage?.prompt_tokens ?? 0,
+          outputTokens: result.usage?.completion_tokens ?? 0,
+        });
+        logRequest(route.platform, route.modelId, route.keyId, 'success', result.usage?.prompt_tokens ?? 0, result.usage?.completion_tokens ?? 0, Date.now() - start, null, null, pinnedModelId);
+        return;
+      }
+    } catch (err: any) {
+      const latency = Date.now() - start;
+      const safeError = sanitizeProviderErrorMessage(err.message);
+      traceRouteEvent('Proxy', {
+        event: 'fail',
+        requestId: requestGroupId,
+        attempt,
+        platform: route.platform,
+        model: route.modelId,
+        latencyMs: latency,
+        error: safeError,
+      });
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
+
+      if (isRetryableError(err)) {
+        if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
+        skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+        setCooldown(
+          route.platform,
+          route.modelId,
+          route.keyId,
+          isPaymentRequiredError(err)
+            ? PAYMENT_REQUIRED_COOLDOWN_MS
+            : isModelAccessForbiddenError(err)
+            ? MODEL_FORBIDDEN_COOLDOWN_MS
+            : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, {
+                rpd: route.rpdLimit,
+                tpd: route.tpdLimit,
+              }, err.retryAfterMs),
+        );
+        recordRateLimitHit(route.modelDbId);
+        learnLimitFromError(route.modelDbId, err);
+        lastError = err;
+        continue;
+      }
+
+      res.status(502).json({
+        error: {
+          message: `Provider error (${route.displayName}): ${safeError}`,
+          type: 'provider_error',
+        },
+      });
+      return;
+    }
+  }
+
+  res.status(429).json({
+    error: {
+      message: `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${sanitizeProviderErrorMessage(lastError?.message)}`,
+      type: 'rate_limit_error',
+    },
+  });
+});
+
 proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const start = Date.now();
   const requestGroupId = getRequestGroupId(req);
@@ -577,6 +959,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // 'required'; tool definitions get their 'function' type re-defaulted.
   const max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
     ? parsed.data.max_tokens : undefined;
+  const stop = providerSafeStop(parsed.data.stop);
   const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice ?? undefined;
   const tools = parsed.data.tools?.map(t => ({ ...t, type: 'function' as const }));
   const parallel_tool_calls = parsed.data.parallel_tool_calls ?? undefined;
@@ -733,7 +1116,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       res.status(422).json({ error: { message: 'Fusion does not support tool calling yet. Use a tool-capable model directly.', type: 'invalid_request_error', code: 'fusion_no_tools' } });
       return;
     }
-    const fusionOptions = { temperature, max_tokens, top_p };
+    const fusionOptions = { temperature, max_tokens, top_p, stop };
     const fusionConfig = parsed.data.fusion ?? {};
 
     if (stream) {
@@ -1030,7 +1413,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, outboundMessages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -1228,7 +1611,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, outboundMessages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls },
+          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls },
           quotaContextForRoute(route, 'chat/completions'),
         );
 

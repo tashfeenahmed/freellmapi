@@ -383,6 +383,11 @@ function extractText(parts: GeminiPart[] | undefined): string | null {
   return text.length > 0 ? text : null;
 }
 
+function toGeminiStopSequences(stop: CompletionOptions['stop']): string[] | undefined {
+  if (!stop) return undefined;
+  return Array.isArray(stop) ? stop : [stop];
+}
+
 export class GoogleProvider extends BaseProvider {
   readonly platform = 'google' as const;
   readonly name = 'Google AI Studio';
@@ -403,6 +408,7 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
       },
       tools,
       // functionCallingConfig is only valid when real function tools are present;
@@ -479,6 +485,7 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
       },
       tools,
       toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
