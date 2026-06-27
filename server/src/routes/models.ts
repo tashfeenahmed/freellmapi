@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
+import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 
 export const modelsRouter = Router();
 
@@ -13,7 +14,7 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT id FROM models WHERE id = ? AND platform = 'custom'").get(id);
+  const row = db.prepare("SELECT id, key_id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number; key_id: number | null } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom model ${id}` } });
     return;
@@ -22,6 +23,7 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   const remove = db.transaction(() => {
     db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
     db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(id);
+    deleteUnusedCustomEndpointKey(db, row.key_id);
   });
   remove();
   res.json({ success: true });

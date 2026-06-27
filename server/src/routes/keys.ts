@@ -38,6 +38,45 @@ keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[];
 
+  const customModels = [
+    ...db.prepare(`
+      SELECT key_id, id, 'chat' AS kind, model_id, display_name, NULL AS family
+        FROM models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+    ...db.prepare(`
+      SELECT key_id, id, 'embedding' AS kind, model_id, display_name, family
+        FROM embedding_models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+    ...db.prepare(`
+      SELECT key_id, id, modality AS kind, model_id, display_name, NULL AS family
+        FROM media_models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+  ];
+  const modelsByKeyId = new Map<number, any[]>();
+  for (const m of customModels) {
+    const keyId = Number(m.key_id);
+    if (!Number.isInteger(keyId)) continue;
+    const list = modelsByKeyId.get(keyId) ?? [];
+    list.push({
+      id: m.id,
+      kind: m.kind,
+      modelId: m.model_id,
+      displayName: m.display_name,
+      family: m.family ?? null,
+    });
+    modelsByKeyId.set(keyId, list);
+  }
+  for (const list of modelsByKeyId.values()) {
+    list.sort((a, b) => {
+      const ka = ['chat', 'embedding', 'image', 'audio'].indexOf(a.kind);
+      const kb = ['chat', 'embedding', 'image', 'audio'].indexOf(b.kind);
+      return (ka - kb) || String(a.displayName).localeCompare(String(b.displayName));
+    });
+  }
+
   const keys = rows.map(row => {
     let maskedKey = '****';
     try {
@@ -56,6 +95,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       enabled: row.enabled === 1,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
+      models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) ?? []) : undefined,
     };
   });
 

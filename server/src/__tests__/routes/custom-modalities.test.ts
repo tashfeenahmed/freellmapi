@@ -25,6 +25,17 @@ async function post(app: Express, path: string, body: unknown) {
   return { status: res.status, body: data };
 }
 
+async function get(app: Express, path: string) {
+  const server = app.listen(0);
+  const addr = server.address() as any;
+  const res = await realFetch(`http://127.0.0.1:${addr.port}${path}`, {
+    headers: isGatedApiPath(path) ? { Authorization: `Bearer ${dashToken}` } : {},
+  });
+  const data = await res.json().catch(() => null);
+  server.close();
+  return { status: res.status, body: data };
+}
+
 async function del(app: Express, path: string) {
   const server = app.listen(0);
   const addr = server.address() as any;
@@ -143,6 +154,87 @@ describe('custom provider modalities', () => {
       { model_id: 'local-image', modality: 'image', key_id: image.body.keyId },
       { model_id: 'local-tts', modality: 'audio', key_id: image.body.keyId },
     ]);
+  });
+
+  it('lists chat, embedding, image, and audio models under their custom endpoint key', async () => {
+    const fetchMock = vi.fn(async () => embeddingResponse(3));
+    globalThis.fetch = fetchMock as any;
+
+    const chat = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:8585/v1',
+      model: 'local-chat',
+      displayName: 'Local Chat',
+      apiKey: 'endpoint-secret',
+      label: 'Local endpoint',
+    });
+    expect(chat.status).toBe(201);
+    expect((await post(app, '/api/embeddings/custom', {
+      baseUrl: 'http://127.0.0.1:8585/v1',
+      model: 'local-embed',
+      family: 'local-list-family',
+      displayName: 'Local Embed',
+    })).status).toBe(201);
+    expect((await post(app, '/api/media/custom', {
+      baseUrl: 'http://127.0.0.1:8585/v1',
+      model: 'local-image',
+      modality: 'image',
+      displayName: 'Local Image',
+    })).status).toBe(201);
+    expect((await post(app, '/api/media/custom', {
+      baseUrl: 'http://127.0.0.1:8585/v1',
+      model: 'local-audio',
+      modality: 'audio',
+      displayName: 'Local Audio',
+    })).status).toBe(201);
+
+    const keys = await get(app, '/api/keys');
+    expect(keys.status).toBe(200);
+    const custom = keys.body.find((k: any) => k.platform === 'custom' && k.baseUrl === 'http://127.0.0.1:8585/v1');
+    expect(custom.label).toBe('Local endpoint');
+    expect(custom.models.map((m: any) => `${m.kind}:${m.modelId}`).sort()).toEqual([
+      'audio:local-audio',
+      'chat:local-chat',
+      'embedding:local-embed',
+      'image:local-image',
+    ]);
+    expect(custom.models.find((m: any) => m.kind === 'embedding').family).toBe('local-list-family');
+  });
+
+  it('deletes individual custom models and removes the endpoint key only when none remain', async () => {
+    const fetchMock = vi.fn(async () => embeddingResponse(3));
+    globalThis.fetch = fetchMock as any;
+
+    expect((await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:8686/v1',
+      model: 'local-chat',
+      apiKey: 'endpoint-secret',
+    })).status).toBe(201);
+    expect((await post(app, '/api/embeddings/custom', {
+      baseUrl: 'http://127.0.0.1:8686/v1',
+      model: 'local-embed',
+      family: 'local-delete-list-family',
+    })).status).toBe(201);
+    expect((await post(app, '/api/media/custom', {
+      baseUrl: 'http://127.0.0.1:8686/v1',
+      model: 'local-image',
+      modality: 'image',
+    })).status).toBe(201);
+
+    const before = await get(app, '/api/keys');
+    const key = before.body.find((k: any) => k.platform === 'custom' && k.baseUrl === 'http://127.0.0.1:8686/v1');
+    const chat = key.models.find((m: any) => m.kind === 'chat');
+    const embedding = key.models.find((m: any) => m.kind === 'embedding');
+    const image = key.models.find((m: any) => m.kind === 'image');
+
+    expect((await del(app, `/api/models/custom/${chat.id}`)).status).toBe(200);
+    const afterChatDelete = await get(app, '/api/keys');
+    const stillPresent = afterChatDelete.body.find((k: any) => k.id === key.id);
+    expect(stillPresent.models.map((m: any) => m.kind).sort()).toEqual(['embedding', 'image']);
+
+    expect((await del(app, `/api/embeddings/custom/${embedding.id}`)).status).toBe(200);
+    expect((await del(app, `/api/media/custom/${image.id}`)).status).toBe(200);
+    const afterAllDeleted = await get(app, '/api/keys');
+    expect(afterAllDeleted.body.find((k: any) => k.id === key.id)).toBeUndefined();
   });
 
   it('deleting a custom endpoint key removes bound embedding and media models', async () => {

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb, setSetting } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
   listEmbeddingModels,
   getDefaultFamily,
@@ -265,13 +266,17 @@ embeddingsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT family FROM embedding_models WHERE id = ? AND platform = 'custom'").get(id) as { family: string } | undefined;
+  const row = db.prepare("SELECT family, key_id FROM embedding_models WHERE id = ? AND platform = 'custom'").get(id) as { family: string; key_id: number | null } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom embedding model ${id}` } });
     return;
   }
 
-  db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(id);
+  const remove = db.transaction(() => {
+    db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(id);
+    deleteUnusedCustomEndpointKey(db, row.key_id);
+  });
+  remove();
   if (getDefaultFamily() === row.family) {
     const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
     if (replacement) setSetting('embeddings_default_family', replacement.family);

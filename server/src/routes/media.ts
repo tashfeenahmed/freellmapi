@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import { listAllMediaModels } from '../services/media.js';
 
 export const mediaRouter = Router();
@@ -189,10 +190,16 @@ mediaRouter.delete('/custom/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const info = getDb().prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(id);
-  if (info.changes === 0) {
+  const db = getDb();
+  const row = db.prepare("SELECT key_id FROM media_models WHERE id = ? AND platform = 'custom'").get(id) as { key_id: number | null } | undefined;
+  if (!row) {
     res.status(404).json({ error: { message: `Unknown custom media model ${id}` } });
     return;
   }
+  const remove = db.transaction(() => {
+    db.prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(id);
+    deleteUnusedCustomEndpointKey(db, row.key_id);
+  });
+  remove();
   res.json({ success: true });
 });

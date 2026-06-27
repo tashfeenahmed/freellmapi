@@ -106,6 +106,14 @@ export interface ModelListRow {
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
 
+export interface ApiKeyModel {
+  id: number;
+  kind: 'chat' | 'embedding' | 'image' | 'audio';
+  modelId: string;
+  displayName: string;
+  family?: string | null;
+}
+
 export interface ApiKey {
   id: number;
   platform: Platform;
@@ -116,6 +124,7 @@ export interface ApiKey {
   enabled: boolean;
   createdAt: string;
   lastCheckedAt: string | null;
+  models?: ApiKeyModel[];
 }
 
 export interface ApiKeyCreate {

@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
-import type { ApiKey, Platform, ProviderQuotaState } from '../../../shared/types'
-import { Pencil, ExternalLink, Globe } from 'lucide-react'
+import type { ApiKey, ApiKeyModel, Platform, ProviderQuotaState } from '../../../shared/types'
+import { ChevronDown, Pencil, ExternalLink, Globe, Trash2 } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -81,6 +81,23 @@ const CUSTOM_GROUP: { value: Platform; label: string; url: string } = {
   value: 'custom',
   label: 'Custom (OpenAI-compatible)',
   url: '',
+}
+
+const CUSTOM_MODEL_KIND_LABEL: Record<ApiKeyModel['kind'], string> = {
+  chat: 'keys.customTypeChat',
+  embedding: 'keys.customTypeEmbedding',
+  image: 'keys.customTypeImage',
+  audio: 'keys.customTypeAudio',
+}
+
+function customModelDeleteKey(model: ApiKeyModel): string {
+  return `${model.kind}:${model.id}`
+}
+
+function customModelDeletePath(model: ApiKeyModel): string {
+  if (model.kind === 'chat') return `/api/models/custom/${model.id}`
+  if (model.kind === 'embedding') return `/api/embeddings/custom/${model.id}`
+  return `/api/media/custom/${model.id}`
 }
 
 const statusDot: Record<string, string> = {
@@ -615,6 +632,8 @@ export default function KeysPage() {
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteModelKey, setConfirmDeleteModelKey] = useState<string | null>(null)
+  const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
   const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
@@ -647,6 +666,18 @@ export default function KeysPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
+    },
+  })
+
+  const deleteCustomModel = useMutation({
+    mutationFn: (model: ApiKeyModel) => apiFetch(customModelDeletePath(model), { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['embeddings'] })
+      queryClient.invalidateQueries({ queryKey: ['media'] })
     },
   })
 
@@ -706,6 +737,15 @@ export default function KeysPage() {
     if (editingLabel !== undefined) {
       updateKey.mutate({ id, label: editingLabel })
     }
+  }
+
+  function toggleExpandedKey(id: number) {
+    setExpandedKeyIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   useEffect(() => {
@@ -912,60 +952,124 @@ export default function KeysPage() {
                       const status = h?.status ?? k.status
                       const lastChecked = h?.lastCheckedAt
                       const isEditing = editingKeyId === k.id
+                      const customModels = k.models ?? []
+                      const hasCustomModels = customModels.length > 0
+                      const isExpanded = expandedKeyIds.has(k.id)
                       return (
-                        <div key={k.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
-                          <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
-                          <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
-                          {isEditing ? (
-                            <Input
-                              ref={editInputRef}
-                              value={editingLabel}
-                              onChange={e => setEditingLabel(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') saveEditing(k.id)
-                                if (e.key === 'Escape') cancelEditing()
-                              }}
-                              onBlur={() => saveEditing(k.id)}
-                              className="h-6 w-[160px] text-xs"
-                              disabled={updateKey.isPending}
-                            />
-                          ) : (
-                            <>
-                              {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
-                            </>
-                          )}
-                          <span className="text-xs text-muted-foreground">{statusLabelKey[status] ? t(statusLabelKey[status]) : status}</span>
-                          <div className="flex-1" />
-                          {lastChecked && (
-                            <span className="text-[11px] text-muted-foreground tabular-nums">
-                              {formatSqliteUtcToLocalTime(lastChecked, { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                          {!isEditing && (
-                            <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
-                              <Pencil className="size-3" />
+                        <div key={k.id} className="bg-card">
+                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                            <span className={`size-1.5 rounded-full flex-shrink-0 ${statusDot[status] ?? statusDot.unknown}`} />
+                            {hasCustomModels && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                className="size-6 p-0 text-muted-foreground"
+                                onClick={() => toggleExpandedKey(k.id)}
+                                title={isExpanded ? t('common.hide') : t('common.show')}
+                              >
+                                <ChevronDown className={`size-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </Button>
+                            )}
+                            <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
+                            {isEditing ? (
+                              <Input
+                                ref={editInputRef}
+                                value={editingLabel}
+                                onChange={e => setEditingLabel(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') saveEditing(k.id)
+                                  if (e.key === 'Escape') cancelEditing()
+                                }}
+                                onBlur={() => saveEditing(k.id)}
+                                className="h-6 w-[160px] text-xs"
+                                disabled={updateKey.isPending}
+                              />
+                            ) : (
+                              <>
+                                {k.label && <span className="text-xs text-muted-foreground">{k.label}</span>}
+                                {k.baseUrl && (
+                                  <code className="text-[11px] text-muted-foreground font-mono truncate max-w-[260px]" title={k.baseUrl}>
+                                    {k.baseUrl}
+                                  </code>
+                                )}
+                              </>
+                            )}
+                            <span className="text-xs text-muted-foreground">{statusLabelKey[status] ? t(statusLabelKey[status]) : status}</span>
+                            <div className="flex-1" />
+                            {lastChecked && (
+                              <span className="text-[11px] text-muted-foreground tabular-nums">
+                                {formatSqliteUtcToLocalTime(lastChecked, { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            {!isEditing && (
+                              <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
+                                <Pencil className="size-3" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
+                              {t('common.check')}
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className={confirmDeleteId === k.id ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}
+                              onClick={() => {
+                                if (confirmDeleteId === k.id) {
+                                  deleteKey.mutate(k.id)
+                                  setConfirmDeleteId(null)
+                                } else {
+                                  setConfirmDeleteId(k.id)
+                                  setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
+                                }
+                              }}
+                              disabled={deleteKey.isPending}
+                            >
+                              {confirmDeleteId === k.id ? t('keys.confirmRemove') : t('common.remove')}
+                            </Button>
+                          </div>
+                          {hasCustomModels && isExpanded && (
+                            <div className="flex flex-wrap gap-2 border-t bg-muted/20 px-4 py-3 pl-12">
+                              {customModels.map(model => {
+                                const modelKey = customModelDeleteKey(model)
+                                const confirming = confirmDeleteModelKey === modelKey
+                                return (
+                                  <div key={modelKey} className="inline-flex min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1 text-[11px]">
+                                    <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      {t(CUSTOM_MODEL_KIND_LABEL[model.kind])}
+                                    </span>
+                                    <span className="max-w-[180px] truncate font-medium" title={model.modelId}>
+                                      {model.displayName}
+                                    </span>
+                                    {model.family && (
+                                      <code className="max-w-[160px] truncate text-muted-foreground" title={model.family}>
+                                        {model.family}
+                                      </code>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="xs"
+                                      className={`h-5 px-1 ${confirming ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}`}
+                                      disabled={deleteCustomModel.isPending}
+                                      onClick={() => {
+                                        if (confirming) {
+                                          deleteCustomModel.mutate(model)
+                                          setConfirmDeleteModelKey(null)
+                                        } else {
+                                          setConfirmDeleteModelKey(modelKey)
+                                          setTimeout(() => setConfirmDeleteModelKey(c => (c === modelKey ? null : c)), 3000)
+                                        }
+                                      }}
+                                      title={t('common.remove')}
+                                    >
+                                      {confirming ? t('common.confirm') : <Trash2 className="size-3" />}
+                                    </Button>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           )}
-                          <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
-                            {t('common.check')}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            className={confirmDeleteId === k.id ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}
-                            onClick={() => {
-                              if (confirmDeleteId === k.id) {
-                                deleteKey.mutate(k.id)
-                                setConfirmDeleteId(null)
-                              } else {
-                                setConfirmDeleteId(k.id)
-                                setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
-                              }
-                            }}
-                            disabled={deleteKey.isPending}
-                          >
-                            {confirmDeleteId === k.id ? t('keys.confirmRemove') : t('common.remove')}
-                          </Button>
                         </div>
                       )
                     })}
