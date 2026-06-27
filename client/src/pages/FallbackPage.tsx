@@ -54,6 +54,10 @@ export interface FallbackEntry {
   contextWindow?: number | null
   supportsVision: boolean
   supportsTools: boolean
+  source?: 'catalog' | 'custom'
+  keyId?: number | null
+  keyLabel?: string | null
+  hasOverrides?: boolean
   keyCount: number
   // Logical-model grouping (sent by the server when unify is relevant). Absent
   // for ungrouped rows; the UI falls back to a per-row "solo" group then.

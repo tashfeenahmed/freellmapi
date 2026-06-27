@@ -5,6 +5,12 @@ import { hasProvider } from '../providers/index.js';
 import { MEDIA_PLATFORMS } from './media.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
+import {
+  applyAllModelOverrides,
+  applyModelOverrides,
+  deleteTombstonedCatalogModels,
+  isCatalogModelTombstoned,
+} from './model-state.js';
 
 // Generative-media modalities are routed into the separate media_models table
 // (see services/media.ts), never into the chat `models` table.
@@ -144,12 +150,13 @@ function isCatalog(value: unknown): value is Catalog {
  * Apply a verified catalog to the local DB inside one transaction.
  *
  * Rules of engagement with user data:
- *  - metadata (name, ranks, limits, context, capabilities) always tracks the
- *    catalog — that is the whole point of the product;
+ *  - metadata (name, ranks, limits, context, capabilities) tracks the catalog
+ *    unless the user has an explicit local override;
  *  - catalog enabled=false force-disables (the model is dead upstream), but
  *    enabled=true never re-enables a model the user turned off themselves;
  *  - models the user added via custom providers (platform='custom' or bound to
  *    a key) are never touched;
+ *  - catalog models the user deleted stay deleted via tombstones;
  *  - models that vanished from the catalog are deleted, exactly like the
  *    dead-model migrations do (fallback_config row first, FK order).
  */
@@ -201,6 +208,7 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
           counts.skippedUnknownPlatform++;
           continue;
         }
+        if (isCatalogModelTombstoned(db, 'media', m.platform, m.modelId)) continue;
         inMediaCatalog.add(`${m.platform}:${m.modelId}`);
         const mrow = selectMedia.get(m.platform, m.modelId) as { id: number; enabled: number } | undefined;
         const mfields = {
@@ -226,6 +234,7 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
         counts.skippedUnknownPlatform++;
         continue;
       }
+      if (isCatalogModelTombstoned(db, 'chat', m.platform, m.modelId)) continue;
       inCatalog.add(`${m.platform}:${m.modelId}`);
 
       const row = selectModel.get(m.platform, m.modelId) as { id: number; enabled: number } | undefined;
@@ -247,12 +256,17 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
         // Catalog disable wins (dead upstream); local disable also wins.
         const enabled = m.enabled ? row.enabled : 0;
         updateModel.run({ ...fields, id: row.id, enabled });
+        applyModelOverrides(db, m.platform, m.modelId);
         counts.updated++;
       } else {
         insertModel.run({ ...fields, platform: m.platform, modelId: m.modelId, enabled: m.enabled ? 1 : 0 });
+        applyModelOverrides(db, m.platform, m.modelId);
         counts.inserted++;
       }
     }
+
+    counts.removed += deleteTombstonedCatalogModels(db);
+    applyAllModelOverrides(db);
 
     // Ensure every model has a fallback_config row (same invariant migrations keep).
     const missingFb = db
@@ -268,7 +282,13 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
 
     // Remove catalog-managed models that the catalog no longer lists.
     const candidates = db
-      .prepare(`SELECT id, platform, model_id FROM models WHERE platform != 'custom' AND key_id IS NULL`)
+      .prepare(`
+        SELECT id, platform, model_id
+          FROM models
+         WHERE platform != 'custom'
+           AND key_id IS NULL
+           AND size_label NOT IN ('User', 'Custom')
+      `)
       .all() as { id: number; platform: string; model_id: string }[];
     const deleteFb = db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?');
     const deleteModel = db.prepare('DELETE FROM models WHERE id = ?');
