@@ -20,6 +20,11 @@ extraResources:
 mac:
   category: public.app-category.developer-tools
   icon: assets/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.inherit.plist
+  notarize: true
   target:
     - target: dmg
       arch:

@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runMigrationsSync } from './migrate/runner.js';
+import { initEncryptionKey, isEncryptionKeyInitialized } from '../lib/crypto.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
@@ -66,6 +67,8 @@ export function initDb(
       process.exit(1);
     }
   }
+
+  if (!isEncryptionKeyInitialized()) initEncryptionKey(db);
 
   return db;
 }

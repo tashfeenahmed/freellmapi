@@ -82,6 +82,10 @@ function getEncryptionKey(): Buffer {
   return cachedKey;
 }
 
+export function isEncryptionKeyInitialized(): boolean {
+  return cachedKey !== null;
+}
+
 export function encrypt(text: string): { encrypted: string; iv: string; authTag: string } {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(16);

@@ -64,12 +64,62 @@ jobs:
           # root-hiding below; also makes local `desktop:dist:win` work on Windows.
           npm --prefix desktop run stage:client
 
+      - name: Validate macOS signing credentials
+        if: matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CSC_LINK:-}" ]; then
+            echo "Missing MACOS_CSC_LINK secret for signed macOS release builds."
+            exit 1
+          fi
+
+          has_api_key_creds=false
+          if [ -n "${APPLE_API_KEY:-}" ] && [ -n "${APPLE_API_KEY_ID:-}" ] && [ -n "${APPLE_API_ISSUER:-}" ]; then
+            has_api_key_creds=true
+          fi
+
+          has_apple_id_creds=false
+          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+            has_apple_id_creds=true
+          fi
+
+          has_keychain_creds=false
+          if [ -n "${APPLE_KEYCHAIN_PROFILE:-}" ]; then
+            has_keychain_creds=true
+          fi
+
+          if [ "$has_api_key_creds" != true ] && [ "$has_apple_id_creds" != true ] && [ "$has_keychain_creds" != true ]; then
+            echo "Missing Apple notarization secrets. Provide APPLE_API_KEY/APPLE_API_KEY_ID/APPLE_API_ISSUER, APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID, or APPLE_KEYCHAIN_PROFILE."
+            exit 1
+          fi
+
       - name: Package installer
         shell: bash
         env:
-          # No signing certs in CI — build unsigned rather than failing on a
-          # missing identity. (The app already ships unsigned; see README.)
-          CSC_IDENTITY_AUTODISCOVERY: 'false'
+          # Pull-request and manual artifact builds stay unsigned. Tagged macOS
+          # release builds must use Developer ID signing + notarization so the
+          # downloaded DMG opens without Gatekeeper's "damaged" quarantine block.
+          CSC_IDENTITY_AUTODISCOVERY: ${{ matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/') && 'true' || 'false' }}
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEYCHAIN: ${{ secrets.APPLE_KEYCHAIN }}
+          APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
         run: |
           set -e
           # Run electron-builder with desktop/ as its own project root. Invoked

@@ -143,4 +143,32 @@ describe('POST /v1/responses (#96)', () => {
     expect(text).toContain('event: response.function_call_arguments.done');
     expect(text).toContain('"arguments":"{\\"city\\":\\"SF\\"}"');
   });
+
+  it('routes built-in Responses tools through tool-capable models', async () => {
+    mockRouteRequest.mockClear();
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status } = await post(app, '/v1/responses', {
+      input: 'say hello',
+      tools: [{
+        type: 'local_shell',
+        name: 'exec_command',
+        description: 'Run a local shell command',
+        parameters: { type: 'object', properties: { cmd: { type: 'string' } } },
+      }],
+    }, key);
+
+    expect(status).toBe(200);
+    const lastCall = mockRouteRequest.mock.calls.at(-1);
+    expect(lastCall?.[4]).toBe(true);
+  });
 });
