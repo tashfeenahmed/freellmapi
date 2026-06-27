@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb } from '../../db/index.js';
+import { getDb, initDb } from '../../db/index.js';
+import { encrypt } from '../../lib/crypto.js';
+import { recordRateLimitHit } from '../../services/router.js';
+import { setCooldown } from '../../services/ratelimit.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -71,6 +74,81 @@ describe('Fallback API', () => {
     for (const axis of ['reliability', 'speed', 'intelligence']) {
       expect(typeof body.customWeights[axis]).toBe('number');
     }
+  });
+
+  it('GET /api/fallback/penalty-inspector is empty when no model has active pressure', async () => {
+    const { status, body } = await request(app, 'GET', '/api/fallback/penalty-inspector');
+    expect(status).toBe(200);
+    expect(body.lookbackMinutes).toBe(30);
+    expect(body.rows).toEqual([]);
+  });
+
+  it('GET /api/fallback/penalty-inspector combines penalties, cooldowns and recent errors', async () => {
+    const db = getDb();
+    const target = db.prepare(`
+      SELECT id, platform, model_id, display_name
+        FROM models
+       WHERE platform = 'groq' AND key_id IS NULL
+       ORDER BY id
+       LIMIT 1
+    `).get() as { id: number; platform: string; model_id: string; display_name: string };
+    const secret = encrypt('inspector-test-key');
+    const keyId = Number(db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, 'inspector', ?, ?, ?, 'healthy', 1)
+    `).run(target.platform, secret.encrypted, secret.iv, secret.authTag).lastInsertRowid);
+
+    recordRateLimitHit(target.id);
+    recordRateLimitHit(target.id);
+    setCooldown(target.platform, target.model_id, keyId, 60_000);
+    db.prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, latency_ms, error)
+      VALUES (?, ?, ?, 'error', 321, 'Groq API error 429: rate limit')
+    `).run(target.platform, target.model_id, keyId);
+
+    const { status, body } = await request(app, 'GET', '/api/fallback/penalty-inspector');
+    expect(status).toBe(200);
+    const row = body.rows.find((r: any) => r.modelDbId === target.id);
+    expect(row).toBeDefined();
+    expect(row.displayName).toBe(target.display_name);
+    expect(row.reasons.sort()).toEqual(['cooldown', 'penalty', 'recent_errors']);
+    expect(row.penalty.value).toBeGreaterThan(0);
+    expect(row.penalty.hits).toBeGreaterThanOrEqual(2);
+    expect(row.penalty.rateLimitFactor).toBeLessThan(1);
+    expect(row.cooldowns).toHaveLength(1);
+    expect(row.cooldowns[0]).toMatchObject({ keyId, keyLabel: 'inspector', keyStatus: 'healthy' });
+    expect(row.cooldowns[0].expiresInMs).toBeGreaterThan(0);
+    expect(row.recentErrorCount).toBe(1);
+    expect(row.recentErrors[0]).toMatchObject({
+      keyId,
+      keyLabel: 'inspector',
+      latencyMs: 321,
+      error: 'Groq API error 429: rate limit',
+    });
+  });
+
+  it('GET /api/fallback/penalty-inspector includes recent failures even without cooldowns', async () => {
+    const db = getDb();
+    const target = db.prepare(`
+      SELECT id, platform, model_id
+        FROM models
+       WHERE platform != 'groq'
+       ORDER BY id
+       LIMIT 1
+    `).get() as { id: number; platform: string; model_id: string };
+    db.prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, latency_ms, error)
+      VALUES (?, ?, NULL, 'error', 111, 'upstream 503 unavailable')
+    `).run(target.platform, target.model_id);
+
+    const { status, body } = await request(app, 'GET', '/api/fallback/penalty-inspector');
+    expect(status).toBe(200);
+    const row = body.rows.find((r: any) => r.modelDbId === target.id);
+    expect(row).toBeDefined();
+    expect(row.reasons).toEqual(['recent_errors']);
+    expect(row.penalty.value).toBe(0);
+    expect(row.cooldowns).toEqual([]);
+    expect(row.recentErrorCount).toBe(1);
   });
 
   it('PUT /api/fallback/routing accepts the custom strategy with weights and persists them', async () => {

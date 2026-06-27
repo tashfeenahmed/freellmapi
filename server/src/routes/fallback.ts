@@ -11,6 +11,7 @@ import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrate
 import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
+import { getPenaltyInspector } from '../services/penalty-inspector.js';
 
 export const fallbackRouter = Router();
 
@@ -19,6 +20,10 @@ export const fallbackRouter = Router();
 //                 breakdown (reliability / speed / intelligence + guardrails).
 fallbackRouter.get('/routing', (_req: Request, res: Response) => {
   res.json(getRoutingScores());
+});
+
+fallbackRouter.get('/penalty-inspector', (_req: Request, res: Response) => {
+  res.json(getPenaltyInspector());
 });
 
 const routingSchema = z.object({

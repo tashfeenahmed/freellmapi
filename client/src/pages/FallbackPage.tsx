@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
 import { Tooltip } from '@/components/tooltip'
+import { PenaltyInspector } from '@/components/penalty-inspector'
 
 export interface FallbackEntry {
   modelDbId: number
@@ -853,6 +854,8 @@ export default function FallbackPage() {
             {isManual ? t('strategies.modeManualHint') : t('strategies.modeScoreHint')}
           </p>
         </section>
+
+        <PenaltyInspector />
 
         {/* Unified routing / fallback table */}
         {isLoading ? (

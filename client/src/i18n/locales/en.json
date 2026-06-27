@@ -166,6 +166,24 @@
     "weightRequired": "At least one weight must be above zero.",
     "scoreColumn": "Score"
   },
+  "penaltyInspector": {
+    "title": "Router pressure",
+    "subtitle": "Penalties, cooldowns, and failures from the last {minutes} min",
+    "rowCount": "{count} active",
+    "offChain": "off chain",
+    "penaltyValue": "Penalty {value}",
+    "factor": "score x{factor}",
+    "noCooldown": "No cooldown",
+    "cooldownChip": "{key} - {time}",
+    "errorsHeading": "{count} recent errors",
+    "noRecentErrors": "No recent errors",
+    "noKey": "no key",
+    "reasons": {
+      "penalty": "penalized",
+      "cooldown": "cooldown",
+      "recent_errors": "failing"
+    }
+  },
   "keys": {
     "pageTitle": "Keys",
     "pageDescription": "Provider credentials and the unified API key your apps connect with.",
