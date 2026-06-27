@@ -29,6 +29,15 @@ function authHeaders() {
   return { Authorization: `Bearer ${getUnifiedApiKey()}` };
 }
 
+function seedGroqKey() {
+  const db = getDb();
+  const key = encrypt('gsk_completion_test');
+  db.prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+    VALUES ('groq', 'completion-test', ?, ?, ?, 'healthy', 1)
+  `).run(key.encrypted, key.iv, key.authTag);
+}
+
 describe('POST /v1/completions', () => {
   let app: Express;
 
@@ -41,22 +50,17 @@ describe('POST /v1/completions', () => {
   beforeEach(() => {
     const db = getDb();
     setRoutingStrategy('priority');
+    db.prepare('DELETE FROM rate_limit_cooldowns').run();
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM requests').run();
-    db.prepare("UPDATE fallback_config SET priority = 1 WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'groq' LIMIT 1)").run();
-
-    const key = encrypt('gsk_completion_test');
-    db.prepare(`
-      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-      VALUES ('groq', 'completion-test', ?, ?, ?, 'healthy', 1)
-    `).run(key.encrypted, key.iv, key.authTag);
+    seedGroqKey();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('adapts a legacy text completion request into a routed chat completion response for autocomplete clients', async () => {
+  it('adapts a legacy text completion request into a routed chat completion response', async () => {
     let capturedBody: any = null;
     const origFetch = global.fetch;
 
@@ -66,6 +70,7 @@ describe('POST /v1/completions', () => {
         capturedBody = JSON.parse(String(init?.body));
         return {
           ok: true,
+          headers: new Headers(),
           json: () => Promise.resolve({
             id: 'chatcmpl-completion',
             object: 'chat.completion',
@@ -108,7 +113,7 @@ describe('POST /v1/completions', () => {
     expect(capturedBody.messages[1].content).toContain('console.log(answer);');
   });
 
-  it('accepts autocomplete clients that send more than four stop sequences and forwards a provider-safe subset', async () => {
+  it('accepts autocomplete clients that send many stop sequences and forwards a provider-safe subset', async () => {
     let capturedBody: any = null;
     const origFetch = global.fetch;
 
@@ -118,6 +123,7 @@ describe('POST /v1/completions', () => {
         capturedBody = JSON.parse(String(init?.body));
         return {
           ok: true,
+          headers: new Headers(),
           json: () => Promise.resolve({
             id: 'chatcmpl-stop',
             object: 'chat.completion',
@@ -147,4 +153,83 @@ describe('POST /v1/completions', () => {
     expect(capturedBody.stop).toEqual(['\n', '}', ';', '<|end|>']);
   });
 
+  it('streams chat deltas as legacy text_completion SSE frames', async () => {
+    const origFetch = global.fetch;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        const body = JSON.parse(String(init?.body));
+        expect(body.stream).toBe(true);
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('data: {"id":"chatcmpl-stream","object":"chat.completion.chunk","created":123,"model":"test","choices":[{"index":0,"delta":{"content":"foo"},"finish_reason":null}]}\n\n'));
+            controller.enqueue(encoder.encode('data: {"id":"chatcmpl-stream","object":"chat.completion.chunk","created":123,"model":"test","choices":[{"index":0,"delta":{"content":"bar"},"finish_reason":null}]}\n\n'));
+            controller.enqueue(encoder.encode('data: {"id":"chatcmpl-stream","object":"chat.completion.chunk","created":123,"model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n'));
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        });
+        return {
+          ok: true,
+          headers: new Headers(),
+          body: stream,
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, raw, headers } = await request(app, 'POST', '/v1/completions', {
+      model: 'auto',
+      prompt: '',
+      stream: true,
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(headers.get('content-type')).toContain('text/event-stream');
+    expect(raw).toContain('"object":"text_completion"');
+    expect(raw).toContain('"text":"foo"');
+    expect(raw).toContain('"text":"bar"');
+    expect(raw).toContain('data: [DONE]');
+  });
+
+  it('passes stop through from chat completions after applying the same provider-safe cap', async () => {
+    let capturedBody: any = null;
+    const origFetch = global.fetch;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        capturedBody = JSON.parse(String(init?.body));
+        return {
+          ok: true,
+          headers: new Headers(),
+          json: () => Promise.resolve({
+            id: 'chatcmpl-chat-stop',
+            object: 'chat.completion',
+            created: 123,
+            model: capturedBody.model,
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'done' },
+              finish_reason: 'stop',
+            }],
+            usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'hi' }],
+      stop: ['a', 'b', 'c', 'd', 'e'],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].message.content).toBe('done');
+    expect(capturedBody.stop).toEqual(['a', 'b', 'c', 'd']);
+  });
 });

@@ -45,7 +45,9 @@ for (const row of models) {
 
   const start = Date.now();
   try {
-    const res = await provider.chatCompletion(apiKey, [{ role: 'user', content: 'hi' }], row.model_id, { max_tokens: 5 });
+    // 120s: NVIDIA NIM cold starts regularly take 15-60s and frontier reasoning
+    // models longer — at the default 15s they false-flag as broken (V23 audit).
+    const res = await provider.chatCompletion(apiKey, [{ role: 'user', content: 'hi' }], row.model_id, { max_tokens: 5, timeoutMs: 120000 });
     const raw = res.choices?.[0]?.message?.content;
     const reply = typeof raw === 'string' ? raw.slice(0, 40) : '';
     results.push({ row, ok: true, ms: Date.now() - start, reply });

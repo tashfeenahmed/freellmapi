@@ -251,6 +251,7 @@ export function recordRequest(platform: string, modelId: string, keyId: number) 
   getWindow(rpdKey).timestamps.push(now);
 
   recordUsage(platform, modelId, keyId, 'request', 0, now);
+  clearNullLimitHits(platform, modelId, keyId);
 }
 
 export function recordTokens(
@@ -308,34 +309,103 @@ const TRANSIENT_COOLDOWN_MS = 90 * 1000;
 // on the next 402 after expiry if still unpaid; a restart re-benches on first hit.
 export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
 
-// Decide how long to bench a model+key after an upstream 429. Escalate to the
-// long quarantine (getNextCooldownDuration, up to 24h) ONLY when the model is
-// genuinely at its DAILY limit (RPD or TPD) — that won't recover until the
-// provider's daily reset, so a long bench avoids hammering a truly-dead key.
+// Long cooldown for a 403 Forbidden on a key that already passed validateKey
+// (so it is not a dead key — the health checker disables those). A request-time
+// 403 means this key's tier can't reach this specific model (e.g. gpt-4o on
+// GitHub Models' free tier, subscription-only models on Cloudflare). That won't
+// change within a minute window, so bench this model+key for a full day and let
+// the router fail over to a model the key can actually serve. See issue #256.
+export const MODEL_FORBIDDEN_COOLDOWN_MS = DAY;
+
+// When RPD/TPD limits are NULL (provider's published daily quota is unknown or
+// not yet seeded — common for ollama, cloudflare, nvidia, huggingface, mistral,
+// kilo, llm7, pollinations), we cannot check a counter against a cap. Fall back
+// to a hit-count heuristic: after 2+ 429s within this rolling window, treat as
+// "effectively daily-exhausted" and enter the standard escalation ladder at
+// the same step the documented-RPD path would. Without this, these providers
+// stay stuck at TRANSIENT_COOLDOWN_MS forever even when every request is a
+// 429 (observed in production: ollama 130× 429s in 1h with all 90s cooldowns
+// expired before the next request). Cheaper than waiting for the operator to
+// seed per-provider limits (Option A), still reversible — a successful call
+// clears the hit window via the normal path.
 //
-// A transient RPM/TPM 429 gets a short fixed cooldown and does NOT count toward
-// escalation. This is the common case for providers with a tight per-minute
-// token budget but a large daily quota — e.g. groq gpt-oss-120b has rpd=1000
-// yet tpm=8000, so a single burst of large prompts 429s on TPM while the daily
-// quota is barely touched. Without this split, those transient bursts escalated
-// (2m → 10m → 1h → 24h) and quarantined a perfectly healthy provider for the
-// rest of the day. Daily counters are persisted (countPersistedRequests /
-// sumPersistedTokens), so this verdict is stable across restarts.
+// Separate counter from `cooldownHits` (used by getNextCooldownDuration's
+// escalation ladder). The shared Map would make this state path-coupled to
+// the ladder index, which would over-skip steps because the ladder also
+// pushes a hit on each call.
+const NULL_LIMIT_HIT_THRESHOLD = 2;
+const NULL_LIMIT_HIT_WINDOW_MS = HOUR;
+const nullLimitHits = new Map<string, number[]>(); // key -> timestamps
+
+function recordNullLimitHit(platform: string, modelId: string, keyId: number, now: number): void {
+  const key = `${platform}:${modelId}:${keyId}`;
+  const hits = nullLimitHits.get(key) ?? [];
+  hits.push(now);
+  nullLimitHits.set(key, hits);
+}
+
+function clearNullLimitHits(platform: string, modelId: string, keyId: number): void {
+  nullLimitHits.delete(`${platform}:${modelId}:${keyId}`);
+}
+
+export function recentHitCount(
+  platform: string,
+  modelId: string,
+  keyId: number,
+  now: number,
+  windowMs: number = NULL_LIMIT_HIT_WINDOW_MS,
+): number {
+  const key = `${platform}:${modelId}:${keyId}`;
+  const hits = nullLimitHits.get(key) ?? [];
+  return hits.filter(t => t > now - windowMs).length;
+}
+
+// Decide how long to bench a model+key after an upstream 429. Escalate to the
+// long quarantine (getNextCooldownDuration, up to 24h) when the model is at its
+// DAILY limit (RPD/TPD counter ≥ cap), OR — when limits are unknown — when
+// recentHitCount crosses the heuristic threshold. Either way, a long bench
+// avoids hammering a truly-dead key.
+//
+// A transient RPM/TPM 429 with healthy daily counters gets a short fixed
+// cooldown and does NOT count toward escalation. This is the common case for
+// providers with a tight per-minute token budget but a large daily quota —
+// e.g. groq gpt-oss-120b has rpd=1000 yet tpm=8000, so a single burst of large
+// prompts 429s on TPM while the daily quota is barely touched. Daily counters
+// are persisted (countPersistedRequests / sumPersistedTokens), so this verdict
+// is stable across restarts.
 export function getCooldownDurationForLimit(
   platform: string,
   modelId: string,
   keyId: number,
   limits: { rpd: number | null; tpd: number | null },
+  retryAfterMs?: number | null,
 ): number {
   const now = Date.now();
   const rpdExhausted =
     limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
   const tpdExhausted =
     limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
-  if (rpdExhausted || tpdExhausted) {
-    return getNextCooldownDuration(platform, modelId, keyId);
+  // No daily quota published → use repeated-429 heuristic: 2+ 429s in the
+  // last hour is treated as effectively daily-exhausted. This unsticks
+  // providers that publish no daily cap (ollama, cloudflare, etc.) from the
+  // 90s-cooldown-loop without requiring operator-side limit seeding.
+  const unknownLimits = limits.rpd === null && limits.tpd === null;
+  let heuristicallyExhausted = false;
+  if (unknownLimits) {
+    // The current hit is recorded first so the threshold can be reached across
+    // consecutive 429s, but only for providers where counters cannot decide.
+    recordNullLimitHit(platform, modelId, keyId, now);
+    heuristicallyExhausted =
+      recentHitCount(platform, modelId, keyId, now) >= NULL_LIMIT_HIT_THRESHOLD;
   }
-  return TRANSIENT_COOLDOWN_MS;
+  const base = (rpdExhausted || tpdExhausted || heuristicallyExhausted)
+    ? getNextCooldownDuration(platform, modelId, keyId)
+    : TRANSIENT_COOLDOWN_MS;
+  // Honor an upstream Retry-After as a floor: never bench shorter than our own
+  // heuristic, but extend (capped at a day) when the provider explicitly asks
+  // to wait longer than we otherwise would.
+  if (retryAfterMs != null && retryAfterMs > base) return Math.min(retryAfterMs, DAY);
+  return base;
 }
 
 function persistedCooldownExpiry(
@@ -420,4 +490,69 @@ export function getRateLimitStatus(
     rpd: { used: requestCount(platform, modelId, keyId, DAY, now), limit: limits.rpd },
     tpm: { used: tokenCount(platform, modelId, keyId, MINUTE, now), limit: limits.tpm },
   };
+}
+
+// ── Learning real provider limits from error bodies (self-correcting catalog) ──
+// Free-tier limits drift and our seeded catalog is frequently wrong or null.
+// When a provider rejects a request with its real limit in the body — Groq 413:
+// "...on tokens per minute (TPM): Limit 30000, Requested 33476" — we can learn
+// that ceiling and persist it so the canUseTokens / canMakeRequest pre-checks
+// stop us BEFORE the next 413 instead of re-discovering it on every request.
+// (Fork-validated: andersmmg's updateLimitsFromError parses the same Groq shape.)
+
+export type LearnedLimitKind = 'tpm' | 'tpd' | 'rpm' | 'rpd';
+export interface LearnedLimit { kind: LearnedLimitKind; limit: number; }
+
+// Order matters: check the per-DAY axes before per-MINUTE so "tokens per day"
+// isn't shadowed by the "tpm" word-boundary alternative, and tokens before
+// requests so a body mentioning both lands on the more specific token ceiling.
+const LIMIT_AXIS_PATTERNS: Array<{ kind: LearnedLimitKind; re: RegExp }> = [
+  { kind: 'tpd', re: /tokens?\s*per\s*day|\btpd\b/i },
+  { kind: 'tpm', re: /tokens?\s*per\s*min(?:ute)?|\btpm\b/i },
+  { kind: 'rpd', re: /requests?\s*per\s*day|\brpd\b/i },
+  { kind: 'rpm', re: /requests?\s*per\s*min(?:ute)?|\brpm\b/i },
+];
+
+/**
+ * Pure parser: pull a provider-reported ceiling out of an error message. Returns
+ * null unless BOTH a numeric "Limit N" and a confident axis (TPM/TPD/RPM/RPD)
+ * are present — guessing the axis would write the wrong column and mis-route
+ * every future request, so we refuse to guess.
+ */
+export function parseProviderLimit(message: string | undefined | null): LearnedLimit | null {
+  if (!message) return null;
+  const m = message.match(/\blimit[:\s]+([\d,]+)/i);
+  if (!m) return null;
+  const limit = Number(m[1]!.replace(/,/g, ''));
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  for (const { kind, re } of LIMIT_AXIS_PATTERNS) {
+    if (re.test(message)) return { kind, limit };
+  }
+  return null;
+}
+
+// Whitelisted column names — the only values ever interpolated into the UPDATE
+// below, so there is no injection surface despite the template literal.
+const LIMIT_COLUMN: Record<LearnedLimitKind, string> = {
+  tpm: 'tpm_limit', tpd: 'tpd_limit', rpm: 'rpm_limit', rpd: 'rpd_limit',
+};
+
+/**
+ * Persist a provider-reported limit onto the model row, but ONLY when it makes
+ * us more conservative: fill a NULL (unknown) limit, or LOWER an existing one
+ * that was too high. Never raises a limit — hitting a ceiling means our pre-check
+ * already let too much through, so the true limit is at or below what we used.
+ * Returns the learned limit when a row was actually changed, else null.
+ * DB-guarded (no-op when the DB is unavailable), like the rest of this module.
+ */
+export function learnLimitFromError(modelDbId: number, err: { message?: string }): LearnedLimit | null {
+  const parsed = parseProviderLimit(err?.message);
+  if (!parsed) return null;
+  const col = LIMIT_COLUMN[parsed.kind];
+  const result = withDb(db =>
+    db.prepare(
+      `UPDATE models SET ${col} = ? WHERE id = ? AND (${col} IS NULL OR ${col} > ?)`,
+    ).run(parsed.limit, modelDbId, parsed.limit),
+  );
+  return result && result.changes > 0 ? parsed : null;
 }

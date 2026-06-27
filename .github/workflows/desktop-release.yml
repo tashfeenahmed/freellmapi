@@ -1,0 +1,97 @@
+name: Desktop release
+
+# Builds the menu-bar desktop app installers (Windows .exe + macOS .dmg) and,
+# on a version tag, attaches them to the GitHub Release. Closes #318 — the
+# dist:win build config already existed; this is the missing publish step.
+#
+# Triggers:
+#   - workflow_dispatch        manual build (artifacts only)
+#   - push tags 'v*'           build + attach the installers to the release
+#   - pull_request (desktop)   build-only smoke test so the Windows build can't
+#                              silently rot (only when desktop/CI files change)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Pinned to windows-2022 (VS 2022): node-gyp can't yet parse the VS "18"
+          # toolset on windows-latest, which breaks the better-sqlite3 native build.
+          - os: windows-2022
+            ebArgs: --win --x64
+            artifact: windows-installer
+            glob: desktop/dist-electron/*.exe
+          - os: macos-latest
+            ebArgs: --mac --arm64
+            artifact: macos-dmg
+            glob: desktop/dist-electron/*.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Install desktop dependencies
+        run: npm --prefix desktop install
+
+      - name: Build client + desktop bundles
+        shell: bash
+        run: |
+          npm run build -w client
+          npm --prefix desktop run build:all
+          # Stage client/dist into desktop/ so electron-builder's extraResources
+          # source stays inside desktop/ (no `../`). Belt-and-suspenders with the
+          # root-hiding below; also makes local `desktop:dist:win` work on Windows.
+          npm --prefix desktop run stage:client
+
+      - name: Package installer
+        shell: bash
+        env:
+          # No signing certs in CI — build unsigned rather than failing on a
+          # missing identity. (The app already ships unsigned; see README.)
+          CSC_IDENTITY_AUTODISCOVERY: 'false'
+        run: |
+          set -e
+          # Run electron-builder with desktop/ as its own project root. Invoked
+          # from the monorepo root (e.g. via `npm --prefix desktop run`), it walks
+          # up, treats the repo root as the project, and on Windows pulls parent
+          # files (.dockerignore, .env.example, …) into the asar — failing with
+          # "<file> must be under …/desktop/". Running from desktop/ and hiding the
+          # root package.json (whose `workspaces` field triggers the upward scan)
+          # makes desktop/ the detected project root.
+          mv package.json "$RUNNER_TEMP/root-package.json"
+          cd desktop
+          npx --no-install electron-builder ${{ matrix.ebArgs }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.glob }}

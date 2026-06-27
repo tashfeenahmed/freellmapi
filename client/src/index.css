@@ -136,6 +136,17 @@
         @apply bg-background text-foreground;
         font-feature-settings: 'ss01', 'cv11', 'tnum';
     }
+    /* Desktop shell (html.desktop set by the app's preload): let the
+       window's vibrancy show through a translucent backdrop so the
+       dashboard reads as real glass, like the tray popover. Cards and
+       popovers stay opaque on top. No effect in the browser, where
+       .desktop is never set. */
+    html.desktop body {
+        background-color: transparent;
+    }
+    html.desktop .desktop-backdrop {
+        background-color: color-mix(in oklab, var(--background) 55%, transparent);
+    }
     code, pre, kbd, samp {
         font-family: var(--font-mono);
         font-feature-settings: 'ss02', 'ss03';

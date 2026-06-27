@@ -1,23 +1,39 @@
 import './env.js';
 import { createApp } from './app.js';
-import { initDb } from './db/index.js';
+import { initDb, getSetting } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
-
-const PORT = process.env.PORT ?? 3001;
-// Dual-stack ('::') by default so the dashboard is reachable over both IPv4
-// and IPv6 (e.g. IPv6-enabled Docker networks — #180). Hosts with IPv6
-// disabled fall back to IPv4-only below; HOST overrides the default outright.
-const HOST = process.env.HOST ?? '::';
+import { applyProxyUrl, applyProxyEnabled, applyProxyBypass } from './lib/proxy.js';
+import { startCatalogSync } from './services/catalog-sync.js';
+import { installProcessSafetyNet } from './lib/process-safety-net.js';
+import { NodeScheduler } from './lib/scheduler.js';
+import { loadConfig } from './lib/config.js';
 
 async function main() {
+  const config = loadConfig();
+  const { port: PORT, host: HOST } = config;
+
+  // Install first so a late provider socket reset (undici HTTP/2 error with no
+  // listener) can't take the proxy down. Genuine bugs still exit 1.
+  installProcessSafetyNet();
+
+  const scheduler = new NodeScheduler();
+
   initDb();
-  const app = createApp();
+
+  // Load the persisted proxy settings from the DB (env var wins if set).
+  // Must happen after initDb so the settings table is ready.
+  applyProxyUrl(getSetting('proxy_url') ?? '');
+  applyProxyEnabled(getSetting('proxy_enabled') !== '0'); // default: enabled
+  applyProxyBypass(getSetting('proxy_bypass') ?? '');
+
+  const app = createApp(config);
 
   const onReady = (host: string) => () => {
     const display = host.includes(':') ? `[${host}]` : host;
     console.log(`Server running on http://${display}:${PORT}`);
     console.log(`Proxy endpoint: http://${display}:${PORT}/v1/chat/completions`);
-    startHealthChecker();
+    startHealthChecker(scheduler);
+    startCatalogSync(scheduler);
   };
 
   const server = app.listen(Number(PORT), HOST, onReady(HOST));

@@ -10,10 +10,12 @@ export const keysRouter = Router();
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
 // was dropped in V4 and re-added in V13 via the router.huggingface.co route.
+// SambaNova was dropped in V23 (free tier permanently retired).
 const PLATFORMS = [
-  'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral',
+  'google', 'groq', 'cerebras', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
-  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'custom',
+  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
+  'routeway', 'bazaarlink', 'ainative', 'custom',
 ] as const;
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added
@@ -117,17 +119,31 @@ keysRouter.post('/', (req: Request, res: Response) => {
   });
 });
 
-// ── Custom OpenAI-compatible provider (#117) ──────────────────────────────
-// A single user-configured endpoint (llama.cpp / LM Studio / vLLM / Ollama /
-// any OpenAI-compatible base_url). The endpoint lives on one 'custom' api_keys
-// row; each call registers another model that routes through it.
+// ── Custom OpenAI-compatible providers (#117, #212) ───────────────────────
+// User-configured endpoints (llama.cpp / LM Studio / vLLM / Ollama / any
+// OpenAI-compatible base_url). Each DISTINCT base_url gets its own 'custom'
+// api_keys row, and every registered model binds to its endpoint's key via
+// models.key_id — so several custom providers coexist without overwriting
+// each other (#212). Re-submitting an existing base_url updates its key/label;
+// re-registering an existing model id re-binds it to the submitted endpoint.
+// A model can be given as a bare id ("qwen3:4b") or as {model, displayName}.
+// `model`/`displayName` (singular) stay supported for older clients; `models`
+// (plural) lets one submit bind several model ids to the same endpoint. (#281)
+const modelEntrySchema = z.union([
+  z.string().min(1),
+  z.object({ model: z.string().min(1), displayName: z.string().optional() }),
+]);
 const customProviderSchema = z.object({
   baseUrl: z.string().url('baseUrl must be a valid URL'),
-  model: z.string().min(1, 'model is required'),
+  model: z.string().optional(),
+  models: z.array(modelEntrySchema).optional(),
   displayName: z.string().optional(),
   apiKey: z.string().optional(),
   label: z.string().optional(),
-});
+}).refine(
+  d => (d.model && d.model.trim().length > 0) || (d.models && d.models.length > 0),
+  { message: 'model or models is required' },
+);
 
 keysRouter.post('/custom', (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
@@ -137,63 +153,113 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   }
 
   const baseUrl = parsed.data.baseUrl.trim().replace(/\/+$/, '');
-  const modelId = parsed.data.model.trim();
-  const displayName = (parsed.data.displayName ?? modelId).trim();
   // Local servers often need no key; keep a sentinel so there's always a bearer.
-  const rawKey = parsed.data.apiKey?.trim() || 'no-key';
-  const label = parsed.data.label ?? 'Custom';
+  const providedKey = parsed.data.apiKey?.trim() || undefined;
+  const label = parsed.data.label?.trim() || undefined;
+
+  // Flatten singular + plural inputs into one list, dedupe by model id, drop
+  // blanks. The singular `displayName` only applies to a lone `model` (it can't
+  // sensibly fan out across many ids).
+  const entries: { modelId: string; displayName: string }[] = [];
+  const seen = new Set<string>();
+  const addEntry = (rawId: string, rawDisplay?: string) => {
+    const modelId = rawId.trim();
+    if (!modelId || seen.has(modelId)) return;
+    seen.add(modelId);
+    entries.push({ modelId, displayName: (rawDisplay?.trim() || modelId) });
+  };
+  if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
+  for (const m of parsed.data.models ?? []) {
+    if (typeof m === 'string') addEntry(m);
+    else addEntry(m.model, m.displayName);
+  }
+
+  if (entries.length === 0) {
+    res.status(400).json({ error: { message: 'model or models is required' } });
+    return;
+  }
 
   const db = getDb();
   const upsert = db.transaction(() => {
-    // One shared 'custom' key holds the endpoint URL. Reuse it across models;
-    // update its base_url/key when re-submitted.
-    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' LIMIT 1").get() as { id: number } | undefined;
+    // One 'custom' key row PER ENDPOINT (matched on base_url). Re-submitting
+    // the same endpoint updates its key/label; a new base_url gets its own
+// row instead of clobbering the previous provider. (#212) Re-submitting with a
+// blank key preserves the stored key; only a provided key updates credentials.
+    const existing = db.prepare("SELECT id, encrypted_key, iv, auth_tag FROM api_keys WHERE platform = 'custom' AND base_url = ? LIMIT 1")
+      .get(baseUrl) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
     let keyId: number;
+    let storedKeyForMask = providedKey ?? 'no-key';
     if (existing) {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      db.prepare("UPDATE api_keys SET base_url = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-        .run(baseUrl, encrypted, iv, authTag, existing.id);
       keyId = existing.id;
+      if (providedKey) {
+        const { encrypted, iv, authTag } = encrypt(providedKey);
+        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
+          .run(label ?? null, encrypted, iv, authTag, existing.id);
+        storedKeyForMask = providedKey;
+      } else {
+        try {
+          storedKeyForMask = decrypt(existing.encrypted_key, existing.iv, existing.auth_tag);
+        } catch {
+          storedKeyForMask = 'no-key';
+        }
+        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), status = 'unknown', enabled = 1 WHERE id = ?")
+          .run(label ?? null, existing.id);
+      }
     } else {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
+      const keyToStore = providedKey ?? 'no-key';
+      const { encrypted, iv, authTag } = encrypt(keyToStore);
       const r = db.prepare(`
         INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
         VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label, encrypted, iv, authTag, baseUrl);
+      `).run(label ?? 'Custom', encrypted, iv, authTag, baseUrl);
       keyId = Number(r.lastInsertRowid);
+      storedKeyForMask = keyToStore;
     }
 
-    // Register the model (idempotent on platform+model_id). Custom models carry
-    // no rate limits and sort last in the intelligence preset (size_label tier).
-    db.prepare(`
-      INSERT OR IGNORE INTO models
-        (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled)
-      VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1)
-    `).run(modelId, displayName);
+    const registered: { modelDbId: number; model: string; displayName: string }[] = [];
+    for (const { modelId, displayName } of entries) {
+      // Register each model bound to THIS endpoint's key. Custom models carry no
+      // rate limits and sort last in the intelligence preset (size_label tier).
+      // Re-registering an existing model id re-binds it (model ids are unique
+      // per platform, so one id can't live on two endpoints at once).
+      db.prepare(`
+        INSERT INTO models
+          (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
+        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
+        ON CONFLICT(platform, model_id)
+        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
+      `).run(modelId, displayName, keyId);
 
-    const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
+      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
 
-    // Append to the fallback chain if not already present.
-    const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
-    if (!inChain) {
-      const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
-      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
+      // Append to the fallback chain if not already present.
+      const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
+      if (!inChain) {
+        const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
+        db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
+      }
+
+      registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
     }
 
-    return { keyId, modelDbId: modelRow.id };
+    return { keyId, registered, storedKeyForMask };
   });
 
-  const { keyId, modelDbId } = upsert();
+  const { keyId, registered, storedKeyForMask } = upsert();
+  // `model`/`displayName`/`modelDbId` echo the first model for older clients;
+  // `models` carries the full set registered in this call.
+  const first = registered[0]!;
   res.status(201).json({
     success: true,
     keyId,
-    modelDbId,
+    modelDbId: first.modelDbId,
     platform: 'custom',
     baseUrl,
-    model: modelId,
-    displayName,
-    maskedKey: maskKey(rawKey),
+    model: first.model,
+    displayName: first.displayName,
+    models: registered,
+    maskedKey: maskKey(storedKeyForMask),
   });
 });
 
@@ -215,15 +281,31 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   const remove = db.transaction(() => {
     db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
     // Custom models exist only because POST /custom registered them alongside
-    // this endpoint key (#117) — they can't route without it. Built-in
-    // platforms keep their seeded catalog rows, but once the last custom key
-    // is gone, orphaned custom models would linger in the fallback chain
-    // forever (#189), so cascade them away.
+    // their endpoint key (#117) — they can't route without it. Cascade away
+    // the models bound to THIS endpoint (#212); other custom providers keep
+    // theirs. Legacy rows (key_id NULL) are swept once no custom keys remain,
+    // so they never linger in the fallback chain forever (#189).
     if (row.platform === 'custom') {
+      const defaultEmbedding = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get() as { value: string } | undefined;
+      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
+      db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
+      db.prepare("DELETE FROM embedding_models WHERE platform = 'custom' AND key_id = ?").run(id);
+      db.prepare("DELETE FROM media_models WHERE platform = 'custom' AND key_id = ?").run(id);
       const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
       if (remaining.n === 0) {
         db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
         db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+        db.prepare("DELETE FROM embedding_models WHERE platform = 'custom'").run();
+        db.prepare("DELETE FROM media_models WHERE platform = 'custom'").run();
+      }
+      if (defaultEmbedding) {
+        const stillExists = db.prepare('SELECT 1 FROM embedding_models WHERE family = ? LIMIT 1').get(defaultEmbedding.value);
+        if (!stillExists) {
+          const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
+          if (replacement) {
+            db.prepare("UPDATE settings SET value = ? WHERE key = 'embeddings_default_family'").run(replacement.family);
+          }
+        }
       }
     }
   });

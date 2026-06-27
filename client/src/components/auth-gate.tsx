@@ -4,6 +4,7 @@ import { apiFetch, setToken, UNAUTHORIZED_EVENT } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useI18n } from '@/i18n'
 
 interface AuthStatus {
   needsSetup: boolean
@@ -20,6 +21,7 @@ function Centered({ children }: { children: ReactNode }) {
 }
 
 function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () => void }) {
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -52,38 +54,38 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
         <span className="font-semibold tracking-tight text-sm">FreeLLMAPI</span>
       </div>
       <div className="rounded-3xl border bg-card p-6">
-        <h1 className="text-base font-medium">{isSetup ? 'Create your account' : 'Sign in'}</h1>
+        <h1 className="text-base font-medium">{isSetup ? t('auth.createYourAccount') : t('auth.signIn')}</h1>
         <p className="text-xs text-muted-foreground mt-1 mb-4">
           {isSetup
-            ? 'Set the email and password that will protect this dashboard.'
-            : 'Sign in to manage your keys, routing, and analytics.'}
+            ? t('auth.setupDescription')
+            : t('auth.loginDescription')}
         </p>
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="auth-email">Email</Label>
+            <Label className="text-xs" htmlFor="auth-email">{t('auth.email')}</Label>
             <Input
               id="auth-email"
               type="email"
               autoComplete="username"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="auth-password">Password</Label>
+            <Label className="text-xs" htmlFor="auth-password">{t('auth.password')}</Label>
             <Input
               id="auth-password"
               type="password"
               autoComplete={isSetup ? 'new-password' : 'current-password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={isSetup ? 'at least 8 characters' : 'your password'}
+              placeholder={isSetup ? t('auth.passwordPlaceholderSetup') : t('auth.passwordPlaceholderLogin')}
             />
           </div>
           {error && <p className="text-destructive text-xs">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy || !email || !password}>
-            {busy ? (isSetup ? 'Creating…' : 'Signing in…') : isSetup ? 'Create account' : 'Sign in'}
+            {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}
           </Button>
         </form>
       </div>
@@ -92,6 +94,7 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const { data, isLoading, isError, refetch } = useQuery<AuthStatus>({
     queryKey: ['auth-status'],
@@ -111,12 +114,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     refetch()
   }
 
-  if (isLoading) return <Centered><p className="text-sm text-muted-foreground text-center">Loading…</p></Centered>
+  if (isLoading) return <Centered><p className="text-sm text-muted-foreground text-center">{t('auth.loading')}</p></Centered>
   if (isError || !data) {
     return (
       <Centered>
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-          Can't reach the server. Make sure the backend is running (<code className="font-mono">npm run dev</code>).
+          {t('auth.serverUnreachableBefore')}<code className="font-mono">npm run dev</code>{t('auth.serverUnreachableAfter')}
         </div>
       </Centered>
     )

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   routeRequest, refreshStatsCache, getRoutingStrategy, setRoutingStrategy, getRoutingScores,
+  getCustomWeights, setCustomWeights,
 } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
@@ -143,6 +144,40 @@ describe('bandit router', () => {
     refreshStatsCache(getDb(), true);
     const fastRun = pickCounts(300);
     expect((fastRun['fast'] ?? 0)).toBeGreaterThan(fastRun['smart'] ?? 0);
+  });
+
+  it('custom weights persist normalized; default to balanced until saved', () => {
+    expect(getCustomWeights()).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+    setCustomWeights({ reliability: 0.6, speed: 0.3, intelligence: 0.1 });
+    const w = getCustomWeights();
+    expect(w.reliability).toBeCloseTo(0.6, 10);
+    expect(w.speed).toBeCloseTo(0.3, 10);
+    expect(w.intelligence).toBeCloseTo(0.1, 10);
+    // Non-normalized input is normalized on save.
+    setCustomWeights({ reliability: 1, speed: 1, intelligence: 0 });
+    expect(getCustomWeights()).toEqual({ reliability: 0.5, speed: 0.5, intelligence: 0 });
+  });
+
+  it('custom weights reject all-zero and negative vectors', () => {
+    expect(() => setCustomWeights({ reliability: 0, speed: 0, intelligence: 0 })).toThrow();
+    expect(() => setCustomWeights({ reliability: -1, speed: 1, intelligence: 1 })).toThrow();
+  });
+
+  it('custom strategy routes with the saved weights (extreme speed wins)', () => {
+    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 9, sizeLabel: 'Small', budget: '~50M', priority: 2 });
+    addHistory('google', 'smart', { successes: 40, failures: 1, outTokens: 100, latencyMs: 3000, ttfbMs: 2500 });
+    addHistory('groq', 'fast', { successes: 40, failures: 1, outTokens: 1000, latencyMs: 1000, ttfbMs: 150 });
+
+    setRoutingStrategy('custom');
+    setCustomWeights({ reliability: 0.1, speed: 0.9, intelligence: 0 });
+    refreshStatsCache(getDb(), true);
+    const counts = pickCounts(300);
+    expect((counts['fast'] ?? 0)).toBeGreaterThan(counts['smart'] ?? 0);
+
+    const { strategy, weights } = getRoutingScores();
+    expect(strategy).toBe('custom');
+    expect(weights).toEqual({ reliability: 0.1, speed: 0.9, intelligence: 0 });
   });
 
   it('getRoutingScores returns a per-axis breakdown ranked by score', () => {

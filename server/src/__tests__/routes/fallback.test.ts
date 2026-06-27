@@ -55,6 +55,51 @@ describe('Fallback API', () => {
     expect(first).toHaveProperty('platform');
     expect(first).toHaveProperty('displayName');
     expect(first).toHaveProperty('intelligenceRank');
+    // contextWindow powers the dashboard catalog filter (#343); present even when
+    // the catalog has no value for a model (null).
+    expect(first).toHaveProperty('contextWindow');
+  });
+
+  // Regression: GET /routing must always carry customWeights, even before the
+  // user has saved any — the dashboard's custom-weight sliders dereference it
+  // and a missing field white-screened the Fallback page.
+  it('GET /api/fallback/routing always includes customWeights', async () => {
+    const { status, body } = await request(app, 'GET', '/api/fallback/routing');
+    expect(status).toBe(200);
+    expect(body).toHaveProperty('strategy');
+    expect(body).toHaveProperty('customWeights');
+    for (const axis of ['reliability', 'speed', 'intelligence']) {
+      expect(typeof body.customWeights[axis]).toBe('number');
+    }
+  });
+
+  it('PUT /api/fallback/routing accepts the custom strategy with weights and persists them', async () => {
+    const put = await request(app, 'PUT', '/api/fallback/routing', {
+      strategy: 'custom',
+      weights: { reliability: 50, speed: 30, intelligence: 20 },
+    });
+    expect(put.status).toBe(200);
+    expect(put.body.strategy).toBe('custom');
+
+    // Weights are renormalized to sum 1 and echoed back on the next GET.
+    const { body } = await request(app, 'GET', '/api/fallback/routing');
+    expect(body.strategy).toBe('custom');
+    const w = body.customWeights;
+    expect(w.reliability + w.speed + w.intelligence).toBeCloseTo(1, 5);
+    expect(w.reliability).toBeCloseTo(0.5, 5);
+    expect(w.speed).toBeCloseTo(0.3, 5);
+
+    // Restore a neutral preset so later tests start clean.
+    await request(app, 'PUT', '/api/fallback/routing', { strategy: 'balanced' });
+  });
+
+  it('PUT /api/fallback/routing rejects all-zero custom weights', async () => {
+    const { status } = await request(app, 'PUT', '/api/fallback/routing', {
+      strategy: 'custom',
+      weights: { reliability: 0, speed: 0, intelligence: 0 },
+    });
+    expect(status).toBe(400);
+    await request(app, 'PUT', '/api/fallback/routing', { strategy: 'balanced' });
   });
 
   it('PUT /api/fallback updates order', async () => {
