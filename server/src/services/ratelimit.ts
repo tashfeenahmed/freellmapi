@@ -251,6 +251,7 @@ export function recordRequest(platform: string, modelId: string, keyId: number) 
   getWindow(rpdKey).timestamps.push(now);
 
   recordUsage(platform, modelId, keyId, 'request', 0, now);
+  clearNullLimitHits(platform, modelId, keyId);
 }
 
 export function recordTokens(
@@ -319,7 +320,7 @@ export const MODEL_FORBIDDEN_COOLDOWN_MS = DAY;
 // When RPD/TPD limits are NULL (provider's published daily quota is unknown or
 // not yet seeded — common for ollama, cloudflare, nvidia, huggingface, mistral,
 // kilo, llm7, pollinations), we cannot check a counter against a cap. Fall back
-// to a hit-count heuristic: after 3+ 429s within this rolling window, treat as
+// to a hit-count heuristic: after 2+ 429s within this rolling window, treat as
 // "effectively daily-exhausted" and enter the standard escalation ladder at
 // the same step the documented-RPD path would. Without this, these providers
 // stay stuck at TRANSIENT_COOLDOWN_MS forever even when every request is a
@@ -341,6 +342,10 @@ function recordNullLimitHit(platform: string, modelId: string, keyId: number, no
   const hits = nullLimitHits.get(key) ?? [];
   hits.push(now);
   nullLimitHits.set(key, hits);
+}
+
+function clearNullLimitHits(platform: string, modelId: string, keyId: number): void {
+  nullLimitHits.delete(`${platform}:${modelId}:${keyId}`);
 }
 
 export function recentHitCount(
@@ -380,16 +385,19 @@ export function getCooldownDurationForLimit(
     limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
   const tpdExhausted =
     limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
-  // No daily quota published → use repeated-429 heuristic: 3+ 429s in the
+  // No daily quota published → use repeated-429 heuristic: 2+ 429s in the
   // last hour is treated as effectively daily-exhausted. This unsticks
   // providers that publish no daily cap (ollama, cloudflare, etc.) from the
   // 90s-cooldown-loop without requiring operator-side limit seeding.
-  // The current hit is recorded first (always — even for transient results)
-  // so the threshold can be reached across consecutive calls.
-  recordNullLimitHit(platform, modelId, keyId, now);
   const unknownLimits = limits.rpd === null && limits.tpd === null;
-  const heuristicallyExhausted =
-    unknownLimits && recentHitCount(platform, modelId, keyId, now) >= NULL_LIMIT_HIT_THRESHOLD;
+  let heuristicallyExhausted = false;
+  if (unknownLimits) {
+    // The current hit is recorded first so the threshold can be reached across
+    // consecutive 429s, but only for providers where counters cannot decide.
+    recordNullLimitHit(platform, modelId, keyId, now);
+    heuristicallyExhausted =
+      recentHitCount(platform, modelId, keyId, now) >= NULL_LIMIT_HIT_THRESHOLD;
+  }
   const base = (rpdExhausted || tpdExhausted || heuristicallyExhausted)
     ? getNextCooldownDuration(platform, modelId, keyId)
     : TRANSIENT_COOLDOWN_MS;

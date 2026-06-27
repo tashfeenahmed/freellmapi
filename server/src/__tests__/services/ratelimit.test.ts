@@ -8,6 +8,7 @@ import {
   getRateLimitStatus,
   getNextCooldownDuration,
   getCooldownDurationForLimit,
+  recentHitCount,
   canUseProvider,
   providerDailyRequestCount,
   getProviderDailyRequestCap,
@@ -176,6 +177,22 @@ describe('Rate Limiter', () => {
       for (let i = 0; i < 5; i++) {
         expect(getCooldownDurationForLimit(platform, model, id, { rpd: 1000, tpd: null })).toBe(90 * 1000);
       }
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(0);
+    });
+
+    it('clears null-limit hit history after a successful request', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      const platform = 'ollama';
+      const model = `nolimit-success-${id}`;
+
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(90 * 1000);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(2 * 60 * 1000);
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(2);
+
+      recordRequest(platform, model, id);
+
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(0);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(90 * 1000);
     });
 
     it('escalates only once the daily request limit is actually reached', () => {
