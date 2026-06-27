@@ -91,11 +91,20 @@ async function openAiStyleEmbed(
   modelId: string,
   inputs: string[],
   extra: Record<string, unknown> = {},
+  dimensions?: number,
 ): Promise<ProviderCallResult> {
+  const body: Record<string, unknown> = { model: modelId, input: inputs, ...extra };
+  // Some providers (NVIDIA NeMo NIM, Google Gemini Embedding, OpenAI v3) support
+  // Matryoshka Representation Learning (MRL) — a smaller output_dim is valid and
+  // truncates the vector rather than failing. Others (HuggingFace feature-extraction,
+  // Cloudflare BGE) ignore unknown fields silently. We only forward the param when
+  // the caller asked for an explicit override, so providers that don't accept it
+  // see a request body identical to today.
+  if (dimensions !== undefined) body.dimensions = dimensions;
   const r = await proxyFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: modelId, input: inputs, ...extra }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!r.ok) {
@@ -112,18 +121,19 @@ async function openAiStyleEmbed(
   };
 }
 
-async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[]): Promise<ProviderCallResult> {
+async function callProvider(row: EmbeddingModelRow, key: string, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
   switch (row.platform) {
     case 'google':
-      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs, {});
+      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs, {}, dimensions);
     case 'nvidia':
       // NeMo Retriever NIMs require input_type; 'query' is the symmetric-safe
       // choice for a gateway that can't know whether this is index or query time.
-      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', key, row.model_id, inputs, { input_type: 'query' });
+      // MRL models (e.g. llama-nemotron-embed-1b-v2) accept dimensions and truncate.
+      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', key, row.model_id, inputs, { input_type: 'query' }, dimensions);
     case 'openrouter':
-      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', key, row.model_id, inputs, {});
+      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', key, row.model_id, inputs, {}, dimensions);
     case 'github':
-      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', key, row.model_id, inputs, {});
+      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', key, row.model_id, inputs, {}, dimensions);
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');
@@ -190,8 +200,15 @@ function logEmbeddingRequest(
 }
 
 /** Embed `inputs` via the family's provider chain, failing over within the
- * family on any provider error. Throws EmbeddingsError when the chain is dry. */
-export async function runEmbeddings(model: string | undefined, inputs: string[]): Promise<EmbeddingsResult> {
+ * family on any provider error. Throws EmbeddingsError when the chain is dry.
+ *
+ * `dimensions` (optional): client-supplied output-dimension override forwarded to
+ * providers that support MRL truncation (NVIDIA NeMo NIM, Google Gemini Embedding,
+ * OpenAI text-embedding-3-*). Providers that ignore the field see an identical
+ * request body. The override is independent of the model's native dimension — the
+ * family registry still pins the canonical dimension, this just lets callers ask
+ * for a smaller vector at the cost of some accuracy. */
+export async function runEmbeddings(model: string | undefined, inputs: string[], dimensions?: number): Promise<EmbeddingsResult> {
   const family = resolveFamily(model);
   if (!family) {
     throw new EmbeddingsError(
@@ -212,7 +229,7 @@ export async function runEmbeddings(model: string | undefined, inputs: string[])
     if (!key) continue; // no usable key for this provider — try the next one
     const started = Date.now();
     try {
-      const out = await callProvider(row, key, inputs);
+      const out = await callProvider(row, key, inputs, dimensions);
       if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
         throw new EmbeddingsError('upstream returned malformed embeddings', 502);
       }

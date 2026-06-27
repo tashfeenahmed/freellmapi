@@ -414,6 +414,11 @@ export function streamChunkText(chunk: any): string {
 const EmbeddingsBody = z.object({
   model: z.string().optional(),
   input: z.union([z.string(), z.array(z.string())]),
+  // Optional output-dimension override forwarded to providers that support MRL
+  // truncation (NVIDIA NeMo NIM, Google Gemini Embedding, OpenAI v3). Validation
+  // only — bounds checking happens upstream (the provider rejects out-of-range
+  // values with a clear 400).
+  dimensions: z.number().int().positive().optional(),
 });
 
 proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
@@ -430,7 +435,7 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
   }
   const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
   try {
-    const result = await runEmbeddings(parsed.data.model, inputs);
+    const result = await runEmbeddings(parsed.data.model, inputs, parsed.data.dimensions);
     res.json({
       object: 'list',
       data: result.vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
