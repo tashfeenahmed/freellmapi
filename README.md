@@ -175,6 +175,42 @@ whichever limit prunes first. Set `REQUEST_ANALYTICS_RETENTION_DAYS=0` or
 
 Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
+### Declarative startup config
+
+For repeatable Docker/server installs, FreeLLMAPI can apply a JSON config on
+every boot. Set `FREEAPI_CONFIG_PATH=/path/to/freellmapi.config.json` or put the
+same JSON in `FREEAPI_CONFIG_JSON`. The config is idempotent: existing keys,
+custom providers, model edits, fallback rows, and routing settings are updated
+instead of duplicated.
+
+```json
+{
+  "keys": [
+    { "platform": "groq", "key": "gsk_...", "label": "main" },
+    { "platform": "google", "key": "AIza...", "enabled": true }
+  ],
+  "customProviders": [
+    {
+      "baseUrl": "http://host.docker.internal:11434/v1",
+      "label": "Ollama",
+      "models": [
+        { "model": "llama3.1:8b", "displayName": "Local Llama", "supportsTools": true }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "platform": "groq",
+      "modelId": "llama-3.3-70b-versatile",
+      "displayName": "Llama 3.3 70B",
+      "supportsTools": true,
+      "fallbackEnabled": true
+    }
+  ],
+  "routing": { "strategy": "balanced" }
+}
+```
+
 > **Reaching the dev UI from another device on your LAN?** Use `npm run dev:lan` — it passes `--host` through to Vite, which then prints a `Network: http://<your-ip>:5173` URL you can open from a phone or another machine. (Plain `npm run dev -- --host` does *not* work here: the root `dev` script is a `concurrently` wrapper, so the flag never reaches Vite.) API calls go through Vite's dev proxy, so no extra server config is needed.
 
 For a production build without Docker:
@@ -203,7 +239,26 @@ docker compose logs -f freellmapi
 
 By default the container's port is bound to `127.0.0.1` (localhost only). To reach the dashboard/API from another machine on your network, publish it on all interfaces with `HOST_BIND=0.0.0.0 docker compose up -d` — only on a trusted LAN, since the proxy is single-user.
 
-SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`. Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because provider keys are encrypted at rest.
+SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`.
+Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because
+provider keys are encrypted at rest. If your host only persists a specific
+directory, set `FREEAPI_DB_PATH=/that/path/freellmapi.db`.
+
+On hosts with ephemeral disks, configure an encrypted backup target:
+
+```env
+FREEAPI_DB_BACKUP_PATH=/app/server/data/freellmapi.db.backup
+# or:
+FREEAPI_DB_BACKUP_URL=https://example.com/freellmapi.db.backup
+FREEAPI_DB_BACKUP_TOKEN=optional-bearer-token
+FREEAPI_DB_BACKUP_KEY=64-char-hex-backup-key
+FREEAPI_DB_BACKUP_INTERVAL_MS=300000
+```
+
+When the database file is missing at startup, FreeLLMAPI restores the backup
+before migrations run. While the server is running it uploads a fresh encrypted
+backup periodically. If `FREEAPI_DB_BACKUP_KEY` is omitted, the app uses
+`ENCRYPTION_KEY` for the backup envelope too.
 
 More Docker operations and examples live in [docker/README.md](./docker/README.md).
 

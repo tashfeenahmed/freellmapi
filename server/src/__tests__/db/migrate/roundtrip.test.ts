@@ -6,6 +6,7 @@ import { up as runLegacyBaseline } from '../../../db/migrations/20260101_000000_
 
 const LEGACY_BASELINE_FILENAME = '20260101_000000_legacy_baseline.ts';
 const CUSTOM_PROVIDER_MODALITIES_FILENAME = '20260627_000001_custom_provider_modalities.ts';
+const CATALOG_MODEL_STATE_FILENAME = '20260627_000002_catalog_model_state.ts';
 
 interface SchemaRow {
   type: string;
@@ -58,6 +59,7 @@ describe('migration round trip', () => {
       expect(getAppliedMigrationNames(db)).toEqual([
         LEGACY_BASELINE_FILENAME,
         CUSTOM_PROVIDER_MODALITIES_FILENAME,
+        CATALOG_MODEL_STATE_FILENAME,
       ]);
     } finally {
       db.close();

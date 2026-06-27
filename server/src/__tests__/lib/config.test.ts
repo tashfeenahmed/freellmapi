@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { loadConfig } from '../../lib/config.js';
 
-const ENV_KEYS = ['PORT', 'HOST', 'DASHBOARD_ORIGINS', 'CLIENT_DIST', 'PROXY_RATE_LIMIT_RPM', 'NODE_ENV'];
+const ENV_KEYS = ['PORT', 'HOST', 'FREEAPI_DB_PATH', 'DASHBOARD_ORIGINS', 'CLIENT_DIST', 'PROXY_RATE_LIMIT_RPM', 'NODE_ENV'];
 
 afterEach(() => {
   ENV_KEYS.forEach(k => delete process.env[k]);
@@ -12,6 +12,7 @@ describe('loadConfig', () => {
     const cfg = loadConfig();
     expect(cfg.port).toBe(3001);
     expect(cfg.host).toBe('::');
+    expect(cfg.dbPath).toBeNull();
     expect(cfg.dashboardOrigins).toEqual([]);
     expect(cfg.clientDist).toBeNull();
     expect(cfg.proxyRateLimitRpm).toBe(120);
@@ -36,6 +37,11 @@ describe('loadConfig', () => {
     process.env.CLIENT_DIST = '/opt/client/dist';
     const cfg = loadConfig();
     expect(cfg.clientDist).toBe('/opt/client/dist');
+  });
+
+  it('reads FREEAPI_DB_PATH from env', () => {
+    process.env.FREEAPI_DB_PATH = '/data/freeapi.db';
+    expect(loadConfig().dbPath).toBe('/data/freeapi.db');
   });
 
   it('parses PROXY_RATE_LIMIT_RPM as a number', () => {

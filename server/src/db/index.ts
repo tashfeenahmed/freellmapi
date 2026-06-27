@@ -18,6 +18,10 @@ export function getDb(): Database.Database {
   return db;
 }
 
+export function getDefaultDbPath(): string {
+  return process.env.FREEAPI_DB_PATH?.trim() || DB_PATH;
+}
+
 export function connectDb(
   dbPath?: string,
   opts?: {
@@ -26,7 +30,7 @@ export function connectDb(
     ensureDir?: boolean;
   },
 ): Database.Database {
-  const resolvedPath = dbPath ?? DB_PATH;
+  const resolvedPath = dbPath ?? getDefaultDbPath();
   const isMemory = resolvedPath === ':memory:';
   const ensureDir = opts?.ensureDir ?? true;
 

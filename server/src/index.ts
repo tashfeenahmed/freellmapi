@@ -1,12 +1,14 @@
 import './env.js';
 import { createApp } from './app.js';
-import { initDb, getSetting } from './db/index.js';
+import { initDb, getDb, getSetting } from './db/index.js';
 import { startHealthChecker } from './services/health.js';
 import { applyProxyUrl, applyProxyEnabled, applyProxyBypass } from './lib/proxy.js';
 import { startCatalogSync } from './services/catalog-sync.js';
 import { installProcessSafetyNet } from './lib/process-safety-net.js';
 import { NodeScheduler } from './lib/scheduler.js';
 import { loadConfig } from './lib/config.js';
+import { applyDeclarativeConfigFromEnv } from './services/declarative-config.js';
+import { restoreDbBackupIfNeeded, startDbBackupPump } from './lib/db-backup.js';
 
 async function main() {
   const config = loadConfig();
@@ -18,7 +20,13 @@ async function main() {
 
   const scheduler = new NodeScheduler();
 
-  initDb();
+  if (config.dbPath) {
+    await restoreDbBackupIfNeeded(config.dbPath);
+  } else {
+    await restoreDbBackupIfNeeded();
+  }
+  initDb(config.dbPath ?? undefined);
+  applyDeclarativeConfigFromEnv();
 
   // Load the persisted proxy settings from the DB (env var wins if set).
   // Must happen after initDb so the settings table is ready.
@@ -34,6 +42,7 @@ async function main() {
     console.log(`Proxy endpoint: http://${display}:${PORT}/v1/chat/completions`);
     startHealthChecker(scheduler);
     startCatalogSync(scheduler);
+    startDbBackupPump(getDb(), scheduler, config.dbPath ?? undefined);
   };
 
   const server = app.listen(Number(PORT), HOST, onReady(HOST));
