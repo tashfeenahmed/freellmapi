@@ -57,6 +57,34 @@ export function messageHasImage(messages: ChatMessage[]): boolean {
   return messages.some((m) => contentHasImage(m.content));
 }
 
+// Harden the OUTBOUND envelope so strict OpenAI clients don't choke on the
+// shape variations free-tier providers emit. Complements normalizeOutboundContent
+// (which fixes array content) by fixing the *frame* fields, not the content:
+//   - `model` coerced to a string (some providers send null/number).
+//   - `choices[].finish_reason` defaulted to null when absent — the field must
+//     exist per spec; Rust agents (the #200 class of compat bugs) branch on it.
+//   - a literal `tool_calls: null` on a message/delta is DELETED — OpenAI omits
+//     the field entirely when there are no calls, and `null` breaks clients that
+//     test for its presence (this is the response-side mirror of the #200 fix).
+// Content, real tool_calls arrays, reasoning_content, and every other field are
+// left untouched. Mutates and returns the same object (frames are parsed fresh
+// per SSE line, so in-place mutation is safe), matching normalizeOutboundContent.
+export function sanitizeResponse<T>(payload: T): T {
+  const p = payload as { model?: unknown; choices?: unknown };
+  if (!p || typeof p !== 'object') return payload;
+  if (p.model != null && typeof p.model !== 'string') p.model = String(p.model);
+  if (Array.isArray(p.choices)) {
+    for (const choice of p.choices) {
+      if (!choice || typeof choice !== 'object') continue;
+      const c = choice as { finish_reason?: unknown; message?: { tool_calls?: unknown }; delta?: { tool_calls?: unknown } };
+      if (c.finish_reason === undefined) c.finish_reason = null;
+      if (c.message && typeof c.message === 'object' && c.message.tool_calls === null) delete c.message.tool_calls;
+      if (c.delta && typeof c.delta === 'object' && c.delta.tool_calls === null) delete c.delta.tool_calls;
+    }
+  }
+  return payload;
+}
+
 // Normalize the OUTBOUND (provider → client) shape so we honor the OpenAI
 // contract on the response path the same way `contentToString` does on the
 // request path. Per spec, `choices[].delta.content` (streaming) and

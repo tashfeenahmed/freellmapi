@@ -7,9 +7,11 @@ import { keysRouter } from './routes/keys.js';
 import { modelsRouter } from './routes/models.js';
 import { proxyRouter } from './routes/proxy.js';
 import { responsesRouter } from './routes/responses.js';
+import { anthropicRouter } from './routes/anthropic.js';
 import { fallbackRouter } from './routes/fallback.js';
 import { profilesRouter } from './routes/profiles.js';
 import { embeddingsRouter } from './routes/embeddings.js';
+import { mediaRouter } from './routes/media.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
 import { settingsRouter } from './routes/settings.js';
@@ -18,6 +20,8 @@ import { authRouter } from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import type { Config } from './lib/config.js';
+import { loadConfig } from './lib/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,18 +31,13 @@ const DEFAULT_DASHBOARD_ORIGINS = [
   'http://[::1]:5173',
 ];
 
-function getAllowedCorsOrigins() {
-  const configuredOrigins = (process.env.DASHBOARD_ORIGINS ?? '')
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean);
-
-  return new Set([...DEFAULT_DASHBOARD_ORIGINS, ...configuredOrigins]);
-}
-
-export function createApp() {
+export function createApp(config?: Config) {
+  const cfg = config ?? loadConfig();
   const app = express();
-  const allowedCorsOrigins = getAllowedCorsOrigins();
+  const allowedCorsOrigins = new Set([
+    ...DEFAULT_DASHBOARD_ORIGINS,
+    ...cfg.dashboardOrigins,
+  ]);
 
   // CSP intentionally disabled — the SPA bundles inline styles and the OG
   // image is loaded from the same origin; enabling helmet's default CSP
@@ -68,6 +67,7 @@ export function createApp() {
   app.use('/api/profiles', requireAuth, profilesRouter);
   app.use('/api/fallback', requireAuth, fallbackRouter);
   app.use('/api/embeddings', requireAuth, embeddingsRouter);
+  app.use('/api/media', requireAuth, mediaRouter);
   app.use('/api/analytics', requireAuth, analyticsRouter);
   app.use('/api/health', requireAuth, healthRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
@@ -76,7 +76,13 @@ export function createApp() {
   // OpenAI-compatible proxy. Per-IP rate limiting (#35 item #6) runs first so
   // it throttles unauthenticated brute-force / flood attempts before any
   // routing work. Tune via PROXY_RATE_LIMIT_RPM; 0 disables it.
-  app.use('/v1', createProxyRateLimiter());
+  app.use('/v1', createProxyRateLimiter(cfg.proxyRateLimitRpm));
+  // Anthropic-compatible Messages API (`POST /v1/messages`, `/count_tokens`) for
+  // Claude Code and anything else speaking the Anthropic SDK. Mounted BEFORE the
+  // OpenAI router so it can content-negotiate `GET /v1/models` (Anthropic shape
+  // when the caller sends `anthropic-version`, else it falls through). All other
+  // paths it doesn't own fall through to the OpenAI router untouched.
+  app.use('/v1', anthropicRouter);
   app.use('/v1', proxyRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
   app.use('/v1', responsesRouter);
@@ -92,18 +98,22 @@ export function createApp() {
   // Serve client static files (after API error handler). CLIENT_DIST lets
   // embedders relocate the built dashboard (e.g. the desktop app ships it in
   // extraResources, where the __dirname-relative path can't reach).
-  const clientDist = process.env.CLIENT_DIST
-    ? path.resolve(process.env.CLIENT_DIST)
-    : path.resolve(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
-  // SPA fallback — serve index.html for non-API routes
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/v1/')) {
-      next();
-      return;
-    }
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
+  // Set serveStaticAssets: false in Config to skip static serving entirely
+  // (e.g. in runtimes that serve assets through a different mechanism).
+  if (cfg.serveStaticAssets) {
+    const clientDist = cfg.clientDist
+      ? path.resolve(cfg.clientDist)
+      : path.resolve(__dirname, '../../client/dist');
+    app.use(express.static(clientDist));
+    // SPA fallback — serve index.html for non-API routes
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/v1/')) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(clientDist, 'index.html'));
+    });
+  }
 
   return app;
 }

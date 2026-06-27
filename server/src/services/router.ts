@@ -8,15 +8,23 @@ import {
   speedScore, intelligenceScore, headroomFactor, rateLimitFactor, combineScore,
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
+import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from './model-groups.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Database } from 'better-sqlite3';
 
 class RouteError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  // Per-model disposition of the chain at the moment routing gave up: one line
+  // per considered model with the reason it could not serve (no key, cooldown,
+  // provider cap, rpm/rpd, tpm/tpd, context too small, …). Populated only on the
+  // synchronous "all exhausted" throw, where NO upstream was tried and nothing
+  // else logs WHY the pool was empty (issue _1: opaque routing_error 429).
+  diagnostics?: string[];
+  constructor(message: string, status: number, diagnostics?: string[]) {
     super(message);
     this.status = status;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -32,7 +40,7 @@ interface KeyRow {
 }
 
 // Chain row joined with the model fields the bandit needs to score it.
-interface ChainRow {
+export interface ChainRow {
   model_db_id: number;
   priority: number;
   enabled: number;
@@ -355,10 +363,17 @@ function scoreChainEntry(
 /**
  * Order the enabled fallback chain for routing.
  *  - 'priority' strategy → legacy manual order + 429 penalty (unchanged).
- *  - bandit strategy      → Thompson-sampled convex score, manual priority as
- *                           the deterministic tiebreaker for (near-)equal scores.
+ *  - bandit strategy      → convex score, manual priority as the deterministic
+ *                           tiebreaker for (near-)equal scores.
+ *
+ * `sampled` controls the bandit branch: Thompson sampling (the default) for
+ * live routing, where per-call randomness is the exploration the bandit needs;
+ * the deterministic expected score (`sampled = false`) for callers that want a
+ * STABLE ranking under the chosen strategy — the fusion panel, which should be a
+ * faithful reflection of the user's picked strategy, not a re-sampled draw each
+ * request. Priority mode is deterministic either way.
  */
-function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
+function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true): ChainRow[] {
   const weights = weightsFor(strategy);
   if (!weights) {
     // Legacy priority mode: base priority + 429 penalty, ascending.
@@ -373,7 +388,7 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
   const intelMax = composites.length ? Math.max(...composites) : 0;
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled).score }))
     // Higher score first; manual priority breaks ties so the chain still matters.
     .sort((a, b) => b.s - a.s || a.e.priority - b.e.priority)
     .map(x => x.e);
@@ -524,6 +539,296 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
   return { chain, strategyKey: `auto:${suffix}` };
 }
 
+/**
+ * Pick a usable key for ONE model and build its RouteResult, or return null if
+ * the model has no key that can serve the request right now (all cooled down,
+ * over quota, undecryptable, or no provider). This is the per-model key
+ * round-robin previously inlined in routeRequest, factored out so the fusion
+ * panel can HARD-PIN a model: rotate across that model's keys without ever
+ * falling through to a different model (issue #326 — soft preference collapses
+ * panel diversity under rate limits). Request-level filters (vision/tools/
+ * context window) stay in the caller; this only does key selection + accounting
+ * pre-checks.
+ */
+function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>, diag?: string[]): RouteResult | null {
+  const db = getDb();
+  const label = `${entry.platform}/${entry.model_id}`;
+
+  if (!hasProvider(entry.platform as Platform)) {
+    diag?.push(`${label}: no provider registered`);
+    return null;
+  }
+  const provider = getProvider(entry.platform as Platform)!;
+
+  const keys = db.prepare(
+    "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+  ).all(entry.platform) as KeyRow[];
+  if (keys.length === 0) {
+    diag?.push(`${label}: no enabled+healthy key for platform`);
+    return null;
+  }
+
+  // Tally the gate that rejected each key, so the exhaustion diagnostic can say
+  // *why* a model with keys still couldn't serve (all on cooldown vs over quota).
+  const skipTally: Record<string, number> = {};
+  const note = (reason: string) => { skipTally[reason] = (skipTally[reason] ?? 0) + 1; };
+
+  const limits = {
+    rpm: entry.rpm_limit,
+    rpd: entry.rpd_limit,
+    tpm: entry.tpm_limit,
+    tpd: entry.tpd_limit,
+  };
+
+  const rrKey = `${entry.platform}:${entry.model_id}`;
+  let idx = roundRobinIndex.get(rrKey) ?? 0;
+
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const key = keys[idx % keys.length];
+    idx++;
+
+    // A custom model belongs to exactly one endpoint (#212); legacy rows
+    // (key_id NULL) keep the old any-key match.
+    if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) { note('custom-key-mismatch'); continue; }
+
+    const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
+    if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }
+
+    if (isOnCooldown(entry.platform, entry.model_id, key.id)) { note('cooldown'); continue; }
+    if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
+    if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
+    if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
+
+    let decryptedKey: string;
+    try {
+      decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
+    } catch {
+      db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
+        .run(key.id);
+      note('decrypt-error');
+      continue;
+    }
+
+    const resolvedProvider = entry.platform === 'custom'
+      ? resolveProvider('custom', key.base_url)
+      : provider;
+    if (!resolvedProvider) { note('no-resolved-provider'); continue; }
+
+    roundRobinIndex.set(rrKey, idx);
+    return {
+      provider: resolvedProvider,
+      modelId: entry.model_id,
+      modelDbId: entry.model_db_id,
+      apiKey: decryptedKey,
+      keyId: key.id,
+      platform: entry.platform,
+      displayName: entry.display_name,
+      rpdLimit: limits.rpd,
+      tpdLimit: limits.tpd,
+    };
+  }
+
+  // No usable key for this model. Advance the round-robin index anyway so we
+  // don't get stuck re-trying the same exhausted key first next time.
+  roundRobinIndex.set(rrKey, idx);
+  const summary = Object.entries(skipTally).map(([r, n]) => `${r}:${n}`).join(', ') || 'no usable key';
+  diag?.push(`${label}: ${keys.length} key(s) — ${summary}`);
+  return null;
+}
+
+/**
+ * Fetch a single enabled model's chain row by its db id.
+ */
+function getModelChainRow(db: Database, modelDbId: number): ChainRow | undefined {
+  return db.prepare(`
+    SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM models m
+    WHERE m.id = ? AND m.enabled = 1
+  `).get(modelDbId) as ChainRow | undefined;
+}
+
+/**
+ * Route to ONE specific model, hard-pinned. Rotates across that model's keys
+ * (cooldowns, quotas, decryption all honored) but NEVER substitutes a different
+ * model — returns null if the pinned model can't serve right now. This is what
+ * makes a fusion panel genuinely diverse: a rate-limited slot is dropped, not
+ * silently collapsed onto whatever else is available. `skipKeys` lets a slot
+ * exclude keys it already failed on this request.
+ */
+export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skipKeys?: Set<string>): RouteResult | null {
+  const db = getDb();
+  const entry = getModelChainRow(db, modelDbId);
+  if (!entry) return null;
+  if (entry.context_window != null && estimatedTokens > entry.context_window) return null;
+  if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) return null;
+  return selectKeyForModel(entry, estimatedTokens, skipKeys);
+}
+
+/**
+ * Resolve a logical model group's member db ids to an ordered ChainRow[] for
+ * strict group-pin routing (the "unify" feature). Each enabled member is
+ * hydrated as a ChainRow carrying its REAL fallback_config.priority, then
+ * ordered by the active strategy via orderChain — so 'priority' honors the
+ * manual within-group order and scored strategies use live scores (priority as
+ * the tiebreaker). Members disabled in the chain (fallback_config.enabled = 0)
+ * are dropped.
+ *
+ * Pass the result to routeRequest() as `prefetchedChain` and DO NOT pass a
+ * `preferredModelDbId` that isn't already one of these rows — otherwise the
+ * preferred-model injection in routeRequest would unshift an off-group model and
+ * the pin would no longer be strict (it could answer with a different model).
+ */
+export function resolveModelGroupCandidates(memberDbIds: number[]): ChainRow[] {
+  const db = getDb();
+  const strategy = getRoutingStrategy();
+  if (strategy !== 'priority') refreshStatsCache(db);
+
+  const selectMember = db.prepare(`
+    SELECT m.id as model_db_id, COALESCE(fc.priority, 0) as priority,
+           COALESCE(fc.enabled, 1) as enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM models m
+    LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+    WHERE m.id = ? AND m.enabled = 1
+  `);
+
+  const rows: ChainRow[] = [];
+  for (const id of memberDbIds) {
+    const row = selectMember.get(id) as ChainRow | undefined;
+    if (row && row.enabled) rows.push(row);
+  }
+  return orderChain(rows, strategy);
+}
+
+// A panel candidate surfaced to the fusion layer: enough to pick a diverse set
+// and resolve each to a pinned dispatch.
+export interface FusionCandidate {
+  modelDbId: number;
+  platform: string;
+  modelId: string;
+  displayName: string;
+  sizeLabel: string;
+  supportsVision: number;
+  supportsTools: number;
+}
+
+/**
+ * The active fallback chain ordered by the current routing strategy, surfaced
+ * for fusion panel selection. Same ordering the normal auto-router would walk,
+ * so the panel's auto-pick draws from the highest-scored models first and the
+ * fusion layer just needs to apply provider-diversity on top.
+ */
+export function getOrderedFusionChain(): FusionCandidate[] {
+  const db = getDb();
+  const strategy = getRoutingStrategy();
+  if (strategy !== 'priority') refreshStatsCache(db);
+  const chain = getActiveChain(db).filter(e => e.enabled);
+
+  // Only consider models that can ACTUALLY be served RIGHT NOW — applying the
+  // same gate selectKeyForModel uses when the router walks the chain: the model
+  // must have a key that is enabled + healthy, NOT on cooldown (e.g. a
+  // HuggingFace key benched for a day after a 402 "Payment Required"), within
+  // the provider's daily request cap, and under its per-minute/day request
+  // limits. Without this, a high-strategy-ranked model whose only key is
+  // currently cooled down (huggingface/Kimi-K2.6) would claim a panel slot it
+  // can't fill — surfacing as "no available key" and pushing out a usable model,
+  // which also makes the panel look like it's ignoring the routing strategy.
+  const usableKeys = db.prepare(
+    "SELECT id, platform FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')"
+  ).all() as { id: number; platform: string }[];
+  const keysByPlatform = new Map<string, number[]>();
+  for (const k of usableKeys) {
+    const arr = keysByPlatform.get(k.platform);
+    if (arr) arr.push(k.id); else keysByPlatform.set(k.platform, [k.id]);
+  }
+  const servable = chain.filter(e => {
+    const keyIds = keysByPlatform.get(e.platform);
+    if (!keyIds) return false;
+    const limits = { rpm: e.rpm_limit, rpd: e.rpd_limit, tpm: e.tpm_limit, tpd: e.tpd_limit };
+    return keyIds.some(kid =>
+      (e.key_id == null || kid === e.key_id) &&
+      !isOnCooldown(e.platform, e.model_id, kid) &&
+      canUseProvider(e.platform, kid) &&
+      canMakeRequest(e.platform, e.model_id, kid, limits),
+    );
+  });
+
+  // Deterministic (expected-score) ordering so the panel faithfully follows the
+  // user's picked routing strategy instead of re-sampling a fresh draw each call.
+  const ordered = orderChain(servable, strategy, false);
+  return ordered.map(e => ({
+    modelDbId: e.model_db_id,
+    platform: e.platform,
+    modelId: e.model_id,
+    displayName: e.display_name,
+    sizeLabel: e.size_label,
+    supportsVision: e.supports_vision,
+    supportsTools: e.supports_tools,
+  }));
+}
+
+/**
+ * Resolve an explicit model id (as a client would type it) to a fusion
+ * candidate, or null when it isn't a known enabled model. Prefers an enabled
+ * row; dedupes a model id that exists on multiple platforms by intelligence
+ * rank, matching how /v1/models picks a representative row.
+ */
+export function resolveFusionCandidate(modelId: string): FusionCandidate | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name,
+           m.size_label, m.supports_vision, m.supports_tools
+    FROM models m
+    WHERE m.model_id = ? AND m.enabled = 1
+    ORDER BY m.intelligence_rank ASC, m.id ASC
+    LIMIT 1
+  `).get(modelId) as {
+    model_db_id: number; platform: string; model_id: string; display_name: string;
+    size_label: string; supports_vision: number; supports_tools: number;
+  } | undefined;
+  if (row) {
+    return {
+      modelDbId: row.model_db_id,
+      platform: row.platform,
+      modelId: row.model_id,
+      displayName: row.display_name,
+      sizeLabel: row.size_label,
+      supportsVision: row.supports_vision,
+      supportsTools: row.supports_tools,
+    };
+  }
+
+  // Unify ON: a fusion picker value may be a canonical GROUP id rather than a
+  // raw model_id. Resolve it to the group's best-ordered enabled member so
+  // saved fusion configs that use canonical ids keep working. Exact model_id
+  // match above always wins first, so OFF mode and legacy configs are untouched.
+  if (isUnifyEnabled()) {
+    const members = resolveRequestedIdToMembers(modelId, getModelGroups());
+    if (members && members.length > 0) {
+      const top = resolveModelGroupCandidates(members)[0];
+      if (top) {
+        return {
+          modelDbId: top.model_db_id,
+          platform: top.platform,
+          modelId: top.model_id,
+          displayName: top.display_name,
+          sizeLabel: top.size_label,
+          supportsVision: top.supports_vision,
+          supportsTools: top.supports_tools,
+        };
+      }
+    }
+  }
+  return null;
+}
+
 export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {
   const db = getDb();
 
@@ -562,23 +867,29 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     }
   }
 
+  // Per-model disposition, attached to the exhaustion error when the loop falls
+  // through with no route — the only record of WHY the pool was empty on the
+  // synchronous "all exhausted" path (nothing downstream logs it). See issue _1.
+  const diag: string[] = [];
+
   for (const entry of sortedChain) {
+    const label = `${entry.platform}/${entry.model_id}`;
     // Models the caller has ruled out for this request — e.g. a 404
     // "model removed upstream" already seen this request: trying the same
     // model again on a different key would just burn another attempt on the
     // same dead route (PR #111, credits @barbotkonv).
-    if (skipModels?.has(entry.model_db_id)) continue;
+    if (skipModels?.has(entry.model_db_id)) { diag.push(`${label}: ruled out earlier this request`); continue; }
 
     // Vision requests skip text-only models — including a sticky/preferred one,
     // which is correct: don't pin an image turn to a model that can't see it.
-    if (requireVision && !entry.supports_vision) continue;
+    if (requireVision && !entry.supports_vision) { diag.push(`${label}: no vision support`); continue; }
 
     // Tool-bearing requests skip models that can't emit structured tool_calls.
     // A model that "answers" a tool request with the call serialized as text
     // looks successful at the transport level while the client's harness sees
     // nothing — worse than a failover. Applies to sticky models too, same
     // reasoning as vision above.
-    if (requireTools && !entry.supports_tools) continue;
+    if (requireTools && !entry.supports_tools) { diag.push(`${label}: no tool-calling support`); continue; }
 
     // Context-aware routing: skip a model whose context window can't hold the
     // request, so a large prompt never selects a small-context model and burns
@@ -589,103 +900,23 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // failed model is put on cooldown — so this is a fast-path, not the only
     // guard. If every model is too small, the loop falls through and the caller
     // gets the normal "all models exhausted" error rather than a wasted sweep.
-    if (entry.context_window != null && estimatedTokens > entry.context_window) continue;
+    if (entry.context_window != null && estimatedTokens > entry.context_window) { diag.push(`${label}: context ${entry.context_window} < estimated ${estimatedTokens}`); continue; }
 
     // Same guard for a model with a small per-minute token budget: a single
     // request that alone exceeds tpm_limit can never fit one minute of quota and
     // returns a guaranteed 413 (e.g. Groq gpt-oss-120b: 131k context but 8k TPM).
     // estimatedTokens already includes reserved output, mirroring the check above.
-    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
+    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) { diag.push(`${label}: tpm_limit ${entry.tpm_limit} < estimated ${estimatedTokens}`); continue; }
 
-    // Check if we have a provider for this platform
-    if (!hasProvider(entry.platform as Platform)) continue;
-    const provider = getProvider(entry.platform as Platform)!;
-
-    // Get enabled keys that have not already failed validation or decryption.
-    const keys = db.prepare(
-      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
-    ).all(entry.platform) as KeyRow[];
-
-    if (keys.length === 0) continue;
-
-    // Get limits once for this model
-    const limits = {
-      rpm: entry.rpm_limit,
-      rpd: entry.rpd_limit,
-      tpm: entry.tpm_limit,
-      tpd: entry.tpd_limit,
-    };
-
-    // Try all keys for this model before giving up on it
-    const rrKey = `${entry.platform}:${entry.model_id}`;
-    let idx = roundRobinIndex.get(rrKey) ?? 0;
-
-    for (let attempt = 0; attempt < keys.length; attempt++) {
-      const key = keys[idx % keys.length];
-      idx++;
-
-      // A custom model belongs to exactly one endpoint: skip every custom key
-      // except the one it was registered with. Without this, multiple custom
-      // providers would round-robin each other's models onto the wrong
-      // endpoint. (#212) Legacy rows (key_id NULL) keep the old any-key match.
-      if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) continue;
-
-      const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
-      if (skipKeys?.has(skipId)) continue;
-
-      // Check cooldown (from previous 429s)
-      if (isOnCooldown(entry.platform, entry.model_id, key.id)) continue;
-
-      // Provider-wide daily request cap (#162): providers like OpenRouter cap
-      // total requests/day across ALL their models for the account, not per
-      // model — skip every model on this provider once that key hits the cap.
-      if (!canUseProvider(entry.platform, key.id)) continue;
-
-      if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) continue;
-      if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) continue;
-
-      let decryptedKey: string;
-      try {
-        decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
-      } catch {
-        db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
-          .run(key.id);
-        continue;
-      }
-
-      // For the 'custom' platform the real provider is built from this key's
-      // base_url (the registered instance is just a placeholder). A custom key
-      // with no base_url can't be routed — skip it.
-      const resolvedProvider = entry.platform === 'custom'
-        ? resolveProvider('custom', key.base_url)
-        : provider;
-      if (!resolvedProvider) continue;
-
-      // We found a working key for this model!
-      roundRobinIndex.set(rrKey, idx);
-      return {
-        provider: resolvedProvider,
-        modelId: entry.model_id,
-        modelDbId: entry.model_db_id,
-        apiKey: decryptedKey,
-        keyId: key.id,
-        platform: entry.platform,
-        displayName: entry.display_name,
-        rpdLimit: limits.rpd,
-        tpdLimit: limits.tpd,
-      };
-    }
-
-    // If we reach here, this specific model has NO available keys.
-    // Update round-robin index even if we failed so we don't get stuck.
-    roundRobinIndex.set(rrKey, idx);
-
-    // We don't explicitly penalize the model here because the fact that we
-    // couldn't find a key means we will naturally move to the next model
-    // in the sortedChain for THIS specific request.
+    // Key selection + accounting pre-checks for this one model. Returns the
+    // first usable key's RouteResult, or null when the model has no key that
+    // can serve right now — in which case we fall through to the next model in
+    // the sorted chain for THIS request (no explicit penalty needed).
+    const route = selectKeyForModel(entry, estimatedTokens, skipKeys, diag);
+    if (route) return route;
   }
 
-  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429);
+  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429, diag);
 }
 
 /**

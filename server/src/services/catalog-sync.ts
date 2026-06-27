@@ -2,7 +2,13 @@ import crypto from 'crypto';
 import type DatabaseType from 'better-sqlite3';
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
+import { MEDIA_PLATFORMS } from './media.js';
 import type { Platform } from '@freellmapi/shared/types.js';
+import type { Scheduler } from '../lib/scheduler.js';
+
+// Generative-media modalities are routed into the separate media_models table
+// (see services/media.ts), never into the chat `models` table.
+const MEDIA_MODALITIES = new Set(['image', 'audio']);
 
 /**
  * catalog-sync — keeps the local model catalog in step with the published one.
@@ -88,6 +94,11 @@ interface CatalogModel {
   enabled: boolean;
   supportsVision: boolean;
   supportsTools: boolean;
+  /** 'text' (default/absent) routes to the chat `models` table; 'image'/'audio'
+   *  route to the separate `media_models` table. */
+  modality?: string;
+  /** Short display note for media models (e.g. "Keyless - up to 1024x1024"). */
+  mediaNote?: string;
 }
 
 interface Catalog {
@@ -164,10 +175,51 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
             @enabled, @supportsVision, @supportsTools)
   `);
 
+  // Generative-media models go to their own table (never the chat router's pool).
+  const selectMedia = db.prepare('SELECT id, enabled FROM media_models WHERE platform = ? AND model_id = ?');
+  const updateMedia = db.prepare(`
+    UPDATE media_models SET
+      display_name = @displayName, modality = @modality, priority = @priority,
+      quota_label = @quotaLabel, enabled = @enabled
+    WHERE id = @id
+  `);
+  const insertMedia = db.prepare(`
+    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+    VALUES (@platform, @modelId, @displayName, @modality, @priority, @enabled, @quotaLabel)
+  `);
+
   const apply = db.transaction(() => {
     const inCatalog = new Set<string>();
+    const inMediaCatalog = new Set<string>();
 
     for (const m of catalog.models) {
+      // Media modalities are gated on MEDIA_PLATFORMS (decoupled from the chat
+      // provider registry) and routed to media_models, then skip the chat path.
+      const modality = m.modality ?? 'text';
+      if (MEDIA_MODALITIES.has(modality)) {
+        if (!MEDIA_PLATFORMS.has(m.platform)) {
+          counts.skippedUnknownPlatform++;
+          continue;
+        }
+        inMediaCatalog.add(`${m.platform}:${m.modelId}`);
+        const mrow = selectMedia.get(m.platform, m.modelId) as { id: number; enabled: number } | undefined;
+        const mfields = {
+          displayName: m.displayName,
+          modality,
+          priority: m.intelligenceRank ?? 0,
+          quotaLabel: m.mediaNote ?? '',
+        };
+        if (mrow) {
+          const enabled = m.enabled ? mrow.enabled : 0; // catalog disable wins; local disable wins
+          updateMedia.run({ ...mfields, id: mrow.id, enabled });
+          counts.updated++;
+        } else {
+          insertMedia.run({ ...mfields, platform: m.platform, modelId: m.modelId, enabled: m.enabled ? 1 : 0 });
+          counts.inserted++;
+        }
+        continue;
+      }
+
       if (m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
         // An older binary may receive models for providers it cannot route yet;
         // skip them — they will appear after the user updates the app.
@@ -225,6 +277,19 @@ export function applyCatalog(db: DatabaseType.Database, catalog: Catalog): NonNu
       if (!inCatalog.has(`${c.platform}:${c.model_id}`)) {
         deleteFb.run(c.id);
         deleteModel.run(c.id);
+        counts.removed++;
+      }
+    }
+
+    // Remove media models the catalog no longer lists (own table, no fallback_config).
+    const mediaCandidates = db
+      .prepare('SELECT id, platform, model_id FROM media_models')
+      .all() as { id: number; platform: string; model_id: string }[];
+    const deleteMedia = db.prepare('DELETE FROM media_models WHERE id = ?');
+    for (const c of mediaCandidates) {
+      if (!MEDIA_PLATFORMS.has(c.platform)) continue; // not media-managed by this binary
+      if (!inMediaCatalog.has(`${c.platform}:${c.model_id}`)) {
+        deleteMedia.run(c.id);
         counts.removed++;
       }
     }
@@ -411,11 +476,11 @@ export function reapplyCachedCatalog(): { reapplied: boolean; version?: string }
   }
 }
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
-let bootTimer: ReturnType<typeof setTimeout> | null = null;
+let cancelBootTimer: (() => void) | null = null;
+let cancelInterval: (() => void) | null = null;
 
-export function startCatalogSync(): void {
-  if (intervalId) return;
+export function startCatalogSync(scheduler: Scheduler): void {
+  if (cancelInterval) return;
   if (process.env.CATALOG_SYNC_DISABLED === '1') {
     console.log('[catalog-sync] disabled via CATALOG_SYNC_DISABLED=1');
     return;
@@ -425,18 +490,18 @@ export function startCatalogSync(): void {
     void refreshLicenseStatus();
     void syncCatalog();
   };
-  bootTimer = setTimeout(run, BOOT_DELAY_MS);
-  intervalId = setInterval(run, SYNC_INTERVAL_MS);
+  cancelBootTimer = scheduler.after(BOOT_DELAY_MS, run);
+  cancelInterval = scheduler.every(SYNC_INTERVAL_MS, run);
   console.log(`[catalog-sync] polling ${catalogBaseUrl()} every ${SYNC_INTERVAL_MS / 3600000}h`);
 }
 
 export function stopCatalogSync(): void {
-  if (bootTimer) {
-    clearTimeout(bootTimer);
-    bootTimer = null;
+  if (cancelBootTimer) {
+    cancelBootTimer();
+    cancelBootTimer = null;
   }
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (cancelInterval) {
+    cancelInterval();
+    cancelInterval = null;
   }
 }

@@ -17,10 +17,12 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { CopyButton } from '@/components/copy-button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
@@ -28,7 +30,7 @@ import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
 import { Tooltip } from '@/components/tooltip'
 
-interface FallbackEntry {
+export interface FallbackEntry {
   modelDbId: number
   priority: number
   effectivePriority: number
@@ -44,16 +46,27 @@ interface FallbackEntry {
   rpmLimit: number | null
   rpdLimit: number | null
   monthlyTokenBudget: string
+  // Parsed token count from the server (single source of truth — see
+  // server/src/lib/budget.ts). Optional only because the dev mock omits it.
+  monthlyTokenBudgetTokens?: number
+  // Max context length in tokens (catalog value), or null when unrecorded.
+  // Drives the catalog context-window filter on the Models page.
+  contextWindow?: number | null
   supportsVision: boolean
   supportsTools: boolean
   keyCount: number
+  // Logical-model grouping (sent by the server when unify is relevant). Absent
+  // for ungrouped rows; the UI falls back to a per-row "solo" group then.
+  groupKey?: string
+  canonicalId?: string
+  groupLabel?: string
 }
 
 type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom'
 
 type RoutingWeights = { reliability: number; speed: number; intelligence: number }
 
-interface RoutingScore {
+export interface RoutingScore {
   modelDbId: number
   reliability: number
   speed: number
@@ -64,7 +77,7 @@ interface RoutingScore {
   totalRequests: number
 }
 
-interface RoutingData {
+export interface RoutingData {
   strategy: RoutingStrategy
   weights: RoutingWeights | null
   customWeights: RoutingWeights
@@ -72,7 +85,7 @@ interface RoutingData {
 }
 
 // A merged row: fallback-chain metadata + live bandit scores.
-type Row = FallbackEntry & Partial<RoutingScore>
+export type Row = FallbackEntry & Partial<RoutingScore>
 
 // `tKey` is the i18n suffix under `strategies.*` (label) and `strategies.*Blurb`.
 // It differs from the routing `key` for Manual, whose strategy id is 'priority'.
@@ -193,11 +206,68 @@ function CustomWeightsPopover({ saved, onSave, saving }: {
   )
 }
 
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
+}
+
+// Compact context-window label (whole-number K/M, base 1000): 8000 → "8K",
+// 128000 → "128K", 1_000_000 → "1M". Used by the catalog context badge/filter.
+function formatContext(n: number): string {
+  if (n >= 1_000_000) return `${Math.round(n / 1_000_000)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`
+  return String(n)
+}
+
+// The largest context window across a logical model's providers.
+function groupMaxContext(members: Row[]): number {
+  return Math.max(0, ...members.map(m => m.contextWindow ?? 0))
+}
+
+// Minimum-context filter buckets for the Models page toolbar. `key` is the token
+// threshold (0 = no filter); numeric labels are not localized (they're numbers).
+const CTX_BUCKETS: { key: number; label?: string; tKey?: string }[] = [
+  { key: 0, tKey: 'ctxAny' },
+  { key: 32_000, label: '32K+' },
+  { key: 128_000, label: '128K+' },
+  { key: 1_000_000, label: '1M+' },
+]
+
+// For models with no monthly token budget, surface their rate quota instead.
+// Strips the catalog's decorative bits ("free · ", " per IP", "~", "?") so e.g.
+// "free · 40 RPM" → "40 RPM", "free · 200/hr per IP" → "200/hr", "~? (anon)" →
+// "anon". Returns null when nothing meaningful remains.
+export function cleanQuotaLabel(s: string | undefined): string | null {
+  if (!s) return null
+  let c = s
+    .replace(/free\s*·\s*/ig, '')
+    .replace(/\s*per ip\s*/ig, '')
+    .replace(/[~?]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  c = c.replace(/^\(([^()]*)\)$/, '$1').trim()
+  return c || null
+}
+
+// The quota badge for a logical model: its summed monthly token budget when it
+// has one (you can spend all providers' budgets via failover), else the best
+// rate cap (RPM/RPD, or the catalog's rate label) for rate-limited providers.
+// Shared by the Models-page group header and the per-model detail page.
+export function groupQuotaBadge(
+  members: Row[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { text: string; title: string } | null {
+  const totalBudget = members.reduce((sum, m) => sum + (m.monthlyTokenBudgetTokens ?? 0), 0)
+  const maxRpm = Math.max(0, ...members.map(m => m.rpmLimit ?? 0))
+  const maxRpd = Math.max(0, ...members.map(m => m.rpdLimit ?? 0))
+  const rateLabelText = members.map(m => cleanQuotaLabel(m.monthlyTokenBudget)).find(Boolean) ?? null
+  if (totalBudget > 0) return { text: t('models.aggregateBudget', { count: formatTokens(totalBudget) }), title: t('models.aggregateBudgetTitle') }
+  if (maxRpm > 0) return { text: t('models.rateRpm', { count: maxRpm }), title: t('models.rateTitle') }
+  if (maxRpd > 0) return { text: t('models.rateRpd', { count: maxRpd }), title: t('models.rateTitle') }
+  if (rateLabelText) return { text: rateLabelText, title: t('models.rateTitle') }
+  return null
 }
 
 interface TokenUsageData {
@@ -222,10 +292,13 @@ const platformColors: Record<string, string> = {
   pollinations: '#a855f7',
   llm7:        '#0ea5e9',
   huggingface: '#ff9d00',
+  routeway:    '#14b8a6',
+  bazaarlink:  '#e11d48',
+  ainative:    '#22c55e',
 }
 
 // A 0..1 value as a thin horizontal bar with the number beside it.
-function AxisBar({ value, color }: { value: number | undefined; color: string }) {
+export function AxisBar({ value, color }: { value: number | undefined; color: string }) {
   const v = value ?? 0
   return (
     <div className="flex items-center gap-1.5">
@@ -335,8 +408,43 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   )
 }
 
+// The shared table header for the unified model/provider table — used by the
+// Models page and the per-model detail page so their columns line up.
+export function ModelTableHead() {
+  const { t } = useI18n()
+  return (
+    <thead>
+      <tr className="text-left text-muted-foreground border-b">
+        <th className="py-2 pl-3 pr-1 w-6"></th>
+        <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
+        <th className="py-2 pr-3 font-medium">{t('models.columnModel')}</th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />{t('strategies.weightReliability')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />{t('strategies.weightSpeed')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />{t('strategies.weightIntelligence')}</span>
+        </th>
+        <th className="py-2 pr-3 font-medium">
+          <Tooltip text={t('strategies.guardrailsTooltip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.guardrails')}</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">
+          <Tooltip text={t('strategies.scoreTooltip')}>
+            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.scoreColumn')}</span>
+          </Tooltip>
+        </th>
+        <th className="py-2 pr-3 font-medium text-right">{t('models.columnOn')}</th>
+      </tr>
+    </thead>
+  )
+}
+
 // ── One row of the unified table ────────────────────────────────────────────
-function RowContent({
+export function RowContent({
   row,
   rank,
   draggable,
@@ -385,9 +493,13 @@ function RowContent({
           )}
         </div>
         <div className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
-          {t('models.tokPerMonth', { count: row.monthlyTokenBudget })}
-          {row.rpmLimit ? ` · ${t('models.rpmLimit', { count: row.rpmLimit })}` : ''}
-          {row.rpdLimit ? ` · ${t('models.rpdLimit', { count: row.rpdLimit })}` : ''}
+          {/* Token budget only when it's a real token count; rate-limited models
+              (NVIDIA's "free · 40 RPM") show their rate, not "… tok/mo". */}
+          {[
+            (row.monthlyTokenBudgetTokens ?? 0) > 0 ? t('models.tokPerMonth', { count: row.monthlyTokenBudget }) : null,
+            row.rpmLimit ? t('models.rpmLimit', { count: row.rpmLimit }) : null,
+            row.rpdLimit ? t('models.rpdLimit', { count: row.rpdLimit }) : null,
+          ].filter(Boolean).join(' · ') || cleanQuotaLabel(row.monthlyTokenBudget) || '—'}
         </div>
       </td>
       <td className="py-2 pr-3 align-middle"><AxisBar value={row.reliability} color="#22c55e" /></td>
@@ -406,38 +518,163 @@ function RowContent({
   )
 }
 
-function SortableRow({ row, rank, onToggle }: { row: Row; rank: number; onToggle: (id: number, e: boolean) => void }) {
+// ── Grouped (unified) rendering ──────────────────────────────────────────────
+// One logical model and the provider rows that serve it.
+interface ModelGroupRow {
+  key: string
+  label: string
+  members: Row[]
+}
+
+// Group merged rows by their server-assigned groupKey (or a per-row "solo" key
+// when ungrouped). Members are ordered like the flat chain — by manual priority
+// under the priority strategy, by live score otherwise — and groups inherit the
+// best member's position so the unified order matches the flat order.
+function buildGroups(rows: Row[], isManual: boolean): ModelGroupRow[] {
+  const map = new Map<string, Row[]>()
+  for (const r of rows) {
+    const key = r.groupKey ?? `solo:${r.modelDbId}`
+    const arr = map.get(key)
+    if (arr) arr.push(r)
+    else map.set(key, [r])
+  }
+  const groups = [...map.entries()].map(([key, members]) => ({
+    key,
+    label: members[0].groupLabel ?? members[0].displayName,
+    members: [...members].sort((a, b) => (isManual ? a.priority - b.priority : (b.score ?? 0) - (a.score ?? 0))),
+  }))
+  groups.sort((a, b) =>
+    isManual
+      ? Math.min(...a.members.map(m => m.priority)) - Math.min(...b.members.map(m => m.priority))
+      : Math.max(...b.members.map(m => m.score ?? 0)) - Math.max(...a.members.map(m => m.score ?? 0)),
+  )
+  return groups
+}
+
+const dragDots = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+    <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+    <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+  </svg>
+)
+
+// The collapsed header row for a logical-model group: name, provider count,
+// union vision/tools badges, the best member's axis bars + score, and a single
+// switch that enables/disables every provider in the group.
+function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
+  group: ModelGroupRow
+  rank: number
+  dragHandle?: ReactNode
+  onToggleGroup: (memberIds: number[], enabled: boolean) => void
+}) {
   const { t } = useI18n()
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.modelDbId })
+  const anyEnabled = group.members.some(m => m.enabled)
+  const solo = group.members.length === 1
+  const best = group.members.reduce((b, m) => ((m.score ?? -1) > (b.score ?? -1) ? m : b), group.members[0])
+  const guard = (best.headroom ?? 1) * (best.rateLimit ?? 1)
+  const vision = group.members.some(m => m.supportsVision)
+  const tools = group.members.some(m => m.supportsTools)
+  const quota = groupQuotaBadge(group.members, t)
+  const maxCtx = groupMaxContext(group.members)
+  // The model name links to its own page, which lists every provider that serves
+  // it (replaces the old inline expansion).
+  const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
+  // The unified model string to paste into .env / API payloads (#343 quick-copy).
+  const copyId = group.members[0].canonicalId ?? group.members[0].modelId
+  return (
+    <>
+      <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
+      <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
+      <td className="py-2 pr-3 align-middle">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left min-w-0">
+            <span className="font-medium text-sm">{group.label}</span>
+            {solo
+              ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
+              : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
+                  <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>
+                </Tooltip>}
+            {quota && (
+              <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+                {quota.text}
+              </span>
+            )}
+            {maxCtx > 0 && (
+              <span title={t('models.ctxTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+                {t('models.ctxBadge', { size: formatContext(maxCtx) })}
+              </span>
+            )}
+            {vision && (
+              <span title={t('models.visionTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>
+            )}
+            {tools && (
+              <span title={t('models.toolsTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>
+            )}
+          </Link>
+          {/* Quick-copy the unified model id (#343). Stop propagation so it neither
+              follows the model link nor triggers the row's navigate-on-click. */}
+          <span onClick={e => e.stopPropagation()} className="shrink-0">
+            <CopyButton text={copyId} className="size-6" label={t('models.copyModelId')} />
+          </span>
+        </div>
+      </td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.reliability} color="#22c55e" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.speed} color="#3b82f6" /></td>
+      <td className="py-2 pr-3 align-middle"><AxisBar value={best.intelligence} color="#a855f7" /></td>
+      <td className="py-2 pr-3 align-middle font-mono text-[11px] text-muted-foreground tabular-nums">{guard < 0.999 ? `×${guard.toFixed(2)}` : '—'}</td>
+      <td className="py-2 pr-3 align-middle text-right font-mono text-xs font-medium tabular-nums">{best.score !== undefined ? best.score.toFixed(3) : '–'}</td>
+      <td className="py-2 pr-3 align-middle text-right" onClick={e => e.stopPropagation()}>
+        <Switch checked={anyEnabled} onCheckedChange={(c) => onToggleGroup(group.members.map(m => m.modelDbId), c)} />
+      </td>
+    </>
+  )
+}
+
+function SortableGroupRow({ group, rank, onToggleGroup }: {
+  group: ModelGroupRow
+  rank: number
+  onToggleGroup: (memberIds: number[], enabled: boolean) => void
+}) {
+  const { t } = useI18n()
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
+  const anyEnabled = group.members.some(m => m.enabled)
+  const navigate = useNavigate()
+  const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
   const handle = (
     <button
       {...attributes}
       {...listeners}
+      onClick={e => e.stopPropagation()}
       className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
-      aria-label={t('models.dragToReorder')}
+      aria-label={t('models.dragToReorderGroup')}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
-        <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-        <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
-      </svg>
+      {dragDots}
     </button>
   )
   return (
     <tr
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`border-b last:border-0 bg-card ${isDragging ? 'opacity-50' : ''} ${row.enabled ? '' : 'opacity-50'}`}
+      onClick={() => navigate(`/models/chat/${detailId}`)}
+      className={`border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
-      <RowContent row={row} rank={rank} draggable dragHandle={handle} onToggle={onToggle} />
+      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} />
     </tr>
   )
 }
 
 export default function FallbackPage() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [localEntries, setLocalEntries] = useState<FallbackEntry[] | null>(null)
+
+  // Catalog search + filter state (#343).
+  const [search, setSearch] = useState('')
+  const [filterVision, setFilterVision] = useState(false)
+  const [filterTools, setFilterTools] = useState(false)
+  const [minContext, setMinContext] = useState(0)
 
   const { data: entries = [], isLoading } = useQuery<FallbackEntry[]>({
     queryKey: ['fallback'],
@@ -482,33 +719,11 @@ export default function FallbackPage() {
   // Entry fields win on overlap: the routing snapshot also carries `enabled`
   // (and identity fields), which would otherwise clobber unsaved local toggles.
   const rows: Row[] = configured.map(e => ({ ...(scoreById.get(e.modelDbId) ?? {}), ...e }))
-  // Manual → the order you set (by priority). Bandit → ranked by live score.
-  const ordered = isManual
-    ? [...rows].sort((a, b) => a.priority - b.priority)
-    : [...rows].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = ordered.findIndex(e => e.modelDbId === active.id)
-    const newIndex = ordered.findIndex(e => e.modelDbId === over.id)
-    const reorderedVisible = arrayMove(ordered, oldIndex, newIndex)
-    const unconfigured = allEntries.filter(e => e.keyCount === 0)
-    const merged: FallbackEntry[] = [
-      ...reorderedVisible.map((e, i) => ({ ...(e as FallbackEntry), priority: i + 1 })),
-      ...unconfigured.map((e, i) => ({ ...e, priority: reorderedVisible.length + i + 1 })),
-    ]
-    setLocalEntries(merged)
-  }
-
-  function handleToggle(modelDbId: number, enabled: boolean) {
-    setLocalEntries(allEntries.map(e => (e.modelDbId === modelDbId ? { ...e, enabled } : e)))
-  }
 
   function handleSave() {
     saveMutation.mutate(allEntries.map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled: e.enabled })))
@@ -516,35 +731,66 @@ export default function FallbackPage() {
 
   const hasChanges = localEntries !== null
 
-  const tableHead = (
-    <thead>
-      <tr className="text-left text-muted-foreground border-b">
-        <th className="py-2 pl-3 pr-1 w-6"></th>
-        <th className="py-2 pr-2 w-6 text-center font-medium">#</th>
-        <th className="py-2 pr-3 font-medium">{t('models.columnModel')}</th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#22c55e' }} />{t('strategies.weightReliability')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />{t('strategies.weightSpeed')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />{t('strategies.weightIntelligence')}</span>
-        </th>
-        <th className="py-2 pr-3 font-medium">
-          <Tooltip text={t('strategies.guardrailsTooltip')}>
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.guardrails')}</span>
-          </Tooltip>
-        </th>
-        <th className="py-2 pr-3 font-medium text-right">
-          <Tooltip text={t('strategies.scoreTooltip')}>
-            <span className="underline decoration-dotted underline-offset-2 cursor-help">{t('strategies.scoreColumn')}</span>
-          </Tooltip>
-        </th>
-        <th className="py-2 pr-3 font-medium text-right">{t('models.columnOn')}</th>
-      </tr>
-    </thead>
-  )
+  // ── Model unification: a model served by several providers is always shown as
+  // one logical row that links to its own page (the on/off toggle was removed). ─
+  const orderedGroups = buildGroups(rows, isManual)
+
+  // Catalog search + filters (#343). Filtering operates on whole logical-model
+  // groups; rank stays the model's position in the full chain so the numbers
+  // don't renumber as you filter. Drag-to-reorder is only offered over the full,
+  // unfiltered manual chain (reordering a filtered subset would be ambiguous).
+  const rankByKey = new Map(orderedGroups.map((g, i) => [g.key, i + 1]))
+  const query = search.trim().toLowerCase()
+  const filtersActive = query !== '' || filterVision || filterTools || minContext > 0
+  const visibleGroups = orderedGroups.filter(g => {
+    if (filterVision && !g.members.some(m => m.supportsVision)) return false
+    if (filterTools && !g.members.some(m => m.supportsTools)) return false
+    if (minContext > 0 && groupMaxContext(g.members) < minContext) return false
+    if (query) {
+      const hay = [
+        g.label,
+        g.members[0].canonicalId ?? '',
+        ...g.members.map(m => m.platform),
+        ...g.members.map(m => m.displayName),
+        ...g.members.map(m => m.modelId),
+      ].join(' ').toLowerCase()
+      if (!hay.includes(query)) return false
+    }
+    return true
+  })
+  const draggable = isManual && !filtersActive
+  function clearFilters() {
+    setSearch('')
+    setFilterVision(false)
+    setFilterTools(false)
+    setMinContext(0)
+  }
+
+  function handleGroupToggle(memberIds: number[], enabled: boolean) {
+    const ids = new Set(memberIds)
+    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+  }
+
+  // Serialize the displayed group order (group-major, member-minor) to the flat
+  // priority list PUT /api/fallback expects; keyless rows keep their tail spot.
+  function persistGroupOrder(groups: ModelGroupRow[]) {
+    const order: number[] = []
+    for (const g of groups) for (const m of g.members) order.push(m.modelDbId)
+    const unconfigured = allEntries.filter(e => e.keyCount === 0).map(e => e.modelDbId)
+    const prio = new Map([...order, ...unconfigured].map((id, i) => [id, i + 1]))
+    setLocalEntries(allEntries.map(e => ({ ...e, priority: prio.get(e.modelDbId) ?? e.priority })))
+  }
+
+  // Reorder models (the failover priority order). Providers within a model are
+  // ordered by the active strategy and managed on the model's own page.
+  function handleGroupedDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldI = orderedGroups.findIndex(g => `grp:${g.key}` === String(active.id))
+    const newI = orderedGroups.findIndex(g => `grp:${g.key}` === String(over.id))
+    if (oldI < 0 || newI < 0) return
+    persistGroupOrder(arrayMove(orderedGroups, oldI, newI))
+  }
 
   return (
     <div>
@@ -607,7 +853,7 @@ export default function FallbackPage() {
         {/* Unified routing / fallback table */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-        ) : ordered.length === 0 ? (
+        ) : orderedGroups.length === 0 ? (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">
               {t('models.noModelsBefore')}<a href="/keys" className="underline text-foreground">{t('models.keysPageLink')}</a>{t('models.noModelsAfter')}
@@ -615,17 +861,78 @@ export default function FallbackPage() {
           </div>
         ) : (
           <>
+            {/* Catalog toolbar: search + capability/context filters (#343) */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder={t('models.searchPlaceholder')}
+                  aria-label={t('models.searchPlaceholder')}
+                  className="w-full rounded-xl border bg-card py-1.5 pl-9 pr-8 text-sm outline-none transition-colors focus:border-foreground/30"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    aria-label={t('models.clearSearch')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setFilterVision(v => !v)}
+                  aria-pressed={filterVision}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${filterVision ? 'bg-foreground text-background border-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  {t('models.vision')}
+                </button>
+                <button
+                  onClick={() => setFilterTools(v => !v)}
+                  aria-pressed={filterTools}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${filterTools ? 'bg-foreground text-background border-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  {t('models.tools')}
+                </button>
+                <div className="inline-flex items-center gap-1 rounded-xl border p-1" role="group" aria-label={t('models.ctxTitle')}>
+                  {CTX_BUCKETS.map(b => (
+                    <button
+                      key={b.key}
+                      onClick={() => setMinContext(b.key)}
+                      className={`px-2.5 py-1 text-xs rounded-lg transition-colors tabular-nums ${minContext === b.key ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                    >
+                      {b.tKey ? t(`models.${b.tKey}`) : b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {filtersActive && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t('models.showingCount', { shown: visibleGroups.length, total: orderedGroups.length })}</span>
+                <button onClick={clearFilters} className="underline hover:text-foreground">{t('models.clearFilters')}</button>
+              </div>
+            )}
+
             {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
                 live-region <div>s, which are invalid as direct <table> children. */}
-            {isManual ? (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            {visibleGroups.length === 0 ? (
+              <div className="rounded-3xl border border-dashed p-8 text-center">
+                <p className="text-sm text-muted-foreground">{t('models.noMatches')}</p>
+              </div>
+            ) : draggable ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
-                    {tableHead}
-                    <SortableContext items={ordered.map(e => e.modelDbId)} strategy={verticalListSortingStrategy}>
+                    <ModelTableHead />
+                    <SortableContext items={visibleGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
                       <tbody>
-                        {ordered.map((row, i) => (
-                          <SortableRow key={row.modelDbId} row={row} rank={i + 1} onToggle={handleToggle} />
+                        {visibleGroups.map(g => (
+                          <SortableGroupRow key={g.key} group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -635,11 +942,15 @@ export default function FallbackPage() {
             ) : (
               <div className="rounded-2xl border overflow-x-auto">
                 <table className="w-full text-sm">
-                  {tableHead}
+                  <ModelTableHead />
                   <tbody>
-                    {ordered.map((row, i) => (
-                      <tr key={row.modelDbId} className={`border-b last:border-0 ${row.enabled ? '' : 'opacity-50'}`}>
-                        <RowContent row={row} rank={i + 1} draggable={false} onToggle={handleToggle} />
+                    {visibleGroups.map(g => (
+                      <tr
+                        key={g.key}
+                        onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
+                        className={`border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
+                      >
+                        <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} />
                       </tr>
                     ))}
                   </tbody>

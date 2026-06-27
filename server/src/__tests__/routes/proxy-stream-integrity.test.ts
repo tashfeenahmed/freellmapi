@@ -111,7 +111,8 @@ describe('proxy stream turn-integrity', () => {
     const fs = frames(r.text);
     expect(fs.some(f => f.choices?.[0]?.delta?.content?.includes('All good'))).toBe(true);
     expect(fs.some(f => f.error)).toBe(false);
-    // The dead turn is recorded as an error, not a success.
+    expect(r.headers.get('x-request-id')).toMatch(/\S+/);
+
     const rows = getDb().prepare("SELECT status, error FROM requests ORDER BY id").all() as any[];
     expect(rows[0].status).toBe('error');
     expect(rows[0].error).toMatch(/in-band provider error/);

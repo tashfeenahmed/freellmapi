@@ -3,6 +3,7 @@ import http from 'node:http';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { decrypt } from '../../lib/crypto.js';
 import { routeRequest } from '../../services/router.js';
 import { resolveProvider, getProvider } from '../../providers/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
@@ -116,6 +117,33 @@ describe('Custom Provider Endpoints', () => {
     const { body } = await get(app, '/api/keys');
     const custom = body.find((k: any) => k.platform === 'custom');
     expect(custom.baseUrl).toBe('http://127.0.0.1:11434/v1');
+  });
+
+  it('does not overwrite an existing endpoint key when a later submit omits apiKey', async () => {
+    const first = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:7777/v1',
+      model: 'secret-model-a',
+      apiKey: 'keep-this-key',
+    });
+    expect(first.status).toBe(201);
+
+    const second = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:7777/v1',
+      model: 'secret-model-b',
+    });
+    expect(second.status).toBe(201);
+
+    const key = getDb().prepare(`
+      SELECT id, encrypted_key, iv, auth_tag
+        FROM api_keys
+       WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:7777/v1'
+    `).get() as { id: number; encrypted_key: string; iv: string; auth_tag: string };
+    expect(decrypt(key.encrypted_key, key.iv, key.auth_tag)).toBe('keep-this-key');
+
+    const db = getDb();
+    db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(key.id);
+    db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(key.id);
+    db.prepare('DELETE FROM api_keys WHERE id = ?').run(key.id);
   });
 
   it('routes a request to the custom model through its base URL', () => {
