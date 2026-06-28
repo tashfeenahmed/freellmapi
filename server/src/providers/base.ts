@@ -89,7 +89,9 @@ export abstract class BaseProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await proxyFetch(url, { ...init, signal: controller.signal }, this.platform);
+      // requestType='chat' + timeoutMs makes the AbortError message read
+      // `<platform>, chat, 15s` for triage from the requests.error column.
+      return await proxyFetch(url, { ...init, signal: controller.signal }, this.platform, 'chat', timeoutMs);
     } finally {
       clearTimeout(timeout);
     }

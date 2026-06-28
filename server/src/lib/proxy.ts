@@ -137,7 +137,90 @@ async function resolveDispatcher(): Promise<{ dispatcher: unknown; isSocks: bool
 
 // ── SOCKS-compatible fetch via http/https modules ──
 
-function socksFetch(urlStr: string, init?: RequestInit, agent?: http.Agent): Promise<Response> {
+/**
+ * Request kinds recognised in AbortError messages. Mirrors the values
+ * written to `requests.request_type` so the abort message and the row
+ * column agree on terminology.
+ */
+export type ProxyRequestType = 'chat' | 'embedding' | 'image' | 'audio' | 'unknown';
+
+/**
+ * Build an AbortError DOMException whose `message` carries a compact triage
+ * tag in the form `<platform>, <type>, <timeout>s`. No upstream URL, no
+ * credentials — the platform column in `requests` already identifies the
+ * upstream and the type column identifies the request kind, so the abort
+ * message just needs to round-trip what's already on the row.
+ *
+ * `isRetryableError()` still triggers on the literal substring "aborted".
+ *
+ * `elapsedMs` (when known) is appended so timeout vs. client-cancel is
+ * distinguishable in logs.
+ */
+function abortError(
+  platform: string | undefined,
+  type: ProxyRequestType,
+  timeoutMs: number | undefined,
+  elapsedMs?: number,
+): DOMException {
+  const tag = describeAbort(platform, type, timeoutMs);
+  const timing = typeof elapsedMs === 'number' ? ` after ${elapsedMs}ms` : '';
+  return new DOMException(`The operation was aborted (${tag})${timing}`, 'AbortError');
+}
+
+/**
+ * Format the `<platform>, <type>, <timeout>s` tag. Exposed for testing and
+ * for callers that want to log the tag without re-throwing. Falls back
+ * gracefully when fields are missing: unknown platform → 'unknown',
+ * unknown type → 'unknown', no timeout → omit the trailing ', <N>s'.
+ */
+export function describeAbort(
+  platform: string | undefined,
+  type: ProxyRequestType,
+  timeoutMs: number | undefined,
+): string {
+  const p = (platform && platform.trim()) || 'unknown';
+  const t = type || 'unknown';
+  if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return `${p}, ${t}`;
+  }
+  const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+  return `${p}, ${t}, ${seconds}s`;
+}
+
+/**
+ * Rewrite an AbortError rejection so its `.message` carries the compact
+ * triage tag `<platform>, <type>, <timeout>s`. Preserves `name: 'AbortError'`
+ * so `isRetryableError()` (which matches on the substring "aborted") keeps
+ * classifying it as retryable. If the original error is not an AbortError,
+ * it's returned unchanged.
+ */
+function enrichAbort(
+  err: unknown,
+  platform: string | undefined,
+  type: ProxyRequestType,
+  timeoutMs: number | undefined,
+): Error {
+  if (!err || typeof err !== 'object') return err as Error;
+  const e = err as Error & { name?: string; cause?: unknown };
+  const isAbort = e.name === 'AbortError' || /aborted/i.test(e.message ?? '');
+  if (!isAbort) return e;
+  const enriched = new DOMException(
+    `The operation was aborted (${describeAbort(platform, type, timeoutMs)})`,
+    'AbortError',
+  );
+  // Preserve upstream error chain so debug logs still see the original cause.
+  if (e.cause !== undefined) (enriched as any).cause = e.cause;
+  return enriched;
+}
+
+function socksFetch(
+  urlStr: string,
+  init: RequestInit | undefined,
+  agent: http.Agent | undefined,
+  platform: string | undefined,
+  type: ProxyRequestType,
+  timeoutMs: number | undefined,
+): Promise<Response> {
   const url = new URL(urlStr);
   const isTls = url.protocol === 'https:';
   const transport = isTls ? https : http;
@@ -151,6 +234,7 @@ function socksFetch(urlStr: string, init?: RequestInit, agent?: http.Agent): Pro
   }
 
   const signal = init?.signal;
+  const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
     const req = transport.request({
@@ -166,7 +250,7 @@ function socksFetch(urlStr: string, init?: RequestInit, agent?: http.Agent): Pro
     }, (res) => {
       if (signal?.aborted) {
         res.destroy();
-        reject(new DOMException('The operation was aborted', 'AbortError'));
+        reject(abortError(platform, type, timeoutMs, Date.now() - startedAt));
         return;
       }
 
@@ -201,12 +285,12 @@ function socksFetch(urlStr: string, init?: RequestInit, agent?: http.Agent): Pro
     if (signal) {
       if (signal.aborted) {
         req.destroy();
-        reject(new DOMException('The operation was aborted', 'AbortError'));
+        reject(abortError(platform, type, timeoutMs, Date.now() - startedAt));
         return;
       }
       signal.addEventListener('abort', () => {
         req.destroy();
-        reject(new DOMException('The operation was aborted', 'AbortError'));
+        reject(abortError(platform, type, timeoutMs, Date.now() - startedAt));
       }, { once: true });
     }
 
@@ -219,32 +303,50 @@ function socksFetch(urlStr: string, init?: RequestInit, agent?: http.Agent): Pro
 
 /**
  * Drop-in replacement for `fetch(url, init)` that routes through the
- * configured proxy.  Pass an optional `platform` string to respect the
+ * configured proxy. Pass an optional `platform` string to respect the
  * per-platform bypass list.
  *
  * When no proxy is configured, or proxy is disabled, or the platform is
  * in the bypass list, this is a direct pass-through to `fetch()`.
+ *
+ * `requestType` and `timeoutMs` are propagated into the AbortError
+ * message so triage reads `<platform>, <type>, <timeout>s`. Both default
+ * to `undefined` / `'unknown'` when callers haven't been updated yet —
+ * the abort still fires, it just omits the unknown fields.
  */
-export async function proxyFetch(url: string, init?: RequestInit, platform?: string): Promise<Response> {
-  // Bypass check: disabled globally, or this platform is exempt.
-  if (shouldBypassProxy(platform)) {
-    return fetch(url, init);
+export async function proxyFetch(
+  url: string,
+  init?: RequestInit,
+  platform?: string,
+  requestType: ProxyRequestType = 'unknown',
+  timeoutMs?: number,
+): Promise<Response> {
+  try {
+    // Bypass check: disabled globally, or this platform is exempt.
+    if (shouldBypassProxy(platform)) {
+      return await fetch(url, init);
+    }
+
+    const resolved = await resolveDispatcher();
+
+    // No dispatcher (no proxy URL configured, or it failed to build) → direct
+    if (!resolved) {
+      return await fetch(url, init);
+    }
+
+    // SOCKS proxy → http/https fallback
+    if (resolved.isSocks) {
+      return await socksFetch(url, init, resolved.dispatcher as http.Agent, platform, requestType, timeoutMs);
+    }
+
+    // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
+    return await fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+  } catch (err) {
+    // Rewrite bare "The operation was aborted" rejections so they carry the
+    // compact triage tag. Preserves the AbortError name so
+    // `isRetryableError()` still classifies the failure as retryable.
+    throw enrichAbort(err, platform, requestType, timeoutMs);
   }
-
-  const resolved = await resolveDispatcher();
-
-  // No dispatcher (no proxy URL configured, or it failed to build) → direct
-  if (!resolved) {
-    return fetch(url, init);
-  }
-
-  // SOCKS proxy → http/https fallback
-  if (resolved.isSocks) {
-    return socksFetch(url, init, resolved.dispatcher as http.Agent);
-  }
-
-  // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
-  return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
 }
 
 /**

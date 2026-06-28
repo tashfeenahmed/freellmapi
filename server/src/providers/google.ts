@@ -229,7 +229,11 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
   }
   if (/^https?:\/\//i.test(url)) {
     try {
-      const res = await proxyFetch(url, undefined, 'google');
+      // Internal helper that turns an image URL into inline data for the
+      // Gemini request body. No formal timeout — relies on the platform's
+      // own default. Use a 30s cap to avoid hanging the whole request when
+      // an image host stalls; classify as `image` for triage.
+      const res = await proxyFetch(url, { signal: AbortSignal.timeout(30_000) }, 'google', 'image', 30_000);
       if (!res.ok) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
