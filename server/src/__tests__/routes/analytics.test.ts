@@ -26,6 +26,7 @@ function insertRequest(createdAt: string) {
     INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error, created_at)
     VALUES ('test', 'test-model', 'success', 1, 2, 3, NULL, ?)
   `).run(createdAt);
+  upsertAggregate(db, createdAt, 'success', 1, 2);
 }
 
 function insertTokensRequest(
@@ -41,6 +42,42 @@ function insertTokensRequest(
     INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error, created_at)
     VALUES (?, ?, ?, ?, ?, 3, NULL, ?)
   `).run(platform, modelId, status, inputTokens, outputTokens, createdAt);
+  upsertAggregate(db, createdAt, status, inputTokens, outputTokens);
+}
+
+// Mirror the production aggregates written by lib/request-log.logRequest so the
+// summary endpoint (which now reads from request_hourly + settings) stays
+// faithful to what real traffic produces.
+function upsertAggregate(
+  db: ReturnType<typeof getDb>,
+  createdAt: string,
+  status: 'success' | 'error',
+  inputTokens: number,
+  outputTokens: number,
+) {
+  const hour = createdAt.slice(0, 13).replace(' ', 'T') + ':00:00';
+  const isSuccess = status === 'success' ? 1 : 0;
+  const isError = status === 'error' ? 1 : 0;
+  db.prepare(`
+    INSERT INTO request_hourly (hour, total_requests, success_count, error_count, input_tokens, output_tokens)
+    VALUES (?, 1, ?, ?, ?, ?)
+    ON CONFLICT(hour) DO UPDATE SET
+      total_requests = total_requests + 1,
+      success_count  = success_count + ?,
+      error_count    = error_count + ?,
+      input_tokens   = input_tokens + ?,
+      output_tokens  = output_tokens + ?
+  `).run(hour, isSuccess, isError, inputTokens, outputTokens, isSuccess, isError, inputTokens, outputTokens);
+
+  const incr = db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + ? AS TEXT)
+  `);
+  incr.run('total_requests', '1', 1);
+  incr.run('total_input_tokens', String(inputTokens), inputTokens);
+  incr.run('total_output_tokens', String(outputTokens), outputTokens);
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('first_request_at', ?)
+    ON CONFLICT(key) DO NOTHING`).run(createdAt);
 }
 
 describe('Analytics API', () => {
@@ -55,6 +92,8 @@ describe('Analytics API', () => {
 
   beforeEach(() => {
     getDb().prepare('DELETE FROM requests').run();
+    getDb().prepare('DELETE FROM request_hourly').run();
+    getDb().prepare(`DELETE FROM settings WHERE key IN ('total_requests','total_input_tokens','total_output_tokens','first_request_at')`).run();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-29T12:00:00.000Z'));
   });
@@ -137,6 +176,7 @@ describe('Analytics API', () => {
         INSERT INTO requests (platform, model_id, requested_model, status, input_tokens, output_tokens, latency_ms, error, created_at)
         VALUES ('test', ?, ?, 'success', 1, 2, 3, NULL, ?)
       `).run(modelId, requestedModel, createdAt);
+      upsertAggregate(getDb(), createdAt, 'success', 1, 2);
     }
 
     it('summary splits pinned, honored, and auto requests', async () => {
