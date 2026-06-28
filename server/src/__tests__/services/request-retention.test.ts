@@ -95,9 +95,11 @@ describe('request analytics retention', () => {
     )`).run();
     const upsert = db.prepare(`INSERT INTO request_hourly (hour, total_requests) VALUES (?, ?)
       ON CONFLICT(hour) DO UPDATE SET total_requests = excluded.total_requests`);
-    upsert.run('2026-05-01T00:00:00', 5);   // outside 30d window from May 31
-    upsert.run('2026-05-15T00:00:00', 3);   // inside
-    upsert.run('2026-05-31T00:00:00', 7);   // boundary hour, kept
+    // Seed in the same 'YYYY-MM-DD HH:00:00' (space) format production writes,
+    // so the prune cutoff (also space) compares apples-to-apples.
+    upsert.run('2026-05-01 00:00:00', 5);   // outside 30d window from May 31
+    upsert.run('2026-05-15 00:00:00', 3);   // inside
+    upsert.run('2026-05-31 00:00:00', 7);   // boundary hour, kept
 
     // First call (cold gate): should prune the May 1 row and leave the rest.
     const first = pruneRequestAnalytics({
@@ -107,7 +109,7 @@ describe('request analytics retention', () => {
     });
     expect(first.deleted).toBe(1);
     const remaining = db.prepare(`SELECT hour, total_requests FROM request_hourly ORDER BY hour`).all() as Array<{ hour: string; total_requests: number }>;
-    expect(remaining.map(r => r.hour)).toEqual(['2026-05-15T00:00:00', '2026-05-31T00:00:00']);
+    expect(remaining.map(r => r.hour)).toEqual(['2026-05-15 00:00:00', '2026-05-31 00:00:00']);
 
     // Second call inside the 24h gate: hourly prune is skipped (raw prune may
     // still run, but with default config + 0 rows it deletes nothing). The
@@ -119,6 +121,6 @@ describe('request analytics retention', () => {
     expect(second.skipped).toBe(false);
     expect(second.deleted).toBe(0);
     const remainingAfter = db.prepare(`SELECT hour FROM request_hourly ORDER BY hour`).all() as Array<{ hour: string }>;
-    expect(remainingAfter.map(r => r.hour)).toEqual(['2026-05-15T00:00:00', '2026-05-31T00:00:00']);
+    expect(remainingAfter.map(r => r.hour)).toEqual(['2026-05-15 00:00:00', '2026-05-31 00:00:00']);
   });
 });

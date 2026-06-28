@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { getDb, initDb } from '../../db/index.js';
+import { logRequest } from '../../lib/request-log.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -55,7 +56,10 @@ function upsertAggregate(
   inputTokens: number,
   outputTokens: number,
 ) {
-  const hour = createdAt.slice(0, 13).replace(' ', 'T') + ':00:00';
+  // Mirror logRequest.hourKey() exactly: created_at truncated to the hour in
+  // SQLite's canonical 'YYYY-MM-DD HH:00:00' text (space separator). Using a 'T'
+  // here would diverge from production and mask a writer/reader format mismatch.
+  const hour = createdAt.slice(0, 13) + ':00:00';
   const isSuccess = status === 'success' ? 1 : 0;
   const isError = status === 'error' ? 1 : 0;
   db.prepare(`
@@ -127,6 +131,42 @@ describe('Analytics API', () => {
 
     expect(status).toBe(200);
     expect(body.totalRequests).toBe(2);
+  });
+
+  // Regression guard for the hour-key FORMAT written by the real production
+  // writer (lib/request-log.logRequest). The bug this prevents: the writer
+  // stores keys as SQLite's 'YYYY-MM-DD HH:00:00' (space), but the summary
+  // reader compared against a '...T...' cutoff, so every bucket on the window's
+  // boundary day was silently dropped. The other summary tests seed via the
+  // local upsertAggregate() helper; this one pins the writer's actual output so
+  // the two can't drift apart unnoticed. Real timers so SQLite's datetime('now')
+  // and getSinceTimestamp() agree on "now".
+  it('logRequest writes space-format hour keys and they round-trip through summary', async () => {
+    vi.useRealTimers();
+    logRequest('groq', 'llama-3.3-70b-versatile', 0, 'success', 100, 50, 12, null);
+    logRequest('groq', 'llama-3.3-70b-versatile', 0, 'success', 200, 70, 15, null);
+    logRequest('groq', 'llama-3.3-70b-versatile', 0, 'error', 30, 0, 9, 'boom');
+
+    // Tight, clock-independent guard: the stored key must match SQLite's
+    // created_at text shape (space separator), never a 'T'. A 'T' here is the
+    // exact desync that made the summary undercount the boundary day.
+    const hours = getDb()
+      .prepare('SELECT hour FROM request_hourly')
+      .all() as Array<{ hour: string }>;
+    expect(hours.length).toBeGreaterThanOrEqual(1); // normally 1 bucket; >1 only if the run straddled an hour tick
+    for (const { hour } of hours) {
+      expect(hour).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:00:00$/);
+      expect(hour).not.toContain('T');
+    }
+
+    const { status, body } = await request(app, '/api/analytics/summary?range=24h');
+    expect(status).toBe(200);
+    expect(body.totalRequests).toBe(3);
+    expect(body.totalInputTokens).toBe(330);
+    expect(body.totalOutputTokens).toBe(120);
+    expect(body.successRate).toBe(66.7);
+    // Lifetime counter is window-independent; sourced from settings, not buckets.
+    expect(body.lifetimeTotalRequests).toBe(3);
   });
 
   it('prices savings at the served model paid-equivalent rate', async () => {

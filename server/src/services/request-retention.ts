@@ -85,12 +85,12 @@ export function pruneRequestAnalytics(options: {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='request_hourly'")
       .get();
     if (hasHourly) {
-      // Match the aggregate bucket format used by logRequest.hourKey():
-      // 'YYYY-MM-DDTHH:00:00' (T separator). The aggregate stores hour keys
-      // with a T so they parse cleanly as ISO timestamps; converting from the
-      // SQLite-style space separator keeps the comparison apples-to-apples.
+      // Hour keys are created_at truncated to the hour, in SQLite's canonical
+      // 'YYYY-MM-DD HH:00:00' text (space separator) — same as logRequest.hourKey()
+      // and the summary/timeline readers. Floor the cutoff to the hour and
+      // compare on the space form so the prune boundary matches the read window.
       const sqliteCutoff = toSqliteTimestamp(new Date(nowMs - HOURLY_RETENTION_DAYS * DAY_MS));
-      const hourlyCutoff = sqliteCutoff.slice(0, 13).replace(' ', 'T') + ':00:00';
+      const hourlyCutoff = sqliteCutoff.slice(0, 13) + ':00:00';
       const hourlyDeleted = db.prepare('DELETE FROM request_hourly WHERE hour < ?').run(hourlyCutoff).changes;
       if (hourlyDeleted > 0) {
         deleted += hourlyDeleted;

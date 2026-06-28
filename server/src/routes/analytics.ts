@@ -30,9 +30,12 @@ function getSinceTimestamp(range: string): string {
 // accurate. Hourly resolution is fine for any UI range the dashboard exposes.
 function readAggregateSince(since: string) {
   const db = getDb();
-  // Aggregate hour keys are stored as 'YYYY-MM-DDTHH:00:00'; range cutoffs
-  // come back as 'YYYY-MM-DD HH:MM:SS'. Normalize to the aggregate shape.
-  const aggregateSince = since.slice(0, 13).replace(' ', 'T') + ':00:00';
+  // Hour keys are created_at truncated to the hour, so they share SQLite's
+  // canonical 'YYYY-MM-DD HH:00:00' text (space separator). The range cutoff is
+  // already in that format — floor it to the hour and compare the strings
+  // directly. No separator conversion: the writer (logRequest) and the timeline
+  // reader both compare on the space form, so this must too.
+  const aggregateSince = since.slice(0, 13) + ':00:00';
   const rows = db.prepare(`
     SELECT
       COALESCE(SUM(total_requests), 0) as total_requests,
