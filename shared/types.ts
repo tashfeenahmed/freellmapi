@@ -53,6 +53,13 @@ export type Platform =
   // ~10M tokens/month free allocation (no card); quota unverified. Key from
   // ainative.studio.
   | 'ainative'
+  // AI Horde — free, community-powered inference (volunteer workers) via an
+  // OpenAI-compatible proxy (https://oai.aihorde.net/v1). Queue-based, so calls
+  // can take tens of seconds; no tool support; usage is reported as kudos, not
+  // tokens. Anonymous key `0000000000` works (lowest priority); a registered
+  // aihorde.net key raises queue priority. Has a dedicated AIHordeProvider that
+  // normalizes the proxy's OpenAI divergences. See issue #345.
+  | 'aihorde'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

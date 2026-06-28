@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { AIHordeProvider } from './aihorde.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -266,6 +267,16 @@ register(new OpenAICompatProvider({
   name: 'AINative Studio',
   baseUrl: 'https://api.ainative.studio/api/v1',
 }));
+
+// AI Horde — free, community-powered inference (volunteer workers) via an
+// OpenAI-compatible proxy. Dedicated AIHordeProvider (not OpenAICompatProvider)
+// because the proxy is queue-based and diverges from the OpenAI contract:
+// max_tokens must be >=16, stop must be an array, no tool calling, usage is
+// reported as kudos (synthesized into token counts), and calls can take tens of
+// seconds (120s timeout, no upstream streaming). Registered keyless so it
+// auto-configures and works anonymously (key 0000000000, lowest queue
+// priority); a registered aihorde.net key raises priority. See issue #345.
+register(new AIHordeProvider());
 
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
