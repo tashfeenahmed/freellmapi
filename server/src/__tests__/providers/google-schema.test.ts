@@ -208,4 +208,68 @@ describe('sanitizeForGemini', () => {
       },
     });
   });
+
+  it('strips x-* vendor extension keys recursively', () => {
+    const input = {
+      type: 'object',
+      'x-root-note': 'ignored by Gemini',
+      properties: {
+        font: {
+          type: 'string',
+          enum: ['INTER', 'LEXEND'],
+          'x-google-enum-descriptions': ['Inter.', 'Lexend.'],
+        },
+        nested: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              'x-provider-hint': 'local-only',
+            },
+          },
+        },
+      },
+    };
+    expect(sanitizeForGemini(input)).toEqual({
+      type: 'object',
+      properties: {
+        font: {
+          type: 'string',
+          enum: ['INTER', 'LEXEND'],
+        },
+        nested: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('preserves real property names that start with x-', () => {
+    const input = {
+      type: 'object',
+      properties: {
+        'x-user-id': {
+          type: 'string',
+          description: 'A real tool argument name, not a schema extension',
+          'x-google-note': 'strip this schema metadata',
+        },
+      },
+      required: ['x-user-id'],
+    };
+    expect(sanitizeForGemini(input)).toEqual({
+      type: 'object',
+      properties: {
+        'x-user-id': {
+          type: 'string',
+          description: 'A real tool argument name, not a schema extension',
+        },
+      },
+      required: ['x-user-id'],
+    });
+  });
 });
