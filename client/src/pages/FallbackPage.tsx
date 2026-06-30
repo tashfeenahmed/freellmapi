@@ -373,7 +373,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         <span className="text-xs text-muted-foreground tabular-nums">
           <span className="text-foreground font-medium">{formatTokens(remaining)}</span> {t('models.remaining')}
           <span className="mx-1.5">·</span>
-          {remainingPct}% {t('models.of')} {formatTokens(totalBudget)}
+          {remainingPct} {t('models.of')} {formatTokens(totalBudget)}
           {totalUsed > 0 && (
             <>
               <span className="mx-1.5">·</span>
