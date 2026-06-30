@@ -399,6 +399,7 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, keyCounts?: Ma
  * @param preferredModelDbId - try this model first (sticky session)
  * @param requireVision - only consider models that accept image input (#118)
  * @param requireTools - only consider models that emit structured tool_calls
+ * @param strictModelId - 严格模式：如果指定了，则只尝试这个具体的模型ID，忽略服务端路由配置
  */
 export interface ResolvedChain {
   chain: ChainRow[];
@@ -484,6 +485,43 @@ function getChainByGlobalSort(db: Database, globalAxis: string): ChainRow[] {
   return orderChain(allEnabled, strat);
 }
 
+/**
+ * 根据模型名查找单个模型（严格模式）
+ * 支持两种格式：
+ *   - "platform/modelId"  — 查找特定平台的模型
+ *   - "modelId"           — 直接查找模型（如果唯一，则返回；如果多个则报错）
+ */
+function findModelByName(db: Database, modelName: string): ChainRow | null {
+  if (modelName.includes('/')) {
+    // 格式: "platform/modelId"
+    const [platform, modelId] = modelName.split('/', 2);
+    const row = db.prepare(`
+      SELECT m.id as model_db_id, 0 as priority, m.enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id
+      FROM models m
+      WHERE m.platform = ? AND m.model_id = ? AND m.enabled = 1
+      LIMIT 1
+    `).get(platform, modelId) as ChainRow | undefined;
+    return row ?? null;
+  } else {
+    // 格式: "modelId"，直接查找
+    const rows = db.prepare(`
+      SELECT m.id as model_db_id, 0 as priority, m.enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id
+      FROM models m
+      WHERE m.model_id = ? AND m.enabled = 1
+      LIMIT 1
+    `).all(modelName) as ChainRow[];
+    return rows.length > 0 ? rows[0] : null;
+  }
+}
+
 export function resolveRoutingChain(modelString: string | undefined): ResolvedChain {
   const db = getDb();
 
@@ -529,13 +567,34 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
   return { chain, strategyKey: `auto:${suffix}` };
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], strictModelId?: string): RouteResult {
   const db = getDb();
+
+  // 严格模式：指定了具体的模型ID
+  let chain: ChainRow[];
+  let strategyKey: string;
+
+  if (strictModelId) {
+    // 严格模式：只查找指定的模型
+    const model = findModelByName(db, strictModelId);
+    if (!model) {
+      const err = new Error(`Model '${strictModelId}' not found or not enabled. Use model=auto for auto-routing, or call /v1/models to see available options.`) as any;
+      err.status = 404;
+      throw err;
+    }
+    chain = [model];
+    strategyKey = strictModelId;
+  } else {
+    // 自动模式：使用配置的路由链
+    const resolved = prefetchedChain ? { chain: prefetchedChain, strategyKey: 'prefetched' } : resolveRoutingChain(undefined);
+    chain = resolved.chain;
+    strategyKey = resolved.strategyKey;
+  }
 
   const strategy = getRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
 
-  const chain = prefetchedChain ?? getActiveChain(db).filter(e => e.enabled);
+  const filteredChain = chain.filter(e => e.enabled);
 
   // Per-platform enabled key count — used to scale monthly_token_budget
   // so headroom protection reflects real available quota with multiple keys.
@@ -545,7 +604,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   ).all() as Array<{ platform: string; cnt: number }>;
   for (const row of cntRows) keyCounts.set(row.platform, row.cnt);
 
-  const sortedChain = orderChain(chain, strategy, keyCounts);
+  const sortedChain = orderChain(filteredChain, strategy, keyCounts);
 
   // Sticky session / Explicit pinning: move preferred model to front of chain
   if (preferredModelDbId) {
