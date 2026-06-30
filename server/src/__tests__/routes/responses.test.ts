@@ -171,4 +171,27 @@ describe('POST /v1/responses (#96)', () => {
     const lastCall = mockRouteRequest.mock.calls.at(-1);
     expect(lastCall?.[4]).toBe(true);
   });
+
+  it('non-stream: returns invalid_request_error when provider API 400s exhaust routing', async () => {
+    mockRouteRequest.mockImplementation((_estimated, skipKeys) => {
+      if (skipKeys?.size) {
+        throw Object.assign(new Error('All models exhausted'), { status: 429 });
+      }
+      return fakeRoute({
+        async chatCompletion() {
+          throw Object.assign(
+            new Error('Google API error 400: Invalid JSON payload received. Unknown name "x-google-enum-descriptions"'),
+            { status: 400 },
+          );
+        },
+        async *streamChatCompletion() { /* unused */ },
+      });
+    });
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    const body = JSON.parse(text);
+    expect(status).toBe(400);
+    expect(body.error.type).toBe('invalid_request_error');
+    expect(body.error.message).toContain('rejected the request as invalid');
+  });
 });

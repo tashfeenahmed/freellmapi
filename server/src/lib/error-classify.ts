@@ -68,6 +68,15 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('unparseable inline tool-call dialect');
 }
 
+// Provider-side 400s are retryable because another provider may accept the same
+// request shape. If every routed provider rejects it, however, the client should
+// see an invalid-request error rather than a misleading rate-limit exhaustion.
+export function isProviderBadRequestError(err: any): boolean {
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  const msg = (err?.message ?? '').toLowerCase();
+  return (status === 0 || status === 400) && msg.includes('api error 400');
+}
+
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:
 // it won't recover on the next window, so the caller benches the model+key with
 // PAYMENT_REQUIRED_COOLDOWN_MS (a full day) rather than the 90s transient cooldown.
