@@ -641,7 +641,7 @@ function migrateModelsV4(db: Database.Database) {
     ['mistral',    'mistral-medium-latest',                  'Mistral Medium 3.5',            14, 8,  'Large',    2, null, 500000, null, '~50-100M', 131072],
 
     // GitHub Models — Low-tier category (15 RPM / 150 RPD, 8K in / 4K out per call)
-    ['github',     'openai/gpt-4.1',                         'GPT-4.1 (GitHub)',              20, 7,  'Large',    10, 50,  null, null, '~9M', 128000],
+    ['github',     'openai/gpt-4.1',                         'GPT-4.1 (GitHub)',              20, 7,  'Large',    10, 50,  null, null, '~9M', 8000],
 
     // Cohere — shared 1000 calls/mo trial pool, 20 RPM Chat
     ['cohere',     'command-a-03-2025',                      'Command-A (03-2025)',           27, 11, 'Large',    20, 33,  null, null, '~1-2M', 131072],
@@ -2292,4 +2292,3 @@ function migrateProfilesInit(db: Database.Database) {
     `).run();
   }
 }
-

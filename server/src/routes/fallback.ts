@@ -286,13 +286,24 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   }
 
   // Build per-model breakdown (only platforms with keys), preserving enabled state
+  const usageRows = db.prepare(`
+    SELECT platform, model_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
+    FROM requests
+    WHERE created_at >= datetime('now', 'start of month')
+      AND request_type = 'chat'
+    GROUP BY platform, model_id
+  `).all() as { platform: string; model_id: string; used: number }[];
+  const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
+
   const modelBudgets = rawModels
     .filter(m => platformSet.has(m.platform))
     .map(m => ({
       modelDbId: m.model_db_id,
       displayName: m.display_name,
       platform: m.platform,
+      modelId: m.model_id,
       budget: parseBudget(m.monthly_token_budget),
+      used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
       enabled: m.enabled === 1,
       rpmLimit: m.rpm_limit,
       rpdLimit: m.rpd_limit,
@@ -302,19 +313,11 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
 
   // Total budget counts all models (both enabled and disabled — they contribute to the pool)
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
-
-  // Tokens used this month
-  const usage = db.prepare(`
-    SELECT
-      COALESCE(SUM(input_tokens + output_tokens), 0) as total_used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-  `).get() as { total_used: number };
+  const totalUsed = modelBudgets.reduce((s, m) => s + m.used, 0);
 
   res.json({
     totalBudget,
-    totalUsed: usage.total_used,
+    totalUsed,
     models: modelBudgets,
   });
 });

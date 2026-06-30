@@ -218,6 +218,17 @@ export function formatTokens(n: number): string {
   return String(n)
 }
 
+function formatPercent(value: number): string {
+  const pct = Math.max(0, Math.min(100, value * 100))
+  if (pct > 0 && pct < 0.1) return '<0.1%'
+  if (pct > 99.9 && pct < 100) {
+    const floored = Math.floor(pct * 100) / 100
+    return `${floored.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%`
+  }
+  const digits = pct < 10 ? 1 : 0
+  return `${pct.toFixed(digits).replace(/\.0$/, '')}%`
+}
+
 // Compact context-window label (whole-number K/M, base 1000): 8000 → "8K",
 // 128000 → "128K", 1_000_000 → "1M". Used by the catalog context badge/filter.
 function formatContext(n: number): string {
@@ -278,7 +289,7 @@ export function groupQuotaBadge(
 interface TokenUsageData {
   totalBudget: number
   totalUsed: number
-  models: { displayName: string; platform: string; budget: number }[]
+  models: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
 }
 
 const platformColors: Record<string, string> = {
@@ -325,7 +336,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { t } = useI18n()
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
-  const remainingPct = totalBudget > 0 ? Math.round((remaining / totalBudget) * 100) : 0
+  const remainingPct = totalBudget > 0 ? formatPercent(remaining / totalBudget) : '0%'
 
   // Collapse the per-model legend to a few rows; the chevron reveals the rest.
   // The toggle only appears when the legend actually overflows the collapsed
@@ -343,12 +354,17 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
     return () => ro.disconnect()
   }, [models.length])
 
-  const modelsWithWidth = models.map(m => ({
-    ...m,
-    remainingTokens: totalBudget > 0 ? (m.budget / totalBudget) * remaining : 0,
-    widthPct: totalBudget > 0 ? (m.budget / totalBudget) * (remaining / totalBudget) * 100 : 0,
-  }))
-  const usedPct = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0
+  const modelsWithWidth = models.map(m => {
+    const usedTokens = m.used ?? 0
+    const remainingTokens = Math.max(0, m.budget - usedTokens)
+    return {
+      ...m,
+      usedTokens,
+      remainingTokens,
+      widthPct: totalBudget > 0 ? (remainingTokens / totalBudget) * 100 : 0,
+    }
+  })
+  const usedPct = totalBudget > 0 ? Math.min(100, (totalUsed / totalBudget) * 100) : 0
 
   return (
     <section className="rounded-3xl border bg-card p-5">
@@ -358,6 +374,12 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
           <span className="text-foreground font-medium">{formatTokens(remaining)}</span> {t('models.remaining')}
           <span className="mx-1.5">·</span>
           {remainingPct}% {t('models.of')} {formatTokens(totalBudget)}
+          {totalUsed > 0 && (
+            <>
+              <span className="mx-1.5">·</span>
+              <span className="text-foreground font-medium">{formatTokens(totalUsed)}</span> {t('models.used')}
+            </>
+          )}
         </span>
       </div>
 
@@ -365,7 +387,7 @@ function TokenUsageBar({ data }: { data: TokenUsageData }) {
         {modelsWithWidth.map((m, i) => (
           <div
             key={i}
-            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} remaining`}
+            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} ${t('models.remaining')}, ${formatTokens(m.usedTokens)} ${t('models.used')}`}
             style={{
               width: `${m.widthPct}%`,
               backgroundColor: platformColors[m.platform] ?? '#94a3b8',

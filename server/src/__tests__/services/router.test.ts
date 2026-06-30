@@ -136,6 +136,42 @@ describe('Router', () => {
     expect(large.modelDbId).not.toBe(baseline.modelDbId);
   });
 
+  it('skips GitHub GPT-4.1 above its free-tier 8K request cap (#426)', () => {
+    const db = getDb();
+    const githubKey = encrypt('test-github-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('github', 'github', githubKey.encrypted, githubKey.iv, githubKey.authTag, 'healthy', 1);
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'groq', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    const github = db.prepare(`
+      SELECT id, context_window FROM models
+       WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'
+    `).get() as { id: number; context_window: number };
+    const groq = db.prepare(`
+      SELECT id FROM models
+       WHERE platform = 'groq' AND context_window > 9000
+       LIMIT 1
+    `).get() as { id: number };
+
+    db.prepare('UPDATE fallback_config SET priority = 1000, enabled = 1').run();
+    db.prepare('UPDATE fallback_config SET priority = 1 WHERE model_db_id = ?').run(github.id);
+    db.prepare('UPDATE fallback_config SET priority = 2 WHERE model_db_id = ?').run(groq.id);
+    db.prepare(`
+      UPDATE models SET tpm_limit = NULL, tpd_limit = NULL
+       WHERE id IN (?, ?)
+    `).run(github.id, groq.id);
+
+    expect(github.context_window).toBe(8000);
+    expect(routeRequest(7000).modelDbId).toBe(github.id);
+    expect(routeRequest(9000).modelDbId).toBe(groq.id);
+  });
+
   it('still routes a model with an unknown (null) context window (#167)', () => {
     const db = getDb();
     const groqKey = encrypt('test-groq-key');
