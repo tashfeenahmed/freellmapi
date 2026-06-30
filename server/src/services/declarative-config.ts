@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { z } from 'zod';
-import type Database from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 import { getDb } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
@@ -124,7 +124,7 @@ function encryptedKey(raw: string) {
   return { encrypted, iv, authTag };
 }
 
-function upsertApiKey(db: Database.Database, input: z.infer<typeof keySchema>): number {
+function upsertApiKey(db: Db, input: z.infer<typeof keySchema>): number {
   const platform = input.platform.trim();
   const enabled = input.enabled === false ? 0 : 1;
   const isCustom = platform === 'custom';
@@ -177,7 +177,7 @@ function normalizeModelEntry(entry: z.infer<typeof modelEntrySchema>): Normalize
   return { ...entry, modelId, displayName: entry.displayName?.trim() || modelId };
 }
 
-function ensureFallbackRow(db: Database.Database, modelDbId: number, enabled = true, updateExisting = true): void {
+function ensureFallbackRow(db: Db, modelDbId: number, enabled = true, updateExisting = true): void {
   const existing = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelDbId);
   if (existing) {
     if (updateExisting) {
@@ -190,7 +190,7 @@ function ensureFallbackRow(db: Database.Database, modelDbId: number, enabled = t
     .run(modelDbId, max.m + 1, enabled ? 1 : 0);
 }
 
-function registerCustomProvider(db: Database.Database, input: z.infer<typeof customProviderSchema>): number {
+function registerCustomProvider(db: Db, input: z.infer<typeof customProviderSchema>): number {
   const keyId = upsertApiKey(db, {
     platform: 'custom',
     key: input.apiKey,
@@ -250,7 +250,7 @@ function modelPatchFromInput(input: z.infer<typeof modelSchema>): ModelOverrideP
   return patch;
 }
 
-function upsertModel(db: Database.Database, input: z.infer<typeof modelSchema>): void {
+function upsertModel(db: Db, input: z.infer<typeof modelSchema>): void {
   const platform = input.platform.trim();
   const modelId = input.modelId.trim();
   clearCatalogModelTombstone(db, 'chat', platform, modelId);
@@ -321,7 +321,7 @@ function upsertModel(db: Database.Database, input: z.infer<typeof modelSchema>):
   ensureFallbackRow(db, existing.id, input.fallbackEnabled ?? input.enabled !== false, input.fallbackEnabled !== undefined);
 }
 
-function applyFallback(db: Database.Database, entries: z.infer<typeof fallbackEntrySchema>[]): number {
+function applyFallback(db: Db, entries: z.infer<typeof fallbackEntrySchema>[]): number {
   const update = db.prepare('UPDATE fallback_config SET priority = ?, enabled = ? WHERE model_db_id = ?');
   let changed = 0;
   entries.forEach((entry, i) => {

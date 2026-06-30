@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 
 export type CatalogModelKind = 'chat' | 'media';
 
@@ -64,7 +64,7 @@ export function isCatalogManagedModel(row: { platform: string; key_id?: number |
 }
 
 export function isCatalogModelTombstoned(
-  db: Database.Database,
+  db: Db,
   kind: CatalogModelKind,
   platform: string,
   modelId: string,
@@ -75,7 +75,7 @@ export function isCatalogModelTombstoned(
 }
 
 export function recordCatalogModelTombstone(
-  db: Database.Database,
+  db: Db,
   kind: CatalogModelKind,
   platform: string,
   modelId: string,
@@ -91,7 +91,7 @@ export function recordCatalogModelTombstone(
 }
 
 export function clearCatalogModelTombstone(
-  db: Database.Database,
+  db: Db,
   kind: CatalogModelKind,
   platform: string,
   modelId: string,
@@ -101,7 +101,7 @@ export function clearCatalogModelTombstone(
 }
 
 export function upsertModelOverrides(
-  db: Database.Database,
+  db: Db,
   platform: string,
   modelId: string,
   patch: ModelOverridePatch,
@@ -122,7 +122,7 @@ export function upsertModelOverrides(
 }
 
 export function getModelOverrides(
-  db: Database.Database,
+  db: Db,
   platform: string,
   modelId: string,
 ): StoredOverrides {
@@ -133,7 +133,7 @@ export function getModelOverrides(
 }
 
 export function applyModelOverrides(
-  db: Database.Database,
+  db: Db,
   platform: string,
   modelId: string,
 ): boolean {
@@ -152,7 +152,7 @@ export function applyModelOverrides(
   return true;
 }
 
-export function applyAllModelOverrides(db: Database.Database): number {
+export function applyAllModelOverrides(db: Db): number {
   const rows = db.prepare('SELECT platform, model_id FROM model_overrides').all() as { platform: string; model_id: string }[];
   let applied = 0;
   for (const row of rows) {
@@ -161,7 +161,7 @@ export function applyAllModelOverrides(db: Database.Database): number {
   return applied;
 }
 
-export function deleteTombstonedCatalogModels(db: Database.Database): number {
+export function deleteTombstonedCatalogModels(db: Db): number {
   const chatRows = db.prepare(`
     SELECT m.id, m.platform, m.model_id
       FROM models m

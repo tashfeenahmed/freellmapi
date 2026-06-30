@@ -1,6 +1,6 @@
-import type Database from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 
-export function deleteUnusedCustomEndpointKey(db: Database.Database, keyId: number | null | undefined) {
+export function deleteUnusedCustomEndpointKey(db: Db, keyId: number | null | undefined) {
   if (keyId == null) return;
   const chat = db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'custom' AND key_id = ?").get(keyId) as { n: number };
   const embeddings = db.prepare("SELECT COUNT(*) AS n FROM embedding_models WHERE platform = 'custom' AND key_id = ?").get(keyId) as { n: number };

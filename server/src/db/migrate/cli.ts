@@ -2,7 +2,8 @@ import '../../env.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type Database from 'better-sqlite3';
+
+import type { Db } from '../types.js';
 import { connectDb } from '../index.js';
 import { getMigrationStatuses, runMigrations } from './runner.js';
 
@@ -42,7 +43,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function runFresh(db: Database.Database): Promise<void> {
+async function runFresh(db: Db): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     console.error('db:migration:fresh is not allowed in production');
     process.exit(1);
@@ -52,7 +53,7 @@ async function runFresh(db: Database.Database): Promise<void> {
   await runMigrations(db, 'up');
 }
 
-function printStatus(db: Database.Database): void {
+function printStatus(db: Db): void {
   const statuses = getMigrationStatuses(db);
   console.table(statuses.map(status => ({
     filename: status.filename,
@@ -182,7 +183,7 @@ function toMigrationBindingName(filename: string): string {
   return `migration${filename.replace(/\.ts$/, '').replace(/[^a-zA-Z0-9_]/g, '_')}`;
 }
 
-function dropAllUserTables(db: Database.Database): void {
+function dropAllUserTables(db: Db): void {
   const tables = db.prepare(`
     SELECT name
       FROM sqlite_master

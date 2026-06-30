@@ -1,6 +1,6 @@
-import type Database from 'better-sqlite3';
+import type { Db } from '../types.js';
 
-export function up(db: Database.Database): void {
+export function up(db: Db): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS catalog_model_tombstones (
       kind TEXT NOT NULL DEFAULT 'chat',
@@ -23,7 +23,7 @@ export function up(db: Database.Database): void {
   `);
 }
 
-export function down(db: Database.Database): void {
+export function down(db: Db): void {
   db.exec(`
     DROP INDEX IF EXISTS idx_catalog_model_tombstones_platform_model;
     DROP TABLE IF EXISTS model_overrides;

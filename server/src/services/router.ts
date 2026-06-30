@@ -11,7 +11,7 @@ import { parseBudget } from '../lib/budget.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from './model-groups.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
-import type { Database } from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 
 class RouteError extends Error {
   status: number;
@@ -240,7 +240,7 @@ function decayWeight(ageDays: number): number {
   return Math.pow(0.5, Math.max(0, ageDays) / HALF_LIFE_DAYS);
 }
 
-export function refreshStatsCache(db: Database, force = false): void {
+export function refreshStatsCache(db: Db, force = false): void {
   if (!force && statsCache && Date.now() - statsCacheTime < CACHE_TTL_MS) return;
 
   const since = new Date(Date.now() - WINDOW_MS).toISOString();
@@ -423,7 +423,7 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
   balanced: 'balanced',
 };
 
-function getActiveChain(db: Database): ChainRow[] {
+function getActiveChain(db: Db): ChainRow[] {
   const activeProfileSetting = db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as { value: string } | undefined;
   if (activeProfileSetting) {
     const profileId = parseInt(activeProfileSetting.value, 10);
@@ -454,7 +454,7 @@ function getActiveChain(db: Database): ChainRow[] {
   `).all() as ChainRow[];
 }
 
-function getChainByProfileName(db: Database, name: string): ChainRow[] | null {
+function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
   const profile = db.prepare("SELECT id FROM profiles WHERE LOWER(name) = ?").get(name.toLowerCase()) as { id: number } | undefined;
   if (!profile) return null;
 
@@ -471,7 +471,7 @@ function getChainByProfileName(db: Database, name: string): ChainRow[] | null {
   `).all(profile.id) as ChainRow[];
 }
 
-function getChainByGlobalSort(db: Database, globalAxis: string): ChainRow[] {
+function getChainByGlobalSort(db: Db, globalAxis: string): ChainRow[] {
   const allEnabled = db.prepare(`
     SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
@@ -639,7 +639,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
 /**
  * Fetch a single enabled model's chain row by its db id.
  */
-function getModelChainRow(db: Database, modelDbId: number): ChainRow | undefined {
+function getModelChainRow(db: Db, modelDbId: number): ChainRow | undefined {
   return db.prepare(`
     SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,

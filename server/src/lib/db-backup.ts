@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { gzipSync, gunzipSync } from 'zlib';
-import type Database from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 import type { Scheduler } from './scheduler.js';
 import { getDefaultDbPath } from '../db/index.js';
 
@@ -133,7 +133,7 @@ export async function restoreDbBackupIfNeeded(dbPath = getDefaultDbPath()): Prom
   return { ok: true, target, bytes: restored.length, restored: true };
 }
 
-export async function backupDbNow(db: Database.Database, dbPath = getDefaultDbPath()): Promise<DbBackupResult> {
+export async function backupDbNow(db: Db, dbPath = getDefaultDbPath()): Promise<DbBackupResult> {
   const target = backupTarget();
   if (!target) return { ok: true, skipped: 'not configured' };
   if (dbPath === ':memory:') return { ok: true, target, skipped: 'memory database' };
@@ -152,7 +152,7 @@ export async function backupDbNow(db: Database.Database, dbPath = getDefaultDbPa
   return { ok: true, target, bytes: plain.length };
 }
 
-export function startDbBackupPump(db: Database.Database, scheduler: Scheduler, dbPath = getDefaultDbPath()): (() => void) | null {
+export function startDbBackupPump(db: Db, scheduler: Scheduler, dbPath = getDefaultDbPath()): (() => void) | null {
   if (!backupTarget()) return null;
   const run = () => {
     void backupDbNow(db, dbPath).catch(err => {
