@@ -82,6 +82,7 @@ if (!app.requestSingleInstanceLock()) {
       successRate: successRateToday(),
       hourly: hourlyRequests(),
       loginItem: app.getLoginItemSettings().openAtLogin,
+      version: app.getVersion(),
       theme,
       locale,
       // The popover renderer is a file:// page with no access to the desktop
