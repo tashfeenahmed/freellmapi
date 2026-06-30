@@ -162,6 +162,7 @@
     "pageTitle": "Chiavi",
     "pageDescription": "Credenziali dei fornitori e la chiave API unificata con cui si connettono le tue app.",
     "tabProviders": "Fornitori",
+    "tabQuotaSignals": "Segnali quota",
     "tabApiKey": "Chiave API unificata",
     "tabAnthropic": "Anthropic",
     "unifiedKey": "La tua chiave API unificata",

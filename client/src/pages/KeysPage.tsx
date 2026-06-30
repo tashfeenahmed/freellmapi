@@ -849,9 +849,10 @@ function AnthropicSection() {
   )
 }
 
-type KeysTab = 'providers' | 'apiKey' | 'anthropic'
+type KeysTab = 'providers' | 'quotaSignals' | 'apiKey' | 'anthropic'
 const KEYS_TABS: { id: KeysTab; labelKey: string }[] = [
   { id: 'providers', labelKey: 'keys.tabProviders' },
+  { id: 'quotaSignals', labelKey: 'keys.tabQuotaSignals' },
   { id: 'apiKey', labelKey: 'keys.tabApiKey' },
   { id: 'anthropic', labelKey: 'keys.tabAnthropic' },
 ]
@@ -1035,7 +1036,7 @@ export default function KeysPage() {
         description={t('keys.pageDescription')}
         actions={
           <>
-            {tab === 'providers' && keys.length > 0 && (
+            {(tab === 'providers' || tab === 'quotaSignals') && keys.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
                 {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
               </Button>
@@ -1068,10 +1069,12 @@ export default function KeysPage() {
 
         {tab === 'anthropic' && <AnthropicSection />}
 
+        {tab === 'quotaSignals' && (
+          <QuotaSignalsSection states={(healthData?.quotaStates ?? []).slice(0, 24)} />
+        )}
+
         {tab === 'providers' && (
         <>
-        <QuotaSignalsSection states={(healthData?.quotaStates ?? []).slice(0, 24)} />
-
         <ImportKeysSection />
 
         <section>

@@ -189,6 +189,7 @@
     "pageTitle": "Keys",
     "pageDescription": "Provider credentials and the unified API key your apps connect with.",
     "tabProviders": "Providers",
+    "tabQuotaSignals": "Quota signals",
     "tabApiKey": "Unified API key",
     "tabAnthropic": "Anthropic",
     "unifiedKey": "Your unified API key",

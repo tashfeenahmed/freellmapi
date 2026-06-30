@@ -144,6 +144,7 @@
     "pageTitle": "密钥",
     "pageDescription": "各提供方的凭据，以及你的应用用来连接的统一 API 密钥。",
     "tabProviders": "提供方",
+    "tabQuotaSignals": "配额信号",
     "tabApiKey": "统一 API 密钥",
     "tabAnthropic": "Anthropic",
     "unifiedKey": "您的统一 API 密钥",
