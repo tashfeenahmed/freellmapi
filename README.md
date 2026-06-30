@@ -130,6 +130,7 @@ On Windows, the easiest path is the desktop **[`.exe` installer from Releases](h
 
 **Prerequisites:** Docker, Docker Compose, OpenSSL.
 
+*On macOS / Linux (Bash):*
 ```bash
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
@@ -138,6 +139,18 @@ cd freellmapi
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
 printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 
+docker compose up -d
+```
+
+*On Windows (PowerShell):*
+```powershell
+git clone https://github.com/tashfeenahmed/freellmapi.git
+cd freellmapi
+
+$Bytes = New-Object Byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($Bytes)
+$ENCRYPTION_KEY = -join ($Bytes | ForEach-Object { "{0:x2}" -f $_ })
+"ENCRYPTION_KEY=$ENCRYPTION_KEY`nPORT=3001" | Out-File -Encoding utf8 .env
 docker compose up -d
 ```
 
@@ -155,6 +168,7 @@ Open http://localhost:3001, add your provider keys on the **Keys** page, reorder
 
 **Prerequisites:** Node.js 20+, npm.
 
+*On macOS / Linux (Bash):*
 ```bash
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
@@ -162,6 +176,17 @@ npm install
 cp .env.example .env
 ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
 printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
+npm run dev
+```
+
+*On Windows (PowerShell):*
+```powershell
+git clone https://github.com/tashfeenahmed/freellmapi.git
+cd freellmapi
+npm install
+Copy-Item .env.example .env
+$ENCRYPTION_KEY = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+"ENCRYPTION_KEY=$ENCRYPTION_KEY`nPORT=3001" | Out-File -Encoding utf8 .env
 npm run dev
 ```
 
@@ -272,10 +297,13 @@ request stats.
 
 **[Download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
 
+> **Note for Windows users building from source:** Building the desktop app requires compiling native SQLite modules for Electron. You must have [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) installed (specifically the "Desktop development with C++" workload) and Python installed before running `npm install`.
+
 ```bash
 npm install
-npm run desktop:dist        # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:win    # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm install --prefix desktop  # install desktop dependencies
+npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
 ```
 
 > Locally built apps are unsigned, so Windows SmartScreen may warn on first run
@@ -517,9 +545,17 @@ Claude model names map to your free pool on the **Keys → Anthropic** tab: each
 
 **Claude Code** — point it at your server and start it:
 
+*On macOS / Linux (Bash):*
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:3001
 export ANTHROPIC_AUTH_TOKEN=freellmapi-your-unified-key   # NOT ANTHROPIC_API_KEY
+claude
+```
+
+*On Windows (PowerShell):*
+```powershell
+$env:ANTHROPIC_BASE_URL="http://localhost:3001"
+$env:ANTHROPIC_AUTH_TOKEN="freellmapi-your-unified-key"
 claude
 ```
 
