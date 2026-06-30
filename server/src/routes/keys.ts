@@ -1,9 +1,12 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'path';
 import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 
 export const keysRouter = Router();
 
@@ -17,6 +20,21 @@ const PLATFORMS = [
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
   'routeway', 'bazaarlink', 'ainative', 'aihorde', 'custom',
 ] as const;
+
+const ALLOWED_IMPORT_EXTENSIONS = new Set(['.env', '.json', '.jsonc', '.md', '.txt']);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_IMPORT_EXTENSIONS.has(ext)) {
+      cb(new Error('Unsupported file type'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added
 // without one; the handler enforces a non-empty key for everyone else.
@@ -32,6 +50,71 @@ const updateKeySchema = z.object({
 }).refine(data => data.enabled !== undefined || data.label !== undefined, {
   message: 'At least one of enabled or label must be provided',
 });
+
+const importKeySchema = z.object({
+  keyName: z.string().optional(),
+  keyValue: z.string().min(1),
+  platform: z.enum(PLATFORMS),
+});
+
+function handleUploadError(err: any, res: Response, next: NextFunction): boolean {
+  if (!err) return false;
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: { message: 'File too large. Maximum size is 5MB' } });
+    return true;
+  }
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    res.status(413).json({ error: { message: 'Too many files. Maximum is 10' } });
+    return true;
+  }
+  if (err.message?.includes('Unsupported file type')) {
+    res.status(400).json({ error: { message: 'Unsupported file type' } });
+    return true;
+  }
+  next(err);
+  return true;
+}
+
+function parseUpload(file: Express.Multer.File) {
+  const content = file.buffer.toString('utf8');
+  if (!content.trim()) {
+    throw Object.assign(new Error('File contains no data'), { status: 400 });
+  }
+
+  if (/\.jsonc?$/i.test(file.originalname)) {
+    try {
+      JSON.parse(stripTrailingCommas(stripJsoncComments(content)));
+    } catch {
+      throw Object.assign(new Error('Invalid JSON format'), { status: 400 });
+    }
+  }
+
+  return parseKeysFromFile(content, file.originalname);
+}
+
+function splitRawKey(rawKey: string) {
+  const eqIndex = rawKey.indexOf('=');
+  return {
+    keyName: eqIndex === -1 ? rawKey : rawKey.slice(0, eqIndex),
+    keyValue: eqIndex === -1 ? '' : rawKey.slice(eqIndex + 1),
+  };
+}
+
+function insertImportedKey(platform: (typeof PLATFORMS)[number], keyName: string, keyValue: string) {
+  if (platform === 'custom') {
+    throw new Error('Custom providers must be added with a base URL');
+  }
+  if (!resolveProvider(platform)) {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
+
+  const db = getDb();
+  const { encrypted, iv, authTag } = encrypt(keyValue.trim());
+  db.prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+    VALUES (?, ?, ?, ?, ?, 'unknown', 1)
+  `).run(platform, keyName, encrypted, iv, authTag);
+}
 
 // List all keys (masked)
 keysRouter.get('/', (_req: Request, res: Response) => {
@@ -300,6 +383,125 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
     displayName: first.displayName,
     models: registered,
     maskedKey: maskKey(storedKeyForMask),
+  });
+});
+
+keysRouter.post('/import', (req: Request, res: Response, next: NextFunction) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (handleUploadError(err, res, next)) return;
+
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: { message: 'No file uploaded' } });
+        return;
+      }
+
+      const result = parseUpload(req.file);
+      const imported: Array<{ keyName: string; platform: string }> = [];
+      const skipped = [...result.skipped];
+      const errors: Array<{ key: string; error: string }> = [];
+
+      for (const parsedKey of result.keys) {
+        const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+        if (!parsedKey.platform) {
+          skipped.push(keyName);
+          continue;
+        }
+        const platformParse = z.enum(PLATFORMS).safeParse(parsedKey.platform);
+        if (!platformParse.success || platformParse.data === 'custom') {
+          skipped.push(keyName);
+          continue;
+        }
+        if (!keyValue.trim()) {
+          errors.push({ key: keyName, error: 'keyValue must be at least 1 character' });
+          continue;
+        }
+
+        try {
+          insertImportedKey(platformParse.data, keyName, keyValue);
+          imported.push({ keyName, platform: platformParse.data });
+        } catch (insertErr) {
+          errors.push({ key: keyName, error: (insertErr as Error).message });
+        }
+      }
+
+      res.json({
+        imported: imported.length,
+        skipped,
+        errors,
+        total: result.keys.length + result.skipped.length,
+      });
+    } catch (handlerErr: any) {
+      res.status(handlerErr.status ?? 500).json({ error: { message: handlerErr.message } });
+    }
+  });
+});
+
+keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) => {
+  upload.array('files', 10)(req, res, (err: any) => {
+    if (handleUploadError(err, res, next)) return;
+
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: { message: 'No files uploaded' } });
+        return;
+      }
+
+      const keys: Array<{ keyName: string; keyValue: string; detectedPlatform: string | null; prefix: string }> = [];
+      const skipped: string[] = [];
+
+      for (const file of files) {
+        const result = parseUpload(file);
+        for (const parsedKey of result.keys) {
+          const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+          keys.push({
+            keyName,
+            keyValue,
+            detectedPlatform: parsedKey.platform,
+            prefix: parsedKey.prefix,
+          });
+        }
+        skipped.push(...result.skipped);
+      }
+
+      res.json({ keys, total: keys.length, skipped });
+    } catch (handlerErr: any) {
+      res.status(handlerErr.status ?? 500).json({ error: { message: handlerErr.message } });
+    }
+  });
+});
+
+keysRouter.post('/import-selected', (req: Request, res: Response) => {
+  const parsed = z.object({ keys: z.array(importKeySchema).max(100) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  let imported = 0;
+  const errors: Array<{ key: string; error: string }> = [];
+
+  for (const key of parsed.data.keys) {
+    const keyName = key.keyName?.trim() || key.platform;
+    if (key.platform === 'custom') {
+      errors.push({ key: keyName, error: 'Custom providers must be added with a base URL' });
+      continue;
+    }
+
+    try {
+      insertImportedKey(key.platform, keyName, key.keyValue);
+      imported++;
+    } catch (err) {
+      errors.push({ key: keyName, error: (err as Error).message });
+    }
+  }
+
+  res.json({
+    imported,
+    skipped: [],
+    errors,
+    total: parsed.data.keys.length,
   });
 });
 
