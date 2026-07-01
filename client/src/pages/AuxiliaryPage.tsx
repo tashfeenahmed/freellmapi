@@ -79,6 +79,11 @@ const taskMeta: Record<string, { label: string; description: string; color: stri
   videogen: { label: "VideoGen", description: "Models for video generation", color: "orange", filterVision: false },
   imagegeneration: { label: "ImageGen", description: "Models for image generation", color: "cyan", filterVision: false },
   compression: { label: "Compression", description: "Models for context compression", color: "slate", filterVision: false },
+  skillhub: { label: "SkillHub", description: "Models for skills hub search and recommendation", color: "violet", filterVision: false },
+  approval: { label: "Approval", description: "Models for user approval and confirmation tasks", color: "teal", filterVision: false },
+  mcp: { label: "MCP", description: "Models for Model Context Protocol interactions", color: "indigo", filterVision: false },
+  tirlegen: { label: "Tirlegen", description: "Models for tireless regeneration and retry logic", color: "fuchsia", filterVision: false },
+  curator: { label: "Curator", description: "Models for skill and content curation tasks", color: "lime", filterVision: false },
   general: { label: "General", description: "General purpose auxiliary tasks", color: "zinc", filterVision: false },
 }
 
