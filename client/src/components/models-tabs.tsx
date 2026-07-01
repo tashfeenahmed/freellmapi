@@ -14,9 +14,9 @@ export function ModelsTabs() {
     }`
   return (
     <div className="inline-flex gap-1 rounded-xl border p-1">
-      <NavLink to=/models/chat className={({ isActive }) => tab(isActive)}>{t("models.chatModelsTab")}</NavLink>
-      <NavLink to=/models/embeddings className={({ isActive }) => tab(isActive)}>{t("models.embeddingsTab")}</NavLink>
-      <NavLink to=/models/groups className={({ isActive }) => tab(isActive)}>
+      <NavLink to="/models/chat" className={({ isActive }) => tab(isActive)}>{t("models.chatModelsTab")}</NavLink>
+      <NavLink to="/models/embeddings" className={({ isActive }) => tab(isActive)}>{t("models.embeddingsTab")}</NavLink>
+      <NavLink to="/models/groups" className={({ isActive }) => tab(isActive)}>
         {({ isActive }) => (
           <>
             {t("models.groupsTab")}
@@ -27,9 +27,9 @@ export function ModelsTabs() {
           </>
         )}
       </NavLink>
-      <NavLink to=/models/image className={({ isActive }) => tab(isActive)}>{t("models.imageTab")}</NavLink>
-      <NavLink to=/models/audio className={({ isActive }) => tab(isActive)}>{t("models.audioTab")}</NavLink>
-      <NavLink to=/models/fusion className={({ isActive }) => tab(isActive)}>
+      <NavLink to="/models/image" className={({ isActive }) => tab(isActive)}>{t("models.imageTab")}</NavLink>
+      <NavLink to="/models/audio" className={({ isActive }) => tab(isActive)}>{t("models.audioTab")}</NavLink>
+      <NavLink to="/models/fusion" className={({ isActive }) => tab(isActive)}>
         {({ isActive }) => (
           <>
             {t("models.fusionTab")}

@@ -2,7 +2,7 @@
 
 import { Router } from 'express';
 import { getDb } from '../db/index.js';
-import { getValidTaskTypes } from '../services/auxiliary.js';
+const VALID_TASK_TYPES = ['vision', 'webextract', 'compression', 'skillhub', 'approval', 'mcp', 'tirlegen', 'curator', 'general', 'coding', 'embedding', 'imagegeneration', 'videogen', 'tts'];
 
 const router = Router();
 
@@ -25,7 +25,7 @@ router.get('/', (req, res) => {
   sql += "ORDER BY ac.task_type, ac.priority ASC";
 
   const rows = db.prepare(sql).all(...params);
-  res.json({ chain: rows, valid_task_types: getValidTaskTypes() });
+  res.json({ chain: rows, valid_task_types: VALID_TASK_TYPES });
 });
 
 // POST /api/auxiliary/add — add a model to a task_type chain

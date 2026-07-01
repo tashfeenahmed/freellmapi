@@ -135,10 +135,10 @@
     "copyModelId": "Copy model id",
     "showingCount": "{shown} of {total} models",
     "clearFilters": "Clear filters",
-    noMatches: No models match your filters.,
-    visionTab: Vision Models,
-    coderTab: Coder Models,
-    groupsTab: Model Groups
+    "noMatches": "No models match your filters.",
+    "visionTab": "Vision Models",
+    "coderTab": "Coder Models",
+    "groupsTab": "Model Groups"
   },
   "strategies": {
     "title": "Routing strategy",
