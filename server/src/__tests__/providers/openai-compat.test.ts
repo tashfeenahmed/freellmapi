@@ -159,6 +159,89 @@ describe('OpenAICompatProvider', () => {
     ).rejects.toThrow(/not OpenAI-compatible/);
   });
 
+  it('distinguishes a truncated 200 body (CDN keepalive) from a wrong-endpoint 200 body (#430)', async () => {
+    // Cloudflare-fronted free-tier upstreams (Kilo routing Nemotron / Poolside Laguna)
+    // deliver a partial JSON body when the 600s edge idle-keepalive fires mid-response.
+    // Node's JSON.parse surfaces that as "Unexpected end of JSON input" — different from
+    // the NDJSON / native-API case above. Operators were chasing a base-URL bug that
+    // didn't exist because both paths produced the same error string.
+    const headers = new Headers({ 'content-type': 'application/json' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+    } as any);
+
+    let caught: Error | null = null;
+    try {
+      await provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toMatch(/truncated mid-stream/);
+    expect(caught!.message).toMatch(/Cloudflare's 600s edge limit/);
+    expect(caught!.message).not.toMatch(/not OpenAI-compatible/);
+  });
+
+  it('attributes an "after JSON at position" parse error with Content-Type: application/json to CDN truncation (#430)', async () => {
+    // Same edge-keepalive case but the body parses far enough to reach a
+    // mid-token garbage character before EOF. Content-Type is the only signal
+    // that distinguishes this from a real NDJSON upstream (next test).
+    const headers = new Headers({ 'content-type': 'application/json' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 4096 (line 1 column 4097)')),
+    } as any);
+
+    await expect(
+      provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model')
+    ).rejects.toThrow(/truncated mid-stream/);
+  });
+
+  it('does not flag NDJSON Content-Type as a truncation (#430 regression guard)', async () => {
+    // A real Ollama-style upstream announces NDJSON via Content-Type. Even if
+    // the parse error message happens to match the "after JSON at position"
+    // substring (NDJSON bodies do — the parser eats one object, then trips
+    // on the next one), we must not misclassify it as a CDN truncation.
+    const headers = new Headers({ 'content-type': 'application/x-ndjson' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 120 (line 3 column 1)')),
+    } as any);
+
+    await expect(
+      provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model')
+    ).rejects.toThrow(/not OpenAI-compatible/);
+  });
+
+  it('does not classify NDJSON Content-Type as a truncation — explicit not.toThrow (#430)', async () => {
+    // Companion to the previous test: explicitly assert the truncation message
+    // does NOT appear, so a future refactor can't silently switch the branch.
+    const headers = new Headers({ 'content-type': 'application/x-ndjson' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 120 (line 3 column 1)')),
+    } as any);
+
+    let caught: Error | null = null;
+    try {
+      await provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).not.toMatch(/truncated mid-stream/);
+    expect(caught!.message).toMatch(/not OpenAI-compatible/);
+  });
+
   it('should validate key using models endpoint', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, status: 200 } as any);
     expect(await provider.validateKey('valid')).toBe(true);
