@@ -2,16 +2,20 @@
 
 # FreeLLMAPI
 
-**One OpenAI-compatible endpoint. Sixteen free LLM providers. ~1.7B tokens per month.**
+**One OpenAI-compatible endpoint. 18 free LLM providers. 161 free models. ~1.7B tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, and OpenCode Zen — plus custom OpenAI-compatible chat, embedding, image, and audio endpoints — behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, OpenCode Zen, and AI Horde, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/tashfeenahmed/freellmapi?style=flat&logo=github&color=yellow)](https://github.com/tashfeenahmed/freellmapi/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co)** — browse the live model catalog
+**[freellmapi.co](https://freellmapi.co)** · browse all 161 free models on the live catalog
+
+Your router updates its own model catalog. Free installs get each new model 30 days after it ships;
+**[Premium gets it the day it lands, and is 79 models ahead right now](https://freellmapi.co/?utm_source=github&utm_medium=readme#pricing)** ($19/yr, 30-day refund).
 
 ![Fallback chain with per-provider token budget](repo-assets/fallback-chain.png)
 
@@ -26,6 +30,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 - [Features](#features)
 - [Not yet supported](#not-yet-supported)
 - [Quick start](#quick-start)
+- [Works with OB-1 and other clients](#works-with-ob-1-and-other-clients)
 - [Docker](#docker)
 - [Desktop app](#desktop-app)
 - [Languages](#languages)
@@ -41,9 +46,11 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 
 ## Why this exists
 
-Every serious AI lab now offers a free tier — a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **1.7 billion tokens per month** of working inference capacity, across 100+ models from small-and-fast to reasonably capable.
+Every serious AI lab now offers a free tier — a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **1.7 billion tokens per month** of working inference capacity, across 160+ models from small-and-fast to reasonably capable.
 
-The problem is that stacking them by hand is painful: seventeen different SDKs, seventeen different rate limits, seventeen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
+The problem is that stacking them by hand is painful: eighteen different SDKs, eighteen different rate limits, eighteen places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
+
+And the free-tier landscape shifts weekly: providers launch models, retire them, and change quotas without notice. FreeLLMAPI tracks all of that for you. The router pulls a signed model catalog from [freellmapi.co](https://freellmapi.co) on its own, so your install keeps up without a `git pull`. See [Premium (live catalog)](#premium-live-catalog) for how fast it keeps up.
 
 ## Supported providers
 
@@ -82,6 +89,8 @@ The problem is that stacking them by hand is painful: seventeen different SDKs, 
 
 Plus a **custom** provider — point chat, embedding, image, or audio models at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway) from the Keys page.
 
+The full, always-current list lives at **[freellmapi.co/models](https://freellmapi.co/models.html)** with per-model rate limits, context windows, and free-token budgets.
+
 ## Features
 
 - **OpenAI-compatible** — `POST /v1/chat/completions` and `GET /v1/models` work with the official OpenAI SDKs and any OpenAI-compatible client (LangChain, LlamaIndex, Continue, Hermes, etc.). Just change `base_url`.
@@ -89,6 +98,7 @@ Plus a **custom** provider — point chat, embedding, image, or audio models at 
 - **Editor autocomplete** — `POST /v1/completions` translates legacy prompt/suffix requests into the same router, so VS Code ghost-text clients such as Continue can use FreeLLMAPI for inline suggestions.
 - **Anthropic Messages API** — `POST /v1/messages` (plus `/v1/messages/count_tokens`) speaks Anthropic's wire format over the same router, so **Claude Code** and the official Anthropic SDKs run against your free pool. `GET /v1/models` is content-negotiated (Anthropic shape when the client sends `anthropic-version`, OpenAI shape otherwise), and Claude families (`opus` / `sonnet` / `haiku` / `default`) map to `auto` or a pinned model on the Keys page. See [Anthropic / Claude clients](#anthropic--claude-clients).
 - **Image generation & text-to-speech** — `POST /v1/images/generations` and `POST /v1/audio/speech` route across the providers that serve media models, including custom OpenAI-compatible media endpoints. Browse and toggle them on the dashboard's **Models → Image / Audio** tabs.
+- **Self-updating model catalog** — the router syncs a signed catalog from freellmapi.co twice a day: new models, quota changes, and provider quirk fixes land in your install automatically. See [Premium (live catalog)](#premium-live-catalog).
 - **Streaming and non-streaming** — Server-Sent Events for `stream: true`, JSON response otherwise. Every provider adapter implements both.
 - **Tool calling** — OpenAI-style `tools` / `tool_choice` requests are passed through, and assistant `tool_calls` + `tool` role follow-up messages round-trip across providers.
 - **Embeddings** — `/v1/embeddings` with family-based routing, including custom OpenAI-compatible embedding endpoints: failover only ever happens between providers serving the *same* model (vectors from different models are incompatible), never across models. See [Embeddings](#embeddings).
@@ -142,6 +152,8 @@ docker compose up -d
 ```
 
 Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
+
+Your fresh install ships with the free catalog snapshot (82 models today) and keeps itself updated from there. Everything the live feed adds on top is listed at [freellmapi.co/models](https://freellmapi.co/models.html).
 
 > **Reaching it from another machine?** By default the container is published only on `127.0.0.1`, so `http://<server-ip>:3001` won't load from another device (the page just hangs). To expose it on your LAN — e.g. a Raspberry Pi at `http://192.168.1.x:3001` — start it with `HOST_BIND=0.0.0.0`:
 >
@@ -280,6 +292,7 @@ npm run desktop:dist:win    # Windows → "desktop/dist-electron/FreeLLMAPI Setu
 
 > Locally built apps are unsigned, so Windows SmartScreen may warn on first run
 > ("More info" → "Run anyway"); the macOS build launches without Gatekeeper prompts.
+> Full instructions in [desktop/README.md](./desktop/README.md).
 
 ## Languages
 
@@ -301,26 +314,71 @@ flat JSON files. To add a language, copy `en.json`, translate the values, and
 register the locale in `client/src/i18n/I18nProvider.tsx` (and
 `desktop/src/i18n.ts` for the tray strings) — PRs welcome.
 
+## Works with OB-1 and other clients
+
+FreeLLMAPI is the free tier for **[OB-1](https://github.com/Overbrilliant/ob-1)**:
+the OB-1 CLI can clone, configure, start, health-check, and wire this proxy into
+its settings automatically. A new OB-1 user can pick **Start free** and reach a
+working OpenAI-compatible endpoint before creating any hosted account.
+
+It is also useful on its own. Any client that can target an OpenAI-compatible
+base URL can use FreeLLMAPI:
+
+- **OB-1**: managed automatically by the CLI, including anonymous providers.
+- **opencode, aider, Continue, LangChain, LlamaIndex**: set `base_url` to
+  `http://localhost:3001/v1` and use the unified key from the dashboard.
+- **Claude Code / Anthropic SDKs**: use the Anthropic-compatible `/v1/messages`
+  surface and the `ANTHROPIC_AUTH_TOKEN` flow documented below.
+- **Local GPU boxes**: add custom OpenAI-compatible endpoints for Ollama,
+  llama.cpp, LM Studio, vLLM, or an internal gateway.
+
+FreeLLMAPI is local-first and single-user by design. Your provider keys stay in
+your SQLite database, encrypted at rest, and requests go from your machine to the
+upstream providers you enabled.
+
 ## Premium (live catalog)
 
 The router keeps its model catalog fresh on its own: it pulls a signed catalog
 from [freellmapi.co](https://freellmapi.co) twice a day and applies new models,
-quota changes, and provider quirk fixes to your local DB (your own enable/disable
-choices and custom providers are never touched; every download is verified
-against a pinned Ed25519 key before it is applied).
+quota changes, and provider quirk fixes to your local DB. Your own
+enable/disable choices and custom providers are never touched, and every
+download is verified against a pinned Ed25519 key before it is applied.
 
-- **Free** installs follow a **monthly snapshot** — zero cost, forever.
-- **[Premium](https://freellmapi.co/#pricing)** ($19/yr or $49 lifetime) follows
-  the **live feed**, refreshed every 2-3 days, so new free models are in your
-  router the moment they exist. One key covers all your devices; activate it in
-  the dashboard under **Premium**. Cancel or manage billing self-serve at
-  [freellmapi.co/manage](https://freellmapi.co/manage).
+The catalog comes in two feeds:
+
+| | Free | Premium |
+|---|---|---|
+| Price | $0, forever | **$19/yr** or **$49 lifetime** |
+| Models served today (July 2026) | 82 | **161** |
+| New free models | 30 days after each one ships | **the day it ships** |
+| Quota changes and quirk fixes | on the same 30-day trail | within 2-3 days |
+| Activation | nothing to do | one key, all your devices |
+
+The gap is not hypothetical. Right now the live feed is **79 models ahead** of
+free installs, including Kimi K2.7 Code, GLM-5.2, MiniMax M3, Qwen3.5 397B, and
+Nemotron 3 Ultra 550B with a 1M-token context window. Each of those reaches free
+installs about a month after it shipped; Premium routers were already serving
+them on day one. Browse exactly what you're missing at
+**[freellmapi.co/models](https://freellmapi.co/models.html)**.
+
+Thirty days is a long time in this market. When a provider launches a strong
+new free model, quietly tightens a quota, or breaks a wire format, live-feed
+routers are patched within days while free installs wait for the model to age
+in. If you use your router every day, Premium is the difference between riding
+the free-tier wave and reading about it.
+
+**[Go live at freellmapi.co →](https://freellmapi.co/?utm_source=github&utm_medium=readme#pricing)**
+
+- $19/year or $49 once, lifetime. Stripe checkout, 30-day no-questions refund.
+- One `fla_` key covers every router you run: desktop, homelab, Raspberry Pi.
+- Activate in the dashboard under **Premium**; cancel or manage billing
+  self-serve at [freellmapi.co/manage](https://freellmapi.co/manage).
+- The router itself stays MIT-licensed and fully free, forever. Premium is only
+  the live feed, and it's what funds the daily model testing and catalog
+  maintenance that keep both tiers working.
 
 The catalog server never sees your prompts, completions, or provider keys — the
 router stays fully self-hosted either way.
-
-Locally built apps launch without Gatekeeper/SmartScreen warnings — no code
-signing involved. Full instructions in [desktop/README.md](./desktop/README.md).
 
 ## Using the API
 
@@ -614,7 +672,7 @@ Stacking free tiers has real trade-offs. Be honest with yourself about them:
 - **No frontier models.** The free-tier catalog tops out around Llama 3.3 70B, GLM-4.5, Qwen 3 Coder, and Gemini 2.5 Pro. You will not get GPT-5 or Claude Opus class reasoning through this. For hard problems, pay for a real API.
 - **Intelligence degrades as the day progresses.** Your top-ranked models (usually Gemini 2.5 Pro, GPT-4o via GitHub Models) have the lowest daily caps. Once they hit their limits, the router falls down your priority chain to smaller/weaker models. Expect the effective intelligence of the endpoint to drop in the late hours of each day — then reset at UTC midnight.
 - **Latency is highly variable.** Cerebras and Groq are extremely fast; others are not. You get whichever one is available.
-- **Free tiers can change without notice.** Providers regularly tighten, loosen, or remove free tiers. When that happens you'll see 429s or auth errors until you update the catalog. Re-seed scripts live in `server/src/scripts/`.
+- **Free tiers can change without notice.** Providers regularly tighten, loosen, or remove free tiers. When that happens you'll see 429s or auth errors until the catalog update reaches you — live-feed installs get those fixes within days, free installs on the 30-day trail. Re-seed scripts live in `server/src/scripts/`.
 - **No SLA, by definition.** If you need reliability, use a paid provider with a contract.
 - **Local-first.** There's no multi-tenant auth. Run this for yourself; don't expose it to the internet.
 
