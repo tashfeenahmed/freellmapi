@@ -7,6 +7,7 @@ import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
+import { assessProviderUrl } from '../lib/url-guard.js';
 
 export const keysRouter = Router();
 
@@ -268,7 +269,7 @@ const customProviderSchema = z.object({
   { message: 'model or models is required' },
 );
 
-keysRouter.post('/custom', (req: Request, res: Response) => {
+keysRouter.post('/custom', async (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
@@ -276,6 +277,16 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   }
 
   const baseUrl = parsed.data.baseUrl.trim().replace(/\/+$/, '');
+
+  // SSRF guard (#440): a base_url is the one user-controlled outbound target.
+  // Cloud metadata / link-local addresses are rejected outright; private
+  // ranges too when FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is set. Re-checked
+  // at request time in proxyFetch for URLs already in the DB.
+  const verdict = await assessProviderUrl(baseUrl);
+  if (!verdict.allowed) {
+    res.status(400).json({ error: { message: `baseUrl rejected: ${verdict.reason}` } });
+    return;
+  }
   // Local servers often need no key; keep a sentinel so there's always a bearer.
   const providedKey = parsed.data.apiKey?.trim() || undefined;
   const label = parsed.data.label?.trim() || undefined;

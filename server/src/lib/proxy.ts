@@ -1,5 +1,6 @@
 import http from 'http';
 import https from 'https';
+import { assertProviderUrlAllowed } from './url-guard.js';
 
 // undici (ProxyAgent) and socks-proxy-agent are lazy-loaded on first proxy use
 // ONLY. Importing undici at module top-level eagerly runs its web/cache init,
@@ -322,6 +323,15 @@ export async function proxyFetch(
   timeoutMs?: number,
 ): Promise<Response> {
   try {
+    // SSRF guard (#440): 'custom' is the only platform whose target URL is
+    // user-supplied (base_url on the api_keys row), so it is re-assessed on
+    // every request — a URL saved before the guard existed, edited in the DB,
+    // or whose DNS now points somewhere blocked still can't reach cloud
+    // metadata / link-local addresses.
+    if (platform === 'custom') {
+      await assertProviderUrlAllowed(url);
+    }
+
     // Bypass check: disabled globally, or this platform is exempt.
     if (shouldBypassProxy(platform)) {
       return await fetch(url, init);
