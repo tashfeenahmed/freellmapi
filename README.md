@@ -801,6 +801,12 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full migration CLI and workflow
 <a href="https://github.com/redenfire"><img src="https://images.weserv.nl/?url=github.com/redenfire.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@redenfire" /></a>
 <a href="https://github.com/itzpingcat"><img src="https://images.weserv.nl/?url=github.com/itzpingcat.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@itzpingcat" /></a>
 <a href="https://github.com/kairwang01"><img src="https://images.weserv.nl/?url=github.com/kairwang01.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@kairwang01" /></a>
+<a href="https://github.com/gongjurenzhangwei"><img src="https://images.weserv.nl/?url=github.com/gongjurenzhangwei.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@gongjurenzhangwei" /></a>
+<a href="https://github.com/jsonring"><img src="https://images.weserv.nl/?url=github.com/jsonring.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@jsonring" /></a>
+<a href="https://github.com/1029734570"><img src="https://images.weserv.nl/?url=github.com/1029734570.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@1029734570" /></a>
+<a href="https://github.com/86TheCactus"><img src="https://images.weserv.nl/?url=github.com/86TheCactus.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@86TheCactus" /></a>
+<a href="https://github.com/AmiroKD"><img src="https://images.weserv.nl/?url=github.com/AmiroKD.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@AmiroKD" /></a>
+<a href="https://github.com/ecryptomillionaire-dev"><img src="https://images.weserv.nl/?url=github.com/ecryptomillionaire-dev.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@ecryptomillionaire-dev" /></a>
 
 ## Terms of Service review
 
