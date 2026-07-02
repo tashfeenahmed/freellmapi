@@ -294,6 +294,36 @@ npm run desktop:dist:win    # Windows → "desktop/dist-electron/FreeLLMAPI Setu
 > ("More info" → "Run anyway"); the macOS build launches without Gatekeeper prompts.
 > Full instructions in [desktop/README.md](./desktop/README.md).
 
+### Credentials and where your data lives
+
+The desktop app has **no username or password to set up**. Unlike the server
+(which gates its dashboard behind an email + password account), the desktop
+build signs the dashboard in automatically with a hidden local account, so
+you're never prompted for credentials and never need one.
+
+The only credential you need is your **unified API key** — the
+`freellmapi-…` token your OpenAI/Anthropic client points at. Get it from:
+
+- the tray popover — click the tray icon, then **Copy Key**, or
+- the dashboard **Keys** page header (tray → **Open Dashboard**).
+
+You do not need to open or edit `freeapi.db` by hand.
+
+Your settings and data live in one folder per OS (copy it to migrate to
+another machine or into a container):
+
+| OS | Location |
+|----|----------|
+| Windows | `%APPDATA%\FreeLLMAPI\` (e.g. `C:\Users\<you>\AppData\Roaming\FreeLLMAPI\`) |
+| macOS | `~/Library/Application Support/FreeLLMAPI/` |
+| Linux | `~/.config/FreeLLMAPI/` |
+
+That folder holds `freeapi.db` (all keys, models, settings, encrypted at rest)
+and `config.json` (window/theme/port/LAN preferences). Copy both to move an
+install. For the server (non-desktop) deployment, the equivalent state is the
+`.env` file and the SQLite DB at `server/data/freeapi.db` (or wherever
+`FREEAPI_DB_PATH` points).
+
 ## Languages
 
 The dashboard and the desktop tray ship in 6 languages. The UI auto-detects your
