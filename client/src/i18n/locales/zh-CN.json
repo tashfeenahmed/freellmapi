@@ -108,7 +108,10 @@
     "copyModelId": "复制模型 ID",
     "showingCount": "{total} 个模型中的 {shown} 个",
     "clearFilters": "清除筛选",
-    "noMatches": "没有符合筛选条件的模型。"
+    "noMatches": "没有符合筛选条件的模型。",
+    "visionTab": "视觉模型",
+    "coderTab": "编码模型",
+    "groupsTab": "模型组"
   },
   "strategies": {
     "title": "路由策略",
