@@ -477,6 +477,22 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
   return true;
 }
 
+/**
+ * Soonest moment any active cooldown expires, in ms since epoch, or null when
+ * nothing is cooling down. Used to tell an exhausted caller roughly when to
+ * retry (#423) instead of the bare "wait for rate limits to reset".
+ */
+export function getSoonestCooldownExpiry(now = Date.now()): number | null {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT MIN(expires_at_ms) AS soonest
+        FROM rate_limit_cooldowns
+       WHERE expires_at_ms > ?
+    `).get(now) as { soonest: number | null } | undefined;
+    return row?.soonest ?? null;
+  }) ?? null;
+}
+
 export function getRateLimitStatus(
   platform: string,
   modelId: string,

@@ -1,7 +1,7 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
-import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider } from './ratelimit.js';
+import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider, getSoonestCooldownExpiry } from './ratelimit.js';
 import {
   BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
   reliabilityPosterior, expectedReliability, sampleBeta,
@@ -26,6 +26,66 @@ class RouteError extends Error {
     this.status = status;
     this.diagnostics = diagnostics;
   }
+}
+
+// Human-readable retry ETA from a cooldown expiry timestamp (#423). Null when
+// nothing is cooling down or it already lapsed.
+export function formatResetEta(soonestResetMs: number | null | undefined, now = Date.now()): string | null {
+  if (soonestResetMs == null) return null;
+  const deltaMs = soonestResetMs - now;
+  if (deltaMs <= 0) return null;
+  const secs = Math.round(deltaMs / 1000);
+  if (secs < 90) return `~${secs}s`;
+  const mins = Math.round(secs / 60);
+  if (mins < 90) return `~${mins}m`;
+  return `~${Math.round(mins / 60)}h`;
+}
+
+const EXHAUSTION_ADVICE = 'Add more API keys or wait for rate limits to reset.';
+
+// Roll the per-model diagnostics (see RouteError.diagnostics) up into a short,
+// client-safe summary so an exhausted caller learns WHY the pool was empty
+// instead of a bare "All models exhausted" (#423). Buckets are aggregate
+// counts only — no key material, no per-key detail. Classifies off the whole
+// line (model ids can contain ':' so splitting label from reason is unsafe).
+export function summarizeExhaustion(
+  diag: string[] | undefined,
+  soonestResetMs?: number | null,
+  now = Date.now(),
+): string {
+  const eta = formatResetEta(soonestResetMs, now);
+  const etaSuffix = eta ? ` Soonest reset ${eta}.` : '';
+  if (!diag || diag.length === 0) {
+    return `All models exhausted. ${EXHAUSTION_ADVICE}${etaSuffix}`;
+  }
+
+  const counts: Record<string, number> = {};
+  const bump = (bucket: string) => { counts[bucket] = (counts[bucket] ?? 0) + 1; };
+  for (const line of diag) {
+    const l = line.toLowerCase();
+    if (l.includes('no provider registered')) bump('unsupported provider');
+    else if (/no enabled\+healthy key|no usable key|decrypt-error/.test(l)) bump('no usable key configured');
+    else if (l.includes('< estimated')) bump('prompt too large for the model');
+    else if (l.includes('no vision support')) bump('model lacks vision');
+    else if (l.includes('no tool-calling support')) bump('model lacks tool-calling');
+    else if (/ruled out|already-failed/.test(l)) bump('failed earlier this request');
+    else if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap/.test(l)) bump('rate-limited or on cooldown');
+    else bump('unavailable');
+  }
+  // Most actionable buckets first.
+  const order = [
+    'rate-limited or on cooldown',
+    'no usable key configured',
+    'prompt too large for the model',
+    'model lacks vision',
+    'model lacks tool-calling',
+    'failed earlier this request',
+    'unsupported provider',
+    'unavailable',
+  ];
+  const parts = order.filter(b => counts[b]).map(b => `${counts[b]} ${b}`);
+  const total = diag.length;
+  return `All models exhausted: ${total} route${total === 1 ? '' : 's'} checked (${parts.join(', ')}). ${EXHAUSTION_ADVICE}${etaSuffix}`;
 }
 
 interface KeyRow {
@@ -916,7 +976,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     if (route) return route;
   }
 
-  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429, diag);
+  throw new RouteError(summarizeExhaustion(diag, getSoonestCooldownExpiry()), 429, diag);
 }
 
 /**
