@@ -117,6 +117,33 @@ function insertImportedKey(platform: (typeof PLATFORMS)[number], keyName: string
   `).run(platform, keyName, encrypted, iv, authTag);
 }
 
+// Count enabled catalog models for a platform. Used to warn when a key is
+// added for a provider that has zero models in the operator's current catalog
+// tier — the Agnes case (#438): the provider is registered and selectable, but
+// its models ship in the premium/live catalog and only appear for free-tier
+// installs once they age into the monthly catalog, so a fresh install adds the
+// key and silently sees nothing.
+function enabledModelCount(platform: string): number {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT COUNT(*) AS c FROM models WHERE platform = ? AND enabled = 1',
+  ).get(platform) as { c: number };
+  return row.c;
+}
+
+// Non-null when the just-added key has no usable models yet, so the client can
+// explain the silence instead of leaving the user staring at an empty list.
+function noModelsNotice(platform: string): string | undefined {
+  if (enabledModelCount(platform) > 0) return undefined;
+  return (
+    `Key saved, but no ${platform} models are in your current catalog yet. ` +
+    `Newer providers are published to the premium catalog first and appear ` +
+    `for free-tier installs once they age into the monthly catalog. Add a ` +
+    `Premium license key to use them now, or add ${platform} as a custom ` +
+    `OpenAI-compatible provider with its base URL.`
+  );
+}
+
 // List all keys (masked)
 keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
@@ -222,6 +249,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
         maskedKey: maskKey(keyToStore),
         status: 'unknown',
         enabled: true,
+        modelsAvailable: enabledModelCount(platform),
+        notice: noModelsNotice(platform),
       });
       return;
     }
@@ -240,6 +269,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
     maskedKey: maskKey(keyToStore),
     status: 'unknown',
     enabled: true,
+    modelsAvailable: enabledModelCount(platform),
+    notice: noModelsNotice(platform),
   });
 });
 

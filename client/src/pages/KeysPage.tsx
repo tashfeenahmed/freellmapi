@@ -867,6 +867,9 @@ export default function KeysPage() {
   const [label, setLabel] = useState('')
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
+  // Server-supplied notice when a key is saved for a platform with no models in
+  // the current catalog tier yet (e.g. a newly added premium provider, #438).
+  const [addNotice, setAddNotice] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteModelKey, setConfirmDeleteModelKey] = useState<string | null>(null)
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
@@ -885,11 +888,12 @@ export default function KeysPage() {
 
   const addKey = useMutation({
     mutationFn: (body: { platform: string; key: string; label?: string }) =>
-      apiFetch('/api/keys', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => {
+      apiFetch<{ notice?: string | null }>('/api/keys', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      setAddNotice(data?.notice ?? null)
       setPlatform('')
       setApiKey('')
       setAccountId('')
@@ -1141,6 +1145,9 @@ export default function KeysPage() {
           </form>
           {addKey.isError && (
             <p className="text-destructive text-xs mt-2">{(addKey.error as Error).message}</p>
+          )}
+          {addNotice && (
+            <p className="text-amber-600 dark:text-amber-500 text-xs mt-2" role="status">{addNotice}</p>
           )}
         </section>
 
