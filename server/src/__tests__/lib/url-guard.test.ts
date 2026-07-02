@@ -46,6 +46,24 @@ describe('classifyIp', () => {
     expect(classifyIp('::ffff:169.254.169.254')).toBe('metadata'); // mapped
     expect(classifyIp('::ffff:8.8.8.8')).toBe('public');
   });
+
+  it('classifies IPv4-mapped IPv6 in hex form (what the WHATWG URL parser emits)', () => {
+    // new URL('http://[::ffff:169.254.169.254]/').hostname === '[::ffff:a9fe:a9fe]'
+    // — the dotted form never reaches classifyIp from a URL, only this one.
+    expect(classifyIp('::ffff:a9fe:a9fe')).toBe('metadata'); // 169.254.169.254
+    expect(classifyIp('::ffff:7f00:1')).toBe('loopback'); // 127.0.0.1
+    expect(classifyIp('::ffff:a00:1')).toBe('private'); // 10.0.0.1
+    expect(classifyIp('::ffff:808:808')).toBe('public'); // 8.8.8.8
+    expect(classifyIp('0:0:0:0:0:ffff:a9fe:a9fe')).toBe('metadata'); // uncompressed
+  });
+
+  it('classifies NAT64, IPv4-compatible, and alternate-spelling metadata addresses', () => {
+    expect(classifyIp('64:ff9b::a9fe:a9fe')).toBe('metadata'); // NAT64 → 169.254.169.254
+    expect(classifyIp('64:ff9b::808:808')).toBe('public'); // NAT64 → 8.8.8.8
+    expect(classifyIp('::a9fe:a9fe')).toBe('metadata'); // deprecated v4-compatible form
+    expect(classifyIp('192.0.0.192')).toBe('metadata'); // Oracle Cloud legacy IMDS
+    expect(classifyIp('fd00:0ec2:0:0:0:0:0:0254')).toBe('metadata'); // AWS IMDS, uncompressed
+  });
 });
 
 describe('assessProviderUrl', () => {
@@ -62,6 +80,13 @@ describe('assessProviderUrl', () => {
   it('blocks decimal-encoded metadata IPs (URL canonicalisation)', async () => {
     // 2852039166 === 169.254.169.254 — WHATWG URL normalises integer hosts.
     const verdict = await assessProviderUrl('http://2852039166/latest/meta-data/');
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toMatch(/metadata/);
+  });
+
+  it('blocks bracketed IPv4-mapped metadata literals end to end', async () => {
+    // The parser rewrites this hostname to the hex form ::ffff:a9fe:a9fe.
+    const verdict = await assessProviderUrl('http://[::ffff:169.254.169.254]/latest/meta-data/');
     expect(verdict.allowed).toBe(false);
     expect(verdict.reason).toMatch(/metadata/);
   });

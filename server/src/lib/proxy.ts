@@ -315,6 +315,8 @@ function socksFetch(
  * to `undefined` / `'unknown'` when callers haven't been updated yet —
  * the abort still fires, it just omits the unknown fields.
  */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 export async function proxyFetch(
   url: string,
   init?: RequestInit,
@@ -330,33 +332,61 @@ export async function proxyFetch(
     // metadata / link-local addresses.
     if (platform === 'custom') {
       await assertProviderUrlAllowed(url);
+      // Redirects are never followed for custom providers: fetch()'s default
+      // 'follow' would re-request the Location target WITHOUT re-running the
+      // guard above, so a public base_url answering 302 → an internal or
+      // metadata address would defeat the check. socksFetch (http.request)
+      // never followed redirects; forcing redirect: 'manual' here makes every
+      // path behave the same, and the 3xx is converted to an explicit error
+      // below so the operator sees why instead of a confusing empty body.
+      init = { ...init, redirect: 'manual' };
     }
 
-    // Bypass check: disabled globally, or this platform is exempt.
-    if (shouldBypassProxy(platform)) {
-      return await fetch(url, init);
+    const response = await dispatchFetch(url, init, platform, requestType, timeoutMs);
+
+    if (platform === 'custom' && REDIRECT_STATUSES.has(response.status)) {
+      const location = response.headers.get('location') ?? 'an unspecified location';
+      throw new Error(
+        `Custom provider URL blocked: upstream redirected (${response.status}) to ${location}; ` +
+        'redirects are not followed for custom providers, point base_url directly at the API',
+      );
     }
-
-    const resolved = await resolveDispatcher();
-
-    // No dispatcher (no proxy URL configured, or it failed to build) → direct
-    if (!resolved) {
-      return await fetch(url, init);
-    }
-
-    // SOCKS proxy → http/https fallback
-    if (resolved.isSocks) {
-      return await socksFetch(url, init, resolved.dispatcher as http.Agent, platform, requestType, timeoutMs);
-    }
-
-    // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
-    return await fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+    return response;
   } catch (err) {
     // Rewrite bare "The operation was aborted" rejections so they carry the
     // compact triage tag. Preserves the AbortError name so
     // `isRetryableError()` still classifies the failure as retryable.
     throw enrichAbort(err, platform, requestType, timeoutMs);
   }
+}
+
+/** Route the request through the configured proxy (or straight to fetch). */
+async function dispatchFetch(
+  url: string,
+  init: RequestInit | undefined,
+  platform: string | undefined,
+  requestType: ProxyRequestType,
+  timeoutMs: number | undefined,
+): Promise<Response> {
+  // Bypass check: disabled globally, or this platform is exempt.
+  if (shouldBypassProxy(platform)) {
+    return fetch(url, init);
+  }
+
+  const resolved = await resolveDispatcher();
+
+  // No dispatcher (no proxy URL configured, or it failed to build) → direct
+  if (!resolved) {
+    return fetch(url, init);
+  }
+
+  // SOCKS proxy → http/https fallback
+  if (resolved.isSocks) {
+    return socksFetch(url, init, resolved.dispatcher as http.Agent, platform, requestType, timeoutMs);
+  }
+
+  // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
+  return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
 }
 
 /**

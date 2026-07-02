@@ -23,6 +23,11 @@ import net from 'node:net';
 //     instances hosted on a VPS where the dashboard is exposed).
 //   - Everything else (public addresses): allowed.
 //
+// Related: proxyFetch refuses HTTP redirects from custom providers outright —
+// following one would re-request the Location target without re-running this
+// guard, so a public base_url answering 302 → an internal address would
+// otherwise defeat every check in this file.
+//
 // Known limitation: hostnames are resolved and classified here, but the
 // actual fetch re-resolves DNS, so a hostile authoritative DNS server could
 // still rebind between check and use. Pinning the resolved address into the
@@ -37,11 +42,15 @@ const METADATA_HOSTNAMES = new Set([
   'metadata.goog',
 ]);
 
-// Exact metadata addresses that sit outside the link-local range.
+// Exact IPv4 metadata addresses that sit outside the link-local range.
 const METADATA_ADDRESSES = new Set([
   '100.100.100.200', // Alibaba Cloud IMDS
-  'fd00:ec2::254', // AWS IMDSv2 IPv6
+  '192.0.0.192', // Oracle Cloud legacy IMDS
 ]);
+
+// AWS IMDSv2 IPv6 (fd00:ec2::254) as its eight expanded hextets, so every
+// spelling (compressed, uncompressed, zero-padded) matches.
+const AWS_IMDS_V6 = [0xfd00, 0x0ec2, 0, 0, 0, 0, 0, 0x0254];
 
 function classifyIpv4(ip: string): AddressClass {
   const octets = ip.split('.').map(Number);
@@ -59,17 +68,59 @@ function classifyIpv4(ip: string): AddressClass {
   return 'public';
 }
 
+/**
+ * Expand an IPv6 literal into its eight 16-bit hextets. Handles `::`
+ * compression, an embedded dotted-IPv4 tail (::ffff:169.254.169.254), and
+ * zone ids. Returns null for anything that isn't a well-formed address.
+ */
+function expandIpv6(ip: string): number[] | null {
+  let s = ip.toLowerCase();
+  const zone = s.indexOf('%');
+  if (zone !== -1) s = s.slice(0, zone);
+  const lastColon = s.lastIndexOf(':');
+  if (s.indexOf('.', lastColon) !== -1) {
+    // Dotted-IPv4 tail → fold into the last two hextets.
+    const octets = s.slice(lastColon + 1).split('.').map(Number);
+    if (octets.length !== 4 || octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) return null;
+    s = s.slice(0, lastColon + 1)
+      + ((octets[0] << 8) | octets[1]).toString(16) + ':'
+      + ((octets[2] << 8) | octets[3]).toString(16);
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = 8 - head.length - tail.length;
+  if (halves.length === 2 ? fill < 0 : fill !== 0) return null;
+  const groups = [...head, ...new Array(halves.length === 2 ? fill : 0).fill('0'), ...tail];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => parseInt(g, 16));
+}
+
 function classifyIpv6(ip: string): AddressClass {
-  const lower = ip.toLowerCase();
-  // IPv4-mapped (::ffff:a.b.c.d) — classify the embedded IPv4.
-  const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return classifyIpv4(mapped[1]);
-  if (METADATA_ADDRESSES.has(lower)) return 'metadata';
-  if (lower === '::1' || lower === '::') return 'loopback';
-  const firstHextet = lower.split(':')[0] || '0';
-  const value = parseInt(firstHextet.padStart(4, '0'), 16);
-  if ((value & 0xffc0) === 0xfe80) return 'link-local'; // fe80::/10
-  if ((value & 0xfe00) === 0xfc00) return 'private'; // fc00::/7 (ULA)
+  const hextets = expandIpv6(ip);
+  // net.isIP already vetted the input, so this branch is unreachable in
+  // practice — but an unparseable address must not classify as public.
+  if (!hextets) return 'link-local';
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = hextets;
+  const embedded = `${h6 >> 8}.${h6 & 0xff}.${h7 >> 8}.${h7 & 0xff}`;
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0) {
+    // ::ffff:0:0/96 (IPv4-mapped) and ::/96 (deprecated IPv4-compatible,
+    // which also covers :: and ::1 → 0.0.0.0 / 0.0.0.1 → loopback). The
+    // WHATWG URL parser canonicalises mapped literals to the HEX form —
+    // http://[::ffff:169.254.169.254]/ parses to hostname ::ffff:a9fe:a9fe —
+    // so classification must go through the expanded hextets; a dotted-form
+    // string match never fires on URL-sourced hostnames.
+    if (h5 === 0xffff || h5 === 0) return classifyIpv4(embedded);
+  }
+  // NAT64 well-known prefix (64:ff9b::/96) — a NAT64 gateway would route
+  // this straight to the embedded IPv4.
+  if (h0 === 0x64 && h1 === 0xff9b && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
+    return classifyIpv4(embedded);
+  }
+  if (AWS_IMDS_V6.every((h, i) => h === hextets[i])) return 'metadata';
+  if ((h0 & 0xffc0) === 0xfe80) return 'link-local'; // fe80::/10
+  if ((h0 & 0xfe00) === 0xfc00) return 'private'; // fc00::/7 (ULA)
   return 'public';
 }
 

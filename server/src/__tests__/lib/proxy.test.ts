@@ -99,6 +99,62 @@ describe('proxyFetch routing', () => {
   });
 });
 
+// SSRF guard, request-time half (#440). The save-time check validates the
+// literal base_url, but fetch()'s default redirect: 'follow' would re-request
+// a 3xx Location target with no re-validation — a public base_url answering
+// 302 → http://169.254.169.254/ used to defeat the guard entirely. Custom
+// providers therefore never follow redirects; the 3xx becomes an explicit
+// error naming the target so the operator can fix base_url.
+describe('proxyFetch custom-provider redirect guard', () => {
+  const redirectResponse = (status: number, location?: string) =>
+    ({ ok: false, status, headers: new Headers(location ? { location } : {}) }) as Response;
+
+  it('forces redirect: "manual" on custom-provider requests', async () => {
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    await proxyFetch('http://93.184.216.34/v1/chat/completions', { method: 'POST' }, 'custom');
+    const [, init] = spy.mock.calls[0];
+    expect((init as any)?.redirect).toBe('manual');
+  });
+
+  it('rejects a custom-provider 302 instead of following it', async () => {
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      redirectResponse(302, 'http://169.254.169.254/latest/meta-data/'),
+    );
+    await expect(proxyFetch('http://93.184.216.34/v1', { method: 'POST' }, 'custom'))
+      .rejects.toThrow(/redirects are not followed/);
+    // The Location target is never requested.
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects every redirect status the same way', async () => {
+    for (const status of [301, 303, 307, 308]) {
+      vi.spyOn(global, 'fetch').mockResolvedValue(redirectResponse(status, 'http://10.0.0.1/'));
+      await expect(proxyFetch('http://93.184.216.34/v1', undefined, 'custom'))
+        .rejects.toThrow(new RegExp(`redirected \\(${status}\\)`));
+    }
+  });
+
+  it('names the redirect target in the error so the operator can fix base_url', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(redirectResponse(301, 'https://api.example.com/v1/'));
+    await expect(proxyFetch('http://93.184.216.34/v1', undefined, 'custom'))
+      .rejects.toThrow(/https:\/\/api\.example\.com\/v1\//);
+  });
+
+  it('passes 3xx responses through untouched for built-in platforms', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(redirectResponse(302, 'https://elsewhere.example.com/'));
+    const res = await proxyFetch('https://api.example.com/v1', undefined, 'groq');
+    expect(res.status).toBe(302);
+  });
+
+  it('blocks hex-form IPv4-mapped metadata literals before any fetch happens', async () => {
+    // new URL() canonicalises [::ffff:169.254.169.254] to [::ffff:a9fe:a9fe].
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    await expect(proxyFetch('http://[::ffff:169.254.169.254]/latest/', undefined, 'custom'))
+      .rejects.toThrow(/metadata/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
 // Compact abort-error triage tag formatting. The string written to
 // `requests.error` is `The operation was aborted (<platform>, <type>, <N>s)`
 // — round-trip what's already on the row so an operator can read the abort
