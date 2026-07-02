@@ -643,13 +643,32 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   const rrKey = `${entry.platform}:${entry.model_id}`;
   let idx = roundRobinIndex.get(rrKey) ?? 0;
 
+  // A custom model belongs to ONE endpoint (base_url), but that endpoint may now
+  // have SEVERAL keys (a rotation pool). Resolve the model's endpoint once from
+  // its bound key_id, so the loop below can rotate across every key sharing this
+  // base_url (and still exclude keys for OTHER custom endpoints).
+  let customEndpoint: string | null = null;
+  if (entry.platform === 'custom' && entry.key_id != null) {
+    const row = db.prepare('SELECT base_url FROM api_keys WHERE id = ?')
+      .get(entry.key_id) as { base_url: string | null } | undefined;
+    customEndpoint = row?.base_url ?? null;
+  }
+
   for (let attempt = 0; attempt < keys.length; attempt++) {
     const key = keys[idx % keys.length];
     idx++;
 
-    // A custom model belongs to exactly one endpoint (#212); legacy rows
-    // (key_id NULL) keep the old any-key match.
-    if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) { note('custom-key-mismatch'); continue; }
+    // Keep a custom model on its OWN endpoint: rotate across every key sharing
+    // its base_url, but skip keys belonging to a different custom endpoint.
+    // (#212 + multi-key pool) If the endpoint base_url can't be resolved, fall
+    // back to the legacy exact-key match. Legacy rows (key_id NULL) match any.
+    if (entry.platform === 'custom' && entry.key_id != null) {
+      if (customEndpoint != null) {
+        if (key.base_url !== customEndpoint) { note('custom-key-mismatch'); continue; }
+      } else if (key.id !== entry.key_id) {
+        note('custom-key-mismatch'); continue;
+      }
+    }
 
     const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
     if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }

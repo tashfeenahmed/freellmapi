@@ -294,6 +294,9 @@ const customProviderSchema = z.object({
   models: z.array(modelEntrySchema).optional(),
   displayName: z.string().optional(),
   apiKey: z.string().optional(),
+  // Extra interchangeable keys for the SAME endpoint — the router round-robins
+  // across all of them (rotation pool). Re-submitting replaces the extra pool.
+  extraKeys: z.array(z.string()).optional(),
   label: z.string().optional(),
 }).refine(
   d => (d.model && d.model.trim().length > 0) || (d.models && d.models.length > 0),
@@ -321,6 +324,12 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // Local servers often need no key; keep a sentinel so there's always a bearer.
   const providedKey = parsed.data.apiKey?.trim() || undefined;
   const label = parsed.data.label?.trim() || undefined;
+  // Extra rotation-pool keys for this endpoint: trimmed, non-empty, deduped, and
+  // never a copy of the primary (it already gets its own row).
+  const primaryKey = providedKey ?? 'no-key';
+  const extraKeys = [...new Set(
+    (parsed.data.extraKeys ?? []).map(k => k.trim()).filter(k => k && k !== primaryKey)
+  )];
 
   // Flatten singular + plural inputs into one list, dedupe by model id, drop
   // blanks. The singular `displayName` only applies to a lone `model` (it can't
@@ -408,10 +417,27 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
     }
 
-    return { keyId, registered, storedKeyForMask };
+    // Rebuild this endpoint's EXTRA key pool. Drop the previous extra rows (custom
+    // rows sharing this base_url that no model binds to and aren't the primary),
+    // then insert the freshly-submitted ones. The router rotates across the
+    // primary + every extra that shares this base_url.
+    db.prepare(`
+      DELETE FROM api_keys
+       WHERE platform = 'custom' AND base_url = ? AND id != ?
+         AND id NOT IN (SELECT key_id FROM models WHERE key_id IS NOT NULL)
+    `).run(baseUrl, keyId);
+    for (const extra of extraKeys) {
+      const { encrypted, iv, authTag } = encrypt(extra);
+      db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
+      `).run(`${label ?? 'Custom'} (pool)`, encrypted, iv, authTag, baseUrl);
+    }
+
+    return { keyId, registered, storedKeyForMask, extraPool: extraKeys.length };
   });
 
-  const { keyId, registered, storedKeyForMask } = upsert();
+  const { keyId, registered, storedKeyForMask, extraPool } = upsert();
   // `model`/`displayName`/`modelDbId` echo the first model for older clients;
   // `models` carries the full set registered in this call.
   const first = registered[0]!;
@@ -425,6 +451,7 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     displayName: first.displayName,
     models: registered,
     maskedKey: maskKey(storedKeyForMask),
+    poolKeys: 1 + extraPool,
   });
 });
 

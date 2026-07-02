@@ -358,3 +358,40 @@ describe('Custom Provider Endpoints', () => {
     });
   });
 });
+
+// Isolated DB so the global custom-key counts in the block above stay intact.
+describe('custom provider key rotation pool', () => {
+  let app: Express;
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    getDb().prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
+    app = createApp();
+    dashToken = mintDashboardToken();
+  });
+
+  it('builds a pool from extraKeys and replaces it on re-submit (primary preserved)', async () => {
+    const base = 'http://127.0.0.1:9991/v1';
+    const r1 = await post(app, '/api/keys/custom', {
+      baseUrl: base, model: 'pool-model', apiKey: 'primary', extraKeys: ['k2', 'k3', 'k2', '  ', 'primary'],
+    });
+    expect(r1.status).toBe(201);
+    expect(r1.body.poolKeys).toBe(3); // primary + 2 unique extras (dupes/blank/self dropped)
+
+    const db = getDb();
+    const count = () =>
+      (db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom' AND base_url = ?").get(base) as { n: number }).n;
+    expect(count()).toBe(3);
+
+    const primaryId = r1.body.keyId;
+    const model = db.prepare("SELECT key_id FROM models WHERE platform = 'custom' AND model_id = 'pool-model'")
+      .get() as { key_id: number };
+    expect(model.key_id).toBe(primaryId); // model stays bound to the primary key
+
+    // Re-submit with a smaller pool → extras rebuilt, primary row + binding kept.
+    const r2 = await post(app, '/api/keys/custom', { baseUrl: base, model: 'pool-model', apiKey: 'primary', extraKeys: ['only2'] });
+    expect(r2.body.poolKeys).toBe(2);
+    expect(r2.body.keyId).toBe(primaryId);
+    expect(count()).toBe(2);
+  });
+});
