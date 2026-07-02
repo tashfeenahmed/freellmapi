@@ -6,7 +6,7 @@
 // token budget. Each platform has a small adapter here; routing fails over
 // across the providers serving the same modality. The rows are maintained in the
 // published catalog and arrive via catalog-sync (premium on the live tier within
-// ~12h, free at the monthly promote) — never seeded by migrations.
+// ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
