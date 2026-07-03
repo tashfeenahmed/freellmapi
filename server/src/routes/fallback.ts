@@ -130,7 +130,8 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       monthlyTokenBudget: r.monthly_token_budget,
       // Parsed once here (single source of truth) so the dashboard never re-implements
       // budget-label parsing; 0 for rate-limited/placeholder labels. See lib/budget.ts.
-      monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget),
+      // Scaled by healthy/enabled key count for multi-account pooled capacity.
+      monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget) * Math.max(1, keyCountMap.get(r.platform) ?? 1),
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
       source: r.platform === 'custom' || r.key_id != null ? 'custom' : 'catalog',
@@ -295,21 +296,29 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   `).all() as { platform: string; model_id: string; used: number }[];
   const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
 
+  const keyCountMap = new Map(
+    (db.prepare("SELECT platform, COUNT(*) as count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+      .map(k => [k.platform, k.count])
+  );
+
   const modelBudgets = rawModels
     .filter(m => platformSet.has(m.platform))
-    .map(m => ({
-      modelDbId: m.model_db_id,
-      displayName: m.display_name,
-      platform: m.platform,
-      modelId: m.model_id,
-      budget: parseBudget(m.monthly_token_budget),
-      used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
-      enabled: m.enabled === 1,
-      rpmLimit: m.rpm_limit,
-      rpdLimit: m.rpd_limit,
-      tpmLimit: m.tpm_limit,
-      tpdLimit: m.tpd_limit,
-    }));
+    .map(m => {
+      const keys = Math.max(1, keyCountMap.get(m.platform) ?? 1);
+      return {
+        modelDbId: m.model_db_id,
+        displayName: m.display_name,
+        platform: m.platform,
+        modelId: m.model_id,
+        budget: parseBudget(m.monthly_token_budget) * keys,
+        used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
+        enabled: m.enabled === 1,
+        rpmLimit: m.rpm_limit,
+        rpdLimit: m.rpd_limit,
+        tpmLimit: m.tpm_limit,
+        tpdLimit: m.tpd_limit,
+      };
+    });
 
   // Total budget counts all models (both enabled and disabled — they contribute to the pool)
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
