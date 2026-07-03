@@ -195,7 +195,6 @@ npm run dev
 git clone https://github.com/tashfeenahmed/freellmapi.git
 cd freellmapi
 npm install
-Copy-Item .env.example .env
 $ENCRYPTION_KEY = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 "ENCRYPTION_KEY=$ENCRYPTION_KEY`nPORT=3001" | Out-File -Encoding utf8 .env
 npm run dev
