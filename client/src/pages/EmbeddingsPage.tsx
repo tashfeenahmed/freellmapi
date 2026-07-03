@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import { TokenUsageBar } from './FallbackPage'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -36,7 +37,9 @@ interface EmbeddingsData {
 }
 
 interface UsageData {
-  families: { family: string; requestsToday: number; tokensMonth: number }[]
+  totalBudget?: number
+  totalUsed?: number
+  families: { family: string; displayName?: string; platform?: string; budget?: number; used?: number; requestsToday: number; tokensMonth: number }[]
 }
 
 function formatTokens(n: number): string {
@@ -134,6 +137,20 @@ export default function EmbeddingsPage() {
           {t('embeddings.autoDescription')}
         </p>
 
+        {usage?.totalBudget !== undefined && usage.totalBudget > 0 && (
+          <TokenUsageBar
+            data={{
+              totalBudget: usage.totalBudget,
+              totalUsed: usage.totalUsed ?? 0,
+              models: (usage.families ?? []).map(f => ({
+                displayName: f.family,
+                platform: f.platform ?? 'cloudflare',
+                budget: f.budget ?? 0,
+                used: f.used ?? 0,
+              })),
+            }}
+          />
+        )}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
