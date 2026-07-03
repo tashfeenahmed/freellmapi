@@ -95,7 +95,7 @@ function getProviderCredential(row: MediaModelRow): ProviderCredential | null {
   if (row.platform === 'custom') return null;
 
   const keyRow = getDb()
-    .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id LIMIT 1")
+    .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY RANDOM() LIMIT 1")
     .get(row.platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
   if (!keyRow) return null;
   try {
