@@ -302,6 +302,7 @@ function upsertModel(db: Database.Database, input: z.infer<typeof modelSchema>):
     contextWindow: 'context_window',
     supportsVision: 'supports_vision',
     supportsTools: 'supports_tools',
+    enabled: 'enabled',
   };
   for (const key of Object.keys(patch) as Array<keyof ModelOverridePatch>) {
     assignments.push(`${columnMap[key]} = ?`);
