@@ -218,8 +218,7 @@ describe('embeddings service', () => {
           (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
         VALUES ('local-embed', 'custom', 'local-embed-v1', 'Local Embed', 3, NULL, 1, 1, '', ?)
       `).run(keyId);
-      const fetchMock = vi.fn(async () => okEmbeddingResponse(3));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(3));
 
       const result = await runEmbeddings('local-embed', ['hello']);
 
@@ -235,16 +234,6 @@ describe('embeddings service', () => {
     });
 
     describe('dimensions parameter (MRL truncation)', () => {
-      // Typed fetch mock so .mock.calls is properly indexed without `as any`.
-      // The cast on assignment to globalThis.fetch is unavoidable because
-      // globalThis.fetch in lib.dom is typed loosely; this is the same
-      // pattern the existing tests in this file use.
-      function mockFetch(impl: typeof fetch): MockedFunction<typeof fetch> {
-        const m = vi.fn(impl) as MockedFunction<typeof fetch>;
-        globalThis.fetch = m as unknown as typeof fetch;
-        return m;
-      }
-
       it('forwards dimensions to NVIDIA NeMo NIM in the request body', async () => {
         addKey('nvidia');
         const fetchMock = mockFetch(async () => okEmbeddingResponse(1536));
