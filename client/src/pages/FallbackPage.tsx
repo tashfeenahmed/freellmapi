@@ -286,7 +286,7 @@ export function groupQuotaBadge(
   return null
 }
 
-interface TokenUsageData {
+export interface TokenUsageData {
   totalBudget: number
   totalUsed: number
   models: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
@@ -332,7 +332,7 @@ export function AxisBar({ value, color }: { value: number | undefined; color: st
 // Legend rows visible while collapsed (~6 rows: 6 × 16px line + 5 × 6px gap).
 const LEGEND_COLLAPSED_PX = 126
 
-function TokenUsageBar({ data }: { data: TokenUsageData }) {
+export function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { t } = useI18n()
   const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)

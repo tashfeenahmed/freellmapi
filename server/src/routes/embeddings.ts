@@ -284,10 +284,44 @@ embeddingsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+function parseEmbeddingQuotaLabel(label: string): number {
+  if (!label) return 0;
+  if (label.includes('neurons/day')) {
+    const match = label.match(/(\d+)K\s*neurons/i);
+    const kNeurons = match ? parseInt(match[1]) : 10;
+    return kNeurons * 100_000 * 30; // 10K neurons/day ~ 30M tokens/month
+  }
+  if (label.includes('/mo credits')) {
+    const match = label.match(/\$([\d.]+)/);
+    const dollars = match ? parseFloat(match[1]) : 0.10;
+    return Math.round(dollars * 20_000_000); // $0.10/mo ~ 2M tokens
+  }
+  return 0;
+}
+
 // Per-family usage: requests today (most embedding quotas are daily/RPM) and
 // tokens this calendar month, from the tagged request log.
 embeddingsRouter.get('/usage', (_req: Request, res: Response) => {
   const db = getDb();
+  const keyCountMap = new Map(
+    (db.prepare("SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+      .map(k => [k.platform, k.count])
+  );
+
+  const models = db.prepare("SELECT id, family, platform, model_id, display_name, quota_label FROM embedding_models WHERE enabled = 1").all() as { id: number; family: string; platform: string; model_id: string; display_name: string; quota_label: string }[];
+
+  const familyMap = new Map<string, { budget: number; platform: string; displayName: string }>();
+  models.forEach(m => {
+    const keys = Math.max(1, keyCountMap.get(m.platform) ?? 1);
+    const b = parseEmbeddingQuotaLabel(m.quota_label) * keys;
+    const existing = familyMap.get(m.family);
+    if (!existing) {
+      familyMap.set(m.family, { budget: b, platform: m.platform, displayName: m.family });
+    } else {
+      existing.budget += b;
+    }
+  });
+
   const usage = db.prepare(`
     SELECT em.family,
            COALESCE(SUM(CASE WHEN r.created_at >= datetime('now', 'start of day') THEN 1 ELSE 0 END), 0) AS requests_today,
@@ -302,11 +336,28 @@ embeddingsRouter.get('/usage', (_req: Request, res: Response) => {
     GROUP BY em.family
   `).all() as { family: string; requests_today: number; tokens_month: number }[];
 
-  res.json({
-    families: usage.map(u => ({
+  let totalBudget = 0;
+  let totalUsed = 0;
+
+  const families = usage.map(u => {
+    const info = familyMap.get(u.family);
+    const budget = info?.budget ?? 0;
+    totalBudget += budget;
+    totalUsed += u.tokens_month;
+    return {
       family: u.family,
+      displayName: u.family,
+      platform: info?.platform ?? 'cloudflare',
+      budget,
+      used: u.tokens_month,
       requestsToday: u.requests_today,
       tokensMonth: u.tokens_month,
-    })),
+    };
+  });
+
+  res.json({
+    totalBudget,
+    totalUsed,
+    families,
   });
 });
