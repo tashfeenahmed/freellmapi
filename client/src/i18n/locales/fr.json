@@ -297,7 +297,8 @@
     "fusionTrace": "{count} réponses de modèles",
     "fusionFailed": "aucune réponse",
     "fusionJudgeSynth": "a synthétisé la réponse finale",
-    "errorPrefix": "Erreur :"
+    "errorPrefix": "Erreur :",
+    "errorTitle": "La requête a échoué"
   },
   "embeddings": {
     "title": "Modèles",

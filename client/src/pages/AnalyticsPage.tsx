@@ -5,7 +5,7 @@ import {
   LineChart, Line, Legend,
 } from 'recharts'
 import { apiFetch } from '@/lib/api'
-import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PageHeader } from '@/components/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -126,18 +126,15 @@ export default function AnalyticsPage() {
         title={t('analytics.title')}
         description={t('analytics.description')}
         actions={
-          <div className="flex gap-1 rounded-lg border p-0.5">
-            {(['24h', '7d', '30d'] as TimeRange[]).map(r => (
-              <Button
-                key={r}
-                variant={range === r ? 'secondary' : 'ghost'}
-                size="xs"
-                onClick={() => setRange(r)}
-              >
-                {t(r === '24h' ? 'analytics.range24h' : r === '7d' ? 'analytics.range7d' : 'analytics.range30d')}
-              </Button>
-            ))}
-          </div>
+          <SegmentedControl
+            value={range}
+            onValueChange={setRange}
+            options={(['24h', '7d', '30d'] as TimeRange[]).map(r => ({
+              value: r,
+              label: t(r === '24h' ? 'analytics.range24h' : r === '7d' ? 'analytics.range7d' : 'analytics.range30d'),
+            }))}
+            ariaLabel={t('analytics.title')}
+          />
         }
       />
 

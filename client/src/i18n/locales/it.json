@@ -318,7 +318,8 @@
     "fusionTrace": "{count} risposte modello",
     "fusionFailed": "nessuna risposta",
     "fusionJudgeSynth": "ha sintetizzato la risposta finale",
-    "errorPrefix": "Errore:"
+    "errorPrefix": "Errore:",
+    "errorTitle": "Richiesta non riuscita"
   },
   "embeddings": {
     "title": "Modelli",

@@ -376,7 +376,8 @@
     "fusionJudgeSynth": "synthesized the final answer",
     "errorPrefix": "Error:",
     "systemPromptLabel": "System prompt",
-    "systemPromptPlaceholder": "Optional. Sent as a system message before your chat."
+    "systemPromptPlaceholder": "Optional. Sent as a system message before your chat.",
+    "errorTitle": "Request failed"
   },
   "embeddings": {
     "title": "Models",

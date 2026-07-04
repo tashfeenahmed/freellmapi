@@ -297,7 +297,8 @@
     "fusionTrace": "{count} respostas de modelos",
     "fusionFailed": "sem resposta",
     "fusionJudgeSynth": "sintetizou a resposta final",
-    "errorPrefix": "Erro:"
+    "errorPrefix": "Erro:",
+    "errorTitle": "A solicitação falhou"
   },
   "embeddings": {
     "title": "Modelos",

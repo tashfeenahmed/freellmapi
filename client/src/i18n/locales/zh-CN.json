@@ -320,7 +320,8 @@
     "fusionJudgeSynth": "综合出最终答案",
     "errorPrefix": "错误:",
     "systemPromptLabel": "系统提示词",
-    "systemPromptPlaceholder": "可选。作为系统消息在你的对话之前发送。"
+    "systemPromptPlaceholder": "可选。作为系统消息在你的对话之前发送。",
+    "errorTitle": "请求失败"
   },
   "embeddings": {
     "title": "模型",

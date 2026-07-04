@@ -6,6 +6,7 @@ import { ConfirmButton } from '@/components/confirm-button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -1051,20 +1052,12 @@ export default function KeysPage() {
                 {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
               </Button>
             )}
-            <div className="inline-flex gap-1 rounded-xl border p-1">
-              {KEYS_TABS.map(tb => (
-                <button
-                  key={tb.id}
-                  type="button"
-                  onClick={() => setTab(tb.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                    tab === tb.id ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t(tb.labelKey)}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              value={tab}
+              onValueChange={setTab}
+              options={KEYS_TABS.map(tb => ({ value: tb.id, label: t(tb.labelKey) }))}
+              ariaLabel={t('keys.pageTitle')}
+            />
           </>
         }
       />

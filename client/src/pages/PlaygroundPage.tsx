@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, ChevronsUpDown, Check, Search } from 'lucide-react'
+import { ChevronRight, CircleAlert } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { ModelCombobox } from '@/components/model-combobox'
 import { buildModelOptions } from '@/lib/model-groups'
-import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { Markdown } from '@/components/markdown'
 import { CopyButton } from '@/components/copy-button'
@@ -26,6 +25,9 @@ interface FallbackEntry {
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  // Request-level failure rendered as a distinct error bubble, not a fake
+  // assistant reply.
+  isError?: boolean
   meta?: {
     platform?: string
     model?: string
@@ -129,8 +131,6 @@ export default function PlaygroundPage() {
   const [selectedModel, setSelectedModel] = useState<string>(
     () => localStorage.getItem('playground.model') ?? 'auto',
   )
-  const [modelQuery, setModelQuery] = useState('')
-  const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -253,7 +253,8 @@ export default function PlaygroundPage() {
         const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }))
         setMessages([...newMessages, {
           role: 'assistant',
-          content: `${t('playground.errorPrefix')} ${err.error?.message ?? t('common.unknownError')}`,
+          isError: true,
+          content: err.error?.message ?? t('common.unknownError'),
         }])
         return
       }
@@ -292,7 +293,8 @@ export default function PlaygroundPage() {
     } catch (err: any) {
       setMessages([...newMessages, {
         role: 'assistant',
-        content: `${t('playground.errorPrefix')} ${err.message}`,
+        isError: true,
+        content: err.message,
       }])
     } finally {
       setLoading(false)
@@ -334,17 +336,9 @@ export default function PlaygroundPage() {
         platforms: o.providerCount > 1 ? o.platforms : [],
       })),
   ]
-  // Literal, case-insensitive substring match against name, providers, and id.
-  const modelQ = modelQuery.trim().toLowerCase()
-  const filteredOptions = modelQ
-    ? pickerOptions.filter(o => `${o.label} ${o.sub} ${o.value} ${o.platforms.join(' ')}`.toLowerCase().includes(modelQ))
-    : pickerOptions
-
   function pickModel(v: string) {
     setSelectedModel(v)
     localStorage.setItem('playground.model', v)
-    setModelPickerOpen(false)
-    setModelQuery('')
   }
 
   const activeModelLabel = selectedModel === 'auto'
@@ -360,53 +354,21 @@ export default function PlaygroundPage() {
         description={t('playground.description')}
         actions={
           <>
-            <Popover open={modelPickerOpen} onOpenChange={(o) => { setModelPickerOpen(o); if (!o) setModelQuery('') }}>
-              <PopoverTrigger
-                aria-label={t('playground.selectModel')}
-                className="flex h-8 w-[260px] items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-              >
-                <span className="truncate">{activeModelLabel}</span>
-                <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-[300px] p-0">
-                <div className="flex items-center gap-2 border-b px-3">
-                  <Search className="size-4 shrink-0 text-muted-foreground" />
-                  <input
-                    autoFocus
-                    value={modelQuery}
-                    onChange={e => setModelQuery(e.target.value)}
-                    placeholder={t('playground.searchModels')}
-                    className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
-                <div className="max-h-72 overflow-y-auto p-1">
-                  {filteredOptions.length === 0 ? (
-                    <div className="px-2 py-6 text-center text-xs text-muted-foreground">{t('playground.noModelsFound')}</div>
-                  ) : (
-                    filteredOptions.map(o => (
-                      <button
-                        key={o.value}
-                        type="button"
-                        onClick={() => pickModel(o.value)}
-                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${o.value === selectedModel ? 'bg-accent/50' : ''}`}
-                      >
-                        <Check className={`size-4 shrink-0 ${o.value === selectedModel ? 'opacity-100' : 'opacity-0'}`} />
-                        <span className="min-w-0 flex-1 truncate">{o.label}</span>
-                        {o.isNew && <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">{t('models.newBadge')}</span>}
-                        {o.sub && (o.platforms.length > 1
-                          ? <Tooltip text={t('models.servedBy', { providers: o.platforms.join(', ') })}><span className="shrink-0 text-xs text-muted-foreground underline decoration-dotted underline-offset-2">{o.sub}</span></Tooltip>
-                          : <span className="shrink-0 text-xs text-muted-foreground">{o.sub}</span>)}
-                      </button>
-                    ))
-                  )}
-                  {!modelQ && availableModels.length === 0 && (
-                    // Models only appear once a platform has an enabled key. Without
-                    // one, the list is just Auto/Fusion and looks broken — say why. (#269)
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('playground.noModels')}</div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <ModelCombobox
+              value={selectedModel}
+              options={pickerOptions}
+              onSelect={pickModel}
+              ariaLabel={t('playground.selectModel')}
+              placeholder={t('playground.searchModels')}
+              emptyText={t('playground.noModelsFound')}
+              footer={
+                availableModels.length === 0 ? (
+                  // Models only appear once a platform has an enabled key. Without
+                  // one, the list is just Auto/Fusion and looks broken — say why. (#269)
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('playground.noModels')}</div>
+                ) : undefined
+              }
+            />
             {messages.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleClear}>
                 {t('playground.clear')}
@@ -441,15 +403,27 @@ export default function PlaygroundPage() {
                       {showBubble && (
                         <div
                           className={`group relative rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                            msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                            msg.role === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : msg.isError
+                                ? 'border border-destructive/25 bg-destructive/10 text-destructive'
+                                : 'bg-muted'
                           }`}
                         >
-                          {msg.role === 'assistant' ? (
+                          {msg.isError ? (
+                            <div className="flex items-start gap-2">
+                              <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-medium">{t('playground.errorTitle')}</p>
+                                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                              </div>
+                            </div>
+                          ) : msg.role === 'assistant' ? (
                             <Markdown>{msg.content}</Markdown>
                           ) : (
                             <div className="whitespace-pre-wrap">{msg.content}</div>
                           )}
-                          {msg.role === 'assistant' && msg.content && (
+                          {msg.role === 'assistant' && !msg.isError && msg.content && (
                             <CopyButton
                               text={msg.content}
                               label={t('playground.copyReply')}
