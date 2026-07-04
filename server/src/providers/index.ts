@@ -12,8 +12,10 @@ function register(provider: BaseProvider) {
   providers.set(provider.platform, provider);
 }
 
-// Google - unique Gemini API format
-register(new GoogleProvider());
+// Google - unique Gemini API format. Gemma reasoning variants take 20-60s on
+// cold start; the default 15s false-flags them as broken. 60s covers the
+// bulk; per-call overrides via CompletionOptions.timeoutMs still win.
+register(new GoogleProvider({ timeoutMs: 60_000 }));
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
@@ -37,11 +39,14 @@ register(new OpenAICompatProvider({
 // NVIDIA NIM - OpenAI-compatible. Several NIM models reject parallel tool calls
 // ("This model only supports single tool-calls at once!"), so pin
 // parallel_tool_calls to false when tools are present. See issue #255.
+// Reasoning models (deepseek-v4-pro, llama-4-maverick, llama-3.1/3.3-70b) take
+// 30-60s on cold start; the default 15s false-flags them as broken. 90s.
 register(new OpenAICompatProvider({
   platform: 'nvidia',
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   forceSingleToolCall: true,
+  timeoutMs: 90_000,
 }));
 
 // Mistral - OpenAI-compatible

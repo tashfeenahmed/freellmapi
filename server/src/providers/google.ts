@@ -402,9 +402,22 @@ function toGeminiStopSequences(stop: CompletionOptions['stop']): string[] | unde
   return Array.isArray(stop) ? stop : [stop];
 }
 
+export interface GoogleProviderOptions {
+  /** Per-provider HTTP timeout override. Some Gemini models (notably
+   *  Gemma reasoning variants) take 20-60s on cold start; the OpenAI-compat
+   *  default of 15s false-flags them as broken. Mirrors OpenAICompatProvider. */
+  timeoutMs?: number;
+}
+
 export class GoogleProvider extends BaseProvider {
   readonly platform = 'google' as const;
   readonly name = 'Google AI Studio';
+  private readonly timeoutMs: number;
+
+  constructor(opts: GoogleProviderOptions = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? 15000;
+  }
 
   async chatCompletion(
     apiKey: string,
@@ -436,7 +449,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
@@ -511,7 +524,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
