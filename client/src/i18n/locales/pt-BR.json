@@ -61,7 +61,8 @@
     "model": "Modelo",
     "provider": "Provedor",
     "success": "Sucessos",
-    "failures": "Falhas"
+    "failures": "Falhas",
+    "dismiss": "Dispensar"
   },
   "models": {
     "title": "Modelos",
@@ -387,5 +388,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "Algo deu errado",
+    "boundaryDescription": "O painel encontrou um erro inesperado. Seus dados estão seguros. Tente novamente ou volte para a página de modelos.",
+    "tryAgain": "Tentar novamente",
+    "goHome": "Voltar aos modelos"
+  },
+  "notFound": {
+    "title": "Página não encontrada",
+    "description": "Esta página não existe ou pode ter sido movida."
   }
 }

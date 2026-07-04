@@ -61,7 +61,8 @@
     "model": "Model",
     "provider": "Provider",
     "success": "Success",
-    "failures": "Failures"
+    "failures": "Failures",
+    "dismiss": "Dismiss"
   },
   "models": {
     "title": "Models",
@@ -466,5 +467,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "Something went wrong",
+    "boundaryDescription": "The dashboard hit an unexpected error. Your data is safe. Try again or go back to the models page.",
+    "tryAgain": "Try again",
+    "goHome": "Back to models"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "This page does not exist or may have moved."
   }
 }

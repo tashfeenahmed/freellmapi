@@ -61,7 +61,8 @@
     "model": "Modelo",
     "provider": "Proveedor",
     "success": "Aciertos",
-    "failures": "Fallos"
+    "failures": "Fallos",
+    "dismiss": "Descartar"
   },
   "models": {
     "title": "Modelos",
@@ -387,5 +388,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "Algo salió mal",
+    "boundaryDescription": "El panel encontró un error inesperado. Tus datos están a salvo. Inténtalo de nuevo o vuelve a la página de modelos.",
+    "tryAgain": "Intentar de nuevo",
+    "goHome": "Volver a modelos"
+  },
+  "notFound": {
+    "title": "Página no encontrada",
+    "description": "Esta página no existe o puede haberse movido."
   }
 }

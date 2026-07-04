@@ -61,7 +61,8 @@
     "model": "Modèle",
     "provider": "Fournisseur",
     "success": "Réussite",
-    "failures": "Échecs"
+    "failures": "Échecs",
+    "dismiss": "Fermer"
   },
   "models": {
     "title": "Modèles",
@@ -387,5 +388,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "Une erreur est survenue",
+    "boundaryDescription": "Le tableau de bord a rencontré une erreur inattendue. Vos données sont en sécurité. Réessayez ou revenez à la page des modèles.",
+    "tryAgain": "Réessayer",
+    "goHome": "Retour aux modèles"
+  },
+  "notFound": {
+    "title": "Page introuvable",
+    "description": "Cette page n'existe pas ou a peut-être été déplacée."
   }
 }

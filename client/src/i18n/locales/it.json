@@ -61,7 +61,8 @@
     "model": "Modello",
     "provider": "Fornitore",
     "success": "Successo",
-    "failures": "Fallimenti"
+    "failures": "Fallimenti",
+    "dismiss": "Chiudi"
   },
   "models": {
     "title": "Modelli",
@@ -408,5 +409,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "Qualcosa è andato storto",
+    "boundaryDescription": "La dashboard ha riscontrato un errore imprevisto. I tuoi dati sono al sicuro. Riprova o torna alla pagina dei modelli.",
+    "tryAgain": "Riprova",
+    "goHome": "Torna ai modelli"
+  },
+  "notFound": {
+    "title": "Pagina non trovata",
+    "description": "Questa pagina non esiste o potrebbe essere stata spostata."
   }
 }

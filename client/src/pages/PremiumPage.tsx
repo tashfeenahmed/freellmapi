@@ -62,6 +62,7 @@ export default function PremiumPage() {
   }
 
   const activate = useMutation({
+    meta: { silenceToast: true },
     mutationFn: (key: string) =>
       apiFetch('/api/premium/key', { method: 'POST', body: JSON.stringify({ key }) }),
     onSuccess: () => {
@@ -81,6 +82,7 @@ export default function PremiumPage() {
   })
 
   const openPortal = useMutation({
+    meta: { silenceToast: true },
     mutationFn: () => apiFetch<{ url: string }>('/api/premium/portal', { method: 'POST' }),
     onSuccess: ({ url }) => {
       window.open(url, '_blank', 'noopener')

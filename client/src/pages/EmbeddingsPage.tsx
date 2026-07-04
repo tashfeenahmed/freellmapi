@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { ConfirmButton } from '@/components/confirm-button'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
@@ -212,15 +213,13 @@ export default function EmbeddingsPage() {
                         onCheckedChange={(c) => updateProvider(f.family, p.id, { enabled: c })}
                       />
                       {p.isCustom && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
+                        <ConfirmButton
                           className="text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteCustom.mutate(p.id)}
+                          onConfirm={() => deleteCustom.mutate(p.id)}
                           disabled={deleteCustom.isPending}
                         >
                           {t('common.remove')}
-                        </Button>
+                        </ConfirmButton>
                       )}
                     </div>
                   ))}

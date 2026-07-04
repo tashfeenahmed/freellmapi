@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { Button } from '@/components/ui/button'
+import { ConfirmButton } from '@/components/confirm-button'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { useI18n } from '@/i18n'
@@ -124,15 +124,13 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
                         onCheckedChange={(c) => toggle.mutate({ id: m.id, enabled: c })}
                       />
                       {m.isCustom && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
+                        <ConfirmButton
                           className="text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteCustom.mutate(m.id)}
+                          onConfirm={() => deleteCustom.mutate(m.id)}
                           disabled={deleteCustom.isPending}
                         >
                           {t('common.remove')}
-                        </Button>
+                        </ConfirmButton>
                       )}
                     </div>
                   ))}

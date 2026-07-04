@@ -61,7 +61,8 @@
     "model": "模型",
     "provider": "提供方",
     "success": "成功",
-    "failures": "失败"
+    "failures": "失败",
+    "dismiss": "关闭"
   },
   "models": {
     "title": "模型",
@@ -410,5 +411,15 @@
     "es": "Español",
     "pt-BR": "Português (Brasil)",
     "it": "Italiano"
+  },
+  "errors": {
+    "boundaryTitle": "出错了",
+    "boundaryDescription": "仪表盘遇到了意外错误。您的数据是安全的。请重试或返回模型页面。",
+    "tryAgain": "重试",
+    "goHome": "返回模型页"
+  },
+  "notFound": {
+    "title": "页面未找到",
+    "description": "此页面不存在或已被移动。"
   }
 }

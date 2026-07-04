@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { ConfirmButton } from '@/components/confirm-button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -280,6 +281,7 @@ function ProxySettingsSection() {
   }, [data?.proxyUrl])
 
   const saveProxy = useMutation({
+    meta: { silenceToast: true },
     mutationFn: (body: { proxyUrl?: string; enabled?: boolean; bypassPlatforms?: string[] }) =>
       apiFetch<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>('/api/settings/proxy', { method: 'PUT', body: JSON.stringify(body) }),
     onSuccess: (result: { proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }) => {
@@ -382,6 +384,7 @@ function ImportKeysSection() {
   }
 
   const preview = useMutation({
+    meta: { silenceToast: true },
     mutationFn: async (nextFiles: File[]) => {
       const formData = new FormData()
       nextFiles.forEach(file => formData.append('files', file))
@@ -403,6 +406,7 @@ function ImportKeysSection() {
   })
 
   const importSelected = useMutation({
+    meta: { silenceToast: true },
     mutationFn: (keys: ImportKey[]) =>
       apiFetch<ImportSelectedResponse>('/api/keys/import-selected', {
         method: 'POST',
@@ -621,6 +625,7 @@ function CustomProviderSection() {
   })
 
   const addCustom = useMutation({
+    meta: { silenceToast: true },
     mutationFn: ({ path, body }: { path: string; body: Record<string, unknown> }) =>
       apiFetch(path, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
@@ -870,8 +875,6 @@ export default function KeysPage() {
   // Server-supplied notice when a key is saved for a platform with no models in
   // the current catalog tier yet (e.g. a newly added premium provider, #438).
   const [addNotice, setAddNotice] = useState<string | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
-  const [confirmDeleteModelKey, setConfirmDeleteModelKey] = useState<string | null>(null)
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
   const editInputRef = useRef<HTMLInputElement>(null)
 
@@ -887,6 +890,7 @@ export default function KeysPage() {
   })
 
   const addKey = useMutation({
+    meta: { silenceToast: true },
     mutationFn: (body: { platform: string; key: string; label?: string }) =>
       apiFetch<{ notice?: string | null }>('/api/keys', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (data) => {
@@ -1250,36 +1254,32 @@ export default function KeysPage() {
                               </span>
                             )}
                             {!isEditing && (
-                              <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                onClick={() => startEditing(k)}
+                                aria-label={t('keys.editLabel')}
+                                title={t('keys.editLabel')}
+                              >
                                 <Pencil className="size-3" />
                               </Button>
                             )}
                             <Button variant="ghost" size="xs" onClick={() => checkKey.mutate(k.id)} disabled={checkKey.isPending}>
                               {t('common.check')}
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              className={confirmDeleteId === k.id ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}
-                              onClick={() => {
-                                if (confirmDeleteId === k.id) {
-                                  deleteKey.mutate(k.id)
-                                  setConfirmDeleteId(null)
-                                } else {
-                                  setConfirmDeleteId(k.id)
-                                  setTimeout(() => setConfirmDeleteId(c => (c === k.id ? null : c)), 3000)
-                                }
-                              }}
+                            <ConfirmButton
+                              className="text-muted-foreground hover:text-destructive"
+                              confirmLabel={t('keys.confirmRemove')}
+                              onConfirm={() => deleteKey.mutate(k.id)}
                               disabled={deleteKey.isPending}
                             >
-                              {confirmDeleteId === k.id ? t('keys.confirmRemove') : t('common.remove')}
-                            </Button>
+                              {t('common.remove')}
+                            </ConfirmButton>
                           </div>
                           {hasCustomModels && isExpanded && (
                             <div className="flex flex-wrap gap-2 border-t bg-muted/20 px-4 py-3 pl-12">
                               {customModels.map(model => {
                                 const modelKey = customModelDeleteKey(model)
-                                const confirming = confirmDeleteModelKey === modelKey
                                 return (
                                   <div key={modelKey} className="inline-flex min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1 text-[11px]">
                                     <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -1293,25 +1293,15 @@ export default function KeysPage() {
                                         {model.family}
                                       </code>
                                     )}
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="xs"
-                                      className={`h-5 px-1 ${confirming ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'}`}
+                                    <ConfirmButton
+                                      className="h-5 px-1 text-muted-foreground hover:text-destructive"
                                       disabled={deleteCustomModel.isPending}
-                                      onClick={() => {
-                                        if (confirming) {
-                                          deleteCustomModel.mutate(model)
-                                          setConfirmDeleteModelKey(null)
-                                        } else {
-                                          setConfirmDeleteModelKey(modelKey)
-                                          setTimeout(() => setConfirmDeleteModelKey(c => (c === modelKey ? null : c)), 3000)
-                                        }
-                                      }}
+                                      onConfirm={() => deleteCustomModel.mutate(model)}
                                       title={t('common.remove')}
+                                      aria-label={t('common.remove')}
                                     >
-                                      {confirming ? t('common.confirm') : <Trash2 className="size-3" />}
-                                    </Button>
+                                      <Trash2 className="size-3" />
+                                    </ConfirmButton>
                                   </div>
                                 )
                               })}

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Languages, Menu, MoreHorizontal, Moon, Sun } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -17,8 +17,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { AuthGate } from '@/components/auth-gate'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { Toaster } from '@/components/toaster'
 import { I18nProvider, useI18n, SUPPORTED_LOCALES, type Locale } from '@/i18n'
 import { logout } from '@/lib/api'
+import { toast } from '@/lib/toast'
 import KeysPage from '@/pages/KeysPage'
 import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
@@ -31,8 +34,19 @@ import MediaDetailPage from '@/pages/MediaDetailPage'
 import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 import PremiumPage from '@/pages/PremiumPage'
+import NotFoundPage from '@/pages/NotFoundPage'
 
-const queryClient = new QueryClient()
+// Every failed mutation surfaces as an error toast, so no action fails
+// silently. A page that already shows the failure inline can opt out with
+// `meta: { silenceToast: true }` on the mutation.
+const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (mutation.meta?.silenceToast) return
+      toast.error(error instanceof Error ? error.message : String(error))
+    },
+  }),
+})
 
 const navItems = [
   { to: '/models', labelKey: 'nav.models' },
@@ -229,6 +243,12 @@ function Navbar() {
   )
 }
 
+// Keyed by pathname so navigating away from a crashed page resets the boundary.
+function PageBoundary({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -238,6 +258,7 @@ function App() {
           <div className={`min-h-screen ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
             <Navbar />
             <main className="max-w-6xl mx-auto px-6 py-8">
+              <PageBoundary>
               <Routes>
                 <Route path="/" element={<Navigate to="/models/chat" replace />} />
                 <Route path="/models" element={<Navigate to="/models/chat" replace />} />
@@ -257,8 +278,11 @@ function App() {
                 <Route path="/premium" element={<PremiumPage />} />
                 <Route path="/test" element={<Navigate to="/playground" replace />} />
                 <Route path="/health" element={<Navigate to="/keys" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              </PageBoundary>
             </main>
+            <Toaster />
           </div>
         </AuthGate>
       </BrowserRouter>
