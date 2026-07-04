@@ -76,7 +76,7 @@
     "imageDesc": "Modelos de generación de texto a imagen.",
     "audioDesc": "Modelos de generación de texto a voz.",
     "mediaHint": "Generar mediante",
-    "mediaEmpty": "Aún no hay modelos: se sincronizan desde el catálogo.",
+    "mediaEmpty": "Aún no hay modelos. Se sincronizan desde el catálogo.",
     "newBadge": "Nuevo",
     "monthlyTokenBudget": "Presupuesto mensual de tokens",
     "remaining": "restante",
@@ -109,7 +109,8 @@
     "copyModelId": "Copiar id del modelo",
     "showingCount": "{shown} de {total} modelos",
     "clearFilters": "Borrar filtros",
-    "noMatches": "Ningún modelo coincide con tus filtros."
+    "noMatches": "Ningún modelo coincide con tus filtros.",
+    "noModelsTitle": "No hay modelos configurados"
   },
   "strategies": {
     "title": "Estrategia de enrutamiento",
@@ -310,7 +311,9 @@
     "unsavedChanges": "Cambios sin guardar",
     "saveChanges": "Guardar cambios",
     "savingChanges": "Guardando…",
-    "tokMax": "{tokens} tok máx."
+    "tokMax": "{tokens} tok máx.",
+    "emptyTitle": "Aún no hay modelos de embeddings",
+    "emptyDesc": "Las familias de embeddings aparecen aquí cuando añades una clave de proveedor compatible con embeddings."
   },
   "fusion": {
     "title": "Fusión",
@@ -398,5 +401,22 @@
   "notFound": {
     "title": "Página no encontrada",
     "description": "Esta página no existe o puede haberse movido."
+  },
+  "setup": {
+    "title": "Primeros pasos",
+    "subtitle": "Tres pasos para enrutar tu primera solicitud.",
+    "progress": "{done} de {total}",
+    "step1Title": "Añade una clave de proveedor",
+    "step1Desc": "Conecta al menos una cuenta de proveedor. Las claves gratuitas funcionan.",
+    "step1Cta": "Añadir claves",
+    "step2Title": "Envía una solicitud de prueba",
+    "step2Desc": "Elige cualquier modelo en el Playground y saluda.",
+    "step2Cta": "Abrir Playground",
+    "step3Title": "Conecta tu aplicación",
+    "step3Desc": "Usa tu clave API unificada con cualquier cliente compatible con OpenAI.",
+    "copyKey": "Copiar clave API",
+    "copyUrl": "Copiar URL base",
+    "copiedKey": "Clave API copiada al portapapeles",
+    "copiedUrl": "URL base copiada al portapapeles"
   }
 }

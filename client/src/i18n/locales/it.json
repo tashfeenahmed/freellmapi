@@ -76,7 +76,7 @@
     "imageDesc": "Modelli di generazione testo-immagine.",
     "audioDesc": "Modelli di generazione testo-parlato.",
     "mediaHint": "Genera tramite",
-    "mediaEmpty": "Nessun modello ancora — vengono sincronizzati dal catalogo.",
+    "mediaEmpty": "Nessun modello ancora. Vengono sincronizzati dal catalogo.",
     "newBadge": "Nuovo",
     "monthlyTokenBudget": "Budget mensile di token",
     "remaining": "rimanenti",
@@ -127,7 +127,8 @@
     "copyModelId": "Copia ID modello",
     "showingCount": "{shown} di {total} modelli",
     "clearFilters": "Cancella filtri",
-    "noMatches": "Nessun modello corrisponde ai tuoi filtri."
+    "noMatches": "Nessun modello corrisponde ai tuoi filtri.",
+    "noModelsTitle": "Nessun modello configurato"
   },
   "strategies": {
     "title": "Strategia di routing",
@@ -331,7 +332,9 @@
     "unsavedChanges": "Modifiche non salvate",
     "saveChanges": "Salva modifiche",
     "savingChanges": "Salvataggio…",
-    "tokMax": "{tokens} tok max"
+    "tokMax": "{tokens} tok max",
+    "emptyTitle": "Ancora nessun modello di embedding",
+    "emptyDesc": "Le famiglie di embedding compaiono qui quando aggiungi una chiave provider che supporta gli embedding."
   },
   "fusion": {
     "title": "Fusion",
@@ -419,5 +422,22 @@
   "notFound": {
     "title": "Pagina non trovata",
     "description": "Questa pagina non esiste o potrebbe essere stata spostata."
+  },
+  "setup": {
+    "title": "Per iniziare",
+    "subtitle": "Tre passaggi per instradare la tua prima richiesta.",
+    "progress": "{done} di {total}",
+    "step1Title": "Aggiungi una chiave provider",
+    "step1Desc": "Collega almeno un account provider. Le chiavi gratuite funzionano.",
+    "step1Cta": "Aggiungi chiavi",
+    "step2Title": "Invia una richiesta di prova",
+    "step2Desc": "Scegli un modello nel Playground e saluta.",
+    "step2Cta": "Apri Playground",
+    "step3Title": "Collega la tua app",
+    "step3Desc": "Usa la tua chiave API unificata con qualsiasi client compatibile OpenAI.",
+    "copyKey": "Copia chiave API",
+    "copyUrl": "Copia URL di base",
+    "copiedKey": "Chiave API copiata negli appunti",
+    "copiedUrl": "URL di base copiato negli appunti"
   }
 }

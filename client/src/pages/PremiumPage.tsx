@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { CardSkeleton } from '@/components/ui/skeleton'
 import { useI18n } from '@/i18n'
 
 interface LicenseStatus {
@@ -93,7 +94,10 @@ export default function PremiumPage() {
     return (
       <div>
         <PageHeader title={t('premium.title')} description={t('premium.description')} />
-        <p className="text-sm text-muted-foreground">{t('premium.loading')}</p>
+        <div className="space-y-6">
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
       </div>
     )
   }

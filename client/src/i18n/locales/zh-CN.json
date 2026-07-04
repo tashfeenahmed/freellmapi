@@ -76,7 +76,7 @@
     "imageDesc": "文本生成图像模型。",
     "audioDesc": "文本转语音模型。",
     "mediaHint": "通过以下端点生成",
-    "mediaEmpty": "暂无模型 — 将从目录同步。",
+    "mediaEmpty": "暂无模型,将从目录同步。",
     "newBadge": "新",
     "monthlyTokenBudget": "每月令牌额度",
     "remaining": "剩余",
@@ -127,7 +127,8 @@
     "copyModelId": "复制模型 ID",
     "showingCount": "{total} 个模型中的 {shown} 个",
     "clearFilters": "清除筛选",
-    "noMatches": "没有符合筛选条件的模型。"
+    "noMatches": "没有符合筛选条件的模型。",
+    "noModelsTitle": "尚未配置模型"
   },
   "strategies": {
     "title": "路由策略",
@@ -333,7 +334,9 @@
     "unsavedChanges": "有未保存的修改",
     "saveChanges": "保存修改",
     "savingChanges": "保存中…",
-    "tokMax": "最多 {tokens} tok"
+    "tokMax": "最多 {tokens} tok",
+    "emptyTitle": "暂无嵌入模型",
+    "emptyDesc": "添加支持嵌入的提供商密钥后,嵌入系列会显示在这里。"
   },
   "fusion": {
     "title": "融合",
@@ -421,5 +424,22 @@
   "notFound": {
     "title": "页面未找到",
     "description": "此页面不存在或已被移动。"
+  },
+  "setup": {
+    "title": "快速开始",
+    "subtitle": "三步完成首个请求的路由。",
+    "progress": "{done} / {total}",
+    "step1Title": "添加提供商密钥",
+    "step1Desc": "至少连接一个提供商账户,免费密钥即可。",
+    "step1Cta": "添加密钥",
+    "step2Title": "发送测试请求",
+    "step2Desc": "在 Playground 中任选一个模型打个招呼。",
+    "step2Cta": "打开 Playground",
+    "step3Title": "接入你的应用",
+    "step3Desc": "在任何兼容 OpenAI 的客户端中使用统一 API 密钥。",
+    "copyKey": "复制 API 密钥",
+    "copyUrl": "复制基础 URL",
+    "copiedKey": "API 密钥已复制到剪贴板",
+    "copiedUrl": "基础 URL 已复制到剪贴板"
   }
 }

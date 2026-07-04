@@ -76,7 +76,7 @@
     "imageDesc": "Text-to-image generation models.",
     "audioDesc": "Text-to-speech generation models.",
     "mediaHint": "Generate via",
-    "mediaEmpty": "No models yet — they sync from the catalog.",
+    "mediaEmpty": "No models yet. They sync from the catalog.",
     "newBadge": "New",
     "monthlyTokenBudget": "Monthly token budget",
     "remaining": "remaining",
@@ -136,7 +136,8 @@
     "copyModelId": "Copy model id",
     "showingCount": "{shown} of {total} models",
     "clearFilters": "Clear filters",
-    "noMatches": "No models match your filters."
+    "noMatches": "No models match your filters.",
+    "noModelsTitle": "No models configured"
   },
   "strategies": {
     "title": "Routing strategy",
@@ -389,7 +390,9 @@
     "unsavedChanges": "Unsaved changes",
     "saveChanges": "Save changes",
     "savingChanges": "Saving…",
-    "tokMax": "{tokens} tok max"
+    "tokMax": "{tokens} tok max",
+    "emptyTitle": "No embedding models yet",
+    "emptyDesc": "Embedding families appear here once you add a provider key that supports embeddings."
   },
   "fusion": {
     "title": "Fusion",
@@ -477,5 +480,22 @@
   "notFound": {
     "title": "Page not found",
     "description": "This page does not exist or may have moved."
+  },
+  "setup": {
+    "title": "Getting started",
+    "subtitle": "Three steps to route your first request.",
+    "progress": "{done} of {total}",
+    "step1Title": "Add a provider key",
+    "step1Desc": "Connect at least one provider account. Free keys work.",
+    "step1Cta": "Add keys",
+    "step2Title": "Send a test request",
+    "step2Desc": "Pick any model in the Playground and say hello.",
+    "step2Cta": "Open Playground",
+    "step3Title": "Connect your app",
+    "step3Desc": "Use your unified API key with any OpenAI-compatible client.",
+    "copyKey": "Copy API key",
+    "copyUrl": "Copy base URL",
+    "copiedKey": "API key copied to clipboard",
+    "copiedUrl": "Base URL copied to clipboard"
   }
 }

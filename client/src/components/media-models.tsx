@@ -1,8 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { AudioLines, Image as ImageIcon } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
 import { ConfirmButton } from '@/components/confirm-button'
+import { EmptyState } from '@/components/empty-state'
+import { CardSkeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { useI18n } from '@/i18n'
@@ -82,9 +85,15 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
         </p>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
         ) : groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('models.mediaEmpty')}</p>
+          <EmptyState
+            icon={modality === 'image' ? ImageIcon : AudioLines}
+            title={t('models.mediaEmpty')}
+          />
         ) : (
           groups.map(g => {
             const anyEnabled = g.members.some(m => m.enabled)

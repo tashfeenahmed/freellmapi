@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, Layers } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { ConfirmButton } from '@/components/confirm-button'
+import { EmptyState } from '@/components/empty-state'
+import { CardSkeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
@@ -136,7 +138,21 @@ export default function EmbeddingsPage() {
         </p>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : families.length === 0 ? (
+          <EmptyState
+            icon={Layers}
+            title={t('embeddings.emptyTitle')}
+            description={t('embeddings.emptyDesc')}
+            action={
+              <Link to="/keys">
+                <Button size="sm">{t('setup.step1Cta')}</Button>
+              </Link>
+            }
+          />
         ) : (
           families.map(f => {
             const u = usageByFamily.get(f.family)

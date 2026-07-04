@@ -11,7 +11,9 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey, ApiKeyModel, ImportKey, ImportSelectedResponse, Platform, PreviewKey, PreviewResponse, ProviderQuotaState } from '../../../shared/types'
-import { ChevronDown, Pencil, ExternalLink, Globe, Trash2, Upload } from 'lucide-react'
+import { ChevronDown, KeyRound, Pencil, ExternalLink, Globe, Trash2, Upload } from 'lucide-react'
+import { EmptyState } from '@/components/empty-state'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -1160,13 +1162,9 @@ export default function KeysPage() {
         <section>
           <h2 className="text-sm font-medium mb-3">{t('keys.configuredProviders')}</h2>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+            <TableSkeleton rows={4} />
           ) : keys.length === 0 ? (
-            <div className="rounded-3xl border border-dashed p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                {t('keys.noProviderKeys')}
-              </p>
-            </div>
+            <EmptyState icon={KeyRound} title={t('keys.noProviderKeys')} />
           ) : (
             <div className="space-y-6">
               {grouped.map(group => (

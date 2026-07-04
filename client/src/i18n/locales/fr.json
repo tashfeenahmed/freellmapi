@@ -76,7 +76,7 @@
     "imageDesc": "Modèles de génération texte-image.",
     "audioDesc": "Modèles de synthèse vocale.",
     "mediaHint": "Générer via",
-    "mediaEmpty": "Aucun modèle pour l'instant — ils se synchronisent depuis le catalogue.",
+    "mediaEmpty": "Aucun modèle pour l'instant. Ils se synchronisent depuis le catalogue.",
     "newBadge": "Nouveau",
     "monthlyTokenBudget": "Budget mensuel de tokens",
     "remaining": "restant",
@@ -109,7 +109,8 @@
     "copyModelId": "Copier l'identifiant du modèle",
     "showingCount": "{shown} sur {total} modèles",
     "clearFilters": "Effacer les filtres",
-    "noMatches": "Aucun modèle ne correspond à vos filtres."
+    "noMatches": "Aucun modèle ne correspond à vos filtres.",
+    "noModelsTitle": "Aucun modèle configuré"
   },
   "strategies": {
     "title": "Stratégie de routage",
@@ -310,7 +311,9 @@
     "unsavedChanges": "Modifications non enregistrées",
     "saveChanges": "Enregistrer les modifications",
     "savingChanges": "Enregistrement…",
-    "tokMax": "{tokens} tok max."
+    "tokMax": "{tokens} tok max.",
+    "emptyTitle": "Aucun modèle d'embeddings pour l'instant",
+    "emptyDesc": "Les familles d'embeddings apparaissent ici dès que vous ajoutez une clé de fournisseur prenant en charge les embeddings."
   },
   "fusion": {
     "title": "Fusion",
@@ -398,5 +401,22 @@
   "notFound": {
     "title": "Page introuvable",
     "description": "Cette page n'existe pas ou a peut-être été déplacée."
+  },
+  "setup": {
+    "title": "Premiers pas",
+    "subtitle": "Trois étapes pour router votre première requête.",
+    "progress": "{done} sur {total}",
+    "step1Title": "Ajoutez une clé de fournisseur",
+    "step1Desc": "Connectez au moins un compte fournisseur. Les clés gratuites fonctionnent.",
+    "step1Cta": "Ajouter des clés",
+    "step2Title": "Envoyez une requête de test",
+    "step2Desc": "Choisissez un modèle dans le Playground et dites bonjour.",
+    "step2Cta": "Ouvrir le Playground",
+    "step3Title": "Connectez votre application",
+    "step3Desc": "Utilisez votre clé API unifiée avec n'importe quel client compatible OpenAI.",
+    "copyKey": "Copier la clé API",
+    "copyUrl": "Copier l'URL de base",
+    "copiedKey": "Clé API copiée dans le presse-papiers",
+    "copiedUrl": "URL de base copiée dans le presse-papiers"
   }
 }

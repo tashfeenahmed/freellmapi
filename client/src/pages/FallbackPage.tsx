@@ -17,14 +17,17 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, SlidersHorizontal, Search, X } from 'lucide-react'
+import { Boxes, ChevronDown, SlidersHorizontal, Search, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/components/copy-button'
+import { EmptyState } from '@/components/empty-state'
+import { GettingStarted } from '@/components/getting-started'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
@@ -830,6 +833,9 @@ export default function FallbackPage() {
       />
 
       <div className="space-y-6">
+        {/* First-run checklist: hides itself once the install has keys + a request */}
+        <GettingStarted />
+
         {/* Monthly token budget — moved to the top */}
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
@@ -882,13 +888,18 @@ export default function FallbackPage() {
 
         {/* Unified routing / fallback table */}
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <TableSkeleton rows={8} />
         ) : orderedGroups.length === 0 ? (
-          <div className="rounded-3xl border border-dashed p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {t('models.noModelsBefore')}<a href="/keys" className="underline text-foreground">{t('models.keysPageLink')}</a>{t('models.noModelsAfter')}
-            </p>
-          </div>
+          <EmptyState
+            icon={Boxes}
+            title={t('models.noModelsTitle')}
+            description={<>{t('models.noModelsBefore')}<Link to="/keys" className="underline text-foreground">{t('models.keysPageLink')}</Link>{t('models.noModelsAfter')}</>}
+            action={
+              <Link to="/keys">
+                <Button size="sm">{t('setup.step1Cta')}</Button>
+              </Link>
+            }
+          />
         ) : (
           <>
             {/* Catalog toolbar: search + capability/context filters (#343) */}
@@ -951,9 +962,12 @@ export default function FallbackPage() {
             {/* DndContext must wrap OUTSIDE the table: it renders hidden a11y
                 live-region <div>s, which are invalid as direct <table> children. */}
             {visibleGroups.length === 0 ? (
-              <div className="rounded-3xl border border-dashed p-8 text-center">
-                <p className="text-sm text-muted-foreground">{t('models.noMatches')}</p>
-              </div>
+              <EmptyState
+                title={t('models.noMatches')}
+                action={
+                  <Button variant="outline" size="sm" onClick={clearFilters}>{t('models.clearFilters')}</Button>
+                }
+              />
             ) : draggable ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupedDragEnd}>
                 <div className="rounded-2xl border overflow-x-auto">

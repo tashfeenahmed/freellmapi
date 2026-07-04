@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { PageHeader } from '@/components/page-header'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip as HoverTooltip } from '@/components/tooltip'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -52,7 +53,7 @@ export default function AnalyticsPage() {
   const { t } = useI18n()
   const [range, setRange] = useState<TimeRange>('7d')
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['analytics', 'summary', range],
     queryFn: () => apiFetch<any>(`/api/analytics/summary?range=${range}`),
   })
@@ -143,16 +144,22 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         {/* Summary stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Stat label={t('analytics.requests')} value={summary?.totalRequests ?? 0} hint={requestsHint} />
-          <Stat label={t('analytics.successRate')} value={`${summary?.successRate ?? 0}%`} />
-          <Stat label={t('analytics.inputTokens')} value={formatTokens(summary?.totalInputTokens)} />
-          <Stat label={t('analytics.outputTokens')} value={formatTokens(summary?.totalOutputTokens)} />
-          <Stat label={t('analytics.avgLatency')} value={`${summary?.avgLatencyMs ?? 0} ms`} />
-          {/* Priced per request at the served model's paid-API equivalent
-              rate (not a flat frontier-model rate) — see db/model-pricing.ts.
-              The value is a 30-day projection; the hover hint tells the whole
-              story (actual period amount + whether it was extrapolated). */}
-          <Stat label={t('analytics.estSavings')} value={`$${savings30d.toFixed(2)}`} hint={savingsHint} />
+          {summaryLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[74px] rounded-3xl" />)
+          ) : (
+            <>
+              <Stat label={t('analytics.requests')} value={summary?.totalRequests ?? 0} hint={requestsHint} />
+              <Stat label={t('analytics.successRate')} value={`${summary?.successRate ?? 0}%`} />
+              <Stat label={t('analytics.inputTokens')} value={formatTokens(summary?.totalInputTokens)} />
+              <Stat label={t('analytics.outputTokens')} value={formatTokens(summary?.totalOutputTokens)} />
+              <Stat label={t('analytics.avgLatency')} value={`${summary?.avgLatencyMs ?? 0} ms`} />
+              {/* Priced per request at the served model's paid-API equivalent
+                  rate (not a flat frontier-model rate) — see db/model-pricing.ts.
+                  The value is a 30-day projection; the hover hint tells the whole
+                  story (actual period amount + whether it was extrapolated). */}
+              <Stat label={t('analytics.estSavings')} value={`$${savings30d.toFixed(2)}`} hint={savingsHint} />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

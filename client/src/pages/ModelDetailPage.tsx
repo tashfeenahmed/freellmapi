@@ -9,6 +9,7 @@ import { ConfirmButton } from '@/components/confirm-button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { CopyButton } from '@/components/copy-button'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
@@ -127,7 +128,7 @@ export default function ModelDetailPage() {
         </Link>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <TableSkeleton rows={3} />
         ) : members.length === 0 ? (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <p className="text-sm text-muted-foreground">{t('models.modelNotFound')}</p>

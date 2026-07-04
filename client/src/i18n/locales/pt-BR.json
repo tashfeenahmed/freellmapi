@@ -76,7 +76,7 @@
     "imageDesc": "Modelos de geração de texto para imagem.",
     "audioDesc": "Modelos de geração de texto para fala.",
     "mediaHint": "Gerar via",
-    "mediaEmpty": "Ainda sem modelos — eles sincronizam do catálogo.",
+    "mediaEmpty": "Ainda sem modelos. Eles sincronizam do catálogo.",
     "newBadge": "Novo",
     "monthlyTokenBudget": "Orçamento mensal de tokens",
     "remaining": "restante",
@@ -109,7 +109,8 @@
     "copyModelId": "Copiar id do modelo",
     "showingCount": "{shown} de {total} modelos",
     "clearFilters": "Limpar filtros",
-    "noMatches": "Nenhum modelo corresponde aos seus filtros."
+    "noMatches": "Nenhum modelo corresponde aos seus filtros.",
+    "noModelsTitle": "Nenhum modelo configurado"
   },
   "strategies": {
     "title": "Estratégia de roteamento",
@@ -310,7 +311,9 @@
     "unsavedChanges": "Alterações não salvas",
     "saveChanges": "Salvar alterações",
     "savingChanges": "Salvando…",
-    "tokMax": "{tokens} tok máx."
+    "tokMax": "{tokens} tok máx.",
+    "emptyTitle": "Ainda sem modelos de embeddings",
+    "emptyDesc": "As famílias de embeddings aparecem aqui quando você adiciona uma chave de provedor com suporte a embeddings."
   },
   "fusion": {
     "title": "Fusão",
@@ -398,5 +401,22 @@
   "notFound": {
     "title": "Página não encontrada",
     "description": "Esta página não existe ou pode ter sido movida."
+  },
+  "setup": {
+    "title": "Primeiros passos",
+    "subtitle": "Três passos para rotear sua primeira solicitação.",
+    "progress": "{done} de {total}",
+    "step1Title": "Adicione uma chave de provedor",
+    "step1Desc": "Conecte pelo menos uma conta de provedor. Chaves gratuitas funcionam.",
+    "step1Cta": "Adicionar chaves",
+    "step2Title": "Envie uma solicitação de teste",
+    "step2Desc": "Escolha qualquer modelo no Playground e diga olá.",
+    "step2Cta": "Abrir Playground",
+    "step3Title": "Conecte seu aplicativo",
+    "step3Desc": "Use sua chave de API unificada com qualquer cliente compatível com OpenAI.",
+    "copyKey": "Copiar chave de API",
+    "copyUrl": "Copiar URL base",
+    "copiedKey": "Chave de API copiada para a área de transferência",
+    "copiedUrl": "URL base copiada para a área de transferência"
   }
 }
