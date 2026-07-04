@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,6 +13,26 @@ import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
 type TimeRange = '24h' | '7d' | '30d'
+
+const TIME_RANGES: readonly TimeRange[] = ['24h', '7d', '30d']
+const STORAGE_KEY = 'freellmapi.analytics.range'
+const DEFAULT_RANGE: TimeRange = '7d'
+
+// Read the previously-selected range from localStorage. Invalid or missing
+// values fall back to the 7d default so a corrupted entry never bricks the
+// page; SSR-safety follows the same try/catch shape as `lib/api.ts`.
+function loadStoredRange(): TimeRange {
+  if (typeof window === 'undefined') return DEFAULT_RANGE
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored && (TIME_RANGES as readonly string[]).includes(stored)) {
+      return stored as TimeRange
+    }
+  } catch {
+    /* localStorage unavailable (private mode, etc.) — use default */
+  }
+  return DEFAULT_RANGE
+}
 
 function formatTokens(n?: number): string {
   if (!n) return '0'
@@ -50,7 +70,19 @@ const primaryFill = 'var(--foreground)'
 
 export default function AnalyticsPage() {
   const { t } = useI18n()
-  const [range, setRange] = useState<TimeRange>('7d')
+  const [range, setRange] = useState<TimeRange>(loadStoredRange)
+
+  // Remember the last-selected range across page reloads / new sessions so
+  // the user lands back on the window they were inspecting. Same
+  // localStorage shape as `theme` and `freellmapi.locale`.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(STORAGE_KEY, range)
+    } catch {
+      /* ignore — storage quota / private mode */
+    }
+  }, [range])
 
   const { data: summary } = useQuery({
     queryKey: ['analytics', 'summary', range],
