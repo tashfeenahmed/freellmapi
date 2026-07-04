@@ -298,7 +298,16 @@
     "importing": "Importing…",
     "noImportSelection": "Select at least one row with a provider.",
     "importResult": "Imported {imported}; failed {failed}.",
-    "confirmRemove": "Confirm?"
+    "confirmRemove": "Confirm?",
+    "quotaSignalsTitle": "Quota signals",
+    "quotaSignalsEmptyTitle": "No quota observations yet",
+    "quotaSignalsEmptyDesc": "This fills in after providers return rate-limit headers, quota errors, or validation signals.",
+    "quotaKeyRef": "key #{id}",
+    "quotaPoolRef": "pool {pool}",
+    "quotaLimit": "Limit",
+    "quotaRemaining": "Remaining",
+    "quotaReset": "Reset",
+    "quotaObserved": "Observed"
   },
   "status": {
     "healthy": "healthy",

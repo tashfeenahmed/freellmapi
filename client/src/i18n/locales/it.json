@@ -129,7 +129,16 @@
     "showingCount": "{shown} di {total} modelli",
     "clearFilters": "Cancella filtri",
     "noMatches": "Nessun modello corrisponde ai tuoi filtri.",
-    "noModelsTitle": "Nessun modello configurato"
+    "noModelsTitle": "Nessun modello configurato",
+    "settingsHeading": "Impostazioni provider",
+    "settingsHint": "Le modifiche locali ai modelli del catalogo vengono mantenute tra le sincronizzazioni del catalogo. I modelli del catalogo eliminati restano eliminati finché non li aggiungi di nuovo tramite la configurazione.",
+    "catalogModel": "catalogo",
+    "customModel": "personalizzato",
+    "localOverride": "override locale",
+    "displayName": "Nome visualizzato",
+    "contextWindow": "Contesto",
+    "inFallback": "Nella catena",
+    "saveModelSettings": "Salva impostazioni modello"
   },
   "strategies": {
     "title": "Strategia di routing",
@@ -242,7 +251,45 @@
     "keyCountOther": "{count} chiavi",
     "proxyEnvHintBefore": "Configurabile anche tramite la variabile d'ambiente ",
     "proxyEnvHintAfter": " (ha precedenza). Lascia vuoto per disabilitare. Esempi:",
-    "confirmRemove": "Confermi?"
+    "confirmRemove": "Confermi?",
+    "quotaSignalsTitle": "Segnali di quota",
+    "quotaSignalsEmptyTitle": "Ancora nessuna osservazione di quota",
+    "quotaSignalsEmptyDesc": "Questa sezione si riempie quando i provider restituiscono header di limite, errori di quota o segnali di validazione.",
+    "quotaKeyRef": "chiave n. {id}",
+    "quotaPoolRef": "pool {pool}",
+    "quotaLimit": "Limite",
+    "quotaRemaining": "Rimanente",
+    "quotaReset": "Reset",
+    "quotaObserved": "Osservato",
+    "customType": "Tipo",
+    "customTypeChat": "Chat",
+    "customTypeEmbedding": "Embedding",
+    "customTypeImage": "Immagine",
+    "customTypeAudio": "Audio",
+    "customModel": "Modello",
+    "customFamily": "Famiglia",
+    "customFamilyPlaceholder": "predefinito: id del modello",
+    "addEmbeddingModel": "Aggiungi embedding",
+    "addImageModel": "Aggiungi modello immagine",
+    "addAudioModel": "Aggiungi modello audio",
+    "importKeys": "Importa chiavi provider",
+    "importKeysDescription": "Carica file .env, JSON, JSONC, Markdown o di testo.",
+    "importFiles": "File",
+    "importFileCount": "{count} selezionati",
+    "previewFiles": "Anteprima",
+    "previewing": "Anteprima in corso…",
+    "selected": "Selezionati",
+    "provider": "Provider",
+    "keyName": "Nome chiave",
+    "keyValue": "Valore chiave",
+    "chooseProvider": "Scegli provider",
+    "noPreviewKeys": "Nessuna chiave trovata in quei file.",
+    "skippedItems": "Ignorati:",
+    "moreItems": "+{count} altri",
+    "importSelected": "Importa {count}",
+    "importing": "Importazione in corso…",
+    "noImportSelection": "Seleziona almeno una riga con un provider.",
+    "importResult": "Importati {imported}; falliti {failed}."
   },
   "status": {
     "healthy": "funzionante",
@@ -319,7 +366,9 @@
     "fusionFailed": "nessuna risposta",
     "fusionJudgeSynth": "ha sintetizzato la risposta finale",
     "errorPrefix": "Errore:",
-    "errorTitle": "Richiesta non riuscita"
+    "errorTitle": "Richiesta non riuscita",
+    "systemPromptLabel": "Prompt di sistema",
+    "systemPromptPlaceholder": "Facoltativo. Inviato come messaggio di sistema prima della chat."
   },
   "embeddings": {
     "title": "Modelli",
@@ -450,5 +499,23 @@
     "groupActions": "Azioni",
     "groupModels": "Modelli",
     "toggleTheme": "Attiva/disattiva la modalità scura"
+  },
+  "penaltyInspector": {
+    "title": "Pressione del router",
+    "subtitle": "Penalità, cooldown ed errori negli ultimi {minutes} min",
+    "rowCount": "{count} attivi",
+    "offChain": "fuori catena",
+    "penaltyValue": "Penalità {value}",
+    "factor": "punteggio x{factor}",
+    "noCooldown": "Nessun cooldown",
+    "cooldownChip": "{key}: {time}",
+    "errorsHeading": "{count} errori recenti",
+    "noRecentErrors": "Nessun errore recente",
+    "noKey": "nessuna chiave",
+    "reasons": {
+      "penalty": "penalizzato",
+      "cooldown": "cooldown",
+      "recent_errors": "in errore"
+    }
   }
 }

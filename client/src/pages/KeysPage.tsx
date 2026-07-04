@@ -149,31 +149,30 @@ function formatResetAt(value: string | null): string {
 }
 
 function QuotaSignalsSection({ states }: { states: ProviderQuotaState[] }) {
+  const { t } = useI18n()
   return (
     <section>
-      <h2 className="text-sm font-medium mb-3">Quota signals</h2>
+      <h2 className="text-sm font-medium mb-3">{t('keys.quotaSignalsTitle')}</h2>
       {states.length === 0 ? (
-        <div className="rounded-3xl border border-dashed p-6 text-sm text-muted-foreground bg-card">
-          No quota observations yet. The dashboard will fill in after providers return headers, quota errors, or validation signals.
-        </div>
+        <EmptyState title={t('keys.quotaSignalsEmptyTitle')} description={t('keys.quotaSignalsEmptyDesc')} className="bg-card" />
       ) : (
         <div className="rounded-3xl border divide-y bg-card overflow-hidden">
           {states.map((state) => (
             <div key={`${state.platform}:${state.keyId}:${state.quotaPoolKey}:${state.metric}`} className="px-4 py-3.5 text-sm">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="font-medium">{state.platform}</span>
-                <span className="text-muted-foreground">key #{state.keyId}</span>
-                <span className="text-muted-foreground">pool {state.quotaPoolKey}</span>
+                <span className="text-muted-foreground">{t('keys.quotaKeyRef', { id: state.keyId })}</span>
+                <span className="text-muted-foreground">{t('keys.quotaPoolRef', { pool: state.quotaPoolKey })}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{state.metric}</span>
                 <span className="ml-auto text-xs text-muted-foreground">
                   {state.source} · {Math.round(state.confidence * 100)}%
                 </span>
               </div>
               <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                <div><span className="text-foreground">Limit</span> {formatQuotaNumber(state.limit)}</div>
-                <div><span className="text-foreground">Remaining</span> {formatQuotaNumber(state.remaining)}</div>
-                <div><span className="text-foreground">Reset</span> {formatResetAt(state.resetAt)}</div>
-                <div><span className="text-foreground">Observed</span> {formatSqliteUtcToLocalTime(state.observedAt, { hour: '2-digit', minute: '2-digit' })}</div>
+                <div><span className="text-foreground">{t('keys.quotaLimit')}</span> {formatQuotaNumber(state.limit)}</div>
+                <div><span className="text-foreground">{t('keys.quotaRemaining')}</span> {formatQuotaNumber(state.remaining)}</div>
+                <div><span className="text-foreground">{t('keys.quotaReset')}</span> {formatResetAt(state.resetAt)}</div>
+                <div><span className="text-foreground">{t('keys.quotaObserved')}</span> {formatSqliteUtcToLocalTime(state.observedAt, { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
               {state.notes && (
                 <p className="mt-2 text-xs text-muted-foreground">{state.notes}</p>
