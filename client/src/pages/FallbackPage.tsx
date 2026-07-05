@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -62,6 +62,11 @@ const CTX_BUCKETS: { key: number; label?: string; tKey?: string }[] = [
   { key: 128_000, label: '128K+' },
   { key: 1_000_000, label: '1M+' },
 ]
+
+// Rows rendered up front; a sentinel below the table streams in the rest as
+// you scroll. Keeps first paint cheap when the catalog grows into the
+// hundreds without a virtualization dependency (which would fight dnd-kit).
+const RENDER_CHUNK = 50
 
 
 export default function FallbackPage() {
@@ -159,6 +164,27 @@ export default function FallbackPage() {
     return true
   })
   const draggable = isManual && !filtersActive
+
+  // Progressive rendering: grow the row budget whenever the sentinel below the
+  // table scrolls near the viewport (drag autoscroll extends it too).
+  const [renderLimit, setRenderLimit] = useState(RENDER_CHUNK)
+  const renderedGroups = visibleGroups.slice(0, renderLimit)
+  const hasMoreRows = visibleGroups.length > renderLimit
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!hasMoreRows) return
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      hits => {
+        if (hits.some(h => h.isIntersecting)) setRenderLimit(l => l + RENDER_CHUNK)
+      },
+      { rootMargin: '600px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMoreRows, renderLimit])
+
   function clearFilters() {
     setSearch('')
     setFilterVision(false)
@@ -342,9 +368,9 @@ export default function FallbackPage() {
                 <div className="rounded-2xl border overflow-x-auto">
                   <table className="w-full text-sm">
                     <ModelTableHead />
-                    <SortableContext items={visibleGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={renderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
                       <tbody>
-                        {visibleGroups.map(g => (
+                        {renderedGroups.map(g => (
                           <SortableGroupRow key={g.key} group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} />
                         ))}
                       </tbody>
@@ -357,7 +383,7 @@ export default function FallbackPage() {
                 <table className="w-full text-sm">
                   <ModelTableHead />
                   <tbody>
-                    {visibleGroups.map(g => (
+                    {renderedGroups.map(g => (
                       <tr
                         key={g.key}
                         onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
@@ -370,6 +396,10 @@ export default function FallbackPage() {
                 </table>
               </div>
             )}
+
+            {/* Invisible sentinel: when it nears the viewport the next row chunk
+                renders. Present only while rows remain, so IO never fires idle. */}
+            {hasMoreRows && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
 
             {/* Floating action bar — fixed to the viewport so it's always visible,
                 sliding up when there are unsaved changes and back down on save/discard. */}
