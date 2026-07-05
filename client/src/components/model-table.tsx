@@ -209,7 +209,11 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
           {/* Quick-copy the unified model id (#343). Stop propagation so it neither
               follows the model link nor triggers the row's navigate-on-click. */}
           <span onClick={e => e.stopPropagation()} className="shrink-0">
-            <CopyButton text={copyId} className="size-6" label={t('models.copyModelId')} />
+            <CopyButton
+              text={copyId}
+              label={t('models.copyModelId')}
+              className="size-6 border-0 bg-transparent hover:bg-muted opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+            />
           </span>
         </div>
       </td>
@@ -251,7 +255,7 @@ export function SortableGroupRow({ group, rank, onToggleGroup }: {
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={() => navigate(`/models/chat/${detailId}`)}
-      className={`border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
+      className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
       <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} />
     </tr>

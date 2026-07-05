@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { ImportKey, ImportSelectedResponse, Platform, PreviewKey, PreviewResponse } from '../../../../shared/types'
 import { Upload } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { toast } from '@/lib/toast'
 import { PLATFORMS } from './shared'
 
 interface ImportRow extends PreviewKey {
@@ -17,13 +18,15 @@ interface ImportRow extends PreviewKey {
   visible: boolean
 }
 
-export function ImportKeysSection() {
+// Always rendered inside the Add key dialog: no outer section chrome/heading.
+// `onImported` lets that dialog close (and surface a result toast) once a batch
+// import succeeds.
+export function ImportKeysSection({ onImported }: { onImported?: () => void } = {}) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
   const [files, setFiles] = useState<File[]>([])
   const [rows, setRows] = useState<ImportRow[]>([])
   const [skipped, setSkipped] = useState<string[]>([])
-  const [result, setResult] = useState<ImportSelectedResponse | null>(null)
 
   const importablePlatforms = PLATFORMS.filter(p => !p.keyless)
 
@@ -51,7 +54,6 @@ export function ImportKeysSection() {
         }
       }))
       setSkipped(data.skipped)
-      setResult(null)
     },
   })
 
@@ -63,10 +65,15 @@ export function ImportKeysSection() {
         body: JSON.stringify({ keys }),
       }),
     onSuccess: (data) => {
-      setResult(data)
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      // The dialog closes on success, so surface the imported/failed counts as
+      // a toast.
+      if (onImported) {
+        toast.success(t('keys.importResult', { imported: data.imported, failed: data.errors.length }))
+        onImported()
+      }
     },
   })
 
@@ -87,31 +94,25 @@ export function ImportKeysSection() {
     setFiles(nextFiles)
     setRows([])
     setSkipped([])
-    setResult(null)
     preview.reset()
     importSelected.reset()
   }
 
-  return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">{t('keys.importKeys')}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('keys.importKeysDescription')}</p>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => preview.mutate(files)}
-          disabled={files.length === 0 || preview.isPending}
-        >
-          <Upload className="size-3.5" />
-          {preview.isPending ? t('keys.previewing') : t('keys.previewFiles')}
-        </Button>
-      </div>
+  const previewButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={() => preview.mutate(files)}
+      disabled={files.length === 0 || preview.isPending}
+    >
+      <Upload className="size-3.5" />
+      {preview.isPending ? t('keys.previewing') : t('keys.previewFiles')}
+    </Button>
+  )
 
-      <div className="rounded-3xl border bg-card p-4">
+  const innerContent = (
+    <>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[260px] flex-1 space-y-1.5">
             <Label className="text-xs">{t('keys.importFiles')}</Label>
@@ -135,7 +136,7 @@ export function ImportKeysSection() {
         )}
 
         {rows.length > 0 && (
-          <div className="mt-4 overflow-hidden rounded-2xl border">
+          <div className="mt-4 overflow-x-auto rounded-2xl border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -236,12 +237,16 @@ export function ImportKeysSection() {
         {importSelected.isError && (
           <p className="mt-3 text-xs text-destructive">{(importSelected.error as Error).message}</p>
         )}
-        {result && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t('keys.importResult', { imported: result.imported, failed: result.errors.length })}
-          </p>
-        )}
+    </>
+  )
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">{t('keys.importKeysDescription')}</p>
+        {previewButton}
       </div>
-    </section>
+      {innerContent}
+    </div>
   )
 }

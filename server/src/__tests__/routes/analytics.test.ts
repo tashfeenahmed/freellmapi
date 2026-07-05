@@ -245,4 +245,180 @@ describe('Analytics API', () => {
       expect(row.pinnedRequests).toBe(1);
     });
   });
+
+  // Raw-row insert covering the newer columns (ttfb_ms, request_type, key_id,
+  // per-row latency). These feed the latency-percentile, TTFT, per-type, and
+  // per-key analytics that only exist on the raw table. No aggregate upsert:
+  // these tests assert the raw-scoped fields, not the hourly totals.
+  function insertRaw(opts: {
+    platform?: string;
+    modelId?: string;
+    keyId?: number | null;
+    status?: 'success' | 'error';
+    inputTokens?: number;
+    outputTokens?: number;
+    latencyMs?: number;
+    ttfbMs?: number | null;
+    requestType?: string;
+    error?: string | null;
+    createdAt: string;
+  }) {
+    const {
+      platform = 'test',
+      modelId = 'test-model',
+      keyId = null,
+      status = 'success',
+      inputTokens = 0,
+      outputTokens = 0,
+      latencyMs = 0,
+      ttfbMs = null,
+      requestType = 'chat',
+      error = null,
+      createdAt,
+    } = opts;
+    getDb().prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, ttfb_ms, request_type, error, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, ttfbMs, requestType, error, createdAt);
+  }
+
+  describe('extended summary fields', () => {
+    it('returns latency percentiles from the raw rows', async () => {
+      // Latencies 10..100 in a 24h window → p50 = 50, p95 = 90 (nearest-rank),
+      // avg = 55.
+      for (let ms = 10; ms <= 100; ms += 10) {
+        insertRaw({ latencyMs: ms, createdAt: '2026-05-29 11:00:00' });
+      }
+
+      const { status, body } = await request(app, '/api/analytics/summary?range=24h');
+
+      expect(status).toBe(200);
+      expect(body.p50LatencyMs).toBe(50);
+      expect(body.p95LatencyMs).toBe(90);
+      expect(body.avgLatencyMs).toBe(55);
+    });
+
+    it('returns null percentiles and TTFT when the raw window is empty', async () => {
+      const { status, body } = await request(app, '/api/analytics/summary?range=24h');
+
+      expect(status).toBe(200);
+      expect(body.p50LatencyMs).toBeNull();
+      expect(body.p95LatencyMs).toBeNull();
+      expect(body.avgTtfbMs).toBeNull();
+    });
+
+    it('averages TTFT over rows that recorded it and ignores NULL ttfb', async () => {
+      insertRaw({ ttfbMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ ttfbMs: 200, createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ ttfbMs: null, createdAt: '2026-05-29 11:02:00' });
+
+      const { status, body } = await request(app, '/api/analytics/summary?range=24h');
+
+      expect(status).toBe(200);
+      expect(body.avgTtfbMs).toBe(150);
+    });
+
+    it('splits requests into chat and embedding counts', async () => {
+      insertRaw({ requestType: 'chat', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ requestType: 'chat', createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ requestType: 'embedding', createdAt: '2026-05-29 11:02:00' });
+
+      const { status, body } = await request(app, '/api/analytics/summary?range=24h');
+
+      expect(status).toBe(200);
+      expect(body.requestTypeCounts).toEqual({ chat: 2, embedding: 1 });
+    });
+  });
+
+  describe('extended by-platform fields', () => {
+    it('adds p95 latency, avg TTFT, error count, and tokens/sec per platform', async () => {
+      // groq: 1 success (100ms, ttfb 20, 1000 out tok) + 1 error (300ms, ttfb 40).
+      insertRaw({ platform: 'groq', status: 'success', outputTokens: 1000, latencyMs: 100, ttfbMs: 20, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'groq', status: 'error', outputTokens: 0, latencyMs: 300, ttfbMs: 40, error: 'boom', createdAt: '2026-05-29 11:01:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+
+      expect(status).toBe(200);
+      const groq = body.find((r: any) => r.platform === 'groq');
+      expect(groq.errorCount).toBe(1);
+      expect(groq.avgTtfbMs).toBe(30);
+      // Only the success row qualifies (output>0 & latency>0): 1000 / 0.1 = 10000 tok/s.
+      expect(groq.avgTokensPerSecond).toBe(10000);
+      expect(typeof groq.p95LatencyMs).toBe('number');
+    });
+
+    it('reports null TTFT and tokens/sec when no rows qualify', async () => {
+      insertRaw({ platform: 'nokey', status: 'success', outputTokens: 0, latencyMs: 0, ttfbMs: null, createdAt: '2026-05-29 11:00:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+
+      expect(status).toBe(200);
+      const row = body.find((r: any) => r.platform === 'nokey');
+      expect(row.avgTtfbMs).toBeNull();
+      expect(row.avgTokensPerSecond).toBeNull();
+    });
+  });
+
+  describe('by-key endpoint', () => {
+    it('groups usage per key, joins the label, and keeps deleted keys', async () => {
+      getDb().prepare('DELETE FROM api_keys').run();
+      getDb().prepare(`
+        INSERT INTO api_keys (id, platform, label, encrypted_key, iv, auth_tag)
+        VALUES (1, 'groq', 'Prod key', 'x', 'x', 'x')
+      `).run();
+
+      // key 1 (exists): 3 rows, 2 success + 1 error, latency 100/200/300.
+      insertRaw({ keyId: 1, status: 'success', inputTokens: 10, outputTokens: 5, latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ keyId: 1, status: 'success', inputTokens: 20, outputTokens: 7, latencyMs: 200, createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ keyId: 1, status: 'error', inputTokens: 0, outputTokens: 0, latencyMs: 300, error: 'boom', createdAt: '2026-05-29 11:02:00' });
+      // key 99 (deleted — no api_keys row): 2 rows.
+      insertRaw({ keyId: 99, status: 'success', latencyMs: 50, createdAt: '2026-05-29 11:03:00' });
+      insertRaw({ keyId: 99, status: 'success', latencyMs: 50, createdAt: '2026-05-29 11:04:00' });
+      // key_id NULL row must be excluded entirely.
+      insertRaw({ keyId: null, status: 'success', createdAt: '2026-05-29 11:05:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-key?range=24h');
+
+      expect(status).toBe(200);
+      expect(body).toHaveLength(2);
+
+      const k1 = body.find((r: any) => r.keyId === 1);
+      expect(k1.label).toBe('Prod key');
+      expect(k1.platform).toBe('groq');
+      expect(k1.requests).toBe(3);
+      expect(k1.successRate).toBe(66.7);
+      expect(k1.avgLatencyMs).toBe(200);
+      expect(k1.totalInputTokens).toBe(30);
+      expect(k1.totalOutputTokens).toBe(12);
+
+      const k99 = body.find((r: any) => r.keyId === 99);
+      expect(k99.label).toBeNull();
+      expect(k99.platform).toBeNull();
+      expect(k99.requests).toBe(2);
+    });
+  });
+
+  describe('90d range', () => {
+    it('accepts range=90d across the analytics endpoints', async () => {
+      insertRequest('2026-02-01 12:00:00'); // ~117 days ago — outside 90d
+      insertRequest('2026-03-15 12:00:00'); // ~75 days ago — inside 90d
+      insertRequest('2026-05-29 11:00:00'); // today — inside 90d
+
+      const summary = await request(app, '/api/analytics/summary?range=90d');
+      expect(summary.status).toBe(200);
+      expect(summary.body.totalRequests).toBe(2);
+
+      const timeline = await request(app, '/api/analytics/timeline?range=90d');
+      expect(timeline.status).toBe(200);
+      // Day-bucketed for 90d; the two in-window rows land on two days.
+      expect(Array.isArray(timeline.body)).toBe(true);
+      expect(timeline.body.every((b: any) => 'inputTokens' in b && 'outputTokens' in b)).toBe(true);
+
+      const byPlatform = await request(app, '/api/analytics/by-platform?range=90d');
+      expect(byPlatform.status).toBe(200);
+
+      const byKey = await request(app, '/api/analytics/by-key?range=90d');
+      expect(byKey.status).toBe(200);
+    });
+  });
 });

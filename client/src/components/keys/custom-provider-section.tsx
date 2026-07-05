@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FieldError } from '@/components/ui/field-error'
 import { isHttpUrl } from '@/lib/validate'
 import { useI18n } from '@/i18n'
+import { toast } from '@/lib/toast'
 
 // Split a free-text model field on commas / newlines into a clean id list,
 // dropping blanks and duplicates so one endpoint can take several models. (#281)
@@ -20,7 +21,10 @@ function parseModelList(raw: string): string[] {
     .filter(s => s.length > 0 && !seen.has(s) && seen.add(s))
 }
 
-export function CustomProviderSection() {
+// Always rendered inside the Add key dialog: no outer section chrome/heading.
+// `onAdded` lets that dialog close (and surface a toast) once a custom model is
+// saved.
+export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
   const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio'>('chat')
@@ -62,6 +66,10 @@ export function CustomProviderSection() {
       setModel('')
       setDisplayName('')
       setFamily('')
+      if (onAdded) {
+        toast.success(t('keys.modelAdded'))
+        onAdded()
+      }
     },
   })
 
@@ -118,13 +126,8 @@ export function CustomProviderSection() {
         ? t('keys.addImageModel')
         : t('keys.addAudioModel')
 
-  return (
-    <section>
-      <h2 className="text-sm font-medium mb-1">{t('keys.addCustom')}</h2>
-      <p className="text-xs text-muted-foreground mb-3">
-        {t('keys.addCustomDescription')}
-      </p>
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-3xl border p-4 bg-card">
+  const form = (
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('keys.customType')}</Label>
           <Select value={customType} onValueChange={(v) => setCustomType(v as typeof customType)}>
@@ -197,9 +200,17 @@ export function CustomProviderSection() {
           {addCustom.isPending ? t('keys.addingCustom') : addLabel}
         </Button>
       </form>
-      {addCustom.isError && (
-        <p className="text-destructive text-xs mt-2">{(addCustom.error as Error).message}</p>
-      )}
-    </section>
+  )
+
+  const errorLine = addCustom.isError ? (
+    <p className="text-destructive text-xs mt-2">{(addCustom.error as Error).message}</p>
+  ) : null
+
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-3">{t('keys.addCustomDescription')}</p>
+      {form}
+      {errorLine}
+    </div>
   )
 }

@@ -18,6 +18,8 @@ function getSinceTimestamp(range: string): string {
       return toSqliteDateTime(now - 24 * 60 * 60 * 1000);
     case '30d':
       return toSqliteDateTime(now - 30 * 24 * 60 * 60 * 1000);
+    case '90d':
+      return toSqliteDateTime(now - 90 * 24 * 60 * 60 * 1000);
     case '7d':
     default:
       return toSqliteDateTime(now - 7 * 24 * 60 * 60 * 1000);
@@ -110,6 +112,50 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
     FROM requests WHERE created_at >= ?
   `).get(since) as { pinned_count: number | null; pin_honored_count: number | null };
 
+  // Latency percentiles, time-to-first-token, and the chat/embedding split all
+  // live on the raw rows (the hourly aggregate keeps neither latency nor a
+  // per-type breakdown). When the raw window is empty (older than the prune
+  // horizon) we report null, not 0, so the UI can render a placeholder instead
+  // of a misleading zero. Percentiles use nearest-rank via ORDER BY/OFFSET.
+  // Only rows that actually recorded a latency participate in the percentile.
+  // The IS NOT NULL guard must be on BOTH the offset-denominator count and the
+  // ordered selection so they range over the same set: a NULL sorts first under
+  // ORDER BY latency_ms ASC, so if it were counted but not filtered the offset
+  // math would shift and a NULL could be selected (rendered as 0).
+  const rawCount = (db.prepare(
+    `SELECT COUNT(*) as c FROM requests WHERE created_at >= ? AND latency_ms IS NOT NULL`
+  ).get(since) as { c: number }).c;
+  const percentileAt = (fraction: number): number | null => {
+    if (rawCount === 0) return null;
+    const offset = Math.floor((rawCount - 1) * fraction);
+    const row = db.prepare(`
+      SELECT latency_ms FROM requests
+      WHERE created_at >= ? AND latency_ms IS NOT NULL
+      ORDER BY latency_ms ASC
+      LIMIT 1 OFFSET ?
+    `).get(since, offset) as { latency_ms: number } | undefined;
+    return row ? Math.round(row.latency_ms) : null;
+  };
+  const p50LatencyMs = percentileAt(0.5);
+  const p95LatencyMs = percentileAt(0.95);
+
+  const ttfbRow = db.prepare(`
+    SELECT AVG(ttfb_ms) as avg_ttfb_ms FROM requests
+    WHERE created_at >= ? AND ttfb_ms IS NOT NULL
+  `).get(since) as { avg_ttfb_ms: number | null } | undefined;
+  const avgTtfbMs = ttfbRow?.avg_ttfb_ms != null ? Math.round(ttfbRow.avg_ttfb_ms) : null;
+
+  const typeRows = db.prepare(`
+    SELECT request_type, COUNT(*) as count FROM requests
+    WHERE created_at >= ?
+    GROUP BY request_type
+  `).all(since) as Array<{ request_type: string; count: number }>;
+  const requestTypeCounts = { chat: 0, embedding: 0 };
+  for (const row of typeRows) {
+    if (row.request_type === 'embedding') requestTypeCounts.embedding = row.count;
+    else if (row.request_type === 'chat') requestTypeCounts.chat = row.count;
+  }
+
   const lifetimeFirst = readLifetimeSettings();
 
   res.json({
@@ -118,6 +164,15 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
     totalInputTokens: aggregate.total_input_tokens ?? 0,
     totalOutputTokens: aggregate.total_output_tokens ?? 0,
     avgLatencyMs: Math.round(latencyRow?.avg_latency_ms ?? 0),
+    // Latency spread (raw rows): p50 typical, p95 tail. Null when the raw
+    // window is empty.
+    p50LatencyMs,
+    p95LatencyMs,
+    // Average streaming time-to-first-token over rows that recorded it; null
+    // when none did (non-streaming traffic or pruned window).
+    avgTtfbMs,
+    // Chat vs embedding request split for the selected window.
+    requestTypeCounts,
     estimatedCostSavings: Math.round((savings.est_savings ?? 0) * 100) / 100,
     // Pinned = requests where the client named a specific model (not 'auto').
     // Honored = the pinned model actually served it; the difference is
@@ -187,8 +242,13 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
     SELECT
       platform,
       COUNT(*) as requests,
+      COUNT(latency_ms) as latency_count,
       SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate,
       AVG(latency_ms) as avg_latency_ms,
+      AVG(ttfb_ms) as avg_ttfb_ms,
+      SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
+      AVG(CASE WHEN output_tokens > 0 AND latency_ms > 0
+        THEN output_tokens / (latency_ms / 1000.0) ELSE NULL END) as avg_tokens_per_second,
       SUM(input_tokens) as total_input_tokens,
       SUM(output_tokens) as total_output_tokens
     FROM requests
@@ -197,8 +257,74 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
     ORDER BY requests DESC
   `).all(since) as any[];
 
+  // P95 latency is a per-group percentile; SQLite has no native percentile
+  // aggregate, so we take the nearest-rank value per platform with a small
+  // ORDER BY/OFFSET query. The platform count is tiny (one row per provider),
+  // so the extra round-trips are negligible and keep the SQL readable.
+  const p95Stmt = db.prepare(`
+    SELECT latency_ms FROM requests
+    WHERE created_at >= ? AND platform = ? AND latency_ms IS NOT NULL
+    ORDER BY latency_ms ASC
+    LIMIT 1 OFFSET ?
+  `);
+
+  res.json(rows.map(r => {
+    // Offset math and the ordered selection both range over the non-null
+    // latency rows (latency_count), so a NULL can neither be counted into the
+    // denominator nor selected as the p95 value.
+    const latencyCount = r.latency_count ?? 0;
+    const p95Row = latencyCount > 0
+      ? (p95Stmt.get(since, r.platform, Math.floor((latencyCount - 1) * 0.95)) as { latency_ms: number } | undefined)
+      : undefined;
+    return {
+      platform: r.platform,
+      requests: r.requests,
+      successRate: Math.round(r.success_rate * 10) / 10,
+      avgLatencyMs: Math.round(r.avg_latency_ms),
+      p95LatencyMs: p95Row ? Math.round(p95Row.latency_ms) : null,
+      avgTtfbMs: r.avg_ttfb_ms != null ? Math.round(r.avg_ttfb_ms) : null,
+      errorCount: r.error_count ?? 0,
+      avgTokensPerSecond: r.avg_tokens_per_second != null
+        ? Math.round(r.avg_tokens_per_second * 10) / 10
+        : null,
+      totalInputTokens: r.total_input_tokens ?? 0,
+      totalOutputTokens: r.total_output_tokens ?? 0,
+    };
+  }));
+});
+
+// Stats grouped by API key. Raw-row scoped (the hourly aggregate has no key
+// dimension), LEFT JOINed to api_keys so a request whose key was later deleted
+// still shows up with a null label — the keyId is always returned.
+analyticsRouter.get('/by-key', (req: Request, res: Response) => {
+  const range = (req.query.range as string) ?? '7d';
+  const since = getSinceTimestamp(range);
+  const db = getDb();
+
+  const rows = db.prepare(`
+    SELECT
+      r.key_id as key_id,
+      k.label as label,
+      k.platform as platform,
+      COUNT(*) as requests,
+      SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate,
+      AVG(r.latency_ms) as avg_latency_ms,
+      SUM(r.input_tokens) as total_input_tokens,
+      SUM(r.output_tokens) as total_output_tokens
+    FROM requests r
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    WHERE r.key_id IS NOT NULL AND r.created_at >= ?
+    GROUP BY r.key_id
+    ORDER BY requests DESC
+    LIMIT 50
+  `).all(since) as any[];
+
   res.json(rows.map(r => ({
-    platform: r.platform,
+    keyId: r.key_id,
+    // Null when the key row was deleted, or the empty string when the key
+    // exists but was never labelled; the client falls back to "Key #<id>".
+    label: r.label ?? null,
+    platform: r.platform ?? null,
     requests: r.requests,
     successRate: Math.round(r.success_rate * 10) / 10,
     avgLatencyMs: Math.round(r.avg_latency_ms),
@@ -225,7 +351,9 @@ analyticsRouter.get('/timeline', (req: Request, res: Response) => {
       strftime('${dateFormat}', hour) as timestamp,
       SUM(total_requests) as requests,
       SUM(success_count) as success_count,
-      SUM(error_count) as failure_count
+      SUM(error_count) as failure_count,
+      SUM(input_tokens) as input_tokens,
+      SUM(output_tokens) as output_tokens
     FROM request_hourly
     WHERE hour >= ?
     GROUP BY strftime('${dateFormat}', hour)
@@ -237,6 +365,8 @@ analyticsRouter.get('/timeline', (req: Request, res: Response) => {
     requests: r.requests,
     successCount: r.success_count,
     failureCount: r.failure_count,
+    inputTokens: r.input_tokens ?? 0,
+    outputTokens: r.output_tokens ?? 0,
   })));
 });
 
