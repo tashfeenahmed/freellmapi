@@ -13,14 +13,13 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
+import { ModelTableHead, RowContent } from '@/components/model-table'
 import {
-  ModelTableHead,
-  RowContent,
   groupQuotaBadge,
   type FallbackEntry,
   type RoutingData,
   type Row,
-} from './FallbackPage'
+} from '@/lib/routing'
 
 type ModelSettingsPatch = {
   displayName: string

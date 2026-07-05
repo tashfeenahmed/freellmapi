@@ -20,7 +20,7 @@ import { apiFetch } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { apiBaseUrl } from '@/components/api-usage'
 import { useI18n } from '@/i18n'
-import type { FallbackEntry } from '@/pages/FallbackPage'
+import type { FallbackEntry } from '@/lib/routing'
 
 // Open the palette from anywhere (navbar button); same custom-event idiom as
 // UNAUTHORIZED_EVENT in lib/api.ts.
