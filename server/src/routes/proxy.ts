@@ -732,6 +732,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         let headerSent = false;
         let ttfbMs: number | null = null;
         let sawText = false;
+        let upstreamFinish: string | null = null;
         const buffered: unknown[] = [];
 
         const flushHeaders = () => {
@@ -759,6 +760,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           for await (const chunk of gen) {
             const text = streamChunkText(chunk);
             if (text.length > 0) sawText = true;
+            const finish = (chunk as any)?.choices?.[0]?.finish_reason;
+            if (finish) upstreamFinish = finish;
             totalOutputTokens += Math.ceil(text.length / 4);
             const frame = legacyCompletionChunk(route, chunk, text);
             // Commit point: hold headers until the first real text, so a stream
@@ -772,7 +775,13 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           }
 
           if (!sawText) {
-            throw new Error(`empty completion from ${route.displayName} (legacy stream produced no text)`);
+            // finish_reason 'length' means the model spent the whole output
+            // budget before any visible text (hidden reasoning) — fail over,
+            // but skip the cooldown/penalty: not a provider-health signal.
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName} (legacy stream produced no text)`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
           }
 
           flushHeaders();
@@ -824,10 +833,20 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
       const text = completionTextFromChat(result);
       if (!text) {
-        throw new Error(`empty completion from ${route.displayName}`);
+        // finish_reason 'length' = output budget consumed by hidden reasoning
+        // before any visible text: fail over without a cooldown/penalty.
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName}`),
+          result.choices?.[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
       }
 
-      const totalTokens = result.usage?.total_tokens ?? 0;
+      // Usage fallback: providers that omit `usage` used to be logged as 0
+      // tokens, silently undercounting analytics and the rate-limit ledger.
+      // Fall back to the same chars/4 estimate the streaming path uses.
+      const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
+      const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+      const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
       recordUpstreamSuccess(route, totalTokens);
 
       res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
@@ -853,10 +872,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         platform: route.platform,
         model: route.modelId,
         latencyMs: Date.now() - start,
-        inputTokens: result.usage?.prompt_tokens ?? 0,
-        outputTokens: result.usage?.completion_tokens ?? 0,
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
       });
-      logRequest(route.platform, route.modelId, route.keyId, 'success', result.usage?.prompt_tokens ?? 0, result.usage?.completion_tokens ?? 0, Date.now() - start, null, null, pinnedModelId);
+      logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId);
       return 'done';
     },
     logFailure: (route, err, attempt) => {
@@ -873,7 +892,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       });
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
     },
-    onFatal: (route, err) => {
+    onFatal: (route, err, attempt) => {
+      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
       res.status(502).json({
         error: {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
@@ -881,10 +901,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         },
       });
     },
-    onRoutingExhausted: (lastError, routeErr) => {
-      if (lastError) {
-        const error = exhaustedRetryError(lastError);
-        res.status(error.status).json({ error: { message: error.message, type: error.type } });
+    onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
+      if (exhaustion) {
+        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       } else {
         const disposition: string[] = Array.isArray(routeErr.diagnostics) ? routeErr.diagnostics : [];
         console.warn(
@@ -895,9 +915,9 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         res.status(routeErr.status ?? 503).json({ error: { message: routeErr.message, type: 'routing_error' } });
       }
     },
-    onExhausted: (lastError) => {
-      const error = exhaustedRetryError(lastError, MAX_RETRIES);
-      res.status(error.status).json({ error: { message: error.message, type: error.type } });
+    onExhausted: (exhaustion, info) => {
+      if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+      res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
     },
   });
 });
@@ -1565,7 +1585,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             // Nothing usable came out — same failover semantics as the
             // non-stream empty-completion path. Headers can't have been sent
             // (header flush requires payload), so the client never notices.
-            throw new Error(`empty completion from ${route.displayName} (stream produced no content and no tool calls)`);
+            // finish_reason 'length' = the model spent the whole output budget
+            // on hidden reasoning before any visible text: fail over, but skip
+            // the cooldown/penalty (not a provider-health signal).
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName} (stream produced no content and no tool calls)`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
           }
 
           flushHeaders();
@@ -1643,7 +1669,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const respMsg = result.choices?.[0]?.message;
         const respText = contentToString(respMsg?.content ?? '');
         if (!respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
-          throw new Error(`empty completion from ${route.displayName}`);
+          // finish_reason 'length' = the model spent the whole output budget on
+          // hidden reasoning before any visible text (observed live: 5 of 11
+          // hops in one chain). Still fail over, but skipBench tells the shared
+          // loop not to cooldown/penalize a healthy model for a truncated turn.
+          throw Object.assign(
+            new Error(`empty completion from ${route.displayName}`),
+            result.choices?.[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+          );
         }
 
         // Inline tool-call dialect rescue (#231 audit): a tool-bearing
@@ -1670,7 +1703,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           }
         }
 
-        const totalTokens = result.usage?.total_tokens ?? 0;
+        // Usage fallback: providers that omit `usage` used to be logged as 0
+        // tokens, silently undercounting analytics and the rate-limit ledger.
+        // Fall back to the same chars/4 estimate the streaming path uses (tool
+        // arguments included, mirroring the stream accounting).
+        const respToolArgChars = (respMsg?.tool_calls ?? []).reduce((n, tc) => n + (tc?.function?.arguments?.length ?? 0), 0);
+        const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
+        const completionTokens = result.usage?.completion_tokens
+          ?? Math.ceil((contentToString(respMsg?.content ?? '').length + respToolArgChars) / 4);
+        const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
         recordUpstreamSuccess(route, totalTokens);
         // Use stickyStrategyKey (not the global strategyKey) so a group-pinned
         // request writes its sticky entry under the SAME key the next turn reads
@@ -1709,8 +1750,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             platform: route.platform,
             modelId: route.modelId,
             keyId: route.keyId,
-            promptTokens: result.usage?.prompt_tokens ?? 0,
-            completionTokens: result.usage?.completion_tokens ?? 0,
+            promptTokens,
+            completionTokens,
           });
         }
 
@@ -1721,10 +1762,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           platform: route.platform,
           model: route.modelId,
           latencyMs: Date.now() - start,
-          inputTokens: result.usage?.prompt_tokens ?? 0,
-          outputTokens: result.usage?.completion_tokens ?? 0,
+          inputTokens: promptTokens,
+          outputTokens: completionTokens,
         });
-        logRequest(route.platform, route.modelId, route.keyId, 'success', result.usage?.prompt_tokens ?? 0, result.usage?.completion_tokens ?? 0, Date.now() - start, null, null, pinnedModelId);
+        logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId);
         return 'done';
       }
     },
@@ -1742,8 +1783,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       });
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
     },
-    onFatal: (route, err) => {
-      // Non-retryable error (auth, bare 4xx, etc.): don't retry.
+    onFatal: (route, err, attempt) => {
+      // Non-retryable error (bare 4xx, etc.): don't retry.
+      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
       res.status(502).json({
         error: {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
@@ -1751,11 +1793,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         },
       });
     },
-    onRoutingExhausted: (lastError, routeErr) => {
+    onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
       // No more models available.
-      if (lastError) {
-        const error = exhaustedRetryError(lastError);
-        res.status(error.status).json({ error: { message: error.message, type: error.type } });
+      if (exhaustion) {
+        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       } else {
         // Synchronous exhaustion: the router rejected every candidate before any
         // upstream was tried, so this is the ONLY place the per-model disposition
@@ -1770,9 +1812,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         res.status(routeErr.status ?? 503).json({ error: { message: routeErr.message, type: 'routing_error' } });
       }
     },
-    onExhausted: (lastError) => {
-      const error = exhaustedRetryError(lastError, MAX_RETRIES);
-      res.status(error.status).json({ error: { message: error.message, type: error.type } });
+    onExhausted: (exhaustion, info) => {
+      if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+      res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
     },
   });
 });

@@ -7,7 +7,6 @@ import type {
   ChatToolCall,
   ChatToolDefinition,
   ChatToolChoice,
-  ChatContent,
   ChatContentBlock,
 } from '@freellmapi/shared/types.js';
 import { routeRequest, routingReserveTokens, type RouteResult } from '../services/router.js';
@@ -18,7 +17,7 @@ import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarke
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, type ExhaustionBody } from '../lib/fallback-loop.js';
 import { resolveAnthropicModel } from '../services/anthropic-map.js';
 import { buildModelListing } from '../services/model-listing.js';
 
@@ -105,15 +104,16 @@ interface AnthropicMessageResponse {
   usage: { input_tokens: number; output_tokens: number };
 }
 
-// Carries an HTTP status + Anthropic error type through the routing loop.
-class AnthropicError extends Error {
-  constructor(readonly status: number, readonly errorType: string, message: string) {
-    super(message);
-  }
-}
-
 function sendError(res: Response, status: number, errorType: string, message: string): void {
   res.status(status).json({ type: 'error', error: { type: errorType, message } });
+}
+
+// The shared exhaustion body's `type` strings are chosen to be valid on the
+// OpenAI-shaped surfaces; the all-keys-failed-auth exhaustion carries
+// 'provider_error', which is not an Anthropic error type. Remap it onto
+// Anthropic's generic 'api_error' so this surface stays wire-correct.
+function anthropicErrorType(body: ExhaustionBody): string {
+  return body.kind === 'auth' ? 'api_error' : body.type;
 }
 
 function newMessageId(): string {
@@ -414,9 +414,13 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       let respToolCalls = respMsg?.tool_calls ?? [];
 
       // Empty completion → fail over via the shared loop, exactly like the
-      // OpenAI route.
+      // OpenAI route; finish_reason 'length' (whole output budget spent on
+      // hidden reasoning) skips the cooldown/penalty.
       if (!respText && respToolCalls.length === 0) {
-        throw new Error(`empty completion from ${route.displayName}`);
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName}`),
+          result.choices?.[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
       }
 
       // Inline tool-call dialect rescue (#231): a tool-bearing request answered
@@ -478,20 +482,21 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
     logFailure: (route, err) => {
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, sanitizeProviderErrorMessage(err.message), null, pinnedModelId);
     },
-    onFatal: (route, err) => {
+    onFatal: (route, err, attempt) => {
+      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
       sendError(res, 502, 'api_error', `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`);
     },
-    onRoutingExhausted: (lastError, routeErr) => {
-      if (lastError) {
-        const e = exhaustedRetryError(lastError);
-        sendError(res, e.status, e.type, e.message);
+    onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
+      if (exhaustion) {
+        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        sendError(res, exhaustion.status, anthropicErrorType(exhaustion), exhaustion.message);
       } else {
         sendError(res, routeErr?.status ?? 503, 'api_error', routeErr?.message ?? 'No model available to route this request');
       }
     },
-    onExhausted: (lastError) => {
-      const e = exhaustedRetryError(lastError, MAX_RETRIES);
-      sendError(res, e.status, e.type, e.message);
+    onExhausted: (exhaustion, info) => {
+      if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+      sendError(res, exhaustion.status, anthropicErrorType(exhaustion), exhaustion.message);
     },
   });
 });
@@ -669,7 +674,13 @@ async function streamCompletion(
     // Nothing usable came out — fail over (message_start was never sent, so the
     // client never saw this attempt).
     if (!messageStarted && completedCalls.length === 0) {
-      throw new Error(`empty completion from ${route.displayName} (stream produced no content and no tool calls)`);
+      // finish_reason 'length' = the model spent the whole output budget on
+      // hidden reasoning before any visible text: fail over, but skip the
+      // cooldown/penalty (not a provider-health signal).
+      throw Object.assign(
+        new Error(`empty completion from ${route.displayName} (stream produced no content and no tool calls)`),
+        upstreamFinish === 'length' ? { skipBench: true } : {},
+      );
     }
 
     ensureMessageStart();

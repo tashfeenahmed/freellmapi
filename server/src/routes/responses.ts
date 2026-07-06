@@ -23,7 +23,7 @@ import {
   traceRouteEvent,
   logRequest,
 } from './proxy.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess } from '../lib/fallback-loop.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -407,6 +407,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         // streamed normally). Mirrors the /chat/completions stream loop.
         let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
         let heldText = '';
+        let upstreamFinish: string | null = null;
 
         // Commit point: headers + the response.created/in_progress skeleton go
         // out only when the first MEANINGFUL output item is about to be emitted
@@ -467,7 +468,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
               throw new Error(`in-band provider error from ${route.displayName}: ${anyChunk.error.message ?? 'provider error'}`);
             }
 
-            const delta = chunk.choices?.[0]?.delta;
+            const choice0 = chunk.choices?.[0];
+            if (choice0?.finish_reason) upstreamFinish = choice0.finish_reason;
+            const delta = choice0?.delta;
             if (!delta) continue;
 
             // Text deltas → output_text events on a single message item, after
@@ -571,7 +574,13 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           // been committed yet (the skeleton is lazy), so throwing lets the
           // shared loop fail over to the next model on the same SSE connection.
           if (msgText.length === 0 && toolAcc.size === 0) {
-            throw new Error(`empty completion from ${route.displayName}`);
+            // finish_reason 'length' = the model spent the whole output budget
+            // on hidden reasoning before any visible text: fail over, but skip
+            // the cooldown/penalty (not a provider-health signal).
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName}`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
           }
 
           // Finalize any open text item.
@@ -673,12 +682,19 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
       const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
 
-      // Empty completion → fail over via the shared loop (see the streaming path).
+      // Empty completion → fail over via the shared loop (see the streaming
+      // path); finish_reason 'length' skips the cooldown/penalty.
       if (!text && toolCalls.length === 0) {
-        throw new Error(`empty completion from ${route.displayName}`);
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName}`),
+          result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
       }
 
-      recordUpstreamSuccess(route, result.usage?.total_tokens ?? 0);
+      // Usage fallback: a missing provider `usage` block used to record 0
+      // tokens against the rate-limit ledger; promptTokens/completionTokens
+      // above already carry the chars/4 estimate.
+      recordUpstreamSuccess(route, result.usage?.total_tokens ?? (promptTokens + completionTokens));
       setStickyModel(messages, route.modelDbId, sessionIdHeader);
 
       res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
@@ -715,30 +731,31 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       });
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
     },
-    onFatal: (route, err) => {
+    onFatal: (route, err, attempt) => {
+      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
       res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`, type: 'provider_error' } });
     },
-    onRoutingExhausted: (lastError, routeErr) => {
-      const exhausted = lastError ? exhaustedRetryError(lastError) : null;
-      const status = exhausted?.status ?? routeErr.status ?? 503;
-      const message = exhausted?.message ?? routeErr.message;
-      const type = exhausted?.type ?? 'routing_error';
+    onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
+      const status = exhaustion?.status ?? routeErr.status ?? 503;
+      const message = exhaustion?.message ?? routeErr.message;
+      const type = exhaustion?.type ?? 'routing_error';
       if (streamStarted) {
         sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
         res.end();
       } else {
+        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
         res.status(status).json({ error: { message, type } });
       }
     },
-    onExhausted: (lastError) => {
+    onExhausted: (exhaustion, info) => {
       // The streaming skeleton may already be on the wire — close the SSE stream
       // with a failed event instead of writing JSON onto a committed response.
-      const exhausted = exhaustedRetryError(lastError, MAX_RETRIES);
       if (streamStarted) {
-        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhausted.message, type: exhausted.type } } });
+        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhaustion.message, type: exhaustion.type } } });
         res.end();
       } else {
-        res.status(exhausted.status).json({ error: { message: exhausted.message, type: exhausted.type } });
+        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       }
     },
   });

@@ -68,6 +68,40 @@ export function isRetryableError(err: any): boolean {
     || msg.includes('unparseable inline tool-call dialect');
 }
 
+// A 401 / invalid-API-key error from a provider. KEY-fatal, not request-fatal:
+// the same request is fine on the provider's sibling key or on another provider,
+// so the fallback loop rotates past the bad key (and triggers an immediate
+// health revalidation) instead of 502-ing the whole request. Deliberately NOT
+// added to isRetryableError: a bad key must be skipped and revalidated, not
+// blindly re-benched like a rate limit — the loop handles it as its own class.
+// A structured non-401 status wins (e.g. a 403 stays model-forbidden); the
+// message substrings are the fallback for errors that carry no numeric status.
+export function isKeyAuthError(err: any): boolean {
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  if (status === 401) return true;
+  if (status !== 0) return false;
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('401')
+    || msg.includes('unauthorized')
+    || msg.includes('invalid api key')
+    || msg.includes('invalid_api_key')
+    || msg.includes('incorrect api key')
+    || msg.includes('api key not valid')
+    || msg.includes('authentication failed');
+}
+
+// A 429 whose body says the provider's DAILY free allocation is spent (observed
+// live: Cloudflare "you have used up your daily free allocation of 10,000
+// neurons"; OpenRouter "free-models-per-day"). A transient 90s cooldown just
+// makes the router re-pick a dead-for-the-day provider all day, so the caller
+// benches until the next UTC midnight instead. Requires BOTH a daily marker and
+// a quota/allocation marker so an ordinary per-minute 429 never matches.
+export function isDailyQuotaExhaustedError(err: any): boolean {
+  const msg = (err?.message ?? '').toLowerCase();
+  if (!/daily|per[ -_]?day|\btoday\b/.test(msg)) return false;
+  return /allocation|quota|limit|exhaust|used up/.test(msg);
+}
+
 // Provider-side 400s are retryable because another provider may accept the same
 // request shape. If every routed provider rejects it, however, the client should
 // see an invalid-request error rather than a misleading rate-limit exhaustion.
