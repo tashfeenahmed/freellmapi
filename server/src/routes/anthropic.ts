@@ -10,18 +10,15 @@ import type {
   ChatContent,
   ChatContentBlock,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasOtherUsableKey, routingReserveTokens, type RouteResult } from '../services/router.js';
-import {
-  recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit,
-  PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError,
-} from '../services/ratelimit.js';
+import { routeRequest, routingReserveTokens, type RouteResult } from '../services/router.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
 import { resolveAnthropicModel } from '../services/anthropic-map.js';
 import { buildModelListing } from '../services/model-listing.js';
 
@@ -324,14 +321,19 @@ function writeSse(res: Response, event: string, data: unknown): void {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// ── Routing (shared loop, trimmed for the translation layer) ────────────────
-// Returns the routed result + the converted (internal) response for the
-// non-streaming path. Streaming is handled inline so we can translate chunks
-// as they arrive. Mirrors the OpenAI route's cooldown/skip/analytics handling.
-function cooldownFor(route: RouteResult, err: any): number {
-  if (isPaymentRequiredError(err)) return PAYMENT_REQUIRED_COOLDOWN_MS;
-  if (isModelAccessForbiddenError(err)) return MODEL_FORBIDDEN_COOLDOWN_MS;
-  return getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }, err?.retryAfterMs);
+// Convert rescued inline tool calls (parsed out of a model that serialized its
+// tool call as TEXT) into OpenAI-shaped tool_calls, so toAnthropicContent /
+// the streaming tool_use emitter render them as Anthropic tool_use blocks —
+// the same rescue /chat/completions and /v1/responses already apply (#231).
+function rescuedToToolCalls(
+  calls: Array<{ name: string; arguments: string }>,
+  schemas: Map<string, unknown>,
+): ChatToolCall[] {
+  return calls.map((c, i) => ({
+    id: `toolu_${crypto.randomBytes(8).toString('hex')}_rescued_${i + 1}`,
+    type: 'function' as const,
+    function: { name: c.name, arguments: repairToolArguments(c.arguments, schemas.get(c.name) as any) },
+  }));
 }
 
 anthropicRouter.post('/messages', async (req: Request, res: Response) => {
@@ -377,47 +379,64 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   let preferredModel = resolved.preferredModelDbId;
   if (preferredModel == null) preferredModel = getStickyModel(messages, sessionId);
 
-  const skipKeys = new Set<string>();
-  const skipModels = new Set<number>();
-  let lastError: any = null;
+  // Thin adapter over the shared fallback loop (lib/fallback-loop.ts): the
+  // cooldown/skip/penalty/exhaustion machinery is shared, only the Anthropic
+  // request/stream translation lives here. This converged three drifts on this
+  // surface: it now honors a provider Retry-After and day-benches a 403 (via the
+  // shared cooldown), returns a shared exhaustion body (a 400 invalid_request
+  // when every provider rejected the request, not always a 429), and applies the
+  // inline tool-call dialect rescue that the OpenAI/Responses surfaces carry.
+  const state = newFallbackState();
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    let route: RouteResult;
-    try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
-    } catch (err: any) {
-      if (lastError) {
-        sendError(res, 429, 'rate_limit_error', `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`);
-      } else {
-        sendError(res, err?.status ?? 503, 'api_error', err?.message ?? 'No model available to route this request');
-      }
-      return;
-    }
-
-    try {
+  await runFallbackLoop({
+    maxRetries: MAX_RETRIES,
+    state,
+    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined),
+    dispatch: async (route, attempt) => {
       if (stream) {
-        await streamCompletion(res, route, messages, completionOptions, {
-          start, attempt, requestedModel, estimatedInputTokens, tools, pinnedModelId,
-          sessionId, pinned: resolved.pinned,
-        });
-        return;
+        try {
+          await streamCompletion(res, route, messages, completionOptions, {
+            start, attempt, requestedModel, estimatedInputTokens, tools, pinnedModelId,
+            sessionId, pinned: resolved.pinned,
+          });
+          return 'done';
+        } catch (err: any) {
+          // The stream already committed (message_start sent) and surfaced its
+          // own error event; stop without failover or a second response.
+          if (err instanceof StreamAlreadyStarted) return 'committed';
+          throw err;
+        }
       }
 
       const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, completionOptions);
       const respMsg = result.choices?.[0]?.message;
       const respText = contentToString(respMsg?.content ?? '');
-      const respToolCalls = respMsg?.tool_calls ?? [];
+      let respToolCalls = respMsg?.tool_calls ?? [];
 
-      // Empty completion → fail over, exactly like the OpenAI route.
+      // Empty completion → fail over via the shared loop, exactly like the
+      // OpenAI route.
       if (!respText && respToolCalls.length === 0) {
-        logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
-        skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-        setCooldown(route.platform, route.modelId, route.keyId, cooldownFor(route, {}));
-        // Only demote the whole model when no sibling key can still serve; the
-        // per-key cooldown already isolates this key's failure (#454).
-        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-        lastError = new Error(`empty completion from ${route.displayName}`);
-        continue;
+        throw new Error(`empty completion from ${route.displayName}`);
+      }
+
+      // Inline tool-call dialect rescue (#231): a tool-bearing request answered
+      // with the call serialized as TEXT → re-parse it into structured tool_use
+      // so Claude Code's agent loop keeps working; a detected-but-unparseable
+      // dialect is a dead turn and fails over like an empty completion. Same
+      // rescue /chat/completions and /v1/responses already apply.
+      if (wantsTools && respMsg && respToolCalls.length === 0 && respText) {
+        const rescue = rescueInlineToolCalls(respText, new Set((tools ?? []).map(t => t.function.name)));
+        if (rescue.detected) {
+          if (!rescue.calls) {
+            throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${respText.slice(0, 120)}`);
+          }
+          const schemas = toolSchemaMap(tools);
+          respMsg.tool_calls = rescuedToToolCalls(rescue.calls, schemas);
+          respMsg.content = rescue.cleanText.length > 0 ? rescue.cleanText : null;
+          if (result.choices?.[0]) result.choices[0].finish_reason = 'tool_calls';
+          respToolCalls = respMsg.tool_calls;
+          console.log(`[Anthropic] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName} into tool_use`);
+        }
       }
 
       // Repair double-encoded tool arguments against the request schemas, so
@@ -434,9 +453,7 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
       const completionTokens = result.usage?.completion_tokens ?? Math.ceil((respText.length + respToolCalls.reduce((n, c) => n + c.function.arguments.length, 0)) / 4);
 
-      recordRequest(route.platform, route.modelId, route.keyId);
-      recordTokens(route.platform, route.modelId, route.keyId, result.usage?.total_tokens ?? promptTokens + completionTokens);
-      recordSuccess(route.modelDbId);
+      recordUpstreamSuccess(route, result.usage?.total_tokens ?? promptTokens + completionTokens);
       // Remember this model for the rest of the auto-routed session (no-op for
       // a pinned request — the pin already fixes the model).
       if (!resolved.pinned) setStickyModel(messages, route.modelDbId, sessionId);
@@ -456,32 +473,27 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
       logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId);
       res.json(anthropicResponse);
-      return;
-    } catch (err: any) {
-      const safeError = sanitizeProviderErrorMessage(err.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safeError, null, pinnedModelId);
-
-      // A stream that already sent its `message_start` cannot fail over — the
-      // helper finished the SSE response itself. Bubble back without retrying.
-      if (err instanceof StreamAlreadyStarted) return;
-
-      if (isRetryableError(err)) {
-        if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
-        skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-        setCooldown(route.platform, route.modelId, route.keyId, cooldownFor(route, err));
-        // Model-level penalty only when no sibling key can still serve (#454).
-        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-        learnLimitFromError(route.modelDbId, err);
-        lastError = err;
-        continue;
+      return 'done';
+    },
+    logFailure: (route, err) => {
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, sanitizeProviderErrorMessage(err.message), null, pinnedModelId);
+    },
+    onFatal: (route, err) => {
+      sendError(res, 502, 'api_error', `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`);
+    },
+    onRoutingExhausted: (lastError, routeErr) => {
+      if (lastError) {
+        const e = exhaustedRetryError(lastError);
+        sendError(res, e.status, e.type, e.message);
+      } else {
+        sendError(res, routeErr?.status ?? 503, 'api_error', routeErr?.message ?? 'No model available to route this request');
       }
-
-      sendError(res, 502, 'api_error', `Provider error (${route.displayName}): ${safeError}`);
-      return;
-    }
-  }
-
-  sendError(res, 429, 'rate_limit_error', `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${sanitizeProviderErrorMessage(lastError?.message)}`);
+    },
+    onExhausted: (lastError) => {
+      const e = exhaustedRetryError(lastError, MAX_RETRIES);
+      sendError(res, e.status, e.type, e.message);
+    },
+  });
 });
 
 // Thrown by streamCompletion once the SSE response is underway, so the outer
@@ -515,13 +527,23 @@ async function streamCompletion(
   options: any,
   ctx: StreamCtx,
 ): Promise<void> {
-  let messageStarted = false; // doubles as "headers + message_start sent"
+  let messageStarted = false; // doubles as "headers + message_start sent" = committed
   let textBlockOpen = false;
   let textBlockIndex = -1;
   let nextIndex = 0;
   let outputChars = 0;
   let upstreamFinish: string | null = null;
   const toolAcc = new Map<number, { id?: string; name: string; args: string }>();
+
+  // Inline-dialect hold window (#231): the first text is held until it either
+  // matches a tool-call dialect marker (held to the end and rescued into
+  // tool_use blocks) or provably cannot (flushed and streamed normally). This is
+  // also the commit point convergence — message_start is not sent until the
+  // first MEANINGFUL content, so a stream that opens with a dialect marker and
+  // then turns out unparseable fails over invisibly (previously this surface
+  // committed on the first non-empty text and had no dialect rescue at all).
+  let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+  let heldText = '';
 
   const ensureMessageStart = () => {
     if (messageStarted) return;
@@ -539,6 +561,18 @@ async function streamCompletion(
       },
     });
     messageStarted = true;
+  };
+
+  // Commit (if needed), open the text block (if needed), and stream `text`.
+  const emitText = (text: string) => {
+    ensureMessageStart();
+    if (!textBlockOpen) {
+      textBlockIndex = nextIndex++;
+      writeSse(res, 'content_block_start', { type: 'content_block_start', index: textBlockIndex, content_block: { type: 'text', text: '' } });
+      textBlockOpen = true;
+    }
+    writeSse(res, 'content_block_delta', { type: 'content_block_delta', index: textBlockIndex, delta: { type: 'text_delta', text } });
+    outputChars += text.length;
   };
 
   try {
@@ -575,14 +609,22 @@ async function streamCompletion(
       const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
       if (text.length === 0) continue;
 
-      ensureMessageStart();
-      if (!textBlockOpen) {
-        textBlockIndex = nextIndex++;
-        writeSse(res, 'content_block_start', { type: 'content_block_start', index: textBlockIndex, content_block: { type: 'text', text: '' } });
-        textBlockOpen = true;
+      if (dialectMode === 'passthrough') {
+        emitText(text);
+      } else {
+        heldText += text;
+        if (dialectMode === 'undecided') {
+          const probe = heldText.trimStart();
+          if (startsWithDialectMarker(probe)) {
+            dialectMode = 'dialect';
+          } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+            dialectMode = 'passthrough';
+            emitText(heldText);
+            heldText = '';
+          }
+        }
+        // else: still a strict prefix of a marker — keep holding.
       }
-      writeSse(res, 'content_block_delta', { type: 'content_block_delta', index: textBlockIndex, delta: { type: 'text_delta', text } });
-      outputChars += text.length;
     }
 
     // Assemble buffered tool calls: synthesize missing ids, repair args against
@@ -597,6 +639,32 @@ async function streamCompletion(
         arguments: repairToolArguments(acc.args || '{}', schemas.get(acc.name)),
       }))
       .filter(c => { try { JSON.parse(c.arguments); return c.name.length > 0; } catch { return false; } });
+
+    // Resolve the dialect hold window now the full text is known. Held text was
+    // never emitted, so a dead dialect turn can still fail over (nothing has been
+    // committed). A rescued dialect becomes tool_use blocks; leftover clean text
+    // is emitted as a text block first.
+    if (heldText.length > 0) {
+      const rescue = (dialectMode === 'dialect' || containsDialectMarker(heldText))
+        ? rescueInlineToolCalls(heldText, new Set((ctx.tools ?? []).map(t => t.function.name)))
+        : { detected: false as const, calls: null, cleanText: heldText };
+      if (rescue.detected && !rescue.calls) {
+        throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${heldText.slice(0, 120)}`);
+      }
+      if (rescue.detected && rescue.calls) {
+        if (rescue.cleanText.length > 0) emitText(rescue.cleanText);
+        for (const c of rescue.calls) {
+          const repaired = repairToolArguments(c.arguments, schemas.get(c.name));
+          if (c.name.length === 0) continue;
+          try { JSON.parse(repaired); } catch { continue; }
+          completedCalls.push({ id: `toolu_${crypto.randomBytes(8).toString('hex')}_rescued_${++synthetic}`, name: c.name, arguments: repaired });
+        }
+        console.log(`[Anthropic] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName} into tool_use`);
+      } else {
+        emitText(heldText);
+      }
+      heldText = '';
+    }
 
     // Nothing usable came out — fail over (message_start was never sent, so the
     // client never saw this attempt).
@@ -621,9 +689,7 @@ async function streamCompletion(
     writeSse(res, 'message_stop', { type: 'message_stop' });
     res.end();
 
-    recordRequest(route.platform, route.modelId, route.keyId);
-    recordTokens(route.platform, route.modelId, route.keyId, ctx.estimatedInputTokens + outputTokens);
-    recordSuccess(route.modelDbId);
+    recordUpstreamSuccess(route, ctx.estimatedInputTokens + outputTokens);
     if (!ctx.pinned) setStickyModel(messages, route.modelDbId, ctx.sessionId);
     logRequest(route.platform, route.modelId, route.keyId, 'success', ctx.estimatedInputTokens, outputTokens, Date.now() - ctx.start, null, null, ctx.pinnedModelId);
   } catch (err: any) {

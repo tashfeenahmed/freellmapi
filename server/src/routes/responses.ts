@@ -9,26 +9,21 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, hasOtherUsableKey, routingReserveTokens, type RouteResult } from '../services/router.js';
-import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
+import { routeRequest, hasEnabledToolsModel, routingReserveTokens, type RouteResult } from '../services/router.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import {
-  isRetryableError,
-  isPaymentRequiredError,
-  isModelNotFoundError,
-  isModelAccessForbiddenError,
   timingSafeStringEqual,
   extractApiToken,
   getRequestGroupId,
   getStickyModel,
   setStickyModel,
   traceRouteEvent,
-  exhaustedRetryError,
   logRequest,
 } from './proxy.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -41,13 +36,16 @@ export const responsesRouter = Router();
 // is rejected — so the existing /v1/chat/completions endpoint isn't reachable
 // from Codex (see issue #96). This endpoint accepts a Responses-shaped request,
 // translates it to the internal chat-message format, runs it through the SAME
-// router/retry machinery as the proxy, and translates the result back into the
-// Responses object / SSE event stream that Codex expects.
+// shared fallback loop as the proxy (lib/fallback-loop.ts), and translates the
+// result back into the Responses object / SSE event stream Codex expects.
 //
-// Deliberately self-contained: it duplicates the proxy's retry loop rather than
-// refactoring that battle-tested handler, so the production /chat/completions
-// path is untouched. Shared, side-effect-free helpers (routing, rate-limit
-// bookkeeping, sticky sessions, logging) are imported, not re-implemented.
+// A thin adapter: the cooldown/skip/penalty/exhaustion machinery is shared, and
+// only the Responses request/stream translation lives here. This is what fixed
+// the drift where /v1/responses ignored a provider Retry-After and under-benched
+// a 403 (both are now handled identically to /chat/completions by the shared
+// loop) and committed the SSE skeleton on the first raw chunk (the commit point
+// is now held until the first meaningful content, so a pre-content failure fails
+// over invisibly).
 // ─────────────────────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 20;
@@ -368,11 +366,13 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   }
 
   const responseId = newId('resp');
-  const skipKeys = new Set<string>();
-  const skipModels = new Set<number>();
-  let lastError: any = null;
+  const state = newFallbackState();
 
-  // Stream bookkeeping (used only when stream === true).
+  // Stream bookkeeping (used only when stream === true). `streamStarted` is the
+  // commit flag: true once the response.created/in_progress skeleton has left,
+  // after which failover is no longer possible. seq/streamStarted span attempts
+  // so the SSE sequence numbers stay monotonic and a committed stream can't be
+  // re-committed by a later attempt.
   let seq = 0;
   let streamStarted = false;
   const sse = (event: string, payload: Record<string, unknown>) => {
@@ -380,25 +380,11 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: event, sequence_number: seq++, ...payload })}\n\n`);
   };
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    let route: RouteResult;
-    try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, wantsTools, skipModels.size > 0 ? skipModels : undefined);
-    } catch (err: any) {
-      const exhausted = lastError ? exhaustedRetryError(lastError) : null;
-      const status = exhausted?.status ?? err.status ?? 503;
-      const message = exhausted?.message ?? err.message;
-      const type = exhausted?.type ?? 'routing_error';
-      if (streamStarted) {
-        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
-        res.end();
-      } else {
-        res.status(status).json({ error: { message, type } });
-      }
-      return;
-    }
-
-    try {
+  await runFallbackLoop({
+    maxRetries: MAX_RETRIES,
+    state,
+    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, false, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined),
+    dispatch: async (route, attempt) => {
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',
         requestId: requestGroupId,
@@ -422,8 +408,31 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
         let heldText = '';
 
+        // Commit point: headers + the response.created/in_progress skeleton go
+        // out only when the first MEANINGFUL output item is about to be emitted
+        // (converged with /chat/completions — responses previously committed on
+        // the first raw chunk, even a role-only one). Until then a connect-time
+        // error, an empty completion, or an unparseable dialect turn fails over
+        // on the same connection with no bytes on the wire. Idempotent.
+        const commit = () => {
+          if (streamStarted) return;
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          const skeleton = {
+            id: responseId, object: 'response', created_at: nowUnix(),
+            status: 'in_progress', model: route.modelId, output: [], output_text: '',
+          };
+          sse('response.created', { response: skeleton });
+          sse('response.in_progress', { response: skeleton });
+          streamStarted = true;
+        };
+
         // Open the text output item and stream `text` as its first delta.
         const openTextItem = (text: string) => {
+          commit();
           msgItemId = newId('msg');
           sse('response.output_item.added', {
             output_index: outputIndex,
@@ -439,116 +448,179 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           }
         };
 
-        const gen = route.provider.streamChatCompletion(
-          route.apiKey,
-          messages,
-          route.modelId,
-          completionOpts,
-          quotaContextForRoute(route, 'responses'),
-        );
+        try {
+          const gen = route.provider.streamChatCompletion(
+            route.apiKey,
+            messages,
+            route.modelId,
+            completionOpts,
+            quotaContextForRoute(route, 'responses'),
+          );
 
-        for await (const chunk of gen) {
-          // In-band upstream error frame ({"error":...} inside a 200 SSE
-          // stream — observed live from Groq). Throw before the lazy header
-          // block so a first-frame error keeps streamStarted=false and takes
-          // the normal failover path in the catch below.
-          const anyChunk = chunk as Record<string, any>;
-          if (anyChunk.error && !anyChunk.choices) {
-            throw new Error(`in-band provider error from ${route.displayName}: ${anyChunk.error.message ?? 'provider error'}`);
-          }
-          // LAZY header set — headers + the response.created/in_progress
-          // skeleton go out only once the provider actually streams a chunk.
-          // Sending them before the provider call (the previous behavior)
-          // committed the SSE response, so a provider error AT STREAM OPEN —
-          // e.g. OpenRouter 503ing a large-context request — was misclassified
-          // as mid-stream and returned to the client with NO failover and NO
-          // cooldown; the next request then hit the same broken model again
-          // (observed: 17 consecutive 503s to the same model while the rest of
-          // the chain sat idle). With lazy headers a connect-time error
-          // bubbles to the catch with streamStarted=false and takes the normal
-          // retry path. Mirrors the proxy's streaming handler.
-          if (!streamStarted) {
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-            if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
-            const skeleton = {
-              id: responseId, object: 'response', created_at: nowUnix(),
-              status: 'in_progress', model: route.modelId, output: [], output_text: '',
-            };
-            sse('response.created', { response: skeleton });
-            sse('response.in_progress', { response: skeleton });
-            streamStarted = true;
-          }
+          for await (const chunk of gen) {
+            // In-band upstream error frame ({"error":...} inside a 200 SSE
+            // stream — observed live from Groq). Throwing hands it to the catch
+            // below: pre-commit it fails over, post-commit it surfaces
+            // response.failed.
+            const anyChunk = chunk as Record<string, any>;
+            if (anyChunk.error && !anyChunk.choices) {
+              throw new Error(`in-band provider error from ${route.displayName}: ${anyChunk.error.message ?? 'provider error'}`);
+            }
 
-          const delta = chunk.choices?.[0]?.delta;
-          if (!delta) continue;
+            const delta = chunk.choices?.[0]?.delta;
+            if (!delta) continue;
 
-          // Text deltas → output_text events on a single message item, after
-          // the dialect hold window has decided the text is real prose.
-          const text = delta.content ?? '';
-          if (text) {
-            totalOutputTokens += Math.ceil(text.length / 4);
-            if (dialectMode === 'passthrough') {
-              if (msgItemId === null) openTextItem('');
-              sse('response.output_text.delta', {
-                item_id: msgItemId, output_index: 0, content_index: 0, delta: text,
-              });
-              msgText += text;
-            } else {
-              heldText += text;
-              if (dialectMode === 'undecided') {
-                const probe = heldText.trimStart();
-                if (startsWithDialectMarker(probe)) {
-                  dialectMode = 'dialect';
-                } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
-                  dialectMode = 'passthrough';
-                  openTextItem(heldText);
-                  heldText = '';
+            // Text deltas → output_text events on a single message item, after
+            // the dialect hold window has decided the text is real prose.
+            const text = delta.content ?? '';
+            if (text) {
+              totalOutputTokens += Math.ceil(text.length / 4);
+              if (dialectMode === 'passthrough') {
+                if (msgItemId === null) openTextItem('');
+                sse('response.output_text.delta', {
+                  item_id: msgItemId, output_index: 0, content_index: 0, delta: text,
+                });
+                msgText += text;
+              } else {
+                heldText += text;
+                if (dialectMode === 'undecided') {
+                  const probe = heldText.trimStart();
+                  if (startsWithDialectMarker(probe)) {
+                    dialectMode = 'dialect';
+                  } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+                    dialectMode = 'passthrough';
+                    openTextItem(heldText);
+                    heldText = '';
+                  }
                 }
               }
             }
-          }
 
-          // Tool-call deltas → function_call item + argument deltas.
-          for (const tc of delta.tool_calls ?? []) {
-            const idx = (tc as any).index ?? 0;
-            let acc = toolAcc.get(idx);
-            if (!acc) {
-              // First time we see this tool call: open a new output item.
-              if (msgItemId !== null && msgText.length > 0) {
-                // close the text item (always output index 0) before starting a function_call item
-                sse('response.output_text.done', { item_id: msgItemId, output_index: 0, content_index: 0, text: msgText });
-                sse('response.content_part.done', { item_id: msgItemId, output_index: 0, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
-                sse('response.output_item.done', { output_index: 0, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
-                msgItemId = null;
+            // Tool-call deltas → function_call item + argument deltas.
+            for (const tc of delta.tool_calls ?? []) {
+              const idx = (tc as any).index ?? 0;
+              let acc = toolAcc.get(idx);
+              if (!acc) {
+                // First time we see this tool call: open a new output item.
+                commit();
+                if (msgItemId !== null && msgText.length > 0) {
+                  // close the text item (always output index 0) before starting a function_call item
+                  sse('response.output_text.done', { item_id: msgItemId, output_index: 0, content_index: 0, text: msgText });
+                  sse('response.content_part.done', { item_id: msgItemId, output_index: 0, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
+                  sse('response.output_item.done', { output_index: 0, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
+                  msgItemId = null;
+                }
+                outputIndex = toolAcc.size + (msgText.length > 0 ? 1 : 0);
+                acc = { outputIndex, itemId: newId('fc'), callId: tc.id || newId('call'), name: tc.function?.name ?? '', args: '' };
+                toolAcc.set(idx, acc);
+                sse('response.output_item.added', {
+                  output_index: acc.outputIndex,
+                  item: { id: acc.itemId, type: 'function_call', status: 'in_progress', call_id: acc.callId, name: acc.name, arguments: '' },
+                });
               }
-              outputIndex = toolAcc.size + (msgText.length > 0 ? 1 : 0);
-              acc = { outputIndex, itemId: newId('fc'), callId: tc.id || newId('call'), name: tc.function?.name ?? '', args: '' };
-              toolAcc.set(idx, acc);
-              sse('response.output_item.added', {
-                output_index: acc.outputIndex,
-                item: { id: acc.itemId, type: 'function_call', status: 'in_progress', call_id: acc.callId, name: acc.name, arguments: '' },
-              });
-            }
-            const argFrag = tc.function?.arguments ?? '';
-            if (tc.function?.name && !acc.name) acc.name = tc.function.name;
-            if (argFrag) {
-              acc.args += argFrag;
-              sse('response.function_call_arguments.delta', { item_id: acc.itemId, output_index: acc.outputIndex, delta: argFrag });
+              const argFrag = tc.function?.arguments ?? '';
+              if (tc.function?.name && !acc.name) acc.name = tc.function.name;
+              if (argFrag) {
+                acc.args += argFrag;
+                sse('response.function_call_arguments.delta', { item_id: acc.itemId, output_index: acc.outputIndex, delta: argFrag });
+              }
             }
           }
-        }
 
-        // Resolve the dialect hold window now that the full text is known.
-        // Held text was never emitted, so a dead dialect turn can still fail
-        // over on the same SSE stream (only the skeleton events are out).
-        if (heldText.length > 0) {
-          const rescue = (dialectMode === 'dialect' || containsDialectMarker(heldText))
-            ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
-            : { detected: false as const, calls: null, cleanText: heldText };
-          if (rescue.detected && !rescue.calls) {
+          // Resolve the dialect hold window now that the full text is known.
+          // Held text was never emitted, so a dead dialect turn can still fail
+          // over on the same SSE stream (nothing has been committed yet).
+          if (heldText.length > 0) {
+            const rescue = (dialectMode === 'dialect' || containsDialectMarker(heldText))
+              ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
+              : { detected: false as const, calls: null, cleanText: heldText };
+            if (rescue.detected && !rescue.calls) {
+              // Unparseable dialect turn: throw so the shared loop cooldowns this
+              // model+key and fails over (streamStarted is still false).
+              throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${heldText.slice(0, 120)}`);
+            }
+            if (rescue.detected && rescue.calls) {
+              // Rescued calls become function_call items, exactly as if the
+              // provider had streamed them structurally.
+              console.log(`[Responses] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName}`);
+              if (rescue.cleanText.length > 0 && msgItemId === null) openTextItem(rescue.cleanText);
+              let rescuedIdx = 0;
+              for (const c of rescue.calls) {
+                const idx = 1000 + rescuedIdx++; // synthetic accumulator keys, past any provider index
+                commit();
+                const acc = {
+                  outputIndex: toolAcc.size + (msgText.length > 0 ? 1 : 0),
+                  itemId: newId('fc'), callId: newId('call'), name: c.name, args: c.arguments,
+                };
+                toolAcc.set(idx, acc);
+                sse('response.output_item.added', {
+                  output_index: acc.outputIndex,
+                  item: { id: acc.itemId, type: 'function_call', status: 'in_progress', call_id: acc.callId, name: acc.name, arguments: '' },
+                });
+              }
+            } else if (msgItemId === null) {
+              // Plain short answer that never left the hold window (e.g. "Hi").
+              openTextItem(heldText);
+            }
+            heldText = '';
+          }
+
+          // Empty completion — the provider returned 200 with no text AND no
+          // tool calls. Seen in production from nemotron-3-super on ~65k-token
+          // contexts: transport-level "success", zero usable output. Nothing has
+          // been committed yet (the skeleton is lazy), so throwing lets the
+          // shared loop fail over to the next model on the same SSE connection.
+          if (msgText.length === 0 && toolAcc.size === 0) {
+            throw new Error(`empty completion from ${route.displayName}`);
+          }
+
+          // Finalize any open text item.
+          if (msgItemId !== null) {
+            sse('response.output_text.done', { item_id: msgItemId, output_index: 0, content_index: 0, text: msgText });
+            sse('response.content_part.done', { item_id: msgItemId, output_index: 0, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
+            sse('response.output_item.done', { output_index: 0, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
+          }
+          // Finalize tool-call items. Arguments are repaired against the tool's
+          // parameter schema at this point (after the full string accumulated):
+          // models like GLM double-encode nested arrays/objects as strings, and
+          // Codex hard-rejects the call ("invalid type: string, expected a
+          // sequence"). Clients consume the *.done events / final response for
+          // arguments, so repairing here covers the streamed path too.
+          const finalToolCalls: ChatToolCall[] = [];
+          for (const acc of toolAcc.values()) {
+            const repairedArgs = repairToolArguments(acc.args, toolSchemas.get(acc.name));
+            sse('response.function_call_arguments.done', { item_id: acc.itemId, output_index: acc.outputIndex, arguments: repairedArgs });
+            sse('response.output_item.done', { output_index: acc.outputIndex, item: { id: acc.itemId, type: 'function_call', status: 'completed', call_id: acc.callId, name: acc.name, arguments: repairedArgs } });
+            finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: repairedArgs } });
+          }
+
+          const finalResponse = buildResponseObject({
+            id: responseId, model: route.modelId, text: msgText,
+            toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
+          });
+          sse('response.completed', { response: finalResponse });
+          res.end();
+
+          recordUpstreamSuccess(route, estimatedInputTokens + totalOutputTokens);
+          setStickyModel(messages, route.modelDbId, sessionIdHeader);
+          traceRouteEvent('Responses', {
+            event: 'ok',
+            requestId: requestGroupId,
+            attempt,
+            platform: route.platform,
+            model: route.modelId,
+            latencyMs: Date.now() - start,
+            inputTokens: estimatedInputTokens,
+            outputTokens: totalOutputTokens,
+          });
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          return 'done';
+        } catch (streamErr: any) {
+          // A committed stream can't fail over (bytes already sent) — surface a
+          // response.failed event honestly and stop. A pre-commit failure throws
+          // through to the shared loop for cooldown + failover.
+          if (streamStarted) {
+            const safe = sanitizeProviderErrorMessage(streamErr.message);
             traceRouteEvent('Responses', {
               event: 'fail',
               requestId: requestGroupId,
@@ -556,193 +628,80 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
               platform: route.platform,
               model: route.modelId,
               latencyMs: Date.now() - start,
-              error: 'unparseable inline tool-call dialect',
+              error: safe,
             });
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, `unparseable inline tool-call dialect: ${heldText.slice(0, 120)}`);
-            skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-            setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-            // Only demote the whole model when no sibling key can still serve;
-            // the per-key cooldown already isolates this key's failure (#454).
-            if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-            lastError = new Error(`unparseable inline tool-call dialect from ${route.displayName}`);
-            continue;
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safe);
+            sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } } });
+            res.end();
+            return 'committed';
           }
-          if (rescue.detected && rescue.calls) {
-            // Rescued calls become function_call items, exactly as if the
-            // provider had streamed them structurally.
-            console.log(`[Responses] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName}`);
-            if (rescue.cleanText.length > 0 && msgItemId === null) openTextItem(rescue.cleanText);
-            let rescuedIdx = 0;
-            for (const c of rescue.calls) {
-              const idx = 1000 + rescuedIdx++; // synthetic accumulator keys, past any provider index
-              const acc = {
-                outputIndex: toolAcc.size + (msgText.length > 0 ? 1 : 0),
-                itemId: newId('fc'), callId: newId('call'), name: c.name, args: c.arguments,
-              };
-              toolAcc.set(idx, acc);
-              sse('response.output_item.added', {
-                output_index: acc.outputIndex,
-                item: { id: acc.itemId, type: 'function_call', status: 'in_progress', call_id: acc.callId, name: acc.name, arguments: '' },
-              });
-            }
-          } else if (msgItemId === null) {
-            // Plain short answer that never left the hold window (e.g. "Hi").
-            openTextItem(heldText);
-          }
-          heldText = '';
+          throw streamErr;
         }
-
-        // Empty completion — the provider returned 200 with no text AND no
-        // tool calls. Seen in production from nemotron-3-super on ~65k-token
-        // contexts: transport-level "success", zero usable output, so the
-        // agent client records a successful run it can't act on and its issue
-        // dead-ends. Nothing substantive has been emitted yet (output_item
-        // events only fire on the first delta; only the created/in_progress
-        // skeletons are out), so it's safe to fail over to the next model on
-        // the same SSE stream.
-        if (msgText.length === 0 && toolAcc.size === 0) {
-          traceRouteEvent('Responses', {
-            event: 'fail',
-            requestId: requestGroupId,
-            attempt,
-            platform: route.platform,
-            model: route.modelId,
-            latencyMs: Date.now() - start,
-            error: 'empty completion',
-          });
-          logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
-          skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-          setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          // Model-level penalty only when no sibling key can still serve (#454).
-          if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-          lastError = new Error(`empty completion from ${route.displayName}`);
-          continue;
-        }
-
-        // Finalize any open text item.
-        if (msgItemId !== null) {
-          sse('response.output_text.done', { item_id: msgItemId, output_index: 0, content_index: 0, text: msgText });
-          sse('response.content_part.done', { item_id: msgItemId, output_index: 0, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
-          sse('response.output_item.done', { output_index: 0, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
-        }
-        // Finalize tool-call items. Arguments are repaired against the tool's
-        // parameter schema at this point (after the full string accumulated):
-        // models like GLM double-encode nested arrays/objects as strings, and
-        // Codex hard-rejects the call ("invalid type: string, expected a
-        // sequence"). Clients consume the *.done events / final response for
-        // arguments, so repairing here covers the streamed path too.
-        const finalToolCalls: ChatToolCall[] = [];
-        for (const acc of toolAcc.values()) {
-          const repairedArgs = repairToolArguments(acc.args, toolSchemas.get(acc.name));
-          sse('response.function_call_arguments.done', { item_id: acc.itemId, output_index: acc.outputIndex, arguments: repairedArgs });
-          sse('response.output_item.done', { output_index: acc.outputIndex, item: { id: acc.itemId, type: 'function_call', status: 'completed', call_id: acc.callId, name: acc.name, arguments: repairedArgs } });
-          finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: repairedArgs } });
-        }
-
-        const finalResponse = buildResponseObject({
-          id: responseId, model: route.modelId, text: msgText,
-          toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
-        });
-        sse('response.completed', { response: finalResponse });
-        res.end();
-
-        recordRequest(route.platform, route.modelId, route.keyId);
-        recordTokens(route.platform, route.modelId, route.keyId, estimatedInputTokens + totalOutputTokens);
-        recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId, sessionIdHeader);
-        traceRouteEvent('Responses', {
-          event: 'ok',
-          requestId: requestGroupId,
-          attempt,
-          platform: route.platform,
-          model: route.modelId,
-          latencyMs: Date.now() - start,
-          inputTokens: estimatedInputTokens,
-          outputTokens: totalOutputTokens,
-        });
-        logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
-        return;
-      } else {
-        const result = await route.provider.chatCompletion(
-          route.apiKey,
-          messages,
-          route.modelId,
-          completionOpts,
-          quotaContextForRoute(route, 'responses'),
-        );
-
-        const msg = result.choices[0]?.message;
-        let text = contentToString(msg?.content ?? '');
-        let toolCalls = (msg?.tool_calls ?? []).map((tc) => ({
-          ...tc,
-          function: { ...tc.function, arguments: repairToolArguments(tc.function.arguments, toolSchemas.get(tc.function.name)) },
-        }));
-
-        // Inline tool-call dialect rescue (#231) — see /chat/completions.
-        if (wantsTools && toolCalls.length === 0 && text) {
-          const rescue = rescueInlineToolCalls(text, new Set((tools ?? []).map(t => t.function.name)));
-          if (rescue.detected) {
-            if (!rescue.calls) {
-              throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${text.slice(0, 120)}`);
-            }
-            console.log(`[Responses] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName}`);
-            toolCalls = rescue.calls.map((c, i) => ({
-              id: `call_rescued_${i + 1}`,
-              type: 'function' as const,
-              function: { name: c.name, arguments: repairToolArguments(c.arguments, toolSchemas.get(c.name)) },
-            }));
-            text = rescue.cleanText;
-          }
-        }
-        const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
-        const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
-
-        // Empty completion → fail over (see the streaming-path comment above).
-        if (!text && toolCalls.length === 0) {
-          traceRouteEvent('Responses', {
-            event: 'fail',
-            requestId: requestGroupId,
-            attempt,
-            platform: route.platform,
-            model: route.modelId,
-            latencyMs: Date.now() - start,
-            error: 'empty completion',
-          });
-          logRequest(route.platform, route.modelId, route.keyId, 'error', promptTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
-          skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-          setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          // Model-level penalty only when no sibling key can still serve (#454).
-          if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-          lastError = new Error(`empty completion from ${route.displayName}`);
-          continue;
-        }
-
-        recordRequest(route.platform, route.modelId, route.keyId);
-        recordTokens(route.platform, route.modelId, route.keyId, result.usage?.total_tokens ?? 0);
-        recordSuccess(route.modelDbId);
-        setStickyModel(messages, route.modelDbId, sessionIdHeader);
-
-        res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-        if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
-        res.json(buildResponseObject({
-          id: responseId, model: route.modelId, text, toolCalls,
-          promptTokens, completionTokens,
-        }));
-
-        traceRouteEvent('Responses', {
-          event: 'ok',
-          requestId: requestGroupId,
-          attempt,
-          platform: route.platform,
-          model: route.modelId,
-          latencyMs: Date.now() - start,
-          inputTokens: promptTokens,
-          outputTokens: completionTokens,
-        });
-        logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null);
-        return;
       }
-    } catch (err: any) {
+
+      const result = await route.provider.chatCompletion(
+        route.apiKey,
+        messages,
+        route.modelId,
+        completionOpts,
+        quotaContextForRoute(route, 'responses'),
+      );
+
+      const msg = result.choices[0]?.message;
+      let text = contentToString(msg?.content ?? '');
+      let toolCalls = (msg?.tool_calls ?? []).map((tc) => ({
+        ...tc,
+        function: { ...tc.function, arguments: repairToolArguments(tc.function.arguments, toolSchemas.get(tc.function.name)) },
+      }));
+
+      // Inline tool-call dialect rescue (#231) — see /chat/completions.
+      if (wantsTools && toolCalls.length === 0 && text) {
+        const rescue = rescueInlineToolCalls(text, new Set((tools ?? []).map(t => t.function.name)));
+        if (rescue.detected) {
+          if (!rescue.calls) {
+            throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${text.slice(0, 120)}`);
+          }
+          console.log(`[Responses] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName}`);
+          toolCalls = rescue.calls.map((c, i) => ({
+            id: `call_rescued_${i + 1}`,
+            type: 'function' as const,
+            function: { name: c.name, arguments: repairToolArguments(c.arguments, toolSchemas.get(c.name)) },
+          }));
+          text = rescue.cleanText;
+        }
+      }
+      const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
+      const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+
+      // Empty completion → fail over via the shared loop (see the streaming path).
+      if (!text && toolCalls.length === 0) {
+        throw new Error(`empty completion from ${route.displayName}`);
+      }
+
+      recordUpstreamSuccess(route, result.usage?.total_tokens ?? 0);
+      setStickyModel(messages, route.modelDbId, sessionIdHeader);
+
+      res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
+      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      res.json(buildResponseObject({
+        id: responseId, model: route.modelId, text, toolCalls,
+        promptTokens, completionTokens,
+      }));
+
+      traceRouteEvent('Responses', {
+        event: 'ok',
+        requestId: requestGroupId,
+        attempt,
+        platform: route.platform,
+        model: route.modelId,
+        latencyMs: Date.now() - start,
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      });
+      logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null);
+      return 'done';
+    },
+    logFailure: (route, err, attempt) => {
       const latency = Date.now() - start;
       const safeError = sanitizeProviderErrorMessage(err.message);
       traceRouteEvent('Responses', {
@@ -755,47 +714,32 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         error: safeError,
       });
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
-
-      // Mid-stream failures can't be retried (bytes already sent) — close cleanly.
-      if (stream && streamStarted) {
-        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } } });
+    },
+    onFatal: (route, err) => {
+      res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`, type: 'provider_error' } });
+    },
+    onRoutingExhausted: (lastError, routeErr) => {
+      const exhausted = lastError ? exhaustedRetryError(lastError) : null;
+      const status = exhausted?.status ?? routeErr.status ?? 503;
+      const message = exhausted?.message ?? routeErr.message;
+      const type = exhausted?.type ?? 'routing_error';
+      if (streamStarted) {
+        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
         res.end();
-        return;
+      } else {
+        res.status(status).json({ error: { message, type } });
       }
-
-      if (isRetryableError(err)) {
-        // Model-level 404: rule out the whole model for this request — its
-        // other keys would 404 the same way. (PR #111, credits @barbotkonv.)
-        if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
-        skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-        setCooldown(route.platform, route.modelId, route.keyId, isPaymentRequiredError(err)
-          ? PAYMENT_REQUIRED_COOLDOWN_MS
-          : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-        // Model-level penalty only when no sibling key can still serve (#454).
-        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
-        // Learn a provider-reported ceiling (e.g. a 413 TPM limit) so the next
-        // request's pre-check fails over before the 413. Mirrors the chat path.
-        learnLimitFromError(route.modelDbId, err);
-        lastError = err;
-        continue;
+    },
+    onExhausted: (lastError) => {
+      // The streaming skeleton may already be on the wire — close the SSE stream
+      // with a failed event instead of writing JSON onto a committed response.
+      const exhausted = exhaustedRetryError(lastError, MAX_RETRIES);
+      if (streamStarted) {
+        sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhausted.message, type: exhausted.type } } });
+        res.end();
+      } else {
+        res.status(exhausted.status).json({ error: { message: exhausted.message, type: exhausted.type } });
       }
-
-      res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${safeError}`, type: 'provider_error' } });
-      return;
-    }
-  }
-
-  // Exhausted all retries. The streaming skeleton may already be on the wire
-  // (reachable since empty-completion failover can burn every attempt after
-  // streamStarted) — close the SSE stream with a failed event instead of
-  // writing JSON onto a committed event-stream response.
-  const exhausted = exhaustedRetryError(lastError, MAX_RETRIES);
-  if (streamStarted) {
-    sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhausted.message, type: exhausted.type } } });
-    res.end();
-    return;
-  }
-  res.status(exhausted.status).json({
-    error: { message: exhausted.message, type: exhausted.type },
+    },
   });
 });
