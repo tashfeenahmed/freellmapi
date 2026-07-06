@@ -62,7 +62,8 @@
     "provider": "Fournisseur",
     "success": "Réussite",
     "failures": "Échecs",
-    "dismiss": "Fermer"
+    "dismiss": "Fermer",
+    "status": "Statut"
   },
   "models": {
     "title": "Modèles",
@@ -363,7 +364,11 @@
     "keyLabelFallback": "Clé n° {id}",
     "errorsByProvider": "Erreurs par fournisseur",
     "recentErrors": "Erreurs récentes",
-    "noErrors": "Aucune erreur"
+    "noErrors": "Aucune erreur",
+    "recentCalls": "Appels récents",
+    "clientIp": "IP du client",
+    "clientAgent": "Application cliente",
+    "requestedModelHint": "{model} demandé, servi par repli"
   },
   "playground": {
     "title": "Bac à sable",

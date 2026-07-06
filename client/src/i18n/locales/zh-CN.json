@@ -62,7 +62,8 @@
     "provider": "提供方",
     "success": "成功",
     "failures": "失败",
-    "dismiss": "关闭"
+    "dismiss": "关闭",
+    "status": "状态"
   },
   "models": {
     "title": "模型",
@@ -363,7 +364,11 @@
     "keyLabelFallback": "密钥 #{id}",
     "errorsByProvider": "按提供方统计错误",
     "recentErrors": "最近的错误",
-    "noErrors": "无错误"
+    "noErrors": "无错误",
+    "recentCalls": "最近调用",
+    "clientIp": "客户端 IP",
+    "clientAgent": "客户端应用",
+    "requestedModelHint": "请求了 {model}，由回退模型提供"
   },
   "playground": {
     "title": "试玩台",

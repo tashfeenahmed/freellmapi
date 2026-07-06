@@ -8,6 +8,7 @@
 // published catalog and arrive via catalog-sync (premium on the live tier within
 // ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
+import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
 
@@ -370,10 +371,11 @@ function resolveMediaChain(model: string | undefined, modality: MediaModality): 
 
 function logMedia(row: MediaModelRow, keyId: number | null, status: 'success' | 'error', latencyMs: number, error: string | null): void {
   try {
+    const client = getClientContext();
     getDb()
-      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
-                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)`)
-      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality);
+      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent)
+                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`)
+      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality, client.ip, client.userAgent);
   } catch (e) {
     console.error('Failed to log media request:', e);
   }

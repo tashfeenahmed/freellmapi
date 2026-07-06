@@ -62,7 +62,8 @@
     "provider": "Provider",
     "success": "Success",
     "failures": "Failures",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "status": "Status"
   },
   "models": {
     "title": "Models",
@@ -381,7 +382,11 @@
     "keyLabelFallback": "Key #{id}",
     "errorsByProvider": "Errors by provider",
     "recentErrors": "Recent errors",
-    "noErrors": "No errors"
+    "noErrors": "No errors",
+    "recentCalls": "Recent calls",
+    "clientIp": "Client IP",
+    "clientAgent": "Client app",
+    "requestedModelHint": "Requested {model}, served by fallback"
   },
   "playground": {
     "title": "Playground",

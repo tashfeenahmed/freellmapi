@@ -457,3 +457,49 @@ analyticsRouter.get('/errors', (req: Request, res: Response) => {
     createdAt: r.created_at,
   })));
 });
+
+// Recent calls — one row per proxied request, newest first, with the caller's
+// IP and User-Agent (all local clients share the unified key, so client_ip is
+// the only per-caller discriminator; UA disambiguates tunneled loopback calls).
+// Reads the raw `requests` table, so history is bounded by the retention prune.
+analyticsRouter.get('/requests', (req: Request, res: Response) => {
+  const range = (req.query.range as string) ?? '7d';
+  const since = getSinceTimestamp(range);
+  const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 100, 1), 500);
+  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+  const db = getDb();
+
+  const total = (db.prepare(
+    'SELECT COUNT(*) as c FROM requests WHERE created_at >= ?'
+  ).get(since) as { c: number }).c;
+
+  const rows = db.prepare(`
+    SELECT id, platform, model_id, requested_model, request_type, status,
+           input_tokens, output_tokens, latency_ms, error,
+           client_ip, client_user_agent,
+           strftime('%Y-%m-%dT%H:%M:%SZ', created_at) as created_at_iso
+    FROM requests
+    WHERE created_at >= ?
+    ORDER BY created_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `).all(since, limit, offset) as any[];
+
+  res.json({
+    total,
+    rows: rows.map(r => ({
+      id: r.id,
+      platform: r.platform,
+      modelId: r.model_id,
+      requestedModel: r.requested_model,
+      requestType: r.request_type,
+      status: r.status,
+      inputTokens: r.input_tokens,
+      outputTokens: r.output_tokens,
+      latencyMs: r.latency_ms,
+      error: r.error,
+      clientIp: r.client_ip,
+      clientUserAgent: r.client_user_agent,
+      createdAt: r.created_at_iso,
+    })),
+  });
+});

@@ -95,6 +95,35 @@ interface RecentErrorRow {
   createdAt: string
 }
 
+interface RecentCallRow {
+  id: number
+  platform: string
+  modelId: string
+  requestedModel: string | null
+  requestType: string
+  status: string
+  inputTokens: number
+  outputTokens: number
+  latencyMs: number
+  error: string | null
+  clientIp: string | null
+  clientUserAgent: string | null
+  createdAt: string
+}
+
+interface RecentCallsResponse {
+  total: number
+  rows: RecentCallRow[]
+}
+
+// First product token of the UA ("python-requests/2.32.3", "curl/8.6.0", …)
+// is enough to tell callers apart in a narrow cell; full string on hover.
+function shortUserAgent(ua: string | null): string {
+  if (!ua) return '—'
+  const first = ua.split(' ')[0]
+  return first.length > 32 ? first.slice(0, 32) + '…' : first
+}
+
 function formatTokens(n?: number): string {
   if (!n) return '0'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -183,6 +212,11 @@ export default function AnalyticsPage() {
   const { data: errorDist } = useQuery({
     queryKey: ['analytics', 'error-distribution', range],
     queryFn: () => apiFetch<ErrorDistribution>(`/api/analytics/error-distribution?range=${range}`),
+  })
+
+  const { data: recentCalls } = useQuery({
+    queryKey: ['analytics', 'requests', range],
+    queryFn: () => apiFetch<RecentCallsResponse>(`/api/analytics/requests?range=${range}&limit=100`),
   })
 
   // Savings card shows ONE stable monthly figure regardless of the selected
@@ -442,6 +476,59 @@ export default function AnalyticsPage() {
               </div>
             )}
           </Panel>
+
+          {/* Recent calls: one line per proxied request with the caller's IP +
+              user agent. All local clients share the unified key, so this is
+              the only view that answers "who is hitting the router". */}
+          <div className="lg:col-span-2">
+            <Panel title={t('analytics.recentCalls')}>
+              {!recentCalls?.rows?.length ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
+              ) : (
+                <div className="max-h-[420px] overflow-y-auto -mx-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-4">{t('analytics.time')}</TableHead>
+                        <TableHead>{t('analytics.clientIp')}</TableHead>
+                        <TableHead>{t('analytics.clientAgent')}</TableHead>
+                        <TableHead>{t('common.model')}</TableHead>
+                        <TableHead>{t('common.provider')}</TableHead>
+                        <TableHead>{t('common.status')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.inTokens')}</TableHead>
+                        <TableHead className="text-right">{t('analytics.outTokens')}</TableHead>
+                        <TableHead className="text-right pr-4">{t('analytics.latency')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentCalls.rows.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="pl-4 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                            {formatSqliteUtcToLocalTime(r.createdAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </TableCell>
+                          <TableCell className="text-xs font-medium tabular-nums">{r.clientIp ?? '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground" title={r.clientUserAgent ?? undefined}>
+                            {shortUserAgent(r.clientUserAgent)}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[220px] truncate" title={r.requestedModel && r.requestedModel !== r.modelId ? t('analytics.requestedModelHint', { model: r.requestedModel }) : undefined}>
+                            {r.modelId}
+                            {r.requestedModel && r.requestedModel !== r.modelId ? ' *' : ''}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{r.platform}</TableCell>
+                          <TableCell className={`text-xs ${r.status === 'success' ? 'text-muted-foreground' : 'text-destructive'}`} title={r.error ?? undefined}>
+                            {r.status}
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{formatTokens(r.inputTokens)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{formatTokens(r.outputTokens)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums pr-4">{r.latencyMs} ms</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </Panel>
+          </div>
 
           <div className="lg:col-span-2">
             <Panel title={t('analytics.perModelBreakdown')}>

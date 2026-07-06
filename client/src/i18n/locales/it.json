@@ -62,7 +62,8 @@
     "provider": "Fornitore",
     "success": "Successo",
     "failures": "Fallimenti",
-    "dismiss": "Chiudi"
+    "dismiss": "Chiudi",
+    "status": "Stato"
   },
   "models": {
     "title": "Modelli",
@@ -363,7 +364,11 @@
     "keyLabelFallback": "Chiave n. {id}",
     "errorsByProvider": "Errori per fornitore",
     "recentErrors": "Errori recenti",
-    "noErrors": "Nessun errore"
+    "noErrors": "Nessun errore",
+    "recentCalls": "Chiamate recenti",
+    "clientIp": "IP del client",
+    "clientAgent": "App client",
+    "requestedModelHint": "Richiesto {model}, servito dal fallback"
   },
   "playground": {
     "title": "Playground",

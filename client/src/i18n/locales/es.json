@@ -62,7 +62,8 @@
     "provider": "Proveedor",
     "success": "Aciertos",
     "failures": "Fallos",
-    "dismiss": "Descartar"
+    "dismiss": "Descartar",
+    "status": "Estado"
   },
   "models": {
     "title": "Modelos",
@@ -363,7 +364,11 @@
     "keyLabelFallback": "Clave n.º {id}",
     "errorsByProvider": "Errores por proveedor",
     "recentErrors": "Errores recientes",
-    "noErrors": "Sin errores"
+    "noErrors": "Sin errores",
+    "recentCalls": "Llamadas recientes",
+    "clientIp": "IP del cliente",
+    "clientAgent": "Aplicación cliente",
+    "requestedModelHint": "Se solicitó {model}, servido por respaldo"
   },
   "playground": {
     "title": "Entorno de pruebas",
