@@ -417,7 +417,7 @@ interface ScoredEntry {
 // capacity. `monthlyUsedTokens` is already summed across all keys, so budget
 // must scale to match or the headroom guardrail damps a multi-key model to the
 // floor after just one account's worth of tokens.
-function usableKeyCountsByPlatform(db: Database): Map<string, number> {
+function usableKeyCountsByPlatform(db: Db): Map<string, number> {
   const rows = db.prepare(
     "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
   ).all() as { platform: string; count: number }[];
