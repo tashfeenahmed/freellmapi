@@ -271,9 +271,16 @@ keysRouter.get('/export', (req: Request, res: Response) => {
   if (format === 'csv') {
     // CSV format: platform,key,label
     const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    // CSV formula-injection guard: a spreadsheet treats a cell that starts with
+    // =, +, -, @, tab or CR as a live formula, so a label like `=HYPERLINK(...)`
+    // would execute on open. Prefix such cells with a single quote to force them
+    // to be read as text. Applied only to free-text fields the user controls
+    // (labels); the key value must round-trip verbatim for re-import, and the
+    // platform is one of our own fixed enum values.
+    const neutralize = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
     const header = 'platform,key,label';
     const lines = decryptedKeys.map(k =>
-      [escCsv(k.platform), escCsv(k.key), escCsv(k.label)].join(',')
+      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(k.label))].join(',')
     );
     const content = [header, ...lines].join('\n') + '\n';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
