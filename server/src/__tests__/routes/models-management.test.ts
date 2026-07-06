@@ -78,6 +78,31 @@ describe('Model management API', () => {
     expect(item.fallbackEnabled).toBe(false);
   });
 
+  it('patches a custom model capability directly, without recording a catalog override', async () => {
+    // Custom models are not catalog-managed, so their capability edits are
+    // written straight to the row (no model_overrides entry to survive syncs).
+    const reg = await request(app, 'POST', '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:6100/v1',
+      model: 'cap-edit-model',
+    });
+    expect(reg.status).toBe(201);
+    const modelDbId = reg.body.modelDbId as number;
+
+    const { status, body } = await request(app, 'PATCH', `/api/models/${modelDbId}`, {
+      supportsVision: true,
+      supportsTools: false,
+    });
+    expect(status).toBe(200);
+    expect(body.success).toBe(true);
+
+    const row = getDb().prepare('SELECT supports_vision, supports_tools FROM models WHERE id = ?')
+      .get(modelDbId) as { supports_vision: number; supports_tools: number };
+    expect(row).toEqual({ supports_vision: 1, supports_tools: 0 });
+
+    const override = getDb().prepare("SELECT 1 FROM model_overrides WHERE platform = 'custom' AND model_id = 'cap-edit-model'").get();
+    expect(override).toBeUndefined();
+  });
+
   it('deletes a catalog model with a tombstone', async () => {
     const target = getDb().prepare(`
       SELECT id, platform, model_id FROM models

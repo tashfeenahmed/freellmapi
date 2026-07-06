@@ -365,9 +365,19 @@ keysRouter.post('/', (req: Request, res: Response) => {
 // A model can be given as a bare id ("qwen3:4b") or as {model, displayName}.
 // `model`/`displayName` (singular) stay supported for older clients; `models`
 // (plural) lets one submit bind several model ids to the same endpoint. (#281)
+// A custom model can declare its capabilities at registration. `supportsTools`
+// defaults to 1 (modern OpenAI-compatible servers — Ollama, vLLM, LM Studio —
+// all emit tool calls), `supportsVision` defaults to 0 unless declared. Leaving
+// a flag unset keeps the DB default on insert and preserves the stored value on
+// re-registration, so a capability the user later toggled isn't clobbered. (#470)
 const modelEntrySchema = z.union([
   z.string().min(1),
-  z.object({ model: z.string().min(1), displayName: z.string().optional() }),
+  z.object({
+    model: z.string().min(1),
+    displayName: z.string().optional(),
+    supportsTools: z.boolean().optional(),
+    supportsVision: z.boolean().optional(),
+  }),
 ]);
 const customProviderSchema = z.object({
   baseUrl: z.string().url('baseUrl must be a valid URL'),
@@ -376,6 +386,10 @@ const customProviderSchema = z.object({
   displayName: z.string().optional(),
   apiKey: z.string().optional(),
   label: z.string().optional(),
+  // Top-level defaults applied to every model in this submit; a per-entry flag
+  // (object form) overrides them for that one model.
+  supportsTools: z.boolean().optional(),
+  supportsVision: z.boolean().optional(),
 }).refine(
   d => (d.model && d.model.trim().length > 0) || (d.models && d.models.length > 0),
   { message: 'model or models is required' },
@@ -405,19 +419,27 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
 
   // Flatten singular + plural inputs into one list, dedupe by model id, drop
   // blanks. The singular `displayName` only applies to a lone `model` (it can't
-  // sensibly fan out across many ids).
-  const entries: { modelId: string; displayName: string }[] = [];
+  // sensibly fan out across many ids). Capability flags resolve per-entry first,
+  // then fall back to the submit-level defaults, then to undefined (DB default).
+  const topTools = parsed.data.supportsTools;
+  const topVision = parsed.data.supportsVision;
+  const entries: { modelId: string; displayName: string; supportsTools?: boolean; supportsVision?: boolean }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
-    entries.push({ modelId, displayName: (rawDisplay?.trim() || modelId) });
+    entries.push({
+      modelId,
+      displayName: (rawDisplay?.trim() || modelId),
+      supportsTools: tools ?? topTools,
+      supportsVision: vision ?? topVision,
+    });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision);
   }
 
   if (entries.length === 0) {
@@ -462,22 +484,34 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       storedKeyForMask = keyToStore;
     }
 
-    const registered: { modelDbId: number; model: string; displayName: string }[] = [];
-    for (const { modelId, displayName } of entries) {
+    const registered: { modelDbId: number; model: string; displayName: string; supportsTools: boolean; supportsVision: boolean }[] = [];
+    for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
       // Register each model bound to THIS endpoint's key. Custom models carry no
       // rate limits and sort last in the intelligence preset (size_label tier).
       // Re-registering an existing model id re-binds it (model ids are unique
       // per platform, so one id can't live on two endpoints at once).
+      // Capability flags: an unset flag binds NULL so COALESCE picks the insert
+      // default (tools 1, vision 0) on a new row and preserves the existing
+      // value on re-registration. (#470)
+      const toolsParam = supportsTools === undefined ? null : (supportsTools ? 1 : 0);
+      const visionParam = supportsVision === undefined ? null : (supportsVision ? 1 : 0);
       db.prepare(`
         INSERT INTO models
           (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
-        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
+           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id,
+           supports_tools, supports_vision)
+        VALUES ('custom', @modelId, @displayName, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, @keyId,
+           COALESCE(@tools, 1), COALESCE(@vision, 0))
         ON CONFLICT(platform, model_id)
-        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
-      `).run(modelId, displayName, keyId);
+        DO UPDATE SET
+          display_name = excluded.display_name,
+          key_id = excluded.key_id,
+          enabled = 1,
+          supports_tools = COALESCE(@tools, supports_tools),
+          supports_vision = COALESCE(@vision, supports_vision)
+      `).run({ modelId, displayName, keyId, tools: toolsParam, vision: visionParam });
 
-      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
+      const modelRow = db.prepare("SELECT id, supports_tools, supports_vision FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number; supports_tools: number; supports_vision: number };
 
       // Append to the fallback chain if not already present.
       const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
@@ -486,7 +520,13 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
         db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
       }
 
-      registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
+      registered.push({
+        modelDbId: modelRow.id,
+        model: modelId,
+        displayName,
+        supportsTools: modelRow.supports_tools === 1,
+        supportsVision: modelRow.supports_vision === 1,
+      });
     }
 
     return { keyId, registered, storedKeyForMask };
@@ -504,6 +544,8 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     baseUrl,
     model: first.model,
     displayName: first.displayName,
+    supportsTools: first.supportsTools,
+    supportsVision: first.supportsVision,
     models: registered,
     maskedKey: maskKey(storedKeyForMask),
   });

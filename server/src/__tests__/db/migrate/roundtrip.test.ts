@@ -10,6 +10,7 @@ const CATALOG_MODEL_STATE_FILENAME = '20260627_000002_catalog_model_state.ts';
 const REQUEST_AGGREGATES_FILENAME = '20260628_120000_request_aggregates.ts';
 const GITHUB_GPT41_CONTEXT_FILENAME = '20260630_000001_github_gpt41_context.ts';
 const REQUEST_CLIENT_INFO_FILENAME = '20260706_000001_request_client_info.ts';
+const CUSTOM_MODEL_TOOL_SUPPORT_FILENAME = '20260706_000002_custom_model_tool_support.ts';
 
 interface SchemaRow {
   type: string;
@@ -66,6 +67,7 @@ describe('migration round trip', () => {
         REQUEST_AGGREGATES_FILENAME,
         GITHUB_GPT41_CONTEXT_FILENAME,
         REQUEST_CLIENT_INFO_FILENAME,
+        CUSTOM_MODEL_TOOL_SUPPORT_FILENAME,
       ]);
     } finally {
       db.close();
@@ -78,6 +80,15 @@ describe('migration round trip', () => {
     try {
       await runMigrations(db, 'up');
       expect(getPendingMigrationNames(db)).toEqual([]);
+
+      // The catalog seed has no custom models, so the custom-model tool-support
+      // backfill only alters state once a user endpoint exists. Seed one (in its
+      // post-migration state, tools = 1) so the round trip actually exercises
+      // that migration's down (tools -> 0) and up (tools -> 1).
+      db.prepare(`
+        INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, supports_tools, supports_vision, enabled)
+        VALUES ('custom', 'roundtrip-custom', 'Roundtrip Custom', 50, 50, 1, 0, 1)
+      `).run();
 
       const fullState = snapshotAppState(db);
       await runDownToBaseline(db);
