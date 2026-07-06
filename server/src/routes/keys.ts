@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { normalizeCustomProviderBaseUrl } from '../lib/custom-provider-url.js';
 
 export const keysRouter = Router();
 
@@ -103,7 +104,13 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
     return;
   }
 
-  const baseUrl = parsed.data.baseUrl.trim().replace(/\/+$/, '');
+  let baseUrl: string;
+  try {
+    baseUrl = normalizeCustomProviderBaseUrl(parsed.data.baseUrl);
+  } catch (err: any) {
+    res.status(400).json({ error: { message: err?.message ?? 'Invalid custom provider baseUrl' } });
+    return;
+  }
   const modelId = parsed.data.model.trim();
   const displayName = (parsed.data.displayName ?? modelId).trim();
   // Local servers often need no key; keep a sentinel so there's always a bearer.

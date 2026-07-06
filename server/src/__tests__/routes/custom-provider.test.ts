@@ -48,6 +48,10 @@ describe('resolveProvider (#117)', () => {
     expect(resolveProvider('custom', '   ')).toBeUndefined();
   });
 
+  it('refuses a custom provider bound to a private remote address', () => {
+    expect(resolveProvider('custom', 'http://192.168.1.20:8080/v1')).toBeUndefined();
+  });
+
   it('returns the registered singleton for built-in platforms', () => {
     expect(resolveProvider('groq')).toBe(getProvider('groq'));
   });
@@ -66,6 +70,50 @@ describe('POST /api/keys/custom (#117)', () => {
   it('rejects an invalid base URL', async () => {
     const { status } = await post(app, '/api/keys/custom', { baseUrl: 'not-a-url', model: 'm' });
     expect(status).toBe(400);
+  });
+
+  it('rejects private-network custom endpoints by default', async () => {
+    const { status, body } = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://192.168.1.20:11434/v1',
+      model: 'm',
+    });
+    expect(status).toBe(400);
+    expect(body.error.message).toMatch(/private|loopback|link-local|unspecified/i);
+  });
+
+  it('rejects non-http custom endpoint schemes', async () => {
+    const { status, body } = await post(app, '/api/keys/custom', {
+      baseUrl: 'file:///etc/passwd',
+      model: 'm',
+    });
+    expect(status).toBe(400);
+    expect(body.error.message).toMatch(/http or https/i);
+  });
+
+  it('allows remote HTTPS custom endpoints only when explicitly enabled', async () => {
+    const previous = process.env.ALLOW_REMOTE_CUSTOM_PROVIDERS;
+    process.env.ALLOW_REMOTE_CUSTOM_PROVIDERS = 'true';
+    try {
+      const { status, body } = await post(app, '/api/keys/custom', {
+        baseUrl: 'https://llm.example.com/v1/',
+        model: 'remote-model',
+      });
+      expect(status).toBe(201);
+      expect(body.baseUrl).toBe('https://llm.example.com/v1');
+    } finally {
+      const db = getDb();
+      const model = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = 'remote-model'").get() as { id: number } | undefined;
+      if (model) {
+        db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(model.id);
+        db.prepare('DELETE FROM models WHERE id = ?').run(model.id);
+      }
+      db.prepare("DELETE FROM api_keys WHERE platform = 'custom' AND base_url = 'https://llm.example.com/v1'").run();
+      if (previous === undefined) {
+        delete process.env.ALLOW_REMOTE_CUSTOM_PROVIDERS;
+      } else {
+        process.env.ALLOW_REMOTE_CUSTOM_PROVIDERS = previous;
+      }
+    }
   });
 
   it('registers a custom endpoint, model, and fallback entry', async () => {

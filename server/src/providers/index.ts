@@ -4,6 +4,7 @@ import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
+import { normalizeCustomProviderBaseUrl } from '../lib/custom-provider-url.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -187,10 +188,16 @@ export function resolveProvider(platform: Platform, baseUrl?: string | null): Ba
   if (platform === 'custom') {
     const trimmed = baseUrl?.trim();
     if (!trimmed) return undefined;
+    let normalized: string;
+    try {
+      normalized = normalizeCustomProviderBaseUrl(trimmed);
+    } catch {
+      return undefined;
+    }
     return new OpenAICompatProvider({
       platform: 'custom',
       name: 'Custom (OpenAI-compatible)',
-      baseUrl: trimmed,
+      baseUrl: normalized,
       timeoutMs: CUSTOM_PROVIDER_TIMEOUT_MS,
     });
   }
