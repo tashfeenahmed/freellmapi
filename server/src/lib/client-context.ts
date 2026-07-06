@@ -22,7 +22,18 @@ function resolveClientIp(req: Request): string | null {
   return raw?.replace(/^::ffff:/i, '') ?? null;
 }
 
+// Privacy opt-out: REQUEST_ANALYTICS_LOG_CLIENT=false stores nulls instead of
+// the caller's IP/UA. Read per request (not at module load) so tests and
+// embedders can toggle it without re-importing.
+function clientLoggingEnabled(): boolean {
+  return process.env.REQUEST_ANALYTICS_LOG_CLIENT !== 'false';
+}
+
 export function clientContextMiddleware(req: Request, _res: Response, next: NextFunction): void {
+  if (!clientLoggingEnabled()) {
+    storage.run({ ip: null, userAgent: null }, next);
+    return;
+  }
   const ua = req.headers['user-agent'];
   storage.run({ ip: resolveClientIp(req), userAgent: typeof ua === 'string' ? ua.slice(0, 256) : null }, next);
 }
