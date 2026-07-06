@@ -3,7 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, ModelListRow } from '@freellmapi/shared/types.js';
-import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, hasOtherUsableKey, routingReserveTokens, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { runImageGeneration, runSpeech, MediaError } from '../services/media.js';
@@ -660,7 +660,9 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   const stop = providerSafeStop(parsed.data.stop);
   const messages = completionPromptToMessages(prompt, suffix);
   const estimatedInputTokens = messages.reduce((sum, m) => sum + Math.ceil(contentToString(m.content).length / 4), 0);
-  const estimatedTotal = estimatedInputTokens + max_tokens;
+  // Cap the reserved output so a huge client-set max_tokens doesn't falsely
+  // exclude the whole model pool (#470); input is still counted in full.
+  const estimatedTotal = estimatedInputTokens + routingReserveTokens(max_tokens);
 
   let resolvedChain: ResolvedChain | undefined;
   if (isAutoModel(requestedModel)) {
@@ -1111,7 +1113,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const IMAGE_TOKEN_ESTIMATE = 1000;
   const imageCount = messages.reduce((n, m) =>
     n + (Array.isArray(m.content) ? m.content.filter(b => (b as { type?: string })?.type === 'image_url' || (b as { type?: string })?.type === 'image').length : 0), 0);
-  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + (max_tokens ?? 1000);
+  // The reserved output is capped (routingReserveTokens, #470) so an oversized
+  // client max_tokens can't starve routing; input + images count in full.
+  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(max_tokens);
 
   // Tool-bearing requests must route to a model that emits STRUCTURED
   // tool_calls. A model without real function-calling support serializes the

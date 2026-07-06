@@ -136,6 +136,29 @@ export interface RouteResult {
   tpdLimit: number | null;
 }
 
+// ── Routing token estimate: cap the reserved OUTPUT, not the full max_tokens ──
+// A client can request a huge max_tokens (e.g. 32000) it will never actually
+// emit. Reserving that full amount against every model's context window and TPM
+// budget falsely excludes the entire free pool (TPM 6k-30k) and returns a bogus
+// "all models exhausted" 429 with ZERO upstream calls (#470). Providers meter
+// ACTUAL tokens, so under-reserving only risks an upstream 429/413 the retry
+// loop already handles, whereas over-reserving starves routing. For routing and
+// the context-window / TPM filters we therefore reserve at most this many output
+// tokens; the INPUT estimate is still counted in full so a genuinely large
+// prompt still (correctly) skips a too-small model.
+export const OUTPUT_RESERVE_CAP = 2000;
+
+/**
+ * Output tokens to reserve for routing/filter purposes: the requested max_tokens
+ * clamped to OUTPUT_RESERVE_CAP (default 1000 when the client omitted it, matching
+ * the historical fallback). Callers add this to their INPUT estimate before
+ * calling routeRequest / routePinnedModel.
+ */
+export function routingReserveTokens(requestedMaxTokens: number | null | undefined): number {
+  const requested = requestedMaxTokens != null && requestedMaxTokens > 0 ? requestedMaxTokens : 1000;
+  return Math.min(requested, OUTPUT_RESERVE_CAP);
+}
+
 // Round-robin index per platform
 const roundRobinIndex = new Map<string, number>();
 
@@ -954,18 +977,21 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // Context-aware routing: skip a model whose context window can't hold the
     // request, so a large prompt never selects a small-context model and burns
     // a failover hop on a 413 "request too large" (#167). Only enforced when we
-    // know the model's window; estimatedTokens already includes the reserved
-    // output (max_tokens), so this is the total-context check the model must
-    // satisfy. A 413 that slips through is still retryable downstream, and the
-    // failed model is put on cooldown — so this is a fast-path, not the only
-    // guard. If every model is too small, the loop falls through and the caller
-    // gets the normal "all models exhausted" error rather than a wasted sweep.
+    // know the model's window; estimatedTokens is the INPUT estimate plus a
+    // CAPPED output reserve (routingReserveTokens, #470), so a huge client-set
+    // max_tokens no longer excludes the model — the input must fit, not
+    // input+full max_tokens. A 413 that slips through is still retryable
+    // downstream, and the failed model is put on cooldown — so this is a
+    // fast-path, not the only guard. If every model is too small, the loop falls
+    // through and the caller gets the normal "all models exhausted" error rather
+    // than a wasted sweep.
     if (entry.context_window != null && estimatedTokens > entry.context_window) { diag.push(`${label}: context ${entry.context_window} < estimated ${estimatedTokens}`); continue; }
 
-    // Same guard for a model with a small per-minute token budget: a single
-    // request that alone exceeds tpm_limit can never fit one minute of quota and
+    // Same guard for a model with a small per-minute token budget: a request
+    // whose input alone exceeds tpm_limit can never fit one minute of quota and
     // returns a guaranteed 413 (e.g. Groq gpt-oss-120b: 131k context but 8k TPM).
-    // estimatedTokens already includes reserved output, mirroring the check above.
+    // estimatedTokens carries the same capped output reserve, mirroring the
+    // check above (#470).
     if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) { diag.push(`${label}: tpm_limit ${entry.tpm_limit} < estimated ${estimatedTokens}`); continue; }
 
     // Key selection + accounting pre-checks for this one model. Returns the

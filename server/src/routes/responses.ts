@@ -9,7 +9,7 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
+import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, hasOtherUsableKey, routingReserveTokens, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
@@ -341,7 +341,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     (sum, m) => sum + Math.ceil(contentToString(m.content).length / 4),
     0,
   );
-  const estimatedTotal = estimatedInputTokens + (reqData.max_output_tokens ?? 1000);
+  // Capped output reserve so a large max_output_tokens can't falsely exclude the
+  // model pool (#470); input counts in full.
+  const estimatedTotal = estimatedInputTokens + routingReserveTokens(reqData.max_output_tokens);
   // Optional client-managed session affinity (mirrors /chat/completions).
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;

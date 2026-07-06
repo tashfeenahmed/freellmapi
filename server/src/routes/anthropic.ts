@@ -10,7 +10,7 @@ import type {
   ChatContent,
   ChatContentBlock,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, type RouteResult } from '../services/router.js';
+import { routeRequest, recordRateLimitHit, recordSuccess, hasOtherUsableKey, routingReserveTokens, type RouteResult } from '../services/router.js';
 import {
   recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit,
   PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError,
@@ -359,7 +359,9 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   const estimatedInputTokens = estimateTokens(messages);
   const imageCount = messages.reduce((n, m) =>
     n + (Array.isArray(m.content) ? m.content.filter(b => (b as any)?.type === 'image_url').length : 0), 0);
-  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + max_tokens;
+  // Capped output reserve so a large max_tokens can't falsely exclude the model
+  // pool (#470); input + images count in full.
+  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(max_tokens);
 
   // Resolve the model through the operator's Claude-family map (opus/sonnet/
   // haiku/default → auto | a pinned catalog model). A concrete catalog id pins
