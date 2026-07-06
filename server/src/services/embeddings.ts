@@ -115,6 +115,7 @@ interface ProviderCallResult {
 
 async function openAiStyleEmbed(
   url: string,
+  platform: string,
   key: string,
   modelId: string,
   inputs: string[],
@@ -134,7 +135,7 @@ async function openAiStyleEmbed(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  }, platform, 'embedding', FETCH_TIMEOUT_MS);
   if (!r.ok) {
     throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
   }
@@ -150,7 +151,7 @@ async function openAiStyleEmbed(
 }
 
 export async function probeEmbeddingDimensions(baseUrl: string, key: string, modelId: string): Promise<number> {
-  const out = await openAiStyleEmbed(`${baseUrl.trim().replace(/\/+$/, '')}/embeddings`, key, modelId, ['dimension probe']);
+  const out = await openAiStyleEmbed(`${baseUrl.trim().replace(/\/+$/, '')}/embeddings`, 'custom', key, modelId, ['dimension probe']);
   const vector = out.vectors[0];
   if (!Array.isArray(vector) || vector.length === 0) {
     throw new EmbeddingsError('upstream returned malformed embeddings', 502);
@@ -163,18 +164,18 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
   switch (row.platform) {
     case 'custom':
       if (!credential.baseUrl) throw new EmbeddingsError('custom embedding provider is missing base_url', 500);
-      return openAiStyleEmbed(`${credential.baseUrl}/embeddings`, key, row.model_id, inputs, {}, dimensions);
+      return openAiStyleEmbed(`${credential.baseUrl}/embeddings`, row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'google':
-      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', key, row.model_id, inputs, {}, dimensions);
+      return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'nvidia':
       // NeMo Retriever NIMs require input_type; 'query' is the symmetric-safe
       // choice for a gateway that can't know whether this is index or query time.
       // MRL models (e.g. llama-nemotron-embed-1b-v2) accept dimensions and truncate.
-      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', key, row.model_id, inputs, { input_type: 'query' }, dimensions);
+      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', row.platform, key, row.model_id, inputs, { input_type: 'query' }, dimensions);
     case 'openrouter':
-      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', key, row.model_id, inputs, {}, dimensions);
+      return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'github':
-      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', key, row.model_id, inputs, {}, dimensions);
+      return openAiStyleEmbed('https://models.github.ai/inference/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');
@@ -183,7 +184,7 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       const token = key.slice(sep + 1);
       return openAiStyleEmbed(
         `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
-        token, row.model_id, inputs, {},
+        row.platform, token, row.model_id, inputs, {},
       );
     }
     case 'huggingface': {
@@ -196,9 +197,10 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
           body: JSON.stringify({ inputs }),
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         },
+        row.platform, 'embedding', FETCH_TIMEOUT_MS,
       );
       if (!r.ok) throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
-      const j = (await r.json()) as number[][] | number[];
+      const j = await r.json() as number[][] | number[];
       const vectors = Array.isArray(j[0]) ? (j as number[][]) : [j as number[]];
       return { vectors, inputTokens: null };
     }
@@ -213,7 +215,7 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
           embedding_types: ['float'],
         }),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
+      }, row.platform, 'embedding', FETCH_TIMEOUT_MS);
       if (!r.ok) throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
       const j = (await r.json()) as { embeddings?: { float?: number[][] }; meta?: { billed_units?: { input_tokens?: number } } };
       return { vectors: j.embeddings?.float ?? [], inputTokens: j.meta?.billed_units?.input_tokens ?? null };

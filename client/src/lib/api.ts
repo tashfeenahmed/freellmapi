@@ -17,16 +17,20 @@ export const UNAUTHORIZED_EVENT = 'freellmapi:unauthorized';
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  const headers = new Headers(options?.headers);
+  const isFormData = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
   const res = await fetch(`${BASE}${path}`, {
     // `...options` first so an explicit method/body/signal applies, but headers
     // are merged last — otherwise an options.headers would clobber the
     // Content-Type and Authorization we set here.
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
+    headers,
   });
   if (res.status === 401) {
     // Session missing/expired — drop the token and let the AuthGate re-render.

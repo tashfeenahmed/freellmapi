@@ -131,15 +131,25 @@ const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
   'deprecated',
 ]);
 
+const VENDOR_EXTENSION_SCHEMA_KEY = /^x-/i;
+
 export function sanitizeForGemini(schema: unknown): unknown {
+  return sanitizeForGeminiSchema(schema, false);
+}
+
+function sanitizeForGeminiSchema(schema: unknown, insidePropertiesMap: boolean): unknown {
   if (Array.isArray(schema)) {
-    return schema.map(sanitizeForGemini);
+    return schema.map(s => sanitizeForGeminiSchema(s, false));
   }
   if (schema && typeof schema === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
-      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.has(k)) continue;
-      out[k] = sanitizeForGemini(v);
+      if (insidePropertiesMap) {
+        out[k] = sanitizeForGeminiSchema(v, false);
+        continue;
+      }
+      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.has(k) || VENDOR_EXTENSION_SCHEMA_KEY.test(k)) continue;
+      out[k] = sanitizeForGeminiSchema(v, k === 'properties');
     }
     return out;
   }
@@ -229,7 +239,11 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
   }
   if (/^https?:\/\//i.test(url)) {
     try {
-      const res = await proxyFetch(url, undefined, 'google');
+      // Internal helper that turns an image URL into inline data for the
+      // Gemini request body. No formal timeout — relies on the platform's
+      // own default. Use a 30s cap to avoid hanging the whole request when
+      // an image host stalls; classify as `image` for triage.
+      const res = await proxyFetch(url, { signal: AbortSignal.timeout(30_000) }, 'google', 'image', 30_000);
       if (!res.ok) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
@@ -388,9 +402,22 @@ function toGeminiStopSequences(stop: CompletionOptions['stop']): string[] | unde
   return Array.isArray(stop) ? stop : [stop];
 }
 
+export interface GoogleProviderOptions {
+  /** Per-provider HTTP timeout override. Some Gemini models (notably
+   *  Gemma reasoning variants) take 20-60s on cold start; the OpenAI-compat
+   *  default of 15s false-flags them as broken. Mirrors OpenAICompatProvider. */
+  timeoutMs?: number;
+}
+
 export class GoogleProvider extends BaseProvider {
   readonly platform = 'google' as const;
   readonly name = 'Google AI Studio';
+  private readonly timeoutMs: number;
+
+  constructor(opts: GoogleProviderOptions = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? 15000;
+  }
 
   async chatCompletion(
     apiKey: string,
@@ -422,7 +449,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
@@ -497,7 +524,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,

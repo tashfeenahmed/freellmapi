@@ -93,6 +93,20 @@ describe('applyCatalog', () => {
     expect(fb).toBeTruthy();
   });
 
+  it('caps GitHub GPT-4.1 catalog context at the routable free-tier limit (#426)', () => {
+    const models = existingAsCatalogModels();
+    const target = models.find((m) => m.platform === 'github' && m.modelId === 'openai/gpt-4.1');
+    expect(target).toBeDefined();
+    target!.contextWindow = 128000;
+
+    applyCatalog(getDb(), catalogOf(models));
+
+    const row = getDb()
+      .prepare("SELECT context_window FROM models WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'")
+      .get() as { context_window: number };
+    expect(row.context_window).toBe(8000);
+  });
+
   it('updates metadata in place and respects the enabled policy', () => {
     const models = existingAsCatalogModels();
     const target = models.find((m) => m.modelId === 'brand-new-model')!;

@@ -26,6 +26,7 @@ import {
   getStickyModel,
   setStickyModel,
   traceRouteEvent,
+  exhaustedRetryError,
   logRequest,
 } from './proxy.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
@@ -382,11 +383,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     try {
       route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, wantsTools, skipModels.size > 0 ? skipModels : undefined);
     } catch (err: any) {
-      const status = lastError ? 429 : (err.status ?? 503);
-      const message = lastError
-        ? `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`
-        : err.message;
-      const type = lastError ? 'rate_limit_error' : 'routing_error';
+      const exhausted = lastError ? exhaustedRetryError(lastError) : null;
+      const status = exhausted?.status ?? err.status ?? 503;
+      const message = exhausted?.message ?? err.message;
+      const type = exhausted?.type ?? 'routing_error';
       if (streamStarted) {
         sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
         res.end();
@@ -782,13 +782,13 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // (reachable since empty-completion failover can burn every attempt after
   // streamStarted) — close the SSE stream with a failed event instead of
   // writing JSON onto a committed event-stream response.
-  const exhaustedMsg = `All models rate-limited after ${MAX_RETRIES} attempts. Last: ${lastError?.message}`;
+  const exhausted = exhaustedRetryError(lastError, MAX_RETRIES);
   if (streamStarted) {
-    sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhaustedMsg, type: 'rate_limit_error' } } });
+    sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhausted.message, type: exhausted.type } } });
     res.end();
     return;
   }
-  res.status(429).json({
-    error: { message: exhaustedMsg, type: 'rate_limit_error' },
+  res.status(exhausted.status).json({
+    error: { message: exhausted.message, type: exhausted.type },
   });
 });

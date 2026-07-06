@@ -7,6 +7,10 @@ export interface DesktopConfig {
   theme?: 'dark' | 'light';
   // BCP-47 locale mirrored from the dashboard (en, zh-CN, fr, es, pt-BR).
   locale?: string;
+  // Bind the embedded server to 0.0.0.0 instead of 127.0.0.1 so other devices
+  // on the LAN / Tailscale can reach it (#442, #418). Off by default: exposes
+  // the API, guarded only by the unified key. Applied at next server start.
+  lanAccess?: boolean;
 }
 
 function configPath(): string {

@@ -30,6 +30,16 @@ function okEmbeddingResponse(dims: number, count = 1) {
   }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
+// Typed fetch mock so .mock.calls is properly indexed without `as any` on
+// every call site. The cast on assignment to globalThis.fetch is unavoidable
+// because globalThis.fetch in lib.dom is typed loosely; this is the same
+// pattern the test suite uses for globalThis.fetch overrides throughout.
+function mockFetch(impl: typeof fetch): MockedFunction<typeof fetch> {
+  const m = vi.fn(impl) as MockedFunction<typeof fetch>;
+  globalThis.fetch = m as unknown as typeof fetch;
+  return m;
+}
+
 describe('embeddings service', () => {
   beforeEach(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
@@ -98,8 +108,7 @@ describe('embeddings service', () => {
     it('embeds via the first provider in the family chain', async () => {
       addKey('nvidia');
       addKey('openrouter');
-      const fetchMock = vi.fn(async () => okEmbeddingResponse(2048));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(2048));
 
       const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
       expect(result.platform).toBe('nvidia');
@@ -112,10 +121,9 @@ describe('embeddings service', () => {
     it('fails over WITHIN the family when the first provider errors', async () => {
       addKey('nvidia');
       addKey('openrouter');
-      const fetchMock = vi.fn()
-        .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
-        .mockResolvedValueOnce(okEmbeddingResponse(2048));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => new Response('rate limited', { status: 429 }));
+      fetchMock.mockResolvedValueOnce(new Response('rate limited', { status: 429 }));
+      fetchMock.mockResolvedValueOnce(okEmbeddingResponse(2048));
 
       const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
       expect(result.platform).toBe('openrouter');
@@ -125,8 +133,7 @@ describe('embeddings service', () => {
 
     it('skips providers without a usable key instead of failing', async () => {
       addKey('openrouter'); // no nvidia key
-      const fetchMock = vi.fn(async () => okEmbeddingResponse(2048));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(2048));
 
       const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
       expect(result.platform).toBe('openrouter');
@@ -136,7 +143,7 @@ describe('embeddings service', () => {
     it('throws 429 when every provider is rate-limited', async () => {
       addKey('nvidia');
       addKey('openrouter');
-      globalThis.fetch = vi.fn(async () => new Response('slow down', { status: 429 })) as any;
+      mockFetch(async () => new Response('slow down', { status: 429 }));
 
       await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'])).rejects.toMatchObject({ status: 429 });
     });
@@ -148,8 +155,7 @@ describe('embeddings service', () => {
 
     it('splits cloudflare account_id:token keys', async () => {
       addKey('cloudflare', 'acct-123:cf-token-xyz');
-      const fetchMock = vi.fn(async () => okEmbeddingResponse(1024));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(1024));
 
       const result = await runEmbeddings('embeddinggemma-300m', ['hello']);
       expect(result.platform).toBe('cloudflare');
@@ -161,8 +167,7 @@ describe('embeddings service', () => {
     it('normalizes hugging face feature-extraction output', async () => {
       // bge-m3: cloudflare first (no key) → falls through to huggingface
       addKey('huggingface');
-      const fetchMock = vi.fn(async () => new Response(JSON.stringify([[0.1, 0.2, 0.3]]), { status: 200 }));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => new Response(JSON.stringify([[0.1, 0.2, 0.3]]), { status: 200 }));
 
       const result = await runEmbeddings('bge-m3', ['hello']);
       expect(result.platform).toBe('huggingface');
@@ -173,10 +178,9 @@ describe('embeddings service', () => {
     it('rejects malformed upstream payloads and fails over', async () => {
       addKey('nvidia');
       addKey('openrouter');
-      const fetchMock = vi.fn()
-        .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // wrong count
-        .mockResolvedValueOnce(okEmbeddingResponse(2048));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => new Response(JSON.stringify({ data: [] }), { status: 200 }));
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })); // wrong count
+      fetchMock.mockResolvedValueOnce(okEmbeddingResponse(2048));
 
       const result = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
       expect(result.platform).toBe('openrouter');
@@ -185,10 +189,9 @@ describe('embeddings service', () => {
     it("logs requests tagged request_type='embedding' so chat budgets ignore them", async () => {
       addKey('nvidia');
       addKey('openrouter');
-      const fetchMock = vi.fn()
-        .mockResolvedValueOnce(new Response('boom', { status: 500 }))
-        .mockResolvedValueOnce(okEmbeddingResponse(2048));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => new Response('boom', { status: 500 }));
+      fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+      fetchMock.mockResolvedValueOnce(okEmbeddingResponse(2048));
 
       await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
       const rows = getDb().prepare(
@@ -215,8 +218,7 @@ describe('embeddings service', () => {
           (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
         VALUES ('local-embed', 'custom', 'local-embed-v1', 'Local Embed', 3, NULL, 1, 1, '', ?)
       `).run(keyId);
-      const fetchMock = vi.fn(async () => okEmbeddingResponse(3));
-      globalThis.fetch = fetchMock as any;
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(3));
 
       const result = await runEmbeddings('local-embed', ['hello']);
 
@@ -232,16 +234,6 @@ describe('embeddings service', () => {
     });
 
     describe('dimensions parameter (MRL truncation)', () => {
-      // Typed fetch mock so .mock.calls is properly indexed without `as any`.
-      // The cast on assignment to globalThis.fetch is unavoidable because
-      // globalThis.fetch in lib.dom is typed loosely; this is the same
-      // pattern the existing tests in this file use.
-      function mockFetch(impl: typeof fetch): MockedFunction<typeof fetch> {
-        const m = vi.fn(impl) as MockedFunction<typeof fetch>;
-        globalThis.fetch = m as unknown as typeof fetch;
-        return m;
-      }
-
       it('forwards dimensions to NVIDIA NeMo NIM in the request body', async () => {
         addKey('nvidia');
         const fetchMock = mockFetch(async () => okEmbeddingResponse(1536));

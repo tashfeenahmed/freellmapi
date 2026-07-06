@@ -6,7 +6,7 @@
 // token budget. Each platform has a small adapter here; routing fails over
 // across the providers serving the same modality. The rows are maintained in the
 // published catalog and arrive via catalog-sync (premium on the live tier within
-// ~12h, free at the monthly promote) — never seeded by migrations.
+// ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
@@ -109,8 +109,19 @@ function getProviderCredential(row: MediaModelRow): ProviderCredential | null {
   }
 }
 
-async function mediaFetch(url: string, platform: string, init: RequestInit): Promise<Response> {
-  const r = await proxyFetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }, platform);
+async function mediaFetch(
+  url: string,
+  platform: string,
+  modality: 'image' | 'audio',
+  init: RequestInit,
+): Promise<Response> {
+  const r = await proxyFetch(
+    url,
+    { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    platform,
+    modality,
+    FETCH_TIMEOUT_MS,
+  );
   if (!r.ok) {
     const body = await r.text().catch(() => '');
     throw new MediaError(`${platform} ${r.status}: ${body.slice(0, 200)}`, r.status);
@@ -187,7 +198,7 @@ async function callImageProvider(
       const body: Record<string, unknown> = { model: row.model_id, prompt: p.prompt };
       if (p.n !== undefined) body.n = p.n;
       if (p.size) body.size = p.size;
-      const r = await mediaFetch(`${credential.baseUrl}/images/generations`, 'custom', {
+      const r = await mediaFetch(`${credential.baseUrl}/images/generations`, 'custom', 'image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key ?? 'no-key'}` },
         body: JSON.stringify(body),
@@ -198,7 +209,7 @@ async function callImageProvider(
     case 'nvidia': {
       // NVIDIA NIM image models live at ai.api.nvidia.com/v1/genai/{model};
       // response is { artifacts: [{ base64 }] }.
-      const r = await mediaFetch(`https://ai.api.nvidia.com/v1/genai/${row.model_id}`, 'nvidia', {
+      const r = await mediaFetch(`https://ai.api.nvidia.com/v1/genai/${row.model_id}`, 'nvidia', 'image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({ prompt: p.prompt, mode: 'base', steps: 4, width: w, height: h }),
@@ -209,13 +220,13 @@ async function callImageProvider(
     case 'pollinations': {
       // Keyless GET image endpoint returns raw image bytes.
       const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p.prompt)}?width=${w}&height=${h}&nologo=true&model=${encodeURIComponent(row.model_id)}`;
-      const r = await mediaFetch(url, 'pollinations', { method: 'GET' });
+      const r = await mediaFetch(url, 'pollinations', 'image', { method: 'GET' });
       const buf = Buffer.from(await r.arrayBuffer());
       return [{ b64_json: buf.toString('base64') }];
     }
     case 'cloudflare': {
       const { accountId, token } = parseCfKey(key);
-      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', {
+      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ prompt: p.prompt, width: w, height: h }),
@@ -232,7 +243,7 @@ async function callImageProvider(
       return [{ b64_json: buf.toString('base64') }];
     }
     case 'siliconflow': {
-      const r = await mediaFetch('https://api.siliconflow.com/v1/images/generations', 'siliconflow', {
+      const r = await mediaFetch('https://api.siliconflow.com/v1/images/generations', 'siliconflow', 'image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({ model: row.model_id, prompt: p.prompt, image_size: `${w}x${h}` }),
@@ -258,7 +269,7 @@ async function callSpeechProvider(
       const body: Record<string, unknown> = { model: row.model_id, input: p.input };
       if (p.voice) body.voice = p.voice;
       if (p.format) body.response_format = p.format;
-      const r = await mediaFetch(`${credential.baseUrl}/audio/speech`, 'custom', {
+      const r = await mediaFetch(`${credential.baseUrl}/audio/speech`, 'custom', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key ?? 'no-key'}` },
         body: JSON.stringify(body),
@@ -270,7 +281,7 @@ async function callSpeechProvider(
     }
     case 'cloudflare': {
       const { accountId, token } = parseCfKey(key);
-      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', {
+      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ prompt: p.input, lang: p.voice ?? 'en' }),
@@ -282,7 +293,7 @@ async function callSpeechProvider(
     }
     case 'siliconflow': {
       const fmt = p.format ?? 'mp3';
-      const r = await mediaFetch('https://api.siliconflow.com/v1/audio/speech', 'siliconflow', {
+      const r = await mediaFetch('https://api.siliconflow.com/v1/audio/speech', 'siliconflow', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({ model: row.model_id, input: p.input, voice: p.voice ?? `${row.model_id}:alex`, response_format: fmt }),
@@ -293,7 +304,7 @@ async function callSpeechProvider(
       // OpenAI-shaped chat-completions with the audio modality returns b64 audio.
       // The anonymous tier needs no key; only send one when it's a real sk_ token.
       const realKey = key && key.startsWith('sk_') ? key : null;
-      const r = await mediaFetch('https://gen.pollinations.ai/v1/chat/completions', 'pollinations', {
+      const r = await mediaFetch('https://gen.pollinations.ai/v1/chat/completions', 'pollinations', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(realKey ? { Authorization: `Bearer ${realKey}` } : {}) },
         body: JSON.stringify({
@@ -314,6 +325,7 @@ async function callSpeechProvider(
       const r = await mediaFetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${row.model_id}:generateContent?key=${encodeURIComponent(key ?? '')}`,
         'google',
+        'audio',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

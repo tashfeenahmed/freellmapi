@@ -14,7 +14,13 @@ let tray: Tray | null = null;
 // is rebuilt on every right-click, so reading the live locale via getLocale()
 // keeps its labels current after a language switch; the static tooltip is
 // refreshed separately (refreshTrayLocale).
-export function buildTray(port: number, token: string, getLocale: () => NativeLocale): Tray {
+export function buildTray(
+  port: number,
+  token: string,
+  getLocale: () => NativeLocale,
+  getLanAccess: () => boolean,
+  onToggleLanAccess: () => void,
+): Tray {
   const iconPath = path.join(__dirname, '../assets/trayTemplate.png');
   const icon = nativeImage.createFromPath(iconPath);
   icon.setTemplateImage(true); // auto light/dark tint in the macOS menu bar
@@ -25,9 +31,13 @@ export function buildTray(port: number, token: string, getLocale: () => NativeLo
   tray.on('click', () => togglePopover(tray!));
   tray.on('right-click', () => {
     const locale = getLocale();
+    const lanOn = getLanAccess();
     tray!.popUpContextMenu(Menu.buildFromTemplate([
-      { label: dt(locale, 'runningOn', { addr: `127.0.0.1:${port}` }), enabled: false },
+      { label: dt(locale, 'runningOn', { addr: `${lanOn ? '0.0.0.0' : '127.0.0.1'}:${port}` }), enabled: false },
       { label: dt(locale, 'openDashboard'), click: () => openDashboard(port, token) },
+      { type: 'separator' },
+      // Toggling relaunches the app (the bind host is fixed at server start).
+      { label: dt(locale, 'lanAccess'), type: 'checkbox', checked: lanOn, click: () => onToggleLanAccess() },
       { type: 'separator' },
       { label: dt(locale, 'quitApp'), click: () => app.quit() },
     ]));

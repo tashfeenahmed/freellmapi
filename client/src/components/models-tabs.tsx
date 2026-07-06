@@ -18,18 +18,7 @@ export function ModelsTabs() {
       <NavLink to="/models/embeddings" className={({ isActive }) => tab(isActive)}>{t('models.embeddingsTab')}</NavLink>
       <NavLink to="/models/image" className={({ isActive }) => tab(isActive)}>{t('models.imageTab')}</NavLink>
       <NavLink to="/models/audio" className={({ isActive }) => tab(isActive)}>{t('models.audioTab')}</NavLink>
-      <NavLink to="/models/fusion" className={({ isActive }) => tab(isActive)}>
-        {({ isActive }) => (
-          <>
-            {t('models.fusionTab')}
-            <span className={`rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide ${
-              isActive ? 'bg-background/20 text-background' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-            }`}>
-              {t('models.newBadge')}
-            </span>
-          </>
-        )}
-      </NavLink>
+      <NavLink to="/models/fusion" className={({ isActive }) => tab(isActive)}>{t('models.fusionTab')}</NavLink>
     </div>
   )
 }

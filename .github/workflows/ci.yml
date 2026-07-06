@@ -8,14 +8,21 @@ on:
 
 jobs:
   test:
-    name: Test & build
+    name: Test & build (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the supported engines range (package.json: >=20.18 <25).
+        # 20 is the CI baseline that has historically caught crashes newer local
+        # Node versions hid; 22 is the current LTS most contributors run.
+        node-version: ['20', '22']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies

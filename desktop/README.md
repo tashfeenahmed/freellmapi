@@ -22,8 +22,9 @@ From the **repo root** (one-time client build + package):
 
 ```bash
 npm install
-npm run desktop:dist        # macOS → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:win    # Windows → desktop/dist-electron/FreeLLMAPI-…-x64 installer
+npm install --prefix desktop  # install desktop dependencies
+npm run desktop:dist          # macOS → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
+npm run desktop:dist:win      # Windows → desktop/dist-electron/FreeLLMAPI-…-x64 installer
 ```
 
 > Locally built apps don't carry the macOS quarantine attribute or Windows

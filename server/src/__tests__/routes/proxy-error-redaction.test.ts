@@ -101,4 +101,36 @@ describe('Provider error redaction', () => {
     expect(analyticsText).not.toContain(leakedUrl);
     expect(analyticsText).toContain('[redacted]');
   });
+
+  it('returns invalid_request_error when provider API 400s exhaust a pinned route', async () => {
+    const origFetch = global.fetch;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        return {
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new Headers(),
+          json: () => Promise.resolve({
+            error: {
+              message: 'tool schema not supported',
+            },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const completion = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'groq/compound-mini',
+      messages: [{ role: 'user', content: 'hello' }],
+    }, authHeaders());
+
+    expect(completion.status).toBe(400);
+    expect(completion.body.error.type).toBe('invalid_request_error');
+    expect(completion.body.error.message).toContain('rejected the request as invalid');
+    expect(completion.body.error.message).toContain('Groq API error 400');
+  });
 });

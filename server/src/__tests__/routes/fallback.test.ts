@@ -63,6 +63,47 @@ describe('Fallback API', () => {
     expect(first).toHaveProperty('contextWindow');
   });
 
+  it('GET /api/fallback/token-usage reports per-model chat usage for configured platforms', async () => {
+    const db = getDb();
+    const target = db.prepare(`
+      SELECT id, platform, model_id FROM models
+       WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'
+    `).get() as { id: number; platform: string; model_id: string };
+    const other = db.prepare(`
+      SELECT platform, model_id FROM models
+       WHERE platform <> ?
+       LIMIT 1
+    `).get(target.platform) as { platform: string; model_id: string };
+    const secret = encrypt('usage-test-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, 'usage', ?, ?, ?, 'healthy', 1)
+    `).run(target.platform, secret.encrypted, secret.iv, secret.authTag);
+    db.prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
+      VALUES (?, ?, NULL, 'success', 123, 45, 10, NULL, 'chat')
+    `).run(target.platform, target.model_id);
+    db.prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
+      VALUES (?, ?, NULL, 'success', 1000, 1000, 10, NULL, 'chat')
+    `).run(other.platform, other.model_id);
+    db.prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
+      VALUES (?, ?, NULL, 'success', 500, 500, 10, NULL, 'embedding')
+    `).run(target.platform, target.model_id);
+
+    const { status, body } = await request(app, 'GET', '/api/fallback/token-usage');
+
+    expect(status).toBe(200);
+    expect(body.totalUsed).toBe(168);
+    const model = body.models.find((m: any) => m.modelDbId === target.id);
+    expect(model).toMatchObject({
+      platform: target.platform,
+      modelId: target.model_id,
+      used: 168,
+    });
+  });
+
   // Regression: GET /routing must always carry customWeights, even before the
   // user has saved any — the dashboard's custom-weight sliders dereference it
   // and a missing field white-screened the Fallback page.

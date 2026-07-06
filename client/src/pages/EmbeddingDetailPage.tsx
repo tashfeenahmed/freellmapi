@@ -88,7 +88,7 @@ export default function EmbeddingDetailPage() {
                     {p.keyCount === 0 && (
                       <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-amber-600/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-400">{t('models.noKey')}</span>
                     )}
-                    <CopyButton text={p.modelId} />
+                    <CopyButton text={p.modelId} label={t('models.copyModelName')} />
                   </div>
                 ))}
               </div>
