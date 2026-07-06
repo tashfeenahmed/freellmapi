@@ -285,7 +285,7 @@
     "addImageModel": "添加图像模型",
     "addAudioModel": "添加音频模型",
     "importKeys": "导入提供方密钥",
-    "importKeysDescription": "上传 .env、JSON、JSONC、Markdown 或文本文件。",
+    "importKeysDescription": "上传 .env、JSON、JSONC、CSV、Markdown 或文本文件。",
     "importFiles": "文件",
     "importFileCount": "已选择 {count} 个",
     "previewFiles": "预览",
@@ -301,7 +301,26 @@
     "importSelected": "导入 {count} 个",
     "importing": "导入中…",
     "noImportSelection": "请至少选择一行包含提供方的记录。",
-    "importResult": "已导入 {imported} 个；失败 {failed} 个。"
+    "duplicate": "重复",
+    "duplicatesFound": "检测到 {count} 个重复项 — 已存在，将被跳过。",
+    "importResult": "已导入 {imported} 个；失败 {failed} 个。",
+    "export": {
+      "json": "JSON",
+      "env": ".env",
+      "csv": "CSV"
+    },
+    "exportAll": "All keys",
+    "exportHealthy": "Healthy only",
+    "exportKeys": "Export API keys",
+    "exportFormat": "Format",
+    "exportHealthyOnly": "Healthy keys only",
+    "exportHealthyOnlyDesc": "Exclude keys that are currently failing health checks",
+    "exportWillExport": "Will export",
+    "exportKey": "key",
+    "exportKeys plural": "keys",
+    "exporting": "Exporting…",
+    "exportDownload": "Download",
+    "exportSuccess": "Exported {count} keys"
   },
   "status": {
     "healthy": "健康",

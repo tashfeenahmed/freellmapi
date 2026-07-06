@@ -5,6 +5,7 @@ export interface PreviewKey {
   keyValue: string;
   detectedPlatform: string | null;
   prefix: string;
+  isDuplicate?: boolean;
 }
 
 export interface ImportKey {
@@ -17,6 +18,7 @@ export interface PreviewResponse {
   keys: PreviewKey[];
   total: number;
   skipped: string[];
+  duplicates: number;
 }
 
 export interface ImportSelectedRequest {
@@ -159,6 +161,7 @@ export interface ApiKey {
   baseUrl: string | null;
   status: KeyStatus;
   enabled: boolean;
+  keyless: boolean;
   createdAt: string;
   lastCheckedAt: string | null;
   models?: ApiKeyModel[];

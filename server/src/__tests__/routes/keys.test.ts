@@ -245,11 +245,12 @@ describe('Keys API', () => {
 
       expect(status).toBe(200);
       expect(body.keys).toEqual([
-        { keyName: 'GROQ_API_KEY', keyValue: 'gsk_test123', detectedPlatform: 'groq', prefix: 'GROQ_' },
-        { keyName: 'ANTHROPIC_API_KEY', keyValue: 'sk-ant-test', detectedPlatform: null, prefix: 'ANTHROPIC_' },
-        { keyName: 'MISTRAL_API_KEY', keyValue: 'mist_test456', detectedPlatform: 'mistral', prefix: 'MISTRAL_' },
+        { keyName: 'GROQ_API_KEY', keyValue: 'gsk_test123', detectedPlatform: 'groq', prefix: 'GROQ_', isDuplicate: false },
+        { keyName: 'ANTHROPIC_API_KEY', keyValue: 'sk-ant-test', detectedPlatform: null, prefix: 'ANTHROPIC_', isDuplicate: false },
+        { keyName: 'MISTRAL_API_KEY', keyValue: 'mist_test456', detectedPlatform: 'mistral', prefix: 'MISTRAL_', isDuplicate: false },
       ]);
       expect(body.total).toBe(3);
+      expect(body.duplicates).toBe(0);
     });
 
     it('imports selected preview rows', async () => {

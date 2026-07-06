@@ -285,7 +285,7 @@
     "addImageModel": "Aggiungi modello immagine",
     "addAudioModel": "Aggiungi modello audio",
     "importKeys": "Importa chiavi provider",
-    "importKeysDescription": "Carica file .env, JSON, JSONC, Markdown o di testo.",
+    "importKeysDescription": "Carica file .env, JSON, JSONC, CSV, Markdown o di testo.",
     "importFiles": "File",
     "importFileCount": "{count} selezionati",
     "previewFiles": "Anteprima",
@@ -301,7 +301,26 @@
     "importSelected": "Importa {count}",
     "importing": "Importazione in corso…",
     "noImportSelection": "Seleziona almeno una riga con un provider.",
-    "importResult": "Importati {imported}; falliti {failed}."
+    "duplicate": "Duplicato",
+    "duplicatesFound": "{count} duplicato/i rilevato/i — già esistente/i e verrà/no saltato/i.",
+    "importResult": "Importati {imported}; falliti {failed}.",
+    "export": {
+      "json": "JSON",
+      "env": ".env",
+      "csv": "CSV"
+    },
+    "exportAll": "All keys",
+    "exportHealthy": "Healthy only",
+    "exportKeys": "Export API keys",
+    "exportFormat": "Format",
+    "exportHealthyOnly": "Healthy keys only",
+    "exportHealthyOnlyDesc": "Exclude keys that are currently failing health checks",
+    "exportWillExport": "Will export",
+    "exportKey": "key",
+    "exportKeys plural": "keys",
+    "exporting": "Exporting…",
+    "exportDownload": "Download",
+    "exportSuccess": "Exported {count} keys"
   },
   "status": {
     "healthy": "funzionante",

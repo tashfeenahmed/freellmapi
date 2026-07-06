@@ -4,7 +4,9 @@ import {
   detectPlatform,
   looksLikeApiKey,
   parseAuthJson,
+  parseCsv,
   parseDotEnv,
+  parseExportJson,
   parseJson,
   parseKeysFromFile,
   stripJsoncComments,
@@ -64,5 +66,65 @@ describe('key parser', () => {
     expect(looksLikeApiKey('true')).toBe(false);
     expect(looksLikeApiKey('https://example.com')).toBe(false);
     expect(looksLikeApiKey('sk-valid-token')).toBe(true);
+  });
+
+  it('parses FreeLLMAPI export JSON format', () => {
+    const exportJson = JSON.stringify({
+      version: 1,
+      exportedAt: '2026-07-06T12:00:00Z',
+      source: 'freellmapi',
+      keys: [
+        { platform: 'google', key: 'AIza-test-key', label: 'Google Key' },
+        { platform: 'groq', key: 'gsk-test-key', label: 'Groq Key' },
+      ],
+    });
+    const result = parseExportJson(exportJson);
+    expect(result).not.toBeNull();
+    expect(result!.keys).toHaveLength(2);
+    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google' });
+    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq' });
+    expect(result!.skipped).toHaveLength(0);
+  });
+
+  it('returns null for non-export JSON', () => {
+    expect(parseExportJson('{"foo":"bar"}')).toBeNull();
+    expect(parseExportJson('[1,2,3]')).toBeNull();
+    expect(parseExportJson('not json')).toBeNull();
+  });
+
+  it('parses CSV format with header', () => {
+    const csv = 'platform,key,label\n"google","AIza-test","Google Key"\n"groq","gsk-test","Groq Key"\n';
+    expect(parseCsv(csv)).toEqual([
+      { key: 'GOOGLE_KEY', value: 'AIza-test' },
+      { key: 'GROQ_KEY', value: 'gsk-test' },
+    ]);
+  });
+
+  it('parses CSV format without header', () => {
+    const csv = 'google,AIza-test,Google Key\n';
+    expect(parseCsv(csv)).toEqual([
+      { key: 'GOOGLE_KEY', value: 'AIza-test' },
+    ]);
+  });
+
+  it('handles export JSON via parseKeysFromFile', () => {
+    const exportJson = JSON.stringify({
+      version: 1,
+      exportedAt: '2026-07-06T12:00:00Z',
+      source: 'freellmapi',
+      keys: [
+        { platform: 'mistral', key: 'mist-test', label: 'Mistral Key' },
+      ],
+    });
+    const result = parseKeysFromFile(exportJson, 'freellmapi-keys.json');
+    expect(result.keys).toHaveLength(1);
+    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral' });
+  });
+
+  it('handles CSV via parseKeysFromFile', () => {
+    const csv = 'platform,key,label\n"nvidia","nv-test","Nvidia Key"\n';
+    const result = parseKeysFromFile(csv, 'freellmapi-keys.csv');
+    expect(result.keys).toHaveLength(1);
+    expect(result.keys[0]).toEqual({ rawKey: 'NVIDIA_KEY=nv-test', prefix: 'NVIDIA_', platform: 'nvidia' });
   });
 });

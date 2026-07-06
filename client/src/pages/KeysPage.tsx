@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { PageHeader } from '@/components/page-header'
 import type { ApiKey } from '../../../shared/types'
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { HealthData } from '@/components/keys/shared'
 import { QuotaSignalsSection } from '@/components/keys/quota-signals-section'
@@ -14,6 +14,7 @@ import { ProxySettingsSection } from '@/components/keys/proxy-settings-section'
 import { AnthropicSection } from '@/components/keys/anthropic-section'
 import { ProviderList } from '@/components/keys/provider-list'
 import { AddKeyDialog } from '@/components/keys/add-key-dialog'
+import { ExportKeysDialog } from '@/components/keys/export-keys-dialog'
 
 type KeysTab = 'providers' | 'quotaSignals' | 'apiKey' | 'anthropic'
 const KEYS_TABS: { id: KeysTab; labelKey: string }[] = [
@@ -28,6 +29,7 @@ export default function KeysPage() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<KeysTab>('providers')
   const [addOpen, setAddOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
 
   // Kept at page level for the header's "Check all" gate; ProviderList runs the
   // same query (deduped by react-query) for the list itself.
@@ -60,6 +62,12 @@ export default function KeysPage() {
             {(tab === 'providers' || tab === 'quotaSignals') && keys.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
                 {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
+              </Button>
+            )}
+            {keys.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+                <Download className="size-3.5" />
+                {t('keys.export')}
               </Button>
             )}
             {tab === 'providers' && (
@@ -96,6 +104,7 @@ export default function KeysPage() {
       </div>
 
       <AddKeyDialog open={addOpen} onOpenChange={setAddOpen} />
+      <ExportKeysDialog open={exportOpen} onOpenChange={setExportOpen} />
     </div>
   )
 }
