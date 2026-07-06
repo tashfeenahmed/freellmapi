@@ -151,6 +151,22 @@ export interface CacheKeyInput {
   max_tokens?: number;
   tools?: unknown;
   tool_choice?: unknown;
+  // Every remaining sampling/format knob a client can send. All are part of the
+  // key so two requests that differ ONLY in one of these can never be served
+  // each other's cached answer (worst case otherwise: a response_format
+  // json_object request gets a cached plain-text reply). Wrong-answer
+  // collisions are worse than missed hits, so these are keyed even when the
+  // proxy does not currently forward them upstream. Loosely typed on purpose:
+  // several arrive un-validated straight from the request body.
+  stop?: unknown;
+  response_format?: unknown;
+  n?: unknown;
+  seed?: unknown;
+  presence_penalty?: unknown;
+  frequency_penalty?: unknown;
+  logit_bias?: unknown;
+  logprobs?: unknown;
+  top_logprobs?: unknown;
 }
 
 function normModel(model: string | undefined): string {
@@ -161,7 +177,7 @@ function normModel(model: string | undefined): string {
 
 export function computeCacheKey(input: CacheKeyInput): string {
   const canonical = stableStringify({
-    v: 1, // bump to invalidate every entry if the cached shape ever changes
+    v: 2, // bump to invalidate every entry if the cached shape ever changes
     model: normModel(input.model),
     messages: input.messages,
     temperature: input.temperature,
@@ -171,6 +187,17 @@ export function computeCacheKey(input: CacheKeyInput): string {
     // set never collides with (or is served) another's cached answer.
     tools: input.tools,
     tool_choice: input.tool_choice,
+    // Remaining knobs (see CacheKeyInput). Absent/undefined fields are dropped
+    // by stableStringify, so requests without them keep hashing identically.
+    stop: input.stop,
+    response_format: input.response_format,
+    n: input.n,
+    seed: input.seed,
+    presence_penalty: input.presence_penalty,
+    frequency_penalty: input.frequency_penalty,
+    logit_bias: input.logit_bias,
+    logprobs: input.logprobs,
+    top_logprobs: input.top_logprobs,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');
 }

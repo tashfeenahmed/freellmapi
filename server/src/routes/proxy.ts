@@ -1250,7 +1250,25 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // via the RESPONSE_CACHE env var or the response_cache_enabled setting.
   const cacheDirective = parseCacheDirective(req.headers['x-freellm-cache'], req.headers['cache-control']);
   const cacheKey = (!stream && cacheActive(cacheDirective) && isCacheableTemperature(temperature))
-    ? computeCacheKey({ model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice })
+    ? computeCacheKey({
+        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
+        // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
+        stop,
+        // The knobs below are NOT in chatCompletionSchema, so zod strips them
+        // from parsed.data; read them from the raw body. They still change what
+        // answer the client is asking for, so requests differing only in one of
+        // them must never collide on a cached entry. Explicit null is coerced
+        // to undefined (dropped from the key) to match how the proxy treats
+        // null-valued optional knobs as absent.
+        response_format: req.body?.response_format ?? undefined,
+        n: req.body?.n ?? undefined,
+        seed: req.body?.seed ?? undefined,
+        presence_penalty: req.body?.presence_penalty ?? undefined,
+        frequency_penalty: req.body?.frequency_penalty ?? undefined,
+        logit_bias: req.body?.logit_bias ?? undefined,
+        logprobs: req.body?.logprobs ?? undefined,
+        top_logprobs: req.body?.top_logprobs ?? undefined,
+      })
     : null;
   if (cacheKey) {
     const hit = getCachedResponse(cacheKey);

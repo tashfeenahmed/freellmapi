@@ -109,6 +109,59 @@ describe('response cache', () => {
       expect(computeCacheKey({ model: 'auto', messages, tools: toolsA }))
         .not.toBe(computeCacheKey({ model: 'auto', messages }));
     });
+
+    // Collision guard for the remaining sampling/format knobs: requests that
+    // differ ONLY in one of these must never share a key, or one could be
+    // served the other's cached answer (worst case: a response_format
+    // json_object request replayed a cached plain-text reply).
+    it('changes when response_format changes (json_object vs none)', () => {
+      const messages = [msg('user', 'give me data')];
+      expect(computeCacheKey({ model: 'auto', messages, response_format: { type: 'json_object' } }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages }));
+      expect(computeCacheKey({ model: 'auto', messages, response_format: { type: 'json_object' } }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages, response_format: { type: 'text' } }));
+    });
+
+    it('changes when stop, seed, or n change', () => {
+      const messages = [msg('user', 'hello')];
+      const base = computeCacheKey({ model: 'auto', messages });
+      expect(computeCacheKey({ model: 'auto', messages, stop: ['\n'] })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, stop: 'END' }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages, stop: 'STOP' }));
+      expect(computeCacheKey({ model: 'auto', messages, seed: 42 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, seed: 42 }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages, seed: 43 }));
+      expect(computeCacheKey({ model: 'auto', messages, n: 2 })).not.toBe(base);
+    });
+
+    it('changes when penalties, logit_bias, or logprobs knobs change', () => {
+      const messages = [msg('user', 'hello')];
+      const base = computeCacheKey({ model: 'auto', messages });
+      expect(computeCacheKey({ model: 'auto', messages, presence_penalty: 0.5 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, frequency_penalty: 0.5 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, logit_bias: { '50256': -100 } })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, logprobs: true })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, logprobs: true, top_logprobs: 5 }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages, logprobs: true }));
+    });
+
+    it('identical requests with the new knobs present collapse to the same key', () => {
+      const messages = [msg('user', 'give me data')];
+      const full = () => computeCacheKey({
+        model: 'auto', messages, temperature: 0.1,
+        response_format: { type: 'json_object' },
+        stop: ['END', 'STOP'], n: 1, seed: 42,
+        presence_penalty: 0.25, frequency_penalty: 0.5,
+        logit_bias: { '50256': -100 }, logprobs: true, top_logprobs: 3,
+      });
+      expect(full()).toBe(full());
+      // Key-order independence holds for the new fields too.
+      expect(computeCacheKey({ seed: 42, stop: 'END', model: 'auto', messages } as any))
+        .toBe(computeCacheKey({ model: 'auto', messages, stop: 'END', seed: 42 }));
+      // And absent knobs still hash like before (undefined dropped, not null-ed).
+      expect(computeCacheKey({ model: 'auto', messages, seed: undefined }))
+        .toBe(computeCacheKey({ model: 'auto', messages }));
+    });
   });
 
   describe('store / get round-trip', () => {

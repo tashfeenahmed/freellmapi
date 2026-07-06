@@ -139,6 +139,24 @@ describe('Response cache (proxy integration)', () => {
     expect(counter.calls).toBe(2);
   });
 
+  it('requests differing only in response_format, seed, or stop never collide', async () => {
+    const counter = mockGroq('knob-sensitive');
+    await chat(); // plain → MISS, populates
+    // Same prompt with response_format json_object must be a MISS, not a
+    // replay of the cached plain-text answer.
+    const jsonReq = await chat({ response_format: { type: 'json_object' } });
+    expect(jsonReq.headers.get('x-freellm-cache')).toBe('MISS');
+    expect(counter.calls).toBe(2);
+    // Same prompt, different seed / stop → also fresh generations.
+    await chat({ seed: 42 });
+    await chat({ stop: 'END' });
+    expect(counter.calls).toBe(4);
+    // But an exact repeat (with a knob present) is still a HIT.
+    const repeat = await chat({ seed: 42 });
+    expect(repeat.headers.get('x-freellm-cache')).toBe('HIT');
+    expect(counter.calls).toBe(4);
+  });
+
   it('X-FreeLLM-Cache: off bypasses the cache on both read and write', async () => {
     const counter = mockGroq('bypassed');
     await chat({}, { 'X-FreeLLM-Cache': 'off' });
