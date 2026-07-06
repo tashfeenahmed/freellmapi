@@ -186,6 +186,17 @@ export function setStickyModel(messages: ChatMessage[], modelDbId: number, sessi
     for (const [k, v] of stickySessionMap) {
       if (now - v.lastUsed > STICKY_TTL_MS) stickySessionMap.delete(k);
     }
+
+    // Hard cap: if still over 1000 after pruning expired entries, evict oldest by lastUsed
+    if (stickySessionMap.size > 1000) {
+      const entries = [...stickySessionMap.entries()].sort(
+        (a, b) => a[1].lastUsed - b[1].lastUsed
+      );
+      const toEvict = stickySessionMap.size - 1000;
+      for (let i = 0; i < toEvict; i++) {
+        stickySessionMap.delete(entries[i][0]);
+      }
+    }
   }
 }
 
