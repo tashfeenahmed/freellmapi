@@ -842,6 +842,9 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full migration CLI and workflow
 <a href="https://github.com/86TheCactus"><img src="https://images.weserv.nl/?url=github.com/86TheCactus.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@86TheCactus" /></a>
 <a href="https://github.com/AmiroKD"><img src="https://images.weserv.nl/?url=github.com/AmiroKD.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@AmiroKD" /></a>
 <a href="https://github.com/ecryptomillionaire-dev"><img src="https://images.weserv.nl/?url=github.com/ecryptomillionaire-dev.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@ecryptomillionaire-dev" /></a>
+<a href="https://github.com/4riful"><img src="https://images.weserv.nl/?url=github.com/4riful.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@4riful" /></a>
+<a href="https://github.com/cagedbird043"><img src="https://images.weserv.nl/?url=github.com/cagedbird043.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@cagedbird043" /></a>
+<a href="https://github.com/fix2015"><img src="https://images.weserv.nl/?url=github.com/fix2015.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@fix2015" /></a>
 
 ## Terms of Service review
 
