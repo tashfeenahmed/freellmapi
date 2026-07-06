@@ -224,6 +224,7 @@
     "customDisplayNamePerModel": "par modèle",
     "customDisplayNameOptional": "facultatif",
     "customApiKey": "Clé API",
+    "customCapabilities": "Capacités",
     "addModel": "Ajouter un modèle",
     "modelAdded": "Modèle ajouté",
     "addModels": "Ajouter {count} modèles",

@@ -16,6 +16,7 @@ import { ModelsTabs } from '@/components/models-tabs'
 import { ModelTableHead, RowContent } from '@/components/model-table'
 import {
   groupQuotaBadge,
+  providerLabel,
   type FallbackEntry,
   type RoutingData,
   type Row,
@@ -182,7 +183,7 @@ export default function ModelDetailPage() {
               <div className="space-y-1.5">
                 {members.map(m => (
                   <div key={m.modelDbId} className="flex items-center gap-2 text-xs">
-                    <span className="w-28 shrink-0 text-muted-foreground">{m.platform}</span>
+                    <span className="w-28 shrink-0 text-muted-foreground">{providerLabel(m)}</span>
                     <code className="min-w-0 flex-1 truncate font-mono text-[11px]">{m.modelId}</code>
                     <Tooltip text={t('models.copyModelName')}>
                       <CopyButton text={m.modelId} label={t('models.copyModelName')} className="border-0 bg-transparent" />
@@ -261,7 +262,7 @@ function ProviderSettingsRow({
   return (
     <div className="rounded-xl border bg-background/60 p-3">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium">{model.platform}</span>
+        <span className="text-xs font-medium">{providerLabel(model)}</span>
         <code className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">{model.modelId}</code>
         <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{sourceLabel}</span>
         {model.hasOverrides && (

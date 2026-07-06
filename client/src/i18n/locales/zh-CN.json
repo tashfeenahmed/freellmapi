@@ -224,6 +224,7 @@
     "customDisplayNamePerModel": "按模型命名",
     "customDisplayNameOptional": "可选",
     "customApiKey": "API 密钥",
+    "customCapabilities": "能力",
     "addModel": "添加模型",
     "modelAdded": "模型已添加",
     "addModels": "添加 {count} 个模型",

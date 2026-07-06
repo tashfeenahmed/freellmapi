@@ -69,6 +69,15 @@ export interface TokenUsageData {
   models: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
 }
 
+// Custom endpoints all share the generic 'custom' platform id, so show the
+// user's key label ("Ollama box") instead so the models list names the actual
+// provider. Falls back to the platform for catalog models (and unlabeled custom
+// keys, whose label defaults to "Custom"). (#469)
+export function providerLabel(row: { platform: string; source?: 'catalog' | 'custom'; keyLabel?: string | null }): string {
+  if (row.source === 'custom' && row.keyLabel && row.keyLabel.trim()) return row.keyLabel
+  return row.platform
+}
+
 export function formatTokens(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`

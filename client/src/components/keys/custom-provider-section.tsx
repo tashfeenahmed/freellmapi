@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/ui/field-error'
 import { isHttpUrl } from '@/lib/validate'
@@ -33,6 +34,10 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   const [displayName, setDisplayName] = useState('')
   const [family, setFamily] = useState('')
   const [apiKey, setApiKey] = useState('')
+  // Chat models default tools on (modern OpenAI-compatible servers all emit tool
+  // calls) and vision off; declare them here or flip them later per model. (#470)
+  const [supportsTools, setSupportsTools] = useState(true)
+  const [supportsVision, setSupportsVision] = useState(false)
 
   const models = customType === 'chat' ? parseModelList(model) : [model.trim()].filter(Boolean)
   const multiple = customType === 'chat' && models.length > 1
@@ -66,6 +71,8 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       setModel('')
       setDisplayName('')
       setFamily('')
+      setSupportsTools(true)
+      setSupportsVision(false)
       if (onAdded) {
         toast.success(t('keys.modelAdded'))
         onAdded()
@@ -94,6 +101,8 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
           models,
           displayName: !multiple ? (displayName || undefined) : undefined,
           apiKey: apiKey || undefined,
+          supportsTools,
+          supportsVision,
         },
       })
       return
@@ -184,6 +193,21 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
               placeholder={embeddingsData?.families?.[0]?.family ?? t('keys.customFamilyPlaceholder')}
               className="w-[190px] font-mono text-xs"
             />
+          </div>
+        )}
+        {customType === 'chat' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t('keys.customCapabilities')}</Label>
+            <div className="flex h-9 items-center gap-4">
+              <label className="flex items-center gap-1.5 text-xs">
+                <Switch size="sm" checked={supportsTools} onCheckedChange={setSupportsTools} />
+                <span>{t('models.tools')}</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-xs">
+                <Switch size="sm" checked={supportsVision} onCheckedChange={setSupportsVision} />
+                <span>{t('models.vision')}</span>
+              </label>
+            </div>
           </div>
         )}
         <div className="space-y-1.5">

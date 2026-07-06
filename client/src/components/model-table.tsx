@@ -11,6 +11,7 @@ import {
   formatContext,
   groupMaxContext,
   groupQuotaBadge,
+  providerLabel,
   type ModelGroupRow,
   type Row,
 } from '@/lib/routing'
@@ -93,7 +94,7 @@ export function RowContent({
       <td className="py-2 pr-3 align-middle">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm">{row.displayName}</span>
-          <span className="text-xs text-muted-foreground">{row.platform}</span>
+          <span className="text-xs text-muted-foreground">{providerLabel(row)}</span>
           {row.supportsVision && (
             <span
               title={t('models.visionTitle')}
@@ -185,8 +186,8 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup }: {
           <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left min-w-0">
             <span className="font-medium text-sm">{group.label}</span>
             {solo
-              ? <span className="text-xs text-muted-foreground">{group.members[0].platform}</span>
-              : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => m.platform).join(', ') })}>
+              ? <span className="text-xs text-muted-foreground">{providerLabel(group.members[0])}</span>
+              : <Tooltip text={t('models.servedBy', { providers: group.members.map(m => providerLabel(m)).join(', ') })}>
                   <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: group.members.length })}</span>
                 </Tooltip>}
             {quota && (
