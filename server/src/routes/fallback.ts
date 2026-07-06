@@ -79,10 +79,12 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
     ORDER BY fc.priority ASC
   `).all() as any[];
 
-  // Count enabled keys per platform
+  // Count usable keys per platform — enabled AND healthy/unknown status. Unified
+  // with /token-usage and the routing scorer (#456) so budget pooling is computed
+  // from the same key set everywhere (a disabled or invalid key adds no capacity).
   const keyCounts = db.prepare(`
     SELECT platform, COUNT(*) as count
-    FROM api_keys WHERE enabled = 1
+    FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')
     GROUP BY platform
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));

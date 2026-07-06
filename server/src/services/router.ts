@@ -411,12 +411,26 @@ interface ScoredEntry {
   score: number;
 }
 
+// Enabled + healthy/unknown key count per platform, for pooled-budget scaling.
+// This is the SAME filter both /api/fallback endpoints use (issue #456): the
+// monthly budget is a PER-KEY free-tier allowance, so N usable keys pool N× the
+// capacity. `monthlyUsedTokens` is already summed across all keys, so budget
+// must scale to match or the headroom guardrail damps a multi-key model to the
+// floor after just one account's worth of tokens.
+function usableKeyCountsByPlatform(db: Database): Map<string, number> {
+  const rows = db.prepare(
+    "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
+  ).all() as { platform: string; count: number }[];
+  return new Map(rows.map(r => [r.platform, r.count]));
+}
+
 function scoreChainEntry(
   entry: ChainRow,
   weights: RoutingWeights,
   intelMin: number,
   intelMax: number,
   sampled: boolean,
+  keyCounts: Map<string, number>,
 ): ScoredEntry {
   const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
   const successes = stats?.successes ?? 0;
@@ -435,7 +449,10 @@ function scoreChainEntry(
     intelligenceComposite(entry.size_label, entry.intelligence_rank), intelMin, intelMax,
   );
 
-  const budget = parseBudget(entry.monthly_token_budget);
+  // Scale the per-key monthly budget by the usable key count for this platform,
+  // matching the pooled `monthlyUsedTokens` aggregate (#456). Math.max(1, …) so a
+  // model whose platform currently has no usable key isn't handed a 0 budget.
+  const budget = parseBudget(entry.monthly_token_budget) * Math.max(1, keyCounts.get(entry.platform) ?? 1);
   const headroom = headroomFactor(stats?.monthlyUsedTokens ?? 0, budget);
   const rl = rateLimitFactor(getPenalty(entry.model_db_id));
 
@@ -469,9 +486,10 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   const intelMin = composites.length ? Math.min(...composites) : 0;
   const intelMax = composites.length ? Math.max(...composites) : 0;
+  const keyCounts = usableKeyCountsByPlatform(getDb());
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled, keyCounts).score }))
     // Higher score first; manual priority breaks ties so the chain still matters.
     .sort((a, b) => b.s - a.s || a.e.priority - b.e.priority)
     .map(x => x.e);
@@ -1097,9 +1115,10 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   const intelMin = composites.length ? Math.min(...composites) : 0;
   const intelMax = composites.length ? Math.max(...composites) : 0;
+  const keyCounts = usableKeyCountsByPlatform(db);
 
   const scores: RoutingScore[] = chain.map(entry => {
-    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false);
+    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false, keyCounts);
     const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
     return {
       modelDbId: entry.model_db_id,
