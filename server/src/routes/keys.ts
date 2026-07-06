@@ -22,7 +22,7 @@ const PLATFORMS = [
   'routeway', 'bazaarlink', 'ainative', 'aihorde', 'custom',
 ] as const;
 
-const ALLOWED_IMPORT_EXTENSIONS = new Set(['.env', '.json', '.jsonc', '.md', '.txt']);
+const ALLOWED_IMPORT_EXTENSIONS = new Set(['.env', '.json', '.jsonc', '.md', '.txt', '.csv']);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -204,6 +204,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       baseUrl: row.base_url ?? null,
       status: row.status,
       enabled: row.enabled === 1,
+      keyless: resolveProvider(row.platform)?.keyless === true,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
       models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) ?? []) : undefined,
@@ -211,6 +212,86 @@ keysRouter.get('/', (_req: Request, res: Response) => {
   });
 
   res.json(keys);
+});
+
+// Export keys — returns plaintext keys in the requested format.
+// GET /api/keys/export?format=json|env|csv&healthy=true
+// The response is the raw file download (Content-Type varies by format).
+keysRouter.get('/export', (req: Request, res: Response) => {
+  const db = getDb();
+  const format = (req.query.format as string) ?? 'json';
+  const healthyOnly = req.query.healthy === 'true';
+
+  let whereClause = '';
+  if (healthyOnly) {
+    whereClause = "WHERE status = 'healthy'";
+  }
+
+  const rows = db.prepare(`SELECT * FROM api_keys ${whereClause} ORDER BY platform, created_at ASC`).all() as any[];
+
+  // Decrypt and filter — only export keys with a real value
+  const decryptedKeys = rows
+    .map(row => {
+      let key = '';
+      try {
+        key = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+      } catch {
+        key = '';
+      }
+      return {
+        platform: row.platform,
+        key,
+        label: row.label || '',
+        baseUrl: row.base_url || undefined,
+      };
+    })
+    .filter(k => {
+      const v = k.key.trim();
+      return v.length > 0 && v !== 'no-key';
+    });
+
+  if (decryptedKeys.length === 0) {
+    res.status(404).json({ error: { message: 'No keys to export' } });
+    return;
+  }
+
+  if (format === 'env') {
+    // .env format: GOOGLE_KEY=xxx\nGROQ_KEY=yyy
+    const lines = decryptedKeys.map(k => {
+      const envKey = `${k.platform.toUpperCase()}_KEY=${k.key}`;
+      return k.label ? `# ${k.label}\n${envKey}` : envKey;
+    });
+    const content = lines.join('\n\n') + '\n';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.env"');
+    res.send(content);
+    return;
+  }
+
+  if (format === 'csv') {
+    // CSV format: platform,key,label
+    const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = 'platform,key,label';
+    const lines = decryptedKeys.map(k =>
+      [escCsv(k.platform), escCsv(k.key), escCsv(k.label)].join(',')
+    );
+    const content = [header, ...lines].join('\n') + '\n';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.csv"');
+    res.send(content);
+    return;
+  }
+
+  // Default: JSON format (round-trip safe — can be imported directly)
+  const jsonExport = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: 'freellmapi',
+    keys: decryptedKeys,
+  };
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.json"');
+  res.json(jsonExport);
 });
 
 // Add a key
@@ -490,24 +571,39 @@ keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) =>
         return;
       }
 
-      const keys: Array<{ keyName: string; keyValue: string; detectedPlatform: string | null; prefix: string }> = [];
+      const keys: Array<{ keyName: string; keyValue: string; detectedPlatform: string | null; prefix: string; isDuplicate: boolean }> = [];
       const skipped: string[] = [];
+
+      // Build a set of existing decrypted key values for duplicate detection
+      const db = getDb();
+      const existingRows = db.prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys').all() as any[];
+      const existingKeys = new Set<string>();
+      for (const row of existingRows) {
+        try {
+          existingKeys.add(decrypt(row.encrypted_key, row.iv, row.auth_tag));
+        } catch { /* skip undecryptable rows */ }
+      }
+
+      let duplicateCount = 0;
 
       for (const file of files) {
         const result = parseUpload(file);
         for (const parsedKey of result.keys) {
           const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+          const isDuplicate = existingKeys.has(keyValue.trim());
+          if (isDuplicate) duplicateCount++;
           keys.push({
             keyName,
             keyValue,
             detectedPlatform: parsedKey.platform,
             prefix: parsedKey.prefix,
+            isDuplicate,
           });
         }
         skipped.push(...result.skipped);
       }
 
-      res.json({ keys, total: keys.length, skipped });
+      res.json({ keys, total: keys.length, skipped, duplicates: duplicateCount });
     } catch (handlerErr: any) {
       res.status(handlerErr.status ?? 500).json({ error: { message: handlerErr.message } });
     }
@@ -522,7 +618,18 @@ keysRouter.post('/import-selected', (req: Request, res: Response) => {
   }
 
   let imported = 0;
+  let duplicateSkipped = 0;
   const errors: Array<{ key: string; error: string }> = [];
+
+  // Build a set of existing decrypted key values for duplicate detection
+  const db = getDb();
+  const existingRows = db.prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys').all() as any[];
+  const existingKeys = new Set<string>();
+  for (const row of existingRows) {
+    try {
+      existingKeys.add(decrypt(row.encrypted_key, row.iv, row.auth_tag));
+    } catch { /* skip undecryptable rows */ }
+  }
 
   for (const key of parsed.data.keys) {
     const keyName = key.keyName?.trim() || key.platform;
@@ -531,9 +638,16 @@ keysRouter.post('/import-selected', (req: Request, res: Response) => {
       continue;
     }
 
+    if (existingKeys.has(key.keyValue.trim())) {
+      duplicateSkipped++;
+      errors.push({ key: keyName, error: 'Duplicate key — already exists' });
+      continue;
+    }
+
     try {
       insertImportedKey(key.platform, keyName, key.keyValue);
       imported++;
+      existingKeys.add(key.keyValue.trim());
     } catch (err) {
       errors.push({ key: keyName, error: (err as Error).message });
     }

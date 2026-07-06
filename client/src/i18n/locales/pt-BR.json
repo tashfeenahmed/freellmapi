@@ -62,7 +62,8 @@
     "provider": "Provedor",
     "success": "Sucessos",
     "failures": "Falhas",
-    "dismiss": "Dispensar"
+    "dismiss": "Dispensar",
+    "status": "Status"
   },
   "models": {
     "title": "Modelos",
@@ -285,7 +286,7 @@
     "addImageModel": "Adicionar modelo de imagem",
     "addAudioModel": "Adicionar modelo de áudio",
     "importKeys": "Importar chaves de provedor",
-    "importKeysDescription": "Envie arquivos .env, JSON, JSONC, Markdown ou texto.",
+    "importKeysDescription": "Envie arquivos .env, JSON, JSONC, CSV, Markdown ou texto.",
     "importFiles": "Arquivos",
     "importFileCount": "{count} selecionados",
     "previewFiles": "Pré-visualizar",
@@ -301,7 +302,26 @@
     "importSelected": "Importar {count}",
     "importing": "Importando…",
     "noImportSelection": "Selecione pelo menos uma linha com um provedor.",
-    "importResult": "Importados {imported}; falharam {failed}."
+    "duplicate": "Duplicado",
+    "duplicatesFound": "{count} duplicado(s) detectado(s) — já existem e serão ignorados.",
+    "importResult": "Importados {imported}; falharam {failed}.",
+    "export": {
+      "json": "JSON",
+      "env": ".env",
+      "csv": "CSV"
+    },
+    "exportAll": "All keys",
+    "exportHealthy": "Healthy only",
+    "exportKeys": "Export API keys",
+    "exportFormat": "Format",
+    "exportHealthyOnly": "Healthy keys only",
+    "exportHealthyOnlyDesc": "Exclude keys that are currently failing health checks",
+    "exportWillExport": "Will export",
+    "exportKey": "key",
+    "exportKeys plural": "keys",
+    "exporting": "Exporting…",
+    "exportDownload": "Download",
+    "exportSuccess": "Exported {count} keys"
   },
   "status": {
     "healthy": "saudável",
@@ -363,7 +383,11 @@
     "keyLabelFallback": "Chave nº {id}",
     "errorsByProvider": "Erros por provedor",
     "recentErrors": "Erros recentes",
-    "noErrors": "Sem erros"
+    "noErrors": "Sem erros",
+    "recentCalls": "Chamadas recentes",
+    "clientIp": "IP do cliente",
+    "clientAgent": "Aplicativo cliente",
+    "requestedModelHint": "Solicitado {model}, servido por fallback"
   },
   "playground": {
     "title": "Playground",

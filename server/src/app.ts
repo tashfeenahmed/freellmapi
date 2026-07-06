@@ -20,6 +20,7 @@ import { authRouter } from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { clientContextMiddleware } from './lib/client-context.js';
 import type { Config } from './lib/config.js';
 import { loadConfig } from './lib/config.js';
 
@@ -55,6 +56,10 @@ export function createApp(config?: Config) {
   // prompts + tool schemas + repo context; 1mb cut their sessions off
   // mid-conversation with an opaque 413. (#200)
   app.use(express.json({ limit: '10mb' }));
+
+  // Caller identity (IP + User-Agent) for request analytics, carried in
+  // AsyncLocalStorage so logRequest() can read it from any depth.
+  app.use(clientContextMiddleware);
 
   // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
   // session; everything else under /api/* requires a logged-in dashboard user.

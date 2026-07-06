@@ -62,7 +62,8 @@
     "provider": "提供方",
     "success": "成功",
     "failures": "失败",
-    "dismiss": "关闭"
+    "dismiss": "关闭",
+    "status": "状态"
   },
   "models": {
     "title": "模型",
@@ -285,7 +286,7 @@
     "addImageModel": "添加图像模型",
     "addAudioModel": "添加音频模型",
     "importKeys": "导入提供方密钥",
-    "importKeysDescription": "上传 .env、JSON、JSONC、Markdown 或文本文件。",
+    "importKeysDescription": "上传 .env、JSON、JSONC、CSV、Markdown 或文本文件。",
     "importFiles": "文件",
     "importFileCount": "已选择 {count} 个",
     "previewFiles": "预览",
@@ -301,7 +302,26 @@
     "importSelected": "导入 {count} 个",
     "importing": "导入中…",
     "noImportSelection": "请至少选择一行包含提供方的记录。",
-    "importResult": "已导入 {imported} 个；失败 {failed} 个。"
+    "duplicate": "重复",
+    "duplicatesFound": "检测到 {count} 个重复项 — 已存在，将被跳过。",
+    "importResult": "已导入 {imported} 个；失败 {failed} 个。",
+    "export": {
+      "json": "JSON",
+      "env": ".env",
+      "csv": "CSV"
+    },
+    "exportAll": "All keys",
+    "exportHealthy": "Healthy only",
+    "exportKeys": "Export API keys",
+    "exportFormat": "Format",
+    "exportHealthyOnly": "Healthy keys only",
+    "exportHealthyOnlyDesc": "Exclude keys that are currently failing health checks",
+    "exportWillExport": "Will export",
+    "exportKey": "key",
+    "exportKeys plural": "keys",
+    "exporting": "Exporting…",
+    "exportDownload": "Download",
+    "exportSuccess": "Exported {count} keys"
   },
   "status": {
     "healthy": "健康",
@@ -363,7 +383,11 @@
     "keyLabelFallback": "密钥 #{id}",
     "errorsByProvider": "按提供方统计错误",
     "recentErrors": "最近的错误",
-    "noErrors": "无错误"
+    "noErrors": "无错误",
+    "recentCalls": "最近调用",
+    "clientIp": "客户端 IP",
+    "clientAgent": "客户端应用",
+    "requestedModelHint": "请求了 {model}，由回退模型提供"
   },
   "playground": {
     "title": "试玩台",

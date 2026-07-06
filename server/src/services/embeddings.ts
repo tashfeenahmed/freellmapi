@@ -8,6 +8,7 @@
 // always works: with one provider it just uses that one, with several it gets
 // cross-provider redundancy for free.
 import { getDb, getSetting } from '../db/index.js';
+import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
 
@@ -87,7 +88,7 @@ function getProviderCredential(row: EmbeddingModelRow): ProviderCredential | nul
   if (row.platform === 'custom') return null;
 
   const keyRow = getDb().prepare(
-    "SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id LIMIT 1",
+    "SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY RANDOM() LIMIT 1",
   ).get(row.platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
   if (!keyRow) return null;
   try {
@@ -234,10 +235,11 @@ function logEmbeddingRequest(
   error: string | null,
 ): void {
   try {
+    const client = getClientContext();
     getDb().prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'embedding')
-    `).run(row.platform, row.model_id, keyId, status, inputTokens, latencyMs, error);
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'embedding', ?, ?)
+    `).run(row.platform, row.model_id, keyId, status, inputTokens, latencyMs, error, client.ip, client.userAgent);
   } catch (e) {
     console.error('Failed to log embedding request:', e);
   }

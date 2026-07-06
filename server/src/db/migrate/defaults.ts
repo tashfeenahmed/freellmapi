@@ -4,6 +4,7 @@ import * as customProviderModalities from '../migrations/20260627_000001_custom_
 import * as catalogModelState from '../migrations/20260627_000002_catalog_model_state.js';
 import * as requestAggregates from '../migrations/20260628_120000_request_aggregates.js';
 import * as githubGpt41Context from '../migrations/20260630_000001_github_gpt41_context.js';
+import * as requestClientInfo from '../migrations/20260706_000001_request_client_info.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -20,6 +21,7 @@ export const CUSTOM_PROVIDER_MODALITIES_FILENAME = '20260627_000001_custom_provi
 export const CATALOG_MODEL_STATE_FILENAME = '20260627_000002_catalog_model_state.ts';
 export const REQUEST_AGGREGATES_FILENAME = '20260628_120000_request_aggregates.ts';
 export const GITHUB_GPT41_CONTEXT_FILENAME = '20260630_000001_github_gpt41_context.ts';
+export const REQUEST_CLIENT_INFO_FILENAME = '20260706_000001_request_client_info.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -27,4 +29,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: CATALOG_MODEL_STATE_FILENAME, module: catalogModelState },
   { filename: REQUEST_AGGREGATES_FILENAME, module: requestAggregates },
   { filename: GITHUB_GPT41_CONTEXT_FILENAME, module: githubGpt41Context },
+  { filename: REQUEST_CLIENT_INFO_FILENAME, module: requestClientInfo },
 ];
