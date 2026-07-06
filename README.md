@@ -851,6 +851,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full migration CLI and workflow
 <a href="https://github.com/xsfhacg"><img src="https://images.weserv.nl/?url=github.com/xsfhacg.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@xsfhacg" /></a>
 <a href="https://github.com/noobix"><img src="https://images.weserv.nl/?url=github.com/noobix.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@noobix" /></a>
 <a href="https://github.com/nandukmelath"><img src="https://images.weserv.nl/?url=github.com/nandukmelath.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@nandukmelath" /></a>
+<a href="https://github.com/coffcoe"><img src="https://images.weserv.nl/?url=github.com/coffcoe.png&w=60&h=60&fit=cover&mask=circle" width="60" alt="@coffcoe" /></a>
 
 ## Terms of Service review
 

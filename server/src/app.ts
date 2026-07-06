@@ -18,6 +18,7 @@ import { settingsRouter } from './routes/settings.js';
 import { premiumRouter } from './routes/premium.js';
 import { cacheRouter } from './routes/cache.js';
 import { authRouter } from './routes/auth.js';
+import { docsRouter } from './routes/docs.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -79,6 +80,12 @@ export function createApp(config?: Config) {
   app.use('/api/settings', requireAuth, settingsRouter);
   app.use('/api/premium', requireAuth, premiumRouter);
   app.use('/api/cache', requireAuth, cacheRouter);
+
+  // Static, unauthenticated API reference: GET /v1/docs (viewer) and
+  // GET /v1/openapi.json (spec). Mounted before the rate limiter so the docs
+  // are always reachable and don't draw down a caller's request budget. It only
+  // owns those two paths; everything else falls through to the routers below.
+  app.use('/v1', docsRouter);
 
   // OpenAI-compatible proxy. Per-IP rate limiting (#35 item #6) runs first so
   // it throttles unauthenticated brute-force / flood attempts before any
