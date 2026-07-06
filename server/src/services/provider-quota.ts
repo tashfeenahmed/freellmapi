@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getDb } from '../db/index.js';
+// Single shared Retry-After parser (was duplicated here and in providers/base.ts).
+import { parseRetryAfterMs } from '../providers/base.js';
 import type {
   Platform,
   QuotaMetric,
@@ -100,16 +102,6 @@ function parseResetAtFromHeader(raw: string | null, now = Date.now()): string | 
   if (parsed > 1_000_000_000_000) return new Date(parsed).toISOString();
   if (parsed > 1_000_000_000) return new Date(parsed * 1000).toISOString();
   return new Date(now + parsed * 1000).toISOString();
-}
-
-function parseRetryAfterMs(raw: string | null): number | null {
-  if (!raw) return null;
-  const seconds = Number(raw.trim());
-  if (Number.isFinite(seconds)) return Math.max(0, Math.round(seconds * 1000));
-  const asDate = new Date(raw);
-  const ms = asDate.getTime();
-  if (Number.isNaN(ms)) return null;
-  return Math.max(0, ms - Date.now());
 }
 
 function pickBetterSource(existing: QuotaObservationSource | null | undefined, next: QuotaObservationSource): QuotaObservationSource {
@@ -228,7 +220,7 @@ export function parseQuotaObservationsFromResponse(
     }
   }
 
-  const retryAfterMs = parseRetryAfterMs(get('retry-after'));
+  const retryAfterMs = parseRetryAfterMs(get('retry-after')) ?? null;
   if (retryAfterMs !== null) {
     observations.push({
       ...base,
@@ -399,6 +391,24 @@ export function recordQuotaObservationsFromResponse(
     .filter((row): row is ProviderQuotaObservation => row !== null);
 }
 
+// A quota window whose reset_at has passed has replenished at the provider, but
+// remaining_value is only ever written on a fresh observation — so a key that hit
+// remaining=0 reads as "exhausted" forever on the dashboard health view until the
+// next live call (#453). Restore remaining to the known limit (or clear it to
+// unknown when the limit isn't known — `= limit_value` yields NULL in that case)
+// and drop the stale reset_at so the row stops reading as exhausted and this
+// fix-up doesn't recur. Runs on read; a new observation re-populates reset_at.
+function normalizeExpiredQuotaState(db: ReturnType<typeof getDb>): void {
+  db.prepare(`
+    UPDATE provider_quota_state
+       SET remaining_value = limit_value,
+           reset_at = NULL,
+           updated_at = datetime('now')
+     WHERE reset_at IS NOT NULL
+       AND julianday(reset_at) < julianday('now')
+  `).run();
+}
+
 export function getQuotaStateForKeys(): QuotaObservationView[] {
   let db;
   try {
@@ -406,6 +416,7 @@ export function getQuotaStateForKeys(): QuotaObservationView[] {
   } catch {
     return [];
   }
+  normalizeExpiredQuotaState(db);
   return db.prepare(`
     WITH latest AS (
       SELECT
