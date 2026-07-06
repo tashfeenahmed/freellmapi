@@ -16,6 +16,7 @@ import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandof
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isProviderBadRequestError } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
+import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from '../services/model-groups.js';
@@ -1239,6 +1240,31 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
+  // ── Response cache (services/cache.ts) ──
+  // Opt-in exact-match cache. An identical earlier request is replayed from an
+  // in-memory LRU without spending any provider quota. Computed here, after
+  // message + sampling-param normalization but before any routing/session work,
+  // so a hit short-circuits the whole pipeline. Only NON-streaming requests at a
+  // cacheable temperature are eligible (v1 scope: streaming always bypasses); a
+  // per-request `X-FreeLLM-Cache` header can force or bypass. Off unless enabled
+  // via the RESPONSE_CACHE env var or the response_cache_enabled setting.
+  const cacheDirective = parseCacheDirective(req.headers['x-freellm-cache'], req.headers['cache-control']);
+  const cacheKey = (!stream && cacheActive(cacheDirective) && isCacheableTemperature(temperature))
+    ? computeCacheKey({ model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice })
+    : null;
+  if (cacheKey) {
+    const hit = getCachedResponse(cacheKey);
+    if (hit) {
+      // A hit consumes NO provider quota, so recordRequest/recordTokens are
+      // deliberately skipped and the reply is not re-logged as provider usage.
+      // The savings are reported separately by GET /api/cache/stats.
+      res.setHeader('X-Routed-Via', 'cache');
+      res.setHeader('X-FreeLLM-Cache', 'HIT');
+      res.json(hit.body);
+      return;
+    }
+  }
+
   // Optional client-managed session affinity (see getSessionKey). Express
   // lower-cases header names; a repeated header arrives as an array — take
   // the first value.
@@ -1741,7 +1767,24 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           }
         }
         // Normalize array-shaped message.content to a string on the way out (#166).
-        res.json(sanitizeResponse(normalizeOutboundContent(result)));
+        const outboundBody = sanitizeResponse(normalizeOutboundContent(result));
+        res.setHeader('X-FreeLLM-Cache', cacheKey ? 'MISS' : 'OFF');
+        res.json(outboundBody);
+
+        // Cache the freshly-generated answer so an identical later request is
+        // served from memory without spending another free-tier slot. A
+        // truncated turn (finish_reason 'length') is NOT cached: replaying a
+        // cut-off answer forever would be worse than regenerating.
+        if (cacheKey && result.choices?.[0]?.finish_reason !== 'length') {
+          storeCachedResponse(cacheKey, {
+            body: outboundBody,
+            platform: route.platform,
+            modelId: route.modelId,
+            keyId: route.keyId,
+            promptTokens: result.usage?.prompt_tokens ?? 0,
+            completionTokens: result.usage?.completion_tokens ?? 0,
+          });
+        }
 
         traceRouteEvent('Proxy', {
           event: 'ok',
