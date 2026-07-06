@@ -201,9 +201,11 @@ $ENCRYPTION_KEY = node -e "console.log(require('crypto').randomBytes(32).toStrin
 npm run dev
 ```
 
-`ENCRYPTION_KEY` is required for startup. The server only falls back to a
-database-stored development key when `NODE_ENV` is not `production`; do not use
-that fallback with real provider keys.
+`ENCRYPTION_KEY` is required for startup. When `NODE_ENV` is not `production`
+and it is unset, the server auto-generates a development key and saves it to a
+`.encryption-key` file (0600) next to the SQLite database, not inside it. Older
+installs that kept the key in the database are migrated to this file on first
+boot. Do not rely on that fallback with real provider keys; set `ENCRYPTION_KEY`.
 
 Request analytics are retained for 90 days or 100000 request rows by default,
 whichever limit prunes first. Set `REQUEST_ANALYTICS_RETENTION_DAYS=0` or
