@@ -15,7 +15,7 @@ Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRoute
 **[freellmapi.co](https://freellmapi.co)** · browse all 161 free models on the live catalog
 
 Your router updates its own model catalog. Free installs get each new model 30 days after it ships;
-**[Premium gets it the day it lands, and is 79 models ahead right now](https://freellmapi.co/?utm_source=github&utm_medium=readme#pricing)** ($19/yr, 30-day refund).
+**[Premium gets it the day it lands, and is 79 models ahead right now](https://freellmapi.co/?utm_source=github&utm_medium=readme#pricing)** ($19/yr, cancel anytime).
 
 ![Fallback chain with per-provider token budget](repo-assets/fallback-chain.png)
 
@@ -425,7 +425,7 @@ the free-tier wave and reading about it.
 
 **[Go live at freellmapi.co →](https://freellmapi.co/?utm_source=github&utm_medium=readme#pricing)**
 
-- $19/year or $49 once, lifetime. Stripe checkout, 30-day no-questions refund.
+- $19/year or $49 once, lifetime. Stripe checkout; cancel anytime, self-serve.
 - One `fla_` key covers every router you run: desktop, homelab, Raspberry Pi.
 - Activate in the dashboard under **Premium**; cancel or manage billing
   self-serve at [freellmapi.co/manage](https://freellmapi.co/manage).
