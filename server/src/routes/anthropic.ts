@@ -413,7 +413,9 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
         setCooldown(route.platform, route.modelId, route.keyId, cooldownFor(route, {}));
-        recordRateLimitHit(route.modelDbId);
+        // Only demote the whole model when no sibling key can still serve; the
+        // per-key cooldown already isolates this key's failure (#454).
+        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
         lastError = new Error(`empty completion from ${route.displayName}`);
         continue;
       }
@@ -467,7 +469,8 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
         setCooldown(route.platform, route.modelId, route.keyId, cooldownFor(route, err));
-        recordRateLimitHit(route.modelDbId);
+        // Model-level penalty only when no sibling key can still serve (#454).
+        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
         learnLimitFromError(route.modelDbId, err);
         lastError = err;
         continue;

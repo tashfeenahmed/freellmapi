@@ -720,6 +720,56 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
 }
 
 /**
+ * Whether the model still has ANOTHER key that could serve it right now, given
+ * the key that just failed (excludingKeyId) and any keys already ruled out this
+ * request (skipKeys, in the "platform:modelId:keyId" form). Applies the same
+ * gates selectKeyForModel uses — enabled + healthy status, not on cooldown,
+ * under the provider daily cap, and under rpm/rpd/tpm/tpd — so the answer means
+ * "a real, dispatchable alternative exists".
+ *
+ * Used by the retry loops to decide whether a single key's 429 should demote the
+ * WHOLE model (the model-level 429 penalty). It should not: the per-key cooldown
+ * already isolates the failing key, so demoting the model while a sibling key can
+ * still serve it wrongly sinks a healthy model in the scorer (#454). We only
+ * record the model-level hit when this returns false — i.e. the 429 exhausted the
+ * model, not just one of its keys.
+ */
+export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, skipKeys?: Set<string>): boolean {
+  const db = getDb();
+  const m = db.prepare(`
+    SELECT platform, model_id, rpm_limit, rpd_limit, tpm_limit, tpd_limit, key_id
+      FROM models WHERE id = ?
+  `).get(modelDbId) as {
+    platform: string; model_id: string;
+    rpm_limit: number | null; rpd_limit: number | null;
+    tpm_limit: number | null; tpd_limit: number | null; key_id: number | null;
+  } | undefined;
+  if (!m) return false;
+
+  const limits = { rpm: m.rpm_limit, rpd: m.rpd_limit, tpm: m.tpm_limit, tpd: m.tpd_limit };
+  const keys = db.prepare(
+    "SELECT id FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+  ).all(m.platform) as { id: number }[];
+
+  for (const k of keys) {
+    if (k.id === excludingKeyId) continue;
+    // A custom model binds to exactly one endpoint key (#212); a sibling custom
+    // key cannot serve it, so it doesn't count as an alternative.
+    if (m.platform === 'custom' && m.key_id != null && k.id !== m.key_id) continue;
+    if (skipKeys?.has(`${m.platform}:${m.model_id}:${k.id}`)) continue;
+    if (isOnCooldown(m.platform, m.model_id, k.id)) continue;
+    if (!canUseProvider(m.platform, k.id)) continue;
+    if (!canMakeRequest(m.platform, m.model_id, k.id, limits)) continue;
+    // A per-minute token spike on the failed key doesn't mean a fresh key lacks
+    // headroom; a nominal 1-token probe only rules out a key already at its
+    // TPM/TPD ceiling.
+    if (!canUseTokens(m.platform, m.model_id, k.id, 1, limits)) continue;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Fetch a single enabled model's chain row by its db id.
  */
 function getModelChainRow(db: Db, modelDbId: number): ChainRow | undefined {

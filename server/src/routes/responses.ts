@@ -561,7 +561,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, `unparseable inline tool-call dialect: ${heldText.slice(0, 120)}`);
             skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
             setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-            recordRateLimitHit(route.modelDbId);
+            // Only demote the whole model when no sibling key can still serve;
+            // the per-key cooldown already isolates this key's failure (#454).
+            if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
             lastError = new Error(`unparseable inline tool-call dialect from ${route.displayName}`);
             continue;
           }
@@ -611,7 +613,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          recordRateLimitHit(route.modelDbId);
+          // Model-level penalty only when no sibling key can still serve (#454).
+          if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
           lastError = new Error(`empty completion from ${route.displayName}`);
           continue;
         }
@@ -708,7 +711,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           logRequest(route.platform, route.modelId, route.keyId, 'error', promptTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)');
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          recordRateLimitHit(route.modelDbId);
+          // Model-level penalty only when no sibling key can still serve (#454).
+          if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
           lastError = new Error(`empty completion from ${route.displayName}`);
           continue;
         }
@@ -767,7 +771,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         setCooldown(route.platform, route.modelId, route.keyId, isPaymentRequiredError(err)
           ? PAYMENT_REQUIRED_COOLDOWN_MS
           : getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-        recordRateLimitHit(route.modelDbId);
+        // Model-level penalty only when no sibling key can still serve (#454).
+        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
         // Learn a provider-reported ceiling (e.g. a 413 TPM limit) so the next
         // request's pre-check fails over before the 413. Mirrors the chat path.
         learnLimitFromError(route.modelDbId, err);

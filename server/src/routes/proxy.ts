@@ -922,7 +922,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
                 tpd: route.tpdLimit,
               }, err.retryAfterMs),
         );
-        recordRateLimitHit(route.modelDbId);
+        // Only demote the whole model when this 429 exhausted it. If another
+        // enabled, non-cooldown key can still serve, the per-key cooldown alone
+        // isolates the failure; a model-level penalty would wrongly sink a
+        // model that's healthy on its other keys (#454).
+        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
         learnLimitFromError(route.modelDbId, err);
         lastError = err;
         continue;
@@ -1680,7 +1684,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, 'empty completion (no content, no tool_calls)', null, pinnedModelId);
           skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
           setCooldown(route.platform, route.modelId, route.keyId, getCooldownDurationForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }));
-          recordRateLimitHit(route.modelDbId);
+          // Model-level penalty only when no sibling key can still serve (#454).
+          if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
           lastError = new Error(`empty completion from ${route.displayName}`);
           continue;
         }
@@ -1794,7 +1799,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
                 tpd: route.tpdLimit,
               }, err.retryAfterMs),
         );
-        recordRateLimitHit(route.modelDbId);
+        // Model-level penalty only when no sibling key can still serve (#454).
+        if (!hasOtherUsableKey(route.modelDbId, route.keyId, skipKeys)) recordRateLimitHit(route.modelDbId);
         // Self-correct the catalog: if the provider reported its real ceiling in
         // the error body (e.g. a Groq 413 "tokens per minute (TPM): Limit 30000"),
         // persist it so the next request's pre-check fails over BEFORE the 413
