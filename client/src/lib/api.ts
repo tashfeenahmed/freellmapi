@@ -15,6 +15,13 @@ export function clearToken(): void {
 
 export const UNAUTHORIZED_EVENT = 'freellmapi:unauthorized';
 
+// Error thrown by apiFetch on a non-2xx response. Carries the HTTP status and
+// the server's machine-readable `error.type` so callers can branch on them.
+export interface ApiError extends Error {
+  status?: number;
+  code?: string;
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
   const headers = new Headers(options?.headers);
@@ -39,7 +46,13 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: { message: res.statusText } }));
-    throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+    // Surface the HTTP status and the machine-readable error type on the thrown
+    // Error so callers can branch on them (e.g. the setup form reveals a code
+    // field on a `setup_code_required` 403). `.message` behaviour is unchanged.
+    const err = new Error(body.error?.message ?? `HTTP ${res.status}`) as ApiError;
+    err.status = res.status;
+    err.code = body.error?.type;
+    throw err;
   }
   // A 200 whose body isn't JSON means this request never reached the API — the
   // usual cause is a reverse proxy (or static host) serving the dashboard's

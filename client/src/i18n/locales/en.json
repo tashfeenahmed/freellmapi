@@ -32,7 +32,10 @@
     "newPasswordAutoComplete": "new-password",
     "currentPasswordAutoComplete": "current-password",
     "serverUnreachableBefore": "Can't reach the server. Make sure the backend is running (",
-    "serverUnreachableAfter": ")."
+    "serverUnreachableAfter": ").",
+    "setupCode": "Setup code",
+    "setupCodePlaceholder": "code from the server logs",
+    "setupCodeHint": "Setting up from another device needs the one-time code printed in the server logs at startup."
   },
   "common": {
     "save": "Save",

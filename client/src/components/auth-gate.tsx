@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, setToken, UNAUTHORIZED_EVENT } from '@/lib/api'
+import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,10 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
   const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [setupCode, setSetupCode] = useState('')
+  // Revealed only after the server asks for it (remote first-run setup). A
+  // browser on the same machine as the server never sees this field.
+  const [codeRequired, setCodeRequired] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [attempted, setAttempted] = useState(false)
@@ -58,13 +62,22 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
     setBusy(true)
     setError('')
     try {
+      const payload: Record<string, string> = { email, password }
+      // Only the setup flow carries a code, and only once the server has asked
+      // for it. The server ignores it for local (loopback) setup.
+      if (isSetup && setupCode) payload.setupCode = setupCode.trim()
       const res = await apiFetch<{ token: string }>(isSetup ? '/api/auth/setup' : '/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       })
       setToken(res.token)
       onAuthed()
     } catch (err) {
+      // The server gates remote first-run setup behind a one-time code; reveal
+      // the field so the operator can paste the code from the server logs.
+      if (isSetup && (err as ApiError).code === 'setup_code_required') {
+        setCodeRequired(true)
+      }
       setError((err as Error).message)
     } finally {
       setBusy(false)
@@ -111,6 +124,20 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
             />
             {attempted && <FieldError error={passwordError} />}
           </div>
+          {isSetup && codeRequired && (
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="auth-setup-code">{t('auth.setupCode')}</Label>
+              <Input
+                id="auth-setup-code"
+                type="text"
+                autoComplete="off"
+                value={setupCode}
+                onChange={e => setSetupCode(e.target.value)}
+                placeholder={t('auth.setupCodePlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
+            </div>
+          )}
           {error && <p className="text-destructive text-xs">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}

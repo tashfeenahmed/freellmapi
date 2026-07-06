@@ -9,6 +9,7 @@ import {
   validateSession,
   deleteSession,
 } from '../services/auth.js';
+import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
 
 export const authRouter = Router();
 
@@ -51,6 +52,18 @@ function bearer(req: Request): string | undefined {
     ?? (req.headers['x-dashboard-token'] as string | undefined);
 }
 
+// Is the caller connecting from the local machine? We check the actual socket
+// peer address, NOT req.ip or X-Forwarded-For: those are attacker-controlled
+// behind a proxy (and trust proxy is off by default anyway), so trusting them
+// here would let a remote caller pretend to be local and skip the setup code.
+function isLoopbackRemote(req: Request): boolean {
+  let addr = req.socket.remoteAddress ?? '';
+  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
+  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
+  if (addr === '::1') return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
+}
+
 // Has the dashboard been set up yet, and is this caller authenticated?
 authRouter.get('/status', (req: Request, res: Response) => {
   const session = validateSession(bearer(req));
@@ -65,15 +78,33 @@ authRouter.get('/status', (req: Request, res: Response) => {
 // can't be used to add accounts once the dashboard is claimed.
 authRouter.post('/setup', (req: Request, res: Response) => {
   if (userCount() > 0) {
+    clearSetupCode();
     res.status(409).json({ error: { message: 'Setup already completed. Use login instead.', type: 'setup_complete' } });
     return;
   }
+
+  // Local/desktop first-run stays frictionless: a browser on this machine can
+  // claim the dashboard without any code. A remote caller must present the
+  // one-time setup code logged at boot, so an exposed fresh install can't be
+  // claimed by a stranger who finds it first.
+  if (!isLoopbackRemote(req) && !setupCodeMatches((req.body ?? {}).setupCode)) {
+    res.status(403).json({
+      error: {
+        message: 'A setup code is required to create the first account from a remote device. ' +
+          'Check the server logs for the code, or open the dashboard from a browser on the machine running FreeLLMAPI.',
+        type: 'setup_code_required',
+      },
+    });
+    return;
+  }
+
   const parsed = credentialsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
     return;
   }
   const user = createUser(parsed.data.email, parsed.data.password);
+  clearSetupCode(); // one-time: the dashboard is now claimed
   const token = createSession(user.userId);
   res.status(201).json({ token, email: user.email });
 });
