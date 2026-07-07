@@ -46,7 +46,7 @@ register(new OpenAICompatProvider({
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   forceSingleToolCall: true,
-  timeoutMs: 90_000,
+  timeoutMs: 150_000,
 }));
 
 // Mistral - OpenAI-compatible
