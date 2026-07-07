@@ -90,7 +90,7 @@ type AnthropicRequest = z.infer<typeof messagesSchema>;
 type AnthropicStopReason = 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use' | null;
 
 interface AnthropicTextBlock { type: 'text'; text: string }
-interface AnthropicToolUseBlock { type: 'tool_use'; id: string; name: string; input: unknown }
+interface AnthropicToolUseBlock { type: 'tool_use'; id: string; name: string; input: unknown; thought_signature?: string }
 type AnthropicResponseBlock = AnthropicTextBlock | AnthropicToolUseBlock;
 
 interface AnthropicMessageResponse {
@@ -227,10 +227,12 @@ function convertRequest(input: AnthropicRequest): ConvertedRequest {
         const url = imageBlockToUrl(block);
         if (url) { imageBlocks.push({ type: 'image_url', image_url: { url } } as ChatContentBlock); hasImage = true; }
       } else if (type === 'tool_use') {
+        const thoughtSignature = (block as any).thought_signature ?? (block as any).thoughtSignature;
         toolCalls.push({
           id: String((block as any).id ?? ''),
           type: 'function',
           function: { name: String((block as any).name ?? ''), arguments: JSON.stringify((block as any).input ?? {}) },
+          ...(typeof thoughtSignature === 'string' && thoughtSignature.length > 0 ? { thought_signature: thoughtSignature } : {}),
         });
       } else if (type === 'tool_result') {
         toolResults.push({
@@ -310,7 +312,14 @@ function toAnthropicContent(message: ChatMessage | undefined): AnthropicResponse
   const text = contentToString(message?.content ?? '');
   if (text.length > 0) blocks.push({ type: 'text', text });
   for (const call of message?.tool_calls ?? []) {
-    blocks.push({ type: 'tool_use', id: call.id, name: call.function.name, input: parseToolInput(call.function.arguments) });
+    const block: AnthropicToolUseBlock = {
+      type: 'tool_use',
+      id: call.id,
+      name: call.function.name,
+      input: parseToolInput(call.function.arguments),
+    };
+    if (call.thought_signature) block.thought_signature = call.thought_signature;
+    blocks.push(block);
   }
   return blocks;
 }
@@ -538,7 +547,7 @@ async function streamCompletion(
   let nextIndex = 0;
   let outputChars = 0;
   let upstreamFinish: string | null = null;
-  const toolAcc = new Map<number, { id?: string; name: string; args: string }>();
+  const toolAcc = new Map<number, { id?: string; name: string; args: string; thought_signature?: string }>();
 
   // Inline-dialect hold window (#231): the first text is held until it either
   // matches a tool-call dialect marker (held to the end and rescued into
@@ -609,6 +618,10 @@ async function streamCompletion(
         if (tc.id && !acc.id) acc.id = tc.id;
         if (tc.function?.name) acc.name += tc.function.name;
         if (tc.function?.arguments) acc.args += tc.function.arguments;
+        const thoughtSignature = (tc as any).thought_signature ?? (tc as any).thoughtSignature;
+        if (typeof thoughtSignature === 'string' && thoughtSignature.length > 0 && !acc.thought_signature) {
+          acc.thought_signature = thoughtSignature;
+        }
       }
 
       const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
@@ -636,12 +649,13 @@ async function streamCompletion(
     // the request schemas, drop any that still aren't valid JSON.
     const schemas = toolSchemaMap(ctx.tools);
     let synthetic = 0;
-    const completedCalls = [...toolAcc.entries()]
+    const completedCalls: Array<{ id: string; name: string; arguments: string; thought_signature?: string }> = [...toolAcc.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([, acc]) => ({
         id: acc.id && acc.id.length > 0 ? acc.id : `toolu_${crypto.randomBytes(8).toString('hex')}_${++synthetic}`,
         name: acc.name,
         arguments: repairToolArguments(acc.args || '{}', schemas.get(acc.name)),
+        ...(acc.thought_signature ? { thought_signature: acc.thought_signature } : {}),
       }))
       .filter(c => { try { JSON.parse(c.arguments); return c.name.length > 0; } catch { return false; } });
 
@@ -688,7 +702,17 @@ async function streamCompletion(
 
     for (const call of completedCalls) {
       const idx = nextIndex++;
-      writeSse(res, 'content_block_start', { type: 'content_block_start', index: idx, content_block: { type: 'tool_use', id: call.id, name: call.name, input: {} } });
+      writeSse(res, 'content_block_start', {
+        type: 'content_block_start',
+        index: idx,
+        content_block: {
+          type: 'tool_use',
+          id: call.id,
+          name: call.name,
+          input: {},
+          ...(call.thought_signature ? { thought_signature: call.thought_signature } : {}),
+        },
+      });
       writeSse(res, 'content_block_delta', { type: 'content_block_delta', index: idx, delta: { type: 'input_json_delta', partial_json: call.arguments } });
       writeSse(res, 'content_block_stop', { type: 'content_block_stop', index: idx });
       outputChars += call.arguments.length;

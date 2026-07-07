@@ -170,6 +170,39 @@ describe('/v1/messages shared-loop convergence', () => {
     expect(text).not.toContain('<function=');
   });
 
+  it('stream: preserves provider thought_signature on tool_use blocks (#487)', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute(streamProvider(async function* () {
+      yield chunk({ role: 'assistant' });
+      yield chunk({
+        tool_calls: [{
+          index: 0,
+          id: 'call_stream_sig',
+          type: 'function',
+          function: { name: 'get_weather', arguments: '{"city":"Oslo"}' },
+          thought_signature: 'sig_stream_tool_1',
+        }],
+      });
+      yield chunk({}, 'tool_calls');
+    })));
+
+    const { status, text } = await post(app, {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'weather?' }],
+      tools: [WEATHER_TOOL],
+    }, key);
+
+    expect(status).toBe(200);
+    const events = sseEvents(text);
+    const toolStart = events.find(e => e.event === 'content_block_start' && e.data.content_block?.type === 'tool_use');
+    expect(toolStart!.data.content_block).toMatchObject({
+      id: 'call_stream_sig',
+      name: 'get_weather',
+      thought_signature: 'sig_stream_tool_1',
+    });
+    const jsonDelta = events.filter(e => e.event === 'content_block_delta' && e.data.delta?.type === 'input_json_delta').map(e => e.data.delta.partial_json).join('');
+    expect(JSON.parse(jsonDelta)).toEqual({ city: 'Oslo' });
+  });
+
   it('stream: an unparseable dialect that opens the stream fails over invisibly (drift #1)', async () => {
     mockRouteRequest
       .mockReturnValueOnce(fakeRoute(streamProvider(async function* () {

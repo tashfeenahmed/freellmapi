@@ -80,6 +80,22 @@ function mockJson(response: any) {
   return captured;
 }
 
+function mockGoogleJsonSequence(responses: any[]) {
+  const origFetch = global.fetch;
+  const capturedBodies: any[] = [];
+  vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+    const urlStr = typeof url === 'string' ? url : url.toString();
+    if (urlStr.includes('generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent')) {
+      capturedBodies.push(JSON.parse(String((init as RequestInit).body)));
+      const response = responses.shift();
+      if (!response) throw new Error('No mocked Google response left');
+      return { ok: true, json: () => Promise.resolve(response) } as any;
+    }
+    return origFetch(url as any, init);
+  });
+  return capturedBodies;
+}
+
 // Mock Groq's streaming upstream with a raw SSE body.
 function mockStream(body: string) {
   const origFetch = global.fetch;
@@ -205,6 +221,71 @@ describe('Anthropic-compatible /v1/messages', () => {
     const toolMsg = msgs.find((m: any) => m.role === 'tool');
     expect(toolMsg).toMatchObject({ role: 'tool', tool_call_id: 'toolu_abc', content: 'Sunny, 35C' });
     expect(body.content[0]).toEqual({ type: 'text', text: 'It is sunny and 35C in Karachi.' });
+  });
+
+  it('preserves Gemini thought_signature across an Anthropic tool loop (#487)', async () => {
+    const db = getDb();
+    db.prepare('DELETE FROM api_keys').run();
+    const addGoogle = await request(app, '/api/keys',
+      { platform: 'google', key: 'AIza_anthropic_thought_signature_test', label: 'g' },
+      { Authorization: `Bearer ${dashToken}` });
+    expect(addGoogle.status).toBe(201);
+
+    const capturedBodies = mockGoogleJsonSequence([
+      {
+        candidates: [{
+          content: {
+            parts: [{
+              thoughtSignature: 'sig_gemini_tool_1',
+              functionCall: {
+                id: 'call_gemini_1',
+                name: 'get_weather',
+                args: { city: 'Dublin' },
+              },
+            }],
+          },
+          finishReason: 'STOP',
+        }],
+        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 4, totalTokenCount: 16 },
+      },
+      {
+        candidates: [{ content: { parts: [{ text: 'Rainy, 12C.' }] }, finishReason: 'STOP' }],
+        usageMetadata: { promptTokenCount: 18, candidatesTokenCount: 5, totalTokenCount: 23 },
+      },
+    ]);
+
+    const first = await request(app, '/v1/messages', {
+      model: 'gemini-3.5-flash', max_tokens: 128,
+      messages: [{ role: 'user', content: 'weather in Dublin?' }],
+      tools: [WEATHER_TOOL],
+    }, anthropicHeaders());
+
+    expect(first.status).toBe(200);
+    const toolUse = first.body.content.find((b: any) => b.type === 'tool_use');
+    expect(toolUse).toMatchObject({
+      id: 'call_gemini_1',
+      name: 'get_weather',
+      input: { city: 'Dublin' },
+      thought_signature: 'sig_gemini_tool_1',
+    });
+
+    const second = await request(app, '/v1/messages', {
+      model: 'gemini-3.5-flash', max_tokens: 128,
+      messages: [
+        { role: 'user', content: 'weather in Dublin?' },
+        { role: 'assistant', content: [toolUse] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: '{"temp":12,"condition":"rain"}' }] },
+      ],
+      tools: [WEATHER_TOOL],
+    }, anthropicHeaders());
+
+    expect(second.status).toBe(200);
+    expect(second.body.content).toEqual([{ type: 'text', text: 'Rainy, 12C.' }]);
+    const assistantEntry = capturedBodies[1].contents.find((c: any) => c.role === 'model');
+    expect(assistantEntry.parts[0]).toMatchObject({
+      thoughtSignature: 'sig_gemini_tool_1',
+      functionCall: { id: 'call_gemini_1', name: 'get_weather' },
+    });
   });
 
   it('accepts an Anthropic image block and forwards it as an image_url block', async () => {

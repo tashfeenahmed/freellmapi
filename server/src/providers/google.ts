@@ -17,36 +17,59 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Gemini 3 REQUIRES the `thoughtSignature` that accompanied a function call to
 // be echoed back whenever that call appears in conversation history, or it
 // rejects the request with 400 "Function call is missing a thought_sig". But
-// OpenAI-format clients (the API surface we expose) have no field to carry a
-// provider-specific signature, so it's dropped on the round-trip and every
-// multi-turn tool conversation through Gemini fails. To bridge this without a
-// schema change, cache each signature we emit keyed by tool-call id and
-// re-attach it when the same call comes back without one. Strictly additive: a
-// cache miss yields exactly the previous behavior (the request may 400 and fail
-// over, as before). Bounded with a TTL so it can't grow unbounded.
+// OpenAI-format clients (the API surface we expose) have no standard field to
+// carry a provider-specific signature, so it can be dropped on the round-trip
+// and multi-turn tool conversations through Gemini fail. Cache each signature
+// we emit keyed by the tool-call id and by a stable name/arguments fingerprint;
+// the latter keeps the Anthropic bridge resilient when an agent/client rewrites
+// opaque tool ids. Strictly additive: a cache miss yields exactly the previous
+// behavior (the request may 400 and fail over, as before). Bounded with a TTL so
+// it can't grow unbounded.
 const THOUGHT_SIG_TTL_MS = 30 * 60 * 1000; // 30 min — longer than any single tool loop
 const THOUGHT_SIG_MAX = 5000;
 const thoughtSigCache = new Map<string, { sig: string; exp: number }>();
 
-function rememberThoughtSig(callId: string | undefined, sig: string | undefined): void {
-  if (!callId || !sig) return;
+function canonicalThoughtSigArgs(args: unknown): string {
+  if (typeof args === 'string') {
+    try { return JSON.stringify(JSON.parse(args)); } catch { return args; }
+  }
+  return JSON.stringify(args ?? {});
+}
+
+function thoughtSigCallKey(name: string | undefined, args: unknown): string | undefined {
+  if (!name) return undefined;
+  return `call:${name}:${canonicalThoughtSigArgs(args)}`;
+}
+
+function rememberThoughtSigKey(key: string | undefined, sig: string | undefined): void {
+  if (!key || !sig) return;
   // Cheap eviction: when full, drop the oldest insertion (Map preserves order).
   if (thoughtSigCache.size >= THOUGHT_SIG_MAX) {
     const oldest = thoughtSigCache.keys().next().value;
     if (oldest !== undefined) thoughtSigCache.delete(oldest);
   }
-  thoughtSigCache.set(callId, { sig, exp: Date.now() + THOUGHT_SIG_TTL_MS });
+  thoughtSigCache.set(key, { sig, exp: Date.now() + THOUGHT_SIG_TTL_MS });
 }
 
-function recallThoughtSig(callId: string | undefined): string | undefined {
-  if (!callId) return undefined;
-  const hit = thoughtSigCache.get(callId);
+function rememberThoughtSig(callId: string | undefined, sig: string | undefined, name?: string, args?: unknown): void {
+  rememberThoughtSigKey(callId ? `id:${callId}` : undefined, sig);
+  rememberThoughtSigKey(thoughtSigCallKey(name, args), sig);
+}
+
+function recallThoughtSigKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  const hit = thoughtSigCache.get(key);
   if (!hit) return undefined;
   if (hit.exp < Date.now()) {
-    thoughtSigCache.delete(callId);
+    thoughtSigCache.delete(key);
     return undefined;
   }
   return hit.sig;
+}
+
+function recallThoughtSig(callId: string | undefined, name?: string, args?: unknown): string | undefined {
+  return recallThoughtSigKey(callId ? `id:${callId}` : undefined)
+    ?? recallThoughtSigKey(thoughtSigCallKey(name, args));
 }
 
 interface GeminiPart {
@@ -310,7 +333,7 @@ async function toGeminiContents(messages: ChatMessage[]) {
           // Prefer a signature the client preserved; otherwise recover the one
           // we cached when this call was first produced (OpenAI-format clients
           // drop the field, so this is the common path for Gemini multi-turn).
-          const sig = call.thought_signature ?? recallThoughtSig(call.id);
+          const sig = call.thought_signature ?? recallThoughtSig(call.id, call.function.name, call.function.arguments);
           parts.push({
             thoughtSignature: sig,
             functionCall: {
@@ -371,16 +394,17 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
     if (!part.functionCall?.name) continue;
 
     const id = part.functionCall.id ?? `call_${Date.now()}_${fallbackIndex++}`;
+    const args = normalizeGeminiArgs(part.functionCall.args);
     // Cache the signature keyed by the id we hand the client, so when the client
     // echoes this call back (without the signature, as OpenAI format requires)
     // we can re-attach it and Gemini accepts the history.
-    rememberThoughtSig(id, part.thoughtSignature);
+    rememberThoughtSig(id, part.thoughtSignature, part.functionCall.name, args);
     calls.push({
       id,
       type: 'function',
       function: {
         name: part.functionCall.name,
-        arguments: normalizeGeminiArgs(part.functionCall.args),
+        arguments: args,
       },
       thought_signature: part.thoughtSignature,
     });

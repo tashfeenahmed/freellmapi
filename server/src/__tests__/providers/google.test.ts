@@ -347,6 +347,69 @@ describe('GoogleProvider', () => {
     expect(assistantEntry.parts[0].functionCall.name).toBe('get_weather');
   });
 
+  it('recovers cached thought_signature when a bridge rewrites the tool id', async () => {
+    const capturedBodies: any[] = [];
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBodies.push(JSON.parse((init as any).body));
+      if (capturedBodies.length === 1) {
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            candidates: [{
+              content: {
+                parts: [{
+                  thoughtSignature: 'sig_by_args',
+                  functionCall: {
+                    id: 'google_call_123',
+                    name: 'get_weather',
+                    args: { city: 'Reykjavik' },
+                  },
+                }],
+              },
+              finishReason: 'STOP',
+            }],
+            usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+          }),
+        } as any;
+      }
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: 'Cold and windy.' }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Weather?' }],
+      'gemini-2.5-pro',
+    );
+
+    await provider.chatCompletion(
+      'test-key',
+      [
+        { role: 'user', content: 'Weather?' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            id: 'toolu_rewritten_by_bridge',
+            type: 'function',
+            function: { name: 'get_weather', arguments: '{"city":"Reykjavik"}' },
+          }],
+        },
+        { role: 'tool', tool_call_id: 'toolu_rewritten_by_bridge', content: '{"temp": 3}' },
+      ],
+      'gemini-2.5-pro',
+    );
+
+    const assistantEntry = capturedBodies[1].contents.find((c: any) => c.role === 'model');
+    expect(assistantEntry.parts[0].thoughtSignature).toBe('sig_by_args');
+    expect(assistantEntry.parts[0].functionCall.id).toBe('toolu_rewritten_by_bridge');
+  });
+
   // ── Streaming ──────────────────────────────────────────────────────────────
   // Build a Response-shaped object backed by a ReadableStream so the provider's
   // `res.body.getReader()` path executes for real (Node 20+ has both globally).
