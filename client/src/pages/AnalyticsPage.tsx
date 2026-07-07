@@ -298,7 +298,7 @@ export default function AnalyticsPage() {
 
       <div className="space-y-6">
         {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
           {summaryLoading ? (
             Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[74px] rounded-3xl" />)
           ) : (
