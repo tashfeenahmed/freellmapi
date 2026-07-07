@@ -74,19 +74,34 @@ export function isRetryableError(err: any): boolean {
 // health revalidation) instead of 502-ing the whole request. Deliberately NOT
 // added to isRetryableError: a bad key must be skipped and revalidated, not
 // blindly re-benched like a rate limit — the loop handles it as its own class.
-// A structured non-401 status wins (e.g. a 403 stays model-forbidden); the
-// message substrings are the fallback for errors that carry no numeric status.
+//
+// Status handling: every provider adapter attaches err.status (providerHttpError
+// in providers/base.ts), so the structured status is the primary signal.
+//   - 401 → always key-auth.
+//   - 400 → key-auth ONLY for Google-style key-specific phrasings: Google
+//     reports a bad/expired key as HTTP 400 INVALID_ARGUMENT with "API key not
+//     valid" / "API key expired" / API_KEY_INVALID (#268, providers/google.ts).
+//     Without this a dead Google key classified as a provider bad-request and
+//     could exhaust into a client-blaming 400 "rejected the request as invalid".
+//     Generic auth wording (unauthorized etc.) stays excluded on a 400 so
+//     ordinary payload rejections never classify as key-auth.
+//   - any other status → not key-auth (e.g. a 403 stays model-forbidden).
+//   - no status at all → key-specific OR generic auth substrings.
 export function isKeyAuthError(err: any): boolean {
   const status = typeof err?.status === 'number' ? err.status : 0;
   if (status === 401) return true;
-  if (status !== 0) return false;
   const msg = (err?.message ?? '').toLowerCase();
-  return msg.includes('401')
+  const keySpecific = msg.includes('api key not valid')
+    || msg.includes('api key expired')
+    || msg.includes('api_key_invalid');
+  if (status === 400) return keySpecific;
+  if (status !== 0) return false;
+  return keySpecific
+    || msg.includes('401')
     || msg.includes('unauthorized')
     || msg.includes('invalid api key')
     || msg.includes('invalid_api_key')
     || msg.includes('incorrect api key')
-    || msg.includes('api key not valid')
     || msg.includes('authentication failed');
 }
 

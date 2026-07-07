@@ -102,14 +102,17 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
  *   - a 429 that says the DAILY free allocation is spent (Cloudflare "used up
  *     your daily free allocation of 10,000 neurons") → benched until the next
  *     UTC midnight, like the 402 path. The old transient 90s cooldown made the
- *     router re-pick a dead-for-the-day provider all day long.
+ *     router re-pick a dead-for-the-day provider all day long. An explicit
+ *     provider Retry-After wins over the midnight heuristic: rolling daily
+ *     windows (Groq RPD "try again in 7m12s" with a Retry-After header) reset
+ *     well before midnight, and the provider knows its own reset time best.
  *   - anything else → the transient/daily escalation ladder, honoring the
  *     provider's Retry-After as a floor (getCooldownDurationForLimit).
  */
 export function cooldownForError(route: RouteResult, err: any): number {
   if (isPaymentRequiredError(err)) return PAYMENT_REQUIRED_COOLDOWN_MS;
   if (isModelAccessForbiddenError(err)) return MODEL_FORBIDDEN_COOLDOWN_MS;
-  if (isDailyQuotaExhaustedError(err)) return msUntilNextUtcMidnight();
+  if (isDailyQuotaExhaustedError(err)) return err?.retryAfterMs ?? msUntilNextUtcMidnight();
   return getCooldownDurationForLimit(
     route.platform,
     route.modelId,
@@ -441,21 +444,9 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
       return;
     }
 
+    let outcome: DispatchOutcome;
     try {
-      const outcome = await hooks.dispatch(route, attempt);
-      // Enforce the dispatch contract: 'done'/'committed' mean the response is
-      // finished. Anything else (a stray `return` in an adapter) would silently
-      // swallow the request, so fail loudly — Express 5 forwards the rejection
-      // to its error handler; if a response already went out it is closed as-is.
-      if (outcome !== 'done' && outcome !== 'committed') {
-        const violation = new Error(
-          `fallback-loop dispatch contract violation on ${route.platform}/${route.modelId}: ` +
-          `expected 'done' or 'committed', got ${JSON.stringify(outcome)}`,
-        );
-        console.error('[FallbackLoop]', violation.message);
-        throw violation;
-      }
-      return;
+      outcome = await hooks.dispatch(route, attempt);
     } catch (err: any) {
       hooks.logFailure(route, err, attempt);
       if (isKeyAuthError(err)) {
@@ -475,6 +466,24 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
       hooks.onFatal(route, err, attempt);
       return;
     }
+
+    // Enforce the dispatch contract: 'done'/'committed' mean the response is
+    // finished. Anything else (a stray `return` in an adapter) would silently
+    // swallow the request, so fail loudly. Deliberately OUTSIDE the try/catch:
+    // the violation message embeds route.modelId, and a model id containing a
+    // digit run like "2503" would match a retryable-error substring and make
+    // the loop re-dispatch the buggy adapter until exhaustion. Routing straight
+    // to onFatal renders an immediate 502 with no retryability classification.
+    if (outcome !== 'done' && outcome !== 'committed') {
+      const violation = new Error(
+        `fallback-loop dispatch contract violation on ${route.platform}/${route.modelId}: ` +
+        `expected 'done' or 'committed', got ${JSON.stringify(outcome)}`,
+      );
+      console.error('[FallbackLoop]', violation.message);
+      hooks.logFailure(route, violation, attempt);
+      hooks.onFatal(route, violation, attempt);
+    }
+    return;
   }
 
   hooks.onExhausted(

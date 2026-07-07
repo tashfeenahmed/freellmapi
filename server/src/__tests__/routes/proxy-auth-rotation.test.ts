@@ -158,6 +158,43 @@ describe('upstream 401 rotates to the sibling key instead of 502 (item 1)', () =
     expect(body.error.message).toContain('failed authentication');
     expect(headers.get('x-fallback-attempts')).toBe('2');
   });
+
+  it('Google-style 400 bad key rotates + revalidates and never blames the client request (#268)', async () => {
+    // Google reports a dead/expired key as HTTP 400 "API key not valid", NOT a
+    // 401. Before the fix that classified as a provider bad-request, so an
+    // exhaustion could surface to the client as 400 "All routed providers
+    // rejected the request as invalid" — blaming the request for a bad key.
+    const googleBadKey = () => Object.assign(
+      new Error('Google API error 400: API key not valid. Please pass a valid API key.'),
+      { status: 400 },
+    );
+    setup(4);
+    chatCompletion
+      .mockRejectedValueOnce(googleBadKey())   // first key: dead Google-style key
+      .mockResolvedValueOnce(GOOD_RESULT);     // sibling key: healthy
+
+    const first = await post(app, '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'google bad key rotation test' }],
+    }, key);
+
+    expect(first.status).toBe(200);            // rotated, not a client-blaming 400
+    expect(first.headers.get('x-fallback-attempts')).toBe('1');
+    expect(chatCompletion).toHaveBeenCalledTimes(2);
+    expect(mockCheckKeyHealth).toHaveBeenCalledTimes(1); // immediate revalidation fired
+
+    // Now the surviving key dies the same way: exhaustion must be the distinct
+    // auth 502, never the invalid-request 400.
+    chatCompletion.mockRejectedValue(googleBadKey());
+    const second = await post(app, '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'google bad key exhaustion test' }],
+    }, key);
+
+    expect(second.status).toBe(502);
+    expect(second.status).not.toBe(400);
+    expect(second.body.error.type).toBe('provider_error');
+    expect(second.body.error.message).toContain('failed authentication');
+    expect(second.body.error.message).not.toContain('rejected the request as invalid');
+  });
 });
 
 describe('exhaustion error quality: attempt trail + reset hint + header (item 2)', () => {

@@ -85,6 +85,19 @@ describe('isKeyAuthError (401 = key-fatal, rotate instead of 502)', () => {
     // A structured non-401 status wins over a suspicious message.
     expect(isKeyAuthError(Object.assign(new Error('unauthorized model'), { status: 403 }))).toBe(false);
   });
+
+  it('flags Google-style HTTP 400 bad-key errors via key-specific substrings only (#268)', () => {
+    // Google reports a bad/expired key as HTTP 400 INVALID_ARGUMENT, and every
+    // adapter attaches err.status (providerHttpError), so the 400 path must
+    // accept the key-specific phrasings...
+    expect(isKeyAuthError(Object.assign(new Error('Google API error 400: API key not valid. Please pass a valid API key.'), { status: 400 }))).toBe(true);
+    expect(isKeyAuthError(Object.assign(new Error('Google API error 400: API key expired. Please renew the API key.'), { status: 400 }))).toBe(true);
+    expect(isKeyAuthError(Object.assign(new Error('400 INVALID_ARGUMENT: API_KEY_INVALID'), { status: 400 }))).toBe(true);
+    // ...while ordinary payload 400s (even with generic auth-ish wording) stay
+    // provider-bad-request, not key-auth.
+    expect(isKeyAuthError(Object.assign(new Error('Google API error 400: Invalid JSON payload received. Unknown name "x"'), { status: 400 }))).toBe(false);
+    expect(isKeyAuthError(Object.assign(new Error('Cerebras API error 400: unauthorized field in tool schema'), { status: 400 }))).toBe(false);
+  });
 });
 
 describe('isDailyQuotaExhaustedError + midnight benching (drift: 90s cooldown on a dead-for-the-day provider)', () => {
@@ -111,6 +124,19 @@ describe('isDailyQuotaExhaustedError + midnight benching (drift: 90s cooldown on
   it('msUntilNextUtcMidnight floors at one minute near midnight', () => {
     const justBeforeMidnight = Date.UTC(2026, 6, 7, 23, 59, 59, 900);
     expect(msUntilNextUtcMidnight(justBeforeMidnight)).toBe(60_000);
+  });
+
+  it('honors an explicit Retry-After over the midnight bench (rolling daily windows)', () => {
+    // Groq-style rolling RPD: the body names a daily limit AND the response
+    // carries Retry-After ("try again in 7m12s"). The provider knows its own
+    // reset time; benching to UTC midnight would over-bench by hours.
+    const route = fakeRoute();
+    const retryAfterMs = 432_000; // 7m12s
+    const err = Object.assign(
+      new Error('Groq API error 429: Rate limit reached on requests per day (RPD): Limit 1000. Please try again in 7m12s.'),
+      { status: 429, retryAfterMs },
+    );
+    expect(cooldownForError(route, err)).toBe(retryAfterMs);
   });
 });
 
@@ -296,6 +322,30 @@ describe('runFallbackLoop: dispatch outcome contract', () => {
     expect(consoleError).toHaveBeenCalledWith('[FallbackLoop]', expect.stringContaining('dispatch contract violation'));
     expect(logFailure).toHaveBeenCalledTimes(1);
     expect(onFatal).toHaveBeenCalledTimes(1); // rendered as a non-retryable error, not silently swallowed
+    consoleError.mockRestore();
+  });
+
+  it('never retries a violation whose modelId embeds a retryable-looking digit run', async () => {
+    // The violation message contains route.modelId; "mistral-small-2503" holds
+    // the substring '503', which the retryable classifier would match if the
+    // violation were thrown into the ordinary catch. The guard must bypass
+    // classification entirely: immediate onFatal, exactly one dispatch.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onFatal = vi.fn();
+    const onExhausted = vi.fn();
+    const dispatch = vi.fn(async () => undefined) as any;
+
+    await runFallbackLoop(hooksSkeleton({
+      route: () => fakeRoute({ modelId: 'mistral-small-2503' }),
+      dispatch,
+      onFatal,
+      onExhausted,
+    }));
+
+    expect(dispatch).toHaveBeenCalledTimes(1);   // no re-dispatch of the buggy adapter
+    expect(onFatal).toHaveBeenCalledTimes(1);    // immediate 502 render
+    expect(onExhausted).not.toHaveBeenCalled();  // never loops to exhaustion
+    expect(onFatal.mock.calls[0][1].message).toContain('dispatch contract violation');
     consoleError.mockRestore();
   });
 });
