@@ -867,12 +867,19 @@ export default function KeysPage() {
   const [label, setLabel] = useState('')
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
+  const [editingBaseUrl, setEditingBaseUrl] = useState('')
+  const [editingApiKey, setEditingApiKey] = useState('')
   // Server-supplied notice when a key is saved for a platform with no models in
   // the current catalog tier yet (e.g. a newly added premium provider, #438).
   const [addNotice, setAddNotice] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteModelKey, setConfirmDeleteModelKey] = useState<string | null>(null)
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
+  const [editingModelId, setEditingModelId] = useState<number | null>(null)
+  const [editingModelName, setEditingModelName] = useState('')
+  const [newModelInput, setNewModelInput] = useState('')
+  const [newModelType, setNewModelType] = useState<'chat' | 'embedding' | 'image' | 'audio'>('chat')
+  const [addingModelToKeyId, setAddingModelToKeyId] = useState<number | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
@@ -921,6 +928,45 @@ export default function KeysPage() {
     },
   })
 
+  const updateCustomModel = useMutation({
+    mutationFn: ({ id, displayName }: { id: number; displayName: string }) =>
+      apiFetch(`/api/models/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      setEditingModelId(null)
+      setEditingModelName('')
+    },
+  })
+
+  const addCustomModel = useMutation({
+    mutationFn: ({ baseUrl, model, kind }: { baseUrl: string; model: string; kind: string }) => {
+      const path = kind === 'chat' ? '/api/keys/custom'
+        : kind === 'embedding' ? '/api/embeddings/custom'
+        : '/api/media/custom'
+      const body: Record<string, unknown> = { baseUrl, model }
+      if (kind !== 'chat' && kind !== 'embedding') body.modality = kind
+      return apiFetch(path, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['models'] })
+      queryClient.invalidateQueries({ queryKey: ['embeddings'] })
+      queryClient.invalidateQueries({ queryKey: ['media'] })
+      setNewModelInput('')
+      setAddingModelToKeyId(null)
+    },
+  })
+
   const checkAll = useMutation({
     mutationFn: () => apiFetch('/api/health/check-all', { method: 'POST' }),
     onSuccess: () => {
@@ -951,32 +997,50 @@ export default function KeysPage() {
   })
 
   const updateKey = useMutation({
-    mutationFn: ({ id, label }: { id: number; label: string }) =>
-      apiFetch(`/api/keys/${id}`, {
+    mutationFn: ({ id, label, baseUrl, apiKey }: { id: number; label?: string; baseUrl?: string; apiKey?: string }) => {
+      const body: Record<string, unknown> = {}
+      if (label !== undefined) body.label = label
+      if (baseUrl !== undefined) body.baseUrl = baseUrl
+      if (apiKey !== undefined) body.apiKey = apiKey
+      return apiFetch(`/api/keys/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ label }),
-      }),
+        body: JSON.stringify(body),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       setEditingKeyId(null)
       setEditingLabel('')
+      setEditingBaseUrl('')
+      setEditingApiKey('')
     },
   })
 
   function startEditing(key: ApiKey) {
     setEditingKeyId(key.id)
     setEditingLabel(key.label)
+    if (key.platform === 'custom') {
+      setEditingBaseUrl(key.baseUrl ?? '')
+      setEditingApiKey('')
+    } else {
+      setEditingBaseUrl('')
+      setEditingApiKey('')
+    }
   }
 
   function cancelEditing() {
     setEditingKeyId(null)
     setEditingLabel('')
+    setEditingBaseUrl('')
+    setEditingApiKey('')
   }
 
   function saveEditing(id: number) {
-    if (editingLabel !== undefined) {
-      updateKey.mutate({ id, label: editingLabel })
-    }
+    const body: { id: number; label?: string; baseUrl?: string; apiKey?: string } = { id }
+    if (editingLabel !== undefined) body.label = editingLabel
+    if (editingBaseUrl !== undefined && editingBaseUrl) body.baseUrl = editingBaseUrl
+    if (editingApiKey !== undefined && editingApiKey) body.apiKey = editingApiKey
+    updateKey.mutate(body)
   }
 
   function toggleExpandedKey(id: number) {
@@ -1219,7 +1283,45 @@ export default function KeysPage() {
                               </Button>
                             )}
                             <code className="text-xs font-mono flex-shrink-0">{k.maskedKey}</code>
-                            {isEditing ? (
+                            {isEditing && k.platform === 'custom' ? (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Input
+                                  ref={editInputRef}
+                                  value={editingLabel}
+                                  onChange={e => setEditingLabel(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') saveEditing(k.id)
+                                    if (e.key === 'Escape') cancelEditing()
+                                  }}
+                                  placeholder="标签"
+                                  className="h-6 w-[100px] text-xs"
+                                  disabled={updateKey.isPending}
+                                />
+                                <Input
+                                  value={editingBaseUrl}
+                                  onChange={e => setEditingBaseUrl(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') saveEditing(k.id)
+                                    if (e.key === 'Escape') cancelEditing()
+                                  }}
+                                  placeholder="Base URL"
+                                  className="h-6 w-[200px] text-xs font-mono"
+                                  disabled={updateKey.isPending}
+                                />
+                                <Input
+                                  type="password"
+                                  value={editingApiKey}
+                                  onChange={e => setEditingApiKey(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') saveEditing(k.id)
+                                    if (e.key === 'Escape') cancelEditing()
+                                  }}
+                                  placeholder="新 API Key（留空不变）"
+                                  className="h-6 w-[160px] text-xs font-mono"
+                                  disabled={updateKey.isPending}
+                                />
+                              </div>
+                            ) : isEditing ? (
                               <Input
                                 ref={editInputRef}
                                 value={editingLabel}
@@ -1249,7 +1351,11 @@ export default function KeysPage() {
                                 {formatSqliteUtcToLocalTime(lastChecked, { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
-                            {!isEditing && (
+                            {isEditing && k.platform === 'custom' ? (
+                              <Button variant="ghost" size="xs" onClick={() => saveEditing(k.id)} disabled={updateKey.isPending}>
+                                {t('keys.save')}
+                              </Button>
+                            ) : !isEditing && (
                               <Button variant="ghost" size="xs" onClick={() => startEditing(k)}>
                                 <Pencil className="size-3" />
                               </Button>
@@ -1280,14 +1386,48 @@ export default function KeysPage() {
                               {customModels.map(model => {
                                 const modelKey = customModelDeleteKey(model)
                                 const confirming = confirmDeleteModelKey === modelKey
+                                const isEditingModel = editingModelId === model.id
                                 return (
                                   <div key={modelKey} className="inline-flex min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1 text-[11px]">
                                     <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                                       {t(CUSTOM_MODEL_KIND_LABEL[model.kind])}
                                     </span>
-                                    <span className="max-w-[180px] truncate font-medium" title={model.modelId}>
-                                      {model.displayName}
-                                    </span>
+                                    {isEditingModel ? (
+                                      <Input
+                                        value={editingModelName}
+                                        onChange={e => setEditingModelName(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter' && editingModelName.trim()) {
+                                            updateCustomModel.mutate({ id: model.id, displayName: editingModelName.trim() })
+                                          }
+                                          if (e.key === 'Escape') {
+                                            setEditingModelId(null)
+                                            setEditingModelName('')
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          if (editingModelName.trim() && editingModelName.trim() !== model.displayName) {
+                                            updateCustomModel.mutate({ id: model.id, displayName: editingModelName.trim() })
+                                          } else {
+                                            setEditingModelId(null)
+                                            setEditingModelName('')
+                                          }
+                                        }}
+                                        className="h-5 w-[130px] text-[11px]"
+                                        disabled={updateCustomModel.isPending}
+                                      />
+                                    ) : (
+                                      <span
+                                        className="max-w-[140px] truncate font-medium cursor-pointer hover:text-primary"
+                                        title={model.modelId}
+                                        onClick={() => {
+                                          setEditingModelId(model.id)
+                                          setEditingModelName(model.displayName)
+                                        }}
+                                      >
+                                        {model.displayName}
+                                      </span>
+                                    )}
                                     {model.family && (
                                       <code className="max-w-[160px] truncate text-muted-foreground" title={model.family}>
                                         {model.family}
@@ -1315,6 +1455,63 @@ export default function KeysPage() {
                                   </div>
                                 )
                               })}
+                              {addingModelToKeyId === k.id ? (
+                                <div className="inline-flex items-center gap-1.5">
+                                  <Select value={newModelType} onValueChange={(v) => setNewModelType(v as typeof newModelType)}>
+                                    <SelectTrigger className="h-6 w-[90px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="chat">{t('keys.customTypeChat')}</SelectItem>
+                                      <SelectItem value="embedding">{t('keys.customTypeEmbedding')}</SelectItem>
+                                      <SelectItem value="image">{t('keys.customTypeImage')}</SelectItem>
+                                      <SelectItem value="audio">{t('keys.customTypeAudio')}</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    value={newModelInput}
+                                    onChange={e => setNewModelInput(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && newModelInput.trim() && k.baseUrl) {
+                                        addCustomModel.mutate({ baseUrl: k.baseUrl, model: newModelInput.trim(), kind: newModelType })
+                                      }
+                                      if (e.key === 'Escape') {
+                                        setNewModelInput('')
+                                        setAddingModelToKeyId(null)
+                                      }
+                                    }}
+                                    placeholder={t('keys.addModel')}
+                                    className="h-6 w-[140px] text-xs"
+                                    disabled={addCustomModel.isPending}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="xs"
+                                    disabled={!newModelInput.trim() || addCustomModel.isPending || !k.baseUrl}
+                                    onClick={() => {
+                                      if (newModelInput.trim() && k.baseUrl) {
+                                        addCustomModel.mutate({ baseUrl: k.baseUrl, model: newModelInput.trim(), kind: newModelType })
+                                      }
+                                    }}
+                                  >
+                                    {t('keys.save')}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => {
+                                    setAddingModelToKeyId(k.id)
+                                    setNewModelInput('')
+                                  }}
+                                  className="h-6 text-xs"
+                                >
+                                  + {t('keys.addModel')}
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>

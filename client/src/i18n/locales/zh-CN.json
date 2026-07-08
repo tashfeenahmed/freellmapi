@@ -202,6 +202,7 @@
     "checking": "检查中…",
     "editLabel": "编辑标签",
     "saveLabel": "保存标签",
+    "save": "保存",
     "unifiedKeyDescBefore": "将其用作你的 OpenAI ",
     "unifiedKeyDescAfter": "；它用于对发往本代理的请求进行身份验证。",
     "serverUnreachableBefore": "无法连接到位于 ",

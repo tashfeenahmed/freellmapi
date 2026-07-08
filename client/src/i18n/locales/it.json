@@ -220,6 +220,7 @@
     "checking": "Controllo…",
     "editLabel": "Modifica etichetta",
     "saveLabel": "Salva etichetta",
+    "save": "Salva",
     "unifiedKeyDescBefore": "Usa questa come tua chiave OpenAI ",
     "unifiedKeyDescAfter": "; autentica le richieste a questo proxy.",
     "serverUnreachableBefore": "Impossibile raggiungere il server su ",

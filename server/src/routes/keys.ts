@@ -48,8 +48,10 @@ const addKeySchema = z.object({
 const updateKeySchema = z.object({
   enabled: z.boolean().optional(),
   label: z.string().optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined, {
-  message: 'At least one of enabled or label must be provided',
+  baseUrl: z.string().url('baseUrl must be a valid URL').optional(),
+  apiKey: z.string().optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.baseUrl !== undefined || data.apiKey !== undefined, {
+  message: 'At least one field must be provided',
 });
 
 const importKeySchema = z.object({
@@ -618,8 +620,8 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
 
-// Update key (toggle enable/disable or edit label)
-keysRouter.patch('/:id', (req: Request, res: Response) => {
+// Update key (toggle enable/disable, edit label, or edit custom provider baseUrl/apiKey)
+keysRouter.patch('/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: { message: 'Invalid key ID' } });
@@ -632,7 +634,33 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label } = parsed.data;
+  const { enabled, label, baseUrl, apiKey } = parsed.data;
+
+  const db = getDb();
+  const existing = db.prepare('SELECT id, platform FROM api_keys WHERE id = ?').get(id) as { id: number; platform: string } | undefined;
+  if (!existing) {
+    res.status(404).json({ error: { message: 'Key not found' } });
+    return;
+  }
+
+  // SSRF guard + duplicate check when updating baseUrl for custom providers
+  if (baseUrl) {
+    if (existing.platform !== 'custom') {
+      res.status(400).json({ error: { message: 'baseUrl can only be updated for custom providers' } });
+      return;
+    }
+    const verdict = await assessProviderUrl(baseUrl);
+    if (!verdict.allowed) {
+      res.status(400).json({ error: { message: `baseUrl rejected: ${verdict.reason}` } });
+      return;
+    }
+    const dupExisting = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = ? AND id != ?").get(baseUrl.trim().replace(/\/+$/, ''), id);
+    if (dupExisting) {
+      res.status(409).json({ error: { message: 'Another custom provider already uses this base URL' } });
+      return;
+    }
+  }
+
   const updates: string[] = [];
   const values: (string | number)[] = [];
 
@@ -644,10 +672,32 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     updates.push('label = ?');
     values.push(label);
   }
+  if (label !== undefined && existing.platform === 'custom' && label) {
+    // 同步更新关联模型的显示名，让模型页和试玩台显示标签
+    db.prepare(`
+      UPDATE models SET display_name = model_id || ' (' || ? || ')'
+      WHERE key_id = ? AND display_name = model_id
+    `).run(label.trim(), id);
+  }
+  if (baseUrl && existing.platform === 'custom') {
+    updates.push('base_url = ?');
+    values.push(baseUrl.trim().replace(/\/+$/, ''));
+  }
+  if (apiKey && existing.platform === 'custom') {
+    const { encrypted, iv, authTag } = encrypt(apiKey.trim());
+    updates.push('encrypted_key = ?');
+    updates.push('iv = ?');
+    updates.push('auth_tag = ?');
+    values.push(encrypted, iv, authTag);
+  }
+
+  if (updates.length === 0) {
+    res.status(400).json({ error: { message: 'No valid fields to update' } });
+    return;
+  }
 
   values.push(id);
 
-  const db = getDb();
   const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
   if (result.changes === 0) {
@@ -658,5 +708,6 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   const response: Record<string, unknown> = { success: true };
   if (enabled !== undefined) response.enabled = enabled;
   if (label !== undefined) response.label = label;
+  if (baseUrl !== undefined && existing.platform === 'custom') response.baseUrl = baseUrl;
   res.json(response);
 });

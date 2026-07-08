@@ -202,6 +202,7 @@
     "checking": "Vérification…",
     "editLabel": "Modifier le libellé",
     "saveLabel": "Enregistrer le libellé",
+    "save": "Enregistrer",
     "unifiedKeyDescBefore": "Utilisez-la comme votre ",
     "unifiedKeyDescAfter": " OpenAI ; elle authentifie les requêtes vers ce proxy.",
     "serverUnreachableBefore": "Impossible de joindre le serveur sur ",

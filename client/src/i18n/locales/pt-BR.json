@@ -202,6 +202,7 @@
     "checking": "Verificando…",
     "editLabel": "Editar rótulo",
     "saveLabel": "Salvar rótulo",
+    "save": "Salvar",
     "unifiedKeyDescBefore": "Use-a como sua ",
     "unifiedKeyDescAfter": " da OpenAI; ela autentica as solicitações a este proxy.",
     "serverUnreachableBefore": "Não foi possível acessar o servidor em ",

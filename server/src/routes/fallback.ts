@@ -114,7 +114,7 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       penalty: penalty?.penalty ?? 0,
       rateLimitHits: penalty?.count ?? 0,
       enabled: r.enabled === 1,
-      platform: r.platform,
+      platform: r.platform === 'custom' && r.key_label ? r.key_label : r.platform,
       modelId: r.model_id,
       displayName: r.display_name,
       intelligenceRank: r.intelligence_rank,

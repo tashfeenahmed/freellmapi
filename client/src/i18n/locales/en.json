@@ -258,6 +258,7 @@
     "checking": "Checking…",
     "editLabel": "Edit label",
     "saveLabel": "Save label",
+    "save": "Save",
     "unifiedKeyDescBefore": "Use this as your OpenAI ",
     "unifiedKeyDescAfter": "; it authenticates requests to this proxy.",
     "serverUnreachableBefore": "Can't reach the server on ",
