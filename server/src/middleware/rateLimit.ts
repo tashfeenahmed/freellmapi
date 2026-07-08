@@ -76,3 +76,52 @@ export function createProxyRateLimiter(rpmLimit?: number) {
     next();
   };
 }
+<<<<<<< HEAD
+=======
+
+// Per-IP fixed-window rate limiter for the /api/* admin surface.
+// The dashboard is single-user, so the default is generous but prevents
+// brute-force attacks on auth or key-export endpoints.
+const ADMIN_DEFAULT_RPM = 60;
+
+export function createAdminRateLimiter(rpm = ADMIN_DEFAULT_RPM) {
+  const limit = Math.max(1, Math.floor(rpm));
+  const windows = new Map<string, WindowState>();
+
+  return function adminRateLimit(req: Request, res: Response, next: NextFunction): void {
+    const now = Date.now();
+    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+
+    let state = windows.get(ip);
+    if (!state || now >= state.resetAt) {
+      state = { count: 0, resetAt: now + WINDOW_MS };
+      windows.set(ip, state);
+    }
+    state.count += 1;
+
+    if (windows.size > MAX_TRACKED_IPS) {
+      for (const [key, value] of windows) {
+        if (now >= value.resetAt) windows.delete(key);
+      }
+    }
+
+    res.setHeader('X-RateLimit-Limit', String(limit));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - state.count)));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil(state.resetAt / 1000)));
+
+    if (state.count > limit) {
+      const retryAfter = Math.max(1, Math.ceil((state.resetAt - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfter));
+      res.status(429).json({
+        error: {
+          message: `Rate limit exceeded: more than ${limit} requests per minute. Retry in ${retryAfter}s.`,
+          type: 'rate_limit_error',
+        },
+      });
+      return;
+    }
+
+    next();
+  };
+}
+>>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)

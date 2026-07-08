@@ -11,6 +11,7 @@ export interface ClientContext {
 // proxy, responses, anthropic, fusion, embeddings and media paths all log).
 const storage = new AsyncLocalStorage<ClientContext>();
 
+<<<<<<< HEAD
 // First X-Forwarded-For hop when present (reverse-proxy deployments, e.g.
 // Traefik), otherwise the socket peer address. The server is LAN-only, so a
 // spoofable header is an acceptable trade for working behind a proxy.
@@ -18,6 +19,21 @@ function resolveClientIp(req: Request): string | null {
   const xff = req.headers['x-forwarded-for'];
   const first = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim();
   const raw = first || req.socket.remoteAddress || null;
+=======
+// Resolve the client IP from the socket peer address. The X-Forwarded-For
+// header is only trusted when Express's "trust proxy" setting is enabled
+// (opt-in via app.set('trust proxy', ...) or the TRUST_PROXY env var in
+// run.ts). Without that, a spoofed header from a LAN client is ignored.
+function resolveClientIp(req: Request): string | null {
+  const trustProxy = req.app?.get('trust proxy') ?? false;
+  let raw: string | null;
+  if (trustProxy) {
+    const xff = req.headers['x-forwarded-for'];
+    raw = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim() || req.socket.remoteAddress || null;
+  } else {
+    raw = req.socket.remoteAddress || null;
+  }
+>>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
   // Normalize IPv4-mapped IPv6 ("::ffff:192.168.0.5" -> "192.168.0.5").
   return raw?.replace(/^::ffff:/i, '') ?? null;
 }
