@@ -16,9 +16,6 @@
     "dist": "npm run build:all && npm run stage:client && electron-builder --mac --arm64",
     "dist:win": "npm run build:all && npm run stage:client && electron-builder --win --x64"
   },
-  "dependencies": {
-    "better-sqlite3": "^12.10.0"
-  },
   "devDependencies": {
     "@electron/rebuild": "^3.7.0",
     "@types/better-sqlite3": "^7.6.13",
@@ -27,5 +24,8 @@
     "electron-builder": "^25.1.8",
     "esbuild": "^0.24.0",
     "typescript": "^5.8.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.10.0"
   }
 }
