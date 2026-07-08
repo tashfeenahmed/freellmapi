@@ -76,8 +76,6 @@ export function createProxyRateLimiter(rpmLimit?: number) {
     next();
   };
 }
-<<<<<<< HEAD
-=======
 
 // Per-IP fixed-window rate limiter for the /api/* admin surface.
 // The dashboard is single-user, so the default is generous but prevents
@@ -124,4 +122,3 @@ export function createAdminRateLimiter(rpm = ADMIN_DEFAULT_RPM) {
     next();
   };
 }
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)

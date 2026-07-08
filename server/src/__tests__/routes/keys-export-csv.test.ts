@@ -27,11 +27,7 @@ async function exportCsvText(app: Express): Promise<{ status: number; text: stri
   const server = app.listen(0);
   const addr = server.address() as { port: number };
   const res = await fetch(`http://127.0.0.1:${addr.port}/api/keys/export?format=csv`, {
-<<<<<<< HEAD
-    headers: { Authorization: `Bearer ${dashToken}` },
-=======
     headers: { Authorization: `Bearer ${dashToken}`, 'x-reauth-password': 'password123' },
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
   });
   const text = await res.text();
   server.close();

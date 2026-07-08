@@ -5,10 +5,7 @@ import { Dialog, DialogClose, DialogPopup, DialogTitle } from '@/components/ui/d
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-<<<<<<< HEAD
-=======
 import { Input } from '@/components/ui/input'
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
 import { useI18n } from '@/i18n'
 import { apiFetch, getToken } from '@/lib/api'
 import { toast } from '@/lib/toast'
@@ -24,15 +21,6 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; ext: string }[] = [
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-<<<<<<< HEAD
-async function downloadExport(format: ExportFormat, healthyOnly: boolean) {
-  const token = getToken()
-  const params = new URLSearchParams({ format })
-  if (healthyOnly) params.set('healthy', 'true')
-  const res = await fetch(`${BASE}/api/keys/export?${params}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-=======
 async function downloadExport(format: ExportFormat, healthyOnly: boolean, password: string) {
   const token = getToken()
   const params = new URLSearchParams({ format })
@@ -41,7 +29,6 @@ async function downloadExport(format: ExportFormat, healthyOnly: boolean, passwo
   if (token) headers.Authorization = `Bearer ${token}`
   if (password) headers['x-reauth-password'] = password
   const res = await fetch(`${BASE}/api/keys/export?${params}`, { headers })
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: { message: res.statusText } }))
     throw new Error(body.error?.message ?? `HTTP ${res.status}`)
@@ -60,10 +47,7 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
   const { t } = useI18n()
   const [format, setFormat] = useState<ExportFormat>('json')
   const [healthyOnly, setHealthyOnly] = useState(false)
-<<<<<<< HEAD
-=======
   const [password, setPassword] = useState('')
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
   const [exporting, setExporting] = useState(false)
 
   const { data: keys = [] } = useQuery<ApiKey[]>({
@@ -79,11 +63,7 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
   async function handleExport() {
     setExporting(true)
     try {
-<<<<<<< HEAD
-      await downloadExport(format, healthyOnly)
-=======
       await downloadExport(format, healthyOnly, password)
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
       toast.success(t('keys.exportSuccess', { count: exportCount }))
       onOpenChange(false)
     } catch (err) {
@@ -108,8 +88,6 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
 
         <div className="space-y-5">
           <div className="space-y-2">
-<<<<<<< HEAD
-=======
             <Label className="text-xs">Confirm password</Label>
             <Input
               type="password"
@@ -121,7 +99,6 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
           </div>
 
           <div className="space-y-2">
->>>>>>> 6971eb3 (feat(security): harden admin endpoints and security middleware)
             <Label className="text-xs">{t('keys.exportFormat')}</Label>
             <div className="flex gap-2">
               {FORMAT_OPTIONS.map(opt => (
