@@ -141,7 +141,10 @@
     "showingCount": "{shown} of {total} models",
     "clearFilters": "Clear filters",
     "noMatches": "No models match your filters.",
-    "noModelsTitle": "No models configured"
+    "noModelsTitle": "No models configured",
+    "visionTab": "Vision Models",
+    "coderTab": "Coder Models",
+    "groupsTab": "Model Groups"
   },
   "strategies": {
     "title": "Routing strategy",

@@ -14,11 +14,35 @@ export function ModelsTabs() {
     }`
   return (
     <div className="inline-flex gap-1 rounded-xl border p-1">
-      <NavLink to="/models/chat" className={({ isActive }) => tab(isActive)}>{t('models.chatModelsTab')}</NavLink>
-      <NavLink to="/models/embeddings" className={({ isActive }) => tab(isActive)}>{t('models.embeddingsTab')}</NavLink>
-      <NavLink to="/models/image" className={({ isActive }) => tab(isActive)}>{t('models.imageTab')}</NavLink>
-      <NavLink to="/models/audio" className={({ isActive }) => tab(isActive)}>{t('models.audioTab')}</NavLink>
-      <NavLink to="/models/fusion" className={({ isActive }) => tab(isActive)}>{t('models.fusionTab')}</NavLink>
+      <NavLink to=/models/chat className={({ isActive }) => tab(isActive)}>{t("models.chatModelsTab")}</NavLink>
+      <NavLink to=/models/embeddings className={({ isActive }) => tab(isActive)}>{t("models.embeddingsTab")}</NavLink>
+      <NavLink to=/models/groups className={({ isActive }) => tab(isActive)}>
+        {({ isActive }) => (
+          <>
+            {t("models.groupsTab")}
+            <span className={"rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide " +
+              (isActive ? "bg-background/20 text-background" : "bg-blue-500/15 text-blue-600 dark:text-blue-400")} >
+              {t("models.newBadge")}
+            </span>
+          </>
+        )}
+      </NavLink>
+      <NavLink to=/models/image className={({ isActive }) => tab(isActive)}>{t("models.imageTab")}</NavLink>
+      <NavLink to=/models/audio className={({ isActive }) => tab(isActive)}>{t("models.audioTab")}</NavLink>
+      <NavLink to=/models/fusion className={({ isActive }) => tab(isActive)}>
+        {({ isActive }) => (
+          <>
+            {t("models.fusionTab")}
+            <span className={"rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide " +
+              (
+              isActive ? "bg-background/20 text-background" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+            )
+            } >
+              {t("models.newBadge")}
+            </span>
+          </>
+        )}
+      </NavLink>
     </div>
   )
 }

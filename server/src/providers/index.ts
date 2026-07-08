@@ -2,6 +2,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import type { BaseProvider } from './base.js';
 import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
+import { OpenModelMessagesProvider } from './openmodel-messages.js';
 import { CohereProvider } from './cohere.js';
 import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
@@ -282,6 +283,9 @@ register(new OpenAICompatProvider({
 // auto-configures and works anonymously (key 0000000000, lowest queue
 // priority); a registered aihorde.net key raises priority. See issue #345.
 register(new AIHordeProvider());
+
+// OpenModel — Anthropic Messages protocol for all models (openmodel.ai)
+register(new OpenModelMessagesProvider());
 
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since

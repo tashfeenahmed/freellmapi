@@ -4,7 +4,6 @@ server/data/
 *.db
 *.db-wal
 *.db-shm
-*.bak
 # Auto-generated dev encryption key (written next to the SQLite DB when
 # ENCRYPTION_KEY is unset outside production). Never commit it.
 .encryption-key
@@ -18,3 +17,5 @@ update-hermes.sh
 
 # Monetization planning — private, never committed
 monetization/
+
+

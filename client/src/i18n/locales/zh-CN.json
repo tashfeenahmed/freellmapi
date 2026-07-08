@@ -138,7 +138,10 @@
     "displayName": "显示名称",
     "contextWindow": "上下文",
     "inFallback": "在链中",
-    "saveModelSettings": "保存模型设置"
+    "saveModelSettings": "保存模型设置",
+    "visionTab": "视觉模型",
+    "coderTab": "编码模型",
+    "groupsTab": "模型组"
   },
   "strategies": {
     "title": "路由策略",

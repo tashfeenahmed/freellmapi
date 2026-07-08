@@ -334,6 +334,21 @@ function App() {
                 <Route path="/models/image/:id" element={<MediaDetailPage modality="image" />} />
                 <Route path="/models/audio" element={<AudioPage />} />
                 <Route path="/models/audio/:id" element={<MediaDetailPage modality="audio" />} />
+                <Route path=/models/groups element={<AuxiliaryPage />} />
+                <Route path=/models/vision element={<AuxiliaryPage />} />
+                <Route path=/models/coder element={<AuxiliaryPage />} />
+                <Route path=/models/webextract element={<AuxiliaryPage />} />
+                <Route path=/models/tts element={<AuxiliaryPage />} />
+                <Route path=/models/embedding element={<AuxiliaryPage />} />
+                <Route path=/models/imagegeneration element={<AuxiliaryPage />} />
+                <Route path=/models/compression element={<AuxiliaryPage />} />
+                <Route path=/models/general element={<AuxiliaryPage />} />
+                <Route path=/models/videogen element={<AuxiliaryPage />} />
+                <Route path=/models/skillhub element={<AuxiliaryPage />} />
+                <Route path=/models/approval element={<AuxiliaryPage />} />
+                <Route path=/models/mcp element={<AuxiliaryPage />} />
+                <Route path=/models/tirlegen element={<AuxiliaryPage />} />
+                <Route path=/models/curator element={<AuxiliaryPage />} />
                 <Route path="/playground" element={<PlaygroundPage />} />
                 <Route path="/keys" element={<KeysPage />} />
                 <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />

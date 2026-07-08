@@ -19,6 +19,7 @@ import { premiumRouter } from './routes/premium.js';
 import { cacheRouter } from './routes/cache.js';
 import { authRouter } from './routes/auth.js';
 import { docsRouter } from './routes/docs.js';
+import auxiliaryRouter from './routes/auxiliary.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -99,6 +100,7 @@ export function createApp(config?: Config) {
   app.use('/v1', anthropicRouter);
   app.use('/v1', proxyRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
+app.use('/api/auxiliary', requireAuth, auxiliaryRouter);
   app.use('/v1', responsesRouter);
 
   // Health check
