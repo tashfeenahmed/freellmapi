@@ -101,6 +101,7 @@ export const MODEL_PRICING: PricingRow[] = [
   // Moonshot / MiniMax (legacy platforms, may exist in older DBs)
   ['moonshot', 'kimi-latest', 0.684, 3.42],
   ['minimax', 'MiniMax-M1', 0.40, 2.20],
+  ['minimax', 'MiniMax-M3', 0.60, 2.40],
 
   // NVIDIA NIM
   ['nvidia', 'deepseek-ai/deepseek-v4-flash', 0.098, 0.197],

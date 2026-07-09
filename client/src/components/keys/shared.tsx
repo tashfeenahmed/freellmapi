@@ -49,6 +49,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'routeway', label: 'Routeway (free key)', url: 'https://routeway.ai' },
   { value: 'bazaarlink', label: 'BazaarLink (free key)', url: 'https://bazaarlink.ai' },
   { value: 'ainative', label: 'AINative Studio (free key)', url: 'https://ainative.studio' },
+  { value: 'minimax', label: 'MiniMax', url: 'https://platform.minimax.io/user-center/basic-information/interface-key' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
 ]
 

@@ -85,6 +85,9 @@ export type Platform =
   // ~10M tokens/month free allocation (no card); quota unverified. Key from
   // ainative.studio.
   | 'ainative'
+  // MiniMax — OpenAI-compatible direct API for MiniMax models, including
+  // MiniMax-M3. Key from platform.minimax.io.
+  | 'minimax'
   // AI Horde — free, community-powered inference (volunteer workers) via an
   // OpenAI-compatible proxy (https://oai.aihorde.net/v1). Queue-based, so calls
   // can take tens of seconds; no tool support; usage is reported as kudos, not

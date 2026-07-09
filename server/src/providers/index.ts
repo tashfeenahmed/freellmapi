@@ -273,6 +273,14 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.ainative.studio/api/v1',
 }));
 
+// MiniMax — OpenAI-compatible direct API for MiniMax models. Direct support was
+// re-added for MiniMax-M3; catalog data supplies the model row and pricing.
+register(new OpenAICompatProvider({
+  platform: 'minimax',
+  name: 'MiniMax',
+  baseUrl: 'https://api.minimax.io/v1',
+}));
+
 // AI Horde — free, community-powered inference (volunteer workers) via an
 // OpenAI-compatible proxy. Dedicated AIHordeProvider (not OpenAICompatProvider)
 // because the proxy is queue-based and diverges from the OpenAI contract:
