@@ -82,6 +82,7 @@ And the free-tier landscape shifts weekly: providers launch models, retire them,
 </tr>
 <tr>
 <td align="center"><a href="https://endpoints.ai.cloud.ovh.net"><b>OVH AI Endpoints</b><br/>Qwen3.5 397B · GPT-OSS · Llama 3.3 (anon ok)</a></td>
+<td align="center"><a href="https://router.bynara.id"><b>NaraRouter</b><br/>Mistral Large · Mistral Medium · Tencent Hy3</a></td>
 <td align="center"><a href="https://aihorde.net"><b>AI Horde</b><br/>Community Llama · Gemma · Cydonia (anon ok, slow)</a></td>
 <td align="center"></td>
 <td align="center"></td>

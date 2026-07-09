@@ -163,6 +163,7 @@ export const platformColors: Record<string, string> = {
   routeway:    '#14b8a6',
   bazaarlink:  '#e11d48',
   ainative:    '#22c55e',
+  nara:         '#2563eb',
   aihorde:     '#dc2626',
 }
 

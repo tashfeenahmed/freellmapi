@@ -273,6 +273,18 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.ainative.studio/api/v1',
 }));
 
+// NaraRouter — OpenAI-compatible aggregator (router.bynara.id/v1). Free plan
+// requires a no-card API key plus Telegram channel/link verification. Live
+// probed 2026-07-09: `mistral-large`, `mistral-medium-3-5`, and `tencent-hy3`
+// answered 200 with a zero-balance account; the rest of /v1/models was
+// credit- or plan-gated. Catalog rows live in the Oracle catalog (premium now,
+// free after the 30-day model-age gate).
+register(new OpenAICompatProvider({
+  platform: 'nara',
+  name: 'NaraRouter',
+  baseUrl: 'https://router.bynara.id/v1',
+}));
+
 // AI Horde — free, community-powered inference (volunteer workers) via an
 // OpenAI-compatible proxy. Dedicated AIHordeProvider (not OpenAICompatProvider)
 // because the proxy is queue-based and diverges from the OpenAI contract:
