@@ -388,7 +388,16 @@
     "recentCalls": "最近调用",
     "clientIp": "客户端 IP",
     "clientAgent": "客户端应用",
-    "requestedModelHint": "请求了 {model}，由回退模型提供"
+    "requestedModelHint": "请求了 {model}，由回退模型提供",
+    "searchAriaLabel": "筛选表格",
+    "searchScopeAriaLabel": "筛选范围",
+    "searchScopeAll": "全部",
+    "searchScopeModels": "模型",
+    "searchScopeCalls": "调用",
+    "searchScopeErrors": "错误",
+    "searchScopeKeys": "密钥",
+    "matchedCount": "{shown} / {total}",
+    "noMatches": "无匹配项"
   },
   "playground": {
     "title": "试玩台",

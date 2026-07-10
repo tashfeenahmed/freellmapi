@@ -405,7 +405,16 @@
     "recentCalls": "Recent calls",
     "clientIp": "Client IP",
     "clientAgent": "Client app",
-    "requestedModelHint": "Requested {model}, served by fallback"
+    "requestedModelHint": "Requested {model}, served by fallback",
+    "searchAriaLabel": "Filter tables",
+    "searchScopeAriaLabel": "Filter scope",
+    "searchScopeAll": "All",
+    "searchScopeModels": "Models",
+    "searchScopeCalls": "Calls",
+    "searchScopeErrors": "Errors",
+    "searchScopeKeys": "Keys",
+    "matchedCount": "{shown} of {total}",
+    "noMatches": "No matches"
   },
   "playground": {
     "title": "Playground",

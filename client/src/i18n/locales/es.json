@@ -388,7 +388,16 @@
     "recentCalls": "Llamadas recientes",
     "clientIp": "IP del cliente",
     "clientAgent": "Aplicación cliente",
-    "requestedModelHint": "Se solicitó {model}, servido por respaldo"
+    "requestedModelHint": "Se solicitó {model}, servido por respaldo",
+    "searchAriaLabel": "Filtrar tablas",
+    "searchScopeAriaLabel": "Alcance del filtro",
+    "searchScopeAll": "Todo",
+    "searchScopeModels": "Modelos",
+    "searchScopeCalls": "Llamadas",
+    "searchScopeErrors": "Errores",
+    "searchScopeKeys": "Claves",
+    "matchedCount": "{shown} de {total}",
+    "noMatches": "Sin coincidencias"
   },
   "playground": {
     "title": "Entorno de pruebas",
