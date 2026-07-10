@@ -39,6 +39,8 @@ import {
 import { sanitizeProviderErrorMessage } from './error-redaction.js';
 import { checkKeyHealth } from '../services/health.js';
 import { getSetting } from '../db/index.js';
+import { parseProviderReportedSize } from './provider-size-parser.js';
+import { setObservedRequestTokens } from './client-context.js';
 
 // Every surface caps failover hops at the same number.
 export const FALLBACK_MAX_RETRIES = 20;
@@ -157,6 +159,17 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     recordRateLimitHit(route.modelDbId);
   }
   learnLimitFromError(route.modelDbId, err);
+
+  // Sticky per-request size from a provider 4xx: once one upstream names the
+  // real token count for THIS request (Groq "Requested N", OpenRouter "about
+  // N tokens", Cloudflare "N input tokens"), propagate it so the rest of the
+  // fallback chain can pre-skip models whose TPM ceiling can't fit it. Without
+  // this, the same 36K-token prompt hits 4-5 models in sequence and each one
+  // rejects independently — wasting both latency and per-key request budget.
+  const observed = parseProviderReportedSize(route.platform, err?.message);
+  if (observed != null) {
+    setObservedRequestTokens(observed);
+  }
 }
 
 // ── Upstream 401 handling (key-fatal, not request-fatal) ─────────────────────
