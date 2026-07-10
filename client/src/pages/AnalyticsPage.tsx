@@ -167,7 +167,7 @@ function Panel({
     <div
       className={cn(
         "rounded-3xl border bg-card transition-shadow duration-200",
-        highlighted && "ring-2 ring-primary/50 shadow-lg shadow-primary/10"
+        highlighted && "ring-4 ring-primary shadow-xl shadow-primary/30"
       )}
     >
       <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -442,7 +442,7 @@ export default function AnalyticsPage() {
             <div
               className={cn(
                 "flex items-center gap-2 rounded-xl border bg-card px-2.5 py-1 transition-shadow duration-200",
-                anyPanelHighlighted && "ring-2 ring-primary/50 shadow-lg shadow-primary/10"
+                anyPanelHighlighted && "ring-4 ring-primary shadow-xl shadow-primary/30"
               )}
             >
               <div className="relative flex-1 min-w-0 sm:w-56">
