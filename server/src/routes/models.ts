@@ -142,8 +142,25 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     }
 
     if (parsed.data.fallbackEnabled !== undefined) {
+      const fallbackEnabled = parsed.data.fallbackEnabled ? 1 : 0;
       db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?')
-        .run(parsed.data.fallbackEnabled ? 1 : 0, id);
+        .run(fallbackEnabled, id);
+      // Mirror the toggle to profile_models for the currently active profile
+      // so the profile-path router (router.ts:528-545) doesn't keep routing
+      // to a model the operator just disabled. When no profile is active,
+      // fallback_config is the only chain and the sync is a no-op.
+      // See references/profile-models-vs-fallback-config.md.
+      const activeProfile = db.prepare(
+        "SELECT value FROM settings WHERE key = 'active_profile_id'"
+      ).get() as { value: string } | undefined;
+      if (activeProfile) {
+        const profileId = Number.parseInt(activeProfile.value, 10);
+        if (Number.isInteger(profileId)) {
+          db.prepare(
+            'UPDATE profile_models SET enabled = ? WHERE profile_id = ? AND model_db_id = ?'
+          ).run(fallbackEnabled, profileId, id);
+        }
+      }
     }
   });
   applyUpdate();
