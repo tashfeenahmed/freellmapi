@@ -262,6 +262,30 @@ export function formatAttemptTrail(attempts: AttemptRecord[]): string {
   return shown.join('; ') + (extra > 0 ? `; +${extra} more` : '');
 }
 
+/**
+ * Set the failover diagnostics headers every surface stamps on its responses:
+ * X-Fallback-Attempts (how many hops failed before this response) and
+ * X-Fallback-Trail (what each hop was and why it failed). Until now the trail
+ * only reached clients inside exhaustion error MESSAGES — a request that
+ * eventually succeeded gave no hint that it burned five hops first, which is
+ * exactly the case an operator wants to notice. Control characters are
+ * scrubbed so a hostile model id can't inject header lines.
+ */
+export function setFallbackHeaders(
+  res: { setHeader(name: string, value: string): void },
+  failedAttempts: number,
+  trail: AttemptRecord[] | undefined,
+): void {
+  if (failedAttempts > 0) res.setHeader('X-Fallback-Attempts', String(failedAttempts));
+  if (trail && trail.length > 0) {
+    const value = trail
+      .slice(0, TRAIL_MAX_SHOWN)
+      .map(a => `${a.platform}/${a.modelId} key${a.keyOrdinal}=${a.errorClass}`)
+      .join('; ') + (trail.length > TRAIL_MAX_SHOWN ? `; +${trail.length - TRAIL_MAX_SHOWN} more` : '');
+    res.setHeader('X-Fallback-Trail', value.replace(/[^\t\x20-\x7e]/g, '?'));
+  }
+}
+
 export interface ExhaustionBody {
   status: number;
   type: string;
@@ -378,6 +402,16 @@ export interface FallbackHooks {
   // Circuit-breaker threshold override, mostly for tests. Defaults to
   // getMaxConsecutiveUpstreamFails() (setting → env → 0 = disabled).
   breakerLimit?: number;
+  // When provided, the loop records every failed attempt into THIS array (it
+  // is the same array used for exhaustion bodies), so the surface can stamp
+  // X-Fallback-Trail on successful responses too.
+  attemptLog?: AttemptRecord[];
+  // Returns true once the client has hung up. Checked before STARTING each
+  // retry: a chain nobody is waiting for must not keep burning provider
+  // quota. The in-flight attempt still completes (same boundary as the
+  // wall-clock budget); stream pumps additionally stop reading upstream on
+  // disconnect, which cancels the upstream request via reader.cancel().
+  clientGone?: () => boolean;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
   // mutate it, and the surface's route() reads it to exclude failed keys/models.
   state: FallbackState;
@@ -432,7 +466,7 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
   const maxRetries = hooks.maxRetries ?? FALLBACK_MAX_RETRIES;
   const budgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
   const startedAt = Date.now();
-  const attempts: AttemptRecord[] = [];
+  const attempts: AttemptRecord[] = hooks.attemptLog ?? [];
   const keyOrdinals = new Map<string, number>();
   const keyOrdinal = (route: RouteResult): number => {
     const key = `${route.platform}:${route.keyId}`;
@@ -462,6 +496,14 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
   };
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Client disconnect: nobody is waiting for this chain anymore, so stop
+    // burning provider quota on retries. Nothing to render — the socket is
+    // gone — so return without calling any exhaustion hook.
+    if (attempt > 0 && hooks.clientGone?.()) {
+      console.log(`[FallbackLoop] client disconnected — stopping failover after ${attempts.length} failed attempt(s)`);
+      return;
+    }
+
     // Wall-clock budget: refuse to START another retry once spent. The first
     // attempt always runs; a slow attempt is never aborted mid-flight (that is
     // the TODO(fallback-v2) hedging work), it just becomes the last one.

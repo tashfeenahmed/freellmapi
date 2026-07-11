@@ -23,7 +23,7 @@ import {
   traceRouteEvent,
   logRequest,
 } from './proxy.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, setFallbackHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
@@ -406,6 +406,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
 
   const responseId = newId('resp');
   const state = newFallbackState();
+  const attemptLog: AttemptRecord[] = [];
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
 
   // Stream bookkeeping (used only when stream === true). `streamStarted` is the
   // commit flag: true once the response.created/in_progress skeleton has left,
@@ -422,6 +425,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
     state,
+    attemptLog,
+    clientGone: () => clientGone,
     route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, false, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, undefined, completionOpts.response_format !== undefined),
     dispatch: async (route, attempt) => {
       traceRouteEvent('Responses', {
@@ -460,7 +465,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          setFallbackHeaders(res, attempt, attemptLog);
           const skeleton = {
             id: responseId, object: 'response', created_at: nowUnix(),
             status: 'in_progress', model: route.modelId, output: [], output_text: '',
@@ -498,6 +503,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
+      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+            if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             // In-band upstream error frame ({"error":...} inside a 200 SSE
             // stream — observed live from Groq). Throwing hands it to the catch
             // below: pre-commit it fails over, post-commit it surfaces
@@ -751,7 +759,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       setStickyModel(messages, route.modelDbId, sessionIdHeader);
 
       res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      setFallbackHeaders(res, attempt, attemptLog);
       res.json(buildResponseObject({
         id: responseId, model: route.modelId, text, toolCalls,
         promptTokens, completionTokens,
@@ -785,7 +793,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError);
     },
     onFatal: (route, err, attempt) => {
-      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      setFallbackHeaders(res, attempt, attemptLog);
       res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`, type: 'provider_error' } });
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
@@ -796,7 +804,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
         res.end();
       } else {
-        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        setFallbackHeaders(res, info.attempts.length, info.attempts);
         res.status(status).json({ error: { message, type } });
       }
     },
@@ -807,7 +815,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: exhaustion.message, type: exhaustion.type } } });
         res.end();
       } else {
-        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        setFallbackHeaders(res, info.attempts.length, info.attempts);
         res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       }
     },

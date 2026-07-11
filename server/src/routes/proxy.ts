@@ -17,7 +17,7 @@ import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
@@ -724,6 +724,9 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
   const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
   const state = newFallbackState();
+  const attemptLog: AttemptRecord[] = [];
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
 
   // Legacy /completions is a thin adapter over the shared fallback loop
   // (lib/fallback-loop.ts): the cooldown/skip/penalty/exhaustion machinery is
@@ -731,6 +734,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
     state,
+    attemptLog,
+    clientGone: () => clientGone,
     route: () => routeRequest(
       estimatedTotal,
       state.skipKeys.size > 0 ? state.skipKeys : undefined,
@@ -765,7 +770,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          setFallbackHeaders(res, attempt, attemptLog);
           headerSent = true;
           for (const frame of buffered) res.write(`data: ${JSON.stringify(frame)}\n\n`);
           buffered.length = 0;
@@ -781,6 +786,9 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
+      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+            if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const text = streamChunkText(chunk);
             if (text.length > 0) sawText = true;
             const finish = (chunk as any)?.choices?.[0]?.finish_reason;
@@ -873,7 +881,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       recordUpstreamSuccess(route, totalTokens);
 
       res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      setFallbackHeaders(res, attempt, attemptLog);
       res.json({
         id: completionIdFromChat(result.id),
         object: 'text_completion',
@@ -916,7 +924,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
     },
     onFatal: (route, err, attempt) => {
-      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      setFallbackHeaders(res, attempt, attemptLog);
       res.status(502).json({
         error: {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
@@ -926,7 +934,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
       if (exhaustion) {
-        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        setFallbackHeaders(res, info.attempts.length, info.attempts);
         res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       } else {
         const disposition: string[] = Array.isArray(routeErr.diagnostics) ? routeErr.diagnostics : [];
@@ -939,7 +947,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       }
     },
     onExhausted: (exhaustion, info) => {
-      if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+      setFallbackHeaders(res, info.attempts.length, info.attempts);
       res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
     },
   });
@@ -1407,10 +1415,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // context-handoff injection, group/unified-chain routing, and the OpenAI
   // stream turn-integrity framing.
   const state = newFallbackState();
+  const attemptLog: AttemptRecord[] = [];
+  let clientGone = false;
+  res.on('close', () => { if (!res.writableEnded) clientGone = true; });
 
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
     state,
+    attemptLog,
+    clientGone: () => clientGone,
     route: () => {
       // When a handoff could fire this turn, pad the token estimate so the router's
       // context-window and TPM checks account for the extra system message overhead.
@@ -1483,7 +1496,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-          if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+          setFallbackHeaders(res, attempt, attemptLog);
           headerSent = true;
           for (const p of preamble) res.write(`data: ${JSON.stringify(p)}\n\n`);
           preamble.length = 0;
@@ -1505,6 +1518,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
+      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
+            if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const anyChunk = chunk as Record<string, any>;
 
             // In-band upstream error frame (observed live: Groq emits
@@ -1786,7 +1802,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
 
         res.setHeader('X-Routed-Via', `${route.platform}/${route.modelId}`);
-        if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+        setFallbackHeaders(res, attempt, attemptLog);
         // Repair double-encoded tool arguments against the request's tool
         // schemas (e.g. GLM emitting an array parameter as a JSON string),
         // so strict clients don't reject the call. Schema-gated — a true
@@ -1849,7 +1865,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     },
     onFatal: (route, err, attempt) => {
       // Non-retryable error (bare 4xx, etc.): don't retry.
-      if (attempt > 0) res.setHeader('X-Fallback-Attempts', String(attempt));
+      setFallbackHeaders(res, attempt, attemptLog);
       res.status(502).json({
         error: {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
@@ -1860,7 +1876,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
       // No more models available.
       if (exhaustion) {
-        if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+        setFallbackHeaders(res, info.attempts.length, info.attempts);
         res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
       } else {
         // Synchronous exhaustion: the router rejected every candidate before any
@@ -1877,7 +1893,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     },
     onExhausted: (exhaustion, info) => {
-      if (info.attempts.length > 0) res.setHeader('X-Fallback-Attempts', String(info.attempts.length));
+      setFallbackHeaders(res, info.attempts.length, info.attempts);
       res.status(exhaustion.status).json({ error: { message: exhaustion.message, type: exhaustion.type } });
     },
   });

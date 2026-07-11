@@ -414,3 +414,46 @@ describe('runFallbackLoop: circuit-breaker guardrail (max_consecutive_upstream_f
     expect(onExhausted).not.toHaveBeenCalled();
   });
 });
+
+describe('runFallbackLoop: client disconnect + attempt log', () => {
+  const retryable = () => Object.assign(new Error('429 Too Many Requests'), { status: 429 });
+
+  it('stops starting retries once the client is gone, without rendering exhaustion', async () => {
+    const onExhausted = vi.fn();
+    let gone = false;
+    const dispatch = vi.fn(async () => { gone = true; throw retryable(); });
+
+    await runFallbackLoop(hooksSkeleton({
+      maxRetries: 20,
+      clientGone: () => gone,
+      dispatch,
+      onExhausted,
+    }));
+
+    expect(dispatch).toHaveBeenCalledTimes(1); // first attempt ran, no retry started
+    expect(onExhausted).not.toHaveBeenCalled(); // nothing to render to a dead socket
+  });
+
+  it('a connected client is unaffected (clientGone false)', async () => {
+    const onExhausted = vi.fn();
+    const dispatch = vi.fn(async () => { throw retryable(); });
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 3, clientGone: () => false, dispatch, onExhausted }));
+    expect(dispatch).toHaveBeenCalledTimes(3);
+    expect(onExhausted).toHaveBeenCalledTimes(1);
+  });
+
+  it('records failed attempts into the caller-supplied attemptLog', async () => {
+    const attemptLog: AttemptRecord[] = [];
+    let calls = 0;
+    const dispatch = vi.fn(async () => {
+      calls += 1;
+      if (calls < 3) throw retryable();
+      return 'done' as const;
+    });
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, attemptLog, dispatch }));
+
+    expect(attemptLog).toHaveLength(2); // the two failures, not the success
+    expect(attemptLog[0].errorClass).toBe('rate_limited');
+  });
+});
