@@ -330,6 +330,7 @@
     "duplicate": "Duplicate",
     "duplicatesFound": "{count} duplicate(s) detected — already exist and will be skipped.",
     "importResult": "Imported {imported}; failed {failed}.",
+    "copyKey": "Copy API key",
     "confirmRemove": "Confirm?",
     "quotaSignalsTitle": "Quota signals",
     "quotaSignalsEmptyTitle": "No quota observations yet",

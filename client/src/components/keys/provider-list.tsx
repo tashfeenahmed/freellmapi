@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, ExternalLink, KeyRound, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, Copy, Check, ExternalLink, KeyRound, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -44,6 +44,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
   const [editingLabel, setEditingLabel] = useState('')
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
+  const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
   // Explicit user open/closed overrides per provider group; absent = default.
   const [groupOverrides, setGroupOverrides] = useState<Map<string, boolean>>(new Map())
   const [search, setSearch] = useState('')
@@ -162,6 +163,13 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       editInputRef.current.focus()
     }
   }, [editingKeyId])
+
+  const copyKey = useCallback(async (id: number) => {
+    const data = await apiFetch(`/api/keys/${id}/reveal`) as { key: string }
+    await navigator.clipboard.writeText(data.key)
+    setCopiedKeyId(id)
+    setTimeout(() => setCopiedKeyId(null), 1500)
+  }, [])
 
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
@@ -400,6 +408,18 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               </span>
                             )}
                             <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+                              <Tooltip text={copiedKeyId === k.id ? t('common.copied') : t('keys.copyKey')}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => void copyKey(k.id)}
+                                  aria-label={t('keys.copyKey')}
+                                >
+                                  {copiedKeyId === k.id
+                                    ? <Check className="size-3 text-emerald-500" />
+                                    : <Copy className="size-3" />}
+                                </Button>
+                              </Tooltip>
                               {!isEditing && (
                                 <Button
                                   variant="ghost"

@@ -711,6 +711,35 @@ keysRouter.post('/import-selected', (req: Request, res: Response) => {
 });
 
 // Delete a key
+// Reveal a single key's plaintext value — used by the dashboard "Copy key" button.
+// GET /api/keys/:id/reveal
+keysRouter.get('/:id/reveal', (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: { message: 'Invalid key ID' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys WHERE id = ?').get(id) as
+    | { encrypted_key: string; iv: string; auth_tag: string }
+    | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: 'Key not found' } });
+    return;
+  }
+
+  let key: string;
+  try {
+    key = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+  } catch {
+    res.status(500).json({ error: { message: 'Failed to decrypt key' } });
+    return;
+  }
+
+  res.json({ key });
+});
+
 keysRouter.delete('/:id', (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
