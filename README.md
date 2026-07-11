@@ -123,6 +123,7 @@ The full, always-current list lives at **[freellmapi.co/models](https://freellma
 - **Admin dashboard** — React + Vite UI to manage keys, reorder the fallback chain, inspect analytics, and run prompts in a playground. Dark mode included.
 - **Analytics** — Per-request logging with latency (p50 / p95 and time-to-first-token for streams), token counts, success rate, estimated cost savings, and per-provider / per-model / per-key breakdowns over 24h to 90d windows.
 - **Interactive API docs** — `GET /v1/docs` serves a dependency-free OpenAPI viewer covering every proxy endpoint; the spec itself lives at `GET /v1/openapi.json`.
+- **MCP server** — `POST /mcp` speaks the Model Context Protocol (Streamable HTTP), so MCP-capable agents can ask the router which free models are usable right now (with per-model `supported_parameters`), check provider/key health and cooldowns, read usage and cache stats, and switch the routing strategy mid-session. See [Coding agents](#coding-agents).
 - **Encrypted DB backups** — optional periodic encrypted snapshots of the SQLite database to a local path or HTTP target, restored automatically on a fresh boot (`FREEAPI_DB_BACKUP_*` env vars).
 - **Context handoff on model switch** — Optional. When a session falls over to a different model, injects one compact system message so the new model knows it is continuing an existing task. Disabled by default; enable with `FREELLMAPI_CONTEXT_HANDOFF=on_model_switch`. See [Context Handoff](#context-handoff).
 - **Runs anywhere Node 20+ runs** — Windows, macOS, Linux servers, or a small ARM SBC (Raspberry Pi included). ~40 MB RSS at idle behind PM2 / systemd / whatever supervisor you prefer.
@@ -416,6 +417,18 @@ a model (`auto` lets the router pick).
 | **Aider** | `OPENAI_API_BASE=http://localhost:3001/v1` + `OPENAI_API_KEY=<unified key>`, then `aider --model openai/auto` |
 | **opencode** | OpenAI-compatible provider with the same base URL and key |
 | **Cursor** | paste the unified key under a custom OpenAI base URL — but note Cursor verifies and calls the API **from its servers**, so your router must be reachable from the internet (a tunnel or a host with a public address), not just `localhost` |
+
+On top of inference, the router is an **MCP server**: agents can introspect it mid-session
+(usable models and the params each one honors, provider health, usage and cache stats,
+routing strategy). For Claude Code:
+
+```bash
+claude mcp add --transport http freellmapi http://localhost:3001/mcp \
+  --header "Authorization: Bearer freellmapi-your-unified-key"
+```
+
+Any MCP client that speaks Streamable HTTP works the same way: point it at `/mcp` with the
+unified key as a Bearer token.
 
 FreeLLMAPI is local-first and single-user by design. Your provider keys stay in
 your SQLite database, encrypted at rest, and requests go from your machine to the
