@@ -102,6 +102,10 @@ export type Platform =
   // aihorde.net key raises queue priority. Has a dedicated AIHordeProvider that
   // normalizes the proxy's OpenAI divergences. See issue #345.
   | 'aihorde'
+  // Alibaba Model Studio (Aliyun MAAS) — OpenAI-compatible endpoint. 1M-token
+  // free quota per model (expires 2026-08-31); key from
+  // bailian.console.aliyun.com (no card for the free tier grants).
+  | 'modelstudio'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

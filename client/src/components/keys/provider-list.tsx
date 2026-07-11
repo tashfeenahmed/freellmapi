@@ -408,18 +408,20 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               </span>
                             )}
                             <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-                              <Tooltip text={copiedKeyId === k.id ? t('common.copied') : t('keys.copyKey')}>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => void copyKey(k.id)}
-                                  aria-label={t('keys.copyKey')}
-                                >
-                                  {copiedKeyId === k.id
-                                    ? <Check className="size-3 text-emerald-500" />
-                                    : <Copy className="size-3" />}
-                                </Button>
-                              </Tooltip>
+                              {!k.keyless && (
+                                <Tooltip text={copiedKeyId === k.id ? t('common.copied') : t('keys.copyKey')}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => void copyKey(k.id)}
+                                    aria-label={t('keys.copyKey')}
+                                  >
+                                    {copiedKeyId === k.id
+                                      ? <Check className="size-3 text-emerald-500" />
+                                      : <Copy className="size-3" />}
+                                  </Button>
+                                </Tooltip>
+                              )}
                               {!isEditing && (
                                 <Button
                                   variant="ghost"

@@ -324,6 +324,18 @@ register(new OpenAICompatProvider({
 // priority); a registered aihorde.net key raises priority. See issue #345.
 register(new AIHordeProvider());
 
+// Alibaba Model Studio (Aliyun MAAS) — OpenAI-compatible. 1M-token free quota
+// per model; key from bailian.console.aliyun.com. The endpoint path includes
+// a workspace-specific prefix but the /compatible-mode/v1 suffix is the
+// standard OpenAI-compatible path they document. Reasoning models can take
+// 30-60s on long prompts, so the timeout is bumped to 90s.
+register(new OpenAICompatProvider({
+  platform: 'modelstudio',
+  name: 'Model Studio',
+  baseUrl: 'https://ws-vjedqv3gk6xvrbw1.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+  timeoutMs: 90_000,
+}));
+
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since
 // a custom provider's base URL is user-supplied and lives on the api_keys row.

@@ -67,6 +67,7 @@ export interface TokenUsageData {
   totalBudget: number
   totalUsed: number
   models: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
+  oneTimeModels?: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
 }
 
 // Custom endpoints all share the generic 'custom' platform id, so show the
@@ -167,6 +168,7 @@ export const platformColors: Record<string, string> = {
   requesty:    '#10b981',
   nara:         '#2563eb',
   aihorde:     '#dc2626',
+  modelstudio: '#e87722',
 }
 
 // ── Grouped (unified) rendering ──────────────────────────────────────────────

@@ -53,6 +53,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'requesty', label: 'Requesty (free key)', url: 'https://www.requesty.ai' },
   { value: 'nara', label: 'NaraRouter (free key)', url: 'https://router.bynara.id' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
+  { value: 'modelstudio', label: 'Model Studio / Aliyun (free key)', url: 'https://bailian.console.aliyun.com' },
 ]
 
 // 'custom' is configured through its own form (base URL + model), not the

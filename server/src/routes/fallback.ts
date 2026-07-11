@@ -303,7 +303,14 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
       .map(k => [k.platform, k.count])
   );
 
-  const modelBudgets = rawModels
+  // One-time grant labels contain a bare number+unit but no `~` prefix and no
+  // recurring-period language — e.g. '1M tokens'. Monthly rolling budgets use `~`
+  // (e.g. '~30M', '~3M'). Split so the client can render two separate sections.
+  function isOneTimeGrant(label: string): boolean {
+    return /^\d[\d.]*[MK]\s+tokens/i.test(label);
+  }
+
+  const allBudgets = rawModels
     .filter(m => platformSet.has(m.platform))
     .map(m => {
       const keys = Math.max(1, keyCountMap.get(m.platform) ?? 1);
@@ -312,6 +319,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
         displayName: m.display_name,
         platform: m.platform,
         modelId: m.model_id,
+        budgetLabel: m.monthly_token_budget,
         budget: parseBudget(m.monthly_token_budget) * keys,
         used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
         enabled: m.enabled === 1,
@@ -322,13 +330,33 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
       };
     });
 
-  // Total budget counts all models (both enabled and disabled — they contribute to the pool)
-  const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
-  const totalUsed = modelBudgets.reduce((s, m) => s + m.used, 0);
+  const monthlyModels = allBudgets.filter(m => !isOneTimeGrant(m.budgetLabel));
+  const oneTimeModels = allBudgets.filter(m => isOneTimeGrant(m.budgetLabel) && m.budget > 0);
+
+  // Collapse duplicate model names for one-time grants (same model_id across many
+  // dated snapshots) — sum their budgets and used tokens into a single row so the
+  // list doesn't show 5 rows for "Qwen Plus (Model Studio)".
+  const oneTimeCollapsed = new Map<string, typeof oneTimeModels[number]>();
+  for (const m of oneTimeModels) {
+    // Key by display name to merge snapshots (e.g. "Qwen3 Max 2025-09-23" stays separate,
+    // but we preserve per-model granularity — the display names are already distinct)
+    const existing = oneTimeCollapsed.get(m.displayName);
+    if (existing) {
+      existing.budget += m.budget;
+      existing.used += m.used;
+    } else {
+      oneTimeCollapsed.set(m.displayName, { ...m });
+    }
+  }
+
+  // Total budget counts all monthly models (rolling pool)
+  const totalBudget = monthlyModels.reduce((s, m) => s + m.budget, 0);
+  const totalUsed = monthlyModels.reduce((s, m) => s + m.used, 0);
 
   res.json({
     totalBudget,
     totalUsed,
-    models: modelBudgets,
+    models: monthlyModels,
+    oneTimeModels: [...oneTimeCollapsed.values()].sort((a, b) => b.budget - a.budget),
   });
 });

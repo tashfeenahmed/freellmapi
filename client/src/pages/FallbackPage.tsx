@@ -231,8 +231,10 @@ export default function FallbackPage() {
         {/* First-run checklist: hides itself once the install has keys + a request */}
         <GettingStarted />
 
-        {/* Monthly token budget — moved to the top */}
-        {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
+        {/* Monthly token budget + one-time quota grants */}
+        {tokenUsage && (tokenUsage.totalBudget > 0 || (tokenUsage.oneTimeModels?.length ?? 0) > 0) && (
+          <TokenUsageBar data={tokenUsage} />
+        )}
 
         {/* Strategy selector */}
         <section className="rounded-3xl border bg-card p-5">
