@@ -31,6 +31,14 @@ function sanitizeCohereTools(tools?: ChatToolDefinition[]): ChatToolDefinition[]
 export class CohereProvider extends BaseProvider {
   readonly platform = 'cohere' as const;
   readonly name = 'Cohere';
+  /** Per-provider HTTP timeout override. Mirrors OpenAICompatProvider. Override
+   * at registration with `getProviderTimeoutMs('cohere')` (env-driven). */
+  private readonly timeoutMs: number;
+
+  constructor(opts: { timeoutMs?: number } = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? 15000;
+  }
 
   async chatCompletion(
     apiKey: string,
@@ -57,7 +65,7 @@ export class CohereProvider extends BaseProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -103,7 +111,7 @@ export class CohereProvider extends BaseProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-    });
+    }, this.timeoutMs);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,

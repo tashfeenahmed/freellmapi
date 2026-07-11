@@ -28,6 +28,7 @@ const DEFAULT_PROVIDER_TIMEOUTS_MS: Partial<Record<Platform, number>> = {
   google: 60_000,
   nvidia: 90_000,
   ollama: 120_000,
+  aihorde: 120_000, // queued generations — most finish in tens of seconds
   custom: 120_000,
 };
 
@@ -107,11 +108,13 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://models.github.ai/inference',
 }));
 
-// Cohere - OpenAI-compatible via Cohere compatibility endpoint
-register(new CohereProvider());
+// Cohere - OpenAI-compatible via Cohere compatibility endpoint.
+// Override the 15s default with PROVIDER_TIMEOUT_COHERE=<ms>.
+register(new CohereProvider({ timeoutMs: getProviderTimeoutMs('cohere') }));
 
 // Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
-register(new CloudflareProvider());
+// Override the 15s default with PROVIDER_TIMEOUT_CLOUDFLARE=<ms>.
+register(new CloudflareProvider({ timeoutMs: getProviderTimeoutMs('cloudflare') }));
 
 // Zhipu (Z.ai / bigmodel.cn) - OpenAI-compatible
 register(new OpenAICompatProvider({
@@ -322,10 +325,11 @@ register(new OpenAICompatProvider({
 // because the proxy is queue-based and diverges from the OpenAI contract:
 // max_tokens must be >=16, stop must be an array, no tool calling, usage is
 // reported as kudos (synthesized into token counts), and calls can take tens of
-// seconds (120s timeout, no upstream streaming). Registered keyless so it
+// seconds (120s default timeout, configurable). Registered keyless so it
 // auto-configures and works anonymously (key 0000000000, lowest queue
 // priority); a registered aihorde.net key raises priority. See issue #345.
-register(new AIHordeProvider());
+// Override the 120s default with PROVIDER_TIMEOUT_AIHORDE=<ms>.
+register(new AIHordeProvider({ timeoutMs: getProviderTimeoutMs('aihorde') }));
 
 // Placeholder so getProvider('custom')/hasProvider('custom')/getAllProviders()
 // behave — but the real instance is built per-key by resolveProvider(), since

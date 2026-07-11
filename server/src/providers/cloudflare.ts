@@ -15,6 +15,14 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
 export class CloudflareProvider extends BaseProvider {
   readonly platform = 'cloudflare' as const;
   readonly name = 'Cloudflare Workers AI';
+  /** Per-provider HTTP timeout override. Mirrors OpenAICompatProvider. Override
+   * at registration with `getProviderTimeoutMs('cloudflare')` (env-driven). */
+  private readonly timeoutMs: number;
+
+  constructor(opts: { timeoutMs?: number } = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? 15000;
+  }
 
   private parseKey(apiKey: string): { accountId: string; token: string } {
     const sep = apiKey.indexOf(':');
@@ -57,7 +65,7 @@ export class CloudflareProvider extends BaseProvider {
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
       }),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -105,7 +113,7 @@ export class CloudflareProvider extends BaseProvider {
         parallel_tool_calls: options?.parallel_tool_calls,
         stream: true,
       }),
-    });
+    }, this.timeoutMs);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,

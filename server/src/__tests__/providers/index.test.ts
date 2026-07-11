@@ -37,10 +37,13 @@ describe('PROVIDER_TIMEOUT_<PLATFORM> env override', () => {
     expect(getProviderTimeoutMs('google')).toBe(60_000);
     expect(getProviderTimeoutMs('nvidia')).toBe(90_000);
     expect(getProviderTimeoutMs('ollama')).toBe(120_000);
+    expect(getProviderTimeoutMs('aihorde')).toBe(120_000);
     expect(getProviderTimeoutMs('custom')).toBe(120_000);
     expect(getProviderTimeoutMs('groq')).toBe(15_000);
     expect(getProviderTimeoutMs('openrouter')).toBe(15_000);
     expect(getProviderTimeoutMs('mistral')).toBe(15_000);
+    expect(getProviderTimeoutMs('cohere')).toBe(15_000);
+    expect(getProviderTimeoutMs('cloudflare')).toBe(15_000);
   });
 
   it('honours the env var when set to a positive integer', () => {
@@ -71,9 +74,24 @@ describe('PROVIDER_TIMEOUT_<PLATFORM> env override', () => {
     // nvidia defaults to 90s; env var can raise it.
     process.env.PROVIDER_TIMEOUT_NVIDIA = '180000';
     expect(getProviderTimeoutMs('nvidia')).toBe(180_000);
-    // custom defaults to 120s.
+    // ollama / aihorde / custom default to 120s; env var can lower them.
+    process.env.PROVIDER_TIMEOUT_OLLAMA = '60000';
+    expect(getProviderTimeoutMs('ollama')).toBe(60_000);
+    process.env.PROVIDER_TIMEOUT_AIHORDE = '240000';
+    expect(getProviderTimeoutMs('aihorde')).toBe(240_000);
     process.env.PROVIDER_TIMEOUT_CUSTOM = '60000';
     expect(getProviderTimeoutMs('custom')).toBe(60_000);
+  });
+
+  it('honours overrides for cohere / cloudflare (regression — used to be hardcoded)', () => {
+    // Before the constructor refactor, CohereProvider and CloudflareProvider
+    // called fetchWithTimeout with no third argument, silently falling back
+    // to BaseProvider's 15s default. Setting PROVIDER_TIMEOUT_* had no effect
+    // on them. After: the registration wires getProviderTimeoutMs() through.
+    process.env.PROVIDER_TIMEOUT_COHERE = '45000';
+    expect(getProviderTimeoutMs('cohere')).toBe(45_000);
+    process.env.PROVIDER_TIMEOUT_CLOUDFLARE = '60000';
+    expect(getProviderTimeoutMs('cloudflare')).toBe(60_000);
   });
 
   it('uses the generic 15s default for unrecognised platforms', () => {
@@ -90,5 +108,8 @@ describe('PROVIDER_TIMEOUT_<PLATFORM> env override', () => {
     expect(getProvider('google')?.name).toBe('Google AI Studio');
     expect(getProvider('nvidia')?.name).toBe('NVIDIA NIM');
     expect(getProvider('ollama')?.name).toBe('Ollama Cloud');
+    expect(getProvider('cohere')?.name).toBe('Cohere');
+    expect(getProvider('cloudflare')?.name).toBe('Cloudflare Workers AI');
+    expect(getProvider('aihorde')?.name).toBe('AI Horde');
   });
 });

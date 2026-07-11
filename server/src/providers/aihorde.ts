@@ -19,8 +19,9 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
  *
  *  - QUEUED execution. A request waits for whatever volunteer workers are
  *    online, so a single call can take tens of seconds to minutes. Hence the
- *    120s timeout and the no-upstream-streaming design — one queued generation,
- *    surfaced whole (streamChatCompletion emits it as a single delta).
+ *    120s timeout (configurable via PROVIDER_TIMEOUT_AIHORDE) and the
+ *    no-upstream-streaming design — one queued generation, surfaced whole
+ *    (streamChatCompletion emits it as a single delta).
  *  - `max_tokens` must be >= 16 or the proxy 422s. We floor it, and default it
  *    when the caller omits it so a worker doesn't run to its own (often large)
  *    internal cap on every call.
@@ -41,7 +42,7 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
 const ANON_KEY = '0000000000';
 const MIN_MAX_TOKENS = 16;
 const DEFAULT_MAX_TOKENS = 512;
-const HORDE_TIMEOUT_MS = 120000;
+const DEFAULT_TIMEOUT_MS = 120000;
 
 /** Rough token estimate (~4 chars/token) used only to fill usage when the proxy
  * returns kudos instead of token counts. Good enough for analytics, never
@@ -67,6 +68,16 @@ export class AIHordeProvider extends BaseProvider {
    * bearer. A stored real horde key replaces the sentinel for higher priority. */
   keyless = true;
   private readonly baseUrl = 'https://oai.aihorde.net/v1';
+  /** Per-provider HTTP timeout override. Mirrors OpenAICompatProvider. Override
+   * at registration with `getProviderTimeoutMs('aihorde')` (env-driven). The
+   * default 120s covers the typical queued-generation case; some workers take
+   * longer (tens of seconds to minutes) so this is operator-tunable. */
+  private readonly timeoutMs: number;
+
+  constructor(opts: { timeoutMs?: number } = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  }
 
   /** Map the stored credential to the bearer we send upstream. The keyless flow
    * stores `'no-key'` (or nothing) for the anonymous case → send AI Horde's
@@ -137,7 +148,7 @@ export class AIHordeProvider extends BaseProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(this.buildBody(messages, modelId, options)),
-    }, options?.timeoutMs ?? HORDE_TIMEOUT_MS);
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
