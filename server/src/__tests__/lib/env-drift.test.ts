@@ -50,6 +50,8 @@ describe('env drift warnings', () => {
         'OLD_FLAG=true',
         'NODE_ENV=production',
         'PROVIDER_DAILY_REQUEST_CAP_GROQ=50',
+        'PROVIDER_TIMEOUT_GROQ=30000',
+        'PROVIDER_TIMEOUT_NVIDIA=120000',
       ].join('\n'),
       'ENCRYPTION_KEY=your-key\nPORT=3001\n# HOST=::\n',
     );

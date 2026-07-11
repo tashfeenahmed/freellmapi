@@ -12,16 +12,46 @@ function register(provider: BaseProvider) {
   providers.set(provider.platform, provider);
 }
 
+/**
+ * Per-provider HTTP timeout for outbound chat/embedding requests. Built-in
+ * defaults below; override per provider with an env var, e.g.
+ *   PROVIDER_TIMEOUT_GROQ=30000      (set 0 to disable the timeout)
+ * Pattern and precedence mirror `getProviderDailyRequestCap` in
+ * services/ratelimit.ts so the two env-var families behave the same.
+ *
+ * 0 is intentionally valid: it disables the timeout entirely (AbortSignal
+ * never fires) for hosts that need it (e.g. local llama.cpp with very long
+ * cold starts). The constructor's own default is the fallback used when the
+ * env var is unset or unparseable.
+ */
+const DEFAULT_PROVIDER_TIMEOUTS_MS: Partial<Record<Platform, number>> = {
+  google: 60_000,
+  nvidia: 90_000,
+  ollama: 120_000,
+  custom: 120_000,
+};
+
+export function getProviderTimeoutMs(platform: Platform): number {
+  const raw = process.env[`PROVIDER_TIMEOUT_${platform.toUpperCase()}`];
+  if (raw !== undefined && raw.trim() !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n; // 0 is valid (disabled)
+  }
+  return DEFAULT_PROVIDER_TIMEOUTS_MS[platform] ?? 15_000;
+}
+
 // Google - unique Gemini API format. Gemma reasoning variants take 20-60s on
 // cold start; the default 15s false-flags them as broken. 60s covers the
 // bulk; per-call overrides via CompletionOptions.timeoutMs still win.
-register(new GoogleProvider({ timeoutMs: 60_000 }));
+// Override the 60s default with PROVIDER_TIMEOUT_GOOGLE=<ms>.
+register(new GoogleProvider({ timeoutMs: getProviderTimeoutMs('google') }));
 
-// Groq - OpenAI-compatible
+// Groq - OpenAI-compatible. Override with PROVIDER_TIMEOUT_GROQ=<ms>.
 register(new OpenAICompatProvider({
   platform: 'groq',
   name: 'Groq',
   baseUrl: 'https://api.groq.com/openai/v1',
+  timeoutMs: getProviderTimeoutMs('groq'),
 }));
 
 // Cerebras - OpenAI-compatible
@@ -41,12 +71,13 @@ register(new OpenAICompatProvider({
 // parallel_tool_calls to false when tools are present. See issue #255.
 // Reasoning models (deepseek-v4-pro, llama-4-maverick, llama-3.1/3.3-70b) take
 // 30-60s on cold start; the default 15s false-flags them as broken. 90s.
+// Override the 90s default with PROVIDER_TIMEOUT_NVIDIA=<ms>.
 register(new OpenAICompatProvider({
   platform: 'nvidia',
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   forceSingleToolCall: true,
-  timeoutMs: 90_000,
+  timeoutMs: getProviderTimeoutMs('nvidia'),
 }));
 
 // Mistral - OpenAI-compatible
@@ -113,11 +144,12 @@ register(new OpenAICompatProvider({
 // regularly take 30-90s on Ollama Cloud Free, so the timeout is bumped from
 // the default 15s. Ollama returns reasoning in `message.reasoning` (not
 // `reasoning_content`) — handled by normalizeChoices.
+// Override the 120s default with PROVIDER_TIMEOUT_OLLAMA=<ms>.
 register(new OpenAICompatProvider({
   platform: 'ollama',
   name: 'Ollama Cloud',
   baseUrl: 'https://ollama.com/v1',
-  timeoutMs: 120000,
+  timeoutMs: getProviderTimeoutMs('ollama'),
 }));
 
 // Kilo AI Gateway — OpenAI-compatible aggregator. Kilo documents anonymous
@@ -304,9 +336,11 @@ register(new OpenAICompatProvider({
   baseUrl: '',
 }));
 
-// Locally-hosted inference (llama.cpp / vLLM / Ollama on CPU) can be slow, so
-// custom providers get the same extended timeout as Ollama Cloud.
-const CUSTOM_PROVIDER_TIMEOUT_MS = 120000;
+// Per-key custom providers are constructed fresh by resolveProvider() below.
+// The HTTP timeout default is the same as Ollama Cloud (120s) since custom
+// base URLs most often point at locally-hosted inference (llama.cpp / vLLM
+// / Ollama on CPU) where 15s is far too tight. Override with
+// PROVIDER_TIMEOUT_CUSTOM=<ms>.
 
 export function getProvider(platform: Platform): BaseProvider | undefined {
   return providers.get(platform);
@@ -326,7 +360,7 @@ export function resolveProvider(platform: Platform, baseUrl?: string | null): Ba
       platform: 'custom',
       name: 'Custom (OpenAI-compatible)',
       baseUrl: trimmed,
-      timeoutMs: CUSTOM_PROVIDER_TIMEOUT_MS,
+      timeoutMs: getProviderTimeoutMs('custom'),
     });
   }
   return providers.get(platform);

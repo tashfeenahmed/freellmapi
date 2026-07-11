@@ -22,6 +22,7 @@ const KNOWN_UNDOCUMENTED_ENV = new Set([
 
 const KNOWN_UNDOCUMENTED_PATTERNS = [
   /^PROVIDER_DAILY_REQUEST_CAP_[A-Z0-9_]+$/,
+  /^PROVIDER_TIMEOUT_[A-Z0-9_]+$/,
 ];
 
 export interface EnvDriftReport {
