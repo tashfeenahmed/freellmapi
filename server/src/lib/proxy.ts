@@ -399,3 +399,11 @@ export function isProxyActive(): boolean {
   if (!_initialized) applyProxyUrl('');
   return _proxyEnabled && !!_proxyUrl;
 }
+
+/** Force-rebuild the proxy dispatcher on the next request. Called on
+ *  sleep/wake recovery to drop pooled TCP connections that died while the
+ *  host was suspended (undici keeps them warm and would hand a dead socket
+ *  to the first post-wake request). */
+export function flushProxyCache(): void {
+  cached = null;
+}
