@@ -13,6 +13,12 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
  * API key format expected: "account_id:api_token"
  * The account_id is extracted from the key to build the URL.
  */
+
+// Workers AI hosts reasoning models (@cf/zai-org/glm-4.7-flash) that spend
+// well over the 15s fetch default before the first byte (live sweep
+// 2026-07-11: repeated 15s aborts). Matches zhipu/agnes/ollama bumps.
+const CHAT_TIMEOUT_MS = 60_000;
+
 export class CloudflareProvider extends BaseProvider {
   readonly platform = 'cloudflare' as const;
   readonly name = 'Cloudflare Workers AI';
@@ -59,7 +65,7 @@ export class CloudflareProvider extends BaseProvider {
         parallel_tool_calls: options?.parallel_tool_calls,
         ...extendedBodyParams(this.platform, options),
       }),
-    });
+    }, CHAT_TIMEOUT_MS);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -108,7 +114,7 @@ export class CloudflareProvider extends BaseProvider {
         ...extendedBodyParams(this.platform, options),
         stream: true,
       }),
-    });
+    }, CHAT_TIMEOUT_MS);
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
