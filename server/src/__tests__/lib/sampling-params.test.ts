@@ -114,7 +114,7 @@ describe('live-sweep policy findings (2026-07-11 demo-box validation)', () => {
   it('reka: json_object upgraded to a permissive json_schema on the wire', () => {
     const body = extendedBodyParams('reka', { response_format: { type: 'json_object' } });
     expect((body.response_format as any).type).toBe('json_schema');
-    expect((body.response_format as any).json_schema.schema).toEqual({ type: 'object' });
+    expect((body.response_format as any).json_schema.schema).toEqual({ type: 'object', properties: {}, additionalProperties: true });
   });
 
   it('reka: an explicit json_schema passes through untouched', () => {

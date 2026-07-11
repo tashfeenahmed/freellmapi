@@ -152,10 +152,13 @@ export const PLATFORM_PARAM_POLICIES: Record<string, PlatformParamPolicy> = {
 };
 
 // The permissive schema a json_object request is upgraded to on platforms
-// that only accept json_schema (any JSON object satisfies it).
+// that only accept json_schema (any JSON object satisfies it). The empty
+// `properties` map matters: Reka 503s on a bare {type:'object'} but accepts
+// this shape (probed live 2026-07-11); additionalProperties keeps arbitrary
+// keys legal.
 const ANY_OBJECT_SCHEMA = {
   type: 'json_schema' as const,
-  json_schema: { name: 'json_output', schema: { type: 'object' } },
+  json_schema: { name: 'json_output', schema: { type: 'object', properties: {}, additionalProperties: true } },
 };
 
 /**
