@@ -111,6 +111,11 @@ export function pickSamplingParams(body: ParsedSamplingBody): ExtendedSamplingOp
 export interface PlatformParamPolicy {
   drop?: readonly ExtendedSamplingKey[];
   rename?: Readonly<Partial<Record<ExtendedSamplingKey, string>>>;
+  // The platform supports json_schema but 400s on json_object (observed live:
+  // Reka — "Unsupported response_format type: 'json_object'. Supported types
+  // are 'text' and 'json_schema'."). Upgrade json_object to a permissive
+  // json_schema on the wire instead of dropping structured output entirely.
+  jsonObjectToSchema?: boolean;
 }
 
 export const PLATFORM_PARAM_POLICIES: Record<string, PlatformParamPolicy> = {
@@ -137,6 +142,20 @@ export const PLATFORM_PARAM_POLICIES: Record<string, PlatformParamPolicy> = {
   cloudflare: { drop: ['min_p', 'logit_bias', 'logprobs', 'top_logprobs'] },
   // AI Horde builds its own payload format; none of the extended set maps.
   aihorde: { drop: [...EXTENDED_SAMPLING_KEYS] },
+  // Kilo's anonymous gateway 400s ("Provider returned error") whenever
+  // response_format is present — observed live 2026-07-11; seed passes fine.
+  // Dropping it also makes structured-output routing skip kilo entirely.
+  kilo: { drop: ['response_format'] },
+  // Reka supports json_schema but rejects json_object (live 2026-07-11);
+  // upgraded on the wire instead of dropped.
+  reka: { jsonObjectToSchema: true },
+};
+
+// The permissive schema a json_object request is upgraded to on platforms
+// that only accept json_schema (any JSON object satisfies it).
+const ANY_OBJECT_SCHEMA = {
+  type: 'json_schema' as const,
+  json_schema: { name: 'json_output', schema: { type: 'object' } },
 };
 
 /**
@@ -151,8 +170,12 @@ export function extendedBodyParams(platform: string, options: ExtendedSamplingOp
   const out: Record<string, unknown> = {};
   for (const key of EXTENDED_SAMPLING_KEYS) {
     if (dropped.has(key)) continue;
-    const value = (options as Record<string, unknown>)[key];
+    let value = (options as Record<string, unknown>)[key];
     if (value === undefined) continue;
+    if (key === 'response_format' && policy?.jsonObjectToSchema
+        && (value as { type?: string }).type === 'json_object') {
+      value = ANY_OBJECT_SCHEMA;
+    }
     out[policy?.rename?.[key] ?? key] = value;
   }
   return out;
