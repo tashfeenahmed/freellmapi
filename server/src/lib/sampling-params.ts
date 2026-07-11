@@ -158,6 +158,12 @@ export function extendedBodyParams(platform: string, options: ExtendedSamplingOp
   return out;
 }
 
+/** True when this platform's policy strips response_format before send — the
+ *  router uses it to skip such platforms for structured-output requests. */
+export function platformDropsResponseFormat(platform: string): boolean {
+  return PLATFORM_PARAM_POLICIES[platform]?.drop?.includes('response_format') ?? false;
+}
+
 /** The advertised parameter list for a model on `platform` — the base set
  *  every surface supports, plus tools when the model does, minus the
  *  platform's droplist. */

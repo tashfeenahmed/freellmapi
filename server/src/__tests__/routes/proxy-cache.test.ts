@@ -140,7 +140,9 @@ describe('Response cache (proxy integration)', () => {
   });
 
   it('requests differing only in response_format, seed, or stop never collide', async () => {
-    const counter = mockGroq('knob-sensitive');
+    // A JSON string literal: valid JSON, so the response_format variant below
+    // survives the structured-output enforcement instead of failing over.
+    const counter = mockGroq('"knob-sensitive"');
     await chat(); // plain → MISS, populates
     // Same prompt with response_format json_object must be a MISS, not a
     // replay of the cached plain-text answer.

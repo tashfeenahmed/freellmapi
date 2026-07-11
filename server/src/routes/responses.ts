@@ -26,6 +26,7 @@ import {
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
+import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -421,7 +422,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
     state,
-    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, false, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined),
+    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, false, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, undefined, completionOpts.response_format !== undefined),
     dispatch: async (route, attempt) => {
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',
@@ -727,6 +728,20 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           new Error(`empty completion from ${route.displayName}`),
           result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
         );
+      }
+
+      // Structured-output enforcement — see /chat/completions. Heal fenced or
+      // prose-wrapped JSON in place, fail over (skipBench) when the model
+      // ignored the requested format outright.
+      if (completionOpts.response_format && text && toolCalls.length === 0) {
+        const enforced = enforceJsonContent(text);
+        if (!enforced.ok) {
+          throw Object.assign(
+            new Error(`${route.displayName} ignored response_format (returned non-JSON despite ${completionOpts.response_format.type})`),
+            { skipBench: true },
+          );
+        }
+        if (enforced.healed) text = enforced.content;
       }
 
       // Usage fallback: a missing provider `usage` block used to record 0

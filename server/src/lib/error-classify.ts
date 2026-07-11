@@ -62,6 +62,10 @@ export function isRetryableError(err: any): boolean {
     // all thrown before any byte reached the client, so another model can
     // serve the request invisibly.
     || msg.includes('empty completion')
+    // The model answered in prose despite a response_format request (and the
+    // JSON couldn't be healed out of the text) — thrown before any byte
+    // reached the client, so the next candidate can serve it invisibly.
+    || msg.includes('ignored response_format')
     || msg.includes('in-band provider error')
     || msg.includes('stream ended unexpectedly')
     || msg.includes('stream stalled')
