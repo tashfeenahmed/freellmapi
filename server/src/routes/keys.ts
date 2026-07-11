@@ -1,9 +1,13 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'path';
 import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
+import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
+import { assessProviderUrl } from '../lib/url-guard.js';
 
 export const keysRouter = Router();
 
@@ -14,8 +18,24 @@ export const keysRouter = Router();
 const PLATFORMS = [
   'google', 'groq', 'cerebras', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
-  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow', 'custom',
+  'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'nara', 'aihorde', 'custom',
 ] as const;
+
+const ALLOWED_IMPORT_EXTENSIONS = new Set(['.env', '.json', '.jsonc', '.md', '.txt', '.csv']);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_IMPORT_EXTENSIONS.has(ext)) {
+      cb(new Error('Unsupported file type'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 // `key` is optional so keyless providers (Kilo's anonymous gateway) can be added
 // without one; the handler enforces a non-empty key for everyone else.
@@ -32,10 +52,141 @@ const updateKeySchema = z.object({
   message: 'At least one of enabled or label must be provided',
 });
 
+const importKeySchema = z.object({
+  keyName: z.string().optional(),
+  keyValue: z.string().min(1),
+  platform: z.enum(PLATFORMS),
+});
+
+function handleUploadError(err: any, res: Response, next: NextFunction): boolean {
+  if (!err) return false;
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: { message: 'File too large. Maximum size is 5MB' } });
+    return true;
+  }
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    res.status(413).json({ error: { message: 'Too many files. Maximum is 10' } });
+    return true;
+  }
+  if (err.message?.includes('Unsupported file type')) {
+    res.status(400).json({ error: { message: 'Unsupported file type' } });
+    return true;
+  }
+  next(err);
+  return true;
+}
+
+function parseUpload(file: Express.Multer.File) {
+  const content = file.buffer.toString('utf8');
+  if (!content.trim()) {
+    throw Object.assign(new Error('File contains no data'), { status: 400 });
+  }
+
+  if (/\.jsonc?$/i.test(file.originalname)) {
+    try {
+      JSON.parse(stripTrailingCommas(stripJsoncComments(content)));
+    } catch {
+      throw Object.assign(new Error('Invalid JSON format'), { status: 400 });
+    }
+  }
+
+  return parseKeysFromFile(content, file.originalname);
+}
+
+function splitRawKey(rawKey: string) {
+  const eqIndex = rawKey.indexOf('=');
+  return {
+    keyName: eqIndex === -1 ? rawKey : rawKey.slice(0, eqIndex),
+    keyValue: eqIndex === -1 ? '' : rawKey.slice(eqIndex + 1),
+  };
+}
+
+function insertImportedKey(platform: (typeof PLATFORMS)[number], keyName: string, keyValue: string) {
+  if (platform === 'custom') {
+    throw new Error('Custom providers must be added with a base URL');
+  }
+  if (!resolveProvider(platform)) {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
+
+  const db = getDb();
+  const { encrypted, iv, authTag } = encrypt(keyValue.trim());
+  db.prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+    VALUES (?, ?, ?, ?, ?, 'unknown', 1)
+  `).run(platform, keyName, encrypted, iv, authTag);
+}
+
+// Count enabled catalog models for a platform. Used to warn when a key is
+// added for a provider that has zero models in the operator's current catalog
+// tier — the Agnes case (#438): the provider is registered and selectable, but
+// its models ship in the premium/live catalog and only appear for free-tier
+// installs once they age into the monthly catalog, so a fresh install adds the
+// key and silently sees nothing.
+function enabledModelCount(platform: string): number {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT COUNT(*) AS c FROM models WHERE platform = ? AND enabled = 1',
+  ).get(platform) as { c: number };
+  return row.c;
+}
+
+// Non-null when the just-added key has no usable models yet, so the client can
+// explain the silence instead of leaving the user staring at an empty list.
+function noModelsNotice(platform: string): string | undefined {
+  if (enabledModelCount(platform) > 0) return undefined;
+  return (
+    `Key saved, but no ${platform} models are in your current catalog yet. ` +
+    `Newer providers are published to the premium catalog first and appear ` +
+    `for free-tier installs once they age into the monthly catalog. Add a ` +
+    `Premium license key to use them now, or add ${platform} as a custom ` +
+    `OpenAI-compatible provider with its base URL.`
+  );
+}
+
 // List all keys (masked)
 keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[];
+
+  const customModels = [
+    ...db.prepare(`
+      SELECT key_id, id, 'chat' AS kind, model_id, display_name, NULL AS family
+        FROM models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+    ...db.prepare(`
+      SELECT key_id, id, 'embedding' AS kind, model_id, display_name, family
+        FROM embedding_models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+    ...db.prepare(`
+      SELECT key_id, id, modality AS kind, model_id, display_name, NULL AS family
+        FROM media_models
+       WHERE platform = 'custom' AND key_id IS NOT NULL
+    `).all() as any[],
+  ];
+  const modelsByKeyId = new Map<number, any[]>();
+  for (const m of customModels) {
+    const keyId = Number(m.key_id);
+    if (!Number.isInteger(keyId)) continue;
+    const list = modelsByKeyId.get(keyId) ?? [];
+    list.push({
+      id: m.id,
+      kind: m.kind,
+      modelId: m.model_id,
+      displayName: m.display_name,
+      family: m.family ?? null,
+    });
+    modelsByKeyId.set(keyId, list);
+  }
+  for (const list of modelsByKeyId.values()) {
+    list.sort((a, b) => {
+      const ka = ['chat', 'embedding', 'image', 'audio'].indexOf(a.kind);
+      const kb = ['chat', 'embedding', 'image', 'audio'].indexOf(b.kind);
+      return (ka - kb) || String(a.displayName).localeCompare(String(b.displayName));
+    });
+  }
 
   const keys = rows.map(row => {
     let maskedKey = '****';
@@ -53,12 +204,101 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       baseUrl: row.base_url ?? null,
       status: row.status,
       enabled: row.enabled === 1,
+      keyless: resolveProvider(row.platform)?.keyless === true,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
+      models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) ?? []) : undefined,
     };
   });
 
   res.json(keys);
+});
+
+// Export keys — returns plaintext keys in the requested format.
+// GET /api/keys/export?format=json|env|csv&healthy=true
+// The response is the raw file download (Content-Type varies by format).
+keysRouter.get('/export', (req: Request, res: Response) => {
+  const db = getDb();
+  const format = (req.query.format as string) ?? 'json';
+  const healthyOnly = req.query.healthy === 'true';
+
+  let whereClause = '';
+  if (healthyOnly) {
+    whereClause = "WHERE status = 'healthy'";
+  }
+
+  const rows = db.prepare(`SELECT * FROM api_keys ${whereClause} ORDER BY platform, created_at ASC`).all() as any[];
+
+  // Decrypt and filter — only export keys with a real value
+  const decryptedKeys = rows
+    .map(row => {
+      let key = '';
+      try {
+        key = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+      } catch {
+        key = '';
+      }
+      return {
+        platform: row.platform,
+        key,
+        label: row.label || '',
+        baseUrl: row.base_url || undefined,
+      };
+    })
+    .filter(k => {
+      const v = k.key.trim();
+      return v.length > 0 && v !== 'no-key';
+    });
+
+  if (decryptedKeys.length === 0) {
+    res.status(404).json({ error: { message: 'No keys to export' } });
+    return;
+  }
+
+  if (format === 'env') {
+    // .env format: GOOGLE_KEY=xxx\nGROQ_KEY=yyy
+    const lines = decryptedKeys.map(k => {
+      const envKey = `${k.platform.toUpperCase()}_KEY=${k.key}`;
+      return k.label ? `# ${k.label}\n${envKey}` : envKey;
+    });
+    const content = lines.join('\n\n') + '\n';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.env"');
+    res.send(content);
+    return;
+  }
+
+  if (format === 'csv') {
+    // CSV format: platform,key,label
+    const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    // CSV formula-injection guard: a spreadsheet treats a cell that starts with
+    // =, +, -, @, tab or CR as a live formula, so a label like `=HYPERLINK(...)`
+    // would execute on open. Prefix such cells with a single quote to force them
+    // to be read as text. Applied only to free-text fields the user controls
+    // (labels); the key value must round-trip verbatim for re-import, and the
+    // platform is one of our own fixed enum values.
+    const neutralize = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
+    const header = 'platform,key,label';
+    const lines = decryptedKeys.map(k =>
+      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(k.label))].join(',')
+    );
+    const content = [header, ...lines].join('\n') + '\n';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.csv"');
+    res.send(content);
+    return;
+  }
+
+  // Default: JSON format (round-trip safe — can be imported directly)
+  const jsonExport = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: 'freellmapi',
+    keys: decryptedKeys,
+  };
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="freellmapi-keys.json"');
+  res.json(jsonExport);
 });
 
 // Add a key
@@ -97,6 +337,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
         maskedKey: maskKey(keyToStore),
         status: 'unknown',
         enabled: true,
+        modelsAvailable: enabledModelCount(platform),
+        notice: noModelsNotice(platform),
       });
       return;
     }
@@ -115,6 +357,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
     maskedKey: maskKey(keyToStore),
     status: 'unknown',
     enabled: true,
+    modelsAvailable: enabledModelCount(platform),
+    notice: noModelsNotice(platform),
   });
 });
 
@@ -128,9 +372,19 @@ keysRouter.post('/', (req: Request, res: Response) => {
 // A model can be given as a bare id ("qwen3:4b") or as {model, displayName}.
 // `model`/`displayName` (singular) stay supported for older clients; `models`
 // (plural) lets one submit bind several model ids to the same endpoint. (#281)
+// A custom model can declare its capabilities at registration. `supportsTools`
+// defaults to 1 (modern OpenAI-compatible servers — Ollama, vLLM, LM Studio —
+// all emit tool calls), `supportsVision` defaults to 0 unless declared. Leaving
+// a flag unset keeps the DB default on insert and preserves the stored value on
+// re-registration, so a capability the user later toggled isn't clobbered. (#470)
 const modelEntrySchema = z.union([
   z.string().min(1),
-  z.object({ model: z.string().min(1), displayName: z.string().optional() }),
+  z.object({
+    model: z.string().min(1),
+    displayName: z.string().optional(),
+    supportsTools: z.boolean().optional(),
+    supportsVision: z.boolean().optional(),
+  }),
 ]);
 const customProviderSchema = z.object({
   baseUrl: z.string().url('baseUrl must be a valid URL'),
@@ -139,12 +393,16 @@ const customProviderSchema = z.object({
   displayName: z.string().optional(),
   apiKey: z.string().optional(),
   label: z.string().optional(),
+  // Top-level defaults applied to every model in this submit; a per-entry flag
+  // (object form) overrides them for that one model.
+  supportsTools: z.boolean().optional(),
+  supportsVision: z.boolean().optional(),
 }).refine(
   d => (d.model && d.model.trim().length > 0) || (d.models && d.models.length > 0),
   { message: 'model or models is required' },
 );
 
-keysRouter.post('/custom', (req: Request, res: Response) => {
+keysRouter.post('/custom', async (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
@@ -152,25 +410,43 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   }
 
   const baseUrl = parsed.data.baseUrl.trim().replace(/\/+$/, '');
+
+  // SSRF guard (#440): a base_url is the one user-controlled outbound target.
+  // Cloud metadata / link-local addresses are rejected outright; private
+  // ranges too when FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is set. Re-checked
+  // at request time in proxyFetch for URLs already in the DB.
+  const verdict = await assessProviderUrl(baseUrl);
+  if (!verdict.allowed) {
+    res.status(400).json({ error: { message: `baseUrl rejected: ${verdict.reason}` } });
+    return;
+  }
   // Local servers often need no key; keep a sentinel so there's always a bearer.
-  const rawKey = parsed.data.apiKey?.trim() || 'no-key';
-  const label = parsed.data.label ?? 'Custom';
+  const providedKey = parsed.data.apiKey?.trim() || undefined;
+  const label = parsed.data.label?.trim() || undefined;
 
   // Flatten singular + plural inputs into one list, dedupe by model id, drop
   // blanks. The singular `displayName` only applies to a lone `model` (it can't
-  // sensibly fan out across many ids).
-  const entries: { modelId: string; displayName: string }[] = [];
+  // sensibly fan out across many ids). Capability flags resolve per-entry first,
+  // then fall back to the submit-level defaults, then to undefined (DB default).
+  const topTools = parsed.data.supportsTools;
+  const topVision = parsed.data.supportsVision;
+  const entries: { modelId: string; displayName: string; supportsTools?: boolean; supportsVision?: boolean }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
-    entries.push({ modelId, displayName: (rawDisplay?.trim() || modelId) });
+    entries.push({
+      modelId,
+      displayName: (rawDisplay?.trim() || modelId),
+      supportsTools: tools ?? topTools,
+      supportsVision: vision ?? topVision,
+    });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision);
   }
 
   if (entries.length === 0) {
@@ -182,40 +458,67 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
   const upsert = db.transaction(() => {
     // One 'custom' key row PER ENDPOINT (matched on base_url). Re-submitting
     // the same endpoint updates its key/label; a new base_url gets its own
-    // row instead of clobbering the previous provider. (#212)
-    const existing = db.prepare("SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = ? LIMIT 1")
-      .get(baseUrl) as { id: number } | undefined;
+// row instead of clobbering the previous provider. (#212) Re-submitting with a
+// blank key preserves the stored key; only a provided key updates credentials.
+    const existing = db.prepare("SELECT id, encrypted_key, iv, auth_tag FROM api_keys WHERE platform = 'custom' AND base_url = ? LIMIT 1")
+      .get(baseUrl) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
     let keyId: number;
+    let storedKeyForMask = providedKey ?? 'no-key';
     if (existing) {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
-      db.prepare("UPDATE api_keys SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-        .run(label, encrypted, iv, authTag, existing.id);
       keyId = existing.id;
+      if (providedKey) {
+        const { encrypted, iv, authTag } = encrypt(providedKey);
+        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
+          .run(label ?? null, encrypted, iv, authTag, existing.id);
+        storedKeyForMask = providedKey;
+      } else {
+        try {
+          storedKeyForMask = decrypt(existing.encrypted_key, existing.iv, existing.auth_tag);
+        } catch {
+          storedKeyForMask = 'no-key';
+        }
+        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), status = 'unknown', enabled = 1 WHERE id = ?")
+          .run(label ?? null, existing.id);
+      }
     } else {
-      const { encrypted, iv, authTag } = encrypt(rawKey);
+      const keyToStore = providedKey ?? 'no-key';
+      const { encrypted, iv, authTag } = encrypt(keyToStore);
       const r = db.prepare(`
         INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
         VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label, encrypted, iv, authTag, baseUrl);
+      `).run(label ?? 'Custom', encrypted, iv, authTag, baseUrl);
       keyId = Number(r.lastInsertRowid);
+      storedKeyForMask = keyToStore;
     }
 
-    const registered: { modelDbId: number; model: string; displayName: string }[] = [];
-    for (const { modelId, displayName } of entries) {
+    const registered: { modelDbId: number; model: string; displayName: string; supportsTools: boolean; supportsVision: boolean }[] = [];
+    for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
       // Register each model bound to THIS endpoint's key. Custom models carry no
       // rate limits and sort last in the intelligence preset (size_label tier).
       // Re-registering an existing model id re-binds it (model ids are unique
       // per platform, so one id can't live on two endpoints at once).
+      // Capability flags: an unset flag binds NULL so COALESCE picks the insert
+      // default (tools 1, vision 0) on a new row and preserves the existing
+      // value on re-registration. (#470)
+      const toolsParam = supportsTools === undefined ? null : (supportsTools ? 1 : 0);
+      const visionParam = supportsVision === undefined ? null : (supportsVision ? 1 : 0);
       db.prepare(`
         INSERT INTO models
           (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id)
-        VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?)
+           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id,
+           supports_tools, supports_vision)
+        VALUES ('custom', @modelId, @displayName, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, @keyId,
+           COALESCE(@tools, 1), COALESCE(@vision, 0))
         ON CONFLICT(platform, model_id)
-        DO UPDATE SET display_name = excluded.display_name, key_id = excluded.key_id, enabled = 1
-      `).run(modelId, displayName, keyId);
+        DO UPDATE SET
+          display_name = excluded.display_name,
+          key_id = excluded.key_id,
+          enabled = 1,
+          supports_tools = COALESCE(@tools, supports_tools),
+          supports_vision = COALESCE(@vision, supports_vision)
+      `).run({ modelId, displayName, keyId, tools: toolsParam, vision: visionParam });
 
-      const modelRow = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number };
+      const modelRow = db.prepare("SELECT id, supports_tools, supports_vision FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number; supports_tools: number; supports_vision: number };
 
       // Append to the fallback chain if not already present.
       const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
@@ -224,13 +527,19 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
         db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
       }
 
-      registered.push({ modelDbId: modelRow.id, model: modelId, displayName });
+      registered.push({
+        modelDbId: modelRow.id,
+        model: modelId,
+        displayName,
+        supportsTools: modelRow.supports_tools === 1,
+        supportsVision: modelRow.supports_vision === 1,
+      });
     }
 
-    return { keyId, registered };
+    return { keyId, registered, storedKeyForMask };
   });
 
-  const { keyId, registered } = upsert();
+  const { keyId, registered, storedKeyForMask } = upsert();
   // `model`/`displayName`/`modelDbId` echo the first model for older clients;
   // `models` carries the full set registered in this call.
   const first = registered[0]!;
@@ -242,8 +551,162 @@ keysRouter.post('/custom', (req: Request, res: Response) => {
     baseUrl,
     model: first.model,
     displayName: first.displayName,
+    supportsTools: first.supportsTools,
+    supportsVision: first.supportsVision,
     models: registered,
-    maskedKey: maskKey(rawKey),
+    maskedKey: maskKey(storedKeyForMask),
+  });
+});
+
+keysRouter.post('/import', (req: Request, res: Response, next: NextFunction) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (handleUploadError(err, res, next)) return;
+
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: { message: 'No file uploaded' } });
+        return;
+      }
+
+      const result = parseUpload(req.file);
+      const imported: Array<{ keyName: string; platform: string }> = [];
+      const skipped = [...result.skipped];
+      const errors: Array<{ key: string; error: string }> = [];
+
+      for (const parsedKey of result.keys) {
+        const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+        if (!parsedKey.platform) {
+          skipped.push(keyName);
+          continue;
+        }
+        const platformParse = z.enum(PLATFORMS).safeParse(parsedKey.platform);
+        if (!platformParse.success || platformParse.data === 'custom') {
+          skipped.push(keyName);
+          continue;
+        }
+        if (!keyValue.trim()) {
+          errors.push({ key: keyName, error: 'keyValue must be at least 1 character' });
+          continue;
+        }
+
+        try {
+          insertImportedKey(platformParse.data, keyName, keyValue);
+          imported.push({ keyName, platform: platformParse.data });
+        } catch (insertErr) {
+          errors.push({ key: keyName, error: (insertErr as Error).message });
+        }
+      }
+
+      res.json({
+        imported: imported.length,
+        skipped,
+        errors,
+        total: result.keys.length + result.skipped.length,
+      });
+    } catch (handlerErr: any) {
+      res.status(handlerErr.status ?? 500).json({ error: { message: handlerErr.message } });
+    }
+  });
+});
+
+keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) => {
+  upload.array('files', 10)(req, res, (err: any) => {
+    if (handleUploadError(err, res, next)) return;
+
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: { message: 'No files uploaded' } });
+        return;
+      }
+
+      const keys: Array<{ keyName: string; keyValue: string; detectedPlatform: string | null; prefix: string; isDuplicate: boolean }> = [];
+      const skipped: string[] = [];
+
+      // Build a set of existing decrypted key values for duplicate detection
+      const db = getDb();
+      const existingRows = db.prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys').all() as any[];
+      const existingKeys = new Set<string>();
+      for (const row of existingRows) {
+        try {
+          existingKeys.add(decrypt(row.encrypted_key, row.iv, row.auth_tag));
+        } catch { /* skip undecryptable rows */ }
+      }
+
+      let duplicateCount = 0;
+
+      for (const file of files) {
+        const result = parseUpload(file);
+        for (const parsedKey of result.keys) {
+          const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+          const isDuplicate = existingKeys.has(keyValue.trim());
+          if (isDuplicate) duplicateCount++;
+          keys.push({
+            keyName,
+            keyValue,
+            detectedPlatform: parsedKey.platform,
+            prefix: parsedKey.prefix,
+            isDuplicate,
+          });
+        }
+        skipped.push(...result.skipped);
+      }
+
+      res.json({ keys, total: keys.length, skipped, duplicates: duplicateCount });
+    } catch (handlerErr: any) {
+      res.status(handlerErr.status ?? 500).json({ error: { message: handlerErr.message } });
+    }
+  });
+});
+
+keysRouter.post('/import-selected', (req: Request, res: Response) => {
+  const parsed = z.object({ keys: z.array(importKeySchema).max(100) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  let imported = 0;
+  let duplicateSkipped = 0;
+  const errors: Array<{ key: string; error: string }> = [];
+
+  // Build a set of existing decrypted key values for duplicate detection
+  const db = getDb();
+  const existingRows = db.prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys').all() as any[];
+  const existingKeys = new Set<string>();
+  for (const row of existingRows) {
+    try {
+      existingKeys.add(decrypt(row.encrypted_key, row.iv, row.auth_tag));
+    } catch { /* skip undecryptable rows */ }
+  }
+
+  for (const key of parsed.data.keys) {
+    const keyName = key.keyName?.trim() || key.platform;
+    if (key.platform === 'custom') {
+      errors.push({ key: keyName, error: 'Custom providers must be added with a base URL' });
+      continue;
+    }
+
+    if (existingKeys.has(key.keyValue.trim())) {
+      duplicateSkipped++;
+      errors.push({ key: keyName, error: 'Duplicate key — already exists' });
+      continue;
+    }
+
+    try {
+      insertImportedKey(key.platform, keyName, key.keyValue);
+      imported++;
+      existingKeys.add(key.keyValue.trim());
+    } catch (err) {
+      errors.push({ key: keyName, error: (err as Error).message });
+    }
+  }
+
+  res.json({
+    imported,
+    skipped: [],
+    errors,
+    total: parsed.data.keys.length,
   });
 });
 
@@ -270,12 +733,26 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
     // theirs. Legacy rows (key_id NULL) are swept once no custom keys remain,
     // so they never linger in the fallback chain forever (#189).
     if (row.platform === 'custom') {
+      const defaultEmbedding = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get() as { value: string } | undefined;
       db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
       db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
+      db.prepare("DELETE FROM embedding_models WHERE platform = 'custom' AND key_id = ?").run(id);
+      db.prepare("DELETE FROM media_models WHERE platform = 'custom' AND key_id = ?").run(id);
       const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
       if (remaining.n === 0) {
         db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
         db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+        db.prepare("DELETE FROM embedding_models WHERE platform = 'custom'").run();
+        db.prepare("DELETE FROM media_models WHERE platform = 'custom'").run();
+      }
+      if (defaultEmbedding) {
+        const stillExists = db.prepare('SELECT 1 FROM embedding_models WHERE family = ? LIMIT 1').get(defaultEmbedding.value);
+        if (!stillExists) {
+          const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
+          if (replacement) {
+            db.prepare("UPDATE settings SET value = ? WHERE key = 'embeddings_default_family'").run(replacement.family);
+          }
+        }
       }
     }
   });

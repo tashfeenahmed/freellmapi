@@ -4,6 +4,7 @@ import type {
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { extendedBodyParams } from '../lib/sampling-params.js';
 import { contentToString } from '../lib/content.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -52,9 +53,11 @@ export class CloudflareProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
+        ...extendedBodyParams(this.platform, options),
       }),
     });
     recordQuotaObservationsFromResponse(res, {
@@ -98,9 +101,11 @@ export class CloudflareProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
         parallel_tool_calls: options?.parallel_tool_calls,
+        ...extendedBodyParams(this.platform, options),
         stream: true,
       }),
     });

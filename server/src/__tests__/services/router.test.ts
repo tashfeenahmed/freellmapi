@@ -7,6 +7,7 @@ import {
   routeRequest,
   setRoutingStrategy,
 } from '../../services/router.js';
+import { setCooldown } from '../../services/ratelimit.js';
 
 describe('Router', () => {
   beforeAll(() => {
@@ -135,6 +136,42 @@ describe('Router', () => {
     expect(large.modelDbId).not.toBe(baseline.modelDbId);
   });
 
+  it('skips GitHub GPT-4.1 above its free-tier 8K request cap (#426)', () => {
+    const db = getDb();
+    const githubKey = encrypt('test-github-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('github', 'github', githubKey.encrypted, githubKey.iv, githubKey.authTag, 'healthy', 1);
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'groq', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    const github = db.prepare(`
+      SELECT id, context_window FROM models
+       WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'
+    `).get() as { id: number; context_window: number };
+    const groq = db.prepare(`
+      SELECT id FROM models
+       WHERE platform = 'groq' AND context_window > 9000
+       LIMIT 1
+    `).get() as { id: number };
+
+    db.prepare('UPDATE fallback_config SET priority = 1000, enabled = 1').run();
+    db.prepare('UPDATE fallback_config SET priority = 1 WHERE model_db_id = ?').run(github.id);
+    db.prepare('UPDATE fallback_config SET priority = 2 WHERE model_db_id = ?').run(groq.id);
+    db.prepare(`
+      UPDATE models SET tpm_limit = NULL, tpd_limit = NULL
+       WHERE id IN (?, ?)
+    `).run(github.id, groq.id);
+
+    expect(github.context_window).toBe(8000);
+    expect(routeRequest(7000).modelDbId).toBe(github.id);
+    expect(routeRequest(9000).modelDbId).toBe(groq.id);
+  });
+
   it('still routes a model with an unknown (null) context window (#167)', () => {
     const db = getDb();
     const groqKey = encrypt('test-groq-key');
@@ -183,5 +220,59 @@ describe('Router', () => {
       count: 2,
       penalty: 3,
     });
+  });
+});
+
+describe('Router exhaustion diagnostics (issue _1)', () => {
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  beforeEach(() => {
+    const db = getDb();
+    setRoutingStrategy('priority');
+    db.prepare('DELETE FROM api_keys').run();
+    db.prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
+    db.prepare('DELETE FROM rate_limit_cooldowns').run();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('attaches a non-empty per-model disposition to the exhaustion error', () => {
+    // No keys configured → every chain model is unroutable. The thrown error
+    // must carry diagnostics so the synchronous routing_error is debuggable
+    // instead of opaque (the failure that NOTHING else logs).
+    let caught: any;
+    try { routeRequest(); } catch (e) { caught = e; }
+    expect(caught).toBeDefined();
+    expect(Array.isArray(caught.diagnostics)).toBe(true);
+    expect(caught.diagnostics.length).toBeGreaterThan(0);
+    // Every entry is "<platform>/<model>: <reason>"; with no keys the reason is
+    // the platform having no enabled+healthy key.
+    expect(caught.diagnostics.every((d: string) => d.includes(': '))).toBe(true);
+    expect(caught.diagnostics.some((d: string) => /no enabled.*key/i.test(d))).toBe(true);
+  });
+
+  it('records cooldown as the skip reason for a benched key', () => {
+    const db = getDb();
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'test', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    // Bench every groq model on this key, so the only configured provider is
+    // fully cooled down and the pool empties with a key present (not absent).
+    const keyId = (db.prepare("SELECT id FROM api_keys WHERE platform='groq'").get() as { id: number }).id;
+    const groqModels = db.prepare("SELECT model_id FROM models WHERE platform='groq' AND enabled=1").all() as { model_id: string }[];
+    for (const m of groqModels) setCooldown('groq', m.model_id, keyId, 5 * 60 * 1000);
+
+    let caught: any;
+    try { routeRequest(); } catch (e) { caught = e; }
+    expect(caught).toBeDefined();
+    expect(caught.diagnostics.some((d: string) => /cooldown/.test(d))).toBe(true);
   });
 });

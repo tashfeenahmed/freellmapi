@@ -3,8 +3,8 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
-import { isFusionModel, fusionConfigSchema } from '../../services/fusion.js';
-import { getOrderedFusionChain, setRoutingStrategy, getRoutingStrategy } from '../../services/router.js';
+import { isFusionModel, fusionConfigSchema, familyKey, diversifyChain } from '../../services/fusion.js';
+import { getOrderedFusionChain, setRoutingStrategy, getRoutingStrategy, type FusionCandidate } from '../../services/router.js';
 import { setCooldown } from '../../services/ratelimit.js';
 
 let dashToken = '';
@@ -44,10 +44,20 @@ function sseBody(content: string): ReadableStream<Uint8Array> {
   return new ReadableStream({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close(); } });
 }
 
-function mockUpstreams(answers: Record<string, string>, rateLimited: Set<string> = new Set(), streamAnswers: Record<string, string> = {}) {
+type MockAnswer = string | {
+  content?: string | null;
+  tool_calls?: any[];
+  finish_reason?: string | null;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+};
+
+function mockUpstreams(answers: Record<string, MockAnswer>, rateLimited: Set<string> = new Set(), streamAnswers: Record<string, string> = {}) {
   const origFetch = global.fetch;
+  const calls: Array<{ url: string; body: any }> = [];
   vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
     const u = typeof url === 'string' ? url : url.toString();
+    const body = typeof (init as any)?.body === 'string' ? JSON.parse((init as any).body) : null;
+    calls.push({ url: u, body });
     for (const host of rateLimited) {
       if (u.includes(host)) {
         return { ok: false, status: 429, headers: new Headers(), text: () => Promise.resolve('rate limited') } as any;
@@ -61,18 +71,31 @@ function mockUpstreams(answers: Record<string, string>, rateLimited: Set<string>
     }
     for (const [host, content] of Object.entries(answers)) {
       if (u.includes(host)) {
+        const message = typeof content === 'string'
+          ? { role: 'assistant', content }
+          : {
+              role: 'assistant',
+              content: content.content ?? null,
+              ...(content.tool_calls ? { tool_calls: content.tool_calls } : {}),
+            };
+        const finishReason = typeof content === 'string'
+          ? 'stop'
+          : content.finish_reason ?? (content.tool_calls?.length ? 'tool_calls' : 'stop');
         return {
           ok: true,
           json: () => Promise.resolve({
             id: 'chatcmpl-x', object: 'chat.completion', created: 1, model: 'm',
-            choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
-            usage: { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 },
+            choices: [{ index: 0, message, finish_reason: finishReason }],
+            usage: typeof content === 'string'
+              ? { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 }
+              : content.usage ?? { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 },
           }),
         } as any;
       }
     }
     return origFetch(url as any, init as any);
   });
+  return { calls };
 }
 
 describe('isFusionModel', () => {
@@ -103,6 +126,9 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
   let groqModel: string;
   let cerebrasModel: string;
   let openrouterModel: string;
+  let toolGroqModel: string;
+  let toolCerebrasModel: string;
+  let nonToolOpenrouterModel: string;
 
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
@@ -110,12 +136,15 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     app = createApp();
     dashToken = mintDashboardToken();
     const db = getDb();
-    const pick = (platform: string) => (db.prepare(
-      'SELECT m.model_id FROM models m WHERE m.platform = ? AND m.enabled = 1 ORDER BY m.intelligence_rank LIMIT 1',
+    const pick = (platform: string, extraWhere = '') => (db.prepare(
+      `SELECT m.model_id FROM models m WHERE m.platform = ? AND m.enabled = 1 ${extraWhere} ORDER BY m.intelligence_rank LIMIT 1`,
     ).get(platform) as { model_id: string }).model_id;
     groqModel = pick('groq');
     cerebrasModel = pick('cerebras');
     openrouterModel = pick('openrouter');
+    toolGroqModel = pick('groq', 'AND m.supports_tools = 1');
+    toolCerebrasModel = pick('cerebras', 'AND m.supports_tools = 1');
+    nonToolOpenrouterModel = pick('openrouter', 'AND m.supports_tools = 0');
   });
 
   beforeEach(async () => {
@@ -217,14 +246,82 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     expect(body.x_fusion.dropped.some((d: string) => d.includes('no-such-model'))).toBe(true);
   });
 
-  it('rejects tool-bearing fusion requests with 422', async () => {
+  it('returns the first structured panel tool_call instead of judging actions', async () => {
+    const toolCalls = [{
+      id: 'call_weather',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{"city":"Karachi"}' },
+    }];
+    const upstream = mockUpstreams({
+      'api.groq.com': { content: null, tool_calls: toolCalls, finish_reason: 'stop' },
+      'api.cerebras.ai': 'cerebras text should not be judged when a tool call wins',
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
     const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
       model: 'fusion',
-      messages: [{ role: 'user', content: 'q' }],
-      tools: [{ type: 'function', function: { name: 'f', parameters: {} } }],
+      messages: [{ role: 'user', content: 'Weather in Karachi?' }],
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'get_weather',
+          description: 'Get current weather',
+          parameters: {
+            type: 'object',
+            properties: { city: { type: 'string' } },
+            required: ['city'],
+          },
+        },
+      }],
+      tool_choice: 'required',
+      parallel_tool_calls: true,
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel, expose_panel: true },
     }, authHeaders());
-    expect(status).toBe(422);
-    expect(body.error.code).toBe('fusion_no_tools');
+
+    expect(status).toBe(200);
+    expect(body.model).toBe('fusion');
+    expect(body.choices[0].finish_reason).toBe('tool_calls');
+    expect(body.choices[0].message.content).toBeNull();
+    expect(body.choices[0].message.tool_calls).toEqual(toolCalls);
+    expect(body._fusion.tool_call_winner).toEqual({ platform: 'groq', model: toolGroqModel });
+    expect(body.x_fusion.tool_call_winner).toEqual({ platform: 'groq', model: toolGroqModel });
+    expect(body.x_fusion.panel.find((p: any) => p.platform === 'groq').tool_calls).toEqual(toolCalls);
+
+    const groqCall = upstream.calls.find(c => c.url.includes('api.groq.com'));
+    expect(groqCall?.body.tools).toHaveLength(1);
+    expect(groqCall?.body.tool_choice).toBe('required');
+    expect(groqCall?.body.parallel_tool_calls).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('keeps tool-bearing fusion panels on tool-capable models even with tool_choice none', async () => {
+    const upstream = mockUpstreams({
+      'api.groq.com': 'groq handled a no-tool turn',
+      'openrouter.ai': 'NON-TOOL MODEL SHOULD NOT RUN',
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      messages: [{ role: 'user', content: 'Answer without calling a tool.' }],
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'get_weather',
+          parameters: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      }],
+      tool_choice: 'none',
+      fusion: { models: [nonToolOpenrouterModel, toolGroqModel], expose_panel: true },
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].message.content).toBe('groq handled a no-tool turn');
+    expect(body.x_fusion.dropped).toContain(`${nonToolOpenrouterModel} (no tool-calling support)`);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+
+    const groqCall = upstream.calls.find(c => c.url.includes('api.groq.com'));
+    expect(groqCall?.body.tools).toHaveLength(1);
+    expect(groqCall?.body.tool_choice).toBe('none');
   });
 
   it('tags every panel/judge sub-call with requested_model="fusion"', async () => {
@@ -396,9 +493,11 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     // Additive _fusion frames: one panel frame per member, plus a judge frame.
     const panelFrames = frames.filter(f => f._fusion?.event === 'panel');
     expect(panelFrames).toHaveLength(2);
+    expect(panelFrames.every(f => Array.isArray(f.choices) && f.choices[0]?.delta && f.choices[0]?.finish_reason === null)).toBe(true);
     expect(panelFrames.map(f => f._fusion.model).sort()).toEqual([groqModel, cerebrasModel].sort());
     expect(panelFrames.every(f => f._fusion.status === 'ok' && typeof f._fusion.content === 'string')).toBe(true);
     const judgeFrame = frames.find(f => f._fusion?.event === 'judge');
+    expect(Array.isArray(judgeFrame.choices)).toBe(true);
     expect(judgeFrame._fusion).toMatchObject({ platform: 'openrouter', model: openrouterModel });
 
     // The final answer still streams as standard content deltas + terminal stop.
@@ -407,5 +506,106 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     expect(text.trimEnd().endsWith('data: [DONE]')).toBe(true);
     // _fusion panel frames precede the final content frame.
     expect(text.indexOf('"event":"panel"')).toBeLessThan(text.indexOf('STREAMED SYNTHESIS'));
+  });
+
+  it('streams fusion tool_calls as OpenAI chunks with terminal tool_calls finish_reason', async () => {
+    const toolCalls = [{
+      id: 'call_weather_stream',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{"city":"Dublin"}' },
+    }];
+    mockUpstreams({
+      'api.groq.com': { content: null, tool_calls: toolCalls, finish_reason: 'tool_calls' },
+      'api.cerebras.ai': 'text answer loses to structured tool call',
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
+    const { status, text } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      stream: true,
+      messages: [{ role: 'user', content: 'Weather in Dublin?' }],
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'get_weather',
+          parameters: {
+            type: 'object',
+            properties: { city: { type: 'string' } },
+            required: ['city'],
+          },
+        },
+      }],
+      tool_choice: 'required',
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel },
+    }, authHeaders());
+    expect(status).toBe(200);
+
+    const frames = text.split('\n')
+      .filter(l => l.startsWith('data: ') && l.slice(6).trim() !== '[DONE]')
+      .map(l => JSON.parse(l.slice(6)));
+
+    const traceFrames = frames.filter(f => f._fusion);
+    expect(traceFrames.length).toBeGreaterThan(0);
+    expect(traceFrames.every(f => Array.isArray(f.choices))).toBe(true);
+    expect(traceFrames.some(f => f._fusion?.tool_calls?.[0]?.id === 'call_weather_stream')).toBe(true);
+
+    const toolFrame = frames.find(f => f.choices?.[0]?.delta?.tool_calls);
+    expect(toolFrame.choices[0].delta.tool_calls).toEqual(toolCalls);
+    expect(frames.map(f => f.choices?.[0]?.finish_reason).filter(Boolean)).toEqual(['tool_calls']);
+    expect(text).not.toContain('JUDGE SHOULD NOT RUN');
+    expect(text.trimEnd().endsWith('data: [DONE]')).toBe(true);
+  });
+});
+
+describe('familyKey', () => {
+  it('strips the provider prefix and any tag suffix to a bare family', () => {
+    expect(familyKey('qwen/qwen3-coder:free')).toBe('qwen3-coder');
+    expect(familyKey('qwen3-coder:480b')).toBe('qwen3-coder');
+    expect(familyKey('accounts/fireworks/models/qwen3-coder')).toBe('qwen3-coder');
+    expect(familyKey('GLM-4.7')).toBe('glm-4.7');
+  });
+});
+
+describe('diversifyChain', () => {
+  const cand = (platform: string, modelId: string): FusionCandidate => ({
+    modelDbId: 0, platform, modelId, displayName: modelId,
+    sizeLabel: 'Large', supportsVision: 0, supportsTools: 0,
+  });
+
+  it('prefers a fresh-family model over a same-family model on a new provider', () => {
+    // Strategy order: same family on two providers, then a different family.
+    // Platform-only diversity would panel [or/qwen3-coder, cb/qwen3-coder] —
+    // perspective-redundant. Family-aware diversity surfaces deepseek instead.
+    const ordered = [
+      cand('openrouter', 'qwen3-coder'),
+      cand('cerebras', 'qwen3-coder'),
+      cand('openrouter', 'deepseek-v3.2'),
+    ];
+    const out = diversifyChain(ordered).slice(0, 2).map(c => `${c.platform}/${c.modelId}`);
+    expect(out).toEqual(['openrouter/qwen3-coder', 'openrouter/deepseek-v3.2']);
+  });
+
+  it('keeps strategy order when every candidate is a distinct family', () => {
+    const ordered = [
+      cand('groq', 'llama-3.3-70b'),
+      cand('cerebras', 'qwen3-coder'),
+      cand('openrouter', 'deepseek-v3.2'),
+    ];
+    expect(diversifyChain(ordered).map(c => c.modelId)).toEqual(
+      ordered.map(c => c.modelId),
+    );
+  });
+
+  it('demotes a both-axes-seen duplicate to the back as last-resort refill', () => {
+    const ordered = [
+      cand('groq', 'llama-3.3-70b'),
+      cand('groq', 'llama-3.3-70b'), // same platform AND family → tier 3
+      cand('cerebras', 'qwen3-coder'),
+    ];
+    expect(diversifyChain(ordered).map(c => `${c.platform}/${c.modelId}`)).toEqual([
+      'groq/llama-3.3-70b',
+      'cerebras/qwen3-coder',
+      'groq/llama-3.3-70b',
+    ]);
   });
 });

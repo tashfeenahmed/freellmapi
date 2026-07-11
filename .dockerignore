@@ -14,6 +14,7 @@ dist
 *.db-wal
 *.db-shm
 *.bak
+.encryption-key
 .DS_Store
 npm-debug.log*
 repo-assets

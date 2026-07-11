@@ -1,10 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, setToken, UNAUTHORIZED_EVENT } from '@/lib/api'
+import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { isEmail } from '@/lib/validate'
 import { useI18n } from '@/i18n'
+
+// Matches the server rule (routes/auth.ts zod schema).
+const PASSWORD_MIN = 8
 
 interface AuthStatus {
   needsSetup: boolean
@@ -24,23 +29,55 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
   const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [setupCode, setSetupCode] = useState('')
+  // Revealed only after the server asks for it (remote first-run setup). A
+  // browser on the same machine as the server never sees this field.
+  const [codeRequired, setCodeRequired] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [attempted, setAttempted] = useState(false)
 
   const isSetup = mode === 'setup'
 
+  // Inline field feedback; the server stays authoritative. Only the setup form
+  // enforces the password minimum client-side (an existing password of any
+  // length must still be able to log in).
+  const emailError = !email.trim()
+    ? t('validation.required')
+    : !isEmail(email)
+      ? t('validation.email')
+      : null
+  const passwordError = !password
+    ? t('validation.required')
+    : isSetup && password.length < PASSWORD_MIN
+      ? t('validation.passwordMin', { min: PASSWORD_MIN })
+      : null
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (emailError || passwordError) {
+      setAttempted(true)
+      return
+    }
     setBusy(true)
     setError('')
     try {
+      const payload: Record<string, string> = { email, password }
+      // Only the setup flow carries a code, and only once the server has asked
+      // for it. The server ignores it for local (loopback) setup.
+      if (isSetup && setupCode) payload.setupCode = setupCode.trim()
       const res = await apiFetch<{ token: string }>(isSetup ? '/api/auth/setup' : '/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       })
       setToken(res.token)
       onAuthed()
     } catch (err) {
+      // The server gates remote first-run setup behind a one-time code; reveal
+      // the field so the operator can paste the code from the server logs.
+      if (isSetup && (err as ApiError).code === 'setup_code_required') {
+        setCodeRequired(true)
+      }
       setError((err as Error).message)
     } finally {
       setBusy(false)
@@ -60,7 +97,7 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
             ? t('auth.setupDescription')
             : t('auth.loginDescription')}
         </p>
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-3" noValidate>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="auth-email">{t('auth.email')}</Label>
             <Input
@@ -70,7 +107,9 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder={t('auth.emailPlaceholder')}
+              aria-invalid={attempted && !!emailError}
             />
+            {attempted && <FieldError error={emailError} />}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="auth-password">{t('auth.password')}</Label>
@@ -81,10 +120,26 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder={isSetup ? t('auth.passwordPlaceholderSetup') : t('auth.passwordPlaceholderLogin')}
+              aria-invalid={attempted && !!passwordError}
             />
+            {attempted && <FieldError error={passwordError} />}
           </div>
+          {isSetup && codeRequired && (
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="auth-setup-code">{t('auth.setupCode')}</Label>
+              <Input
+                id="auth-setup-code"
+                type="text"
+                autoComplete="off"
+                value={setupCode}
+                onChange={e => setSetupCode(e.target.value)}
+                placeholder={t('auth.setupCodePlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
+            </div>
+          )}
           {error && <p className="text-destructive text-xs">{error}</p>}
-          <Button type="submit" className="w-full" disabled={busy || !email || !password}>
+          <Button type="submit" className="w-full" disabled={busy}>
             {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}
           </Button>
         </form>

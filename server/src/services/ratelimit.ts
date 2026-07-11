@@ -251,6 +251,7 @@ export function recordRequest(platform: string, modelId: string, keyId: number) 
   getWindow(rpdKey).timestamps.push(now);
 
   recordUsage(platform, modelId, keyId, 'request', 0, now);
+  clearNullLimitHits(platform, modelId, keyId);
 }
 
 export function recordTokens(
@@ -316,19 +317,62 @@ export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
 // the router fail over to a model the key can actually serve. See issue #256.
 export const MODEL_FORBIDDEN_COOLDOWN_MS = DAY;
 
-// Decide how long to bench a model+key after an upstream 429. Escalate to the
-// long quarantine (getNextCooldownDuration, up to 24h) ONLY when the model is
-// genuinely at its DAILY limit (RPD or TPD) — that won't recover until the
-// provider's daily reset, so a long bench avoids hammering a truly-dead key.
+// When RPD/TPD limits are NULL (provider's published daily quota is unknown or
+// not yet seeded — common for ollama, cloudflare, nvidia, huggingface, mistral,
+// kilo, llm7, pollinations), we cannot check a counter against a cap. Fall back
+// to a hit-count heuristic: after 2+ 429s within this rolling window, treat as
+// "effectively daily-exhausted" and enter the standard escalation ladder at
+// the same step the documented-RPD path would. Without this, these providers
+// stay stuck at TRANSIENT_COOLDOWN_MS forever even when every request is a
+// 429 (observed in production: ollama 130× 429s in 1h with all 90s cooldowns
+// expired before the next request). Cheaper than waiting for the operator to
+// seed per-provider limits (Option A), still reversible — a successful call
+// clears the hit window via the normal path.
 //
-// A transient RPM/TPM 429 gets a short fixed cooldown and does NOT count toward
-// escalation. This is the common case for providers with a tight per-minute
-// token budget but a large daily quota — e.g. groq gpt-oss-120b has rpd=1000
-// yet tpm=8000, so a single burst of large prompts 429s on TPM while the daily
-// quota is barely touched. Without this split, those transient bursts escalated
-// (2m → 10m → 1h → 24h) and quarantined a perfectly healthy provider for the
-// rest of the day. Daily counters are persisted (countPersistedRequests /
-// sumPersistedTokens), so this verdict is stable across restarts.
+// Separate counter from `cooldownHits` (used by getNextCooldownDuration's
+// escalation ladder). The shared Map would make this state path-coupled to
+// the ladder index, which would over-skip steps because the ladder also
+// pushes a hit on each call.
+const NULL_LIMIT_HIT_THRESHOLD = 2;
+const NULL_LIMIT_HIT_WINDOW_MS = HOUR;
+const nullLimitHits = new Map<string, number[]>(); // key -> timestamps
+
+function recordNullLimitHit(platform: string, modelId: string, keyId: number, now: number): void {
+  const key = `${platform}:${modelId}:${keyId}`;
+  const hits = nullLimitHits.get(key) ?? [];
+  hits.push(now);
+  nullLimitHits.set(key, hits);
+}
+
+function clearNullLimitHits(platform: string, modelId: string, keyId: number): void {
+  nullLimitHits.delete(`${platform}:${modelId}:${keyId}`);
+}
+
+export function recentHitCount(
+  platform: string,
+  modelId: string,
+  keyId: number,
+  now: number,
+  windowMs: number = NULL_LIMIT_HIT_WINDOW_MS,
+): number {
+  const key = `${platform}:${modelId}:${keyId}`;
+  const hits = nullLimitHits.get(key) ?? [];
+  return hits.filter(t => t > now - windowMs).length;
+}
+
+// Decide how long to bench a model+key after an upstream 429. Escalate to the
+// long quarantine (getNextCooldownDuration, up to 24h) when the model is at its
+// DAILY limit (RPD/TPD counter ≥ cap), OR — when limits are unknown — when
+// recentHitCount crosses the heuristic threshold. Either way, a long bench
+// avoids hammering a truly-dead key.
+//
+// A transient RPM/TPM 429 with healthy daily counters gets a short fixed
+// cooldown and does NOT count toward escalation. This is the common case for
+// providers with a tight per-minute token budget but a large daily quota —
+// e.g. groq gpt-oss-120b has rpd=1000 yet tpm=8000, so a single burst of large
+// prompts 429s on TPM while the daily quota is barely touched. Daily counters
+// are persisted (countPersistedRequests / sumPersistedTokens), so this verdict
+// is stable across restarts.
 export function getCooldownDurationForLimit(
   platform: string,
   modelId: string,
@@ -341,7 +385,20 @@ export function getCooldownDurationForLimit(
     limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
   const tpdExhausted =
     limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
-  const base = (rpdExhausted || tpdExhausted)
+  // No daily quota published → use repeated-429 heuristic: 2+ 429s in the
+  // last hour is treated as effectively daily-exhausted. This unsticks
+  // providers that publish no daily cap (ollama, cloudflare, etc.) from the
+  // 90s-cooldown-loop without requiring operator-side limit seeding.
+  const unknownLimits = limits.rpd === null && limits.tpd === null;
+  let heuristicallyExhausted = false;
+  if (unknownLimits) {
+    // The current hit is recorded first so the threshold can be reached across
+    // consecutive 429s, but only for providers where counters cannot decide.
+    recordNullLimitHit(platform, modelId, keyId, now);
+    heuristicallyExhausted =
+      recentHitCount(platform, modelId, keyId, now) >= NULL_LIMIT_HIT_THRESHOLD;
+  }
+  const base = (rpdExhausted || tpdExhausted || heuristicallyExhausted)
     ? getNextCooldownDuration(platform, modelId, keyId)
     : TRANSIENT_COOLDOWN_MS;
   // Honor an upstream Retry-After as a floor: never bench shorter than our own
@@ -418,6 +475,22 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
     return false;
   }
   return true;
+}
+
+/**
+ * Soonest moment any active cooldown expires, in ms since epoch, or null when
+ * nothing is cooling down. Used to tell an exhausted caller roughly when to
+ * retry (#423) instead of the bare "wait for rate limits to reset".
+ */
+export function getSoonestCooldownExpiry(now = Date.now()): number | null {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT MIN(expires_at_ms) AS soonest
+        FROM rate_limit_cooldowns
+       WHERE expires_at_ms > ?
+    `).get(now) as { soonest: number | null } | undefined;
+    return row?.soonest ?? null;
+  }) ?? null;
 }
 
 export function getRateLimitStatus(

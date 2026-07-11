@@ -3,6 +3,7 @@ import http from 'node:http';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { decrypt } from '../../lib/crypto.js';
 import { routeRequest } from '../../services/router.js';
 import { resolveProvider, getProvider } from '../../providers/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
@@ -116,6 +117,33 @@ describe('Custom Provider Endpoints', () => {
     const { body } = await get(app, '/api/keys');
     const custom = body.find((k: any) => k.platform === 'custom');
     expect(custom.baseUrl).toBe('http://127.0.0.1:11434/v1');
+  });
+
+  it('does not overwrite an existing endpoint key when a later submit omits apiKey', async () => {
+    const first = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:7777/v1',
+      model: 'secret-model-a',
+      apiKey: 'keep-this-key',
+    });
+    expect(first.status).toBe(201);
+
+    const second = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:7777/v1',
+      model: 'secret-model-b',
+    });
+    expect(second.status).toBe(201);
+
+    const key = getDb().prepare(`
+      SELECT id, encrypted_key, iv, auth_tag
+        FROM api_keys
+       WHERE platform = 'custom' AND base_url = 'http://127.0.0.1:7777/v1'
+    `).get() as { id: number; encrypted_key: string; iv: string; auth_tag: string };
+    expect(decrypt(key.encrypted_key, key.iv, key.auth_tag)).toBe('keep-this-key');
+
+    const db = getDb();
+    db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(key.id);
+    db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(key.id);
+    db.prepare('DELETE FROM api_keys WHERE id = ?').run(key.id);
   });
 
   it('routes a request to the custom model through its base URL', () => {
@@ -326,6 +354,88 @@ describe('Custom Provider Endpoints', () => {
 
     it('rejects a submit with neither model nor models', async () => {
       const { status } = await post(app, '/api/keys/custom', { baseUrl: 'http://127.0.0.1:9999/v1' });
+      expect(status).toBe(400);
+    });
+  });
+
+  // #470: custom models used to register with supports_tools = 0, so agentic
+  // clients that send `tools` matched zero of them and hit a false "all models
+  // exhausted" error. Registration now defaults tools on, vision off.
+  describe('capability defaults (#470)', () => {
+    beforeAll(() => {
+      const db = getDb();
+      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
+      db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
+      db.prepare("DELETE FROM api_keys WHERE platform = 'custom'").run();
+    });
+
+    function toolsVision(modelId: string) {
+      return getDb()
+        .prepare("SELECT supports_tools, supports_vision FROM models WHERE platform = 'custom' AND model_id = ?")
+        .get(modelId) as { supports_tools: number; supports_vision: number };
+    }
+
+    it('defaults a new custom model to tools on, vision off', async () => {
+      const { status, body } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5001/v1',
+        model: 'defaults-model',
+      });
+      expect(status).toBe(201);
+      expect(toolsVision('defaults-model')).toEqual({ supports_tools: 1, supports_vision: 0 });
+      // Echoed back to the client so the UI can render the capability badges.
+      expect(body.supportsTools).toBe(true);
+      expect(body.supportsVision).toBe(false);
+    });
+
+    it('honors submit-level supportsTools / supportsVision flags', async () => {
+      const { status } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5002/v1',
+        model: 'vision-no-tools',
+        supportsTools: false,
+        supportsVision: true,
+      });
+      expect(status).toBe(201);
+      expect(toolsVision('vision-no-tools')).toEqual({ supports_tools: 0, supports_vision: 1 });
+    });
+
+    it('honors per-entry flags in the models array and per-model defaults', async () => {
+      const { status } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5003/v1',
+        models: [
+          { model: 'entry-vision', supportsVision: true },
+          'entry-default',
+        ],
+      });
+      expect(status).toBe(201);
+      expect(toolsVision('entry-vision')).toEqual({ supports_tools: 1, supports_vision: 1 });
+      expect(toolsVision('entry-default')).toEqual({ supports_tools: 1, supports_vision: 0 });
+    });
+
+    it('preserves a stored capability when re-registration omits the flag', async () => {
+      await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5004/v1',
+        model: 'preserve-model',
+        supportsTools: false,
+      });
+      expect(toolsVision('preserve-model')).toEqual({ supports_tools: 0, supports_vision: 0 });
+
+      // Re-submit the same endpoint/model without capability flags — the earlier
+      // tools = 0 the user chose must survive, not snap back to the default.
+      const { status } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5004/v1',
+        model: 'preserve-model',
+        displayName: 'Renamed',
+      });
+      expect(status).toBe(201);
+      expect(toolsVision('preserve-model')).toEqual({ supports_tools: 0, supports_vision: 0 });
+    });
+
+    it('rejects a non-boolean capability flag', async () => {
+      const { status } = await post(app, '/api/keys/custom', {
+        baseUrl: 'http://127.0.0.1:5005/v1',
+        model: 'bad-flag',
+        supportsTools: 'yes',
+      });
       expect(status).toBe(400);
     });
   });

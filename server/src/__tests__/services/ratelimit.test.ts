@@ -8,6 +8,7 @@ import {
   getRateLimitStatus,
   getNextCooldownDuration,
   getCooldownDurationForLimit,
+  recentHitCount,
   canUseProvider,
   providerDailyRequestCount,
   getProviderDailyRequestCap,
@@ -131,12 +132,67 @@ describe('Rate Limiter', () => {
       expect(getCooldownDurationForLimit(...args, { rpd: 1000, tpd: null })).toBe(90 * 1000);
     });
 
-    it('treats a null daily limit as never-exhausted (always transient)', () => {
+    it('stays transient for the first 429 with null daily limits (heuristic threshold)', () => {
       const id = Math.floor(Math.random() * 1_000_000);
-      for (let i = 0; i < 50; i++) recordRequest('mistral', `nolimit-${id}`, id);
+      // 1st 429 → transient (no signal yet). Subsequent 429s stay transient
+      // until the threshold is crossed.
       expect(
         getCooldownDurationForLimit('mistral', `nolimit-${id}`, id, { rpd: null, tpd: null }),
       ).toBe(90 * 1000);
+    });
+
+    it('escalates null-limit 429s through the same ladder as documented RPD exhaustion', () => {
+      // Documented RPD path (see "escalates only once the daily request limit
+      // is actually reached"): 1st call after counter ≥ limit → 2min (idx=0),
+      // 2nd → 10min (idx=1), 3rd → HOUR (idx=2), 4th+ → DAY (idx=3).
+      //
+      // Null-limit path mirrors that sequence starting at the 2nd 429 (1st
+      // is transient — no signal yet). Uses an independent counter so the
+      // ladder index isn't inflated by the heuristic's own hits.
+      const id = Math.floor(Math.random() * 1_000_000);
+      const platform = 'ollama';
+      const model = `nolimit-esc-${id}`;
+      // 1st 429 — no history → transient
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(90 * 1000);
+      // 2nd 429 — heuristic threshold (2) crossed → 2min (ladder idx=0)
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(2 * 60 * 1000);
+      // 3rd 429 → 10min (idx=1)
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(10 * 60 * 1000);
+      // 4th 429 → HOUR (idx=2)
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(60 * 60 * 1000);
+      // 5th 429 → DAY (idx=3, capped)
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(24 * 60 * 60 * 1000);
+      // 6th+ stays at DAY
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(24 * 60 * 60 * 1000);
+    });
+
+    it('does NOT trigger the heuristic when limits are known (even after 5+ hits)', () => {
+      // rpd=1000 known: counters track it, daily-exhausted check uses the
+      // counter, not the hit count. The null-limits heuristic only fires
+      // when BOTH rpd AND tpd are null. With a known cap, repeated 429s
+      // stay transient (the counter-based path takes over instead).
+      const id = Math.floor(Math.random() * 1_000_000);
+      const platform = 'openrouter';
+      const model = `known-${id}`;
+      for (let i = 0; i < 5; i++) {
+        expect(getCooldownDurationForLimit(platform, model, id, { rpd: 1000, tpd: null })).toBe(90 * 1000);
+      }
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(0);
+    });
+
+    it('clears null-limit hit history after a successful request', () => {
+      const id = Math.floor(Math.random() * 1_000_000);
+      const platform = 'ollama';
+      const model = `nolimit-success-${id}`;
+
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(90 * 1000);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(2 * 60 * 1000);
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(2);
+
+      recordRequest(platform, model, id);
+
+      expect(recentHitCount(platform, model, id, Date.now())).toBe(0);
+      expect(getCooldownDurationForLimit(platform, model, id, { rpd: null, tpd: null })).toBe(90 * 1000);
     });
 
     it('escalates only once the daily request limit is actually reached', () => {

@@ -1,24 +1,92 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
-import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider } from './ratelimit.js';
+import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider, getSoonestCooldownExpiry } from './ratelimit.js';
 import {
   BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
   reliabilityPosterior, expectedReliability, sampleBeta,
   speedScore, intelligenceScore, headroomFactor, rateLimitFactor, combineScore,
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
+import { platformDropsResponseFormat } from '../lib/sampling-params.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from './model-groups.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
-import type { Database } from 'better-sqlite3';
+import type { Db } from '../db/types.js';
 
 class RouteError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  // Per-model disposition of the chain at the moment routing gave up: one line
+  // per considered model with the reason it could not serve (no key, cooldown,
+  // provider cap, rpm/rpd, tpm/tpd, context too small, …). Populated only on the
+  // synchronous "all exhausted" throw, where NO upstream was tried and nothing
+  // else logs WHY the pool was empty (issue _1: opaque routing_error 429).
+  diagnostics?: string[];
+  constructor(message: string, status: number, diagnostics?: string[]) {
     super(message);
     this.status = status;
+    this.diagnostics = diagnostics;
   }
+}
+
+// Human-readable retry ETA from a cooldown expiry timestamp (#423). Null when
+// nothing is cooling down or it already lapsed.
+export function formatResetEta(soonestResetMs: number | null | undefined, now = Date.now()): string | null {
+  if (soonestResetMs == null) return null;
+  const deltaMs = soonestResetMs - now;
+  if (deltaMs <= 0) return null;
+  const secs = Math.round(deltaMs / 1000);
+  if (secs < 90) return `~${secs}s`;
+  const mins = Math.round(secs / 60);
+  if (mins < 90) return `~${mins}m`;
+  return `~${Math.round(mins / 60)}h`;
+}
+
+const EXHAUSTION_ADVICE = 'Add more API keys or wait for rate limits to reset.';
+
+// Roll the per-model diagnostics (see RouteError.diagnostics) up into a short,
+// client-safe summary so an exhausted caller learns WHY the pool was empty
+// instead of a bare "All models exhausted" (#423). Buckets are aggregate
+// counts only — no key material, no per-key detail. Classifies off the whole
+// line (model ids can contain ':' so splitting label from reason is unsafe).
+export function summarizeExhaustion(
+  diag: string[] | undefined,
+  soonestResetMs?: number | null,
+  now = Date.now(),
+): string {
+  const eta = formatResetEta(soonestResetMs, now);
+  const etaSuffix = eta ? ` Soonest reset ${eta}.` : '';
+  if (!diag || diag.length === 0) {
+    return `All models exhausted. ${EXHAUSTION_ADVICE}${etaSuffix}`;
+  }
+
+  const counts: Record<string, number> = {};
+  const bump = (bucket: string) => { counts[bucket] = (counts[bucket] ?? 0) + 1; };
+  for (const line of diag) {
+    const l = line.toLowerCase();
+    if (l.includes('no provider registered')) bump('unsupported provider');
+    else if (/no enabled\+healthy key|no usable key|decrypt-error/.test(l)) bump('no usable key configured');
+    else if (l.includes('< estimated')) bump('prompt too large for the model');
+    else if (l.includes('no vision support')) bump('model lacks vision');
+    else if (l.includes('no tool-calling support')) bump('model lacks tool-calling');
+    else if (/ruled out|already-failed/.test(l)) bump('failed earlier this request');
+    else if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap/.test(l)) bump('rate-limited or on cooldown');
+    else bump('unavailable');
+  }
+  // Most actionable buckets first.
+  const order = [
+    'rate-limited or on cooldown',
+    'no usable key configured',
+    'prompt too large for the model',
+    'model lacks vision',
+    'model lacks tool-calling',
+    'failed earlier this request',
+    'unsupported provider',
+    'unavailable',
+  ];
+  const parts = order.filter(b => counts[b]).map(b => `${counts[b]} ${b}`);
+  const total = diag.length;
+  return `All models exhausted: ${total} route${total === 1 ? '' : 's'} checked (${parts.join(', ')}). ${EXHAUSTION_ADVICE}${etaSuffix}`;
 }
 
 interface KeyRow {
@@ -67,6 +135,29 @@ export interface RouteResult {
   // exhaustion (escalate the cooldown) from a transient per-minute spike.
   rpdLimit: number | null;
   tpdLimit: number | null;
+}
+
+// ── Routing token estimate: cap the reserved OUTPUT, not the full max_tokens ──
+// A client can request a huge max_tokens (e.g. 32000) it will never actually
+// emit. Reserving that full amount against every model's context window and TPM
+// budget falsely excludes the entire free pool (TPM 6k-30k) and returns a bogus
+// "all models exhausted" 429 with ZERO upstream calls (#470). Providers meter
+// ACTUAL tokens, so under-reserving only risks an upstream 429/413 the retry
+// loop already handles, whereas over-reserving starves routing. For routing and
+// the context-window / TPM filters we therefore reserve at most this many output
+// tokens; the INPUT estimate is still counted in full so a genuinely large
+// prompt still (correctly) skips a too-small model.
+export const OUTPUT_RESERVE_CAP = 2000;
+
+/**
+ * Output tokens to reserve for routing/filter purposes: the requested max_tokens
+ * clamped to OUTPUT_RESERVE_CAP (default 1000 when the client omitted it, matching
+ * the historical fallback). Callers add this to their INPUT estimate before
+ * calling routeRequest / routePinnedModel.
+ */
+export function routingReserveTokens(requestedMaxTokens: number | null | undefined): number {
+  const requested = requestedMaxTokens != null && requestedMaxTokens > 0 ? requestedMaxTokens : 1000;
+  return Math.min(requested, OUTPUT_RESERVE_CAP);
 }
 
 // Round-robin index per platform
@@ -233,7 +324,7 @@ function decayWeight(ageDays: number): number {
   return Math.pow(0.5, Math.max(0, ageDays) / HALF_LIFE_DAYS);
 }
 
-export function refreshStatsCache(db: Database, force = false): void {
+export function refreshStatsCache(db: Db, force = false): void {
   if (!force && statsCache && Date.now() - statsCacheTime < CACHE_TTL_MS) return;
 
   const since = new Date(Date.now() - WINDOW_MS).toISOString();
@@ -321,12 +412,26 @@ interface ScoredEntry {
   score: number;
 }
 
+// Enabled + healthy/unknown key count per platform, for pooled-budget scaling.
+// This is the SAME filter both /api/fallback endpoints use (issue #456): the
+// monthly budget is a PER-KEY free-tier allowance, so N usable keys pool N× the
+// capacity. `monthlyUsedTokens` is already summed across all keys, so budget
+// must scale to match or the headroom guardrail damps a multi-key model to the
+// floor after just one account's worth of tokens.
+function usableKeyCountsByPlatform(db: Db): Map<string, number> {
+  const rows = db.prepare(
+    "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
+  ).all() as { platform: string; count: number }[];
+  return new Map(rows.map(r => [r.platform, r.count]));
+}
+
 function scoreChainEntry(
   entry: ChainRow,
   weights: RoutingWeights,
   intelMin: number,
   intelMax: number,
   sampled: boolean,
+  keyCounts: Map<string, number>,
 ): ScoredEntry {
   const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
   const successes = stats?.successes ?? 0;
@@ -345,7 +450,10 @@ function scoreChainEntry(
     intelligenceComposite(entry.size_label, entry.intelligence_rank), intelMin, intelMax,
   );
 
-  const budget = parseBudget(entry.monthly_token_budget);
+  // Scale the per-key monthly budget by the usable key count for this platform,
+  // matching the pooled `monthlyUsedTokens` aggregate (#456). Math.max(1, …) so a
+  // model whose platform currently has no usable key isn't handed a 0 budget.
+  const budget = parseBudget(entry.monthly_token_budget) * Math.max(1, keyCounts.get(entry.platform) ?? 1);
   const headroom = headroomFactor(stats?.monthlyUsedTokens ?? 0, budget);
   const rl = rateLimitFactor(getPenalty(entry.model_db_id));
 
@@ -379,9 +487,10 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   const intelMin = composites.length ? Math.min(...composites) : 0;
   const intelMax = composites.length ? Math.max(...composites) : 0;
+  const keyCounts = usableKeyCountsByPlatform(getDb());
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled, keyCounts).score }))
     // Higher score first; manual priority breaks ties so the chain still matters.
     .sort((a, b) => b.s - a.s || a.e.priority - b.e.priority)
     .map(x => x.e);
@@ -416,7 +525,7 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
   balanced: 'balanced',
 };
 
-function getActiveChain(db: Database): ChainRow[] {
+function getActiveChain(db: Db): ChainRow[] {
   const activeProfileSetting = db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as { value: string } | undefined;
   if (activeProfileSetting) {
     const profileId = parseInt(activeProfileSetting.value, 10);
@@ -447,7 +556,7 @@ function getActiveChain(db: Database): ChainRow[] {
   `).all() as ChainRow[];
 }
 
-function getChainByProfileName(db: Database, name: string): ChainRow[] | null {
+function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
   const profile = db.prepare("SELECT id FROM profiles WHERE LOWER(name) = ?").get(name.toLowerCase()) as { id: number } | undefined;
   if (!profile) return null;
 
@@ -464,7 +573,7 @@ function getChainByProfileName(db: Database, name: string): ChainRow[] | null {
   `).all(profile.id) as ChainRow[];
 }
 
-function getChainByGlobalSort(db: Database, globalAxis: string): ChainRow[] {
+function getChainByGlobalSort(db: Db, globalAxis: string): ChainRow[] {
   const allEnabled = db.prepare(`
     SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
@@ -543,16 +652,28 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
  * context window) stay in the caller; this only does key selection + accounting
  * pre-checks.
  */
-function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>): RouteResult | null {
+function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>, diag?: string[]): RouteResult | null {
   const db = getDb();
+  const label = `${entry.platform}/${entry.model_id}`;
 
-  if (!hasProvider(entry.platform as Platform)) return null;
+  if (!hasProvider(entry.platform as Platform)) {
+    diag?.push(`${label}: no provider registered`);
+    return null;
+  }
   const provider = getProvider(entry.platform as Platform)!;
 
   const keys = db.prepare(
     "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
   ).all(entry.platform) as KeyRow[];
-  if (keys.length === 0) return null;
+  if (keys.length === 0) {
+    diag?.push(`${label}: no enabled+healthy key for platform`);
+    return null;
+  }
+
+  // Tally the gate that rejected each key, so the exhaustion diagnostic can say
+  // *why* a model with keys still couldn't serve (all on cooldown vs over quota).
+  const skipTally: Record<string, number> = {};
+  const note = (reason: string) => { skipTally[reason] = (skipTally[reason] ?? 0) + 1; };
 
   const limits = {
     rpm: entry.rpm_limit,
@@ -570,15 +691,15 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
 
     // A custom model belongs to exactly one endpoint (#212); legacy rows
     // (key_id NULL) keep the old any-key match.
-    if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) continue;
+    if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) { note('custom-key-mismatch'); continue; }
 
     const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
-    if (skipKeys?.has(skipId)) continue;
+    if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }
 
-    if (isOnCooldown(entry.platform, entry.model_id, key.id)) continue;
-    if (!canUseProvider(entry.platform, key.id)) continue;
-    if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) continue;
-    if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) continue;
+    if (isOnCooldown(entry.platform, entry.model_id, key.id)) { note('cooldown'); continue; }
+    if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
+    if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
+    if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
 
     let decryptedKey: string;
     try {
@@ -586,13 +707,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     } catch {
       db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
         .run(key.id);
+      note('decrypt-error');
       continue;
     }
 
     const resolvedProvider = entry.platform === 'custom'
       ? resolveProvider('custom', key.base_url)
       : provider;
-    if (!resolvedProvider) continue;
+    if (!resolvedProvider) { note('no-resolved-provider'); continue; }
 
     roundRobinIndex.set(rrKey, idx);
     return {
@@ -611,13 +733,65 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   // No usable key for this model. Advance the round-robin index anyway so we
   // don't get stuck re-trying the same exhausted key first next time.
   roundRobinIndex.set(rrKey, idx);
+  const summary = Object.entries(skipTally).map(([r, n]) => `${r}:${n}`).join(', ') || 'no usable key';
+  diag?.push(`${label}: ${keys.length} key(s) — ${summary}`);
   return null;
+}
+
+/**
+ * Whether the model still has ANOTHER key that could serve it right now, given
+ * the key that just failed (excludingKeyId) and any keys already ruled out this
+ * request (skipKeys, in the "platform:modelId:keyId" form). Applies the same
+ * gates selectKeyForModel uses — enabled + healthy status, not on cooldown,
+ * under the provider daily cap, and under rpm/rpd/tpm/tpd — so the answer means
+ * "a real, dispatchable alternative exists".
+ *
+ * Used by the retry loops to decide whether a single key's 429 should demote the
+ * WHOLE model (the model-level 429 penalty). It should not: the per-key cooldown
+ * already isolates the failing key, so demoting the model while a sibling key can
+ * still serve it wrongly sinks a healthy model in the scorer (#454). We only
+ * record the model-level hit when this returns false — i.e. the 429 exhausted the
+ * model, not just one of its keys.
+ */
+export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, skipKeys?: Set<string>): boolean {
+  const db = getDb();
+  const m = db.prepare(`
+    SELECT platform, model_id, rpm_limit, rpd_limit, tpm_limit, tpd_limit, key_id
+      FROM models WHERE id = ?
+  `).get(modelDbId) as {
+    platform: string; model_id: string;
+    rpm_limit: number | null; rpd_limit: number | null;
+    tpm_limit: number | null; tpd_limit: number | null; key_id: number | null;
+  } | undefined;
+  if (!m) return false;
+
+  const limits = { rpm: m.rpm_limit, rpd: m.rpd_limit, tpm: m.tpm_limit, tpd: m.tpd_limit };
+  const keys = db.prepare(
+    "SELECT id FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+  ).all(m.platform) as { id: number }[];
+
+  for (const k of keys) {
+    if (k.id === excludingKeyId) continue;
+    // A custom model binds to exactly one endpoint key (#212); a sibling custom
+    // key cannot serve it, so it doesn't count as an alternative.
+    if (m.platform === 'custom' && m.key_id != null && k.id !== m.key_id) continue;
+    if (skipKeys?.has(`${m.platform}:${m.model_id}:${k.id}`)) continue;
+    if (isOnCooldown(m.platform, m.model_id, k.id)) continue;
+    if (!canUseProvider(m.platform, k.id)) continue;
+    if (!canMakeRequest(m.platform, m.model_id, k.id, limits)) continue;
+    // A per-minute token spike on the failed key doesn't mean a fresh key lacks
+    // headroom; a nominal 1-token probe only rules out a key already at its
+    // TPM/TPD ceiling.
+    if (!canUseTokens(m.platform, m.model_id, k.id, 1, limits)) continue;
+    return true;
+  }
+  return false;
 }
 
 /**
  * Fetch a single enabled model's chain row by its db id.
  */
-function getModelChainRow(db: Database, modelDbId: number): ChainRow | undefined {
+function getModelChainRow(db: Db, modelDbId: number): ChainRow | undefined {
   return db.prepare(`
     SELECT m.id as model_db_id, 0 as priority, 1 as enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
@@ -807,7 +981,7 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   return null;
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false): RouteResult {
   const db = getDb();
 
   const strategy = getRoutingStrategy();
@@ -845,50 +1019,67 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     }
   }
 
+  // Per-model disposition, attached to the exhaustion error when the loop falls
+  // through with no route — the only record of WHY the pool was empty on the
+  // synchronous "all exhausted" path (nothing downstream logs it). See issue _1.
+  const diag: string[] = [];
+
   for (const entry of sortedChain) {
+    const label = `${entry.platform}/${entry.model_id}`;
     // Models the caller has ruled out for this request — e.g. a 404
     // "model removed upstream" already seen this request: trying the same
     // model again on a different key would just burn another attempt on the
     // same dead route (PR #111, credits @barbotkonv).
-    if (skipModels?.has(entry.model_db_id)) continue;
+    if (skipModels?.has(entry.model_db_id)) { diag.push(`${label}: ruled out earlier this request`); continue; }
 
     // Vision requests skip text-only models — including a sticky/preferred one,
     // which is correct: don't pin an image turn to a model that can't see it.
-    if (requireVision && !entry.supports_vision) continue;
+    if (requireVision && !entry.supports_vision) { diag.push(`${label}: no vision support`); continue; }
 
     // Tool-bearing requests skip models that can't emit structured tool_calls.
     // A model that "answers" a tool request with the call serialized as text
     // looks successful at the transport level while the client's harness sees
     // nothing — worse than a failover. Applies to sticky models too, same
     // reasoning as vision above.
-    if (requireTools && !entry.supports_tools) continue;
+    if (requireTools && !entry.supports_tools) { diag.push(`${label}: no tool-calling support`); continue; }
+
+    // Structured-output routing (#514 follow-up): when the request carries a
+    // response_format, skip platforms whose param policy can't even receive it
+    // (the param would be dropped before send, so the model would answer in
+    // prose and burn a failover hop). Platform-level fast path — model-level
+    // capability isn't in the catalog; models that accept the param but ignore
+    // it are caught by the non-stream JSON enforcement downstream.
+    if (requireStructured && platformDropsResponseFormat(entry.platform)) { diag.push(`${label}: platform drops response_format`); continue; }
 
     // Context-aware routing: skip a model whose context window can't hold the
     // request, so a large prompt never selects a small-context model and burns
     // a failover hop on a 413 "request too large" (#167). Only enforced when we
-    // know the model's window; estimatedTokens already includes the reserved
-    // output (max_tokens), so this is the total-context check the model must
-    // satisfy. A 413 that slips through is still retryable downstream, and the
-    // failed model is put on cooldown — so this is a fast-path, not the only
-    // guard. If every model is too small, the loop falls through and the caller
-    // gets the normal "all models exhausted" error rather than a wasted sweep.
-    if (entry.context_window != null && estimatedTokens > entry.context_window) continue;
+    // know the model's window; estimatedTokens is the INPUT estimate plus a
+    // CAPPED output reserve (routingReserveTokens, #470), so a huge client-set
+    // max_tokens no longer excludes the model — the input must fit, not
+    // input+full max_tokens. A 413 that slips through is still retryable
+    // downstream, and the failed model is put on cooldown — so this is a
+    // fast-path, not the only guard. If every model is too small, the loop falls
+    // through and the caller gets the normal "all models exhausted" error rather
+    // than a wasted sweep.
+    if (entry.context_window != null && estimatedTokens > entry.context_window) { diag.push(`${label}: context ${entry.context_window} < estimated ${estimatedTokens}`); continue; }
 
-    // Same guard for a model with a small per-minute token budget: a single
-    // request that alone exceeds tpm_limit can never fit one minute of quota and
+    // Same guard for a model with a small per-minute token budget: a request
+    // whose input alone exceeds tpm_limit can never fit one minute of quota and
     // returns a guaranteed 413 (e.g. Groq gpt-oss-120b: 131k context but 8k TPM).
-    // estimatedTokens already includes reserved output, mirroring the check above.
-    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) continue;
+    // estimatedTokens carries the same capped output reserve, mirroring the
+    // check above (#470).
+    if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) { diag.push(`${label}: tpm_limit ${entry.tpm_limit} < estimated ${estimatedTokens}`); continue; }
 
     // Key selection + accounting pre-checks for this one model. Returns the
     // first usable key's RouteResult, or null when the model has no key that
     // can serve right now — in which case we fall through to the next model in
     // the sorted chain for THIS request (no explicit penalty needed).
-    const route = selectKeyForModel(entry, estimatedTokens, skipKeys);
+    const route = selectKeyForModel(entry, estimatedTokens, skipKeys, diag);
     if (route) return route;
   }
 
-  throw new RouteError('All models exhausted. Add more API keys or wait for rate limits to reset.', 429);
+  throw new RouteError(summarizeExhaustion(diag, getSoonestCooldownExpiry()), 429, diag);
 }
 
 /**
@@ -933,9 +1124,10 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   const intelMin = composites.length ? Math.min(...composites) : 0;
   const intelMax = composites.length ? Math.max(...composites) : 0;
+  const keyCounts = usableKeyCountsByPlatform(db);
 
   const scores: RoutingScore[] = chain.map(entry => {
-    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false);
+    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false, keyCounts);
     const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
     return {
       modelDbId: entry.model_db_id,

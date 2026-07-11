@@ -62,11 +62,14 @@ export function setClaudeModelMap(input: unknown): AnthropicModelMap {
 export function classifyClaudeFamily(model?: string): ClaudeFamily | null {
   const m = (model ?? '').trim().toLowerCase();
   if (!m || m === 'auto' || m === 'default' || m === 'freellmapi-auto') return 'default';
+  // Claude Code's planning alias is opus-ish by name but must hit the catch-all,
+  // so match it before the substring family checks below.
+  if (m === 'opusplan' || m === 'opusplan-4') return 'default';
   if (m.includes('opus')) return 'opus';
   if (m.includes('sonnet')) return 'sonnet';
   if (m.includes('haiku')) return 'haiku';
-  // Any other claude-ish alias (incl. Claude Code's opusplan) → the catch-all.
-  if (m.startsWith('claude') || m === 'opusplan' || m === 'opusplan-4') return 'default';
+  // Any other claude-ish alias → the catch-all.
+  if (m.startsWith('claude')) return 'default';
   return null;
 }
 

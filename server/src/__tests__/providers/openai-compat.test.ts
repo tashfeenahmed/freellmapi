@@ -159,6 +159,89 @@ describe('OpenAICompatProvider', () => {
     ).rejects.toThrow(/not OpenAI-compatible/);
   });
 
+  it('distinguishes a truncated 200 body (CDN keepalive) from a wrong-endpoint 200 body (#430)', async () => {
+    // Cloudflare-fronted free-tier upstreams (Kilo routing Nemotron / Poolside Laguna)
+    // deliver a partial JSON body when the 600s edge idle-keepalive fires mid-response.
+    // Node's JSON.parse surfaces that as "Unexpected end of JSON input" — different from
+    // the NDJSON / native-API case above. Operators were chasing a base-URL bug that
+    // didn't exist because both paths produced the same error string.
+    const headers = new Headers({ 'content-type': 'application/json' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+    } as any);
+
+    let caught: Error | null = null;
+    try {
+      await provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toMatch(/truncated mid-stream/);
+    expect(caught!.message).toMatch(/Cloudflare's 600s edge limit/);
+    expect(caught!.message).not.toMatch(/not OpenAI-compatible/);
+  });
+
+  it('attributes an "after JSON at position" parse error with Content-Type: application/json to CDN truncation (#430)', async () => {
+    // Same edge-keepalive case but the body parses far enough to reach a
+    // mid-token garbage character before EOF. Content-Type is the only signal
+    // that distinguishes this from a real NDJSON upstream (next test).
+    const headers = new Headers({ 'content-type': 'application/json' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 4096 (line 1 column 4097)')),
+    } as any);
+
+    await expect(
+      provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model')
+    ).rejects.toThrow(/truncated mid-stream/);
+  });
+
+  it('does not flag NDJSON Content-Type as a truncation (#430 regression guard)', async () => {
+    // A real Ollama-style upstream announces NDJSON via Content-Type. Even if
+    // the parse error message happens to match the "after JSON at position"
+    // substring (NDJSON bodies do — the parser eats one object, then trips
+    // on the next one), we must not misclassify it as a CDN truncation.
+    const headers = new Headers({ 'content-type': 'application/x-ndjson' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 120 (line 3 column 1)')),
+    } as any);
+
+    await expect(
+      provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model')
+    ).rejects.toThrow(/not OpenAI-compatible/);
+  });
+
+  it('does not classify NDJSON Content-Type as a truncation — explicit not.toThrow (#430)', async () => {
+    // Companion to the previous test: explicitly assert the truncation message
+    // does NOT appear, so a future refactor can't silently switch the branch.
+    const headers = new Headers({ 'content-type': 'application/x-ndjson' });
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers,
+      json: () => Promise.reject(new SyntaxError('Unexpected non-whitespace character after JSON at position 120 (line 3 column 1)')),
+    } as any);
+
+    let caught: Error | null = null;
+    try {
+      await provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model');
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).not.toMatch(/truncated mid-stream/);
+    expect(caught!.message).toMatch(/not OpenAI-compatible/);
+  });
+
   it('should validate key using models endpoint', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, status: 200 } as any);
     expect(await provider.validateKey('valid')).toBe(true);
@@ -301,6 +384,9 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
     { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     { platform: 'opencode',   name: 'OpenCode Zen',  baseUrl: 'https://opencode.ai/zen/v1' },
+    { platform: 'aion',       name: 'Aion Labs',     baseUrl: 'https://api.aionlabs.ai/v1' },
+    { platform: 'requesty',   name: 'Requesty',      baseUrl: 'https://router.requesty.ai/v1' },
+    { platform: 'nara',       name: 'NaraRouter',    baseUrl: 'https://router.bynara.id/v1' },
   ] as const;
 
   for (const p of platforms) {
@@ -386,5 +472,72 @@ describe('OpenAICompatProvider - platform instances', () => {
         provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'm', { tools }),
       ).rejects.toThrow(/API error 400/);
     });
+  });
+});
+
+describe('extended sampling param passthrough', () => {
+  const mockOk = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      id: 'x', object: 'chat.completion', created: 1, model: 'm',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    }),
+  }) as any;
+
+  const extended = {
+    seed: 42, top_k: 40, min_p: 0.05, presence_penalty: 0.5, frequency_penalty: -0.25,
+    logit_bias: { '50256': -100 }, logprobs: true, top_logprobs: 3,
+    response_format: { type: 'json_schema' as const, json_schema: { name: 'a', schema: { type: 'object' } } },
+  };
+
+  it('forwards the full extended set for a policy-free platform', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'cerebras', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', extended);
+
+    expect(body.seed).toBe(42);
+    expect(body.top_k).toBe(40);
+    expect(body.min_p).toBe(0.05);
+    expect(body.logit_bias).toEqual({ '50256': -100 });
+    expect(body.logprobs).toBe(true);
+    expect(body.top_logprobs).toBe(3);
+    expect(body.response_format.type).toBe('json_schema');
+  });
+
+  it('applies the mistral policy on the wire: random_seed rename, strict-API params dropped', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'mistral', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', extended);
+
+    expect(body.random_seed).toBe(42);
+    expect(body).not.toHaveProperty('seed');
+    expect(body).not.toHaveProperty('top_k');
+    expect(body).not.toHaveProperty('logit_bias');
+    expect(body).not.toHaveProperty('logprobs');
+    expect(body.presence_penalty).toBe(0.5);
+    expect(body.response_format.type).toBe('json_schema');
+  });
+
+  it('sends no extended keys when none were requested (undefined stays omitted)', async () => {
+    let raw = '';
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      raw = (init as any).body;
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'groq', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', { temperature: 0.7 });
+
+    expect(raw).not.toContain('seed');
+    expect(raw).not.toContain('response_format');
+    expect(raw).not.toContain('logit_bias');
   });
 });

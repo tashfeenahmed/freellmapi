@@ -14,6 +14,7 @@ import { initDb, getDb, getUnifiedApiKey } from '../../server/src/db/index.js';
 import { startHealthChecker } from '../../server/src/services/health.js';
 import { startCatalogSync } from '../../server/src/services/catalog-sync.js';
 import { userCount, createUser, createSession } from '../../server/src/services/auth.js';
+import { NodeScheduler } from '../../server/src/lib/scheduler.js';
 
 export { getDb, getUnifiedApiKey };
 
@@ -34,8 +35,12 @@ export async function startServer(opts: StartOptions): Promise<ServerHandle> {
   initDb(opts.dbPath);
   const app = createApp();
   const { server, port } = await listenWithScan(app, opts.host, opts.preferredPort);
-  startHealthChecker();
-  startCatalogSync();
+  // Background timers need a Scheduler since the abstraction landed (4cbb571);
+  // mirror server/src/index.ts. Without it both calls receive `undefined` and
+  // throw "reading 'every'" on the first scheduler.every() during boot.
+  const scheduler = new NodeScheduler();
+  startHealthChecker(scheduler);
+  startCatalogSync(scheduler);
   return { server, port };
 }
 

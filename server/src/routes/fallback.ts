@@ -11,6 +11,7 @@ import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrate
 import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
+import { getPenaltyInspector } from '../services/penalty-inspector.js';
 
 export const fallbackRouter = Router();
 
@@ -19,6 +20,10 @@ export const fallbackRouter = Router();
 //                 breakdown (reliability / speed / intelligence + guardrails).
 fallbackRouter.get('/routing', (_req: Request, res: Response) => {
   res.json(getRoutingScores());
+});
+
+fallbackRouter.get('/penalty-inspector', (_req: Request, res: Response) => {
+  res.json(getPenaltyInspector());
 });
 
 const routingSchema = z.object({
@@ -63,17 +68,23 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
            m.tpm_limit, m.tpd_limit, m.context_window,
-           m.monthly_token_budget, m.supports_vision, m.supports_tools
+           m.monthly_token_budget, m.supports_vision, m.supports_tools,
+           m.key_id, ak.label AS key_label,
+           mo.overrides_json IS NOT NULL AS has_overrides
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id
+    LEFT JOIN api_keys ak ON ak.id = m.key_id
+    LEFT JOIN model_overrides mo ON mo.platform = m.platform AND mo.model_id = m.model_id
     WHERE m.enabled = 1
     ORDER BY fc.priority ASC
   `).all() as any[];
 
-  // Count enabled keys per platform
+  // Count usable keys per platform — enabled AND healthy/unknown status. Unified
+  // with /token-usage and the routing scorer (#456) so budget pooling is computed
+  // from the same key set everywhere (a disabled or invalid key adds no capacity).
   const keyCounts = db.prepare(`
     SELECT platform, COUNT(*) as count
-    FROM api_keys WHERE enabled = 1
+    FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')
     GROUP BY platform
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
@@ -121,9 +132,14 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       monthlyTokenBudget: r.monthly_token_budget,
       // Parsed once here (single source of truth) so the dashboard never re-implements
       // budget-label parsing; 0 for rate-limited/placeholder labels. See lib/budget.ts.
-      monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget),
+      // Scaled by healthy/enabled key count for multi-account pooled capacity.
+      monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget) * Math.max(1, keyCountMap.get(r.platform) ?? 1),
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
+      source: r.platform === 'custom' || r.key_id != null ? 'custom' : 'catalog',
+      keyId: r.key_id ?? null,
+      keyLabel: r.key_label ?? null,
+      hasOverrides: Boolean(r.has_overrides),
       keyCount: keyCountMap.get(r.platform) ?? 0,
     };
   }));
@@ -273,35 +289,46 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   }
 
   // Build per-model breakdown (only platforms with keys), preserving enabled state
-  const modelBudgets = rawModels
-    .filter(m => platformSet.has(m.platform))
-    .map(m => ({
-      modelDbId: m.model_db_id,
-      displayName: m.display_name,
-      platform: m.platform,
-      budget: parseBudget(m.monthly_token_budget),
-      enabled: m.enabled === 1,
-      rpmLimit: m.rpm_limit,
-      rpdLimit: m.rpd_limit,
-      tpmLimit: m.tpm_limit,
-      tpdLimit: m.tpd_limit,
-    }));
-
-  // Total budget counts all models (both enabled and disabled — they contribute to the pool)
-  const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
-
-  // Tokens used this month
-  const usage = db.prepare(`
-    SELECT
-      COALESCE(SUM(input_tokens + output_tokens), 0) as total_used
+  const usageRows = db.prepare(`
+    SELECT platform, model_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
     FROM requests
     WHERE created_at >= datetime('now', 'start of month')
       AND request_type = 'chat'
-  `).get() as { total_used: number };
+    GROUP BY platform, model_id
+  `).all() as { platform: string; model_id: string; used: number }[];
+  const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
+
+  const keyCountMap = new Map(
+    (db.prepare("SELECT platform, COUNT(*) as count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+      .map(k => [k.platform, k.count])
+  );
+
+  const modelBudgets = rawModels
+    .filter(m => platformSet.has(m.platform))
+    .map(m => {
+      const keys = Math.max(1, keyCountMap.get(m.platform) ?? 1);
+      return {
+        modelDbId: m.model_db_id,
+        displayName: m.display_name,
+        platform: m.platform,
+        modelId: m.model_id,
+        budget: parseBudget(m.monthly_token_budget) * keys,
+        used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
+        enabled: m.enabled === 1,
+        rpmLimit: m.rpm_limit,
+        rpdLimit: m.rpd_limit,
+        tpmLimit: m.tpm_limit,
+        tpdLimit: m.tpd_limit,
+      };
+    });
+
+  // Total budget counts all models (both enabled and disabled — they contribute to the pool)
+  const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);
+  const totalUsed = modelBudgets.reduce((s, m) => s + m.used, 0);
 
   res.json({
     totalBudget,
-    totalUsed: usage.total_used,
+    totalUsed,
     models: modelBudgets,
   });
 });

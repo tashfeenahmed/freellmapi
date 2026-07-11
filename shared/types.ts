@@ -1,5 +1,37 @@
 // ---- Platform & Model Types ----
 
+export interface PreviewKey {
+  keyName: string;
+  keyValue: string;
+  detectedPlatform: string | null;
+  prefix: string;
+  isDuplicate?: boolean;
+}
+
+export interface ImportKey {
+  keyName: string;
+  keyValue: string;
+  platform: string;
+}
+
+export interface PreviewResponse {
+  keys: PreviewKey[];
+  total: number;
+  skipped: string[];
+  duplicates: number;
+}
+
+export interface ImportSelectedRequest {
+  keys: ImportKey[];
+}
+
+export interface ImportSelectedResponse {
+  imported: number;
+  skipped: string[];
+  errors: Array<{ key: string; error: string }>;
+  total: number;
+}
+
 // Active platforms — must match server/src/providers/index.ts and
 // server/src/routes/keys.ts PLATFORMS allowlist.
 // Moonshot and MiniMax direct integrations were dropped in migrateModelsV4
@@ -42,6 +74,34 @@ export type Platform =
   // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
   // chat is supported too. Key from siliconflow.com (no card).
   | 'siliconflow'
+  // Routeway — OpenAI-compatible aggregator. Free ':free' models ($0) on a
+  // rate-limited pool (~5 rpm observed); requires a browser User-Agent (CF
+  // blocks others). Key from routeway.ai (no card).
+  | 'routeway'
+  // BazaarLink — OpenAI-compatible aggregator. Free 'auto:free' route picks an
+  // available zero-cost model. Key from bazaarlink.ai (no card).
+  | 'bazaarlink'
+  // AINative Studio — OpenAI-compatible aggregator. Advertises a recurring
+  // ~10M tokens/month free allocation (no card); quota unverified. Key from
+  // ainative.studio.
+  | 'ainative'
+  // Aion Labs — OpenAI-compatible aggregator with a no-card free API key.
+  // Catalog rows live in the Oracle catalog (premium now, free after 30 days).
+  | 'aion'
+  // Requesty — OpenAI-compatible router with no-card free models/credits.
+  // Catalog rows live in the Oracle catalog (premium now, free after 30 days).
+  | 'requesty'
+  // NaraRouter — OpenAI-compatible aggregator. Free account key from
+  // router.bynara.id after Telegram channel/link verification; free-plan routes
+  // reset daily and are catalog-managed (premium now, free after 30 days).
+  | 'nara'
+  // AI Horde — free, community-powered inference (volunteer workers) via an
+  // OpenAI-compatible proxy (https://oai.aihorde.net/v1). Queue-based, so calls
+  // can take tens of seconds; no tool support; usage is reported as kudos, not
+  // tokens. Anonymous key `0000000000` works (lowest priority); a registered
+  // aihorde.net key raises queue priority. Has a dedicated AIHordeProvider that
+  // normalizes the proxy's OpenAI divergences. See issue #345.
+  | 'aihorde'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';
@@ -95,15 +155,26 @@ export interface ModelListRow {
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
 
+export interface ApiKeyModel {
+  id: number;
+  kind: 'chat' | 'embedding' | 'image' | 'audio';
+  modelId: string;
+  displayName: string;
+  family?: string | null;
+}
+
 export interface ApiKey {
   id: number;
   platform: Platform;
   label: string;
   maskedKey: string;
+  baseUrl: string | null;
   status: KeyStatus;
   enabled: boolean;
+  keyless: boolean;
   createdAt: string;
   lastCheckedAt: string | null;
+  models?: ApiKeyModel[];
 }
 
 export interface ApiKeyCreate {
@@ -217,6 +288,7 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
   stream?: boolean;
   top_p?: number;
+  stop?: string | string[];
   tools?: ChatToolDefinition[];
   tool_choice?: ChatToolChoice;
   parallel_tool_calls?: boolean;
@@ -226,6 +298,9 @@ export interface ChatCompletionChoice {
   index: number;
   message: ChatMessage;
   finish_reason: string | null;
+  // Present when the client requested logprobs and the provider returned
+  // them; passed through verbatim (provider shapes vary slightly).
+  logprobs?: unknown;
 }
 
 export interface TokenUsage {

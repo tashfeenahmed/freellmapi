@@ -6,6 +6,7 @@ import type {
   Platform,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { extendedBodyParams } from '../lib/sampling-params.js';
 import { rescueInlineToolCalls } from '../lib/tool-call-rescue.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
@@ -111,9 +112,11 @@ export class OpenAICompatProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
         parallel_tool_calls: this.resolveParallelToolCalls(options),
+        ...extendedBodyParams(this.platform, options),
       }),
     }, options?.timeoutMs ?? this.timeoutMs);
 
@@ -146,13 +149,51 @@ export class OpenAICompatProvider extends BaseProvider {
     }
 
     let data: ChatCompletionResponse;
+    let parseErr: unknown;
     try {
       data = await res.json() as ChatCompletionResponse;
-    } catch {
-      // A 200 whose body isn't a single JSON document — typically a base URL
-      // pointing at a non-OpenAI-compatible API (e.g. Ollama's native NDJSON
-      // /api endpoints instead of /v1, #189). Surface what's wrong instead of
-      // the raw JSON.parse position error.
+    } catch (err) {
+      parseErr = err;
+      data = undefined as unknown as ChatCompletionResponse;
+    }
+    if (!data) {
+      // A 200 whose body isn't a single JSON document. Two distinct causes:
+      //   (1) base URL points at a non-OpenAI-compatible API (Ollama's native
+      //       NDJSON /api endpoints, llama.cpp's non-/v1 server, etc., #189).
+      //       Typical signals: Content-Type is application/x-ndjson or
+      //       text/event-stream; parser sees a SECOND JSON object after the
+      //       first one ends ("Unexpected non-whitespace character after JSON
+      //       at position <n> (line <n> column <n>)") where <n> sits inside
+      //       the whitespace between two valid JSON documents.
+      //   (2) the upstream connection was cut short mid-response — most often
+      //       Cloudflare's 600-second edge idle keepalive dropping a slow
+      //       free-tier queue (Kilo provider, NVIDIA nemotron / Poolside
+      //       Laguna models on Cloudflare-fronted upstreams). Signals: body
+      //       ends inside a string or mid-token, parser sees
+      //       "Unexpected end of JSON input"; Content-Type is application/json
+      //       (CF proxies it transparently); latency_ms ≈ 600000.
+      // Without this split every Cloudflare-truncated request was logged as
+      // "endpoint is not OpenAI-compatible", which sent operators chasing a
+      // base-URL config bug that doesn't exist (#430).
+      const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      const contentType = (res.headers?.get?.('content-type') ?? '').toLowerCase();
+      const looksLikeNdjson = /ndjson|text\/event-stream|x-ndjson/.test(contentType);
+      const looksLikeJson = /application\/json/.test(contentType);
+      // Truncation = body parsed cleanly until mid-stream EOF/mid-token garbage.
+      // Only attribute it to a CDN keepalive when the upstream claims to be
+      // sending JSON (Content-Type: application/json). Without that hint,
+      // the parser is more likely choking on NDJSON, native API output, or
+      // HTML — all "wrong endpoint" cases. This is the safe default.
+      const looksTruncated =
+        /Unexpected end of JSON input/.test(msg) ||
+        (/Unexpected non-whitespace character after JSON at position/.test(msg) && looksLikeJson && !looksLikeNdjson);
+      if (looksTruncated) {
+        throw new Error(
+          `${this.name} returned 200 but the response body was truncated mid-stream ` +
+          `(likely an idle-keepalive timeout at an upstream proxy or CDN, e.g. Cloudflare's ` +
+          `600s edge limit). Retry, or switch to a faster model/upstream.`,
+        );
+      }
       throw new Error(
         `${this.name} returned 200 with a non-JSON body — the endpoint is not OpenAI-compatible. ` +
         `Check the base URL (for Ollama use http://host:11434/v1, for llama.cpp/vLLM/LM Studio the /v1 path).`,
@@ -183,9 +224,11 @@ export class OpenAICompatProvider extends BaseProvider {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
+        stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
         parallel_tool_calls: this.resolveParallelToolCalls(options),
+        ...extendedBodyParams(this.platform, options),
         stream: true,
       }),
     }, this.timeoutMs);

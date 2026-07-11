@@ -143,4 +143,55 @@ describe('POST /v1/responses (#96)', () => {
     expect(text).toContain('event: response.function_call_arguments.done');
     expect(text).toContain('"arguments":"{\\"city\\":\\"SF\\"}"');
   });
+
+  it('routes built-in Responses tools through tool-capable models', async () => {
+    mockRouteRequest.mockClear();
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status } = await post(app, '/v1/responses', {
+      input: 'say hello',
+      tools: [{
+        type: 'local_shell',
+        name: 'exec_command',
+        description: 'Run a local shell command',
+        parameters: { type: 'object', properties: { cmd: { type: 'string' } } },
+      }],
+    }, key);
+
+    expect(status).toBe(200);
+    const lastCall = mockRouteRequest.mock.calls.at(-1);
+    expect(lastCall?.[4]).toBe(true);
+  });
+
+  it('non-stream: returns invalid_request_error when provider API 400s exhaust routing', async () => {
+    mockRouteRequest.mockImplementation((_estimated, skipKeys) => {
+      if (skipKeys?.size) {
+        throw Object.assign(new Error('All models exhausted'), { status: 429 });
+      }
+      return fakeRoute({
+        async chatCompletion() {
+          throw Object.assign(
+            new Error('Google API error 400: Invalid JSON payload received. Unknown name "x-google-enum-descriptions"'),
+            { status: 400 },
+          );
+        },
+        async *streamChatCompletion() { /* unused */ },
+      });
+    });
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    const body = JSON.parse(text);
+    expect(status).toBe(400);
+    expect(body.error.type).toBe('invalid_request_error');
+    expect(body.error.message).toContain('rejected the request as invalid');
+  });
 });

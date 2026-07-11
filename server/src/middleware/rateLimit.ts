@@ -31,8 +31,8 @@ function parseLimit(): number {
   return Math.floor(n);
 }
 
-export function createProxyRateLimiter() {
-  const limit = parseLimit();
+export function createProxyRateLimiter(rpmLimit?: number) {
+  const limit = rpmLimit !== undefined ? Math.floor(Math.max(0, rpmLimit)) : parseLimit();
   const windows = new Map<string, WindowState>();
 
   return function proxyRateLimit(req: Request, res: Response, next: NextFunction): void {

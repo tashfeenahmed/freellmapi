@@ -85,4 +85,42 @@ describe('request analytics retention', () => {
     const rows = getDb().prepare('SELECT error FROM requests ORDER BY created_at ASC').all() as Array<{ error: string }>;
     expect(rows.map(row => row.error)).toEqual(['row-3', 'row-4']);
   });
+
+  it('prunes hourly aggregate rows older than 30 days and only when the daily gate has elapsed', () => {
+    // Hourly buckets never auto-create themselves in this test (logRequest is
+    // the only writer), so seed them by hand to exercise the prune path.
+    const db = getDb();
+    db.prepare(`CREATE TABLE IF NOT EXISTS request_hourly (
+      hour TEXT PRIMARY KEY, total_requests INTEGER NOT NULL DEFAULT 0
+    )`).run();
+    const upsert = db.prepare(`INSERT INTO request_hourly (hour, total_requests) VALUES (?, ?)
+      ON CONFLICT(hour) DO UPDATE SET total_requests = excluded.total_requests`);
+    // Seed in the same 'YYYY-MM-DD HH:00:00' (space) format production writes,
+    // so the prune cutoff (also space) compares apples-to-apples.
+    upsert.run('2026-05-01 00:00:00', 5);   // outside 30d window from May 31
+    upsert.run('2026-05-15 00:00:00', 3);   // inside
+    upsert.run('2026-05-31 00:00:00', 7);   // boundary hour, kept
+
+    // First call (cold gate): should prune the May 1 row and leave the rest.
+    const first = pruneRequestAnalytics({
+      db,
+      force: true,
+      now: new Date('2026-05-31T01:00:00Z'),
+    });
+    expect(first.deleted).toBe(1);
+    const remaining = db.prepare(`SELECT hour, total_requests FROM request_hourly ORDER BY hour`).all() as Array<{ hour: string; total_requests: number }>;
+    expect(remaining.map(r => r.hour)).toEqual(['2026-05-15 00:00:00', '2026-05-31 00:00:00']);
+
+    // Second call inside the 24h gate: hourly prune is skipped (raw prune may
+    // still run, but with default config + 0 rows it deletes nothing). The
+    // hourly rows are unchanged.
+    const second = pruneRequestAnalytics({
+      db,
+      now: new Date('2026-05-31T01:05:00Z'),
+    });
+    expect(second.skipped).toBe(false);
+    expect(second.deleted).toBe(0);
+    const remainingAfter = db.prepare(`SELECT hour FROM request_hourly ORDER BY hour`).all() as Array<{ hour: string }>;
+    expect(remainingAfter.map(r => r.hour)).toEqual(['2026-05-15 00:00:00', '2026-05-31 00:00:00']);
+  });
 });

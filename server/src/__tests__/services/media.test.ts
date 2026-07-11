@@ -13,11 +13,20 @@ function addKey(platform: string, raw = `${platform}-test-key`) {
   `).run(platform, encrypted, iv, authTag);
 }
 
-function addMedia(platform: string, modelId: string, modality: 'image' | 'audio', priority = 1) {
+function addCustomKey(baseUrl: string, raw = 'custom-media-key'): number {
+  const { encrypted, iv, authTag } = encrypt(raw);
+  const row = getDb().prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+    VALUES ('custom', 'test', ?, ?, ?, 'healthy', 1, ?)
+  `).run(encrypted, iv, authTag, baseUrl);
+  return Number(row.lastInsertRowid);
+}
+
+function addMedia(platform: string, modelId: string, modality: 'image' | 'audio', priority = 1, keyId: number | null = null) {
   getDb().prepare(`
-    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
-    VALUES (?, ?, ?, ?, ?, 1, '')
-  `).run(platform, modelId, modelId, modality, priority);
+    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
+    VALUES (?, ?, ?, ?, ?, 1, '', ?)
+  `).run(platform, modelId, modelId, modality, priority, keyId);
 }
 
 function jsonResponse(body: unknown) {
@@ -39,6 +48,7 @@ describe('media service', () => {
     const cols = (getDb().prepare('PRAGMA table_info(media_models)').all() as { name: string }[]).map(c => c.name);
     expect(cols).toContain('modality');
     expect(cols).toContain('quota_label');
+    expect(cols).toContain('key_id');
   });
 
   describe('image generation', () => {
@@ -117,6 +127,26 @@ describe('media service', () => {
       const r = await runImageGeneration('auto', { prompt: 'x' });
       expect(r.platform).toBe('siliconflow');
     });
+
+    it('custom image models call the bound OpenAI-compatible endpoint', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8282/v1', 'custom-image-key');
+      addMedia('custom', 'local-image', 'image', 1, keyId);
+      const fetchMock = vi.fn(async () => jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+
+      const r = await runImageGeneration('local-image', { prompt: 'a cat', n: 2, size: '512x512' });
+
+      expect(r.platform).toBe('custom');
+      expect(r.images[0].url).toBe('https://example.test/image.png');
+      expect(String(fetchMock.mock.calls[0][0])).toBe('http://127.0.0.1:8282/v1/images/generations');
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer custom-image-key');
+      const body = JSON.parse(String(init.body));
+      expect(body).toMatchObject({ model: 'local-image', prompt: 'a cat', n: 2, size: '512x512' });
+      const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'image' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
+      expect(log.key_id).toBe(keyId);
+    });
   });
 
   describe('text-to-speech', () => {
@@ -160,6 +190,27 @@ describe('media service', () => {
       expect(r.audio.subarray(8, 12).toString()).toBe('WAVE');
       // header (44) + 4 PCM bytes
       expect(r.audio.length).toBe(48);
+    });
+
+    it('custom audio models call the bound OpenAI-compatible endpoint', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8383/v1', 'custom-audio-key');
+      addMedia('custom', 'local-tts', 'audio', 1, keyId);
+      const fetchMock = vi.fn(async () =>
+        new Response(Buffer.from('MP3'), { status: 200, headers: { 'content-type': 'audio/mpeg' } })) as any;
+      globalThis.fetch = fetchMock as any;
+
+      const r = await runSpeech('local-tts', { input: 'hi', voice: 'alloy', format: 'mp3' });
+
+      expect(r.platform).toBe('custom');
+      expect(r.audio.toString()).toBe('MP3');
+      expect(String(fetchMock.mock.calls[0][0])).toBe('http://127.0.0.1:8383/v1/audio/speech');
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer custom-audio-key');
+      const body = JSON.parse(String(init.body));
+      expect(body).toMatchObject({ model: 'local-tts', input: 'hi', voice: 'alloy', response_format: 'mp3' });
+      const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'audio' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
+      expect(log.key_id).toBe(keyId);
     });
   });
 });

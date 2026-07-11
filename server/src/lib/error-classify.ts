@@ -62,10 +62,72 @@ export function isRetryableError(err: any): boolean {
     // all thrown before any byte reached the client, so another model can
     // serve the request invisibly.
     || msg.includes('empty completion')
+    // The model answered in prose despite a response_format request (and the
+    // JSON couldn't be healed out of the text) — thrown before any byte
+    // reached the client, so the next candidate can serve it invisibly.
+    || msg.includes('ignored response_format')
     || msg.includes('in-band provider error')
     || msg.includes('stream ended unexpectedly')
     || msg.includes('stream stalled')
     || msg.includes('unparseable inline tool-call dialect');
+}
+
+// A 401 / invalid-API-key error from a provider. KEY-fatal, not request-fatal:
+// the same request is fine on the provider's sibling key or on another provider,
+// so the fallback loop rotates past the bad key (and triggers an immediate
+// health revalidation) instead of 502-ing the whole request. Deliberately NOT
+// added to isRetryableError: a bad key must be skipped and revalidated, not
+// blindly re-benched like a rate limit — the loop handles it as its own class.
+//
+// Status handling: every provider adapter attaches err.status (providerHttpError
+// in providers/base.ts), so the structured status is the primary signal.
+//   - 401 → always key-auth.
+//   - 400 → key-auth ONLY for Google-style key-specific phrasings: Google
+//     reports a bad/expired key as HTTP 400 INVALID_ARGUMENT with "API key not
+//     valid" / "API key expired" / API_KEY_INVALID (#268, providers/google.ts).
+//     Without this a dead Google key classified as a provider bad-request and
+//     could exhaust into a client-blaming 400 "rejected the request as invalid".
+//     Generic auth wording (unauthorized etc.) stays excluded on a 400 so
+//     ordinary payload rejections never classify as key-auth.
+//   - any other status → not key-auth (e.g. a 403 stays model-forbidden).
+//   - no status at all → key-specific OR generic auth substrings.
+export function isKeyAuthError(err: any): boolean {
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  if (status === 401) return true;
+  const msg = (err?.message ?? '').toLowerCase();
+  const keySpecific = msg.includes('api key not valid')
+    || msg.includes('api key expired')
+    || msg.includes('api_key_invalid');
+  if (status === 400) return keySpecific;
+  if (status !== 0) return false;
+  return keySpecific
+    || msg.includes('401')
+    || msg.includes('unauthorized')
+    || msg.includes('invalid api key')
+    || msg.includes('invalid_api_key')
+    || msg.includes('incorrect api key')
+    || msg.includes('authentication failed');
+}
+
+// A 429 whose body says the provider's DAILY free allocation is spent (observed
+// live: Cloudflare "you have used up your daily free allocation of 10,000
+// neurons"; OpenRouter "free-models-per-day"). A transient 90s cooldown just
+// makes the router re-pick a dead-for-the-day provider all day, so the caller
+// benches until the next UTC midnight instead. Requires BOTH a daily marker and
+// a quota/allocation marker so an ordinary per-minute 429 never matches.
+export function isDailyQuotaExhaustedError(err: any): boolean {
+  const msg = (err?.message ?? '').toLowerCase();
+  if (!/daily|per[ -_]?day|\btoday\b/.test(msg)) return false;
+  return /allocation|quota|limit|exhaust|used up/.test(msg);
+}
+
+// Provider-side 400s are retryable because another provider may accept the same
+// request shape. If every routed provider rejects it, however, the client should
+// see an invalid-request error rather than a misleading rate-limit exhaustion.
+export function isProviderBadRequestError(err: any): boolean {
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  const msg = (err?.message ?? '').toLowerCase();
+  return (status === 0 || status === 400) && msg.includes('api error 400');
 }
 
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:

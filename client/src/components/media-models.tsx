@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { AudioLines, Image as ImageIcon } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
+import { ConfirmButton } from '@/components/confirm-button'
+import { EmptyState } from '@/components/empty-state'
+import { CardSkeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { useI18n } from '@/i18n'
@@ -15,6 +19,7 @@ export interface MediaModel {
   enabled: boolean
   quotaLabel: string
   keyCount: number
+  isCustom?: boolean
 }
 interface MediaData { models: MediaModel[] }
 
@@ -60,6 +65,11 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['media'] }),
   })
 
+  const deleteCustom = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/media/custom/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['media'] }),
+  })
+
   const groups = groupMedia((data?.models ?? []).filter(m => m.modality === modality))
   const title = modality === 'image' ? t('models.imageTitle') : t('models.audioTitle')
   const description = modality === 'image' ? t('models.imageDesc') : t('models.audioDesc')
@@ -75,9 +85,15 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
         </p>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
         ) : groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('models.mediaEmpty')}</p>
+          <EmptyState
+            icon={modality === 'image' ? ImageIcon : AudioLines}
+            title={t('models.mediaEmpty')}
+          />
         ) : (
           groups.map(g => {
             const anyEnabled = g.members.some(m => m.enabled)
@@ -116,6 +132,15 @@ export function MediaModelsView({ modality }: { modality: 'image' | 'audio' }) {
                         checked={m.enabled}
                         onCheckedChange={(c) => toggle.mutate({ id: m.id, enabled: c })}
                       />
+                      {m.isCustom && (
+                        <ConfirmButton
+                          className="text-muted-foreground hover:text-destructive"
+                          onConfirm={() => deleteCustom.mutate(m.id)}
+                          disabled={deleteCustom.isPending}
+                        >
+                          {t('common.remove')}
+                        </ConfirmButton>
+                      )}
                     </div>
                   ))}
                 </div>

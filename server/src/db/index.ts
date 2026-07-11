@@ -1,40 +1,90 @@
 import crypto from 'crypto';
-import Database from 'better-sqlite3';
+import BetterSqlite from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { migrateDbSchema } from './migrations.js';
+import { runMigrationsSync } from './migrate/runner.js';
+import { initEncryptionKey, isEncryptionKeyInitialized } from '../lib/crypto.js';
+import type { Db, DbFactory } from './types.js';
+
+export type { Db, DbFactory } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../data/freeapi.db');
 
-let db: Database.Database;
+let db: Db;
 
-export function getDb(): Database.Database {
+export function getDb(): Db {
   if (!db) {
-    throw new Error('Database not initialized. Call initDb() first.');
+    throw new Error('Database not initialized. Call initDb() or connectDb() first.');
   }
   return db;
 }
 
-export function initDb(dbPath?: string): Database.Database {
-  const resolvedPath = dbPath ?? DB_PATH;
-  const isMemory = resolvedPath === ':memory:';
+export function getDefaultDbPath(): string {
+  return process.env.FREEAPI_DB_PATH?.trim() || DB_PATH;
+}
 
-  if (!isMemory) {
+/** Default factory: opens a better-sqlite3 connection at the given path. */
+function betterSqliteFactory(resolvedPath: string): Db {
+  return new BetterSqlite(resolvedPath) as unknown as Db;
+}
+
+export function connectDb(
+  dbPath?: string,
+  opts?: {
+    /** Create the parent directory if absent. Default: true. Set false in
+     *  environments that do not have a writable local filesystem. */
+    ensureDir?: boolean;
+    /** Factory that constructs the raw Db connection. Default: better-sqlite3. */
+    factory?: DbFactory;
+  },
+): Db {
+  const resolvedPath = dbPath ?? getDefaultDbPath();
+  const isMemory = resolvedPath === ':memory:';
+  const ensureDir = opts?.ensureDir ?? true;
+  const factory = opts?.factory ?? betterSqliteFactory;
+
+  if (!isMemory && ensureDir) {
     const dataDir = path.dirname(resolvedPath);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
   }
 
-  db = new Database(resolvedPath);
+  db = factory(resolvedPath);
   if (!isMemory) db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  migrateDbSchema(db);
-
   console.log(`Database initialized at ${resolvedPath}`);
+  return db;
+}
+
+export function initDb(
+  dbPath?: string,
+  opts?: { ensureDir?: boolean; factory?: DbFactory },
+): Db {
+  const db = connectDb(dbPath, opts);
+
+  if (process.env.NODE_ENV !== 'development') {
+    runMigrationsSync(db, 'up');
+  } else {
+    // In dev, verify the DB has been initialised. If not, give a clear error.
+    const ready = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'"
+    ).get();
+    if (!ready) {
+      console.error(
+        '\n  [dev] Database not initialised. Run:\n\n' +
+        '    npm run db:migration:up\n\n' +
+        '  Then restart the server.\n'
+      );
+      process.exit(1);
+    }
+  }
+
+  if (!isEncryptionKeyInitialized()) initEncryptionKey(db);
+
   return db;
 }
 

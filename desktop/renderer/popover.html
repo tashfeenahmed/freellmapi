@@ -132,6 +132,12 @@
   .ghost.copied { color: var(--ok); }
 
   .foot { display: flex; align-items: center; font-size: 11.5px; color: var(--fg-dim); }
+  #login-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .switch {
     position: relative; width: 30px; height: 18px; border-radius: 9px;
     background: var(--switch-off); margin-right: 7px; flex: none;
@@ -146,8 +152,15 @@
   }
   .switch.on { background: var(--ok); }
   .switch.on::after { left: 14px; }
+  .version {
+    flex: none;
+    margin-left: auto;
+    color: var(--fg-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
   .quit {
-    margin-left: auto; background: none; color: var(--fg-dim);
+    margin-left: 6px; background: none; color: var(--fg-dim);
     font-size: 11.5px; padding: 4px 6px; border-radius: 7px;
   }
   .quit:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
@@ -199,6 +212,7 @@
     <div class="foot">
       <div class="switch" id="login"></div>
       <span id="login-label">Start at login</span>
+      <span class="version" id="version"></span>
       <button class="quit" id="quit">Quit</button>
     </div>
   </div>
@@ -260,6 +274,7 @@
     $('tokens').textContent = fmt(s.tokens);
     $('rate').textContent = s.successRate == null ? '' : (S.successSuffix || '{n}% success').replace('{n}', s.successRate);
     $('model').textContent = s.lastModel;
+    $('version').textContent = s.version ? 'v' + s.version : '';
     loginOn = s.loginItem;
     $('login').classList.toggle('on', loginOn);
     drawChart(s.hourly);

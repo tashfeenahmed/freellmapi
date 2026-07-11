@@ -17,36 +17,59 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Gemini 3 REQUIRES the `thoughtSignature` that accompanied a function call to
 // be echoed back whenever that call appears in conversation history, or it
 // rejects the request with 400 "Function call is missing a thought_sig". But
-// OpenAI-format clients (the API surface we expose) have no field to carry a
-// provider-specific signature, so it's dropped on the round-trip and every
-// multi-turn tool conversation through Gemini fails. To bridge this without a
-// schema change, cache each signature we emit keyed by tool-call id and
-// re-attach it when the same call comes back without one. Strictly additive: a
-// cache miss yields exactly the previous behavior (the request may 400 and fail
-// over, as before). Bounded with a TTL so it can't grow unbounded.
+// OpenAI-format clients (the API surface we expose) have no standard field to
+// carry a provider-specific signature, so it can be dropped on the round-trip
+// and multi-turn tool conversations through Gemini fail. Cache each signature
+// we emit keyed by the tool-call id and by a stable name/arguments fingerprint;
+// the latter keeps the Anthropic bridge resilient when an agent/client rewrites
+// opaque tool ids. Strictly additive: a cache miss yields exactly the previous
+// behavior (the request may 400 and fail over, as before). Bounded with a TTL so
+// it can't grow unbounded.
 const THOUGHT_SIG_TTL_MS = 30 * 60 * 1000; // 30 min — longer than any single tool loop
 const THOUGHT_SIG_MAX = 5000;
 const thoughtSigCache = new Map<string, { sig: string; exp: number }>();
 
-function rememberThoughtSig(callId: string | undefined, sig: string | undefined): void {
-  if (!callId || !sig) return;
+function canonicalThoughtSigArgs(args: unknown): string {
+  if (typeof args === 'string') {
+    try { return JSON.stringify(JSON.parse(args)); } catch { return args; }
+  }
+  return JSON.stringify(args ?? {});
+}
+
+function thoughtSigCallKey(name: string | undefined, args: unknown): string | undefined {
+  if (!name) return undefined;
+  return `call:${name}:${canonicalThoughtSigArgs(args)}`;
+}
+
+function rememberThoughtSigKey(key: string | undefined, sig: string | undefined): void {
+  if (!key || !sig) return;
   // Cheap eviction: when full, drop the oldest insertion (Map preserves order).
   if (thoughtSigCache.size >= THOUGHT_SIG_MAX) {
     const oldest = thoughtSigCache.keys().next().value;
     if (oldest !== undefined) thoughtSigCache.delete(oldest);
   }
-  thoughtSigCache.set(callId, { sig, exp: Date.now() + THOUGHT_SIG_TTL_MS });
+  thoughtSigCache.set(key, { sig, exp: Date.now() + THOUGHT_SIG_TTL_MS });
 }
 
-function recallThoughtSig(callId: string | undefined): string | undefined {
-  if (!callId) return undefined;
-  const hit = thoughtSigCache.get(callId);
+function rememberThoughtSig(callId: string | undefined, sig: string | undefined, name?: string, args?: unknown): void {
+  rememberThoughtSigKey(callId ? `id:${callId}` : undefined, sig);
+  rememberThoughtSigKey(thoughtSigCallKey(name, args), sig);
+}
+
+function recallThoughtSigKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  const hit = thoughtSigCache.get(key);
   if (!hit) return undefined;
   if (hit.exp < Date.now()) {
-    thoughtSigCache.delete(callId);
+    thoughtSigCache.delete(key);
     return undefined;
   }
   return hit.sig;
+}
+
+function recallThoughtSig(callId: string | undefined, name?: string, args?: unknown): string | undefined {
+  return recallThoughtSigKey(callId ? `id:${callId}` : undefined)
+    ?? recallThoughtSigKey(thoughtSigCallKey(name, args));
 }
 
 interface GeminiPart {
@@ -131,15 +154,25 @@ const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
   'deprecated',
 ]);
 
+const VENDOR_EXTENSION_SCHEMA_KEY = /^x-/i;
+
 export function sanitizeForGemini(schema: unknown): unknown {
+  return sanitizeForGeminiSchema(schema, false);
+}
+
+function sanitizeForGeminiSchema(schema: unknown, insidePropertiesMap: boolean): unknown {
   if (Array.isArray(schema)) {
-    return schema.map(sanitizeForGemini);
+    return schema.map(s => sanitizeForGeminiSchema(s, false));
   }
   if (schema && typeof schema === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
-      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.has(k)) continue;
-      out[k] = sanitizeForGemini(v);
+      if (insidePropertiesMap) {
+        out[k] = sanitizeForGeminiSchema(v, false);
+        continue;
+      }
+      if (GEMINI_UNSUPPORTED_SCHEMA_KEYS.has(k) || VENDOR_EXTENSION_SCHEMA_KEY.test(k)) continue;
+      out[k] = sanitizeForGeminiSchema(v, k === 'properties');
     }
     return out;
   }
@@ -151,6 +184,32 @@ export function sanitizeForGemini(schema: unknown): unknown {
 // it. It maps to Gemini's `{ google_search: {} }` tool rather than a function
 // declaration, and can ride alongside real function tools in the same array. (#59)
 const GROUNDING_TOOL_NAMES = new Set(['google_search', 'googlesearch', 'google_search_retrieval']);
+
+/**
+ * Extended generationConfig knobs translated from the OpenAI wire: topK,
+ * seed, penalties, and structured output. JSON output conflicts with function
+ * calling on Gemini ("Function calling with a response mime type:
+ * 'application/json' is unsupported"), so response_format is only applied on
+ * tool-free requests. Params Gemini has no equivalent for (min_p, logit_bias,
+ * logprobs…) are dropped by the platform policy in lib/sampling-params.ts and
+ * are ignored here. Exported for tests.
+ */
+export function toGeminiExtendedConfig(options?: CompletionOptions): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    topK: options?.top_k,
+    seed: options?.seed,
+    presencePenalty: options?.presence_penalty,
+    frequencyPenalty: options?.frequency_penalty,
+  };
+  const rf = options?.response_format;
+  const hasTools = (options?.tools?.length ?? 0) > 0;
+  if (rf && !hasTools) {
+    out.responseMimeType = 'application/json';
+    const schema = rf.type === 'json_schema' ? rf.json_schema?.schema : undefined;
+    if (schema) out.responseSchema = sanitizeForGemini(schema);
+  }
+  return out;
+}
 
 function toGeminiTools(tools?: ChatToolDefinition[]): Array<Record<string, unknown>> | undefined {
   if (!tools || tools.length === 0) return undefined;
@@ -229,7 +288,11 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
   }
   if (/^https?:\/\//i.test(url)) {
     try {
-      const res = await proxyFetch(url, undefined, 'google');
+      // Internal helper that turns an image URL into inline data for the
+      // Gemini request body. No formal timeout — relies on the platform's
+      // own default. Use a 30s cap to avoid hanging the whole request when
+      // an image host stalls; classify as `image` for triage.
+      const res = await proxyFetch(url, { signal: AbortSignal.timeout(30_000) }, 'google', 'image', 30_000);
       if (!res.ok) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
@@ -296,7 +359,7 @@ async function toGeminiContents(messages: ChatMessage[]) {
           // Prefer a signature the client preserved; otherwise recover the one
           // we cached when this call was first produced (OpenAI-format clients
           // drop the field, so this is the common path for Gemini multi-turn).
-          const sig = call.thought_signature ?? recallThoughtSig(call.id);
+          const sig = call.thought_signature ?? recallThoughtSig(call.id, call.function.name, call.function.arguments);
           parts.push({
             thoughtSignature: sig,
             functionCall: {
@@ -357,16 +420,17 @@ function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
     if (!part.functionCall?.name) continue;
 
     const id = part.functionCall.id ?? `call_${Date.now()}_${fallbackIndex++}`;
+    const args = normalizeGeminiArgs(part.functionCall.args);
     // Cache the signature keyed by the id we hand the client, so when the client
     // echoes this call back (without the signature, as OpenAI format requires)
     // we can re-attach it and Gemini accepts the history.
-    rememberThoughtSig(id, part.thoughtSignature);
+    rememberThoughtSig(id, part.thoughtSignature, part.functionCall.name, args);
     calls.push({
       id,
       type: 'function',
       function: {
         name: part.functionCall.name,
-        arguments: normalizeGeminiArgs(part.functionCall.args),
+        arguments: args,
       },
       thought_signature: part.thoughtSignature,
     });
@@ -383,9 +447,27 @@ function extractText(parts: GeminiPart[] | undefined): string | null {
   return text.length > 0 ? text : null;
 }
 
+function toGeminiStopSequences(stop: CompletionOptions['stop']): string[] | undefined {
+  if (!stop) return undefined;
+  return Array.isArray(stop) ? stop : [stop];
+}
+
+export interface GoogleProviderOptions {
+  /** Per-provider HTTP timeout override. Some Gemini models (notably
+   *  Gemma reasoning variants) take 20-60s on cold start; the OpenAI-compat
+   *  default of 15s false-flags them as broken. Mirrors OpenAICompatProvider. */
+  timeoutMs?: number;
+}
+
 export class GoogleProvider extends BaseProvider {
   readonly platform = 'google' as const;
   readonly name = 'Google AI Studio';
+  private readonly timeoutMs: number;
+
+  constructor(opts: GoogleProviderOptions = {}) {
+    super();
+    this.timeoutMs = opts.timeoutMs ?? 15000;
+  }
 
   async chatCompletion(
     apiKey: string,
@@ -403,6 +485,8 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
       // functionCallingConfig is only valid when real function tools are present;
@@ -416,7 +500,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
@@ -479,6 +563,8 @@ export class GoogleProvider extends BaseProvider {
         temperature: options?.temperature,
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
       toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
@@ -490,7 +576,7 @@ export class GoogleProvider extends BaseProvider {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
