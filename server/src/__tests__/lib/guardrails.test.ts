@@ -20,6 +20,7 @@ import {
   recordBreakerFailure,
   REQUEST_MAX_TOKENS_BUDGET_SETTING,
   MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING,
+  TOKEN_BUDGET_OUTPUT_CAP,
 } from '../../lib/guardrails.js';
 
 beforeEach(() => {
@@ -93,6 +94,16 @@ describe('applyTokenBudget', () => {
   it('caps an absent max_tokens to the budget remainder instead of rejecting', () => {
     settingStore.set(REQUEST_MAX_TOKENS_BUDGET_SETTING, '8000');
     expect(applyTokenBudget(5000, undefined)).toEqual({ rejection: null, maxTokens: 3000 });
+  });
+
+  it('clamps the injected max_tokens to the output cap under a generous budget', () => {
+    // Regression: budget 100000 minus a 1000-token prompt forwarded
+    // max_tokens=99000 verbatim, and providers that validate max_tokens
+    // against the model's limits 400'd every candidate in the chain.
+    settingStore.set(REQUEST_MAX_TOKENS_BUDGET_SETTING, '100000');
+    expect(applyTokenBudget(1000, undefined)).toEqual({ rejection: null, maxTokens: TOKEN_BUDGET_OUTPUT_CAP });
+    // A client-set max_tokens is never rewritten, only validated.
+    expect(applyTokenBudget(1000, 50_000)).toEqual({ rejection: null, maxTokens: 50_000 });
   });
 
   it('rejects an absent max_tokens when the input alone fills the budget', () => {

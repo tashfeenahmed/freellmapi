@@ -163,6 +163,30 @@ describe('recordRetryableFailure skipBench exemption (reasoning truncation)', ()
     // modelDbId 424242 has no sibling key rows, so the penalty fires.
     expect(getAllPenalties().some(p => p.modelDbId === route.modelDbId)).toBe(true);
   });
+
+  it('skipModelForRequest rules out the whole model, not just the key', () => {
+    // Format-ignore is MODEL behavior: a sibling key reproduces it exactly, so
+    // burning one failover hop per key on the same model was pure waste.
+    const route = fakeRoute();
+    const state = newFallbackState();
+    const err = Object.assign(
+      new Error(`${route.displayName} ignored response_format (returned non-JSON despite json_schema)`),
+      { skipBench: true, skipModelForRequest: true },
+    );
+    recordRetryableFailure(route, err, state);
+
+    expect(state.skipModels.has(route.modelDbId)).toBe(true);
+    expect(state.skipKeys.has(`fake:fake-model:${route.keyId}`)).toBe(true);
+    // skipBench still applies: no cooldown, no penalty.
+    const cooldown = getDb().prepare('SELECT 1 FROM rate_limit_cooldowns WHERE platform = ? AND key_id = ?').get('fake', route.keyId);
+    expect(cooldown).toBeUndefined();
+    expect(getAllPenalties().some(p => p.modelDbId === route.modelDbId)).toBe(false);
+  });
+
+  it('classifyAttemptError buckets format-ignore and truncated-JSON as format_ignored', () => {
+    expect(classifyAttemptError(new Error('X ignored response_format (returned non-JSON despite json_object)'))).toBe('format_ignored');
+    expect(classifyAttemptError(new Error('truncated JSON from X (finish_reason=length — raise max_tokens for this json_schema request)'))).toBe('format_ignored');
+  });
 });
 
 describe('exhaustedRetryError attempt trail + auth exhaustion', () => {
@@ -397,6 +421,42 @@ describe('runFallbackLoop: circuit-breaker guardrail (max_consecutive_upstream_f
     expect(body.kind).toBe('auth'); // the more specific all-auth body wins over the breaker body
     expect(body.status).toBe(502);
     expect(info.attempts).toHaveLength(2);
+  });
+
+  it('skipBench failures (format ignored, hidden reasoning) never trip the breaker', async () => {
+    // Three prose answers to a json_schema request say nothing about pool
+    // health — candidate four must still get its shot. (#511 x #516)
+    const onExhausted = vi.fn();
+    let calls = 0;
+    const dispatch = vi.fn(async () => {
+      calls += 1;
+      if (calls <= 3) {
+        throw Object.assign(
+          new Error(`Fake ${calls} ignored response_format (returned non-JSON despite json_schema)`),
+          { skipBench: true },
+        );
+      }
+      return 'done' as const;
+    });
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, breakerLimit: 3, dispatch, onExhausted }));
+
+    expect(dispatch).toHaveBeenCalledTimes(4); // 3 skipBench failures did not trip the 3-limit breaker
+    expect(onExhausted).not.toHaveBeenCalled();
+  });
+
+  it('a breaker trip after client disconnect stops the chain without rendering', async () => {
+    const onExhausted = vi.fn();
+    let gone = false;
+    const dispatch = vi.fn(async () => {
+      gone = true; // client hangs up during the (only) attempt
+      throw retryable429();
+    });
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, breakerLimit: 1, clientGone: () => gone, dispatch, onExhausted }));
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(onExhausted).not.toHaveBeenCalled(); // no body to a dead socket
   });
 
   it('a success below the limit ends the request normally (breaker untouched)', async () => {

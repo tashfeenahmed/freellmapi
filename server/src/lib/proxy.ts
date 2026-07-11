@@ -400,10 +400,31 @@ export function isProxyActive(): boolean {
   return _proxyEnabled && !!_proxyUrl;
 }
 
-/** Force-rebuild the proxy dispatcher on the next request. Called on
+/** Force-rebuild the outbound connection pools on the next request. Called on
  *  sleep/wake recovery to drop pooled TCP connections that died while the
  *  host was suspended (undici keeps them warm and would hand a dead socket
  *  to the first post-wake request). */
 export function flushProxyCache(): void {
+  // Outbound-proxy dispatcher (only in play when a proxy URL is configured).
   cached = null;
+  // The default no-proxy path is bare fetch() on Node's GLOBAL undici
+  // dispatcher — exactly the pool the headline laptop-lid scenario rides — so
+  // nulling the proxy cache alone left the flush a no-op for most
+  // deployments. Node keeps that dispatcher in the global symbol registry
+  // (getGlobalDispatcher/setGlobalDispatcher read and write the same key), so
+  // swap in a fresh instance of its own constructor: new requests get new
+  // sockets, in-flight requests keep a reference to the old dispatcher and
+  // complete undisturbed. Deliberately NOT `import('undici')`: the built-in
+  // fetch uses Node's bundled copy, and the npm package isn't installed in
+  // the production image (verified live — the import throws there).
+  try {
+    const sym = Symbol.for('undici.globalDispatcher.1');
+    const current = (globalThis as Record<symbol, unknown>)[sym] as { constructor: new () => unknown } | undefined;
+    // Symbol unset = no fetch has run yet, so there are no pooled sockets to drop.
+    if (current?.constructor) {
+      (globalThis as Record<symbol, unknown>)[sym] = new current.constructor();
+    }
+  } catch (err: any) {
+    console.warn(`[proxy] could not replace the global fetch dispatcher on wake: ${err?.message ?? err}`);
+  }
 }

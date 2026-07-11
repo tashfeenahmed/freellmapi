@@ -27,11 +27,21 @@ export interface WakeEvent {
 
 const TICK_MS = 5_000;
 const DRIFT_THRESHOLD_MS = 30_000;
+// One recovery pass per resume: a drift tick and an operator SIGCONT/SIGUSR2
+// for the SAME wake (or signal spam) must not stack flushes + full key
+// re-probes on top of each other.
+const WAKE_DEBOUNCE_MS = 15_000;
 
 let hooks: WakeHooks | null = null;
 let timer: NodeJS.Timeout | null = null;
 let lastTickAt = 0;
+let lastWakeAt = 0;
 let installed = false;
+// Kept so stopWakeDetect can remove exactly the listeners this module added —
+// removeAllListeners would silently unhook any OTHER module's SIGUSR2 handler
+// (log rotation, heap-dump triggers).
+const sigcontHandler = () => handleSignal('SIGCONT');
+const sigusr2Handler = () => handleSignal('SIGUSR2');
 
 function tick(): void {
   const now = Date.now();
@@ -57,6 +67,9 @@ function handleSignal(name: string): void {
 // logged and swallowed, sync or async.
 function invokeHooks(event: WakeEvent): void {
   if (!hooks) return;
+  const now = Date.now();
+  if (now - lastWakeAt < WAKE_DEBOUNCE_MS) return;
+  lastWakeAt = now;
   try {
     Promise.resolve(hooks.onWake(event)).catch((err) => {
       console.error(`[wake-detect] onWake handler error: ${err?.message ?? err}`);
@@ -73,8 +86,8 @@ export function startWakeDetect(h: WakeHooks): void {
   lastTickAt = Date.now();
   timer = setTimeout(tick, TICK_MS);
   if (timer.unref) timer.unref();
-  process.on('SIGCONT', () => handleSignal('SIGCONT'));
-  process.on('SIGUSR2', () => handleSignal('SIGUSR2'));
+  process.on('SIGCONT', sigcontHandler);
+  process.on('SIGUSR2', sigusr2Handler);
 }
 
 export function stopWakeDetect(): void {
@@ -84,10 +97,11 @@ export function stopWakeDetect(): void {
     clearTimeout(timer);
     timer = null;
   }
-  process.removeAllListeners('SIGCONT');
-  process.removeAllListeners('SIGUSR2');
+  process.removeListener('SIGCONT', sigcontHandler);
+  process.removeListener('SIGUSR2', sigusr2Handler);
   hooks = null;
   lastTickAt = 0;
+  lastWakeAt = 0;
 }
 
 export function _resetForTests(): void {

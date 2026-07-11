@@ -503,8 +503,6 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
-      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
-          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             // In-band upstream error frame ({"error":...} inside a 200 SSE
             // stream — observed live from Groq). Throwing hands it to the catch
@@ -621,6 +619,15 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           // been committed yet (the skeleton is lazy), so throwing lets the
           // shared loop fail over to the next model on the same SSE connection.
           if (msgText.length === 0 && toolAcc.size === 0) {
+            // Disconnect before the commit point: the break above fired with
+            // nothing accumulated — CLIENT behavior, not a provider failure.
+            // Falling through to the empty-completion throw benched a healthy
+            // model+key for 90s on every Ctrl-C during a reasoning model's
+            // TTFB window.
+            if (clientGone && !streamStarted) {
+              console.log(`[Responses] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
+              return 'committed';
+            }
             // finish_reason 'length' = the model spent the whole output budget
             // on hidden reasoning before any visible text: fail over, but skip
             // the cooldown/penalty (not a provider-health signal).
@@ -739,14 +746,19 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       }
 
       // Structured-output enforcement — see /chat/completions. Heal fenced or
-      // prose-wrapped JSON in place, fail over (skipBench) when the model
-      // ignored the requested format outright.
+      // prose-wrapped JSON in place, fail over (skipBench + skipModelForRequest
+      // — a sibling key would misbehave identically) when the model ignored the
+      // requested format; finish_reason 'length' gets an honest "truncated"
+      // class instead, since the JSON was cut off by max_tokens, not ignored.
       if (completionOpts.response_format && text && toolCalls.length === 0) {
         const enforced = enforceJsonContent(text);
         if (!enforced.ok) {
+          const truncated = result.choices[0]?.finish_reason === 'length';
           throw Object.assign(
-            new Error(`${route.displayName} ignored response_format (returned non-JSON despite ${completionOpts.response_format.type})`),
-            { skipBench: true },
+            new Error(truncated
+              ? `truncated JSON from ${route.displayName} (finish_reason=length — raise max_tokens for this ${completionOpts.response_format.type} request)`
+              : `${route.displayName} ignored response_format (returned non-JSON despite ${completionOpts.response_format.type})`),
+            { skipBench: true, skipModelForRequest: true },
           );
         }
         if (enforced.healed) text = enforced.content;

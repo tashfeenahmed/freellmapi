@@ -369,27 +369,35 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
 
   const body = parsed.data;
   const requestedModel = body.model ?? 'auto';
-  const max_tokens = body.max_tokens != null && body.max_tokens > 0 ? body.max_tokens : DEFAULT_MAX_TOKENS;
+  // The Anthropic wire format requires max_tokens, but OUR default injection
+  // must not change the budget gate's verdict: gating AFTER defaulting made a
+  // no-max_tokens request 413 here (input + 1024 over budget) where the chat
+  // surface would cap it and serve. Gate on what the client actually sent,
+  // then resolve the default against the budget remainder.
+  const clientMaxTokens = body.max_tokens != null && body.max_tokens > 0 ? body.max_tokens : undefined;
   const { temperature, top_p, stream } = body;
 
   const { messages, tools, tool_choice, hasImage, wantsTools } = convertRequest(body);
-  const completionOptions = { temperature, max_tokens, top_p, top_k: body.top_k ?? undefined, tools, tool_choice };
 
   const estimatedInputTokens = estimateTokens(messages);
   const imageCount = messages.reduce((n, m) =>
     n + (Array.isArray(m.content) ? m.content.filter(b => (b as any)?.type === 'image_url').length : 0), 0);
-  // Capped output reserve so a large max_tokens can't falsely exclude the model
-  // pool (#470); input + images count in full.
-  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(max_tokens);
 
   // Guardrail: per-request token budget (request_max_tokens_budget, default
-  // off). max_tokens is always set on this surface (Anthropic requires it),
-  // so a violation can only reject — no capping branch.
-  const budgetCheck = applyTokenBudget(estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE, max_tokens);
+  // off). A client-set max_tokens can only pass or reject; an omitted one is
+  // capped to the budget remainder, mirroring /v1/chat/completions.
+  const budgetCheck = applyTokenBudget(estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE, clientMaxTokens);
   if (budgetCheck.rejection) {
     sendError(res, 413, 'invalid_request_error', tokenBudgetMessage(budgetCheck.rejection));
     return;
   }
+  const max_tokens = clientMaxTokens
+    ?? (budgetCheck.maxTokens != null ? Math.min(DEFAULT_MAX_TOKENS, budgetCheck.maxTokens) : DEFAULT_MAX_TOKENS);
+
+  const completionOptions = { temperature, max_tokens, top_p, top_k: body.top_k ?? undefined, tools, tool_choice };
+  // Capped output reserve so a large max_tokens can't falsely exclude the model
+  // pool (#470); input + images count in full.
+  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(max_tokens);
 
   // Resolve the model through the operator's Claude-family map (opus/sonnet/
   // haiku/default → auto | a pinned catalog model). A concrete catalog id pins
@@ -713,6 +721,15 @@ async function streamCompletion(
     // Nothing usable came out — fail over (message_start was never sent, so the
     // client never saw this attempt).
     if (!messageStarted && completedCalls.length === 0) {
+      // Disconnect before the commit point: the pump loop broke with nothing
+      // accumulated because the CLIENT left, not because the provider failed —
+      // benching a healthy model+key for it was wrong. StreamAlreadyStarted
+      // maps to 'committed' in the dispatcher: stop, no failover, no
+      // exhaustion render (the socket is gone anyway).
+      if (ctx.clientGone()) {
+        console.log(`[Anthropic] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
+        throw new StreamAlreadyStarted();
+      }
       // finish_reason 'length' = the model spent the whole output budget on
       // hidden reasoning before any visible text: fail over, but skip the
       // cooldown/penalty (not a provider-health signal).

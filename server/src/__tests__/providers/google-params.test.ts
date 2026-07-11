@@ -46,6 +46,27 @@ describe('toGeminiExtendedConfig', () => {
     expect(cfg).not.toHaveProperty('responseSchema');
   });
 
+  it('grounding-only pseudo-tools do NOT suppress structured output', () => {
+    // google_search converts to a grounding block, not functionDeclarations —
+    // raw tools.length was silently dropping responseMimeType for it.
+    const cfg = toGeminiExtendedConfig({
+      response_format: { type: 'json_object' },
+      tools: [{ type: 'function', function: { name: 'google_search', parameters: {} } }],
+    });
+    expect(cfg.responseMimeType).toBe('application/json');
+  });
+
+  it('a grounding tool alongside a real function still suppresses structured output', () => {
+    const cfg = toGeminiExtendedConfig({
+      response_format: { type: 'json_object' },
+      tools: [
+        { type: 'function', function: { name: 'google_search', parameters: {} } },
+        { type: 'function', function: { name: 'f', parameters: {} } },
+      ],
+    });
+    expect(cfg).not.toHaveProperty('responseMimeType');
+  });
+
   it('returns all-undefined fields for empty options (JSON.stringify drops them)', () => {
     const cfg = toGeminiExtendedConfig(undefined);
     expect(cfg.topK).toBeUndefined();

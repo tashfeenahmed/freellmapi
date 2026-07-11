@@ -786,8 +786,6 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
-      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
-          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const text = streamChunkText(chunk);
             if (text.length > 0) sawText = true;
@@ -803,6 +801,16 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             }
             flushHeaders();
             res.write(`data: ${JSON.stringify(frame)}\n\n`);
+          }
+
+          // Disconnect before the commit point: the break above fired with no
+          // text seen, which is indistinguishable from an empty completion
+          // below — but it is CLIENT behavior, not a provider failure. Without
+          // this check every Ctrl-C during a reasoning model's TTFB window
+          // benched the healthy model+key for 90s and logged a provider error.
+          if (clientGone && !headerSent && !sawText) {
+            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
+            return 'committed';
           }
 
           if (!sawText) {
@@ -1251,6 +1259,24 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         options: fusionOptions,
         estimatedTokens: estimatedTotal,
       });
+      // Structured-output enforcement for fusion (#516 scope gap): the panel/
+      // judge output got no format check, so model:"fusion" could hand back
+      // prose as a "success" for a json_schema request. Fusion has no failover
+      // machinery to hand this to — heal what's healable, otherwise answer
+      // honestly instead of pretending. (Streaming fusion stays unenforced,
+      // same boundary as every other streamed response.)
+      const fusionMsg = (response as any)?.choices?.[0]?.message;
+      if (samplingParams.response_format && fusionMsg && !fusionMsg.tool_calls?.length) {
+        const fusionText = contentToString(fusionMsg.content ?? '');
+        if (fusionText) {
+          const enforced = enforceJsonContent(fusionText);
+          if (!enforced.ok) {
+            res.status(502).json({ error: { message: `fusion produced non-JSON output despite response_format=${samplingParams.response_format.type} — retry, or pin a structured-output-capable model instead of "fusion"`, type: 'server_error' } });
+            return;
+          }
+          if (enforced.healed) fusionMsg.content = enforced.content;
+        }
+      }
       res.setHeader('X-Routed-Via', routedVia);
       res.json(response);
     } catch (err: any) {
@@ -1518,8 +1544,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           );
 
           for await (const chunk of gen) {
-      if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
-          if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const anyChunk = chunk as Record<string, any>;
 
@@ -1641,6 +1665,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
           }
 
+          // Disconnect before the commit point: nothing usable was (or will
+          // be) delivered, and that is CLIENT behavior, not a provider
+          // failure — do not let it fall through to the empty-completion
+          // throw below, which would bench a healthy model+key for 90s and
+          // log a provider error for every Ctrl-C during a reasoning model's
+          // TTFB window.
+          if (clientGone && !headerSent && heldText.trim().length === 0 && completedCalls.length === 0) {
+            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
+            return 'committed';
+          }
+
           const hasText = headerSent || heldText.trim().length > 0;
           if (!hasText && completedCalls.length === 0) {
             // Nothing usable came out — same failover semantics as the
@@ -1740,25 +1775,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           );
         }
 
-        // Structured-output enforcement (#514 follow-up): the client asked for
-        // JSON; a model that answered in prose despite the forwarded
-        // response_format must not be returned as a "success". Heal the common
-        // almost-right shapes (fenced block, prose-wrapped JSON) in place;
-        // otherwise fail over. skipBench: the provider is healthy — the MODEL
-        // ignored the format — so no cooldown/penalty, just the next candidate.
-        if (samplingParams.response_format && respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
-          const enforced = enforceJsonContent(respText);
-          if (!enforced.ok) {
-            throw Object.assign(
-              new Error(`${route.displayName} ignored response_format (returned non-JSON despite ${samplingParams.response_format.type})`),
-              { skipBench: true },
-            );
-          }
-          if (enforced.healed && respMsg) {
-            respMsg.content = enforced.content;
-          }
-        }
-
         // Inline tool-call dialect rescue (#231 audit): a tool-bearing
         // request answered with the call serialized as TEXT (a mid-
         // conversation model switch makes the new model imitate the previous
@@ -1780,6 +1796,35 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             respMsg.content = rescue.cleanText.length > 0 ? rescue.cleanText : null;
             if (result.choices?.[0]) result.choices[0].finish_reason = 'tool_calls';
             console.log(`[Proxy] Rescued ${rescue.calls.length} inline tool call(s) from ${route.displayName} into structured tool_calls`);
+          }
+        }
+
+        // Structured-output enforcement (#514 follow-up): the client asked for
+        // JSON; a model that answered in prose despite the forwarded
+        // response_format must not be returned as a "success". Heal the common
+        // almost-right shapes (fenced block, prose-wrapped JSON) in place;
+        // otherwise fail over. Deliberately AFTER the dialect rescue (matching
+        // responses.ts): an inline tool-call turn isn't JSON either, and
+        // gating it first burned a failover hop on turns the rescue converts.
+        // skipBench: the provider is healthy — the MODEL misbehaved — so no
+        // cooldown/penalty; skipModelForRequest: a sibling key would misbehave
+        // identically, so rule out the whole model for this request.
+        if (samplingParams.response_format && respText && (respMsg?.tool_calls?.length ?? 0) === 0) {
+          const enforced = enforceJsonContent(respText);
+          if (!enforced.ok) {
+            // finish_reason 'length' = the JSON was CUT OFF by max_tokens, not
+            // ignored — same failover (a terser model may fit the budget), but
+            // an honest error class/trail instead of "ignored response_format".
+            const truncated = result.choices?.[0]?.finish_reason === 'length';
+            throw Object.assign(
+              new Error(truncated
+                ? `truncated JSON from ${route.displayName} (finish_reason=length — raise max_tokens for this ${samplingParams.response_format.type} request)`
+                : `${route.displayName} ignored response_format (returned non-JSON despite ${samplingParams.response_format.type})`),
+              { skipBench: true, skipModelForRequest: true },
+            );
+          }
+          if (enforced.healed && respMsg) {
+            respMsg.content = enforced.content;
           }
         }
 

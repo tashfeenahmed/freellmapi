@@ -45,4 +45,26 @@ describe('enforceJsonContent', () => {
     const clean = '{"code":"if (a) { return b; }"}';
     expect(enforceJsonContent(`prefix ${clean} suffix`)).toEqual({ ok: true, content: clean, healed: true });
   });
+
+  it('a citation marker in leading prose does not shadow the real object', () => {
+    // Regression: first-bracket-wins sliced this to `[1]` — a valid parse of
+    // the WRONG value, delivered silently as the structured output.
+    const r = enforceJsonContent('According to source [1], here is the JSON: {"city":"Paris"}');
+    expect(r).toEqual({ ok: true, content: '{"city":"Paris"}', healed: true });
+  });
+
+  it('a bracket token in trailing prose does not shadow the real object', () => {
+    const r = enforceJsonContent('{"city":"Paris"} as shown in [2]');
+    expect(r).toEqual({ ok: true, content: '{"city":"Paris"}', healed: true });
+  });
+
+  it('markdown links around a JSON array still heal to the array', () => {
+    const r = enforceJsonContent('See [docs](https://x) first. ["a","b","c"] covers it.');
+    expect(r).toEqual({ ok: false }); // first-[ to last-] spans the link — unparseable, honest reject
+  });
+
+  it('prose-wrapped array with no other brackets heals', () => {
+    const r = enforceJsonContent('Here are your items: [1, 2, 3]');
+    expect(r).toEqual({ ok: true, content: '[1, 2, 3]', healed: true });
+  });
 });

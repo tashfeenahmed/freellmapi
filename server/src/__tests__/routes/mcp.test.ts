@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 
 let app: Express;
 
@@ -41,26 +41,87 @@ describe('MCP server (/mcp, stateless Streamable HTTP)', () => {
     expect(body.error.code).toBe(-32001);
   });
 
-  it('initialize negotiates a supported protocol version and advertises tools', async () => {
+  it('initialize always negotiates 2025-06-18 (batch-free transport) and advertises tools', async () => {
+    // Echoing an older requested revision (2025-03-26 allowed batching) while
+    // the transport rejects batches promised clients something they never got.
     const { status, body } = await rpc({
       jsonrpc: '2.0', id: 1, method: 'initialize',
       params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } },
     });
     expect(status).toBe(200);
-    expect(body.result.protocolVersion).toBe('2025-03-26');
+    expect(body.result.protocolVersion).toBe('2025-06-18');
     expect(body.result.capabilities.tools).toBeDefined();
     expect(body.result.serverInfo.name).toBe('freellmapi');
-  });
 
-  it('falls back to the default protocol version for an unknown one', async () => {
-    const { body } = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '1999-01-01' } });
-    expect(body.result.protocolVersion).toBe('2025-06-18');
+    const unknown = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '1999-01-01' } });
+    expect(unknown.body.result.protocolVersion).toBe('2025-06-18');
   });
 
   it('accepts notifications with a 202 and no body', async () => {
     const { status, body } = await rpc({ jsonrpc: '2.0', method: 'notifications/initialized' });
     expect(status).toBe(202);
     expect(body).toBeNull();
+  });
+
+  it('a notification is any message without an id — never answered, even for regular methods', async () => {
+    // JSON-RPC 2.0: no `id` member = notification. Detecting notifications by
+    // the method prefix answered no-id pings, which violates the spec.
+    const { status, body } = await rpc({ jsonrpc: '2.0', method: 'ping' });
+    expect(status).toBe(202);
+    expect(body).toBeNull();
+  });
+
+  it('echoes id:0 (falsy ids must not collapse to null)', async () => {
+    const { body } = await rpc({ jsonrpc: '2.0', id: 0, method: 'ping' });
+    expect(body.id).toBe(0);
+    expect(body.result).toEqual({});
+  });
+
+  it('echoes the request id on auth failures', async () => {
+    const { status, body } = await rpc({ jsonrpc: '2.0', id: 42, method: 'tools/list' }, { auth: false });
+    expect(status).toBe(401);
+    expect(body.id).toBe(42);
+  });
+
+  it('prototype-key tool names are unknown tools, not confusing tool errors', async () => {
+    for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const { body } = await rpc({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name } });
+      expect(body.error?.code).toBe(-32602);
+    }
+  });
+
+  it('a prototype-key usage range falls back to 24h instead of throwing', async () => {
+    const { body } = await rpc({
+      jsonrpc: '2.0', id: 11, method: 'tools/call',
+      params: { name: 'usage_summary', arguments: { range: 'constructor' } },
+    });
+    expect(body.result.isError).toBeUndefined();
+    expect(toolResultJson(body).range).toBe('24h');
+  });
+
+  it('usage_summary counts rows stored in SQLite datetime format (boundary day included)', async () => {
+    // Regression: the ISO 'T' in the since-param sorted GREATER than every
+    // same-day SQLite-format row (space < 'T'), so the window's boundary day
+    // was silently dropped and "24h" behaved like "since UTC midnight".
+    const db = getDb();
+    // 23h old: still inside the 24h window but (almost always) on the same
+    // UTC date as the since-boundary — exactly the rows the bug dropped.
+    const boundaryDayRow = new Date(Date.now() - 23 * 3600_000);
+    const sqlite = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
+    db.prepare(`INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, created_at)
+                VALUES ('groq', 'test-model', 'success', 100, 50, ?)`).run(sqlite(boundaryDayRow));
+    const hour = sqlite(boundaryDayRow).slice(0, 13) + ':00:00';
+    db.prepare(`INSERT INTO request_hourly (hour, total_requests, success_count, input_tokens, output_tokens)
+                VALUES (?, 1, 1, 100, 50)
+                ON CONFLICT(hour) DO UPDATE SET total_requests = total_requests + 1`).run(hour);
+
+    const { body } = await rpc({
+      jsonrpc: '2.0', id: 12, method: 'tools/call',
+      params: { name: 'usage_summary', arguments: { range: '24h' } },
+    });
+    const data = toolResultJson(body);
+    expect(data.requests).toBeGreaterThanOrEqual(1);
+    expect(data.top_models.some((m: any) => m.model_id === 'test-model')).toBe(true);
   });
 
   it('lists the six gateway tools with schemas', async () => {

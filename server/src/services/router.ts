@@ -69,6 +69,7 @@ export function summarizeExhaustion(
     else if (l.includes('< estimated')) bump('prompt too large for the model');
     else if (l.includes('no vision support')) bump('model lacks vision');
     else if (l.includes('no tool-calling support')) bump('model lacks tool-calling');
+    else if (l.includes('drops response_format')) bump('platform cannot honor response_format');
     else if (/ruled out|already-failed/.test(l)) bump('failed earlier this request');
     else if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap/.test(l)) bump('rate-limited or on cooldown');
     else bump('unavailable');
@@ -80,6 +81,7 @@ export function summarizeExhaustion(
     'prompt too large for the model',
     'model lacks vision',
     'model lacks tool-calling',
+    'platform cannot honor response_format',
     'failed earlier this request',
     'unsupported provider',
     'unavailable',

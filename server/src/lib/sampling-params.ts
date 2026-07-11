@@ -22,6 +22,7 @@
 // droplist entry is one line to add.
 
 import { z } from 'zod';
+import type { Platform } from '@freellmapi/shared/types.js';
 
 // Every field is `.nullable()` because real clients serialize their whole
 // request struct and send explicit nulls for unset knobs (#200); null is
@@ -118,7 +119,10 @@ export interface PlatformParamPolicy {
   jsonObjectToSchema?: boolean;
 }
 
-export const PLATFORM_PARAM_POLICIES: Record<string, PlatformParamPolicy> = {
+// Keyed by Platform (not string) so a typo'd platform id fails tsc instead of
+// silently no-op'ing the policy; the string-typed accessors below cast at the
+// boundary since routes carry platform ids as plain strings.
+export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
   // Mistral's API is strict (422 on unknown body keys) and names its seed
   // `random_seed`. It has no top_k/min_p/logit_bias/logprobs equivalents.
   mistral: {
@@ -168,7 +172,7 @@ const ANY_OBJECT_SCHEMA = {
  */
 export function extendedBodyParams(platform: string, options: ExtendedSamplingOptions | undefined): Record<string, unknown> {
   if (!options) return {};
-  const policy = PLATFORM_PARAM_POLICIES[platform];
+  const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
   const dropped = new Set<string>(policy?.drop ?? []);
   const out: Record<string, unknown> = {};
   for (const key of EXTENDED_SAMPLING_KEYS) {
@@ -187,14 +191,14 @@ export function extendedBodyParams(platform: string, options: ExtendedSamplingOp
 /** True when this platform's policy strips response_format before send — the
  *  router uses it to skip such platforms for structured-output requests. */
 export function platformDropsResponseFormat(platform: string): boolean {
-  return PLATFORM_PARAM_POLICIES[platform]?.drop?.includes('response_format') ?? false;
+  return PLATFORM_PARAM_POLICIES[platform as Platform]?.drop?.includes('response_format') ?? false;
 }
 
 /** The advertised parameter list for a model on `platform` — the base set
  *  every surface supports, plus tools when the model does, minus the
  *  platform's droplist. */
 export function supportedParametersFor(platform: string, caps: { tools?: boolean } = {}): string[] {
-  const policy = PLATFORM_PARAM_POLICIES[platform];
+  const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
   const dropped = new Set<string>(policy?.drop ?? []);
   const params = [
     'temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stop', 'stream',

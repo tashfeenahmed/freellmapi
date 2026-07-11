@@ -104,7 +104,10 @@ export function createApp(config?: Config) {
 
   // MCP server (Model Context Protocol over stateless Streamable HTTP):
   // gateway introspection tools for MCP-speaking agents. Unified-key auth,
-  // like /v1 — NOT behind the dashboard session gate.
+  // like /v1 — NOT behind the dashboard session gate. Same per-IP limiter as
+  // /v1 (its own bucket): both surfaces guard the same unified key, so an
+  // unauthenticated brute-force must not get a free throttle-less oracle here.
+  app.use('/mcp', createProxyRateLimiter(cfg.proxyRateLimitRpm));
   app.use('/mcp', mcpRouter);
 
   // Health check

@@ -65,9 +65,20 @@ export interface TokenBudgetRejection {
 export interface TokenBudgetResult {
   rejection: TokenBudgetRejection | null;
   /** The max_tokens to forward upstream: unchanged when the client set one,
-   *  capped to the budget remainder when it didn't. */
+   *  capped to min(budget remainder, TOKEN_BUDGET_OUTPUT_CAP) when it didn't. */
   maxTokens: number | undefined;
 }
+
+// Ceiling on the max_tokens the budget gate INJECTS when the client sent none.
+// Without it, a generous budget (say 100000) minus a small prompt forwarded
+// max_tokens≈99000 verbatim, and providers that validate max_tokens against
+// the model's context/completion limit 400'd a request that previously worked —
+// on every candidate in the chain, since the same value rode every retry.
+// Routing only reserves a capped ~2000 tokens for output (routingReserveTokens,
+// #470), so it never protects against this. A client that genuinely wants a
+// bigger completion can always set max_tokens explicitly; the budget then only
+// validates, never rewrites.
+export const TOKEN_BUDGET_OUTPUT_CAP = 4096;
 
 /**
  * Apply the per-request token budget to one request. `estimatedInputTokens`
@@ -84,7 +95,7 @@ export function applyTokenBudget(estimatedInputTokens: number, maxTokens: number
     const remaining = budget - estimatedInputTokens;
     // Input alone fills the whole budget: nothing left for output.
     if (remaining < 1) return { rejection: { budget, estimatedTotal }, maxTokens };
-    return { rejection: null, maxTokens: remaining };
+    return { rejection: null, maxTokens: Math.min(remaining, TOKEN_BUDGET_OUTPUT_CAP) };
   }
   return { rejection: null, maxTokens };
 }

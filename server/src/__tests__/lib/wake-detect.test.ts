@@ -40,6 +40,29 @@ describe('wake-detect', () => {
     expect(onWake.mock.calls[0][0]).toMatchObject({ reason: 'signal', signal: 'SIGUSR2' });
   });
 
+  it('debounces wake events: one recovery pass per resume, not one per signal', () => {
+    // A drift tick and an operator SIGCONT for the SAME wake (or signal spam)
+    // used to stack full key re-probes on top of each other.
+    const onWake = vi.fn();
+    startWakeDetect({ onWake });
+    process.emit('SIGUSR2' as any);
+    process.emit('SIGCONT' as any);
+    process.emit('SIGUSR2' as any);
+    expect(onWake).toHaveBeenCalledTimes(1);
+  });
+
+  it('stop removes only its OWN signal listeners, not other modules’', () => {
+    // removeAllListeners('SIGUSR2') silently unhooked any other registrant
+    // (log rotation, heap-dump triggers).
+    const foreign = vi.fn();
+    process.on('SIGUSR2', foreign);
+    startWakeDetect({ onWake: vi.fn() });
+    stopWakeDetect();
+    process.emit('SIGUSR2' as any);
+    expect(foreign).toHaveBeenCalledTimes(1);
+    process.removeListener('SIGUSR2', foreign);
+  });
+
   it('fires a drift wake when the wall clock jumps past the threshold (host suspend)', () => {
     vi.useFakeTimers();
     const onWake = vi.fn();

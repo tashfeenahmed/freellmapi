@@ -147,7 +147,11 @@ export function cooldownForError(route: RouteResult, err: any): number {
  * Callers add the just-failed key to skipKeys via this function (do not pre-add).
  */
 export function recordRetryableFailure(route: RouteResult, err: any, state: FallbackState): void {
-  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) {
+  // `skipModelForRequest: true` = the failure is MODEL behavior, not key
+  // state (ignored response_format, JSON truncated at max_tokens): a sibling
+  // key would reproduce it exactly, so rule out the whole model for this
+  // request instead of burning one failover hop per key.
+  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || err?.skipModelForRequest === true) {
     state.skipModels.add(route.modelDbId);
   }
   state.skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
@@ -224,6 +228,7 @@ export type AttemptErrorClass =
   | 'forbidden'
   | 'provider_bad_request'
   | 'empty_completion'
+  | 'format_ignored'
   | 'timeout'
   | 'rate_limited'
   | 'upstream_error'
@@ -245,6 +250,7 @@ export function classifyAttemptError(err: any): AttemptErrorClass {
   if (isProviderBadRequestError(err)) return 'provider_bad_request';
   const msg = (err?.message ?? '').toLowerCase();
   if (msg.includes('empty completion')) return 'empty_completion';
+  if (msg.includes('ignored response_format') || msg.includes('truncated json')) return 'format_ignored';
   if (msg.includes('timeout') || msg.includes('stalled') || msg.includes('etimedout') || msg.includes('aborted')) return 'timeout';
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('quota')) return 'rate_limited';
   const status = typeof err?.status === 'number' ? err.status : 0;
@@ -488,6 +494,13 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
   const breaker = newBreaker(hooks.breakerLimit);
   const stopIfBreakerTripped = (): boolean => {
     if (!recordBreakerFailure(breaker)) return false;
+    // Tripped after the client already hung up: stop the chain, but there is
+    // no socket to render an exhaustion body to (mirrors the loop-top
+    // clientGone check).
+    if (hooks.clientGone?.()) {
+      console.log(`[FallbackLoop] breaker tripped after client disconnect — stopping without rendering (${attempts.length} failed attempt(s))`);
+      return true;
+    }
     hooks.onExhausted(
       exhaustedRetryError(lastError, maxRetries, { attempts, breakerFails: breaker.consecutive }),
       { attempts, timedOut: false },
@@ -544,7 +557,12 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
         recordRetryableFailure(route, err, hooks.state);
         attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: classifyAttemptError(err) });
         lastError = err;
-        if (stopIfBreakerTripped()) return;
+        // skipBench failures (format ignored, hidden-reasoning truncation) are
+        // model behavior, not provider health — recordRetryableFailure already
+        // skips the cooldown/penalty for them, and they must not count toward
+        // the "pool looks unhealthy" breaker either: three prose answers to a
+        // json_schema request say nothing about whether candidate four is up.
+        if (err?.skipBench !== true && stopIfBreakerTripped()) return;
         continue;
       }
       hooks.onFatal(route, err, attempt);

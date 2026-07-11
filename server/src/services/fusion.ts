@@ -678,7 +678,15 @@ export async function runFusion(params: {
           const cand = resolveFusionCandidate(config.judge!);
           return cand ? routePinnedModel(cand.modelDbId, judgeEstimate, skipKeys) : null;
         }
-      : (skipKeys: Set<string>, skipModels: Set<number>) => routeRequest(judgeEstimate, skipKeys.size ? skipKeys : undefined, undefined, false, false, skipModels.size ? skipModels : undefined);
+      : (skipKeys: Set<string>, skipModels: Set<number>) => routeRequest(
+          judgeEstimate, skipKeys.size ? skipKeys : undefined, undefined, false, false,
+          skipModels.size ? skipModels : undefined, undefined,
+          // The judge writes the final answer the client receives, so a
+          // structured-output request must not land it on a platform whose
+          // policy drops response_format (kilo) — the schema would never even
+          // reach the model. Mirrors the non-fusion routing (#516).
+          options.response_format !== undefined,
+        );
 
     // Stream the judge when the caller wants live tokens (Playground); otherwise
     // a single buffered call (plain API clients hitting fusion non-streaming).

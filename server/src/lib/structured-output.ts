@@ -33,17 +33,23 @@ function parses(text: string): boolean {
   }
 }
 
-/** Slice from the first '{' or '[' to the matching last '}' or ']'. */
-function outermostJsonSlice(text: string): string | null {
-  const firstObj = text.indexOf('{');
-  const firstArr = text.indexOf('[');
-  const first = firstObj === -1 ? firstArr : (firstArr === -1 ? firstObj : Math.min(firstObj, firstArr));
-  if (first === -1) return null;
-  const open = text[first];
-  const close = open === '{' ? '}' : ']';
-  const last = text.lastIndexOf(close);
-  if (last <= first) return null;
-  return text.slice(first, last + 1);
+/**
+ * Candidate slices from the first '{' to the last '}' and from the first '['
+ * to the last ']', longest first. Both bracket types must be tried
+ * independently: picking whichever opener appears FIRST turned
+ * `According to [1], here is the JSON: {"city":"Paris"}` into the citation
+ * marker `[1]` — a valid parse of the wrong value, silently delivered as the
+ * structured output. Longest-first means an incidental bracket token in prose
+ * can never shadow the real payload next to it.
+ */
+function candidateJsonSlices(text: string): string[] {
+  const out: string[] = [];
+  for (const [open, close] of [['{', '}'], ['[', ']']] as const) {
+    const first = text.indexOf(open);
+    const last = text.lastIndexOf(close);
+    if (first !== -1 && last > first) out.push(text.slice(first, last + 1));
+  }
+  return out.sort((a, b) => b.length - a.length);
 }
 
 export function enforceJsonContent(content: string): JsonEnforcement {
@@ -60,8 +66,9 @@ export function enforceJsonContent(content: string): JsonEnforcement {
   }
 
   // Leading/trailing prose around one JSON value ("Here is your JSON: {...}").
-  const slice = outermostJsonSlice(trimmed);
-  if (slice && parses(slice)) return { ok: true, content: slice, healed: true };
+  for (const slice of candidateJsonSlices(trimmed)) {
+    if (parses(slice)) return { ok: true, content: slice, healed: true };
+  }
 
   return { ok: false };
 }

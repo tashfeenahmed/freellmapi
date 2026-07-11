@@ -66,17 +66,31 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
   }
 }
 
-export async function checkAllKeys(): Promise<void> {
-  const db = getDb();
-  const keys = db.prepare('SELECT id, platform FROM api_keys WHERE enabled = 1').all() as { id: number; platform: string }[];
+// Overlap guard: the scheduled 5-minute pass and wake-recovery re-probes can
+// coincide (or SIGCONT spam can queue several) — concurrent full passes
+// multiply provider validate traffic and let two passes each increment the
+// same genuinely-bad key's failureCount, reaching the auto-disable threshold
+// in fewer wall-clock checks than "3 consecutive checks" intends. A second
+// caller joins the in-flight pass instead of starting another.
+let checkAllInFlight: Promise<void> | null = null;
 
-  console.log(`[Health] Checking ${keys.length} keys...`);
+export function checkAllKeys(): Promise<void> {
+  if (checkAllInFlight) return checkAllInFlight;
+  checkAllInFlight = (async () => {
+    const db = getDb();
+    const keys = db.prepare('SELECT id, platform FROM api_keys WHERE enabled = 1').all() as { id: number; platform: string }[];
 
-  for (const key of keys) {
-    await checkKeyHealth(key.id);
-  }
+    console.log(`[Health] Checking ${keys.length} keys...`);
 
-  console.log(`[Health] Check complete.`);
+    for (const key of keys) {
+      await checkKeyHealth(key.id);
+    }
+
+    console.log(`[Health] Check complete.`);
+  })().finally(() => {
+    checkAllInFlight = null;
+  });
+  return checkAllInFlight;
 }
 
 let cancelHealthCheck: (() => void) | null = null;

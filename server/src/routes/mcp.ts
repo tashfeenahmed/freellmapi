@@ -30,8 +30,12 @@ import { getCacheStats } from '../services/cache.js';
 
 export const mcpRouter = Router();
 
-const SUPPORTED_PROTOCOL_VERSIONS = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
-const DEFAULT_PROTOCOL_VERSION = '2025-06-18';
+// Always negotiated to 2025-06-18: this transport rejects JSON-RPC batches,
+// which the 2025-03-26 and 2024-11-05 revisions still allowed — echoing an
+// older requested version while enforcing the newer transport rule promised
+// clients batching they'd never get. Per the MCP spec the server answers with
+// the latest version it supports; clients that can't speak it disconnect.
+const PROTOCOL_VERSION = '2025-06-18';
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -118,9 +122,17 @@ function providerHealth(): unknown {
 const USAGE_RANGES: Record<string, number> = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 };
 
 function usageSummary(args: Record<string, unknown>): unknown {
-  const range = typeof args.range === 'string' && USAGE_RANGES[args.range] ? args.range : '24h';
+  // Object.hasOwn: a prototype key ('constructor', 'toString') is truthy via
+  // the prototype chain but multiplies to NaN below — fall back to 24h.
+  const range = typeof args.range === 'string' && Object.hasOwn(USAGE_RANGES, args.range) ? args.range : '24h';
   const db = getDb();
-  const since = new Date(Date.now() - USAGE_RANGES[range] * 3600_000).toISOString();
+  // SQLite datetime('now') format (space separator, no ms/Z) — an ISO 'T'
+  // string compares GREATER than every same-day stored row (space < 'T'
+  // lexicographically), which silently dropped the window's boundary day:
+  // "24h" effectively meant "since UTC midnight". Same conversion as
+  // routes/analytics.ts.
+  const since = new Date(Date.now() - USAGE_RANGES[range] * 3600_000)
+    .toISOString().slice(0, 19).replace('T', ' ');
   const totals = db.prepare(`
     SELECT COALESCE(SUM(total_requests), 0) AS requests,
            COALESCE(SUM(success_count), 0) AS successes,
@@ -225,14 +237,23 @@ const TOOLS: Record<string, McpTool> = {
 
 // ── JSON-RPC dispatch ────────────────────────────────────────────────────
 
+// Returns the JSON-RPC response for a request, or undefined for a
+// notification. JSON-RPC 2.0 defines a notification as a message WITHOUT an
+// `id` member (id:null is a — discouraged — request and gets a response);
+// detecting notifications by the `notifications/` method prefix answered
+// no-id requests and 202'd id-carrying notifications.
 function handleRpc(msg: JsonRpcRequest): unknown | undefined {
+  const isNotification = msg.id === undefined;
+  const respond = (response: unknown) => (isNotification ? undefined : response);
   const id = msg.id ?? null;
+  return respond(dispatchRpc(msg, id));
+}
+
+function dispatchRpc(msg: JsonRpcRequest, id: number | string | null): unknown {
   switch (msg.method) {
     case 'initialize': {
-      const requested = (msg.params?.protocolVersion as string) ?? '';
-      const version = SUPPORTED_PROTOCOL_VERSIONS.has(requested) ? requested : DEFAULT_PROTOCOL_VERSION;
       return rpcResult(id, {
-        protocolVersion: version,
+        protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: 'freellmapi', version: '1.0.0' },
         instructions: 'FreeLLMAPI gateway introspection: list usable free models (with per-model supported_parameters), check provider/key health, read usage and cache stats, and switch the routing strategy. Inference goes through the OpenAI-compatible /v1 endpoints, not MCP.',
@@ -250,7 +271,10 @@ function handleRpc(msg: JsonRpcRequest): unknown | undefined {
       });
     case 'tools/call': {
       const name = msg.params?.name as string;
-      const tool = TOOLS[name];
+      // Object.hasOwn: a bare index lookup resolves prototype members, so
+      // name:"constructor"/"toString" passed the !tool check and died inside
+      // the try as a confusing tool-level error instead of -32602.
+      const tool = typeof name === 'string' && Object.hasOwn(TOOLS, name) ? TOOLS[name] : undefined;
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${name}`);
       try {
         const args = (msg.params?.arguments as Record<string, unknown>) ?? {};
@@ -261,7 +285,9 @@ function handleRpc(msg: JsonRpcRequest): unknown | undefined {
       }
     }
     default:
-      if (msg.method?.startsWith('notifications/')) return undefined; // ack silently
+      // Known client notifications (notifications/initialized etc.) land here;
+      // handleRpc drops the response for anything sent without an id, so they
+      // are acked silently without special-casing the method name.
       return rpcError(id, -32601, `Method not found: ${msg.method}`);
   }
 }
@@ -270,7 +296,11 @@ function authenticate(req: Request, res: Response): boolean {
   const token = extractApiToken(req);
   const unifiedKey = getUnifiedApiKey();
   if (!token || !timingSafeStringEqual(token, unifiedKey)) {
-    res.status(401).json(rpcError(null, -32001, 'Invalid API key. Authenticate with the unified key as a Bearer token.'));
+    // Echo the request id when the body carries one, so strict JSON-RPC
+    // clients can correlate the auth error with their pending call.
+    const body = req.body;
+    const id = body && typeof body === 'object' && !Array.isArray(body) && body.id !== undefined ? body.id : null;
+    res.status(401).json(rpcError(id, -32001, 'Invalid API key. Authenticate with the unified key as a Bearer token.'));
     return false;
   }
   return true;
