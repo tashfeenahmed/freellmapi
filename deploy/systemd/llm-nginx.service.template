@@ -1,0 +1,17 @@
+[Unit]
+Description=nginx reverse proxy for __DOMAIN__
+After=network-online.target llmapi.service
+Wants=network-online.target
+Requires=llmapi.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/sbin/nginx -t -c __LLMAP_ROOT__/deploy/runtime/nginx/nginx.conf
+ExecStart=/usr/sbin/nginx -c __LLMAP_ROOT__/deploy/runtime/nginx/nginx.conf -g "daemon off;"
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+Slice=llm.nalits.slice
+
+[Install]
+WantedBy=multi-user.target

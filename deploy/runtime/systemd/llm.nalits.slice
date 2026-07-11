@@ -1,0 +1,7 @@
+[Unit]
+Description=Memory limit for llm.nalits.com (llmapi + nginx)
+
+[Slice]
+MemoryAccounting=yes
+MemoryMax=400M
+MemorySwapMax=0

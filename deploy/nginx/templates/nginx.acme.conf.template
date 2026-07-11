@@ -1,0 +1,27 @@
+worker_processes 1;
+error_log __LLMAP_ROOT__/deploy/runtime/nginx/acme-error.log warn;
+pid __LLMAP_ROOT__/deploy/runtime/nginx/acme-nginx.pid;
+
+events {
+    worker_connections 32;
+}
+
+http {
+    server_tokens off;
+    access_log off;
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name __DOMAIN__;
+
+        location /.well-known/acme-challenge/ {
+            root __ACME_WEBROOT__;
+            default_type text/plain;
+        }
+
+        location / {
+            return 204;
+        }
+    }
+}

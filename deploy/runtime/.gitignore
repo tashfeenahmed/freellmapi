@@ -1,0 +1,5 @@
+# Runtime artifacts (rendered configs, logs, ACME webroot)
+deploy/runtime/nginx/
+deploy/runtime/systemd/
+deploy/runtime/certbot/www/.well-known/
+!deploy/runtime/**/.gitkeep

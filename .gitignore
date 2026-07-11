@@ -10,6 +10,7 @@ server/data/
 .encryption-key
 .env
 .env.local
+deploy/.env
 .DS_Store
 
 # Personal deployment scripts (contain keys/credentials — kept local)

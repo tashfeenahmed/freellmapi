@@ -1,0 +1,20 @@
+[Unit]
+Description=FreeLLMAPI backend for llm.nalits.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/llmapi
+EnvironmentFile=-/home/ubuntu/llmapi/deploy/.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+Environment=NODE_OPTIONS=--max-old-space-size=256
+ExecStart=/usr/bin/node server/dist/index.js
+Restart=on-failure
+RestartSec=5
+Slice=llm.nalits.slice
+
+[Install]
+WantedBy=multi-user.target
