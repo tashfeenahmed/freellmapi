@@ -5,6 +5,7 @@ import type {
   ChatToolDefinition,
 } from '@freellmapi/shared/types.js';
 import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { extendedBodyParams } from '../lib/sampling-params.js';
 import { flattenMessageContent } from '../lib/content.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { stripSchemaKeys } from '../lib/tool-args.js';
@@ -48,6 +49,7 @@ export class CohereProvider extends BaseProvider {
       stop: options?.stop,
       tools: sanitizeCohereTools(options?.tools),
       tool_choice: options?.tool_choice,
+      ...extendedBodyParams(this.platform, options),
     };
 
     const res = await this.fetchWithTimeout(`${API_BASE}/chat/completions`, {
@@ -93,6 +95,7 @@ export class CohereProvider extends BaseProvider {
       stop: options?.stop,
       tools: sanitizeCohereTools(options?.tools),
       tool_choice: options?.tool_choice,
+      ...extendedBodyParams(this.platform, options),
       stream: true,
     };
 

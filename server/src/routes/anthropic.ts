@@ -79,6 +79,9 @@ const messagesSchema = z.object({
   system: z.union([z.string(), z.array(contentBlockSchema)]).optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
+  // Anthropic's native top_k — forwarded to providers that support it via the
+  // platform policy in lib/sampling-params.ts.
+  top_k: z.number().int().min(1).nullable().optional(),
   stream: z.boolean().optional(),
   stop_sequences: z.array(z.string()).optional(),
   tools: z.array(anthropicToolSchema).optional(),
@@ -370,7 +373,7 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   const { temperature, top_p, stream } = body;
 
   const { messages, tools, tool_choice, hasImage, wantsTools } = convertRequest(body);
-  const completionOptions = { temperature, max_tokens, top_p, tools, tool_choice };
+  const completionOptions = { temperature, max_tokens, top_p, top_k: body.top_k ?? undefined, tools, tool_choice };
 
   const estimatedInputTokens = estimateTokens(messages);
   const imageCount = messages.reduce((n, m) =>

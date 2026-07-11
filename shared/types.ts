@@ -298,6 +298,9 @@ export interface ChatCompletionChoice {
   index: number;
   message: ChatMessage;
   finish_reason: string | null;
+  // Present when the client requested logprobs and the provider returned
+  // them; passed through verbatim (provider shapes vary slightly).
+  logprobs?: unknown;
 }
 
 export interface TokenUsage {

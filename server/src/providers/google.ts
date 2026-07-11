@@ -185,6 +185,32 @@ function sanitizeForGeminiSchema(schema: unknown, insidePropertiesMap: boolean):
 // declaration, and can ride alongside real function tools in the same array. (#59)
 const GROUNDING_TOOL_NAMES = new Set(['google_search', 'googlesearch', 'google_search_retrieval']);
 
+/**
+ * Extended generationConfig knobs translated from the OpenAI wire: topK,
+ * seed, penalties, and structured output. JSON output conflicts with function
+ * calling on Gemini ("Function calling with a response mime type:
+ * 'application/json' is unsupported"), so response_format is only applied on
+ * tool-free requests. Params Gemini has no equivalent for (min_p, logit_bias,
+ * logprobs…) are dropped by the platform policy in lib/sampling-params.ts and
+ * are ignored here. Exported for tests.
+ */
+export function toGeminiExtendedConfig(options?: CompletionOptions): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    topK: options?.top_k,
+    seed: options?.seed,
+    presencePenalty: options?.presence_penalty,
+    frequencyPenalty: options?.frequency_penalty,
+  };
+  const rf = options?.response_format;
+  const hasTools = (options?.tools?.length ?? 0) > 0;
+  if (rf && !hasTools) {
+    out.responseMimeType = 'application/json';
+    const schema = rf.type === 'json_schema' ? rf.json_schema?.schema : undefined;
+    if (schema) out.responseSchema = sanitizeForGemini(schema);
+  }
+  return out;
+}
+
 function toGeminiTools(tools?: ChatToolDefinition[]): Array<Record<string, unknown>> | undefined {
   if (!tools || tools.length === 0) return undefined;
 
@@ -460,6 +486,7 @@ export class GoogleProvider extends BaseProvider {
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
         stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
       // functionCallingConfig is only valid when real function tools are present;
@@ -537,6 +564,7 @@ export class GoogleProvider extends BaseProvider {
         maxOutputTokens: options?.max_tokens,
         topP: options?.top_p,
         stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
       toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,

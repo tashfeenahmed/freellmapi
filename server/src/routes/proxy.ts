@@ -19,6 +19,7 @@ import { logRequest } from '../lib/request-log.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
+import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from '../services/model-groups.js';
@@ -260,6 +261,11 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         // Non-standard but additive: OpenAI clients ignore unknown fields.
         available: m.available === 1,
         unavailable_reason: m.available === 1 ? null : (m.enabled === 1 ? 'no_key' : 'disabled'),
+        // OpenRouter's field name; agents use it to pick knobs per model. For
+        // a unify group this is the intersection over member platforms — a
+        // param is only advertised when every platform the router might pick
+        // honors it.
+        supported_parameters: supportedParametersForPlatforms(m.platforms, { tools: m.supportsTools }),
       })),
     ],
   });
@@ -415,6 +421,10 @@ const chatCompletionSchema = z.object({
   // Fusion config — only meaningful when `model` is the virtual "fusion" id.
   // Ignored for every other model. See services/fusion.ts.
   fusion: fusionConfigSchema.optional(),
+  // Extended sampling + structured-output params (top_k, seed, penalties,
+  // logit_bias, logprobs, response_format, max_completion_tokens…), forwarded
+  // per the platform policy in lib/sampling-params.ts.
+  ...samplingParamSchemaFields,
 });
 
 // Upstream-error classifiers live in lib/error-classify.ts so the fusion
@@ -976,10 +986,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
-  // `let`: the token-budget guardrail below may cap an absent max_tokens to
-  // the budget remainder before the options objects are built from it.
-  let max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
-    ? parsed.data.max_tokens : undefined;
+  // `max_completion_tokens` is OpenAI's newer alias — honored when max_tokens
+  // itself is absent. `let`: the token-budget guardrail below may cap an
+  // absent max_tokens to the budget remainder before the options objects are
+  // built from it.
+  const requestedMaxTokens = parsed.data.max_tokens ?? parsed.data.max_completion_tokens;
+  let max_tokens = requestedMaxTokens != null && requestedMaxTokens > 0
+    ? requestedMaxTokens : undefined;
+  // Extended sampling/output params (seed, penalties, response_format…),
+  // spread into every options object below — including fusion fan-out.
+  const samplingParams = pickSamplingParams(parsed.data);
   const stop = providerSafeStop(parsed.data.stop);
   const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice ?? undefined;
   const tools = parsed.data.tools?.map(t => ({ ...t, type: 'function' as const }));
@@ -1149,7 +1165,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       res.status(422).json({ error: { message: 'Fusion does not support image input yet. Use a vision model directly.', type: 'invalid_request_error', code: 'fusion_no_vision' } });
       return;
     }
-    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls };
+    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams };
     const fusionConfig = parsed.data.fusion ?? {};
 
     if (stream) {
@@ -1483,7 +1499,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, outboundMessages, route.modelId,
-            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls },
+            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -1685,7 +1701,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, outboundMessages, route.modelId,
-          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls },
+          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams },
           quotaContextForRoute(route, 'chat/completions'),
         );
 

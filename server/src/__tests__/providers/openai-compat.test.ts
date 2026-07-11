@@ -474,3 +474,70 @@ describe('OpenAICompatProvider - platform instances', () => {
     });
   });
 });
+
+describe('extended sampling param passthrough', () => {
+  const mockOk = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      id: 'x', object: 'chat.completion', created: 1, model: 'm',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    }),
+  }) as any;
+
+  const extended = {
+    seed: 42, top_k: 40, min_p: 0.05, presence_penalty: 0.5, frequency_penalty: -0.25,
+    logit_bias: { '50256': -100 }, logprobs: true, top_logprobs: 3,
+    response_format: { type: 'json_schema' as const, json_schema: { name: 'a', schema: { type: 'object' } } },
+  };
+
+  it('forwards the full extended set for a policy-free platform', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'cerebras', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', extended);
+
+    expect(body.seed).toBe(42);
+    expect(body.top_k).toBe(40);
+    expect(body.min_p).toBe(0.05);
+    expect(body.logit_bias).toEqual({ '50256': -100 });
+    expect(body.logprobs).toBe(true);
+    expect(body.top_logprobs).toBe(3);
+    expect(body.response_format.type).toBe('json_schema');
+  });
+
+  it('applies the mistral policy on the wire: random_seed rename, strict-API params dropped', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'mistral', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', extended);
+
+    expect(body.random_seed).toBe(42);
+    expect(body).not.toHaveProperty('seed');
+    expect(body).not.toHaveProperty('top_k');
+    expect(body).not.toHaveProperty('logit_bias');
+    expect(body).not.toHaveProperty('logprobs');
+    expect(body.presence_penalty).toBe(0.5);
+    expect(body.response_format.type).toBe('json_schema');
+  });
+
+  it('sends no extended keys when none were requested (undefined stays omitted)', async () => {
+    let raw = '';
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      raw = (init as any).body;
+      return mockOk();
+    });
+    const p = new OpenAICompatProvider({ platform: 'groq', name: 'T', baseUrl: 'https://x/v1' });
+    await p.chatCompletion('k', [{ role: 'user', content: 'q' }], 'm', { temperature: 0.7 });
+
+    expect(raw).not.toContain('seed');
+    expect(raw).not.toContain('response_format');
+    expect(raw).not.toContain('logit_bias');
+  });
+});

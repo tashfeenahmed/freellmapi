@@ -7,6 +7,7 @@ import type {
   Platform,
 } from '@freellmapi/shared/types.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
+import type { ExtendedSamplingOptions } from '../lib/sampling-params.js';
 import { proxyFetch } from '../lib/proxy.js';
 
 /** A provider HTTP error carrying the upstream status and, when the response
@@ -39,7 +40,10 @@ export function providerHttpError(res: Response, message: string): ProviderHttpE
   return err;
 }
 
-export interface CompletionOptions {
+// Extended sampling knobs (top_k, seed, penalties, logit_bias, logprobs,
+// response_format…) ride along via ExtendedSamplingOptions; adapters forward
+// them per the platform policy in lib/sampling-params.ts.
+export interface CompletionOptions extends ExtendedSamplingOptions {
   model?: string;
   temperature?: number;
   max_tokens?: number;

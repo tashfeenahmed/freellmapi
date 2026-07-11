@@ -25,6 +25,7 @@ import {
 } from './proxy.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
+import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -119,6 +120,18 @@ const responsesRequestSchema = z.object({
     z.object({ type: z.literal('function'), name: z.string() }).passthrough(),
   ]).optional(),
   parallel_tool_calls: z.boolean().nullable().optional(),
+  // Extended sampling params, validated the same way as /chat/completions.
+  // Responses clients express structured output as `text.format` rather than
+  // `response_format` — mapped where completionOpts is built.
+  ...samplingParamSchemaFields,
+  text: z.object({
+    format: z.object({
+      type: z.enum(['text', 'json_object', 'json_schema']),
+      name: z.string().optional(),
+      strict: z.boolean().nullable().optional(),
+      schema: z.record(z.string(), z.unknown()).optional(),
+    }).passthrough().optional(),
+  }).passthrough().nullable().optional(),
 }).passthrough();
 
 type ResponsesRequest = z.infer<typeof responsesRequestSchema>;
@@ -327,6 +340,17 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // the way back out (see lib/tool-args.ts).
   const toolSchemas = toolSchemaMap(tools);
   const tool_choice = tools?.length ? toChatToolChoice(reqData.tool_choice) : undefined;
+  // Responses-API structured output arrives as `text.format`; translate it to
+  // the internal response_format shape (an explicit response_format on the
+  // body, unusual for this surface but valid, wins).
+  const samplingParams = pickSamplingParams(reqData);
+  const textFormat = reqData.text?.format;
+  if (!samplingParams.response_format && textFormat && textFormat.type !== 'text') {
+    samplingParams.response_format = textFormat.type === 'json_schema'
+      ? { type: 'json_schema', json_schema: { name: textFormat.name, strict: textFormat.strict, schema: textFormat.schema } }
+      : { type: 'json_object' } as ResponseFormat;
+  }
+
   const completionOpts = {
     temperature: reqData.temperature ?? undefined,
     max_tokens: reqData.max_output_tokens ?? undefined,
@@ -334,6 +358,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     tools,
     tool_choice,
     parallel_tool_calls: reqData.parallel_tool_calls ?? undefined,
+    ...samplingParams,
   };
 
   const estimatedInputTokens = messages.reduce(
