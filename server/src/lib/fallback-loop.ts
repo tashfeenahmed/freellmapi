@@ -39,6 +39,7 @@ import {
 import { sanitizeProviderErrorMessage } from './error-redaction.js';
 import { checkKeyHealth } from '../services/health.js';
 import { getSetting } from '../db/index.js';
+import { newBreaker, recordBreakerFailure } from './guardrails.js';
 
 // Every surface caps failover hops at the same number.
 export const FALLBACK_MAX_RETRIES = 20;
@@ -266,8 +267,9 @@ export interface ExhaustionBody {
   type: string;
   message: string;
   // Coarse class of the exhaustion, for surfaces that need to remap `type` to
-  // their own wire vocabulary (the Anthropic route maps 'auth' → 'api_error').
-  kind: 'auth' | 'bad_request' | 'rate_limit';
+  // their own wire vocabulary (the Anthropic route maps 'auth' → 'api_error'
+  // and 'unavailable' → 'overloaded_error').
+  kind: 'auth' | 'bad_request' | 'rate_limit' | 'unavailable';
 }
 
 export interface ExhaustionContext {
@@ -275,6 +277,9 @@ export interface ExhaustionContext {
   // True when the wall-clock retry budget stopped the loop before maxRetries.
   timedOut?: boolean;
   budgetMs?: number;
+  // Set (to the failure count) when the circuit-breaker guardrail stopped the
+  // loop; renders as a 503 instead of a rate-limit exhaustion.
+  breakerFails?: number;
 }
 
 /**
@@ -318,6 +323,22 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
     };
   }
 
+  // Circuit-breaker guardrail stop. Checked after the all-auth and bad-request
+  // diagnoses, which are more specific about WHY the pool is failing.
+  if (ctx?.breakerFails) {
+    const breakerEta = formatResetEta(getSoonestCooldownExpiry());
+    const breakerEtaNote = breakerEta ? ` Soonest cooldown reset ${breakerEta}.` : '';
+    return {
+      kind: 'unavailable',
+      status: 503,
+      type: 'service_unavailable',
+      message: `Failover stopped early by the circuit-breaker guardrail: ${ctx.breakerFails} consecutive upstream ` +
+        `failure${ctx.breakerFails === 1 ? '' : 's'} (max_consecutive_upstream_fails). The enabled pool looks ` +
+        `unhealthy right now, so the remaining candidates were skipped instead of burning quota on them.` +
+        `${breakerEtaNote}${trail} Last error: ${safeLastError}`,
+    };
+  }
+
   const attemptCount = attempts.length > 0 ? attempts.length : maxRetries;
   const scope = attemptCount == null
     ? 'All models rate-limited'
@@ -354,6 +375,9 @@ export interface FallbackHooks {
   // Wall-clock retry budget override, mostly for tests. Defaults to
   // getFallbackTimeBudgetMs() (setting → env → 45s; 0 disables).
   timeBudgetMs?: number;
+  // Circuit-breaker threshold override, mostly for tests. Defaults to
+  // getMaxConsecutiveUpstreamFails() (setting → env → 0 = disabled).
+  breakerLimit?: number;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
   // mutate it, and the surface's route() reads it to exclude failed keys/models.
   state: FallbackState;
@@ -421,6 +445,22 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
   };
   let lastError: any = null;
 
+  // Circuit-breaker guardrail (default off): the Nth consecutive upstream
+  // failure aborts the chain with a 503 instead of grinding the remaining
+  // candidates of a pool that is failing across the board. Auth failures count
+  // too — a wall of dead keys is exactly the "stop early" case. Within one
+  // request every recorded failure is consecutive by construction (a success
+  // ends the loop), so this is "max upstream failures per request".
+  const breaker = newBreaker(hooks.breakerLimit);
+  const stopIfBreakerTripped = (): boolean => {
+    if (!recordBreakerFailure(breaker)) return false;
+    hooks.onExhausted(
+      exhaustedRetryError(lastError, maxRetries, { attempts, breakerFails: breaker.consecutive }),
+      { attempts, timedOut: false },
+    );
+    return true;
+  };
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     // Wall-clock budget: refuse to START another retry once spent. The first
     // attempt always runs; a slow attempt is never aborted mid-flight (that is
@@ -455,12 +495,14 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
         recordAuthFailure(route, hooks.state);
         attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: 'auth' });
         lastError = err;
+        if (stopIfBreakerTripped()) return;
         continue;
       }
       if (isRetryableError(err)) {
         recordRetryableFailure(route, err, hooks.state);
         attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: classifyAttemptError(err) });
         lastError = err;
+        if (stopIfBreakerTripped()) return;
         continue;
       }
       hooks.onFatal(route, err, attempt);

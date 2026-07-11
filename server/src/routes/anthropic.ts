@@ -18,6 +18,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, type ExhaustionBody } from '../lib/fallback-loop.js';
+import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { resolveAnthropicModel } from '../services/anthropic-map.js';
 import { buildModelListing } from '../services/model-listing.js';
 
@@ -110,10 +111,14 @@ function sendError(res: Response, status: number, errorType: string, message: st
 
 // The shared exhaustion body's `type` strings are chosen to be valid on the
 // OpenAI-shaped surfaces; the all-keys-failed-auth exhaustion carries
-// 'provider_error', which is not an Anthropic error type. Remap it onto
-// Anthropic's generic 'api_error' so this surface stays wire-correct.
+// 'provider_error' and the circuit-breaker stop carries 'service_unavailable',
+// neither of which is an Anthropic error type. Remap them onto Anthropic's
+// vocabulary ('api_error' / 'overloaded_error') so this surface stays
+// wire-correct.
 function anthropicErrorType(body: ExhaustionBody): string {
-  return body.kind === 'auth' ? 'api_error' : body.type;
+  if (body.kind === 'auth') return 'api_error';
+  if (body.kind === 'unavailable') return 'overloaded_error';
+  return body.type;
 }
 
 function newMessageId(): string {
@@ -373,6 +378,15 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   // Capped output reserve so a large max_tokens can't falsely exclude the model
   // pool (#470); input + images count in full.
   const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(max_tokens);
+
+  // Guardrail: per-request token budget (request_max_tokens_budget, default
+  // off). max_tokens is always set on this surface (Anthropic requires it),
+  // so a violation can only reject — no capping branch.
+  const budgetCheck = applyTokenBudget(estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE, max_tokens);
+  if (budgetCheck.rejection) {
+    sendError(res, 413, 'invalid_request_error', tokenBudgetMessage(budgetCheck.rejection));
+    return;
+  }
 
   // Resolve the model through the operator's Claude-family map (opus/sonnet/
   // haiku/default → auto | a pinned catalog model). A concrete catalog id pins

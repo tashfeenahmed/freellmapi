@@ -18,6 +18,7 @@ import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModel
 import { logRequest } from '../lib/request-log.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError } from '../lib/fallback-loop.js';
+import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from '../services/model-groups.js';
@@ -654,6 +655,17 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   // exclude the whole model pool (#470); input is still counted in full.
   const estimatedTotal = estimatedInputTokens + routingReserveTokens(max_tokens);
 
+  // Guardrail: per-request token budget (request_max_tokens_budget, default
+  // off). max_tokens always has a value on this surface (default 128), so a
+  // violation can only reject — no capping branch.
+  const budgetCheck = applyTokenBudget(estimatedInputTokens, max_tokens);
+  if (budgetCheck.rejection) {
+    res.status(413).json({
+      error: { message: tokenBudgetMessage(budgetCheck.rejection), type: 'invalid_request_error', code: 'request_token_budget' },
+    });
+    return;
+  }
+
   let resolvedChain: ResolvedChain | undefined;
   if (isAutoModel(requestedModel)) {
     resolvedChain = resolveRoutingChain(requestedModel);
@@ -964,7 +976,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
-  const max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
+  // `let`: the token-budget guardrail below may cap an absent max_tokens to
+  // the budget remainder before the options objects are built from it.
+  let max_tokens = parsed.data.max_tokens != null && parsed.data.max_tokens > 0
     ? parsed.data.max_tokens : undefined;
   const stop = providerSafeStop(parsed.data.stop);
   const tool_choice = parsed.data.tool_choice === 'any' ? 'required' as const : parsed.data.tool_choice ?? undefined;
@@ -1108,6 +1122,20 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     });
     return;
   }
+
+  // Guardrail: per-request token budget (request_max_tokens_budget, default
+  // off). Estimated input (incl. images) + requested output must fit the
+  // ceiling; a request with no max_tokens gets its output capped to the
+  // remainder instead. Sits before the Fusion branch so fan-out inherits the
+  // capped max_tokens too.
+  const budgetCheck = applyTokenBudget(estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE, max_tokens);
+  if (budgetCheck.rejection) {
+    res.status(413).json({
+      error: { message: tokenBudgetMessage(budgetCheck.rejection), type: 'invalid_request_error', code: 'request_token_budget' },
+    });
+    return;
+  }
+  max_tokens = budgetCheck.maxTokens;
 
   // ── Fusion: multi-model synthesis ──────────────────────────────────────────
   // The virtual "fusion" model fans the prompt out to a panel of diverse models

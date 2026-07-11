@@ -5,6 +5,12 @@ import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, isProxyActive, getP
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
+import {
+  getRequestMaxTokensBudget,
+  getMaxConsecutiveUpstreamFails,
+  REQUEST_MAX_TOKENS_BUDGET_SETTING,
+  MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING,
+} from '../lib/guardrails.js';
 import { z } from 'zod';
 
 export const settingsRouter = Router();
@@ -71,6 +77,41 @@ settingsRouter.put('/anthropic-map', (req: Request, res: Response) => {
       : (err?.message ?? 'invalid');
     res.status(400).json({ error: { message: `Invalid anthropic model map: ${detail}`, type: 'invalid_request_error' } });
   }
+});
+
+// Get the request guardrails (per-request token budget + failover circuit
+// breaker). Both default to 0 = disabled; see lib/guardrails.ts.
+settingsRouter.get('/guardrails', (_req: Request, res: Response) => {
+  res.json({
+    requestMaxTokensBudget: getRequestMaxTokensBudget(),
+    maxConsecutiveUpstreamFails: getMaxConsecutiveUpstreamFails(),
+  });
+});
+
+const guardrailsPutSchema = z.object({
+  requestMaxTokensBudget: z.number().int().min(0).optional(),
+  maxConsecutiveUpstreamFails: z.number().int().min(0).optional(),
+});
+
+// Update the guardrails. Partial: send just the knob you want to change.
+// Takes effect on the next request — no restart needed. 0 disables a knob.
+settingsRouter.put('/guardrails', (req: Request, res: Response) => {
+  const parsed = guardrailsPutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const detail = parsed.error.errors.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
+    res.status(400).json({ error: { message: `Invalid guardrail settings: ${detail}`, type: 'invalid_request_error' } });
+    return;
+  }
+  if (parsed.data.requestMaxTokensBudget !== undefined) {
+    setSetting(REQUEST_MAX_TOKENS_BUDGET_SETTING, String(parsed.data.requestMaxTokensBudget));
+  }
+  if (parsed.data.maxConsecutiveUpstreamFails !== undefined) {
+    setSetting(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING, String(parsed.data.maxConsecutiveUpstreamFails));
+  }
+  res.json({
+    requestMaxTokensBudget: getRequestMaxTokensBudget(),
+    maxConsecutiveUpstreamFails: getMaxConsecutiveUpstreamFails(),
+  });
 });
 
 // Get the unified API key

@@ -24,6 +24,7 @@ import {
   logRequest,
 } from './proxy.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess } from '../lib/fallback-loop.js';
+import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -342,6 +343,18 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // Capped output reserve so a large max_output_tokens can't falsely exclude the
   // model pool (#470); input counts in full.
   const estimatedTotal = estimatedInputTokens + routingReserveTokens(reqData.max_output_tokens);
+
+  // Guardrail: per-request token budget (request_max_tokens_budget, default
+  // off). A request with no max_output_tokens gets its output capped to the
+  // budget remainder instead of a rejection.
+  const budgetCheck = applyTokenBudget(estimatedInputTokens, completionOpts.max_tokens);
+  if (budgetCheck.rejection) {
+    res.status(413).json({
+      error: { message: tokenBudgetMessage(budgetCheck.rejection), type: 'invalid_request_error', code: 'request_token_budget' },
+    });
+    return;
+  }
+  completionOpts.max_tokens = budgetCheck.maxTokens;
   // Optional client-managed session affinity (mirrors /chat/completions).
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
