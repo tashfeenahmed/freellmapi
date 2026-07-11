@@ -20,7 +20,7 @@ import { cacheRouter } from './routes/cache.js';
 import { authRouter } from './routes/auth.js';
 import { docsRouter } from './routes/docs.js';
 import { requireAuth } from './middleware/requireAuth.js';
-import { createProxyRateLimiter } from './middleware/rateLimit.js';
+import { createProxyRateLimiter, createAdminRateLimiter } from './middleware/rateLimit.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { clientContextMiddleware } from './lib/client-context.js';
 import type { Config } from './lib/config.js';
@@ -42,13 +42,25 @@ export function createApp(config?: Config) {
     ...cfg.dashboardOrigins,
   ]);
 
-  // CSP intentionally disabled — the SPA bundles inline styles and the OG
-  // image is loaded from the same origin; enabling helmet's default CSP
-  // breaks the React build's hashed-asset loader. HSTS off because this is
-  // a single-user local proxy, served over HTTP on localhost. Both should
-  // stay disabled unless someone serves the proxy over HTTPS publicly
-  // (which is also not a supported deployment — see README).
-  app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
+  // CSP: default-src 'self' restricts content to the same origin. Scripts
+  // are hashed by the Vite/React build, so 'self' works in production. Inline
+  // styles from React hydration need 'unsafe-inline'. HSTS stays off because
+  // this is a single-user local proxy served over HTTP (see README).
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        formAction: ["'self'"],
+        baseUri: ["'self'"],
+      },
+    },
+    hsts: false,
+  }));
   app.use(cors({
     origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       callback(null, !origin || allowedCorsOrigins.has(origin));
@@ -68,7 +80,13 @@ export function createApp(config?: Config) {
   // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
   app.use('/api/auth', authRouter);
 
-  // API routes — all admin endpoints sit behind requireAuth.
+  // Admin API — all routes share an IP-based rate limiter to throttle
+  // brute-force attempts (auth, key export, etc). The limiter is mounted
+  // broadly on /api; requireAuth gates each sub-path individually so that
+  // unauthenticated endpoints under /api (like /api/ping) are not blocked.
+  const adminRateLimiter = createAdminRateLimiter();
+  app.use('/api', adminRateLimiter);
+
   app.use('/api/keys', requireAuth, keysRouter);
   app.use('/api/models', requireAuth, modelsRouter);
   app.use('/api/profiles', requireAuth, profilesRouter);
@@ -80,6 +98,11 @@ export function createApp(config?: Config) {
   app.use('/api/settings', requireAuth, settingsRouter);
   app.use('/api/premium', requireAuth, premiumRouter);
   app.use('/api/cache', requireAuth, cacheRouter);
+
+  // Health check — no auth required.
+  app.get('/api/ping', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
 
   // Static, unauthenticated API reference: GET /v1/docs (viewer) and
   // GET /v1/openapi.json (spec). Mounted before the rate limiter so the docs
@@ -100,11 +123,6 @@ export function createApp(config?: Config) {
   app.use('/v1', proxyRouter);
   // OpenAI Responses API shim (Codex CLI requires wire_api="responses"; see #96)
   app.use('/v1', responsesRouter);
-
-  // Health check
-  app.get('/api/ping', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
 
   // Error handler (for API routes)
   app.use(errorHandler);

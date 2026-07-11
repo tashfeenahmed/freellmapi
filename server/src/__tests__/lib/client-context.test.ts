@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { clientContextMiddleware, getClientContext } from '../../lib/client-context.js';
 
-// Minimal fake req: the middleware only touches headers and socket.
-function fakeReq(headers: Record<string, string | string[]>, remoteAddress?: string): Request {
-  return { headers, socket: { remoteAddress } } as unknown as Request;
+// Minimal fake req: the middleware only touches headers, socket, and app.
+function fakeReq(headers: Record<string, string | string[]>, remoteAddress?: string, trustProxy?: boolean): Request {
+  return { headers, socket: { remoteAddress }, app: { get: () => trustProxy ?? false } } as unknown as Request;
 }
 
 // Run the middleware and capture the context visible to downstream code
@@ -25,10 +25,11 @@ describe('clientContextMiddleware', () => {
     expect(ctx).toEqual({ ip: '192.168.0.42', userAgent: 'curl/8.6.0' });
   });
 
-  it('prefers the first X-Forwarded-For hop over the socket address', () => {
+  it('prefers the first X-Forwarded-For hop when trust proxy is enabled', () => {
     const ctx = contextFor(fakeReq(
       { 'x-forwarded-for': '10.1.2.3, 172.16.0.1', 'user-agent': 'ua' },
       '127.0.0.1',
+      true,
     ));
     expect(ctx.ip).toBe('10.1.2.3');
   });
