@@ -273,6 +273,24 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.ainative.studio/api/v1',
 }));
 
+// Aion Labs — OpenAI-compatible aggregator (api.aionlabs.ai/v1). Free key from
+// aionlabs.ai (no card); recurring free availability is catalog-managed so
+// premium users see rows immediately and free users get them after 30 days.
+register(new OpenAICompatProvider({
+  platform: 'aion',
+  name: 'Aion Labs',
+  baseUrl: 'https://api.aionlabs.ai/v1',
+}));
+
+// Requesty — OpenAI-compatible router (router.requesty.ai/v1). Free key from
+// requesty.ai (no card); free model rows age into the public monthly catalog
+// through the standard 30-day gate.
+register(new OpenAICompatProvider({
+  platform: 'requesty',
+  name: 'Requesty',
+  baseUrl: 'https://router.requesty.ai/v1',
+}));
+
 // NaraRouter — OpenAI-compatible aggregator (router.bynara.id/v1). Free plan
 // requires a no-card API key plus Telegram channel/link verification. Live
 // probed 2026-07-09: `mistral-large`, `mistral-medium-3-5`, and `tencent-hy3`

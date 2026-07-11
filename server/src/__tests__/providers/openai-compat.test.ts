@@ -384,6 +384,8 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
     { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     { platform: 'opencode',   name: 'OpenCode Zen',  baseUrl: 'https://opencode.ai/zen/v1' },
+    { platform: 'aion',       name: 'Aion Labs',     baseUrl: 'https://api.aionlabs.ai/v1' },
+    { platform: 'requesty',   name: 'Requesty',      baseUrl: 'https://router.requesty.ai/v1' },
     { platform: 'nara',       name: 'NaraRouter',    baseUrl: 'https://router.bynara.id/v1' },
   ] as const;
 

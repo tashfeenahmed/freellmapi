@@ -136,12 +136,14 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   if (platform === 'routeway') return 'routeway::free';
   if (platform === 'bazaarlink') return 'bazaarlink::free';
   if (platform === 'ainative') return 'ainative::account';
+  if (platform === 'aion') return 'aion::free';
+  if (platform === 'requesty') return 'requesty::free';
   if (platform === 'nara') return 'nara::free';
   return normalizedModelId ? `${platform}::${normalizedModelId}` : `${platform}::account`;
 }
 
 function isSharedPool(platform: Platform): boolean {
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'nara', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'nara', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };

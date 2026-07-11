@@ -85,6 +85,12 @@ export type Platform =
   // ~10M tokens/month free allocation (no card); quota unverified. Key from
   // ainative.studio.
   | 'ainative'
+  // Aion Labs — OpenAI-compatible aggregator with a no-card free API key.
+  // Catalog rows live in the Oracle catalog (premium now, free after 30 days).
+  | 'aion'
+  // Requesty — OpenAI-compatible router with no-card free models/credits.
+  // Catalog rows live in the Oracle catalog (premium now, free after 30 days).
+  | 'requesty'
   // NaraRouter — OpenAI-compatible aggregator. Free account key from
   // router.bynara.id after Telegram channel/link verification; free-plan routes
   // reset daily and are catalog-managed (premium now, free after 30 days).

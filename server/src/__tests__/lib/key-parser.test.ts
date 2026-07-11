@@ -38,12 +38,16 @@ describe('key parser', () => {
     expect(detectPlatform('GOOGLE_')).toBe('google');
     expect(detectPlatform('OLLAMA_CLOUD_')).toBe('ollama');
     expect(detectPlatform('NARAROUTER_')).toBe('nara');
+    expect(detectPlatform('AIONLABS_')).toBe('aion');
+    expect(detectPlatform('REQUESTY_')).toBe('requesty');
     expect(detectPlatform('SAMBANOVA_')).toBeNull();
   });
 
   it('parses Hermes/OpenCode auth.json provider names', () => {
     expect(AUTH_JSON_PROVIDER_MAP['ollama-cloud']).toBe('ollama');
     expect(AUTH_JSON_PROVIDER_MAP['bynara']).toBe('nara');
+    expect(AUTH_JSON_PROVIDER_MAP['aion-labs']).toBe('aion');
+    expect(AUTH_JSON_PROVIDER_MAP['requesty']).toBe('requesty');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],
