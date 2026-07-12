@@ -77,36 +77,46 @@ interface ProviderCredential {
   baseUrl: string | null;
 }
 
-function getProviderCredential(row: MediaModelRow): ProviderCredential | null {
+function getProviderCredentials(row: MediaModelRow): ProviderCredential[] {
+  const db = getDb();
   if (row.key_id != null) {
-    const keyRow = getDb()
-      .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1")
-      .get(row.key_id) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-    if (!keyRow) return null;
-    try {
-      return {
-        id: keyRow.id,
-        key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
-        baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-      };
-    } catch {
-      return null;
+    // Custom endpoint: a model routes ONLY through its bound keys
+    // (custom_key_bindings), not every key on the endpoint. The binding
+    // modality is the media modality ('image' | 'audio').
+    const keyRows = db.prepare(
+      `SELECT k.id, k.encrypted_key, k.iv, k.auth_tag, k.base_url
+         FROM custom_key_bindings ckb
+         JOIN api_keys k ON k.id = ckb.key_id
+        WHERE ckb.modality = ? AND ckb.model_db_id = ?
+          AND k.enabled = 1 AND k.status IN ('healthy', 'unknown')
+        ORDER BY k.id`,
+    ).all(row.modality, row.id) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null }[];
+    const creds: ProviderCredential[] = [];
+    for (const kr of keyRows) {
+      try {
+        creds.push({
+          id: kr.id,
+          key: decrypt(kr.encrypted_key, kr.iv, kr.auth_tag),
+          baseUrl: kr.base_url?.trim().replace(/\/+$/, '') ?? null,
+        });
+      } catch { /* skip undecryptable key */ }
     }
+    return creds;
   }
-  if (row.platform === 'custom') return null;
+  if (row.platform === 'custom') return [];
 
-  const keyRow = getDb()
-    .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY RANDOM() LIMIT 1")
+  const keyRow = db
+    .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY id LIMIT 1")
     .get(row.platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-  if (!keyRow) return null;
+  if (!keyRow) return [];
   try {
-    return {
+    return [{
       id: keyRow.id,
       key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
       baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-    };
+    }];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -393,22 +403,24 @@ export async function runImageGeneration(model: string | undefined, params: Imag
   const chain = resolveMediaChain(model, 'image');
   let lastError: MediaError | null = null;
   for (const row of chain) {
-    const credential = KEYLESS_CAPABLE.has(row.platform)
-      ? { id: null, key: null, baseUrl: null }
-      : getProviderCredential(row);
-    if (!credential) continue; // no usable key for this provider — try the next
-    const started = Date.now();
-    try {
-      const images = await callImageProvider(row, credential, params);
-      if (!images.length || images.every(i => !i.b64_json && !i.url)) {
-        throw new MediaError('upstream returned no image', 502);
+    const credentials = KEYLESS_CAPABLE.has(row.platform)
+      ? [{ id: null, key: null, baseUrl: null }]
+      : getProviderCredentials(row);
+    if (credentials.length === 0) continue;
+    for (const credential of credentials) {
+      const started = Date.now();
+      try {
+        const images = await callImageProvider(row, credential, params);
+        if (!images.length || images.every(i => !i.b64_json && !i.url)) {
+          throw new MediaError('upstream returned no image', 502);
+        }
+        logMedia(row, credential.id, 'success', Date.now() - started, null);
+        return { platform: row.platform, modelId: row.model_id, images };
+      } catch (err: any) {
+        const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+        logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+        lastError = e;
       }
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, images };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
     }
   }
   throw chainError('image', lastError);
@@ -419,20 +431,22 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
   const chain = resolveMediaChain(model, 'audio');
   let lastError: MediaError | null = null;
   for (const row of chain) {
-    const credential = KEYLESS_CAPABLE.has(row.platform)
-      ? { id: null, key: null, baseUrl: null }
-      : getProviderCredential(row);
-    if (!credential) continue;
-    const started = Date.now();
-    try {
-      const out = await callSpeechProvider(row, credential, params);
-      if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
+    const credentials = KEYLESS_CAPABLE.has(row.platform)
+      ? [{ id: null, key: null, baseUrl: null }]
+      : getProviderCredentials(row);
+    if (credentials.length === 0) continue;
+    for (const credential of credentials) {
+      const started = Date.now();
+      try {
+        const out = await callSpeechProvider(row, credential, params);
+        if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
+        logMedia(row, credential.id, 'success', Date.now() - started, null);
+        return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
+      } catch (err: any) {
+        const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+        logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+        lastError = e;
+      }
     }
   }
   throw chainError('audio', lastError);

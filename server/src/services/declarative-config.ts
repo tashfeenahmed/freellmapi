@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Db } from '../db/types.js';
 import { getDb } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
+import { findOrInsertCustomKey, upsertBinding } from '../lib/custom-key-upsert.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy } from './router.js';
 import {
@@ -191,12 +192,10 @@ function ensureFallbackRow(db: Db, modelDbId: number, enabled = true, updateExis
 }
 
 function registerCustomProvider(db: Db, input: z.infer<typeof customProviderSchema>): number {
-  const keyId = upsertApiKey(db, {
-    platform: 'custom',
-    key: input.apiKey,
-    label: input.label,
+  const { processedKeyId: keyId } = findOrInsertCustomKey(db, {
     baseUrl: input.baseUrl,
-    enabled: true,
+    apiKey: input.apiKey,
+    label: input.label,
   });
   let registered = 0;
   for (const entry of input.models) {
@@ -217,7 +216,6 @@ function registerCustomProvider(db: Db, input: z.infer<typeof customProviderSche
         context_window = excluded.context_window,
         supports_vision = excluded.supports_vision,
         supports_tools = excluded.supports_tools,
-        key_id = excluded.key_id,
         enabled = 1
     `).run(
       model.modelId,
@@ -232,6 +230,7 @@ function registerCustomProvider(db: Db, input: z.infer<typeof customProviderSche
       keyId,
     );
     const row = db.prepare("SELECT id FROM models WHERE platform = 'custom' AND model_id = ?").get(model.modelId) as { id: number };
+    upsertBinding(db, 'chat', row.id, keyId);
     ensureFallbackRow(db, row.id, model.fallbackEnabled !== false);
     registered++;
   }

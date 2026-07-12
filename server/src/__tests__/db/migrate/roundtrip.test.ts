@@ -11,6 +11,7 @@ const REQUEST_AGGREGATES_FILENAME = '20260628_120000_request_aggregates.ts';
 const GITHUB_GPT41_CONTEXT_FILENAME = '20260630_000001_github_gpt41_context.ts';
 const REQUEST_CLIENT_INFO_FILENAME = '20260706_000001_request_client_info.ts';
 const CUSTOM_MODEL_TOOL_SUPPORT_FILENAME = '20260706_000002_custom_model_tool_support.ts';
+const CUSTOM_KEY_BINDINGS_FILENAME = '20260707_000000_custom_key_bindings.ts';
 
 interface SchemaRow {
   type: string;
@@ -68,6 +69,7 @@ describe('migration round trip', () => {
         GITHUB_GPT41_CONTEXT_FILENAME,
         REQUEST_CLIENT_INFO_FILENAME,
         CUSTOM_MODEL_TOOL_SUPPORT_FILENAME,
+        CUSTOM_KEY_BINDINGS_FILENAME,
       ]);
     } finally {
       db.close();

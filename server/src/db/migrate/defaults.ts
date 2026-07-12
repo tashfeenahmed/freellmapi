@@ -6,6 +6,7 @@ import * as requestAggregates from '../migrations/20260628_120000_request_aggreg
 import * as githubGpt41Context from '../migrations/20260630_000001_github_gpt41_context.js';
 import * as requestClientInfo from '../migrations/20260706_000001_request_client_info.js';
 import * as customModelToolSupport from '../migrations/20260706_000002_custom_model_tool_support.js';
+import * as customKeyBindings from '../migrations/20260707_000000_custom_key_bindings.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -24,6 +25,7 @@ export const REQUEST_AGGREGATES_FILENAME = '20260628_120000_request_aggregates.t
 export const GITHUB_GPT41_CONTEXT_FILENAME = '20260630_000001_github_gpt41_context.ts';
 export const REQUEST_CLIENT_INFO_FILENAME = '20260706_000001_request_client_info.ts';
 export const CUSTOM_MODEL_TOOL_SUPPORT_FILENAME = '20260706_000002_custom_model_tool_support.ts';
+export const CUSTOM_KEY_BINDINGS_FILENAME = '20260707_000000_custom_key_bindings.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -33,4 +35,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: GITHUB_GPT41_CONTEXT_FILENAME, module: githubGpt41Context },
   { filename: REQUEST_CLIENT_INFO_FILENAME, module: requestClientInfo },
   { filename: CUSTOM_MODEL_TOOL_SUPPORT_FILENAME, module: customModelToolSupport },
+  { filename: CUSTOM_KEY_BINDINGS_FILENAME, module: customKeyBindings },
 ];

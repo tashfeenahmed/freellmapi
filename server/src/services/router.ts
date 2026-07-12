@@ -664,9 +664,27 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   }
   const provider = getProvider(entry.platform as Platform)!;
 
-  const keys = db.prepare(
-    "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
-  ).all(entry.platform) as KeyRow[];
+  // Custom models route ONLY across the keys explicitly bound to them in
+  // custom_key_bindings — not every key on the endpoint. This keeps a finance
+  // model from burning a research key's quota while still letting one model
+  // pool several keys when the user registers it against each. (#212)
+  let keys: KeyRow[];
+  let rrKey: string;
+  if (entry.platform === 'custom' && entry.key_id != null) {
+    keys = db.prepare(
+      `SELECT k.* FROM custom_key_bindings ckb
+         JOIN api_keys k ON k.id = ckb.key_id
+        WHERE ckb.modality = 'chat' AND ckb.model_db_id = ?
+          AND k.enabled = 1 AND k.status IN ('healthy', 'unknown')
+        ORDER BY k.id`,
+    ).all(entry.model_db_id) as KeyRow[];
+    rrKey = `custom:${entry.model_db_id}`;
+  } else {
+    keys = db.prepare(
+      "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')",
+    ).all(entry.platform) as KeyRow[];
+    rrKey = `${entry.platform}:${entry.model_id}`;
+  }
   if (keys.length === 0) {
     diag?.push(`${label}: no enabled+healthy key for platform`);
     return null;
@@ -684,16 +702,11 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     tpd: entry.tpd_limit,
   };
 
-  const rrKey = `${entry.platform}:${entry.model_id}`;
   let idx = roundRobinIndex.get(rrKey) ?? 0;
 
   for (let attempt = 0; attempt < keys.length; attempt++) {
     const key = keys[idx % keys.length];
     idx++;
-
-    // A custom model belongs to exactly one endpoint (#212); legacy rows
-    // (key_id NULL) keep the old any-key match.
-    if (entry.platform === 'custom' && entry.key_id != null && key.id !== entry.key_id) { note('custom-key-mismatch'); continue; }
 
     const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
     if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }
@@ -774,9 +787,14 @@ export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, ski
 
   for (const k of keys) {
     if (k.id === excludingKeyId) continue;
-    // A custom model binds to exactly one endpoint key (#212); a sibling custom
-    // key cannot serve it, so it doesn't count as an alternative.
-    if (m.platform === 'custom' && m.key_id != null && k.id !== m.key_id) continue;
+    // A custom model routes only through its bound keys (custom_key_bindings);
+    // a sibling custom key NOT bound to this model cannot serve it.
+    if (m.platform === 'custom' && m.key_id != null) {
+      const bound = db.prepare(
+        "SELECT 1 FROM custom_key_bindings WHERE modality = 'chat' AND model_db_id = ? AND key_id = ? LIMIT 1",
+      ).get(modelDbId, k.id);
+      if (!bound) continue;
+    }
     if (skipKeys?.has(`${m.platform}:${m.model_id}:${k.id}`)) continue;
     if (isOnCooldown(m.platform, m.model_id, k.id)) continue;
     if (!canUseProvider(m.platform, k.id)) continue;
@@ -902,12 +920,27 @@ export function getOrderedFusionChain(): FusionCandidate[] {
     const arr = keysByPlatform.get(k.platform);
     if (arr) arr.push(k.id); else keysByPlatform.set(k.platform, [k.id]);
   }
+  // Custom models are servable when any of their BOUND keys (not just any key
+  // on the endpoint) is available — the binding table is the source of truth.
+  const customBoundKeyIds = new Map<string, Set<number>>();
+  for (const e of chain) {
+    if (e.platform !== 'custom' || e.model_db_id == null) continue;
+    const key = `chat:${e.model_db_id}`;
+    if (customBoundKeyIds.has(key)) continue;
+    const rows = db.prepare(
+      "SELECT key_id FROM custom_key_bindings WHERE modality = 'chat' AND model_db_id = ?",
+    ).all(e.model_db_id) as { key_id: number }[];
+    customBoundKeyIds.set(key, new Set(rows.map(r => r.key_id)));
+  }
   const servable = chain.filter(e => {
     const keyIds = keysByPlatform.get(e.platform);
     if (!keyIds) return false;
     const limits = { rpm: e.rpm_limit, rpd: e.rpd_limit, tpm: e.tpm_limit, tpd: e.tpd_limit };
+    const allowed = e.platform === 'custom' && e.model_db_id != null
+      ? (customBoundKeyIds.get(`chat:${e.model_db_id}`) ?? new Set<number>())
+      : null;
     return keyIds.some(kid =>
-      (e.key_id == null || kid === e.key_id) &&
+      (allowed === null || allowed.has(kid)) &&
       !isOnCooldown(e.platform, e.model_id, kid) &&
       canUseProvider(e.platform, kid) &&
       canMakeRequest(e.platform, e.model_id, kid, limits),

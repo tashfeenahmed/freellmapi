@@ -71,13 +71,15 @@ export const CUSTOM_MODEL_KIND_LABEL: Record<ApiKeyModel['kind'], string> = {
 }
 
 export function customModelDeleteKey(model: ApiKeyModel): string {
-  return `${model.kind}:${model.id}`
+  return `${model.kind}:${model.id}:${model.keyId}`
 }
 
 export function customModelDeletePath(model: ApiKeyModel): string {
-  if (model.kind === 'chat') return `/api/models/custom/${model.id}`
-  if (model.kind === 'embedding') return `/api/embeddings/custom/${model.id}`
-  return `/api/media/custom/${model.id}`
+  // Per-binding delete: removes one (model, key) association. The model survives
+  // if other keys remain bound; the key survives if other models use it.
+  if (model.kind === 'chat') return `/api/models/custom/${model.id}/keys/${model.keyId}`
+  if (model.kind === 'embedding') return `/api/embeddings/custom/${model.id}/keys/${model.keyId}`
+  return `/api/media/custom/${model.id}/keys/${model.keyId}`
 }
 
 export const statusDot: Record<string, string> = {

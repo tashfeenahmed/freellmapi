@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
-import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { deleteCustomModelAndCleanup } from '../lib/custom-provider-cleanup.js';
+import { findOrInsertCustomKey, upsertBinding, removeBinding, getModelBoundKeyIds, type CustomModality } from '../lib/custom-key-upsert.js';
 import { listAllMediaModels } from '../services/media.js';
 
 export const mediaRouter = Router();
@@ -71,49 +72,11 @@ mediaRouter.post('/custom', (req: Request, res: Response) => {
   const quotaLabel = parsed.data.quotaLabel?.trim() || 'custom endpoint';
 
   const upsert = db.transaction(() => {
-    const existingKey = db.prepare(`
-      SELECT id, encrypted_key, iv, auth_tag
-        FROM api_keys
-       WHERE platform = 'custom' AND base_url = ?
-       LIMIT 1
-    `).get(baseUrl) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
-    let keyId: number;
-    let storedKeyForMask = providedKey ?? 'no-key';
-    if (existingKey) {
-      keyId = existingKey.id;
-      if (providedKey) {
-        const { encrypted, iv, authTag } = encrypt(providedKey);
-        db.prepare(`
-          UPDATE api_keys
-             SET label = COALESCE(?, label),
-                 encrypted_key = ?,
-                 iv = ?,
-                 auth_tag = ?,
-                 status = 'unknown',
-                 enabled = 1
-           WHERE id = ?
-        `).run(label ?? null, encrypted, iv, authTag, keyId);
-        storedKeyForMask = providedKey;
-      } else {
-        try {
-          storedKeyForMask = decrypt(existingKey.encrypted_key, existingKey.iv, existingKey.auth_tag);
-        } catch {
-          storedKeyForMask = 'no-key';
-        }
-        db.prepare(`
-          UPDATE api_keys
-             SET label = COALESCE(?, label), status = 'unknown', enabled = 1
-           WHERE id = ?
-        `).run(label ?? null, keyId);
-      }
-    } else {
-      const { encrypted, iv, authTag } = encrypt(providedKey ?? 'no-key');
-      const key = db.prepare(`
-        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
-        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label ?? 'Custom', encrypted, iv, authTag, baseUrl);
-      keyId = Number(key.lastInsertRowid);
-    }
+    const { processedKeyId, storedKeyForMask } = findOrInsertCustomKey(db, {
+      baseUrl,
+      apiKey: providedKey,
+      label,
+    });
 
     const existingModel = db.prepare(`
       SELECT id, modality, priority
@@ -126,6 +89,7 @@ mediaRouter.post('/custom', (req: Request, res: Response) => {
       : (db.prepare('SELECT COALESCE(MAX(priority), 0) AS maxPriority FROM media_models WHERE modality = ?')
         .get(parsed.data.modality) as { maxPriority: number }).maxPriority + 1;
 
+    let modelDbId: number;
     if (existingModel) {
       db.prepare(`
         UPDATE media_models
@@ -133,19 +97,21 @@ mediaRouter.post('/custom', (req: Request, res: Response) => {
                modality = ?,
                priority = ?,
                enabled = 1,
-               quota_label = ?,
-               key_id = ?
+               quota_label = ?
          WHERE id = ?
-      `).run(displayName, parsed.data.modality, priority, quotaLabel, keyId, existingModel.id);
-      return { modelDbId: existingModel.id, keyId, storedKeyForMask };
+      `).run(displayName, parsed.data.modality, priority, quotaLabel, existingModel.id);
+      modelDbId = existingModel.id;
+    } else {
+      const model = db.prepare(`
+        INSERT INTO media_models
+          (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
+        VALUES ('custom', ?, ?, ?, ?, 1, ?, ?)
+      `).run(modelId, displayName, parsed.data.modality, priority, quotaLabel, processedKeyId);
+      modelDbId = Number(model.lastInsertRowid);
     }
 
-    const model = db.prepare(`
-      INSERT INTO media_models
-        (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
-      VALUES ('custom', ?, ?, ?, ?, 1, ?, ?)
-    `).run(modelId, displayName, parsed.data.modality, priority, quotaLabel, keyId);
-    return { modelDbId: Number(model.lastInsertRowid), keyId, storedKeyForMask };
+    upsertBinding(db, parsed.data.modality as CustomModality, modelDbId, processedKeyId);
+    return { modelDbId, keyId: processedKeyId, storedKeyForMask };
   });
 
   const result = upsert();
@@ -191,14 +157,91 @@ mediaRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT key_id FROM media_models WHERE id = ? AND platform = 'custom'").get(id) as { key_id: number | null } | undefined;
+  const row = db.prepare("SELECT modality FROM media_models WHERE id = ? AND platform = 'custom'").get(id) as { modality: 'image' | 'audio' } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom media model ${id}` } });
     return;
   }
   const remove = db.transaction(() => {
-    db.prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(id);
-    deleteUnusedCustomEndpointKey(db, row.key_id);
+    deleteCustomModelAndCleanup(db, row.modality as CustomModality, id);
+  });
+  remove();
+  res.json({ success: true });
+});
+
+mediaRouter.delete('/custom/:id/keys/:keyId', (req: Request, res: Response) => {
+  const modelDbId = Number(req.params.id);
+  const keyId = Number(req.params.keyId);
+  if (!Number.isInteger(modelDbId) || !Number.isInteger(keyId)) {
+    res.status(400).json({ error: { message: 'Invalid id' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT modality FROM media_models WHERE id = ? AND platform = 'custom'").get(modelDbId) as { modality: 'image' | 'audio' } | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: `Unknown custom media model ${modelDbId}` } });
+    return;
+  }
+  const modality = row.modality as CustomModality;
+  const bound = db.prepare(
+    'SELECT 1 FROM custom_key_bindings WHERE modality = ? AND model_db_id = ? AND key_id = ?',
+  ).get(modality, modelDbId, keyId);
+  if (!bound) {
+    res.status(404).json({ error: { message: `Key ${keyId} is not bound to custom media model ${modelDbId}` } });
+    return;
+  }
+
+  const remove = db.transaction(() => {
+    const formerKeyIds = getModelBoundKeyIds(db, modality, modelDbId);
+    removeBinding(db, modality, modelDbId, keyId);
+    const stillBound = formerKeyIds.filter(k => k !== keyId).length > 0;
+    if (!stillBound) {
+      db.prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(modelDbId);
+    }
+    const keyStillUsed = db.prepare('SELECT 1 FROM custom_key_bindings WHERE key_id = ? LIMIT 1').get(keyId);
+    if (!keyStillUsed) {
+      db.prepare("DELETE FROM api_keys WHERE id = ? AND platform = 'custom'").run(keyId);
+    }
+  });
+  remove();
+  res.json({ success: true });
+});
+
+mediaRouter.delete('/custom/:id/keys/:keyId', (req: Request, res: Response) => {
+  const modelDbId = Number(req.params.id);
+  const keyId = Number(req.params.keyId);
+  if (!Number.isInteger(modelDbId) || !Number.isInteger(keyId)) {
+    res.status(400).json({ error: { message: 'Invalid id' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT modality FROM media_models WHERE id = ? AND platform = 'custom'").get(modelDbId) as { modality: 'image' | 'audio' } | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: `Unknown custom media model ${modelDbId}` } });
+    return;
+  }
+  const modality = row.modality as CustomModality;
+  const bound = db.prepare(
+    'SELECT 1 FROM custom_key_bindings WHERE modality = ? AND model_db_id = ? AND key_id = ?',
+  ).get(modality, modelDbId, keyId);
+  if (!bound) {
+    res.status(404).json({ error: { message: `Key ${keyId} is not bound to custom media model ${modelDbId}` } });
+    return;
+  }
+
+  const remove = db.transaction(() => {
+    const formerKeyIds = getModelBoundKeyIds(db, modality, modelDbId);
+    removeBinding(db, modality, modelDbId, keyId);
+    const stillBound = formerKeyIds.filter(k => k !== keyId).length > 0;
+    if (!stillBound) {
+      db.prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(modelDbId);
+    }
+    const keyStillUsed = db.prepare('SELECT 1 FROM custom_key_bindings WHERE key_id = ? LIMIT 1').get(keyId);
+    if (!keyStillUsed) {
+      db.prepare("DELETE FROM api_keys WHERE id = ? AND platform = 'custom'").run(keyId);
+    }
   });
   remove();
   res.json({ success: true });

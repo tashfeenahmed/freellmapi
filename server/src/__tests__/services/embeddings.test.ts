@@ -213,11 +213,13 @@ describe('embeddings service', () => {
 
     it('routes custom embeddings through the model-bound endpoint key', async () => {
       const keyId = addCustomKey('http://127.0.0.1:8181/v1', 'custom-embed-key');
-      getDb().prepare(`
+      const modelRow = getDb().prepare(`
         INSERT INTO embedding_models
           (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
         VALUES ('local-embed', 'custom', 'local-embed-v1', 'Local Embed', 3, NULL, 1, 1, '', ?)
-      `).run(keyId);
+          RETURNING id
+      `).get(keyId) as { id: number };
+      getDb().prepare('INSERT OR IGNORE INTO custom_key_bindings (modality, model_db_id, key_id) VALUES (?, ?, ?)').run('embedding', modelRow.id, keyId);
       const fetchMock = mockFetch(async () => okEmbeddingResponse(3));
 
       const result = await runEmbeddings('local-embed', ['hello']);

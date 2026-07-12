@@ -8,6 +8,7 @@ import { resolveProvider } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
+import { findOrInsertCustomKey, getEndpointKeyCount, upsertBinding } from '../lib/custom-key-upsert.js';
 
 export const keysRouter = Router();
 
@@ -149,25 +150,39 @@ keysRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[];
 
-  const customModels = [
+  // Custom models attach to a key via custom_key_bindings (the routing source of
+  // truth). Each key row only shows the models bound to IT — not every model on
+  // the endpoint — so the Keys page can offer a per-(model,key) delete and a
+  // user sees which of their accounts can reach which model.
+  const customKeyCount = new Map<string, number>();
+  for (const r of rows) {
+    if (r.platform === 'custom' && r.base_url) {
+      customKeyCount.set(r.base_url, (customKeyCount.get(r.base_url) ?? 0) + 1);
+    }
+  }
+
+  const boundModels = [
     ...db.prepare(`
-      SELECT key_id, id, 'chat' AS kind, model_id, display_name, NULL AS family
-        FROM models
-       WHERE platform = 'custom' AND key_id IS NOT NULL
+      SELECT ckb.key_id, m.id, 'chat' AS kind, m.model_id, m.display_name, NULL AS family, m.supports_tools, m.supports_vision
+        FROM custom_key_bindings ckb
+        JOIN models m ON m.id = ckb.model_db_id
+       WHERE ckb.modality = 'chat'
     `).all() as any[],
     ...db.prepare(`
-      SELECT key_id, id, 'embedding' AS kind, model_id, display_name, family
-        FROM embedding_models
-       WHERE platform = 'custom' AND key_id IS NOT NULL
+      SELECT ckb.key_id, m.id, 'embedding' AS kind, m.model_id, m.display_name, m.family, NULL AS supports_tools, NULL AS supports_vision
+        FROM custom_key_bindings ckb
+        JOIN embedding_models m ON m.id = ckb.model_db_id
+       WHERE ckb.modality = 'embedding'
     `).all() as any[],
     ...db.prepare(`
-      SELECT key_id, id, modality AS kind, model_id, display_name, NULL AS family
-        FROM media_models
-       WHERE platform = 'custom' AND key_id IS NOT NULL
+      SELECT ckb.key_id, m.id, m.modality AS kind, m.model_id, m.display_name, NULL AS family, NULL AS supports_tools, NULL AS supports_vision
+        FROM custom_key_bindings ckb
+        JOIN media_models m ON m.id = ckb.model_db_id
+       WHERE ckb.modality IN ('image', 'audio')
     `).all() as any[],
   ];
   const modelsByKeyId = new Map<number, any[]>();
-  for (const m of customModels) {
+  for (const m of boundModels) {
     const keyId = Number(m.key_id);
     if (!Number.isInteger(keyId)) continue;
     const list = modelsByKeyId.get(keyId) ?? [];
@@ -177,6 +192,9 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       modelId: m.model_id,
       displayName: m.display_name,
       family: m.family ?? null,
+      supportsTools: m.supports_tools === 1,
+      supportsVision: m.supports_vision === 1,
+      keyId,
     });
     modelsByKeyId.set(keyId, list);
   }
@@ -196,18 +214,24 @@ keysRouter.get('/', (_req: Request, res: Response) => {
     } catch {
       maskedKey = '[decrypt failed]';
     }
+    const baseUrl = row.base_url ?? null;
     return {
       id: row.id,
       platform: row.platform,
       label: row.label,
       maskedKey,
-      baseUrl: row.base_url ?? null,
+      baseUrl,
       status: row.status,
       enabled: row.enabled === 1,
       keyless: resolveProvider(row.platform)?.keyless === true,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
-      models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) ?? []) : undefined,
+      models: row.platform === 'custom'
+        ? (modelsByKeyId.get(row.id) ?? [])
+        : undefined,
+      endpointKeyCount: row.platform === 'custom' && baseUrl
+        ? (customKeyCount.get(baseUrl) ?? 0)
+        : undefined,
     };
   });
 
@@ -456,50 +480,21 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
 
   const db = getDb();
   const upsert = db.transaction(() => {
-    // One 'custom' key row PER ENDPOINT (matched on base_url). Re-submitting
-    // the same endpoint updates its key/label; a new base_url gets its own
-// row instead of clobbering the previous provider. (#212) Re-submitting with a
-// blank key preserves the stored key; only a provided key updates credentials.
-    const existing = db.prepare("SELECT id, encrypted_key, iv, auth_tag FROM api_keys WHERE platform = 'custom' AND base_url = ? LIMIT 1")
-      .get(baseUrl) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
-    let keyId: number;
-    let storedKeyForMask = providedKey ?? 'no-key';
-    if (existing) {
-      keyId = existing.id;
-      if (providedKey) {
-        const { encrypted, iv, authTag } = encrypt(providedKey);
-        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), encrypted_key = ?, iv = ?, auth_tag = ?, status = 'unknown', enabled = 1 WHERE id = ?")
-          .run(label ?? null, encrypted, iv, authTag, existing.id);
-        storedKeyForMask = providedKey;
-      } else {
-        try {
-          storedKeyForMask = decrypt(existing.encrypted_key, existing.iv, existing.auth_tag);
-        } catch {
-          storedKeyForMask = 'no-key';
-        }
-        db.prepare("UPDATE api_keys SET label = COALESCE(?, label), status = 'unknown', enabled = 1 WHERE id = ?")
-          .run(label ?? null, existing.id);
-      }
-    } else {
-      const keyToStore = providedKey ?? 'no-key';
-      const { encrypted, iv, authTag } = encrypt(keyToStore);
-      const r = db.prepare(`
-        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
-        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label ?? 'Custom', encrypted, iv, authTag, baseUrl);
-      keyId = Number(r.lastInsertRowid);
-      storedKeyForMask = keyToStore;
-    }
+    // One endpoint (base_url) may hold several keys. Upsert by plaintext dedupe:
+    // a matching key is re-enabled (idempotent); a new key is inserted alongside
+    // the existing ones — never clobbering them. (#212)
+    const { processedKeyId, storedKeyForMask } = findOrInsertCustomKey(db, {
+      baseUrl,
+      apiKey: providedKey,
+      label,
+    });
 
     const registered: { modelDbId: number; model: string; displayName: string; supportsTools: boolean; supportsVision: boolean }[] = [];
     for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
-      // Register each model bound to THIS endpoint's key. Custom models carry no
-      // rate limits and sort last in the intelligence preset (size_label tier).
-      // Re-registering an existing model id re-binds it (model ids are unique
-      // per platform, so one id can't live on two endpoints at once).
-      // Capability flags: an unset flag binds NULL so COALESCE picks the insert
-      // default (tools 1, vision 0) on a new row and preserves the existing
-      // value on re-registration. (#470)
+      // Upsert the model row. The (platform, model_id) uniqueness means one
+      // model id can't live on two endpoints — re-registering re-binds it to
+      // THIS endpoint. key_id is a placeholder; upsertBinding recomputes the
+      // anchor (MIN of bound keys) right after.
       const toolsParam = supportsTools === undefined ? null : (supportsTools ? 1 : 0);
       const visionParam = supportsVision === undefined ? null : (supportsVision ? 1 : 0);
       db.prepare(`
@@ -512,13 +507,17 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
         ON CONFLICT(platform, model_id)
         DO UPDATE SET
           display_name = excluded.display_name,
-          key_id = excluded.key_id,
           enabled = 1,
           supports_tools = COALESCE(@tools, supports_tools),
           supports_vision = COALESCE(@vision, supports_vision)
-      `).run({ modelId, displayName, keyId, tools: toolsParam, vision: visionParam });
+      `).run({ modelId, displayName, keyId: processedKeyId, tools: toolsParam, vision: visionParam });
 
       const modelRow = db.prepare("SELECT id, supports_tools, supports_vision FROM models WHERE platform = 'custom' AND model_id = ?").get(modelId) as { id: number; supports_tools: number; supports_vision: number };
+
+      // Record the (model, key) binding — the routing source of truth. Idempotent
+      // on the PK: re-registering the same model+key is a no-op; a new key adds
+      // a binding so the model pools both keys.
+      upsertBinding(db, 'chat', modelRow.id, processedKeyId);
 
       // Append to the fallback chain if not already present.
       const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
@@ -536,16 +535,15 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       });
     }
 
-    return { keyId, registered, storedKeyForMask };
+    return { processedKeyId, registered, storedKeyForMask };
   });
 
-  const { keyId, registered, storedKeyForMask } = upsert();
-  // `model`/`displayName`/`modelDbId` echo the first model for older clients;
-  // `models` carries the full set registered in this call.
+  const { processedKeyId, registered, storedKeyForMask } = upsert();
+  const endpointKeyCount = getEndpointKeyCount(db, baseUrl);
   const first = registered[0]!;
   res.status(201).json({
     success: true,
-    keyId,
+    keyId: processedKeyId,
     modelDbId: first.modelDbId,
     platform: 'custom',
     baseUrl,
@@ -555,6 +553,7 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     supportsVision: first.supportsVision,
     models: registered,
     maskedKey: maskKey(storedKeyForMask),
+    endpointKeyCount,
   });
 });
 
@@ -726,24 +725,49 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
   }
 
   const remove = db.transaction(() => {
-    db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
-    // Custom models exist only because POST /custom registered them alongside
-    // their endpoint key (#117) — they can't route without it. Cascade away
-    // the models bound to THIS endpoint (#212); other custom providers keep
-    // theirs. Legacy rows (key_id NULL) are swept once no custom keys remain,
-    // so they never linger in the fallback chain forever (#189).
+    // Custom key: remove all its bindings, then cascade any model that lost its
+    // last binding. The key row itself is deleted last. (#212)
     if (row.platform === 'custom') {
       const defaultEmbedding = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get() as { value: string } | undefined;
-      db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
-      db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
-      db.prepare("DELETE FROM embedding_models WHERE platform = 'custom' AND key_id = ?").run(id);
-      db.prepare("DELETE FROM media_models WHERE platform = 'custom' AND key_id = ?").run(id);
-      const remaining = db.prepare("SELECT COUNT(*) AS n FROM api_keys WHERE platform = 'custom'").get() as { n: number };
-      if (remaining.n === 0) {
+
+      const affected = db.prepare(
+        'SELECT modality, model_db_id FROM custom_key_bindings WHERE key_id = ?',
+      ).all(id) as { modality: string; model_db_id: number }[];
+
+      db.prepare('DELETE FROM custom_key_bindings WHERE key_id = ?').run(id);
+
+      for (const { modality, model_db_id } of affected) {
+        const m = modality as 'chat' | 'embedding' | 'image' | 'audio';
+        const stillBound = db.prepare(
+          'SELECT 1 FROM custom_key_bindings WHERE modality = ? AND model_db_id = ? LIMIT 1',
+        ).get(m, model_db_id);
+        if (!stillBound) {
+          if (m === 'chat') {
+            db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(model_db_id);
+            db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(model_db_id);
+          } else if (m === 'embedding') {
+            db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(model_db_id);
+          } else {
+            db.prepare("DELETE FROM media_models WHERE id = ? AND platform = 'custom'").run(model_db_id);
+          }
+        } else {
+          const anchor = db.prepare(
+            'SELECT MIN(key_id) AS k FROM custom_key_bindings WHERE modality = ? AND model_db_id = ?',
+          ).get(m, model_db_id) as { k: number };
+          const table = m === 'chat' ? 'models' : m === 'embedding' ? 'embedding_models' : 'media_models';
+          db.prepare(`UPDATE ${table} SET key_id = ? WHERE id = ?`).run(anchor.k, model_db_id);
+        }
+      }
+
+      db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+
+      const anyCustom = db.prepare("SELECT 1 FROM api_keys WHERE platform = 'custom' LIMIT 1").get();
+      if (!anyCustom) {
         db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom')").run();
         db.prepare("DELETE FROM models WHERE platform = 'custom'").run();
         db.prepare("DELETE FROM embedding_models WHERE platform = 'custom'").run();
         db.prepare("DELETE FROM media_models WHERE platform = 'custom'").run();
+        db.prepare('DELETE FROM custom_key_bindings').run();
       }
       if (defaultEmbedding) {
         const stillExists = db.prepare('SELECT 1 FROM embedding_models WHERE family = ? LIMIT 1').get(defaultEmbedding.value);
@@ -754,6 +778,8 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
           }
         }
       }
+    } else {
+      db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
     }
   });
   remove();

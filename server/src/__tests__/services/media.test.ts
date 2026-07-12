@@ -23,10 +23,17 @@ function addCustomKey(baseUrl: string, raw = 'custom-media-key'): number {
 }
 
 function addMedia(platform: string, modelId: string, modality: 'image' | 'audio', priority = 1, keyId: number | null = null) {
-  getDb().prepare(`
+  const db = getDb();
+  const row = db.prepare(`
     INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
     VALUES (?, ?, ?, ?, ?, 1, '', ?)
-  `).run(platform, modelId, modelId, modality, priority, keyId);
+      RETURNING id
+  `).get(platform, modelId, modelId, modality, priority, keyId) as { id: number };
+  if (platform === 'custom' && keyId != null) {
+    db.prepare('INSERT OR IGNORE INTO custom_key_bindings (modality, model_db_id, key_id) VALUES (?, ?, ?)')
+      .run(modality, row.id, keyId);
+  }
+  return row.id;
 }
 
 function jsonResponse(body: unknown) {

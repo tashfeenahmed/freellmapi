@@ -390,6 +390,11 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     {k.baseUrl}
                                   </code>
                                 )}
+                                {k.platform === 'custom' && (k.models?.length ?? 0) > 1 && (
+                                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full" title={`${k.models!.length} models bound to this key`}>
+                                    {k.models!.length} models
+                                  </span>
+                                )}
                               </>
                             )}
                             <span className="text-xs text-muted-foreground">{statusLabelKey[status] ? t(statusLabelKey[status]) : status}</span>

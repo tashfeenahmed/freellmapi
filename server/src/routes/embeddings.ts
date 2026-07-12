@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb, setSetting } from '../db/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
-import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { deleteCustomModelAndCleanup } from '../lib/custom-provider-cleanup.js';
+import { findOrInsertCustomKey, upsertBinding, removeBinding, getModelBoundKeyIds } from '../lib/custom-key-upsert.js';
 import {
   listEmbeddingModels,
   getDefaultFamily,
@@ -136,40 +137,11 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
   }
 
   const upsert = db.transaction(() => {
-    let keyId: number;
-    let storedKeyForMask = probeKey;
-    if (existingKey) {
-      keyId = existingKey.id;
-      if (providedKey) {
-        const { encrypted, iv, authTag } = encrypt(providedKey);
-        db.prepare(`
-          UPDATE api_keys
-             SET label = COALESCE(?, label),
-                 encrypted_key = ?,
-                 iv = ?,
-                 auth_tag = ?,
-                 status = 'unknown',
-                 enabled = 1
-           WHERE id = ?
-        `).run(label ?? null, encrypted, iv, authTag, keyId);
-        storedKeyForMask = providedKey;
-      } else {
-        db.prepare(`
-          UPDATE api_keys
-             SET label = COALESCE(?, label), status = 'unknown', enabled = 1
-           WHERE id = ?
-        `).run(label ?? null, keyId);
-      }
-    } else {
-      const keyToStore = providedKey ?? 'no-key';
-      const { encrypted, iv, authTag } = encrypt(keyToStore);
-      const key = db.prepare(`
-        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
-        VALUES ('custom', ?, ?, ?, ?, 'unknown', 1, ?)
-      `).run(label ?? 'Custom', encrypted, iv, authTag, baseUrl);
-      keyId = Number(key.lastInsertRowid);
-      storedKeyForMask = keyToStore;
-    }
+    const { processedKeyId, storedKeyForMask } = findOrInsertCustomKey(db, {
+      baseUrl,
+      apiKey: providedKey,
+      label,
+    });
 
     const existingModel = db.prepare(`
       SELECT id, priority
@@ -182,6 +154,7 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
         .get(family) as { maxPriority: number }).maxPriority + 1
     );
 
+    let modelDbId: number;
     if (existingModel) {
       db.prepare(`
         UPDATE embedding_models
@@ -191,19 +164,21 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
                max_input_tokens = ?,
                priority = ?,
                enabled = 1,
-               quota_label = ?,
-               key_id = ?
+               quota_label = ?
          WHERE id = ?
-      `).run(family, displayName, dimensions, parsed.data.maxInputTokens ?? null, priority, quotaLabel, keyId, existingModel.id);
-      return { modelDbId: existingModel.id, keyId, storedKeyForMask };
+      `).run(family, displayName, dimensions, parsed.data.maxInputTokens ?? null, priority, quotaLabel, existingModel.id);
+      modelDbId = existingModel.id;
+    } else {
+      const model = db.prepare(`
+        INSERT INTO embedding_models
+          (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
+        VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(family, modelId, displayName, dimensions, parsed.data.maxInputTokens ?? null, priority, quotaLabel, processedKeyId);
+      modelDbId = Number(model.lastInsertRowid);
     }
 
-    const model = db.prepare(`
-      INSERT INTO embedding_models
-        (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
-      VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(family, modelId, displayName, dimensions, parsed.data.maxInputTokens ?? null, priority, quotaLabel, keyId);
-    return { modelDbId: Number(model.lastInsertRowid), keyId, storedKeyForMask };
+    upsertBinding(db, 'embedding', modelDbId, processedKeyId);
+    return { modelDbId, keyId: processedKeyId, storedKeyForMask };
   });
 
   const result = upsert();
@@ -266,20 +241,67 @@ embeddingsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT family, key_id FROM embedding_models WHERE id = ? AND platform = 'custom'").get(id) as { family: string; key_id: number | null } | undefined;
+  const row = db.prepare("SELECT family FROM embedding_models WHERE id = ? AND platform = 'custom'").get(id) as { family: string } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom embedding model ${id}` } });
     return;
   }
 
   const remove = db.transaction(() => {
-    db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(id);
-    deleteUnusedCustomEndpointKey(db, row.key_id);
+    deleteCustomModelAndCleanup(db, 'embedding', id);
   });
   remove();
   if (getDefaultFamily() === row.family) {
-    const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
-    if (replacement) setSetting('embeddings_default_family', replacement.family);
+    const stillExists = db.prepare('SELECT 1 FROM embedding_models WHERE family = ? LIMIT 1').get(row.family);
+    if (!stillExists) {
+      const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
+      if (replacement) setSetting('embeddings_default_family', replacement.family);
+    }
+  }
+  res.json({ success: true });
+});
+
+embeddingsRouter.delete('/custom/:id/keys/:keyId', (req: Request, res: Response) => {
+  const modelDbId = Number(req.params.id);
+  const keyId = Number(req.params.keyId);
+  if (!Number.isInteger(modelDbId) || !Number.isInteger(keyId)) {
+    res.status(400).json({ error: { message: 'Invalid id' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT family FROM embedding_models WHERE id = ? AND platform = 'custom'").get(modelDbId) as { family: string } | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: `Unknown custom embedding model ${modelDbId}` } });
+    return;
+  }
+  const bound = db.prepare(
+    "SELECT 1 FROM custom_key_bindings WHERE modality = 'embedding' AND model_db_id = ? AND key_id = ?",
+  ).get(modelDbId, keyId);
+  if (!bound) {
+    res.status(404).json({ error: { message: `Key ${keyId} is not bound to custom embedding model ${modelDbId}` } });
+    return;
+  }
+
+  const remove = db.transaction(() => {
+    const formerKeyIds = getModelBoundKeyIds(db, 'embedding', modelDbId);
+    removeBinding(db, 'embedding', modelDbId, keyId);
+    const stillBound = formerKeyIds.filter(k => k !== keyId).length > 0;
+    if (!stillBound) {
+      db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(modelDbId);
+    }
+    const keyStillUsed = db.prepare('SELECT 1 FROM custom_key_bindings WHERE key_id = ? LIMIT 1').get(keyId);
+    if (!keyStillUsed) {
+      db.prepare("DELETE FROM api_keys WHERE id = ? AND platform = 'custom'").run(keyId);
+    }
+  });
+  remove();
+  if (getDefaultFamily() === row.family) {
+    const stillExists = db.prepare('SELECT 1 FROM embedding_models WHERE family = ? LIMIT 1').get(row.family);
+    if (!stillExists) {
+      const replacement = db.prepare('SELECT family FROM embedding_models ORDER BY family, priority LIMIT 1').get() as { family: string } | undefined;
+      if (replacement) setSetting('embeddings_default_family', replacement.family);
+    }
   }
   res.json({ success: true });
 });

@@ -161,6 +161,9 @@ export interface ApiKeyModel {
   modelId: string;
   displayName: string;
   family?: string | null;
+  supportsTools?: boolean;
+  supportsVision?: boolean;
+  keyId: number;
 }
 
 export interface ApiKey {
@@ -175,6 +178,7 @@ export interface ApiKey {
   createdAt: string;
   lastCheckedAt: string | null;
   models?: ApiKeyModel[];
+  endpointKeyCount?: number;
 }
 
 export interface ApiKeyCreate {

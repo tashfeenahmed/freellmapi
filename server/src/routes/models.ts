@@ -3,7 +3,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
-import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { deleteCustomModelAndCleanup } from '../lib/custom-provider-cleanup.js';
+import { removeBinding, getModelBoundKeyIds } from '../lib/custom-key-upsert.js';
 import {
   isCatalogManagedModel,
   recordCatalogModelTombstone,
@@ -72,16 +73,53 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT id, key_id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number; key_id: number | null } | undefined;
+  const row = db.prepare("SELECT id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom model ${id}` } });
     return;
   }
 
   const remove = db.transaction(() => {
-    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
-    db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(id);
-    deleteUnusedCustomEndpointKey(db, row.key_id);
+    deleteCustomModelAndCleanup(db, 'chat', id);
+  });
+  remove();
+  res.json({ success: true });
+});
+
+modelsRouter.delete('/custom/:id/keys/:keyId', (req: Request, res: Response) => {
+  const modelDbId = Number(req.params.id);
+  const keyId = Number(req.params.keyId);
+  if (!Number.isInteger(modelDbId) || !Number.isInteger(keyId)) {
+    res.status(400).json({ error: { message: 'Invalid id' } });
+    return;
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT id FROM models WHERE id = ? AND platform = 'custom'").get(modelDbId) as { id: number } | undefined;
+  if (!row) {
+    res.status(404).json({ error: { message: `Unknown custom model ${modelDbId}` } });
+    return;
+  }
+  const bound = db.prepare(
+    "SELECT 1 FROM custom_key_bindings WHERE modality = 'chat' AND model_db_id = ? AND key_id = ?",
+  ).get(modelDbId, keyId);
+  if (!bound) {
+    res.status(404).json({ error: { message: `Key ${keyId} is not bound to custom model ${modelDbId}` } });
+    return;
+  }
+
+  const remove = db.transaction(() => {
+    const formerKeyIds = getModelBoundKeyIds(db, 'chat', modelDbId);
+    removeBinding(db, 'chat', modelDbId, keyId);
+    const stillBound = formerKeyIds.filter(k => k !== keyId).length > 0;
+    if (!stillBound) {
+      db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(modelDbId);
+      db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(modelDbId);
+    }
+    const keyStillUsed = db.prepare('SELECT 1 FROM custom_key_bindings WHERE key_id = ? LIMIT 1').get(keyId);
+    if (!keyStillUsed) {
+      db.prepare("DELETE FROM api_keys WHERE id = ? AND platform = 'custom'").run(keyId);
+    }
   });
   remove();
   res.json({ success: true });
@@ -169,9 +207,12 @@ modelsRouter.delete('/:id', (req: Request, res: Response) => {
     if (isCatalogManagedModel(row)) {
       recordCatalogModelTombstone(db, 'chat', row.platform, row.model_id);
     }
-    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
-    db.prepare('DELETE FROM models WHERE id = ?').run(id);
-    if (row.platform === 'custom') deleteUnusedCustomEndpointKey(db, row.key_id);
+    if (row.platform === 'custom') {
+      deleteCustomModelAndCleanup(db, 'chat', id);
+    } else {
+      db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+      db.prepare('DELETE FROM models WHERE id = ?').run(id);
+    }
   });
   remove();
 
