@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -124,6 +125,84 @@ function shortUserAgent(ua: string | null): string {
   return first.length > 32 ? first.slice(0, 32) + '…' : first
 }
 
+const TIME_RANGES: readonly TimeRange[] = ['24h', '7d', '30d', '90d']
+const STORAGE_KEY = 'freellmapi.analytics.range'
+const DEFAULT_RANGE: TimeRange = '7d'
+
+// Read the previously-selected range from localStorage. Invalid or missing
+// values fall back to the 7d default so a corrupted entry never bricks the
+// page; SSR-safety follows the same try/catch shape as `lib/api.ts`.
+function loadStoredRange(): TimeRange {
+  if (typeof window === 'undefined') return DEFAULT_RANGE
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored && (TIME_RANGES as readonly string[]).includes(stored)) {
+      return stored as TimeRange
+    }
+  } catch {
+    /* localStorage unavailable (private mode, etc.) — use default */
+  }
+  return DEFAULT_RANGE
+}
+
+// Per-model table sort state. The `pinned` column is intentionally NOT
+// sortable — it renders "—" for zero-pinned rows and the unsortable `0`/`>0`
+// distinction would confuse the indicator. 3-state cycle per column:
+// null → asc → desc → null. Switching to a new column resets to asc.
+type SortColumn = 'model' | 'provider' | 'requests' | 'success' | 'latency' | 'inTokens' | 'outTokens' | 'saved'
+type SortDirection = 'asc' | 'desc'
+type SortState = { column: SortColumn; direction: SortDirection } | null
+
+const SORT_COLUMNS: readonly SortColumn[] = [
+  'model', 'provider', 'requests', 'success', 'latency', 'inTokens', 'outTokens', 'saved',
+]
+const SORT_STORAGE_KEY = 'freellmapi.analytics.byModelSort'
+
+function loadStoredSort(): SortState {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(SORT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { column?: unknown; direction?: unknown }
+    if (
+      typeof parsed.column === 'string' &&
+      (SORT_COLUMNS as readonly string[]).includes(parsed.column) &&
+      (parsed.direction === 'asc' || parsed.direction === 'desc')
+    ) {
+      return { column: parsed.column as SortColumn, direction: parsed.direction }
+    }
+  } catch {
+    /* corrupted JSON or storage unavailable — fall through to null */
+  }
+  return null
+}
+
+// Numeric accessor for a sortable column. Returns null for values the API
+// didn't include so they sort to the bottom on asc and top on desc.
+function sortValue(row: any, col: SortColumn): number | string | null {
+  switch (col) {
+    case 'model': return row.displayName ?? null
+    case 'provider': return row.platform ?? null
+    case 'requests': return row.requests ?? null
+    case 'success': return row.successRate ?? null
+    case 'latency': return row.avgLatencyMs ?? null
+    case 'inTokens': return row.totalInputTokens ?? null
+    case 'outTokens': return row.totalOutputTokens ?? null
+    case 'saved': return row.estimatedCost ?? null
+  }
+}
+
+function compareRows(a: any, b: any, col: SortColumn): number {
+  const av = sortValue(a, col)
+  const bv = sortValue(b, col)
+  // Nulls always last regardless of direction (Excel/Sheets convention).
+  if (av === null && bv === null) return 0
+  if (av === null) return 1
+  if (bv === null) return -1
+  if (typeof av === 'number' && typeof bv === 'number') return av - bv
+  return String(av).localeCompare(String(bv))
+}
+
 function formatTokens(n?: number): string {
   if (!n) return '0'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -172,12 +251,96 @@ const chartVars = `
 .dark .analytics-viz { --series-a: #3987e5; --series-b: #199e70; }
 `
 
+// Sortable header cell. Renders the label + a state-aware indicator:
+// unsorted → ChevronsUpDown (faded), asc → ArrowUp, desc → ArrowDown.
+// Right-aligned columns flip the indicator order so it sits to the LEFT
+// of the label, keeping the label closest to the data.
+function SortableHeader({
+  column,
+  label,
+  align,
+  extraClass,
+  sort,
+  onClick,
+}: {
+  column: SortColumn
+  label: string
+  align: 'left' | 'right'
+  extraClass?: string
+  sort: SortState
+  onClick: (col: SortColumn) => void
+}) {
+  const active = sort?.column === column
+  const direction = active ? sort.direction : null
+  const indicator = direction === 'asc'
+    ? <ArrowUp className="size-3 shrink-0" />
+    : direction === 'desc'
+    ? <ArrowDown className="size-3 shrink-0" />
+    : <ChevronsUpDown className="size-3 shrink-0 opacity-40" />
+  const alignClass = align === 'right' ? 'text-right' : ''
+  const headClass = [alignClass, extraClass].filter(Boolean).join(' ')
+  return (
+    <TableHead className={headClass || undefined}>
+      <button
+        type="button"
+        onClick={() => onClick(column)}
+        aria-label={label}
+        aria-sort={direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
+        className={
+          'inline-flex items-center gap-1 ' +
+          (align === 'right' ? 'flex-row-reverse' : 'flex-row') +
+          ' cursor-pointer select-none hover:text-foreground transition-colors ' +
+          (active ? 'text-foreground' : 'text-muted-foreground')
+        }
+      >
+        <span>{label}</span>
+        {indicator}
+      </button>
+    </TableHead>
+  )
+}
+
 export default function AnalyticsPage() {
   const { t } = useI18n()
-  const [range, setRange] = useState<TimeRange>('7d')
+  const [range, setRange] = useState<TimeRange>(loadStoredRange)
+
+  // Remember the last-selected range across page reloads / new sessions so
+  // the user lands back on the window they were inspecting. Same
+  // localStorage shape as `theme` and `freellmapi.locale`.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(STORAGE_KEY, range)
+    } catch {
+      /* ignore — storage quota / private mode */
+    }
+  }, [range])
+
   // Capture "now" once at mount so the savings extrapolation below stays a pure
   // render (calling Date.now() during render is impure and non-deterministic).
   const [now] = useState(() => Date.now())
+
+  // Per-model table sort. Cycle: null → asc → desc → null. Switching column
+  // starts at asc on the new column. Persisted so the next visit lands on
+  // the user's preferred sort.
+  const [sort, setSort] = useState<SortState>(loadStoredSort)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (sort === null) window.localStorage.removeItem(SORT_STORAGE_KEY)
+      else window.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort))
+    } catch {
+      /* ignore */
+    }
+  }, [sort])
+
+  const onHeaderClick = (col: SortColumn) => {
+    setSort((current) => {
+      if (!current || current.column !== col) return { column: col, direction: 'asc' }
+      if (current.direction === 'asc') return { column: col, direction: 'desc' }
+      return null // third click on the same column → restore API order
+    })
+  }
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['analytics', 'summary', range],
@@ -203,6 +366,21 @@ export default function AnalyticsPage() {
     queryKey: ['analytics', 'by-key', range],
     queryFn: () => apiFetch<ByKeyRow[]>(`/api/analytics/by-key?range=${range}`),
   })
+
+  // Apply the user's sort to byModel. When sort is null we render the rows
+  // in API-returned order; the API's natural ordering (requests DESC) is
+  // the right default. The sort is stable within the comparator because we
+  // fall back to insertion order for equal values (Array.prototype.sort is
+  // stable in all modern engines).
+  const sortedByModel = useMemo(() => {
+    if (!sort) return byModel
+    const copy = byModel.slice()
+    copy.sort((a, b) => {
+      const primary = compareRows(a, b, sort.column)
+      return sort.direction === 'asc' ? primary : -primary
+    })
+    return copy
+  }, [byModel, sort])
 
   const { data: errors = [] } = useQuery({
     queryKey: ['analytics', 'errors', range],
@@ -539,19 +717,19 @@ export default function AnalyticsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="pl-4">{t('common.model')}</TableHead>
-                        <TableHead>{t('common.provider')}</TableHead>
-                        <TableHead className="text-right">{t('analytics.requests')}</TableHead>
+                        <SortableHeader column="model" label={t('common.model')} align="left" extraClass="pl-4" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="provider" label={t('common.provider')} align="left" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="requests" label={t('analytics.requests')} align="right" sort={sort} onClick={onHeaderClick} />
                         <TableHead className="text-right">{t('analytics.pinned')}</TableHead>
-                        <TableHead className="text-right">{t('common.success')}</TableHead>
-                        <TableHead className="text-right">{t('analytics.latency')}</TableHead>
-                        <TableHead className="text-right">{t('analytics.inTokens')}</TableHead>
-                        <TableHead className="text-right">{t('analytics.outTokens')}</TableHead>
-                        <TableHead className="text-right pr-4">{t('analytics.saved')}</TableHead>
+                        <SortableHeader column="success" label={t('common.success')} align="right" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="latency" label={t('analytics.latency')} align="right" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="inTokens" label={t('analytics.inTokens')} align="right" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="outTokens" label={t('analytics.outTokens')} align="right" sort={sort} onClick={onHeaderClick} />
+                        <SortableHeader column="saved" label={t('analytics.saved')} align="right" extraClass="pr-4" sort={sort} onClick={onHeaderClick} />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {byModel.map((m, i) => (
+                      {sortedByModel.map((m, i) => (
                         <TableRow key={i}>
                           <TableCell className="pl-4 text-sm font-medium">{m.displayName}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{m.platform}</TableCell>
