@@ -12,6 +12,7 @@ import type { ApiKey, Platform } from '../../../shared/types'
 import { Pencil, ExternalLink, Globe } from 'lucide-react'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { parseModelList } from '@/lib/model-list'
 
 // Claude (Anthropic) model families the mapping editor exposes. Anthropic
 // clients send these names; each maps to "auto" (router picks a free model) or
@@ -290,14 +291,6 @@ function ProxySettingsSection() {
 
 // Split a free-text model field on commas / newlines into a clean id list,
 // dropping blanks and duplicates so one endpoint can take several models. (#281)
-function parseModelList(raw: string): string[] {
-  const seen = new Set<string>()
-  return raw
-    .split(/[\n,]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !seen.has(s) && seen.add(s))
-}
-
 function CustomProviderSection() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
