@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { applyThrottle } from '../services/throttler.js';
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { logRequest } from '../lib/request-log.js';
-import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
+import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel, getRequestGroupId } from './proxy.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { resolveAnthropicModel } from '../services/anthropic-map.js';
@@ -355,6 +356,8 @@ function rescuedToToolCalls(
 
 anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   const start = Date.now();
+  const requestGroupId = getRequestGroupId(req);
+  res.setHeader('X-Request-ID', requestGroupId);
   if (!authenticate(req, res)) return;
 
   const parsed = messagesSchema.safeParse(req.body);
@@ -432,6 +435,12 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
     clientGone: () => clientGone,
     route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined),
     dispatch: async (route, attempt) => {
+      // Apply throttle based on the ACTUAL resolved model — not the client-sent model.
+      try {
+        await applyThrottle({ platform: route.platform, modelId: route.modelId, modelDbId: route.modelDbId, keyId: route.keyId, requestId: requestGroupId });
+      } catch (throttleErr) {
+        console.error('Throttle error:', throttleErr);
+      }
       if (stream) {
         try {
           await streamCompletion(res, route, messages, completionOptions, {
