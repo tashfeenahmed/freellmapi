@@ -10,6 +10,7 @@ import {
   upsertModelOverrides,
   type ModelOverridePatch,
 } from '../services/model-state.js';
+import { getActiveProfileId } from '../services/profile-models.js';
 
 export const modelsRouter = Router();
 
@@ -142,8 +143,14 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     }
 
     if (parsed.data.fallbackEnabled !== undefined) {
+      const next = parsed.data.fallbackEnabled ? 1 : 0;
       db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?')
-        .run(parsed.data.fallbackEnabled ? 1 : 0, id);
+        .run(next, id);
+      const activeProfileId = getActiveProfileId(db);
+      if (activeProfileId != null) {
+        db.prepare('UPDATE profile_models SET enabled = ? WHERE profile_id = ? AND model_db_id = ?')
+          .run(next, activeProfileId, id);
+      }
     }
   });
   applyUpdate();
@@ -181,7 +188,8 @@ modelsRouter.delete('/:id', (req: Request, res: Response) => {
 // List all models with availability info
 modelsRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
-  const models = db.prepare(`
+  const activeProfileId = getActiveProfileId(db);
+  const models = activeProfileId == null ? db.prepare(`
     SELECT m.*, fc.priority, fc.enabled as fallback_enabled,
            mo.overrides_json IS NOT NULL AS has_overrides,
            ak.label AS key_label
@@ -190,7 +198,18 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     LEFT JOIN model_overrides mo ON mo.platform = m.platform AND mo.model_id = m.model_id
     LEFT JOIN api_keys ak ON ak.id = m.key_id
     ORDER BY COALESCE(fc.priority, m.intelligence_rank) ASC
-  `).all() as any[];
+  `).all() as any[] : db.prepare(`
+    SELECT m.*, COALESCE(pm.priority, fc.priority) AS priority,
+           COALESCE(pm.enabled, fc.enabled) AS fallback_enabled,
+           mo.overrides_json IS NOT NULL AS has_overrides,
+           ak.label AS key_label
+    FROM models m
+    LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+    LEFT JOIN profile_models pm ON pm.profile_id = ? AND pm.model_db_id = m.id
+    LEFT JOIN model_overrides mo ON mo.platform = m.platform AND mo.model_id = m.model_id
+    LEFT JOIN api_keys ak ON ak.id = m.key_id
+    ORDER BY COALESCE(pm.priority, fc.priority, m.intelligence_rank) ASC
+  `).all(activeProfileId) as any[];
 
   // Count keys per platform
   const keyCounts = db.prepare(`

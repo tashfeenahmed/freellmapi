@@ -12,6 +12,7 @@ import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector } from '../services/penalty-inspector.js';
+import { getActiveProfileId } from '../services/profile-models.js';
 
 export const fallbackRouter = Router();
 
@@ -63,7 +64,25 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
 // Get fallback chain (with dynamic penalties)
 fallbackRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
-  const rows = db.prepare(`
+  const activeProfileId = getActiveProfileId(db);
+  let rows = activeProfileId == null ? [] : db.prepare(`
+    SELECT pm.model_db_id, pm.priority, pm.enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
+           m.tpm_limit, m.tpd_limit, m.context_window,
+           m.monthly_token_budget, m.supports_vision, m.supports_tools,
+           m.key_id, ak.label AS key_label,
+           mo.overrides_json IS NOT NULL AS has_overrides
+    FROM profile_models pm
+    JOIN models m ON m.id = pm.model_db_id
+    LEFT JOIN api_keys ak ON ak.id = m.key_id
+    LEFT JOIN model_overrides mo ON mo.platform = m.platform AND mo.model_id = m.model_id
+    WHERE pm.profile_id = ? AND m.enabled = 1
+    ORDER BY pm.priority ASC
+  `).all(activeProfileId) as any[];
+
+  if (rows.length === 0) {
+    rows = db.prepare(`
     SELECT fc.model_db_id, fc.priority, fc.enabled,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
@@ -77,7 +96,8 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
     LEFT JOIN model_overrides mo ON mo.platform = m.platform AND mo.model_id = m.model_id
     WHERE m.enabled = 1
     ORDER BY fc.priority ASC
-  `).all() as any[];
+    `).all() as any[];
+  }
 
   // Count usable keys per platform — enabled AND healthy/unknown status. Unified
   // with /token-usage and the routing scorer (#456) so budget pooling is computed
@@ -160,13 +180,18 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const update = db.prepare(`
-    UPDATE fallback_config SET priority = ?, enabled = ? WHERE model_db_id = ?
-  `);
+  const activeProfileId = getActiveProfileId(db);
+  const useProfile = activeProfileId != null && Boolean(
+    db.prepare('SELECT 1 FROM profile_models WHERE profile_id = ? LIMIT 1').get(activeProfileId),
+  );
+  const update = useProfile
+    ? db.prepare('UPDATE profile_models SET priority = ?, enabled = ? WHERE profile_id = ? AND model_db_id = ?')
+    : db.prepare('UPDATE fallback_config SET priority = ?, enabled = ? WHERE model_db_id = ?');
 
   const updateAll = db.transaction(() => {
     for (const entry of parsed.data) {
-      update.run(entry.priority, entry.enabled ? 1 : 0, entry.modelDbId);
+      if (useProfile) update.run(entry.priority, entry.enabled ? 1 : 0, activeProfileId, entry.modelDbId);
+      else update.run(entry.priority, entry.enabled ? 1 : 0, entry.modelDbId);
     }
   });
   updateAll();
@@ -216,6 +241,10 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   const preset = String(req.params.preset);
   const db = getDb();
   let models: { id: number }[] = [];
+  const activeProfileId = getActiveProfileId(db);
+  const useProfile = activeProfileId != null && Boolean(
+    db.prepare('SELECT 1 FROM profile_models WHERE profile_id = ? LIMIT 1').get(activeProfileId),
+  );
 
   if (preset === 'budget') {
     const allModels = db.prepare(`SELECT id, monthly_token_budget, tpd_limit FROM models`).all() as any[];
@@ -230,10 +259,13 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
     models = db.prepare(`SELECT m.id FROM models m ORDER BY ${orderBy}`).all() as { id: number }[];
   }
 
-  const update = db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
+  const update = useProfile
+    ? db.prepare('UPDATE profile_models SET priority = ? WHERE profile_id = ? AND model_db_id = ?')
+    : db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?');
   const reorder = db.transaction(() => {
     for (let i = 0; i < models.length; i++) {
-      update.run(i + 1, models[i].id);
+      if (useProfile) update.run(i + 1, activeProfileId, models[i].id);
+      else update.run(i + 1, models[i].id);
     }
   });
   reorder();
