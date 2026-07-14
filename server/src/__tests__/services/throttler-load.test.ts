@@ -12,7 +12,7 @@
  *   npm run test -- server/src/__tests__/services/throttler-load.test.ts
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { calculateDelay, checkThrottle, applyThrottle, ThrottleContext } from '../../services/throttler';
 import { initDb, getDb } from '../../db/index.js';
 import { recordRequest, getRateLimitStatus } from '../../services/ratelimit.js';
