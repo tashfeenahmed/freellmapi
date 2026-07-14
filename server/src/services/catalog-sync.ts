@@ -11,6 +11,7 @@ import {
   deleteTombstonedCatalogModels,
   isCatalogModelTombstoned,
 } from './model-state.js';
+import { ensureAllModelsInProfiles } from './profile-models.js';
 
 // Generative-media modalities are routed into the separate media_models table
 // (see services/media.ts), never into the chat `models` table.
@@ -284,6 +285,7 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
       const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
       missingFb.forEach((r, i) => addFb.run(r.id, maxPriority + 1 + i));
     }
+    ensureAllModelsInProfiles(db);
 
     // Remove catalog-managed models that the catalog no longer lists.
     const candidates = db
