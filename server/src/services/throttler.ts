@@ -18,7 +18,7 @@ export interface ThrottleContext {
   requestId?: string;
 }
 
-function calculateDelay(
+export function calculateDelay(
   rpmLimit: number | null,
   tpmLimit: number | null,
   rpmUsed: number | undefined,

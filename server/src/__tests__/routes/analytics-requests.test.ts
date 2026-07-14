@@ -43,20 +43,14 @@ describe('GET /api/analytics/requests', () => {
   });
 
   it('returns one row per call, newest first, with caller identity', async () => {
-    // Use relative timestamps so the test does not drift past a 7d window boundary.
-    const now = Date.now();
-    const t1 = new Date(now - 1 * 60 * 60 * 1000); // 1 hour ago
-    const t2 = new Date(now - 2 * 60 * 60 * 1000); // 2 hours ago
-    const t3 = new Date(now - 3 * 60 * 60 * 1000); // 3 hours ago
-    const toSqlite = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
-    insertCall(toSqlite(t1), '192.168.0.3', 'curl/8.6.0');
-    insertCall(toSqlite(t2), '192.168.0.15', 'python-httpx/0.27');
-    insertCall(toSqlite(t3), null, null);
+    insertCall('2026-07-06 10:00:00', '192.168.0.3', 'curl/8.6.0');
+    insertCall('2026-07-06 11:00:00', '192.168.0.15', 'python-httpx/0.27');
+    insertCall('2026-07-06 12:00:00', null, null);
 
     const { status, body } = await request(app, '/api/analytics/requests?range=7d');
     expect(status).toBe(200);
     expect(body.total).toBe(3);
-    expect(body.rows.map((r: any) => r.clientIp)).toEqual(['192.168.0.3', '192.168.0.15', null]);
+    expect(body.rows.map((r: any) => r.clientIp)).toEqual([null, '192.168.0.15', '192.168.0.3']);
     expect(body.rows[1]).toMatchObject({
       platform: 'test',
       modelId: 'test-model',
@@ -68,24 +62,16 @@ describe('GET /api/analytics/requests', () => {
       clientUserAgent: 'python-httpx/0.27',
     });
     // created_at is emitted as ISO-8601 UTC so the dashboard localizes it.
-    expect(body.rows[1].createdAt).toBe(t2.toISOString().slice(0, 19) + 'Z');
+    expect(body.rows[1].createdAt).toBe('2026-07-06T11:00:00Z');
   });
 
   it('paginates with limit/offset and clamps limit to 500', async () => {
-    // Use relative timestamps so the test does not drift past a 7d window boundary.
-    const now = Date.now();
-    const toSqlite = (offsetH: number) => {
-      const d = new Date(now - offsetH * 60 * 60 * 1000);
-      return d.toISOString().slice(0, 19).replace('T', ' ');
-    };
-    for (let i = 0; i < 5; i++) insertCall(toSqlite(5 - i), '10.0.0.1', 'ua');
+    for (let i = 0; i < 5; i++) insertCall(`2026-07-06 0${i}:00:00`, '10.0.0.1', 'ua');
 
     const page = await request(app, '/api/analytics/requests?range=7d&limit=2&offset=2');
     expect(page.body.total).toBe(5);
     expect(page.body.rows).toHaveLength(2);
-    // Third-newest is the one inserted 3h from now (offsetH=3, i=2)
-    expect(page.body.rows[0].createdAt).toBe(
-      new Date(now - 3 * 60 * 60 * 1000).toISOString().slice(0, 19) + 'Z');
+    expect(page.body.rows[0].createdAt).toBe('2026-07-06T02:00:00Z');
 
     const clamped = await request(app, '/api/analytics/requests?range=7d&limit=99999');
     expect(clamped.body.rows).toHaveLength(5);
