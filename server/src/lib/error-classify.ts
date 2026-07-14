@@ -17,8 +17,11 @@ export function isRetryableError(err: any): boolean {
   // 410 (model pulled upstream), 429 (rate limit) and all 5xx are transient or
   // fail-over-able; 400/401 stay fatal (status 0 here, handled by the absence of a
   // matching rule) and 403 is handled by isModelAccessForbiddenError below.
+  // 422 (notably Mistral's strict validation) is a provider-side request-shape
+  // rejection: fail over to another provider, but if the whole chain rejects it
+  // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status === 408 || status === 409 || status === 410 || status === 429 || status >= 500) return true;
+  if (status === 408 || status === 409 || status === 410 || status === 422 || status === 429 || status >= 500) return true;
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
@@ -52,6 +55,11 @@ export function isRetryableError(err: any): boolean {
     // which comes from the OpenAI-compat provider's error formatting, not
     // a bare "400" which is deliberately non-retryable for validation errors.
     || msg.includes('api error 400')
+    // 422: Mistral and other strict OpenAI-compatible endpoints use
+    // Unprocessable Entity for request-shape validation. Rotate to a provider
+    // that accepts the same OpenAI payload; if every provider rejects it, render
+    // a clean invalid_request_error instead of a rate-limit exhaustion.
+    || msg.includes('api error 422') || msg.includes('unprocessable entity')
     // 402: this provider/key is out of credits (e.g. HuggingFace Router
     // "API error 402: Payment required"). The SAME model often lives on another
     // provider (Kimi K2.6 is on HF + Cloudflare + NVIDIA), so fail over instead
@@ -132,7 +140,10 @@ export function isDailyQuotaExhaustedError(err: any): boolean {
 export function isProviderBadRequestError(err: any): boolean {
   const status = typeof err?.status === 'number' ? err.status : 0;
   const msg = (err?.message ?? '').toLowerCase();
-  return (status === 0 || status === 400) && msg.includes('api error 400');
+  if (status === 400) return msg.includes('api error 400');
+  if (status === 422) return msg.includes('api error 422') || msg.includes('unprocessable entity');
+  if (status !== 0) return false;
+  return msg.includes('api error 400') || msg.includes('api error 422') || msg.includes('unprocessable entity');
 }
 
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:

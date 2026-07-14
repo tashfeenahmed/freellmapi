@@ -22,8 +22,9 @@ export class OpenAICompatProvider extends BaseProvider {
   private readonly baseUrl: string;
   private readonly extraHeaders: Record<string, string>;
   private readonly validateUrl?: string;
-  /** Per-provider HTTP timeout override. Cloud APIs finish in ~15s; locally-hosted
-   * inference (llama.cpp / vLLM on CPU) can take 30-120s for long prompts. Default 15000. */
+  /** Per-provider HTTP timeout override. OpenAI-compatible gateways often buffer
+   * non-streaming responses until generation completes, and reasoning models can
+   * take >15s before first byte. Default 60000. */
   private readonly timeoutMs: number;
   /** NVIDIA NIM models reject any request that permits parallel tool calls with
    * `400 This model only supports single tool-calls at once!`. When set, pin
@@ -46,7 +47,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.baseUrl = opts.baseUrl;
     this.extraHeaders = opts.extraHeaders ?? {};
     this.validateUrl = opts.validateUrl;
-    this.timeoutMs = opts.timeoutMs ?? 15000;
+    this.timeoutMs = opts.timeoutMs ?? 60_000;
     this.keyless = opts.keyless ?? false;
     this.forceSingleToolCall = opts.forceSingleToolCall ?? false;
   }
@@ -92,6 +93,47 @@ export class OpenAICompatProvider extends BaseProvider {
     return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
   }
 
+  /** Mistral's OpenAI-compatible endpoint is strict about unknown nested fields
+   * and returns 422 for provider-private replay fields that other gateways
+   * ignore. Keep the OpenAI wire shape, but strip our internal reasoning /
+   * thought-signature extensions before sending to Mistral. */
+  private messagesForPlatform(messages: ChatMessage[]): ChatMessage[] {
+    if (this.platform !== 'mistral') return messages;
+
+    return messages.map((m) => {
+      if (m.role === 'assistant') {
+        return {
+          role: m.role,
+          content: m.content,
+          ...(m.name ? { name: m.name } : {}),
+          ...(m.tool_calls && m.tool_calls.length > 0 ? {
+            tool_calls: m.tool_calls.map((tc) => ({
+              id: tc.id,
+              type: tc.type,
+              function: {
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              },
+            })),
+          } : {}),
+        };
+      }
+      if (m.role === 'tool') {
+        return {
+          role: m.role,
+          content: m.content,
+          ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+          ...(m.name ? { name: m.name } : {}),
+        };
+      }
+      return {
+        role: m.role,
+        content: m.content,
+        ...(m.name ? { name: m.name } : {}),
+      };
+    });
+  }
+
   async chatCompletion(
     apiKey: string,
     messages: ChatMessage[],
@@ -108,7 +150,7 @@ export class OpenAICompatProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: modelId,
-        messages,
+        messages: this.messagesForPlatform(messages),
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
@@ -220,7 +262,7 @@ export class OpenAICompatProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: modelId,
-        messages,
+        messages: this.messagesForPlatform(messages),
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
@@ -231,7 +273,7 @@ export class OpenAICompatProvider extends BaseProvider {
         ...extendedBodyParams(this.platform, options),
         stream: true,
       }),
-    }, this.timeoutMs);
+    }, options?.timeoutMs ?? this.timeoutMs);
 
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
