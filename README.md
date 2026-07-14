@@ -85,9 +85,14 @@ And the free-tier landscape shifts weekly: providers launch models, retire them,
 <td align="center"><a href="https://router.bynara.id"><b>NaraRouter</b><br/>Mistral Large · Mistral Medium · Tencent Hy3</a></td>
 <td align="center"><a href="https://aihorde.net"><b>AI Horde</b><br/>Community Llama · Gemma · Cydonia (anon ok, slow)</a></td>
 <td align="center"><a href="https://aionlabs.ai"><b>Aion Labs</b><br/>Aggregator free tier (key, no card)</a></td>
+</tr>
+<tr>
 <td align="center"><a href="https://requesty.ai"><b>Requesty</b><br/>Router free tier (key, no card)</a></td>
+<td align="center"><a href="https://api.navy"><b>NavyAI</b><br/>150K tokens/day free (key, no card)</a></td>
 </tr>
 </table>
+
+Thanks to <a href="https://github.com/MetaMysteries8">@MetaMysteries8</a> for suggesting the NavyAI integration in <a href="https://github.com/tashfeenahmed/freellmapi/issues/532">#532</a>.
 
 Plus a **custom** provider — point chat, embedding, image, or audio models at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway) from the Keys page.
 

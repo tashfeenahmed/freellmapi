@@ -51,6 +51,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'ainative', label: 'AINative Studio (free key)', url: 'https://ainative.studio' },
   { value: 'aion', label: 'Aion Labs (free key)', url: 'https://www.aionlabs.ai' },
   { value: 'requesty', label: 'Requesty (free key)', url: 'https://www.requesty.ai' },
+  { value: 'navy', label: 'NavyAI (free key)', url: 'https://api.navy' },
   { value: 'nara', label: 'NaraRouter (free key)', url: 'https://router.bynara.id' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
 ]

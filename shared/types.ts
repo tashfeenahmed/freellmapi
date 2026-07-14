@@ -91,6 +91,9 @@ export type Platform =
   // Requesty — OpenAI-compatible router with no-card free models/credits.
   // Catalog rows live in the Oracle catalog (premium now, free after 30 days).
   | 'requesty'
+  // NavyAI — OpenAI-compatible unified API. Free plan is 150K tokens/day and
+  // 20 RPM; catalog rows live in the Oracle catalog (premium now, free after 30 days).
+  | 'navy'
   // NaraRouter — OpenAI-compatible aggregator. Free account key from
   // router.bynara.id after Telegram channel/link verification; free-plan routes
   // reset daily and are catalog-managed (premium now, free after 30 days).

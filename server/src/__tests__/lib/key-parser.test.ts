@@ -40,6 +40,7 @@ describe('key parser', () => {
     expect(detectPlatform('NARAROUTER_')).toBe('nara');
     expect(detectPlatform('AIONLABS_')).toBe('aion');
     expect(detectPlatform('REQUESTY_')).toBe('requesty');
+    expect(detectPlatform('NAVYAI_')).toBe('navy');
     expect(detectPlatform('SAMBANOVA_')).toBeNull();
   });
 
@@ -48,6 +49,7 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['bynara']).toBe('nara');
     expect(AUTH_JSON_PROVIDER_MAP['aion-labs']).toBe('aion');
     expect(AUTH_JSON_PROVIDER_MAP['requesty']).toBe('requesty');
+    expect(AUTH_JSON_PROVIDER_MAP['api-navy']).toBe('navy');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],

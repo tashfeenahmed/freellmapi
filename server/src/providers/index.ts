@@ -302,6 +302,18 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://router.requesty.ai/v1',
 }));
 
+// NavyAI — OpenAI-compatible unified API (api.navy/v1). Free key from the
+// Discord-backed dashboard; the free plan is 150K tokens/day and 20 RPM.
+// Live smoke tests required an explicit User-Agent header.
+register(new OpenAICompatProvider({
+  platform: 'navy',
+  name: 'NavyAI',
+  baseUrl: 'https://api.navy/v1',
+  extraHeaders: {
+    'User-Agent': 'FreeLLMAPI/1.0',
+  },
+}));
+
 // NaraRouter — OpenAI-compatible aggregator (router.bynara.id/v1). Free plan
 // requires a no-card API key plus Telegram channel/link verification. Live
 // probed 2026-07-09: `mistral-large`, `mistral-medium-3-5`, and `tencent-hy3`
