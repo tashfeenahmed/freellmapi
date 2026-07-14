@@ -17,7 +17,7 @@ interface ProviderConfig {
   providers: Record<string, ProviderEntry>;
 }
 
-const DEFAULT_DELAY_THRESHOLD = 0.8; // 80% utilization triggers delay
+const DEFAULT_DELAY_THRESHOLD = 0.5; // 50% utilization triggers delay
 
 let config: ProviderConfig | null = null;
 
