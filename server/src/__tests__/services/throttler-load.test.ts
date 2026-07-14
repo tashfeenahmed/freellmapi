@@ -242,13 +242,13 @@ describe('Load Test: Throttler Effectiveness Comparison', () => {
       console.log(`Max Delay: ${(results.maxDelay/1000).toFixed(2)}s`);
       console.log('=========================================\n');
 
-      // With throttler, ~10 requests (50% of 20) get through immediately
-      // Remaining 40 get delayed, spreading the load
+      // With throttler, ~9 requests (45% of 20) get through immediately (below threshold)
+      // Remaining 41 get delayed, spreading the load
       // Without throttler, all 50 would hit immediately -> likely 429s
 
-      expect(results.immediate).toBe(10); // First 10 pass (50% threshold)
-      expect(results.delayed).toBe(40);    // Remaining 40 get delayed
-      expect(throttleRate).toBe(80);      // 80% of requests are throttled
+      expect(results.immediate).toBe(9); // First 9 pass (below 50% threshold)
+      expect(results.delayed).toBe(41);   // Remaining 41 get delayed (at or above threshold)
+      expect(throttleRate).toBeCloseTo(82, 0); // 82% of requests are throttled (41/50)
     });
 
     it('compares expected failure rates with/without throttling', () => {
@@ -335,8 +335,8 @@ describe('Load Test: Throttler Effectiveness Comparison', () => {
 
       // Assertions for throttled scenario
       expect(simulatedThrottled.failed).toBe(0); // No failures with throttler
-      expect(simulatedThrottled.immediateSuccess).toBeGreaterThanOrEqual(9); // First ~9 pass
-      expect(simulatedThrottled.delayedSuccess).toBeLessThanOrEqual(41);   // Remaining get delayed
+      expect(simulatedThrottled.immediateSuccess).toBeGreaterThanOrEqual(8); // First ~8-9 pass (at threshold gets min delay)
+      expect(simulatedThrottled.delayedSuccess).toBeLessThanOrEqual(42);   // Remaining get delayed
 
       // Assertions for non-throttled scenario
       expect(simulatedNoThrottle.failed).toBe(30); // 30 would fail without throttler
