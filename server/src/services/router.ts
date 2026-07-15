@@ -1,7 +1,14 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
-import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider, getSoonestCooldownExpiry } from './ratelimit.js';
+import {
+  canMakeRequest,
+  canUseTokens,
+  isOnCooldown,
+  canUseProvider,
+  canUseProviderTokens,
+  getSoonestCooldownExpiry,
+} from './ratelimit.js';
 import {
   BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
   reliabilityPosterior, expectedReliability, sampleBeta,
@@ -702,6 +709,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
     if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
     if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
+    if (!canUseProviderTokens(entry.platform, key.id, entry.model_id, estimatedTokens)) { note('provider-daily-token-cap'); continue; }
 
     let decryptedKey: string;
     try {
@@ -785,6 +793,7 @@ export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, ski
     // headroom; a nominal 1-token probe only rules out a key already at its
     // TPM/TPD ceiling.
     if (!canUseTokens(m.platform, m.model_id, k.id, 1, limits)) continue;
+    if (!canUseProviderTokens(m.platform, k.id, m.model_id, 1)) continue;
     return true;
   }
   return false;
@@ -923,7 +932,8 @@ export function getOrderedFusionChain(): FusionCandidate[] {
       (e.key_id == null || kid === e.key_id) &&
       !isOnCooldown(e.platform, e.model_id, kid) &&
       canUseProvider(e.platform, kid) &&
-      canMakeRequest(e.platform, e.model_id, kid, limits),
+      canMakeRequest(e.platform, e.model_id, kid, limits) &&
+      canUseProviderTokens(e.platform, kid, e.model_id, 1),
     );
   });
 

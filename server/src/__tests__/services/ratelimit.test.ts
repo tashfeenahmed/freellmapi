@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { initDb, getDb } from '../../db/index.js';
 import {
   canMakeRequest,
   canUseTokens,
@@ -10,8 +11,11 @@ import {
   getCooldownDurationForLimit,
   recentHitCount,
   canUseProvider,
+  canUseProviderTokens,
   providerDailyRequestCount,
   getProviderDailyRequestCap,
+  providerDailyTokenCount,
+  getProviderDailyTokenCap,
 } from '../../services/ratelimit.js';
 import { parseRetryAfterMs } from '../../providers/base.js';
 
@@ -283,6 +287,78 @@ describe('Rate Limiter', () => {
       expect(canUseProvider('openrouter', testId)).toBe(true); // 2 < 3
       recordRequest('openrouter', 'model-c', testId);
       expect(canUseProvider('openrouter', testId)).toBe(false); // 3 >= 3
+    });
+  });
+
+  describe('provider-wide daily token cap (NavyAI)', () => {
+    const ENV = 'PROVIDER_DAILY_TOKEN_CAP_NAVY';
+    let original: string | undefined;
+    let dbReady = false;
+
+    function ensureDb() {
+      if (dbReady) return;
+      process.env.ENCRYPTION_KEY = '0'.repeat(64);
+      initDb(':memory:');
+      dbReady = true;
+    }
+
+    function seedNavyModel(modelId: string, tpdLimit: number, monthlyTokenBudget: string) {
+      getDb().prepare(`
+        INSERT INTO models (
+          platform, model_id, display_name, intelligence_rank, speed_rank,
+          size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit,
+          monthly_token_budget, context_window, enabled, supports_vision,
+          supports_tools
+        ) VALUES (
+          'navy', ?, ?, 1, 1, 'Large', 20, NULL, NULL, ?,
+          ?, NULL, 1, 0, 1
+        )
+        ON CONFLICT(platform, model_id) DO UPDATE SET
+          tpd_limit = excluded.tpd_limit,
+          monthly_token_budget = excluded.monthly_token_budget
+      `).run(modelId, `${modelId} (NavyAI)`, tpdLimit, monthlyTokenBudget);
+    }
+
+    beforeEach(() => {
+      ensureDb();
+      original = process.env[ENV];
+      getDb().prepare('DELETE FROM rate_limit_usage').run();
+      getDb().prepare("DELETE FROM models WHERE platform = 'navy'").run();
+      delete process.env[ENV];
+    });
+
+    afterEach(() => {
+      if (original === undefined) delete process.env[ENV];
+      else process.env[ENV] = original;
+    });
+
+    it('defaults to NavyAI 150K tokens/day and allows env override / disable', () => {
+      expect(getProviderDailyTokenCap('navy')).toBe(150_000);
+      expect(getProviderDailyTokenCap('groq')).toBeNull();
+      process.env[ENV] = '5000';
+      expect(getProviderDailyTokenCap('navy')).toBe(5000);
+      process.env[ENV] = '0';
+      expect(getProviderDailyTokenCap('navy')).toBeNull();
+    });
+
+    it('counts NavyAI tokens across all models using catalog multiplier hints', () => {
+      seedNavyModel('gpt-5.4', 33_333, '150K/day shared \u00b7 4.5x');
+      seedNavyModel('llama-3.3-70b-instruct', 150_000, '150K/day shared \u00b7 1x');
+
+      recordTokens('navy', 'gpt-5.4', testId, 1000);
+      recordTokens('navy', 'llama-3.3-70b-instruct', testId, 1000);
+
+      expect(providerDailyTokenCount('navy', testId)).toBe(5500);
+    });
+
+    it('blocks the provider key when multiplier-adjusted tokens would exceed the shared cap', () => {
+      process.env[ENV] = '5000';
+      seedNavyModel('gemini-2.5-flash', 75_000, '150K/day shared \u00b7 2x');
+
+      recordTokens('navy', 'gemini-2.5-flash', testId, 2000);
+
+      expect(canUseProviderTokens('navy', testId, 'gemini-2.5-flash', 400)).toBe(true);
+      expect(canUseProviderTokens('navy', testId, 'gemini-2.5-flash', 600)).toBe(false);
     });
   });
 });
