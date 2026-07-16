@@ -1,6 +1,7 @@
 ---
 name: "OPSX: Sync"
 description: Sync delta specs from a change to main specs
+allowed-tools: Bash(openspec:*)
 category: Workflow
 tags: [workflow, specs, experimental]
 ---
@@ -8,6 +9,8 @@ tags: [workflow, specs, experimental]
 Sync delta specs from a change to main specs.
 
 This is an **agent-driven** operation - you will read delta specs and directly edit main specs to apply the changes. This allows intelligent merging (e.g., adding a scenario without copying the entire requirement).
+
+**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Input**: Optionally specify a change name after `/opsx:sync` (e.g., `/opsx:sync add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -21,9 +24,16 @@ This is an **agent-driven** operation - you will read delta specs and directly e
 
    **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
 
-2. **Find delta specs**
+2. **Resolve change context**
 
-   Look for delta spec files in `openspec/changes/<name>/specs/*/spec.md`.
+   Run:
+   ```bash
+   openspec status --change "<name>" --json
+   ```
+
+3. **Find delta specs**
+
+   Use `artifactPaths.specs.existingOutputPaths` from the status JSON as the list of delta spec files.
 
    Each delta spec file contains sections like:
    - `## ADDED Requirements` - New requirements to add
@@ -33,9 +43,9 @@ This is an **agent-driven** operation - you will read delta specs and directly e
 
    If no delta specs found, inform user and stop.
 
-3. **For each delta spec, apply changes to main specs**
+4. **For each delta spec, apply changes to main specs**
 
-   For each capability with a delta spec at `openspec/changes/<name>/specs/<capability>/spec.md`:
+   For each repo-local capability delta spec path returned by the CLI:
 
    a. **Read the delta spec** to understand the intended changes
 
@@ -66,7 +76,7 @@ This is an **agent-driven** operation - you will read delta specs and directly e
       - Add Purpose section (can be brief, mark as TBD)
       - Add Requirements section with the ADDED requirements
 
-4. **Show summary**
+5. **Show summary**
 
    After applying all changes, summarize:
    - Which capabilities were updated
