@@ -12,6 +12,7 @@
     "export-catalog": "tsx src/scripts/export-catalog.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@freellmapi/shared": "*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",

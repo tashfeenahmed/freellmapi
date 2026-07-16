@@ -6,6 +6,13 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
+import type {
+  AnthropicMessage,
+  MessagesOptions,
+  AnthropicStreamEvent,
+} from '@freellmapi/shared/anthropic-types.js';
+import { anthropicToOpenAI, openAIToAnthropicResponse } from '../lib/anthropic-adapter.js';
+import { openAIChunksToAnthropicEvents } from '../lib/anthropic-stream.js';
 import { proxyFetch } from '../lib/proxy.js';
 
 /** A provider HTTP error carrying the upstream status and, when the response
@@ -76,6 +83,63 @@ export abstract class BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk>;
 
   abstract validateKey(apiKey: string): Promise<boolean>;
+
+  /**
+   * Anthropic Messages API — non-streaming.
+   *
+   * The default implementation adapts through the existing OpenAI-compatible
+   * pipeline (`chatCompletion`). Providers that speak Anthropic natively
+   * should override this method to bypass the adapter.
+   */
+  async messages(
+    apiKey: string,
+    options: MessagesOptions,
+  ): Promise<AnthropicMessage> {
+    const { messages, model, temperature, max_tokens, top_p, tools, tool_choice } =
+      anthropicToOpenAI(options);
+
+    const result = await this.chatCompletion(apiKey, messages, model, {
+      temperature,
+      max_tokens,
+      top_p,
+      tools,
+      tool_choice,
+    });
+
+    return openAIToAnthropicResponse(result, model);
+  }
+
+  /**
+   * Anthropic Messages API — streaming.
+   *
+   * The default implementation adapts through the existing OpenAI-compatible
+   * pipeline (`streamChatCompletion`). Providers that speak Anthropic natively
+   * should override this method to bypass the adapter.
+   */
+  async *streamMessages(
+    apiKey: string,
+    options: MessagesOptions,
+  ): AsyncGenerator<AnthropicStreamEvent> {
+    const { messages, model, temperature, max_tokens, top_p, tools, tool_choice } =
+      anthropicToOpenAI(options);
+
+    // Estimate input tokens from anthropic content
+    let estimatedInputTokens = 0;
+    for (const m of messages) {
+      const text = typeof m.content === 'string' ? m.content : '';
+      estimatedInputTokens += Math.ceil(text.length / 4);
+    }
+
+    const chunks = this.streamChatCompletion(apiKey, messages, model, {
+      temperature,
+      max_tokens,
+      top_p,
+      tools,
+      tool_choice,
+    });
+
+    yield* openAIChunksToAnthropicEvents(chunks, model, estimatedInputTokens);
+  }
 
   protected async fetchWithTimeout(
     url: string,

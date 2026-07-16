@@ -82,3 +82,13 @@ export function normalizeOutboundContent<T>(payload: T): T {
   }
   return payload;
 }
+
+/** Rough token estimation: ~4 characters per token. Used for routing decisions
+ *  (skip a model whose budget is too small) and for streaming bookkeeping when
+ *  the provider doesn't echo a final usage count. */
+export function estimateTokens(messages: ChatMessage[]): number {
+  return messages.reduce((sum, m) => {
+    const text = contentToString(m.content);
+    return sum + Math.ceil(text.length / 4);
+  }, 0);
+}
