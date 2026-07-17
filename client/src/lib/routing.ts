@@ -167,6 +167,7 @@ export const platformColors: Record<string, string> = {
   requesty:    '#10b981',
   navy:         '#1d4ed8',
   nara:         '#2563eb',
+  sealion:     '#0ea5e9',
   aihorde:     '#dc2626',
 }
 

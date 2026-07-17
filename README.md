@@ -4,7 +4,7 @@
 
 **One OpenAI-compatible endpoint. 28 free LLM providers. 339 free model endpoints. ~4 billion tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, OpenCode Zen, AI Horde, NaraRouter, Aion Labs, Requesty, NavyAI, Agnes AI, Reka, SiliconFlow, Routeway, BazaarLink, and AINative Studio, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, OpenCode Zen, AI Horde, NaraRouter, Aion Labs, Requesty, NavyAI, Agnes AI, Reka, SiliconFlow, Routeway, BazaarLink, AINative Studio, and SEA-LION, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/tashfeenahmed/freellmapi?style=flat&logo=github&color=yellow)](https://github.com/tashfeenahmed/freellmapi/stargazers)
@@ -97,6 +97,9 @@ And the free-tier landscape shifts weekly: providers launch models, retire them,
 <td align="center"><a href="https://routeway.ai"><b>Routeway</b><br/>Router free tier</a></td>
 <td align="center"><a href="https://bazaarlink.ai"><b>BazaarLink</b><br/>Auto free router</a></td>
 <td align="center"><a href="https://ainative.studio"><b>AINative Studio</b><br/>Qwen · DeepSeek · Llama</a></td>
+</tr>
+<tr>
+<td align="center"><a href="https://sea-lion.ai"><b>SEA-LION</b><br/>SEA-multilingual (key, no card)</a></td>
 </tr>
 </table>
 

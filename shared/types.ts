@@ -98,6 +98,10 @@ export type Platform =
   // router.bynara.id after Telegram channel/link verification; free-plan routes
   // reset daily and are catalog-managed (premium now, free after 30 days).
   | 'nara'
+  // SEA-LION (AI Singapore) — OpenAI-compatible first-party API. Free key
+  // (Google sign-in, no card, no region wall) at 10 RPM; catalog rows live in
+  // the Oracle catalog (premium now, free after 30 days).
+  | 'sealion'
   // AI Horde — free, community-powered inference (volunteer workers) via an
   // OpenAI-compatible proxy (https://oai.aihorde.net/v1). Queue-based, so calls
   // can take tens of seconds; no tool support; usage is reported as kudos, not

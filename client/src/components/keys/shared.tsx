@@ -53,6 +53,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'requesty', label: 'Requesty (free key)', url: 'https://www.requesty.ai' },
   { value: 'navy', label: 'NavyAI (free key)', url: 'https://api.navy' },
   { value: 'nara', label: 'NaraRouter (free key)', url: 'https://router.bynara.id' },
+  { value: 'sealion', label: 'SEA-LION (free key)', url: 'https://sea-lion.ai' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
 ]
 

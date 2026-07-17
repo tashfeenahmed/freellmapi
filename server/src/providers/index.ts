@@ -326,6 +326,16 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://router.bynara.id/v1',
 }));
 
+// SEA-LION (AI Singapore) — OpenAI-compatible first-party API (api.sea-lion.ai/v1).
+// Free key from sea-lion.ai (Google sign-in, no card, no region wall); recurring
+// free tier at 10 RPM. Catalog rows live in the Oracle catalog (premium now, free
+// after the 30-day model-age gate).
+register(new OpenAICompatProvider({
+  platform: 'sealion',
+  name: 'SEA-LION',
+  baseUrl: 'https://api.sea-lion.ai/v1',
+}));
+
 // AI Horde — free, community-powered inference (volunteer workers) via an
 // OpenAI-compatible proxy. Dedicated AIHordeProvider (not OpenAICompatProvider)
 // because the proxy is queue-based and diverges from the OpenAI contract:
