@@ -130,6 +130,14 @@ jobs:
           APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
         run: |
           set -e
+          # Unconfigured secrets arrive as EMPTY env vars, and electron-builder
+          # treats a present-but-empty CSC_LINK as a certificate path — failing
+          # with "<dir> not a file" on any non-PR build (PR builds never hit it
+          # because electron-builder skips signing for pull requests). Drop empty
+          # signing vars so unsigned builds actually build unsigned.
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID APPLE_KEYCHAIN APPLE_KEYCHAIN_PROFILE; do
+            if [ -z "${!v:-}" ]; then unset "$v"; fi
+          done
           # Run electron-builder with desktop/ as its own project root. Invoked
           # from the monorepo root (e.g. via `npm --prefix desktop run`), it walks
           # up, treats the repo root as the project, and on Windows pulls parent
