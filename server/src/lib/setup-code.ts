@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { createOneTimeCode } from './one-time-code.js';
 
 // One-time first-run setup code.
 //
@@ -11,48 +11,30 @@ import crypto from 'crypto';
 // must present it. The code is regenerated once per boot and cleared as soon as
 // an account exists.
 
-// Uppercase letters + digits, minus the visually ambiguous I, O, 0 and 1, so
-// the code is easy to read from a log and type by hand.
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_LENGTH = 10;
-
-let currentCode: string | null = null;
-
-function generate(): string {
-  const bytes = crypto.randomBytes(CODE_LENGTH);
-  let out = '';
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    out += ALPHABET[bytes[i]! % ALPHABET.length];
-  }
-  return out;
-}
+const _code = createOneTimeCode();
 
 // Mint a fresh code and log it prominently. Call once at boot when there are
 // zero accounts. Returns the code (handy for tests).
 export function generateSetupCode(): string {
-  currentCode = generate();
+  const code = _code.generate();
   console.log('');
-  console.log('  First-run setup code: ' + currentCode);
+  console.log('  First-run setup code: ' + code);
   console.log('  A browser on this machine can finish setup without it. From any');
   console.log('  other device, enter this code to create the first account.');
   console.log('');
-  return currentCode;
+  return code;
 }
 
 export function getSetupCode(): string | null {
-  return currentCode;
+  return _code.get();
 }
 
 export function clearSetupCode(): void {
-  currentCode = null;
+  _code.clear();
 }
 
 // Constant-time comparison against the active code. Returns false when no code
 // is active or the input is not a matching string.
 export function setupCodeMatches(provided: unknown): boolean {
-  if (!currentCode || typeof provided !== 'string') return false;
-  const a = Buffer.from(currentCode);
-  const b = Buffer.from(provided);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  return _code.matches(provided);
 }

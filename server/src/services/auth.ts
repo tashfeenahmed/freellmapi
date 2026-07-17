@@ -80,3 +80,41 @@ export function deleteSession(token: string | undefined | null): void {
   if (!token) return;
   getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
 }
+
+/** Update the email of the authenticated user. Throws { code: 'email_taken' } on conflict. */
+export function updateEmail(userId: number, newEmail: string): void {
+  const db = getDb();
+  const normalized = normalizeEmail(newEmail);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(normalized, userId);
+  if (existing) {
+    const err = new Error('An account with that email already exists') as any;
+    err.code = 'email_taken';
+    throw err;
+  }
+  db.prepare('UPDATE users SET email = ? WHERE id = ?').run(normalized, userId);
+  // Keep sessions alive; the new email will be reflected on the next validateSession call.
+}
+
+/** Update the password of the authenticated user after verifying the current one. */
+export function updatePassword(userId: number, currentPassword: string, newPassword: string): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?')
+    .get(userId) as { password_hash: string } | undefined;
+  if (!row) return false;
+  if (!verifyPassword(currentPassword, row.password_hash)) return false;
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), userId);
+  return true;
+}
+
+/**
+ * Reset the password (and only the password) for the single existing user.
+ * All other data (email, sessions, keys, etc.) is preserved.
+ * Returns false if no user exists.
+ */
+export function resetUserPassword(newPassword: string): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT id FROM users LIMIT 1').get() as { id: number } | undefined;
+  if (!row) return false;
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), row.id);
+  return true;
+}

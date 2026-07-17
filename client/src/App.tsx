@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ChevronDown, Languages, Menu, MoreHorizontal, Moon, Search, Sun } from 'lucide-react'
+import { ChevronDown, KeyRound, Languages, Menu, MoreHorizontal, Moon, Search, Sun } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { AuthGate } from '@/components/auth-gate'
+import { AuthGate, ChangeCredentialsModal } from '@/components/auth-gate'
 import { CommandPalette, openCommandPalette } from '@/components/command-palette'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Toaster } from '@/components/toaster'
@@ -160,7 +160,13 @@ function LanguageSubMenu() {
   )
 }
 
-function Navbar() {
+function Navbar({
+  onChangePassword,
+  onChangeEmail,
+}: {
+  onChangePassword: () => void
+  onChangeEmail: () => void
+}) {
   const { dark, toggle } = useDarkMode()
   const { t } = useI18n()
   const location = useLocation()
@@ -242,10 +248,22 @@ function Navbar() {
               </DropdownMenuItem>
               <LanguageSubMenu />
               {!isDesktopApp && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
-                </>
+                <DropdownMenuSeparator />
+              )}
+              {!isDesktopApp && (
+                <DropdownMenuItem onClick={onChangeEmail} className="gap-2">
+                  <span className="flex size-4 items-center justify-center font-serif text-xs font-bold">@</span>
+                  {t('auth.changeEmail')}
+                </DropdownMenuItem>
+              )}
+              {!isDesktopApp && (
+                <DropdownMenuItem onClick={onChangePassword} className="gap-2">
+                  <KeyRound className="size-4" />
+                  {t('auth.changePassword')}
+                </DropdownMenuItem>
+              )}
+              {!isDesktopApp && (
+                <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -295,6 +313,18 @@ function Navbar() {
                 </DropdownMenuItem>
                 <LanguageSubMenu />
                 {!isDesktopApp && (
+                  <DropdownMenuItem onClick={onChangeEmail} className="gap-2">
+                    <span className="flex size-4 items-center justify-center font-serif text-xs font-bold">@</span>
+                    {t('auth.changeEmail')}
+                  </DropdownMenuItem>
+                )}
+                {!isDesktopApp && (
+                  <DropdownMenuItem onClick={onChangePassword} className="gap-2">
+                    <KeyRound className="size-4" />
+                    {t('auth.changePassword')}
+                  </DropdownMenuItem>
+                )}
+                {!isDesktopApp && (
                   <DropdownMenuItem onClick={() => logout()}>{t('nav.signOut')}</DropdownMenuItem>
                 )}
               </DropdownMenuGroup>
@@ -313,13 +343,18 @@ function PageBoundary({ children }: { children: ReactNode }) {
 }
 
 function App() {
+  const [credModal, setCredModal] = useState<'password' | 'email' | null>(null)
+
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthGate>
           <div className={`min-h-screen ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
-            <Navbar />
+            <Navbar
+              onChangePassword={() => setCredModal('password')}
+              onChangeEmail={() => setCredModal('email')}
+            />
             <main className="max-w-6xl mx-auto px-6 py-8">
               <PageBoundary>
               <Routes>
@@ -347,6 +382,9 @@ function App() {
             </main>
             <Toaster />
             <CommandPalette />
+            {credModal && (
+              <ChangeCredentialsModal mode={credModal} onClose={() => setCredModal(null)} />
+            )}
           </div>
         </AuthGate>
       </BrowserRouter>
