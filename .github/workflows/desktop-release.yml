@@ -65,6 +65,7 @@ jobs:
           npm --prefix desktop run stage:client
 
       - name: Validate macOS signing credentials
+        id: maccreds
         if: matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
@@ -78,9 +79,14 @@ jobs:
           APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
         run: |
           set -euo pipefail
+          # No signing cert at all → fall back to an unsigned DMG rather than
+          # failing the release (users bypass Gatekeeper via right-click → Open
+          # or xattr -d com.apple.quarantine). Signing cert present but broken
+          # notarization config is still a hard error — that's a misconfiguration.
           if [ -z "${CSC_LINK:-}" ]; then
-            echo "Missing MACOS_CSC_LINK secret for signed macOS release builds."
-            exit 1
+            echo "::warning::No MACOS_CSC_LINK secret — building an UNSIGNED DMG. Configure Apple Developer ID signing + notarization secrets for a Gatekeeper-clean release."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           has_api_key_creds=false
@@ -102,14 +108,16 @@ jobs:
             echo "Missing Apple notarization secrets. Provide APPLE_API_KEY/APPLE_API_KEY_ID/APPLE_API_ISSUER, APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID, or APPLE_KEYCHAIN_PROFILE."
             exit 1
           fi
+          echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Package installer
         shell: bash
         env:
           # Pull-request and manual artifact builds stay unsigned. Tagged macOS
-          # release builds must use Developer ID signing + notarization so the
-          # downloaded DMG opens without Gatekeeper's "damaged" quarantine block.
-          CSC_IDENTITY_AUTODISCOVERY: ${{ matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/') && 'true' || 'false' }}
+          # release builds sign + notarize when the Apple secrets are configured
+          # (so the downloaded DMG opens without Gatekeeper's "damaged" quarantine
+          # block) and fall back to an unsigned DMG when they aren't.
+          CSC_IDENTITY_AUTODISCOVERY: ${{ matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/') && steps.maccreds.outputs.signed == 'true' && 'true' || 'false' }}
           CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
