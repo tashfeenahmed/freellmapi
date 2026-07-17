@@ -17,6 +17,8 @@ import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/rese
 
 export const authRouter = Router();
 
+const failedPasswordAttempts = new Map<number, number>();
+
 // Dashboard auth (#35). These routes are mounted BEFORE requireAuth, so
 // /status, /setup and /login are reachable without a session (bootstrap);
 // /logout and /me validate the token themselves.
@@ -153,8 +155,9 @@ authRouter.get('/me', (req: Request, res: Response) => {
   res.json({ email: session.email });
 });
 
-// Change email (requires active session)
+// Change email (requires active session + current password)
 const changeEmailSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
   newEmail: z.string().email('A valid email is required'),
 });
 
@@ -170,7 +173,20 @@ authRouter.post('/change-email', (req: Request, res: Response) => {
     return;
   }
   try {
-    updateEmail(session.userId, parsed.data.newEmail);
+    const ok = updateEmail(session.userId, parsed.data.currentPassword, parsed.data.newEmail);
+    if (!ok) {
+      const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
+      if (attempts >= 3) {
+        deleteSession(bearer(req));
+        failedPasswordAttempts.delete(session.userId);
+        res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+        return;
+      }
+      failedPasswordAttempts.set(session.userId, attempts);
+      res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
+      return;
+    }
+    failedPasswordAttempts.delete(session.userId);
     res.json({ success: true, email: parsed.data.newEmail.trim().toLowerCase() });
   } catch (err: any) {
     if (err.code === 'email_taken') {
@@ -200,20 +216,37 @@ authRouter.post('/change-password', (req: Request, res: Response) => {
   }
   const ok = updatePassword(session.userId, parsed.data.currentPassword, parsed.data.newPassword);
   if (!ok) {
-    res.status(401).json({ error: { message: 'Current password is incorrect', type: 'authentication_error' } });
+    const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
+    if (attempts >= 3) {
+      deleteSession(bearer(req));
+      failedPasswordAttempts.delete(session.userId);
+      res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+      return;
+    }
+    failedPasswordAttempts.set(session.userId, attempts);
+    res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
     return;
   }
+  failedPasswordAttempts.delete(session.userId);
   res.json({ success: true });
 });
 
 // Forgot password: mint a reset code and log it
+const RESET_CODE_MIN_INTERVAL_MS = 10_000;
+let lastResetCodeAt = 0;
 authRouter.post('/forgot-password', (_req: Request, res: Response) => {
+  // Always respond 200 regardless of account existence to avoid user enumeration.
   if (userCount() === 0) {
-    res.status(404).json({ error: { message: 'No account exists yet. Use setup instead.', type: 'not_found' } });
+    res.json({ success: true });
     return;
   }
+  const now = Date.now();
+  if (now - lastResetCodeAt < RESET_CODE_MIN_INTERVAL_MS) {
+    res.status(429).json({ error: { message: 'Too many reset-code requests. Try again later.', type: 'rate_limit_error' } });
+    return;
+  }
+  lastResetCodeAt = now;
   generateResetCode();
-  // Always respond 200 regardless of account existence to avoid user enumeration.
   res.json({ success: true });
 });
 
