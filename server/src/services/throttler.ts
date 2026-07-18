@@ -30,7 +30,7 @@ export function calculateDelay(
     const rpmRatio = rpmUsed / rpmLimit;
     if (rpmRatio >= threshold) {
       const overThreshold = rpmRatio - threshold;
-      rpmDelay = Math.max(100, Math.floor(overThreshold * 60 * 1000));
+      rpmDelay = Math.max(100, Math.floor(overThreshold * 20 * 1000));
     }
   }
 
@@ -39,7 +39,7 @@ export function calculateDelay(
     const tpmRatio = tpmUsed / tpmLimit;
     if (tpmRatio >= threshold) {
       const overThreshold = tpmRatio - threshold;
-      tpmDelay = Math.max(100, Math.floor(overThreshold * 60 * 1000));
+      tpmDelay = Math.max(100, Math.floor(overThreshold * 20 * 1000));
     }
   }
 
