@@ -84,6 +84,22 @@ docker compose up -d --build
 | `FREEAPI_CONFIG_PATH` | No | None | JSON config file applied idempotently after migrations on every boot. |
 | `FREEAPI_CONFIG_JSON` | No | None | Inline JSON config. Takes precedence over `FREEAPI_CONFIG_PATH`. |
 
+### Live declarative configuration reload
+
+When `FREEAPI_CONFIG_PATH` points to a JSON file, FreeLLMAPI watches the file's
+directory and reapplies a valid atomic replacement without restarting the
+process. Secret managers and deployment controllers should write a temporary
+file and rename it over the configured path. The previous valid configuration
+remains active when a replacement is invalid or temporarily unavailable.
+
+```bash
+FREEAPI_CONFIG_PATH=/run/secrets/freellmapi.config.json docker compose up -d
+```
+
+The watcher is intentionally provider-agnostic: Infisical, Vault, AWS Secrets
+Manager, Kubernetes Secrets, or a local GitOps reconciler can materialize the
+file. FreeLLMAPI does not contact or depend on another FreeLLMAPI instance.
+
 The `freellmapi-data` volume stores SQLite data at `/app/server/data`. Keep the same volume and `ENCRYPTION_KEY` when upgrading, otherwise existing encrypted provider keys cannot be decrypted.
 
 Example `freellmapi.config.json`:
