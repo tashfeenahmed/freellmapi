@@ -65,13 +65,13 @@ describe('Throttler Integration - timing behavior', () => {
       requestId: 'test-req',
     };
 
-    // 45 requests out of 60 (75%) - above 50% threshold -> ~15000ms delay
+    // 45 requests out of 60 (75%) - above 50% threshold -> ~5000ms delay
     for (let i = 0; i < 45; i++) {
       recordRequest('test-provider', 'test-model', 1);
     }
 
     const delay = checkThrottle(ctx);
-    expect(delay).toBe(15000);
+    expect(delay).toBe(5000);
   });
 
   it('applies delay via applyThrottle with fake timers', async () => {
@@ -145,8 +145,8 @@ describe('Throttler Integration - timing behavior', () => {
       recordRequest('test-provider', 'test-model', 1);
     }
 
-    // 85% > 80% threshold -> delay should be (0.85-0.8)*60000 = 3000ms (may get 2999 due to precision)
-    expect(checkThrottle(ctx)).toBeGreaterThanOrEqual(2999);
+    // 85% > 80% threshold -> delay should be (0.85-0.8)*20000 = 1000ms (may get 999 due to precision)
+    expect(checkThrottle(ctx)).toBeGreaterThanOrEqual(999);
   });
 
   it('uses max of RPM and TPM delays', () => {
@@ -166,16 +166,16 @@ describe('Throttler Integration - timing behavior', () => {
     };
 
     // Both RPM and TPM above threshold
-    // RPM: 45/60 = 75% -> (0.75-0.5)*60000 = 15000ms
-    // TPM: 60000/100000 = 60% -> (0.6-0.5)*60000 = 6000ms
-    // Should use max = 15000ms
+    // RPM: 45/60 = 75% -> (0.75-0.5)*20000 = 5000ms
+    // TPM: 60000/100000 = 60% -> (0.6-0.5)*20000 = 2000ms
+    // Should use max = 5000ms
     for (let i = 0; i < 45; i++) {
       recordRequest('test-provider', 'test-model', 1);
     }
 
     const delay = checkThrottle(ctx);
-    // Should delay ~15000ms (max of both axes)
-    expect(delay).toBe(15000);
+    // Should delay ~5000ms (max of both axes)
+    expect(delay).toBe(5000);
   });
 });
 
@@ -221,7 +221,7 @@ describe('Throttler behavior across endpoints', () => {
       }
 
       // All platforms should get the same delay
-      expect(checkThrottle(ctx)).toBe(15000);
+      expect(checkThrottle(ctx)).toBe(5000);
     }
   });
 
@@ -259,7 +259,7 @@ describe('Throttler behavior across endpoints', () => {
     }
 
     // 45 requests - 75% usage
-    expect(checkThrottle(ctx)).toBe(15000); // ~15000ms delay
+    expect(checkThrottle(ctx)).toBe(5000); // ~5000ms delay
   });
 
   it('returns 0 for non-existent model', () => {

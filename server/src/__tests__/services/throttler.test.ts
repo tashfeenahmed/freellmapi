@@ -38,23 +38,23 @@ describe('Throttler delay calculation', () => {
     });
 
     it('calculates proportional delay above threshold', () => {
-      // With 0.5 threshold, 75% usage = (0.75-0.5)*60000 = 15000ms
-      expect(calculateDelay(60, 100000, 45, undefined, 0.5)).toBeCloseTo(15000, -2);
+      // With 0.5 threshold, 75% usage = (0.75-0.5)*20000 = 5000ms
+      expect(calculateDelay(60, 100000, 45, undefined, 0.5)).toBeCloseTo(5000, -2);
     });
 
     it('takes max of RPM and TPM delays', () => {
-      // RPM: 70/60 = 1.167 → (1.167-0.5)*60000 ≈ 40020ms
-      // TPM: 60000/100000 = 0.6 → (0.6-0.5)*60000 = 6000ms
-      // Expect max: ~40020ms
-      expect(calculateDelay(60, 100000, 70, 60000, 0.5)).toBeGreaterThan(35000);
+      // RPM: 70/60 = 1.167 → (1.167-0.5)*20000 ≈ 13340ms
+      // TPM: 60000/100000 = 0.6 → (0.6-0.5)*20000 = 2000ms
+      // Expect max: ~13340ms
+      expect(calculateDelay(60, 100000, 70, 60000, 0.5)).toBeGreaterThan(13000);
     });
 
     it('handles null limits correctly', () => {
-      // RPM null → only TPM contributes: (0.6-0.5)*60000 = 6000ms (floats may give 5999 due to precision)
-      expect(calculateDelay(null, 100000, undefined, 60000, 0.5)).toBeGreaterThanOrEqual(5999);
+      // RPM null → only TPM contributes: (0.6-0.5)*20000 = 2000ms (floats may give 1999 due to precision)
+      expect(calculateDelay(null, 100000, undefined, 60000, 0.5)).toBeGreaterThanOrEqual(1999);
 
-      // TPM null → only RPM contributes: (40/60-0.5)*60000 = (0.667-0.5)*60000 = 10020ms (may give 9999)
-      expect(calculateDelay(60, null, 40, undefined, 0.5)).toBeGreaterThanOrEqual(9999);
+      // TPM null → only RPM contributes: (40/60-0.5)*20000 = (0.667-0.5)*20000 = 3333ms (may give 3332 due to precision)
+      expect(calculateDelay(60, null, 40, undefined, 0.5)).toBeGreaterThanOrEqual(3332);
     });
 
     it('handles RPM at threshold, TPM below → RPM minimum 100ms', () => {
