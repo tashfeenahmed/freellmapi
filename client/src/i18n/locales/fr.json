@@ -388,7 +388,16 @@
     "recentCalls": "Appels récents",
     "clientIp": "IP du client",
     "clientAgent": "Application cliente",
-    "requestedModelHint": "{model} demandé, servi par repli"
+    "requestedModelHint": "{model} demandé, servi par repli",
+    "searchAriaLabel": "Filtrer les tableaux",
+    "searchScopeAriaLabel": "Portée du filtre",
+    "searchScopeAll": "Tous",
+    "searchScopeModels": "Modèles",
+    "searchScopeCalls": "Appels",
+    "searchScopeErrors": "Erreurs",
+    "searchScopeKeys": "Clés",
+    "matchedCount": "{shown} sur {total}",
+    "noMatches": "Aucun résultat"
   },
   "playground": {
     "title": "Bac à sable",

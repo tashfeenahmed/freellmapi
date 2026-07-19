@@ -388,7 +388,16 @@
     "recentCalls": "Chamadas recentes",
     "clientIp": "IP do cliente",
     "clientAgent": "Aplicativo cliente",
-    "requestedModelHint": "Solicitado {model}, servido por fallback"
+    "requestedModelHint": "Solicitado {model}, servido por fallback",
+    "searchAriaLabel": "Filtrar tabelas",
+    "searchScopeAriaLabel": "Escopo do filtro",
+    "searchScopeAll": "Todos",
+    "searchScopeModels": "Modelos",
+    "searchScopeCalls": "Chamadas",
+    "searchScopeErrors": "Erros",
+    "searchScopeKeys": "Chaves",
+    "matchedCount": "{shown} de {total}",
+    "noMatches": "Nenhum resultado"
   },
   "playground": {
     "title": "Playground",

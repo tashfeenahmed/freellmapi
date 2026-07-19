@@ -388,7 +388,16 @@
     "recentCalls": "Chiamate recenti",
     "clientIp": "IP del client",
     "clientAgent": "App client",
-    "requestedModelHint": "Richiesto {model}, servito dal fallback"
+    "requestedModelHint": "Richiesto {model}, servito dal fallback",
+    "searchAriaLabel": "Filtra tabelle",
+    "searchScopeAriaLabel": "Ambito del filtro",
+    "searchScopeAll": "Tutto",
+    "searchScopeModels": "Modelli",
+    "searchScopeCalls": "Chiamate",
+    "searchScopeErrors": "Errori",
+    "searchScopeKeys": "Chiavi",
+    "matchedCount": "{shown} di {total}",
+    "noMatches": "Nessun risultato"
   },
   "playground": {
     "title": "Playground",
