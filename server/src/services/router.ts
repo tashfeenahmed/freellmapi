@@ -901,7 +901,7 @@ export interface FusionCandidate {
  * so the panel's auto-pick draws from the highest-scored models first and the
  * fusion layer just needs to apply provider-diversity on top.
  */
-export function getOrderedFusionChain(): FusionCandidate[] {
+export function getOrderedFusionChain(estimatedTokens: number): FusionCandidate[] {
   const db = getDb();
   const strategy = getRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
@@ -916,6 +916,13 @@ export function getOrderedFusionChain(): FusionCandidate[] {
   // currently cooled down (huggingface/Kimi-K2.6) would claim a panel slot it
   // can't fill — surfacing as "no available key" and pushing out a usable model,
   // which also makes the panel look like it's ignoring the routing strategy.
+  //
+  // The SIZE gates matter as much as the key gates: a model whose context window
+  // cannot hold the prompt can NEVER fill its slot, yet diversifyChain keeps
+  // handing it one on every request when it is its platform's only representative.
+  // That leaves one panel slot dead on arrival and reports the failure as the
+  // misleading "no available key for model". Passing a placeholder token count
+  // here made both size gates no-ops.
   const usableKeys = db.prepare(
     "SELECT id, platform FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')"
   ).all() as { id: number; platform: string }[];
@@ -925,6 +932,9 @@ export function getOrderedFusionChain(): FusionCandidate[] {
     if (arr) arr.push(k.id); else keysByPlatform.set(k.platform, [k.id]);
   }
   const servable = chain.filter(e => {
+    // A null context_window means "unknown", not "zero": same convention the
+    // auto-router uses, so an unspecified window is never itself a reason to skip.
+    if (e.context_window != null && estimatedTokens > e.context_window) return false;
     const keyIds = keysByPlatform.get(e.platform);
     if (!keyIds) return false;
     const limits = { rpm: e.rpm_limit, rpd: e.rpd_limit, tpm: e.tpm_limit, tpd: e.tpd_limit };
@@ -933,7 +943,7 @@ export function getOrderedFusionChain(): FusionCandidate[] {
       !isOnCooldown(e.platform, e.model_id, kid) &&
       canUseProvider(e.platform, kid) &&
       canMakeRequest(e.platform, e.model_id, kid, limits) &&
-      canUseProviderTokens(e.platform, kid, e.model_id, 1),
+      canUseProviderTokens(e.platform, kid, e.model_id, estimatedTokens),
     );
   });
 
