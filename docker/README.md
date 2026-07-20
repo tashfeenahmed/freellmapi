@@ -106,6 +106,30 @@ Example `freellmapi.config.json`:
 }
 ```
 
+## Resetting the dashboard password
+
+If you lose access to the dashboard, use the reset script from the repo root.
+It connects to the running container via `docker exec`, updates the password
+hash in SQLite, and invalidates all existing sessions — no `sqlite3` binary or
+external tools required on the host.
+
+```bash
+# Interactive (prompts for new password and optionally new email)
+./scripts/reset-password.sh
+
+# Non-interactive
+./scripts/reset-password.sh -p 'NewPass123!'
+./scripts/reset-password.sh -p 'NewPass123!' -e newemail@example.com
+```
+
+If your container has a custom name (e.g. you renamed the Compose project):
+
+```bash
+FREELLMAPI_CONTAINER=mycontainer ./scripts/reset-password.sh -p 'NewPass123!'
+```
+
+See `scripts/reset-password.sh --help` for the full option reference.
+
 ## Published Image
 
 Images are published to GitHub Container Registry:
