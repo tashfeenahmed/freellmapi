@@ -465,7 +465,9 @@ export default function AnalyticsPage() {
                     {errors.slice(0, 20).map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="pl-4 text-xs">{e.platform}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate">{e.error}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          <HoverTooltip text={e.error ?? ''} side="top">{e.error}</HoverTooltip>
+                        </TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground tabular-nums pr-4">
                           {formatSqliteUtcToLocalTime(e.createdAt, { hour: '2-digit', minute: '2-digit' })}
                         </TableCell>
