@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@freellmapi/shared": "*",
+    "compression": "^1.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.44.2",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
     "@types/multer": "^2.1.0",
