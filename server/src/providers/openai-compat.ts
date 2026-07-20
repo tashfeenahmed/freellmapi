@@ -156,6 +156,10 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
+    // Strip platform prefix for providers that use bare model names (local Ollama).
+    if (this.platform === 'ollama') {
+      modelId = modelId.replace(/^ollama\//, '');
+    }
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -268,6 +272,10 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk> {
+    // Strip platform prefix for providers that use bare model names (local Ollama).
+    if (this.platform === 'ollama') {
+      modelId = modelId.replace(/^ollama\//, '');
+    }
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {

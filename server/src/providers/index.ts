@@ -108,23 +108,14 @@ register(new OpenAICompatProvider({
 }));
 
 // Moonshot direct integration was dropped in V4 (paid-only); MiniMax direct
-// was dropped in V4 (superseded by the OpenRouter route).
-
-// Ollama Cloud — OpenAI-compatible. Free plan: 1 concurrent model, 5h session
-// caps, GPU-time-based quota (not per-token). Many catalog models on the
-// /v1/models list are subscription-only — Free returns 403 with an explicit
-// "this model requires a subscription" message. Catalog rows are filtered to
-// confirmed-Free entries.
-//
-// Frontier reasoning models (glm-4.7, kimi-k2-thinking, cogito-2.1:671b)
-// regularly take 30-90s on Ollama Cloud Free, so the timeout is bumped from
-// the default 15s. Ollama returns reasoning in `message.reasoning` (not
-// `reasoning_content`) — handled by normalizeChoices.
+// was dropped in V4 (superseded by the OpenRouter route).// Local Ollama — OpenAI-compatible. Runs at 127.0.0.1:11434. Models
+// are the local models pulled via `ollama pull`. No auth required.
+// Timeout matches the custom-provider extended timeout.
 register(new OpenAICompatProvider({
-  platform: 'ollama',
-  name: 'Ollama Cloud',
-  baseUrl: 'https://ollama.com/v1',
-  timeoutMs: 120000,
+    platform: 'ollama',
+    name: 'Local Ollama',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    timeoutMs: 120000,
 }));
 
 // Kilo AI Gateway — OpenAI-compatible aggregator. Kilo documents anonymous
