@@ -1545,7 +1545,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
           for await (const chunk of gen) {
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
-            const anyChunk = chunk as Record<string, any>;
+            // Provider metadata is not authoritative for the public gateway
+            // response. Some OpenAI-compatible providers (notably Reka) return
+            // the literal model name "default" even when a concrete model was
+            // requested. Normalize every streamed frame at the proxy boundary
+            // so clients consistently see the model that was actually routed.
+            const anyChunk: Record<string, any> = { ...(chunk as Record<string, any>), model: route.modelId };
 
             // In-band upstream error frame (observed live: Groq emits
             // {"error":{...,"code":"tool_use_failed"}} inside a 200 SSE
@@ -1593,8 +1598,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               if (tc.function?.arguments) acc.args += tc.function.arguments;
             }
 
-            normalizeOutboundContent(chunk);
-            sanitizeResponse(chunk);
+            normalizeOutboundContent(anyChunk);
+            sanitizeResponse(anyChunk);
             const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
 
             if (text.length === 0) {
@@ -1756,6 +1761,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams },
           quotaContextForRoute(route, 'chat/completions'),
         );
+
+        // Upstream `model` fields are provider-controlled and can be a generic
+        // placeholder such as Reka's "default". The gateway contract exposes
+        // the concrete routed model, consistently across every provider.
+        result.model = route.modelId;
 
         // Empty completion (no text, no tool calls) → fail over rather than
         // return a transport-level "success" the caller can't act on. Mirrors

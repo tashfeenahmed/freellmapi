@@ -319,9 +319,17 @@ describe('OpenAICompatProvider', () => {
     expect(await provider.validateKey('valid')).toBe(true);
   });
 
-  it('validateKey returns false on confirmed 401', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 401 } as any);
-    expect(await provider.validateKey('bad')).toBe(false);
+  it('validateKey preserves the provider reason on confirmed 401', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: () => Promise.resolve({ error: { message: 'This token has expired' } }),
+    } as any);
+    expect(await provider.validateKey('bad')).toEqual({
+      valid: false,
+      error: 'TestProvider key validation failed (HTTP 401): This token has expired',
+    });
   });
 
   it('validateKey propagates transport errors instead of swallowing', async () => {
@@ -494,6 +502,7 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'mistral',    name: 'Mistral',       baseUrl: 'https://api.mistral.ai/v1' },
     { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },
     { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
+    { platform: 'pollinations', name: 'Pollinations', baseUrl: 'https://gen.pollinations.ai/v1' },
     { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     { platform: 'opencode',   name: 'OpenCode Zen',  baseUrl: 'https://opencode.ai/zen/v1' },
     { platform: 'aion',       name: 'Aion Labs',     baseUrl: 'https://api.aionlabs.ai/v1' },
@@ -525,6 +534,37 @@ describe('OpenAICompatProvider - platform instances', () => {
       expect(result._routed_via?.platform).toBe(p.platform);
     });
   }
+
+  it('omits greedy temperature=0 for Requesty Leanstral and supplies neutral top_p', async () => {
+    const provider = new OpenAICompatProvider({
+      platform: 'requesty',
+      name: 'Requesty',
+      baseUrl: 'https://router.requesty.ai/v1',
+    });
+    let body: Record<string, unknown> = {};
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse(String((init as RequestInit).body));
+      return {
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'mistral/leanstral-1-5',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'key',
+      [{ role: 'user', content: 'hi' }],
+      'mistral/leanstral-1-5',
+      { temperature: 0 },
+    );
+
+    expect(body.temperature).toBeUndefined();
+    expect(body.top_p).toBe(1);
+  });
 
   // #264: Groq (and others) reject a model's inline tool-call dialect with a 400
   // `tool_use_failed`, handing back the raw text in `error.failed_generation`.

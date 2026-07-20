@@ -3,7 +3,7 @@ import type {
   ChatCompletionResponse,
   ChatCompletionChunk,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult, type KeyValidationFailure } from './base.js';
 import { extendedBodyParams } from '../lib/sampling-params.js';
 import { contentToString } from '../lib/content.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
@@ -20,10 +20,19 @@ import { providerTimeoutMs } from '../lib/provider-timeout.js';
 // 2026-07-11: repeated 15s aborts). Matches zhipu/agnes/ollama bumps.
 // PROVIDER_TIMEOUT_CLOUDFLARE overrides (#547).
 const CHAT_TIMEOUT_MS = providerTimeoutMs('cloudflare', 60_000);
+const GLM_47_FLASH_TIMEOUT_MS = 200_000;
 
 export class CloudflareProvider extends BaseProvider {
   readonly platform = 'cloudflare' as const;
   readonly name = 'Cloudflare Workers AI';
+
+  private timeoutFor(modelId: string, override?: number): number {
+    if (override !== undefined) return override;
+    if (CHAT_TIMEOUT_MS <= 0) return CHAT_TIMEOUT_MS;
+    return modelId === '@cf/zai-org/glm-4.7-flash'
+      ? Math.max(CHAT_TIMEOUT_MS, GLM_47_FLASH_TIMEOUT_MS)
+      : CHAT_TIMEOUT_MS;
+  }
 
   private parseKey(apiKey: string): { accountId: string; token: string } {
     const sep = apiKey.indexOf(':');
@@ -67,7 +76,7 @@ export class CloudflareProvider extends BaseProvider {
         parallel_tool_calls: options?.parallel_tool_calls,
         ...extendedBodyParams(this.platform, options),
       }),
-    }, CHAT_TIMEOUT_MS);
+    }, this.timeoutFor(modelId, options?.timeoutMs));
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -116,7 +125,7 @@ export class CloudflareProvider extends BaseProvider {
         ...extendedBodyParams(this.platform, options),
         stream: true,
       }),
-    }, CHAT_TIMEOUT_MS);
+    }, this.timeoutFor(modelId, options?.timeoutMs));
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -134,7 +143,7 @@ export class CloudflareProvider extends BaseProvider {
     yield* this.readSseStream(res);
   }
 
-  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     // Transport errors propagate — health.ts marks status='error' without
     // counting toward auto-disable. Only confirmed bad/inactive tokens disable.
     const { accountId, token } = this.parseKey(apiKey);
@@ -148,21 +157,22 @@ export class CloudflareProvider extends BaseProvider {
       token,
       quotaContext,
     );
-    if (userResult !== 'auth-failed') return userResult;
+    if ('result' in userResult) return userResult.result;
 
     const accountResult = await this.verifyAt(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/tokens/verify`,
       token,
       quotaContext,
     );
-    if (accountResult === 'auth-failed') return false;
-    return accountResult;
+    if ('result' in accountResult) return accountResult.result;
+    return accountResult.authFailed;
   }
 
-  // Hits a Cloudflare token-verify endpoint. Returns true/false for a definitive
-  // active/inactive verdict, or 'auth-failed' when the token lacks access to
-  // THIS endpoint (401/403) so the caller can try the other scope.
-  private async verifyAt(url: string, token: string, quotaContext?: QuotaObservationContext): Promise<boolean | 'auth-failed'> {
+  // Hits a Cloudflare token-verify endpoint. Returns {result} for a definitive
+  // verdict, or {authFailed} when the token lacks access to THIS endpoint
+  // (401/403) so the caller can try the other scope — carrying the upstream
+  // reason so a key that fails both scopes still surfaces why.
+  private async verifyAt(url: string, token: string, quotaContext?: QuotaObservationContext): Promise<{ result: KeyValidationResult } | { authFailed: KeyValidationFailure }> {
     const res = await this.fetchWithTimeout(
       url,
       { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } },
@@ -176,9 +186,15 @@ export class CloudflareProvider extends BaseProvider {
       quotaPoolKey: quotaContext?.quotaPoolKey,
       endpoint: 'tokens/verify',
     });
-    if (res.status === 401 || res.status === 403) return 'auth-failed';
-    if (!res.ok) return true; // unexpected non-2xx that isn't auth — don't disable
+    if (res.status === 401 || res.status === 403) {
+      return { authFailed: await this.validationResult(res) as KeyValidationFailure };
+    }
+    if (!res.ok) return { result: true }; // unexpected non-2xx that isn't auth — don't disable
     const data = await res.json() as any;
-    return data.success === true && data.result?.status === 'active';
+    if (data.success === true && data.result?.status === 'active') return { result: true };
+    const reason = data.result?.status
+      ? `token status is "${data.result.status}"`
+      : data.errors?.[0]?.message ?? 'verify endpoint did not confirm an active token';
+    return { result: { valid: false, error: `${this.name} key validation failed: ${reason}` } };
   }
 }

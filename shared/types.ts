@@ -181,6 +181,7 @@ export interface ApiKey {
   keyless: boolean;
   createdAt: string;
   lastCheckedAt: string | null;
+  lastHealthError: string | null;
   models?: ApiKeyModel[];
 }
 

@@ -153,43 +153,110 @@ describe('media service', () => {
     it('Cloudflare MeloTTS: base64 audio → audio/mpeg bytes', async () => {
       addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio');
       addKey('cloudflare', 'acct:tok');
-      globalThis.fetch = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('MP3').toString('base64') } })) as any;
-      const r = await runSpeech('@cf/myshell-ai/melotts', { input: 'hi' });
+      const fetchMock = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('MP3').toString('base64') } }));
+      globalThis.fetch = fetchMock as any;
+      const r = await runSpeech('@cf/myshell-ai/melotts', { input: 'hi', voice: 'alloy' });
       expect(r.contentType).toBe('audio/mpeg');
       expect(r.audio.toString()).toBe('MP3');
+      const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+      expect(body).toMatchObject({ prompt: 'hi', lang: 'en' });
     });
 
-    it('SiliconFlow CosyVoice: raw audio bytes', async () => {
+    it('SiliconFlow CosyVoice: maps OpenAI voices, accepts native names, and defaults unknown names', async () => {
       addMedia('siliconflow', 'FunAudioLLM/CosyVoice2-0.5B', 'audio');
       addKey('siliconflow');
-      globalThis.fetch = vi.fn(async () =>
-        new Response(Buffer.from('COSY'), { status: 200, headers: { 'content-type': 'audio/mpeg' } })) as any;
-      const r = await runSpeech('FunAudioLLM/CosyVoice2-0.5B', { input: 'hi' });
+      const fetchMock = vi.fn(async () =>
+        new Response(Buffer.from('COSY'), { status: 200, headers: { 'content-type': 'audio/mpeg' } }));
+      globalThis.fetch = fetchMock as any;
+      const r = await runSpeech('FunAudioLLM/CosyVoice2-0.5B', { input: 'hi', voice: 'nova' });
+      await runSpeech('FunAudioLLM/CosyVoice2-0.5B', { input: 'hi', voice: 'diana' });
+      await runSpeech('FunAudioLLM/CosyVoice2-0.5B', { input: 'hi', voice: 'not-a-voice' });
       expect(r.contentType).toBe('audio/mpeg');
       expect(r.audio.toString()).toBe('COSY');
+      const voices = fetchMock.mock.calls.map(call =>
+        JSON.parse(String((call[1] as RequestInit).body)).voice,
+      );
+      expect(voices).toEqual([
+        'FunAudioLLM/CosyVoice2-0.5B:anna',
+        'FunAudioLLM/CosyVoice2-0.5B:diana',
+        'FunAudioLLM/CosyVoice2-0.5B:alex',
+      ]);
     });
 
-    it('Pollinations openai-audio: message.audio.data → bytes (keyless)', async () => {
+    it('Pollinations openai-audio: keeps OpenAI voices and defaults unknown names (keyless)', async () => {
       addMedia('pollinations', 'openai-audio', 'audio');
-      globalThis.fetch = vi.fn(async () =>
-        jsonResponse({ choices: [{ message: { audio: { data: Buffer.from('POLLY').toString('base64') } } }] })) as any;
-      const r = await runSpeech('openai-audio', { input: 'hi' });
+      const fetchMock = vi.fn(async () =>
+        jsonResponse({ choices: [{ message: { audio: { data: Buffer.from('POLLY').toString('base64') } } }] }));
+      globalThis.fetch = fetchMock as any;
+      const r = await runSpeech('openai-audio', { input: 'hi', voice: 'shimmer' });
+      await runSpeech('openai-audio', { input: 'hi', voice: 'not-a-voice' });
       expect(r.audio.toString()).toBe('POLLY');
+      const voices = fetchMock.mock.calls.map(call =>
+        JSON.parse(String((call[1] as RequestInit).body)).audio.voice,
+      );
+      expect(voices).toEqual(['shimmer', 'alloy']);
     });
 
-    it('Gemini TTS: base64 PCM wrapped as WAV (RIFF header)', async () => {
+    it('Gemini TTS: maps OpenAI voices and wraps base64 PCM as WAV', async () => {
       addMedia('google', 'gemini-2.5-flash-preview-tts', 'audio');
       addKey('google');
       const pcm = Buffer.from([1, 2, 3, 4]);
-      globalThis.fetch = vi.fn(async () => jsonResponse({
+      const fetchMock = vi.fn(async () => jsonResponse({
         candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] } }],
-      })) as any;
-      const r = await runSpeech('gemini-2.5-flash-preview-tts', { input: 'hi' });
+      }));
+      globalThis.fetch = fetchMock as any;
+      const r = await runSpeech('gemini-2.5-flash-preview-tts', { input: 'hi', voice: 'alloy' });
       expect(r.contentType).toBe('audio/wav');
       expect(r.audio.subarray(0, 4).toString()).toBe('RIFF');
       expect(r.audio.subarray(8, 12).toString()).toBe('WAVE');
       // header (44) + 4 PCM bytes
       expect(r.audio.length).toBe(48);
+      const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+      expect(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Schedar');
+    });
+
+    it('Gemini TTS: canonicalizes native voices and defaults unknown names', async () => {
+      addMedia('google', 'gemini-2.5-flash-preview-tts', 'audio');
+      addKey('google');
+      const pcm = Buffer.from([1, 2]);
+      const fetchMock = vi.fn(async () => jsonResponse({
+        candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;rate=24000', data: pcm.toString('base64') } }] } }],
+      }));
+      globalThis.fetch = fetchMock as any;
+
+      await runSpeech('gemini-2.5-flash-preview-tts', { input: 'hi', voice: 'achernar' });
+      await runSpeech('gemini-2.5-flash-preview-tts', { input: 'hi', voice: 'not-a-voice' });
+
+      const voices = fetchMock.mock.calls.map(call => {
+        const body = JSON.parse(String((call[1] as RequestInit).body));
+        return body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName;
+      });
+      expect(voices).toEqual(['Achernar', 'Kore']);
+    });
+
+    it('uses provider-safe voices during failover without losing a native Gemini voice', async () => {
+      addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio', 1);
+      addKey('cloudflare', 'acct:tok');
+      addMedia('google', 'gemini-2.5-flash-preview-tts', 'audio', 2);
+      addKey('google');
+      const pcm = Buffer.from([1, 2]);
+      const fetchMock = vi.fn(async (url: string | URL | Request) => {
+        if (String(url).includes('cloudflare.com')) {
+          return new Response('temporarily unavailable', { status: 503 });
+        }
+        return jsonResponse({
+          candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;rate=24000', data: pcm.toString('base64') } }] } }],
+        });
+      });
+      globalThis.fetch = fetchMock as any;
+
+      const result = await runSpeech('auto', { input: 'hi', voice: 'achernar' });
+
+      expect(result.platform).toBe('google');
+      const cloudflareBody = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+      const googleBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body));
+      expect(cloudflareBody.lang).toBe('en');
+      expect(googleBody.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Achernar');
     });
 
     it('custom audio models call the bound OpenAI-compatible endpoint', async () => {

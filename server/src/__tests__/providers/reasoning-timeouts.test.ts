@@ -29,7 +29,7 @@ describe('reasoning-model chat timeouts', () => {
     expect((provider as unknown as { timeoutMs: number }).timeoutMs).toBe(ms);
   });
 
-  it('cloudflare chat aborts on a 60s timer, not the 15s default', async () => {
+  it('cloudflare GLM 4.7 Flash gets its live-verified 200s per-model timeout', async () => {
     const provider = new CloudflareProvider();
     const delays: number[] = [];
     const origSetTimeout = global.setTimeout;
@@ -54,7 +54,7 @@ describe('reasoning-model chat timeouts', () => {
       '@cf/zai-org/glm-4.7-flash',
     );
 
-    expect(delays).toContain(60_000);
+    expect(delays).toContain(200_000);
     expect(delays).not.toContain(15_000);
   });
 });

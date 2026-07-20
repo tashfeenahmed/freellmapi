@@ -7,7 +7,7 @@ import type {
   ChatToolDefinition,
   TokenUsage,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { contentToString } from '../lib/content.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
@@ -793,7 +793,7 @@ export class GoogleProvider extends BaseProvider {
     }
   }
 
-  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     // Transport errors propagate — health.ts marks status='error' without
     // counting toward auto-disable.
     const res = await this.fetchWithTimeout(
@@ -838,13 +838,19 @@ export class GoogleProvider extends BaseProvider {
       /API key not valid|API key expired|API_KEY_INVALID/i.test(message);
     if (badCredentials) {
       console.warn(`[Google] validateKey: key rejected as invalid (HTTP ${res.status}${reason ? ` ${reason}` : ''})`);
-      return false;
+      return {
+        valid: false,
+        error: `Google key validation failed (HTTP ${res.status}${reason ? ` ${reason}` : ''})${message ? `: ${message}` : ''}`,
+      };
     }
 
     console.warn(
       `[Google] validateKey: inconclusive HTTP ${res.status} (${gStatus ?? 'UNKNOWN'}${reason ? `/${reason}` : ''}): ${message.slice(0, 200)} ` +
       `— treating as 'error', not auto-disabling (the key may be valid but blocked by region/permission/restriction on this host).`,
     );
-    throw new Error(`Google key validation inconclusive (HTTP ${res.status}${gStatus ? ` ${gStatus}` : ''})`);
+    throw new Error(
+      `Google key validation inconclusive (HTTP ${res.status}${gStatus ? ` ${gStatus}` : ''}${reason ? ` ${reason}` : ''})` +
+      `${message ? `: ${message}` : ''}`,
+    );
   }
 }

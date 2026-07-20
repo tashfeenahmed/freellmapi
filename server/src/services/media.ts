@@ -55,6 +55,96 @@ export interface SpeechResult {
 export interface ImageParams { prompt: string; n?: number; size?: string }
 export interface SpeechParams { input: string; voice?: string; format?: string }
 
+// OpenAI clients commonly send one of these voice names even when the user did
+// not choose a voice explicitly. Native TTS providers use unrelated voice
+// vocabularies, so forwarding the value verbatim makes an otherwise ordinary
+// OpenAI request fail. Keep the translation here, at the provider boundary;
+// custom OpenAI-compatible endpoints still receive the caller's value as-is.
+// Pollinations' openai-audio route exposes the original OpenAI TTS vocabulary.
+const POLLINATIONS_VOICES = new Set([
+  'alloy', 'echo', 'fable', 'nova', 'onyx', 'shimmer',
+]);
+
+const SILICONFLOW_NATIVE_VOICES = new Set([
+  'alex', 'anna', 'bella', 'benjamin', 'charles', 'claire', 'david', 'diana',
+]);
+
+const SILICONFLOW_OPENAI_VOICE_MAP: Record<string, string> = {
+  alloy: 'alex',
+  ash: 'claire',
+  ballad: 'diana',
+  coral: 'bella',
+  echo: 'benjamin',
+  fable: 'charles',
+  nova: 'anna',
+  onyx: 'david',
+  sage: 'benjamin',
+  shimmer: 'bella',
+  verse: 'charles',
+  marin: 'anna',
+  cedar: 'david',
+};
+
+const GEMINI_NATIVE_VOICES = [
+  'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede',
+  'Callirrhoe', 'Autonoe', 'Enceladus', 'Iapetus', 'Umbriel', 'Algieba',
+  'Despina', 'Erinome', 'Algenib', 'Rasalgethi', 'Laomedeia', 'Achernar',
+  'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird', 'Zubenelgenubi',
+  'Vindemiatrix', 'Sadachbia', 'Sadaltager', 'Sulafat',
+] as const;
+
+const GEMINI_NATIVE_VOICE_LOOKUP = new Map(
+  GEMINI_NATIVE_VOICES.map(voice => [voice.toLowerCase(), voice]),
+);
+
+const GEMINI_OPENAI_VOICE_MAP: Record<string, string> = {
+  alloy: 'Schedar',       // even
+  ash: 'Charon',          // informative
+  ballad: 'Enceladus',    // breathy
+  coral: 'Sulafat',       // warm
+  echo: 'Iapetus',        // clear
+  fable: 'Puck',          // upbeat
+  nova: 'Zephyr',         // bright
+  onyx: 'Gacrux',         // mature
+  sage: 'Sadaltager',     // knowledgeable
+  shimmer: 'Achernar',    // soft
+  verse: 'Laomedeia',     // upbeat
+  marin: 'Aoede',         // breezy
+  cedar: 'Kore',          // firm
+};
+
+function normalizedVoice(voice?: string): string | undefined {
+  const value = voice?.trim().toLowerCase();
+  return value || undefined;
+}
+
+function siliconFlowVoice(modelId: string, requested?: string): string {
+  const raw = requested?.trim();
+  const prefix = `${modelId}:`;
+  const qualifiedNative = raw?.startsWith(prefix)
+    ? normalizedVoice(raw.slice(prefix.length))
+    : undefined;
+  const name = qualifiedNative && SILICONFLOW_NATIVE_VOICES.has(qualifiedNative)
+    ? qualifiedNative
+    : normalizedVoice(raw);
+  const native = name && SILICONFLOW_NATIVE_VOICES.has(name) ? name : undefined;
+  const mapped = name ? SILICONFLOW_OPENAI_VOICE_MAP[name] : undefined;
+  return `${modelId}:${native ?? mapped ?? 'alex'}`;
+}
+
+function pollinationsVoice(requested?: string): string {
+  const voice = normalizedVoice(requested);
+  return voice && POLLINATIONS_VOICES.has(voice) ? voice : 'alloy';
+}
+
+function geminiVoice(requested?: string): string {
+  const voice = normalizedVoice(requested);
+  if (!voice) return 'Kore';
+  return GEMINI_NATIVE_VOICE_LOOKUP.get(voice)
+    ?? GEMINI_OPENAI_VOICE_MAP[voice]
+    ?? 'Kore';
+}
+
 // Media generations are slower than chat — a cold FLUX/SDXL run can take 30-60s.
 const FETCH_TIMEOUT_MS = 60_000;
 
@@ -285,7 +375,9 @@ async function callSpeechProvider(
       const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ prompt: p.input, lang: p.voice ?? 'en' }),
+        // MeloTTS has a language selector, not a voice selector. In particular,
+        // OpenAI's default `alloy` must never be sent as `lang`.
+        body: JSON.stringify({ prompt: p.input, lang: 'en' }),
       });
       const j = (await r.json()) as { result?: { audio?: string } };
       const b64 = j.result?.audio;
@@ -297,7 +389,12 @@ async function callSpeechProvider(
       const r = await mediaFetch('https://api.siliconflow.com/v1/audio/speech', 'siliconflow', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: row.model_id, input: p.input, voice: p.voice ?? `${row.model_id}:alex`, response_format: fmt }),
+        body: JSON.stringify({
+          model: row.model_id,
+          input: p.input,
+          voice: siliconFlowVoice(row.model_id, p.voice),
+          response_format: fmt,
+        }),
       });
       return { audio: Buffer.from(await r.arrayBuffer()), contentType: contentTypeFor(fmt) };
     }
@@ -311,7 +408,7 @@ async function callSpeechProvider(
         body: JSON.stringify({
           model: row.model_id,
           modalities: ['text', 'audio'],
-          audio: { voice: p.voice ?? 'alloy', format: p.format ?? 'mp3' },
+          audio: { voice: pollinationsVoice(p.voice), format: p.format ?? 'mp3' },
           messages: [{ role: 'user', content: p.input }],
         }),
       });
@@ -334,7 +431,7 @@ async function callSpeechProvider(
             contents: [{ parts: [{ text: p.input }] }],
             generationConfig: {
               responseModalities: ['AUDIO'],
-              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: p.voice ?? 'Kore' } } },
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiVoice(p.voice) } } },
             },
           }),
         },

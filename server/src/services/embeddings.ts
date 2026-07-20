@@ -109,6 +109,18 @@ function estimateTokens(inputs: string[]): number {
 
 const FETCH_TIMEOUT_MS = 30_000;
 
+/** Provider adapters that can safely receive catalog-managed embedding rows. */
+export const EMBEDDING_PLATFORMS = new Set([
+  'google',
+  'nvidia',
+  'openrouter',
+  'github',
+  'cloudflare',
+  'huggingface',
+  'cohere',
+  'sealion',
+]);
+
 interface ProviderCallResult {
   vectors: number[][];
   inputTokens: number | null; // provider-reported, when available
@@ -177,6 +189,8 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'github':
       return openAiStyleEmbed('https://models.github.ai/inference/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
+    case 'sealion':
+      return openAiStyleEmbed('https://api.sea-lion.ai/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');

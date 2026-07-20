@@ -54,7 +54,7 @@ function mockUpstream(script: Array<{ body: string; status?: number }>) {
     const urlStr = typeof url === 'string' ? url : url.toString();
     // Only intercept provider upstreams; the test's own localhost request
     // and anything else goes through.
-    if (!/api\.groq\.com|openrouter\.ai|api\.cohere|generativelanguage|integrate\.api\.nvidia|api\.cerebras|api\.mistral|router\.huggingface|api\.cloudflare|models\.github|open\.bigmodel|api\.llm7|api\.kilo|text\.pollinations|ollama\.com|opencode\.ai|api\.aionlabs\.ai|router\.requesty\.ai|api\.navy|router\.bynara\.id/.test(urlStr)) {
+    if (!/api\.groq\.com|openrouter\.ai|api\.cohere|generativelanguage|integrate\.api\.nvidia|api\.cerebras|api\.mistral|router\.huggingface|api\.cloudflare|models\.github|open\.bigmodel|api\.llm7|api\.kilo|gen\.pollinations|ollama\.com|opencode\.ai|api\.aionlabs\.ai|router\.requesty\.ai|api\.navy|router\.bynara\.id/.test(urlStr)) {
       return origFetch(url as any, init);
     }
     const reqBody = JSON.parse(String((init as RequestInit).body));
@@ -252,7 +252,7 @@ describe('proxy stream turn-integrity', () => {
   });
 
   it('streams ordinary text through unmodified, always ending in a terminal finish_reason', async () => {
-    mockUpstream([
+    const up = mockUpstream([
       { body: sse(roleChunk, textChunk('Hello'), textChunk(' world'), finishChunk('stop'), '[DONE]') },
     ]);
     const r = await request(app, '/v1/chat/completions', {
@@ -262,6 +262,9 @@ describe('proxy stream turn-integrity', () => {
     const text = fs.map(f => f.choices?.[0]?.delta?.content ?? '').join('');
     expect(text).toBe('Hello world');
     expect(fs.map(f => f.choices?.[0]?.finish_reason).filter(Boolean)).toEqual(['stop']);
+    // The crafted upstream frames all advertise model "m". Public frames must
+    // instead identify the concrete model selected by the router (#568).
+    expect(fs.every(f => f.error || f.model === up.seen[0].model)).toBe(true);
     expect(r.text.trim().endsWith('data: [DONE]')).toBe(true);
   });
 

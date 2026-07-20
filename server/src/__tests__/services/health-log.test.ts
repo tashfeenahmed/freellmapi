@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import { initDb } from '../../db/index.js';
+import { getDb, initDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 
 // Mock the providers module BEFORE importing the service so the test never
@@ -71,6 +71,8 @@ describe('checkKeyHealth transport-error log format', () => {
     expect(m[2]).toBe('openai-compat');
     expect(m[3]).toBe('https://api.example.com/v1');
     expect(m[4]).toBe('mocked transport failure');
+    const row = getDb().prepare('SELECT last_health_error FROM api_keys WHERE id = ?').get(id) as { last_health_error: string };
+    expect(row.last_health_error).toBe('mocked transport failure');
   });
 
   it('falls back to base=default when base_url is null', async () => {

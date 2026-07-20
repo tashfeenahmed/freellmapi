@@ -2114,7 +2114,7 @@ function migrateQuirksV1(db: Db) {
       title: 'No API key required',
       body: 'Routes anonymously — the catalog ships a keyless sentinel row and calls work with no account or key.',
       severity: 'info',
-      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'pollinations' }, { platform: 'ovh' }],
+      targets: [{ platform: 'kilo' }, { platform: 'llm7' }, { platform: 'ovh' }],
     },
     {
       slug: 'ovh-anon-trickle',
@@ -2125,8 +2125,8 @@ function migrateQuirksV1(db: Db) {
     },
     {
       slug: 'pollinations-degraded',
-      title: 'Anon tier degraded (1 concurrent)',
-      body: 'Pollinations’ legacy text API is deprecated for authenticated users (replacement enter.pollinations.ai is pay-as-you-go), but anonymous access is explicitly unaffected. Anon is queue-limited to 1 concurrent request per IP and serves a single model (openai-fast); expect 429 "Queue full" under any parallelism. Live-probed 2026-06-10.',
+      title: 'Publishable key uses recurring shared capacity',
+      body: 'Pollinations chat uses https://gen.pollinations.ai/v1 with a free publishable API key. Shared free capacity currently accrues at one pollen per IP per hour; the legacy text host is no longer used.',
       severity: 'warning',
       targets: [{ platform: 'pollinations' }],
     },

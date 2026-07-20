@@ -208,6 +208,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       keyless: resolveProvider(row.platform)?.keyless === true,
       createdAt: row.created_at,
       lastCheckedAt: row.last_checked_at,
+      lastHealthError: row.last_health_error ?? null,
       models: row.platform === 'custom' ? (modelsByKeyId.get(row.id) ?? []) : undefined,
     };
   });

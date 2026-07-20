@@ -38,7 +38,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
   { value: 'ollama', label: 'Ollama Cloud', url: 'https://ollama.com/settings/keys' },
   { value: 'kilo', label: 'Kilo Gateway (no key needed)', url: 'https://app.kilo.ai', keyless: true },
-  { value: 'pollinations', label: 'Pollinations (no key needed)', url: 'https://pollinations.ai', keyless: true },
+  { value: 'pollinations', label: 'Pollinations', url: 'https://enter.pollinations.ai' },
   { value: 'ovh', label: 'OVH AI Endpoints (no key needed)', url: 'https://endpoints.ai.cloud.ovh.net', keyless: true },
   { value: 'llm7', label: 'LLM7 (anon ok)', url: 'https://llm7.io' },
   { value: 'huggingface', label: 'HuggingFace Router', url: 'https://huggingface.co/settings/tokens' },
@@ -110,6 +110,6 @@ export interface HealthPlatform {
 
 export interface HealthData {
   platforms: HealthPlatform[]
-  keys: { id: number; platform: string; status: string; lastCheckedAt: string | null }[]
+  keys: { id: number; platform: string; status: string; lastCheckedAt: string | null; lastHealthError: string | null }[]
   quotaStates: ProviderQuotaState[]
 }

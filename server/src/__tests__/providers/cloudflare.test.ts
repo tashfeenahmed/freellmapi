@@ -90,15 +90,23 @@ describe('CloudflareProvider', () => {
       expect(calls[1]).toBe('https://api.cloudflare.com/client/v4/accounts/acc123/tokens/verify');
     });
 
-    it('returns false only when both scopes reject the token', async () => {
+    it('fails with the upstream reason when both scopes reject the token', async () => {
       vi.spyOn(global, 'fetch').mockImplementation(async () => {
-        return { ok: false, status: 403, json: () => Promise.resolve({}) } as any;
+        return {
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          json: () => Promise.resolve({ success: false, errors: [{ code: 9109, message: 'Invalid access token' }] }),
+        } as any;
       });
 
-      expect(await provider.validateKey('acc123:tok')).toBe(false);
+      const result = await provider.validateKey('acc123:tok');
+      expect(result).toMatchObject({ valid: false });
+      expect((result as any).error).toContain('HTTP 403');
+      expect((result as any).error).toContain('Invalid access token');
     });
 
-    it('returns false when the account scope reports an inactive token', async () => {
+    it('fails with the token status when the account scope reports an inactive token', async () => {
       vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
         if ((url as string).includes('/user/tokens/verify')) {
           return { ok: false, status: 403, json: () => Promise.resolve({}) } as any;
@@ -110,7 +118,9 @@ describe('CloudflareProvider', () => {
         } as any;
       });
 
-      expect(await provider.validateKey('acc123:tok')).toBe(false);
+      const result = await provider.validateKey('acc123:tok');
+      expect(result).toMatchObject({ valid: false });
+      expect((result as any).error).toContain('token status is "disabled"');
     });
   });
 

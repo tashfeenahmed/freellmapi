@@ -5,7 +5,7 @@ import type {
   ChatCompletionChunk,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
@@ -197,7 +197,7 @@ export class AIHordeProvider extends BaseProvider {
    * confirmed 401/403 is treated as an invalid key. Transport errors propagate
    * to health.ts (marked status='error' without counting a failure).
    */
-  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/models`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.resolveBearer(apiKey)}` },
@@ -209,6 +209,6 @@ export class AIHordeProvider extends BaseProvider {
       quotaPoolKey: quotaContext?.quotaPoolKey,
       endpoint: 'models',
     });
-    return res.status !== 401 && res.status !== 403;
+    return this.validationResult(res);
   }
 }

@@ -5,7 +5,7 @@ import type {
   ChatToolCall,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { extendedBodyParams } from '../lib/sampling-params.js';
 import { rescueInlineToolCalls } from '../lib/tool-call-rescue.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -108,6 +108,23 @@ export class OpenAICompatProvider extends BaseProvider {
     return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
   }
 
+  /** Requesty's Leanstral route rejects greedy sampling when temperature=0.
+   * Omitting that value and supplying a neutral top_p keeps the caller's intent
+   * deterministic enough while using the provider's supported sampling path. */
+  private samplingForModel(modelId: string, options?: CompletionOptions): {
+    temperature: number | undefined;
+    topP: number | undefined;
+  } {
+    if (
+      this.platform === 'requesty' &&
+      modelId === 'mistral/leanstral-1-5' &&
+      options?.temperature === 0
+    ) {
+      return { temperature: undefined, topP: options.top_p ?? 1 };
+    }
+    return { temperature: options?.temperature, topP: options?.top_p };
+  }
+
   /** Mistral's OpenAI-compatible endpoint is strict about unknown nested fields
    * and returns 422 for provider-private replay fields that other gateways
    * ignore. Keep the OpenAI wire shape, but strip our internal reasoning /
@@ -156,6 +173,7 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
+    const sampling = this.samplingForModel(modelId, options);
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -166,9 +184,9 @@ export class OpenAICompatProvider extends BaseProvider {
       body: JSON.stringify({
         model: modelId,
         messages: this.messagesForPlatform(messages),
-        temperature: options?.temperature,
+        temperature: sampling.temperature,
         max_tokens: options?.max_tokens,
-        top_p: options?.top_p,
+        top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
@@ -268,6 +286,7 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk> {
+    const sampling = this.samplingForModel(modelId, options);
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -278,9 +297,9 @@ export class OpenAICompatProvider extends BaseProvider {
       body: JSON.stringify({
         model: modelId,
         messages: this.messagesForPlatform(messages),
-        temperature: options?.temperature,
+        temperature: sampling.temperature,
         max_tokens: options?.max_tokens,
-        top_p: options?.top_p,
+        top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
         tool_choice: options?.tool_choice,
@@ -316,7 +335,7 @@ export class OpenAICompatProvider extends BaseProvider {
     yield* this.readSseStream(res);
   }
 
-  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     // Note: transport errors (DNS / timeout / TLS) propagate to the caller.
     // health.ts catches them and marks status='error' WITHOUT incrementing
     // the consecutive-failure counter — only confirmed 401/403 disables a key.
@@ -340,7 +359,7 @@ export class OpenAICompatProvider extends BaseProvider {
       quotaPoolKey: quotaContext?.quotaPoolKey,
       endpoint: 'models',
     });
-    return res.status !== 401 && res.status !== 403;
+    return this.validationResult(res);
   }
 }
 

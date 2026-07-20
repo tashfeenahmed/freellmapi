@@ -59,6 +59,14 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
   timeoutMs?: number;
 }
 
+export interface KeyValidationFailure {
+  valid: false;
+  /** Provider-supplied reason suitable for health logs and the local keys UI. */
+  error: string;
+}
+
+export type KeyValidationResult = boolean | KeyValidationFailure;
+
 export abstract class BaseProvider {
   abstract readonly platform: Platform;
   abstract readonly name: string;
@@ -84,7 +92,38 @@ export abstract class BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk>;
 
-  abstract validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean>;
+  abstract validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult>;
+
+  /**
+   * Turn a conventional 401/403 validation response into a diagnostic result.
+   * Providers still return a simple boolean when no useful error body exists,
+   * but preserving the upstream message here lets the health service persist
+   * and display the reason instead of reducing every failure to "invalid".
+   */
+  protected async validationResult(res: Response): Promise<KeyValidationResult> {
+    if (res.status !== 401 && res.status !== 403) return true;
+
+    let body: any = null;
+    try {
+      if (typeof (res as any).json === 'function') body = await res.json();
+    } catch {
+      // A status and provider name are still more useful than no reason.
+    }
+
+    const detail = [
+      body?.error?.message,
+      body?.errors?.[0]?.message,
+      body?.message,
+      body?.detail,
+      body?.title,
+      res.statusText,
+    ].find((value) => typeof value === 'string' && value.trim().length > 0);
+
+    return {
+      valid: false,
+      error: `${this.name} key validation failed (HTTP ${res.status})${detail ? `: ${detail}` : ''}`,
+    };
+  }
 
   protected async fetchWithTimeout(
     url: string,

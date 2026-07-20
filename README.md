@@ -41,6 +41,8 @@ Your router updates its own model catalog from a signed feed: new free models, q
 - [How it works](#how-it-works)
 - [Context Handoff](#context-handoff)
 - [Limitations](#limitations)
+- [Documentation index](docs/README.md)
+- [Contributor guide](CONTRIBUTING.md)
 - [Contributing](#contributing)
 - [Terms of Service review](#terms-of-service-review)
 - [Disclaimer](#disclaimer)
@@ -163,6 +165,8 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
 On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** (below); the Docker steps work in WSL or any bash shell.
+
+On Android, see the experimental [Termux installation guide](docs/install/android-termux.md). It uses Node's built-in SQLite driver and does not require the Android NDK.
 
 **Or manually with Docker Compose.** It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
 

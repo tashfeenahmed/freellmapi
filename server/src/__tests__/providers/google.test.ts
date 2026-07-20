@@ -86,7 +86,7 @@ describe('GoogleProvider', () => {
     expect(await provider.validateKey('valid-key')).toBe(true);
 
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 401 } as any);
-    expect(await provider.validateKey('invalid-key')).toBe(false);
+    expect(await provider.validateKey('invalid-key')).toMatchObject({ valid: false });
   });
 
   // #268: Google reports a bad key as HTTP 400 INVALID_ARGUMENT / API_KEY_INVALID,
@@ -104,7 +104,7 @@ describe('GoogleProvider', () => {
         },
       }),
     } as any);
-    expect(await provider.validateKey('bad-key')).toBe(false);
+    expect(await provider.validateKey('bad-key')).toMatchObject({ valid: false });
   });
 
   // #268: a permission/region/restriction 403 (e.g. API not enabled on the project,
