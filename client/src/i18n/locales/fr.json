@@ -280,5 +280,15 @@
     "fr": "Français",
     "es": "Español",
     "pt-BR": "Português (Brasil)"
+  },
+  "aliases": {
+    "title": "Logical models",
+    "add": "New alias",
+    "name": "Name",
+    "level": "Level",
+    "priority": "Priority",
+    "members": "Members",
+    "noMembers": "No members - assign this alias to a model row below",
+    "none": "None"
   }
 }

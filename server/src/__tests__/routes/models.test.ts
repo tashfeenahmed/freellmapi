@@ -152,6 +152,45 @@ describe('Models API', () => {
       }
     });
 
+    it('writes alias_id/alias_priority onto each created row', async () => {
+      const baseUrl = 'http://127.0.0.1:11600/v1';
+      const k1 = createCustomKey(baseUrl, 'A');
+      const k2 = createCustomKey(baseUrl, 'B');
+      const aliasId = Number(
+        getDb()
+          .prepare("INSERT INTO aliases (name, level, priority, enabled) VALUES ('glm5.2', 'high', 0, 1)")
+          .run().lastInsertRowid,
+      );
+      const { status, body } = await request(app, 'POST', '/api/models', {
+        keyIds: [k1, k2],
+        modelId: 'qwen3:8b',
+        aliasId,
+        aliasPriority: 7,
+      });
+      expect(status).toBe(200);
+      expect(body.created).toHaveLength(2);
+      const rows = getDb()
+        .prepare("SELECT alias_id, alias_priority FROM models WHERE platform='custom' AND model_id IN (?, ?)")
+        .all(`${k1}-qwen3:8b`, `${k2}-qwen3:8b`) as { alias_id: number | null; alias_priority: number }[];
+      expect(rows).toHaveLength(2);
+      for (const r of rows) {
+        expect(r.alias_id).toBe(aliasId);
+        expect(r.alias_priority).toBe(7);
+      }
+    });
+
+    it('rejects aliasId pointing at a non-existent alias', async () => {
+      const baseUrl = 'http://127.0.0.1:11601/v1';
+      const k1 = createCustomKey(baseUrl);
+      const { status, body } = await request(app, 'POST', '/api/models', {
+        keyIds: [k1],
+        modelId: 'x',
+        aliasId: 9999999,
+      });
+      expect(status).toBe(400);
+      expect(body.error).toMatch(/alias/);
+    });
+
     it('UPDATEs existing rows on repeat submit and only touches display_name', async () => {
       const baseUrl = 'http://127.0.0.1:11500/v1';
       const k1 = createCustomKey(baseUrl);

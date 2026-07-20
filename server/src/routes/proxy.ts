@@ -3,7 +3,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ModelListRow } from '@freellmapi/shared/types.js';
-import { routeRequest, resolveRoutingChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain } from '../services/router.js';
+import { routeRequest, resolveRoutingChain, resolveRequestedModel, resolveScopedChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult, type ResolvedChain } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
@@ -654,18 +654,38 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
 
+  // Parse the client `model` field into a routing intent. auto -> existing
+  // resolveRoutingChain + sticky session; scoped-level/scoped-alias -> expand
+  // to a ChainRow[] as prefetchedChain (group-first failover, exhausted =
+  // 503 scope_exhausted, no global fallback); pinned -> existing model_id
+  // lookup as preferredModel (global failover preserved).
+  const requestedKind = resolveRequestedModel(requestedModel);
   let resolvedChain: ResolvedChain | undefined;
+  let scopedChain: ReturnType<typeof resolveScopedChain> | undefined;
   let strategyKey: string | undefined;
-
-  if (isAutoModel(requestedModel)) {
+  if (requestedKind.kind === 'auto') {
     resolvedChain = resolveRoutingChain(requestedModel);
     strategyKey = resolvedChain.strategyKey;
+  } else if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+    scopedChain = resolveScopedChain(requestedKind);
+    strategyKey = requestedKind.kind === 'scoped-level' ? `${requestedKind.level}-level` : requestedKind.aliasName;
+    // Empty scope -> 503 scope_exhausted immediately (no models to try).
+    if (scopedChain.length === 0) {
+      res.status(503).json({
+        error: {
+          message: `No enabled models in scope '${strategyKey}'.`,
+          type: 'scope_exhausted',
+          code: 'scope_exhausted',
+        },
+      });
+      return;
+    }
   }
 
   // Context handoff only applies to auto-routed requests. Pinned-model requests
   // are deliberate client choices; injecting "you are taking over" there would
   // be semantically wrong.
-  const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
+  const isAutoRouted = requestedKind.kind === 'auto';
   const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
   const sessionKey = handoffMode !== 'off' ? getSessionKey(messages, sessionIdHeader, strategyKey) : '';
   if (handoffMode !== 'off' && sessionKey) {
@@ -682,33 +702,31 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // different model would be surprising to OpenAI-compatible clients.
   // Sticky-session is the fallback when no `model` field was sent at all.
   let preferredModel: number | undefined;
-  if (isAutoModel(requestedModel)) {
+  if (requestedKind.kind === 'auto') {
     preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
-  } else if (requestedModel) {
+  } else if (requestedKind.kind === 'pinned') {
     const db = getDb();
-    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
+    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedKind.modelId) as { id: number } | undefined;
     if (enabled) {
       preferredModel = enabled.id;
     } else {
-      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
+      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedKind.modelId) as { id: number } | undefined;
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
       res.status(400).json({
         error: {
-          message: `Model '${requestedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+          message: `Model '${requestedKind.modelId}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
           type: 'invalid_request_error',
           code: 'model_not_found',
         },
       });
       return;
     }
-  } else {
-    preferredModel = getStickyModel(messages, sessionIdHeader, strategyKey);
   }
 
   // For analytics: the model id the client pinned, null when auto-routed
   // ('auto' or omitted). Logged with every request row so pinned vs auto
   // traffic and failover overrides are visible.
-  const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
+  const pinnedModelId = requestedKind.kind === 'pinned' ? requestedKind.modelId : null;
 
   // Retry loop: on 429/rate limit, skip that model+key and try the next one
   const skipKeys = new Set<string>();
@@ -725,8 +743,22 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // model is on record). Turns where injection can't happen — every turn 1, and
       // sessions that never switched — pay no headroom tax.
       const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
-      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, resolvedChain?.chain);
+      route = routeRequest(routingEstimate, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, scopedChain ?? resolvedChain?.chain);
     } catch (err: any) {
+      // Scoped routing (level/alias) exhausted: 503 scope_exhausted, NOT 429.
+      // The scope is empty/all-failed, not rate-limited, and we must NOT fall
+      // back to the global active chain.
+      if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+        const safeLastError = sanitizeProviderErrorMessage(lastError?.message ?? err.message);
+        res.status(503).json({
+          error: {
+            message: `All models in scope '${strategyKey}' exhausted. Last error: ${safeLastError}`,
+            type: 'scope_exhausted',
+            code: 'scope_exhausted',
+          },
+        });
+        return;
+      }
       // No more models available
       if (lastError) {
         const safeLastError = sanitizeProviderErrorMessage(lastError.message);

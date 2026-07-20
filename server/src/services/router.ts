@@ -9,7 +9,7 @@ import {
 } from './scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import type { BaseProvider } from '../providers/base.js';
-import type { Platform } from '@freellmapi/shared/types.js';
+import type { Platform, AliasLevel, RequestedModelKind } from '@freellmapi/shared/types.js';
 import type { Database } from 'better-sqlite3';
 
 class RouteError extends Error {
@@ -485,43 +485,6 @@ function getChainByGlobalSort(db: Database, globalAxis: string): ChainRow[] {
   return orderChain(allEnabled, strat);
 }
 
-/**
- * 根据模型名查找单个模型（严格模式）
- * 支持两种格式：
- *   - "platform/modelId"  — 查找特定平台的模型
- *   - "modelId"           — 直接查找模型（如果唯一，则返回；如果多个则报错）
- */
-function findModelByName(db: Database, modelName: string): ChainRow | null {
-  if (modelName.includes('/')) {
-    // 格式: "platform/modelId"
-    const [platform, modelId] = modelName.split('/', 2);
-    const row = db.prepare(`
-      SELECT m.id as model_db_id, 0 as priority, m.enabled,
-             m.platform, m.model_id, m.display_name, m.intelligence_rank,
-             m.size_label, m.monthly_token_budget,
-             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id
-      FROM models m
-      WHERE m.platform = ? AND m.model_id = ? AND m.enabled = 1
-      LIMIT 1
-    `).get(platform, modelId) as ChainRow | undefined;
-    return row ?? null;
-  } else {
-    // 格式: "modelId"，直接查找
-    const rows = db.prepare(`
-      SELECT m.id as model_db_id, 0 as priority, m.enabled,
-             m.platform, m.model_id, m.display_name, m.intelligence_rank,
-             m.size_label, m.monthly_token_budget,
-             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id
-      FROM models m
-      WHERE m.model_id = ? AND m.enabled = 1
-      LIMIT 1
-    `).all(modelName) as ChainRow[];
-    return rows.length > 0 ? rows[0] : null;
-  }
-}
-
 export function resolveRoutingChain(modelString: string | undefined): ResolvedChain {
   const db = getDb();
 
@@ -567,29 +530,54 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
   return { chain, strategyKey: `auto:${suffix}` };
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], strictModelId?: string): RouteResult {
+// Parse a client `model` field into a routing intent. Order: auto -> level
+// name (high-level/middle-level/low-level, case-insensitive) -> alias name
+// (case-sensitive, enabled only) -> exact model_id pin. The caller branches on
+// `kind` to decide prefetchedChain vs preferredModel (see proxy.ts).
+export function resolveRequestedModel(modelString: string | undefined): RequestedModelKind {
+  if (!modelString) return { kind: 'auto' };
+  const lower = modelString.toLowerCase();
+  if (lower === 'auto' || lower.startsWith('auto:')) return { kind: 'auto' };
+  if (lower === 'high-level') return { kind: 'scoped-level', level: 'high' };
+  if (lower === 'middle-level') return { kind: 'scoped-level', level: 'middle' };
+  if (lower === 'low-level') return { kind: 'scoped-level', level: 'low' };
+  const db = getDb();
+  const alias = db.prepare('SELECT id FROM aliases WHERE name = ? AND enabled = 1').get(modelString) as { id: number } | undefined;
+  if (alias) return { kind: 'scoped-alias', aliasName: modelString };
+  return { kind: 'pinned', modelId: modelString };
+}
+
+// Expand a scoped-level or scoped-alias intent into an ordered ChainRow[].
+// Level: all enabled aliases in that level, ordered by alias.priority then
+// models.alias_priority (group-first failover - same alias's members stay
+// contiguous, all fail before crossing to the next alias). Alias: members of
+// one alias ordered by alias_priority. Empty array = scope has no models.
+export function resolveScopedChain(kind: { kind: 'scoped-level'; level: AliasLevel } | { kind: 'scoped-alias'; aliasName: string }): ChainRow[] {
+  const db = getDb();
+  const select = `
+    SELECT m.id as model_db_id, 0 as priority, m.enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id
+    FROM models m
+    JOIN aliases a ON m.alias_id = a.id
+    WHERE m.enabled = 1 AND a.enabled = 1
+  `;
+  if (kind.kind === 'scoped-level') {
+    return db.prepare(`${select} AND a.level = ? ORDER BY a.priority ASC, m.alias_priority ASC`).all(kind.level) as ChainRow[];
+  }
+  return db.prepare(`${select} AND a.name = ? ORDER BY m.alias_priority ASC`).all(kind.aliasName) as ChainRow[];
+}
+
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[]): RouteResult {
   const db = getDb();
 
-  // 严格模式：指定了具体的模型ID
   let chain: ChainRow[];
   let strategyKey: string;
-
-  if (strictModelId) {
-    // 严格模式：只查找指定的模型
-    const model = findModelByName(db, strictModelId);
-    if (!model) {
-      const err = new Error(`Model '${strictModelId}' not found or not enabled. Use model=auto for auto-routing, or call /v1/models to see available options.`) as any;
-      err.status = 404;
-      throw err;
-    }
-    chain = [model];
-    strategyKey = strictModelId;
-  } else {
-    // 自动模式：使用配置的路由链
-    const resolved = prefetchedChain ? { chain: prefetchedChain, strategyKey: 'prefetched' } : resolveRoutingChain(undefined);
-    chain = resolved.chain;
-    strategyKey = resolved.strategyKey;
-  }
+  const resolved = prefetchedChain ? { chain: prefetchedChain, strategyKey: 'prefetched' } : resolveRoutingChain(undefined);
+  chain = resolved.chain;
+  strategyKey = resolved.strategyKey;
 
   const strategy = getRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);

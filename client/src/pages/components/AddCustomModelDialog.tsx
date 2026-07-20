@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { X } from 'lucide-react'
 import type { ApiKey } from '../../../../shared/types'
 import { useI18n } from '@/i18n'
@@ -33,9 +34,17 @@ export function AddCustomModelDialog({ open, onClose, baseUrl, keys, defaultSele
   const [selected, setSelected] = useState<Set<number>>(() => new Set(defaultSelectedKeyIds))
   const [error, setError] = useState<string | null>(null)
   const [resultText, setResultText] = useState<string | null>(null)
+  const [aliasId, setAliasId] = useState<number | null>(null)
+  const [aliasPriority, setAliasPriority] = useState('')
+
+  const { data: aliases = [] } = useQuery<{ id: number; name: string; enabled: boolean }[]>({
+    queryKey: ['aliases'],
+    queryFn: () => apiFetch('/api/aliases'),
+  })
+  const enabledAliases = aliases.filter(a => a.enabled)
 
   const submit = useMutation({
-    mutationFn: (body: { keyIds: number[]; modelId: string; displayName?: string }) =>
+    mutationFn: (body: { keyIds: number[]; modelId: string; displayName?: string; aliasId?: number | null; aliasPriority?: number }) =>
       apiFetch<{ created: number[]; updated: number[] }>('/api/models', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -64,11 +73,17 @@ export function AddCustomModelDialog({ open, onClose, baseUrl, keys, defaultSele
       setError('Select at least one key')
       return
     }
-    submit.mutate({
+    const body: { keyIds: number[]; modelId: string; displayName?: string; aliasId?: number | null; aliasPriority?: number } = {
       keyIds,
       modelId: id,
       displayName: displayName.trim() || undefined,
-    })
+    }
+    if (aliasId != null) {
+      body.aliasId = aliasId
+      const p = Number(aliasPriority)
+      body.aliasPriority = aliasPriority === '' || !Number.isFinite(p) ? 0 : Math.trunc(p)
+    }
+    submit.mutate(body)
   }
 
   function toggleKey(id: number) {
@@ -150,6 +165,34 @@ export function AddCustomModelDialog({ open, onClose, baseUrl, keys, defaultSele
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">{t('aliases.title')}</Label>
+            <Select
+              value={aliasId == null ? 'none' : String(aliasId)}
+              onValueChange={v => setAliasId(v === 'none' ? null : Number(v))}
+            >
+              <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-xs">{t('aliases.none')}</SelectItem>
+                {enabledAliases.map(a => (
+                  <SelectItem key={a.id} value={String(a.id)} className="text-xs">{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {aliasId != null && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t('aliases.priority')}</Label>
+                <Input
+                  value={aliasPriority}
+                  onChange={e => setAliasPriority(e.target.value)}
+                  placeholder="0"
+                  type="number"
+                  className="text-xs"
+                />
+              </div>
+            )}
           </div>
 
           {error && (

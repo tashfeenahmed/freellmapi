@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
+import { routeRequest, resolveRequestedModel, resolveScopedChain, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS } from '../services/ratelimit.js';
 import { getDb } from '../db/index.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
@@ -140,7 +140,6 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
 
   const data = parsed.data;
   const requestedModel = data.model || 'auto';
-  const isAuto = !data.model || data.model === 'auto';
   const stream = data.stream ?? false;
 
   // Cast to AnthropicMessageParam for downstream consumers
@@ -187,30 +186,47 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
 
-  // Resolve model
+  // Resolve model - same intent parsing as /chat/completions (see proxy.ts):
+  // auto -> sticky; scoped-level/scoped-alias -> prefetchedChain (503
+  // scope_exhausted on exhaustion, no global fallback); pinned -> preferredModel.
+  const requestedKind = resolveRequestedModel(requestedModel);
+  let scopedChain: ReturnType<typeof resolveScopedChain> | undefined;
   let preferredModel: number | undefined;
-  if (isAuto) {
+  if (requestedKind.kind === 'auto') {
     preferredModel = getStickyModel(messages as any, sessionIdHeader);
+  } else if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+    scopedChain = resolveScopedChain(requestedKind);
+    if (scopedChain.length === 0) {
+      const scopeName = requestedKind.kind === 'scoped-level' ? `${requestedKind.level}-level` : requestedKind.aliasName;
+      res.status(503).json({
+        type: 'error',
+        error: {
+          type: 'scope_exhausted',
+          message: `No enabled models in scope '${scopeName}'.`,
+        },
+      });
+      return;
+    }
   } else {
     const db = getDb();
-    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(data.model!) as { id: number } | undefined;
+    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedKind.modelId) as { id: number } | undefined;
     if (enabled) {
       preferredModel = enabled.id;
     } else {
-      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(data.model!) as { id: number } | undefined;
+      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedKind.modelId) as { id: number } | undefined;
       const reason = disabled ? 'is disabled' : 'is not in the catalog';
       res.status(400).json({
         type: 'error',
         error: {
           type: 'invalid_request_error',
-          message: `Model '${data.model}' ${reason}.`,
+          message: `Model '${requestedKind.modelId}' ${reason}.`,
         },
       });
       return;
     }
   }
 
-  const pinnedModelId = !isAuto ? requestedModel : null;
+  const pinnedModelId = requestedKind.kind === 'pinned' ? requestedKind.modelId : null;
 
   // Retry loop
   const skipKeys = new Set<string>();
@@ -220,8 +236,18 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, hasImage, wantsTools, skipModels.size > 0 ? skipModels : undefined, scopedChain);
     } catch (err: any) {
+      // Scoped routing (level/alias) exhausted: 503 scope_exhausted, NOT 429.
+      if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+        const safeLastError = sanitizeProviderErrorMessage(lastError?.message ?? err.message);
+        const scopeName = requestedKind.kind === 'scoped-level' ? `${requestedKind.level}-level` : requestedKind.aliasName;
+        res.status(503).json({
+          type: 'error',
+          error: { type: 'scope_exhausted', message: `All models in scope '${scopeName}' exhausted. Last error: ${safeLastError}` },
+        });
+        return;
+      }
       if (lastError) {
         const safeLastError = sanitizeProviderErrorMessage(lastError.message);
         res.status(429).json({

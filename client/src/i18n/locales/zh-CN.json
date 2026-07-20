@@ -280,5 +280,15 @@
     "fr": "Français",
     "es": "Español",
     "pt-BR": "Português (Brasil)"
+  },
+  "aliases": {
+    "title": "逻辑模型",
+    "add": "新建别名",
+    "name": "名称",
+    "level": "层级",
+    "priority": "优先级",
+    "members": "成员",
+    "noMembers": "暂无成员——在下方模型行中将此别名指派给模型",
+    "none": "无"
   }
 }

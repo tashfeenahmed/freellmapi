@@ -9,7 +9,7 @@ export const modelsRouter = Router();
 // the body is rejected (the response lists the offenders) so identity-bearing
 // fields (platform, modelId, source) and routing-policy fields (ranks, limits,
 // monthly_token_budget) cannot drift away from their write-path defaults.
-const PATCH_ALLOWED_FIELDS = ['displayName', 'enabled', 'contextWindow', 'supportsVision', 'supportsTools'] as const;
+const PATCH_ALLOWED_FIELDS = ['displayName', 'enabled', 'contextWindow', 'supportsVision', 'supportsTools', 'aliasId', 'aliasPriority'] as const;
 
 // List all models with availability info
 modelsRouter.get('/', (_req: Request, res: Response) => {
@@ -49,6 +49,8 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     supportsVision: m.supports_vision === 1,
     supportsTools: m.supports_tools === 1,
     source: m.source,
+    aliasId: m.alias_id ?? null,
+    aliasPriority: m.alias_priority ?? 0,
     priority: m.priority,
     fallbackEnabled: m.fallback_enabled === 1,
     hasProvider: hasProvider(m.platform),
@@ -112,15 +114,30 @@ modelsRouter.post('/', (req: Request, res: Response) => {
     return res.status(409).json({ error: 'Model already exists', existingId: existing.id });
   }
 
+  // Optional alias grouping (migrateModelsV29Aliases). null = ungrouped; the
+  // model is reachable only via auto or exact model_id pin.
+  let aliasId: number | null = null;
+  if (body.aliasId !== undefined && body.aliasId !== null) {
+    const aid = typeof body.aliasId === 'number' ? body.aliasId : Number(body.aliasId);
+    if (!Number.isInteger(aid) || aid <= 0) {
+      return res.status(400).json({ error: 'aliasId must be a positive integer' });
+    }
+    const alias = db.prepare('SELECT id FROM aliases WHERE id = ?').get(aid) as { id: number } | undefined;
+    if (!alias) return res.status(400).json({ error: `alias ${aid} does not exist` });
+    aliasId = aid;
+  }
+  const aliasPriority = typeof body.aliasPriority === 'number' && Number.isFinite(body.aliasPriority)
+    ? Math.trunc(body.aliasPriority) : 0;
+
   let newId = 0;
   const insert = db.transaction(() => {
     const info = db
       .prepare(
         `INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-                             monthly_token_budget, context_window, enabled, supports_vision, supports_tools, source)
-         VALUES (?, ?, ?, 50, 50, 'User', '', ?, 1, ?, ?, 'user')`,
+                             monthly_token_budget, context_window, enabled, supports_vision, supports_tools, source, alias_id, alias_priority)
+         VALUES (?, ?, ?, 50, 50, 'User', '', ?, 1, ?, ?, 'user', ?, ?)`,
       )
-      .run(platform, modelId, displayName, contextWindow, supportsVision, supportsTools);
+      .run(platform, modelId, displayName, contextWindow, supportsVision, supportsTools, aliasId, aliasPriority);
     newId = Number(info.lastInsertRowid);
     const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
     db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(newId, max.m + 1);
@@ -138,6 +155,8 @@ modelsRouter.post('/', (req: Request, res: Response) => {
     supportsTools: supportsTools === 1,
     enabled: true,
     source: 'user',
+    aliasId,
+    aliasPriority,
   });
 });
 
@@ -210,6 +229,21 @@ function handleCustomKeyIdsWrite(
     });
   }
 
+  // Optional alias grouping (mirrors Form A). null = ungrouped; the model is
+  // reachable only via auto or exact model_id pin.
+  let aliasId: number | null = null;
+  if (body.aliasId !== undefined && body.aliasId !== null) {
+    const aid = typeof body.aliasId === 'number' ? body.aliasId : Number(body.aliasId);
+    if (!Number.isInteger(aid) || aid <= 0) {
+      return res.status(400).json({ error: 'aliasId must be a positive integer' });
+    }
+    const alias = db.prepare('SELECT id FROM aliases WHERE id = ?').get(aid) as { id: number } | undefined;
+    if (!alias) return res.status(400).json({ error: `alias ${aid} does not exist` });
+    aliasId = aid;
+  }
+  const aliasPriority = typeof body.aliasPriority === 'number' && Number.isFinite(body.aliasPriority)
+    ? Math.trunc(body.aliasPriority) : 0;
+
   // Single transaction: each keyId either INSERTs a fresh row (and a fallback
   // entry) or UPDATEs the existing row's display_name. We pre-probe each row's
   // existence (better-sqlite3's RUN result lacks a portable insert-vs-update
@@ -221,8 +255,8 @@ function handleCustomKeyIdsWrite(
     const upsertStmt = db.prepare(`
       INSERT INTO models
         (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id, source)
-      VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?, 'user')
+         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id, source, alias_id, alias_priority)
+      VALUES ('custom', ?, ?, 50, 50, 'Custom', NULL, NULL, NULL, NULL, '', NULL, 1, ?, 'user', ?, ?)
       ON CONFLICT(platform, model_id)
       DO UPDATE SET display_name = excluded.display_name
     `);
@@ -231,7 +265,7 @@ function handleCustomKeyIdsWrite(
     for (const keyId of keyIds) {
       const scopedModelId = `${keyId}-${modelId}`;
       const before = probeStmt.get(scopedModelId) as { id: number } | undefined;
-      upsertStmt.run(scopedModelId, displayName, keyId);
+      upsertStmt.run(scopedModelId, displayName, keyId, aliasId, aliasPriority);
       const after = probeStmt.get(scopedModelId) as { id: number };
       if (before) {
         updated.push(after.id);
@@ -288,6 +322,21 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     sets.push('supports_tools = ?');
     params.push(body.supportsTools ? 1 : 0);
   }
+  if (body.aliasId === null) {
+    sets.push('alias_id = ?');
+    params.push(null);
+  } else if (typeof body.aliasId === 'number' && Number.isFinite(body.aliasId)) {
+    const aid = Math.trunc(body.aliasId);
+    if (aid <= 0) return res.status(400).json({ error: 'aliasId must be a positive integer' });
+    const alias = db.prepare('SELECT id FROM aliases WHERE id = ?').get(aid) as { id: number } | undefined;
+    if (!alias) return res.status(400).json({ error: `alias ${aid} does not exist` });
+    sets.push('alias_id = ?');
+    params.push(aid);
+  }
+  if (typeof body.aliasPriority === 'number' && Number.isFinite(body.aliasPriority)) {
+    sets.push('alias_priority = ?');
+    params.push(Math.trunc(body.aliasPriority));
+  }
 
   if (sets.length === 0) {
     return res.status(400).json({ error: 'no editable fields provided' });
@@ -307,6 +356,8 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     supportsVision: updated.supports_vision === 1,
     supportsTools: updated.supports_tools === 1,
     source: updated.source,
+    aliasId: updated.alias_id ?? null,
+    aliasPriority: updated.alias_priority ?? 0,
   });
 });
 

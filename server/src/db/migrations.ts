@@ -62,6 +62,9 @@ export function migrateDbSchema(db: Database.Database) {
   // Drop legacy premium-tier settings rows left behind by older installs.
   // Idempotent; safe on every boot.
   migrateRemovePremiumSettings(db);
+  // V29 (July 2026): logical-model aliases table + models.alias_id/alias_priority
+  // columns. Idempotent CREATE TABLE + ALTER; safe on every run.
+  migrateModelsV29Aliases(db);
 }
 
 function createTables(db: Database.Database) {
@@ -1962,6 +1965,35 @@ function migrateModelsV27Agnes(db: Database.Database) {
     backfillFallback(db);
   });
   apply();
+}
+
+// V29 (July 2026): introduce logical-model aliases - a named group of
+// synonymous provider model instances (e.g. "glm5.2" = provider1's "glm5.2" +
+// provider2's "bailian/glm5-2" + provider3's "GLM5.2"). Clients address the
+// group by name (model: "<aliasName>"); the server expands it to the member
+// models ordered by alias_priority for group-first failover. aliases.level is
+// one of high|middle|low (default low). models.alias_id is nullable so
+// catalog-synced rows stay out of level/alias routing until a maintainer
+// groups them. Idempotent; safe on every run.
+function migrateModelsV29Aliases(db: Database.Database) {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS aliases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      level TEXT NOT NULL DEFAULT 'low',
+      priority INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
+
+  const modelsCols = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!modelsCols.some(c => c.name === 'alias_id')) {
+    db.prepare('ALTER TABLE models ADD COLUMN alias_id INTEGER REFERENCES aliases(id) ON DELETE SET NULL').run();
+  }
+  if (!modelsCols.some(c => c.name === 'alias_priority')) {
+    db.prepare('ALTER TABLE models ADD COLUMN alias_priority INTEGER NOT NULL DEFAULT 0').run();
+  }
 }
 
 // V26 NOTE (June 2026, recurring-free audit pass 2): the model-data changes

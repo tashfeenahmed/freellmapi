@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pencil, Trash2, X } from 'lucide-react'
 import type { ApiKey, Platform } from '../../../../shared/types'
 import { useI18n } from '@/i18n'
 import { AddCustomModelDialog } from './AddCustomModelDialog'
+import { AliasSection } from './AliasSection'
 
 // Drawer that surfaces every model row for one platform — regardless of source
 // (migration / catalog / user) — and routes the maintainer's actions through
@@ -32,6 +34,8 @@ interface ModelRow {
   supportsTools: boolean
   source: 'migration' | 'catalog' | 'user'
   keyId?: number | null
+  aliasId?: number | null
+  aliasPriority?: number
 }
 
 export type ManageModelsDrawerProps =
@@ -252,6 +256,8 @@ function PlatformDrawer({ onClose, platform, platformLabel }: PlatformDrawerProp
           ))
         )}
       </div>
+
+      <AliasSection />
     </DrawerShell>
   )
 }
@@ -417,6 +423,8 @@ function CustomEndpointDrawer({ onClose, baseUrl, keys }: CustomEndpointDrawerPr
         )
       })}
 
+      <AliasSection />
+
       {dialogDefaults !== null && (
         <AddCustomModelDialog
           open={true}
@@ -510,6 +518,11 @@ function ModelListRow({
   setConfirmDeleteId: (v: number | null | ((c: number | null) => number | null)) => void
 }) {
   const { t } = useI18n()
+  const { data: aliases = [] } = useQuery<{ id: number; name: string; enabled: boolean }[]>({
+    queryKey: ['aliases'],
+    queryFn: () => apiFetch('/api/aliases'),
+  })
+  const enabledAliases = aliases.filter(a => a.enabled)
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-3">
@@ -553,6 +566,38 @@ function ModelListRow({
               <span className="ml-1">{t('keys.confirmRemove')}</span>
             )}
           </Button>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-2 pl-1">
+        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{t('aliases.title')}</span>
+        <Select
+          value={row.aliasId == null ? 'none' : String(row.aliasId)}
+          onValueChange={v => updateModel.mutate({ id: row.id, patch: { aliasId: v === 'none' ? null : Number(v) } })}
+          disabled={updateModel.isPending}
+        >
+          <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none" className="text-xs">{t('aliases.none')}</SelectItem>
+            {enabledAliases.map(a => (
+              <SelectItem key={a.id} value={String(a.id)} className="text-xs">{a.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {row.aliasId != null && (
+          <>
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{t('aliases.priority')}</span>
+            <Input
+              key={row.id}
+              defaultValue={String(row.aliasPriority ?? 0)}
+              onBlur={e => {
+                const p = Number(e.target.value)
+                const next = Number.isFinite(p) ? Math.trunc(p) : 0
+                if (next !== (row.aliasPriority ?? 0)) updateModel.mutate({ id: row.id, patch: { aliasPriority: next } })
+              }}
+              type="number"
+              className="h-7 w-16 text-xs"
+            />
+          </>
         )}
       </div>
       {isEditing && (

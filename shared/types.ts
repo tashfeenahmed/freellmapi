@@ -64,7 +64,37 @@ export interface Model {
   //   'user'      — added by maintainer through POST /api/models
   // Drives UI delete-vs-disable affordance and catalog-sync's preserve filter.
   source: 'migration' | 'catalog' | 'user';
+  // Logical-model alias grouping (aliases table, migrateModelsV29Aliases).
+  // null = this model is not part of any alias and is excluded from level/alias
+  // routing (only auto or exact model_id pin can reach it). aliasPriority
+  // orders members within an alias for group-first failover.
+  aliasId: number | null;
+  aliasPriority: number;
 }
+
+// ---- Logical Model Alias ----
+// A named group of synonymous provider model instances sharing one level.
+// Clients address the group by name (model: "<aliasName>"); the server expands
+// it to the member models ordered by aliasPriority for group-first failover.
+export type AliasLevel = 'high' | 'middle' | 'low';
+
+export interface Alias {
+  id: number;
+  name: string;
+  level: AliasLevel;
+  priority: number;
+  enabled: boolean;
+  createdAt: string;
+}
+
+// Result of parsing a client `model` field into a routing intent.
+// See resolveRequestedModel() in server/src/services/router.ts. The resolver
+// checks in order: auto -> level name -> alias name -> exact model_id pin.
+export type RequestedModelKind =
+  | { kind: 'auto' }
+  | { kind: 'scoped-level'; level: AliasLevel }
+  | { kind: 'scoped-alias'; aliasName: string }
+  | { kind: 'pinned'; modelId: string };
 
 // ---- Quirks ----
 // Structured, reusable notes about catalog models. One quirk is applied to many

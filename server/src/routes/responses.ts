@@ -8,9 +8,9 @@ import type {
   ChatToolDefinition,
   ChatToolChoice,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
+import { routeRequest, resolveRequestedModel, resolveScopedChain, recordRateLimitHit, recordSuccess, hasEnabledToolsModel, type RouteResult } from '../services/router.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
-import { getUnifiedApiKey } from '../db/index.js';
+import { getDb, getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
@@ -323,7 +323,46 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // Optional client-managed session affinity (mirrors /chat/completions).
   const rawSessionId = req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
-  const preferredModel = getStickyModel(messages, sessionIdHeader);
+  // Resolve model - same intent parsing as /chat/completions (see proxy.ts):
+  // auto -> sticky; scoped-level/scoped-alias -> prefetchedChain (503
+  // scope_exhausted on exhaustion, no global fallback); pinned -> preferredModel.
+  const requestedModel = reqData.model;
+  const requestedKind = resolveRequestedModel(requestedModel);
+  let scopedChain: ReturnType<typeof resolveScopedChain> | undefined;
+  let preferredModel: number | undefined;
+  if (requestedKind.kind === 'auto') {
+    preferredModel = getStickyModel(messages, sessionIdHeader);
+  } else if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+    scopedChain = resolveScopedChain(requestedKind);
+    if (scopedChain.length === 0) {
+      const scopeName = requestedKind.kind === 'scoped-level' ? `${requestedKind.level}-level` : requestedKind.aliasName;
+      res.status(503).json({
+        error: {
+          message: `No enabled models in scope '${scopeName}'.`,
+          type: 'scope_exhausted',
+          code: 'scope_exhausted',
+        },
+      });
+      return;
+    }
+  } else {
+    const db = getDb();
+    const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedKind.modelId) as { id: number } | undefined;
+    if (enabled) {
+      preferredModel = enabled.id;
+    } else {
+      const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedKind.modelId) as { id: number } | undefined;
+      const reason = disabled ? 'is disabled' : 'is not in the catalog';
+      res.status(400).json({
+        error: {
+          message: `Model '${requestedKind.modelId}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+          type: 'invalid_request_error',
+          code: 'model_not_found',
+        },
+      });
+      return;
+    }
+  }
 
   // Tool-bearing requests (the normal case for Codex/agent clients on this
   // endpoint) must stay on models that emit structured tool_calls — a model
@@ -357,13 +396,26 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     let route: RouteResult;
     try {
-      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, wantsTools, skipModels.size > 0 ? skipModels : undefined);
+      route = routeRequest(estimatedTotal, skipKeys.size > 0 ? skipKeys : undefined, preferredModel, false, wantsTools, skipModels.size > 0 ? skipModels : undefined, scopedChain);
     } catch (err: any) {
-      const status = lastError ? 429 : (err.status ?? 503);
-      const message = lastError
-        ? `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`
-        : err.message;
-      const type = lastError ? 'rate_limit_error' : 'routing_error';
+      let status: number;
+      let message: string;
+      let type: string;
+      // Scoped routing (level/alias) exhausted: 503 scope_exhausted, NOT 429.
+      if (requestedKind.kind === 'scoped-level' || requestedKind.kind === 'scoped-alias') {
+        const scopeName = requestedKind.kind === 'scoped-level' ? `${requestedKind.level}-level` : requestedKind.aliasName;
+        status = 503;
+        message = `All models in scope '${scopeName}' exhausted. Last error: ${sanitizeProviderErrorMessage(lastError?.message ?? err.message)}`;
+        type = 'scope_exhausted';
+      } else if (lastError) {
+        status = 429;
+        message = `All models rate-limited. Last error: ${sanitizeProviderErrorMessage(lastError.message)}`;
+        type = 'rate_limit_error';
+      } else {
+        status = err.status ?? 503;
+        message = err.message;
+        type = 'routing_error';
+      }
       if (streamStarted) {
         sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message, type } } });
         res.end();
