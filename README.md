@@ -4,7 +4,7 @@
 
 **One OpenAI-compatible endpoint. 28 free LLM providers. 339 free model endpoints. ~4 billion tokens per month.**
 
-Aggregate the free tiers from Google, Groq, Cerebras, NVIDIA, Mistral, OpenRouter, GitHub Models, Cohere, Cloudflare, HuggingFace, Z.ai (Zhipu), Ollama, Kilo, Pollinations, LLM7, OVH AI Endpoints, OpenCode Zen, AI Horde, NaraRouter, Aion Labs, Requesty, NavyAI, Agnes AI, Reka, SiliconFlow, Routeway, BazaarLink, AINative Studio, and SEA-LION, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
+Aggregate free tiers from dozens of providers, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.
 
 [![CI](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/tashfeenahmed/freellmapi/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/tashfeenahmed/freellmapi?style=flat&logo=github&color=yellow)](https://github.com/tashfeenahmed/freellmapi/stargazers)
@@ -76,36 +76,9 @@ And the free-tier landscape shifts weekly: providers launch models, retire them,
 <td align="center"><a href="https://build.nvidia.com"><b>NVIDIA</b><br/>NIM · 40 RPM free (eval-only ToS)</a></td>
 <td align="center"><a href="https://huggingface.co/docs/inference-providers"><b>HuggingFace</b><br/>Router → DeepSeek V4 · Kimi K2.6 · Qwen3</a></td>
 </tr>
-<tr>
-<td align="center"><a href="https://ollama.com"><b>Ollama Cloud</b><br/>GLM-4.7 · Kimi K2 · gpt-oss · Qwen3</a></td>
-<td align="center"><a href="https://kilo.ai"><b>Kilo Gateway</b><br/>:free routes (anon ok)</a></td>
-<td align="center"><a href="https://pollinations.ai"><b>Pollinations</b><br/>GPT-OSS 20B (anon ok)</a></td>
-<td align="center"><a href="https://llm7.io"><b>LLM7</b><br/>GPT-OSS · Llama 3.1 · GLM (anon ok)</a></td>
-</tr>
-<tr>
-<td align="center"><a href="https://endpoints.ai.cloud.ovh.net"><b>OVH AI Endpoints</b><br/>Qwen3.5 397B · GPT-OSS · Llama 3.3 (anon ok)</a></td>
-<td align="center"><a href="https://router.bynara.id"><b>NaraRouter</b><br/>Mistral Large · Mistral Medium · Tencent Hy3</a></td>
-<td align="center"><a href="https://aihorde.net"><b>AI Horde</b><br/>Community Llama · Gemma · Cydonia (anon ok, slow)</a></td>
-<td align="center"><a href="https://aionlabs.ai"><b>Aion Labs</b><br/>Aggregator free tier (key, no card)</a></td>
-</tr>
-<tr>
-<td align="center"><a href="https://requesty.ai"><b>Requesty</b><br/>Router free tier (key, no card)</a></td>
-<td align="center"><a href="https://api.navy"><b>NavyAI</b><br/>150K tokens/day free (key, no card)</a></td>
-<td align="center"><a href="https://platform.agnes-ai.com"><b>Agnes AI</b><br/>Flash models (promo $0/token)</a></td>
-<td align="center"><a href="https://platform.reka.ai"><b>Reka</b><br/>Flash · Edge</a></td>
-</tr>
-<tr>
-<td align="center"><a href="https://siliconflow.com"><b>SiliconFlow</b><br/>Chat · image · audio routes</a></td>
-<td align="center"><a href="https://routeway.ai"><b>Routeway</b><br/>Router free tier</a></td>
-<td align="center"><a href="https://bazaarlink.ai"><b>BazaarLink</b><br/>Auto free router</a></td>
-<td align="center"><a href="https://ainative.studio"><b>AINative Studio</b><br/>Qwen · DeepSeek · Llama</a></td>
-</tr>
-<tr>
-<td align="center"><a href="https://sea-lion.ai"><b>SEA-LION</b><br/>SEA-multilingual (key, no card)</a></td>
-</tr>
 </table>
 
-Thanks to <a href="https://github.com/MetaMysteries8">@MetaMysteries8</a> for suggesting the NavyAI integration in <a href="https://github.com/tashfeenahmed/freellmapi/issues/532">#532</a>.
+<p align="center"><strong>…and many more.</strong></p>
 
 Plus a **custom** provider — point chat, embedding, image, or audio models at any OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM, a local Ollama, or a remote gateway) from the Keys page.
 
