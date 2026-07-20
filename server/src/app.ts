@@ -49,6 +49,12 @@ export function createApp(config?: Config) {
   // a single-user local proxy, served over HTTP on localhost. Both should
   // stay disabled unless someone serves the proxy over HTTPS publicly
   // (which is also not a supported deployment — see README).
+
+  // DEBUG: Request entry logging to trace 502 errors
+  app.use((req, res, next) => {
+      console.log(`[REQ_ENTRY] ${new Date().toISOString()} ${req.method} ${req.path} | IP: ${req.ip} | UA: ${req.get('user-agent')}`);
+      next();
+  });
   app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
   app.use(cors({
     origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
