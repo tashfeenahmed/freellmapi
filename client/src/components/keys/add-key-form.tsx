@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/ui/field-error'
-import type { Platform } from '../../../../shared/types'
+import type { ApiKey, Platform } from '../../../../shared/types'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
 import { GetKeyLink, PLATFORMS } from './shared'
@@ -18,6 +19,10 @@ import { GetKeyLink, PLATFORMS } from './shared'
 export function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
+  const { data: keys = [] } = useQuery<ApiKey[]>({
+    queryKey: ['keys'],
+    queryFn: () => apiFetch('/api/keys'),
+  })
   const [platform, setPlatform] = useState<Platform | ''>('')
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
@@ -43,6 +48,10 @@ export function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
 
   const needsAccountId = platform === 'cloudflare'
   const isKeyless = PLATFORMS.find(p => p.value === platform)?.keyless ?? false
+  const keyCountByPlatform = keys.reduce<Partial<Record<Platform, number>>>((counts, key) => {
+    counts[key.platform] = (counts[key.platform] ?? 0) + 1
+    return counts
+  }, {})
 
   // Field-level validation: the submit stays clickable and reveals what is
   // missing instead of being silently disabled.
@@ -73,7 +82,12 @@ export function AddKeyForm({ onSuccess }: { onSuccess: () => void }) {
             </SelectTrigger>
             <SelectContent>
               {PLATFORMS.map(p => (
-                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                <SelectItem key={p.value} value={p.value}>
+                  <Badge variant="secondary" className="min-w-5 px-1.5 tabular-nums">
+                    {keyCountByPlatform[p.value] ?? 0}
+                  </Badge>
+                  <span>{p.label}</span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
