@@ -164,6 +164,8 @@ Prefer to read before you pipe to bash? [The script is here](https://freellmapi.
 
 On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** (below); the Docker steps work in WSL or any bash shell.
 
+On Android, you can run FreeLLMAPI locally with Termux — see the [Android (Termux) installation guide](docs/install/android-termux.md). Community-supported, experimental.
+
 **Or manually with Docker Compose.** It runs the API and dashboard together on port 3001 and persists SQLite in a named volume.
 
 **Prerequisites:** Docker, Docker Compose, OpenSSL.
