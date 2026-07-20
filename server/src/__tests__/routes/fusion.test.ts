@@ -395,16 +395,16 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     try {
       // Priority mode: ordering is the manual chain order, and stable.
       setRoutingStrategy('priority');
-      const p1 = getOrderedFusionChain().map(c => c.modelId);
-      const p2 = getOrderedFusionChain().map(c => c.modelId);
+      const p1 = getOrderedFusionChain(1).map(c => c.modelId);
+      const p2 = getOrderedFusionChain(1).map(c => c.modelId);
       expect(p1.length).toBeGreaterThan(0);
       expect(p2).toEqual(p1);
 
       // Bandit mode: previously Thompson-sampled (random per call); now the
       // deterministic expected-score ranking, so two calls must be identical.
       setRoutingStrategy('smartest');
-      const s1 = getOrderedFusionChain().map(c => c.modelId);
-      const s2 = getOrderedFusionChain().map(c => c.modelId);
+      const s1 = getOrderedFusionChain(1).map(c => c.modelId);
+      const s2 = getOrderedFusionChain(1).map(c => c.modelId);
       expect(s2).toEqual(s1);
 
       // The strategy actually drives the ordering: 'smartest' (intelligence)
@@ -422,7 +422,7 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     const r = await request(app, 'POST', '/api/keys', { platform: 'groq', key: 'k_groq_only', label: 'only-groq' });
     expect(r.status).toBe(201);
 
-    const candidates = getOrderedFusionChain();
+    const candidates = getOrderedFusionChain(1);
     expect(candidates.length).toBeGreaterThan(0);
     // Even though the seeded catalog has many higher-ranked models on other
     // platforms (cerebras, openrouter, opencode…), none are routable without a
@@ -436,14 +436,47 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     await request(app, 'POST', '/api/keys', { platform: 'groq', key: 'k_groq_cool', label: 'cool' });
     const keyId = (db.prepare("SELECT id FROM api_keys WHERE platform = 'groq'").get() as { id: number }).id;
 
-    const before = getOrderedFusionChain().filter(c => c.platform === 'groq');
+    const before = getOrderedFusionChain(1).filter(c => c.platform === 'groq');
     expect(before.length).toBeGreaterThan(0);
     const target = before[0]; // the top groq model under the strategy
 
     // Bench that exact model+key (as a 402/429 cooldown would), then re-check.
     setCooldown('groq', target.modelId, keyId, 60_000);
-    const after = getOrderedFusionChain();
+    const after = getOrderedFusionChain(1);
     expect(after.find(c => c.modelId === target.modelId)).toBeUndefined();
+  });
+
+  it('auto-panel excludes a model whose context window cannot hold the prompt', async () => {
+    const db = getDb();
+    db.prepare('DELETE FROM api_keys').run();
+    await request(app, 'POST', '/api/keys', { platform: 'groq', key: 'k_groq_ctx', label: 'ctx' });
+
+    const target = getOrderedFusionChain(1).find(c => c.platform === 'groq');
+    expect(target).toBeDefined();
+    db.prepare('UPDATE models SET context_window = 1000 WHERE platform = ? AND model_id = ?')
+      .run('groq', target!.modelId);
+
+    // Fits: a 500-token prompt is well inside the 1000-token window.
+    expect(getOrderedFusionChain(500).find(c => c.modelId === target!.modelId)).toBeDefined();
+    // Does not fit: the model can NEVER serve this request, so it must not claim
+    // a panel slot. Before this gate it was selected anyway and failed at
+    // dispatch, reported as the misleading "no available key for model".
+    expect(getOrderedFusionChain(5000).find(c => c.modelId === target!.modelId)).toBeUndefined();
+  });
+
+  it('auto-panel treats a null context_window as unknown, not as zero', async () => {
+    const db = getDb();
+    db.prepare('DELETE FROM api_keys').run();
+    await request(app, 'POST', '/api/keys', { platform: 'groq', key: 'k_groq_null', label: 'nullctx' });
+
+    const target = getOrderedFusionChain(1).find(c => c.platform === 'groq');
+    expect(target).toBeDefined();
+    db.prepare('UPDATE models SET context_window = NULL WHERE platform = ? AND model_id = ?')
+      .run('groq', target!.modelId);
+
+    // An unspecified window must never itself exclude a model, at any size:
+    // same convention the auto-router uses.
+    expect(getOrderedFusionChain(5_000_000).find(c => c.modelId === target!.modelId)).toBeDefined();
   });
 
   it('auto-panel refills failed slots from the fallback chain', async () => {
