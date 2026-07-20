@@ -32,8 +32,7 @@ FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3001
-
+ENV PORT=8080
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 # npm nests some production packages under the workspace instead of hoisting
