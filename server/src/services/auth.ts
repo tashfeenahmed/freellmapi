@@ -80,3 +80,49 @@ export function deleteSession(token: string | undefined | null): void {
   if (!token) return;
   getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
 }
+
+/** Update the email of the authenticated user after verifying the current password. Throws { code: 'email_taken' } on conflict. */
+export function updateEmail(userId: number, currentPassword: string, newEmail: string): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?')
+    .get(userId) as { password_hash: string } | undefined;
+  if (!row) return false;
+  if (!verifyPassword(currentPassword, row.password_hash)) return false;
+
+  const normalized = normalizeEmail(newEmail);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(normalized, userId);
+  if (existing) {
+    const err = new Error('An account with that email already exists') as any;
+    err.code = 'email_taken';
+    throw err;
+  }
+  db.prepare('UPDATE users SET email = ? WHERE id = ?').run(normalized, userId);
+  // Keep sessions alive; the new email will be reflected on the next validateSession call.
+  return true;
+}
+
+/** Update the password of the authenticated user after verifying the current one. Invalidates all sessions on success. */
+export function updatePassword(userId: number, currentPassword: string, newPassword: string): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?')
+    .get(userId) as { password_hash: string } | undefined;
+  if (!row) return false;
+  if (!verifyPassword(currentPassword, row.password_hash)) return false;
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), userId);
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  return true;
+}
+
+/**
+ * Reset the password for the single existing user and invalidate all
+ * sessions.
+ * Returns false if no user exists.
+ */
+export function resetUserPassword(newPassword: string): boolean {
+  const db = getDb();
+  const row = db.prepare('SELECT id FROM users LIMIT 1').get() as { id: number } | undefined;
+  if (!row) return false;
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), row.id);
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.id);
+  return true;
+}

@@ -8,10 +8,16 @@ import {
   createSession,
   validateSession,
   deleteSession,
+  updateEmail,
+  updatePassword,
+  resetUserPassword,
 } from '../services/auth.js';
 import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
+import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/reset-code.js';
 
 export const authRouter = Router();
+
+const failedPasswordAttempts = new Map<number, number>();
 
 // Dashboard auth (#35). These routes are mounted BEFORE requireAuth, so
 // /status, /setup and /login are reachable without a session (bootstrap);
@@ -147,4 +153,124 @@ authRouter.get('/me', (req: Request, res: Response) => {
     return;
   }
   res.json({ email: session.email });
+});
+
+// Change email (requires active session + current password)
+const changeEmailSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newEmail: z.string().email('A valid email is required'),
+});
+
+authRouter.post('/change-email', (req: Request, res: Response) => {
+  const session = validateSession(bearer(req));
+  if (!session) {
+    res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
+    return;
+  }
+  const parsed = changeEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+  try {
+    const ok = updateEmail(session.userId, parsed.data.currentPassword, parsed.data.newEmail);
+    if (!ok) {
+      const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
+      if (attempts >= 3) {
+        deleteSession(bearer(req));
+        failedPasswordAttempts.delete(session.userId);
+        res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+        return;
+      }
+      failedPasswordAttempts.set(session.userId, attempts);
+      res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
+      return;
+    }
+    failedPasswordAttempts.delete(session.userId);
+    res.json({ success: true, email: parsed.data.newEmail.trim().toLowerCase() });
+  } catch (err: any) {
+    if (err.code === 'email_taken') {
+      res.status(409).json({ error: { message: err.message, type: 'email_taken' } });
+    } else {
+      throw err;
+    }
+  }
+});
+
+// Change password (requires active session + current password)
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+authRouter.post('/change-password', (req: Request, res: Response) => {
+  const session = validateSession(bearer(req));
+  if (!session) {
+    res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
+    return;
+  }
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+  const ok = updatePassword(session.userId, parsed.data.currentPassword, parsed.data.newPassword);
+  if (!ok) {
+    const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
+    if (attempts >= 3) {
+      deleteSession(bearer(req));
+      failedPasswordAttempts.delete(session.userId);
+      res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+      return;
+    }
+    failedPasswordAttempts.set(session.userId, attempts);
+    res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
+    return;
+  }
+  failedPasswordAttempts.delete(session.userId);
+  res.json({ success: true });
+});
+
+// Forgot password: mint a reset code and log it
+const RESET_CODE_MIN_INTERVAL_MS = 10_000;
+let lastResetCodeAt = 0;
+authRouter.post('/forgot-password', (_req: Request, res: Response) => {
+  // Always respond 200 regardless of account existence to avoid user enumeration.
+  if (userCount() === 0) {
+    res.json({ success: true });
+    return;
+  }
+  const now = Date.now();
+  if (now - lastResetCodeAt < RESET_CODE_MIN_INTERVAL_MS) {
+    res.status(429).json({ error: { message: 'Too many reset-code requests. Try again later.', type: 'rate_limit_error' } });
+    return;
+  }
+  lastResetCodeAt = now;
+  generateResetCode();
+  res.json({ success: true });
+});
+
+// Reset password: accept the logged code + new password
+const resetPasswordSchema = z.object({
+  resetCode: z.string().min(1, 'Reset code is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+authRouter.post('/reset-password', (req: Request, res: Response) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+  if (!resetCodeMatches(parsed.data.resetCode)) {
+    res.status(403).json({ error: { message: 'Invalid or expired reset code', type: 'authentication_error' } });
+    return;
+  }
+  const ok = resetUserPassword(parsed.data.newPassword);
+  if (!ok) {
+    res.status(404).json({ error: { message: 'No account found', type: 'not_found' } });
+    return;
+  }
+  clearResetCode();
+  res.json({ success: true });
 });
