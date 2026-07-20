@@ -2,6 +2,20 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+// node:sqlite ships in Node 22.13+. CI also tests Node 20, where the built-in
+// module (and therefore the Android fallback) does not exist — skip the tests
+// that open a database there; the factory-selection test still runs everywhere.
+const hasNodeSqlite = (() => {
+  try {
+    createRequire(import.meta.url)('node:sqlite');
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const itWithSqlite = it.skipIf(!hasNodeSqlite);
 import { connectDb, defaultDbFactory } from '../../db/index.js';
 import { nodeSqliteFactory } from '../../db/node-sqlite.js';
 import { runMigrationsSync } from '../../db/migrate/runner.js';
@@ -23,7 +37,7 @@ describe('node:sqlite Android fallback', () => {
     expect(defaultDbFactory('linux')).not.toBe(nodeSqliteFactory);
   });
 
-  it('runs the complete application migration set', () => {
+  itWithSqlite('runs the complete application migration set', () => {
     db = connectDb(':memory:', { factory: nodeSqliteFactory, ensureDir: false });
     runMigrationsSync(db, 'up');
 
@@ -32,7 +46,7 @@ describe('node:sqlite Android fallback', () => {
     expect((db.prepare('SELECT COUNT(*) AS count FROM models').get() as { count: number }).count).toBeGreaterThan(0);
   });
 
-  it('opens a file-backed database with WAL and file metadata', () => {
+  itWithSqlite('opens a file-backed database with WAL and file metadata', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'freellmapi-node-sqlite-'));
     tempDirs.push(dir);
     const dbPath = path.join(dir, 'freeapi.db');
@@ -47,7 +61,7 @@ describe('node:sqlite Android fallback', () => {
     expect(db.pragma('journal_mode')).toEqual([{ journal_mode: 'wal' }]);
   });
 
-  it('supports nested transaction commit and rollback semantics', () => {
+  itWithSqlite('supports nested transaction commit and rollback semantics', () => {
     db = connectDb(':memory:', { factory: nodeSqliteFactory, ensureDir: false });
     db.exec('CREATE TABLE items (id INTEGER PRIMARY KEY, value TEXT NOT NULL)');
 
