@@ -1,7 +1,14 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
-import { canMakeRequest, canUseTokens, isOnCooldown, canUseProvider, getSoonestCooldownExpiry } from './ratelimit.js';
+import {
+  canMakeRequest,
+  canUseTokens,
+  isOnCooldown,
+  canUseProvider,
+  canUseProviderTokens,
+  getSoonestCooldownExpiry,
+} from './ratelimit.js';
 import {
   BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
   reliabilityPosterior, expectedReliability, sampleBeta,
@@ -10,6 +17,7 @@ import {
 import { parseBudget } from '../lib/budget.js';
 import { platformDropsResponseFormat } from '../lib/sampling-params.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdToMembers } from './model-groups.js';
+import { getActiveProfileId } from './profile-models.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
@@ -528,9 +536,8 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
 };
 
 function getActiveChain(db: Db): ChainRow[] {
-  const activeProfileSetting = db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as { value: string } | undefined;
-  if (activeProfileSetting) {
-    const profileId = parseInt(activeProfileSetting.value, 10);
+  const profileId = getActiveProfileId(db);
+  if (profileId != null) {
     const chain = db.prepare(`
       SELECT pm.model_db_id, pm.priority, pm.enabled,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
@@ -702,6 +709,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
     if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
     if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
+    if (!canUseProviderTokens(entry.platform, key.id, entry.model_id, estimatedTokens)) { note('provider-daily-token-cap'); continue; }
 
     let decryptedKey: string;
     try {
@@ -785,6 +793,7 @@ export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, ski
     // headroom; a nominal 1-token probe only rules out a key already at its
     // TPM/TPD ceiling.
     if (!canUseTokens(m.platform, m.model_id, k.id, 1, limits)) continue;
+    if (!canUseProviderTokens(m.platform, k.id, m.model_id, 1)) continue;
     return true;
   }
   return false;
@@ -824,12 +833,11 @@ export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skip
 
 /**
  * Resolve a logical model group's member db ids to an ordered ChainRow[] for
- * strict group-pin routing (the "unify" feature). Each enabled member is
- * hydrated as a ChainRow carrying its REAL fallback_config.priority, then
- * ordered by the active strategy via orderChain — so 'priority' honors the
- * manual within-group order and scored strategies use live scores (priority as
- * the tiebreaker). Members disabled in the chain (fallback_config.enabled = 0)
- * are dropped.
+ * strict group-pin routing (the "unify" feature). Each catalog-enabled member
+ * is hydrated as a ChainRow carrying its active-profile/manual priority, then
+ * ordered by the active strategy via orderChain. Auto-chain enabled/disabled is
+ * intentionally ignored here because an explicit model request should still be
+ * able to use a direct model that the user removed from auto routing.
  *
  * Pass the result to routeRequest() as `prefetchedChain` and DO NOT pass a
  * `preferredModelDbId` that isn't already one of these rows — otherwise the
@@ -841,22 +849,36 @@ export function resolveModelGroupCandidates(memberDbIds: number[]): ChainRow[] {
   const strategy = getRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
 
-  const selectMember = db.prepare(`
-    SELECT m.id as model_db_id, COALESCE(fc.priority, 0) as priority,
-           COALESCE(fc.enabled, 1) as enabled,
-           m.platform, m.model_id, m.display_name, m.intelligence_rank,
-           m.size_label, m.monthly_token_budget,
-           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id
-    FROM models m
-    LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
-    WHERE m.id = ? AND m.enabled = 1
-  `);
+  const activeProfileId = getActiveProfileId(db);
+  const selectMember = activeProfileId == null
+    ? db.prepare(`
+      SELECT m.id as model_db_id, COALESCE(fc.priority, 0) as priority,
+             1 as enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id
+      FROM models m
+      LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+      WHERE m.id = ? AND m.enabled = 1
+    `)
+    : db.prepare(`
+      SELECT m.id as model_db_id, COALESCE(pm.priority, fc.priority, 0) as priority,
+             1 as enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id
+      FROM models m
+      LEFT JOIN profile_models pm ON pm.profile_id = ? AND pm.model_db_id = m.id
+      LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+      WHERE m.id = ? AND m.enabled = 1
+    `);
 
   const rows: ChainRow[] = [];
   for (const id of memberDbIds) {
-    const row = selectMember.get(id) as ChainRow | undefined;
-    if (row && row.enabled) rows.push(row);
+    const row = (activeProfileId == null ? selectMember.get(id) : selectMember.get(activeProfileId, id)) as ChainRow | undefined;
+    if (row) rows.push(row);
   }
   return orderChain(rows, strategy);
 }
@@ -910,7 +932,8 @@ export function getOrderedFusionChain(): FusionCandidate[] {
       (e.key_id == null || kid === e.key_id) &&
       !isOnCooldown(e.platform, e.model_id, kid) &&
       canUseProvider(e.platform, kid) &&
-      canMakeRequest(e.platform, e.model_id, kid, limits),
+      canMakeRequest(e.platform, e.model_id, kid, limits) &&
+      canUseProviderTokens(e.platform, kid, e.model_id, 1),
     );
   });
 
@@ -989,7 +1012,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   const strategy = getRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
 
-  const chain = prefetchedChain ?? getActiveChain(db).filter(e => e.enabled);
+  const chain = (prefetchedChain ?? getActiveChain(db)).filter(e => e.enabled);
 
   const sortedChain = orderChain(chain, strategy);
 
@@ -1109,16 +1132,7 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   const strategy = getRoutingStrategy();
   refreshStatsCache(db);
 
-  const chain = db.prepare(`
-    SELECT fc.model_db_id, fc.priority, fc.enabled,
-           m.platform, m.model_id, m.display_name, m.intelligence_rank,
-           m.size_label, m.monthly_token_budget,
-           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window
-    FROM fallback_config fc
-    JOIN models m ON m.id = fc.model_db_id
-    WHERE m.enabled = 1
-  `).all() as ChainRow[];
+  const chain = getActiveChain(db);
 
   // For display we score under 'balanced' weights when in priority mode, so the
   // table still shows a meaningful ranking even with the bandit turned off.
@@ -1159,13 +1173,7 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
 // the generic exhaustion message when none is configured (#118, #125).
 export function hasEnabledVisionModel(): boolean {
   const db = getDb();
-  const row = db.prepare(`
-    SELECT COUNT(*) as cnt
-    FROM fallback_config fc
-    JOIN models m ON m.id = fc.model_db_id
-    WHERE fc.enabled = 1 AND m.enabled = 1 AND m.supports_vision = 1
-  `).get() as { cnt: number };
-  return row.cnt > 0;
+  return getActiveChain(db).some(entry => entry.enabled === 1 && entry.supports_vision === 1);
 }
 
 // Whether at least one tool-capable model is enabled in the fallback chain.
@@ -1173,11 +1181,5 @@ export function hasEnabledVisionModel(): boolean {
 // requests beats routing them to a model that mangles the tool call.
 export function hasEnabledToolsModel(): boolean {
   const db = getDb();
-  const row = db.prepare(`
-    SELECT COUNT(*) as cnt
-    FROM fallback_config fc
-    JOIN models m ON m.id = fc.model_db_id
-    WHERE fc.enabled = 1 AND m.enabled = 1 AND m.supports_tools = 1
-  `).get() as { cnt: number };
-  return row.cnt > 0;
+  return getActiveChain(db).some(entry => entry.enabled === 1 && entry.supports_tools === 1);
 }

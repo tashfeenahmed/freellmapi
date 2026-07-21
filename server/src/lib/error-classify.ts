@@ -17,14 +17,22 @@ export function isRetryableError(err: any): boolean {
   // 410 (model pulled upstream), 429 (rate limit) and all 5xx are transient or
   // fail-over-able; 400/401 stay fatal (status 0 here, handled by the absence of a
   // matching rule) and 403 is handled by isModelAccessForbiddenError below.
+  // 422 (notably Mistral's strict validation) is a provider-side request-shape
+  // rejection: fail over to another provider, but if the whole chain rejects it
+  // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status === 408 || status === 409 || status === 410 || status === 429 || status >= 500) return true;
+  if (status === 408 || status === 409 || status === 410 || status === 422 || status === 429 || status >= 500) return true;
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
     || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
     || msg.includes('503') || msg.includes('unavailable')
+    // Provider marks the hosted deployment itself as sick (NVIDIA NIM's
+    // "DEGRADED function cannot be invoked" arrives as a 400, #522). The
+    // 'api error 400' rule below already catches the NIM shape; this keeps
+    // degraded conditions retryable even when a provider words it differently.
+    || msg.includes('degraded')
     || msg.includes('500') || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
     // provider in the fallback chain may have a larger limit. Same reasoning as 503.
@@ -52,6 +60,11 @@ export function isRetryableError(err: any): boolean {
     // which comes from the OpenAI-compat provider's error formatting, not
     // a bare "400" which is deliberately non-retryable for validation errors.
     || msg.includes('api error 400')
+    // 422: Mistral and other strict OpenAI-compatible endpoints use
+    // Unprocessable Entity for request-shape validation. Rotate to a provider
+    // that accepts the same OpenAI payload; if every provider rejects it, render
+    // a clean invalid_request_error instead of a rate-limit exhaustion.
+    || msg.includes('api error 422') || msg.includes('unprocessable entity')
     // 402: this provider/key is out of credits (e.g. HuggingFace Router
     // "API error 402: Payment required"). The SAME model often lives on another
     // provider (Kimi K2.6 is on HF + Cloudflare + NVIDIA), so fail over instead
@@ -126,13 +139,28 @@ export function isDailyQuotaExhaustedError(err: any): boolean {
   return /allocation|quota|limit|exhaust|used up/.test(msg);
 }
 
+// A provider-side "this hosted model is temporarily degraded" condition dressed
+// up as a 400. Observed live on NVIDIA NIM (issue #522): a degraded function
+// returns `400 {"detail":"Function id '...': DEGRADED function cannot be
+// invoked"}` — the request is fine; the deployment is sick. Must NOT classify
+// as a provider bad-request: exhausting on it would render a client-blaming
+// 400 invalid_request_error for what is capacity/health, not request shape.
+export function isProviderDegradedError(err: any): boolean {
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('degraded');
+}
+
 // Provider-side 400s are retryable because another provider may accept the same
 // request shape. If every routed provider rejects it, however, the client should
 // see an invalid-request error rather than a misleading rate-limit exhaustion.
 export function isProviderBadRequestError(err: any): boolean {
+  if (isProviderDegradedError(err)) return false;
   const status = typeof err?.status === 'number' ? err.status : 0;
   const msg = (err?.message ?? '').toLowerCase();
-  return (status === 0 || status === 400) && msg.includes('api error 400');
+  if (status === 400) return msg.includes('api error 400');
+  if (status === 422) return msg.includes('api error 422') || msg.includes('unprocessable entity');
+  if (status !== 0) return false;
+  return msg.includes('api error 400') || msg.includes('api error 422') || msg.includes('unprocessable entity');
 }
 
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:

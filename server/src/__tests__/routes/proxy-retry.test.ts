@@ -99,6 +99,17 @@ describe('isRetryableError', () => {
       expect(isProviderBadRequestError(new Error('400 Bad Request'))).toBe(false);
       expect(isProviderBadRequestError(Object.assign(new Error('Bad Request'), { status: 400 }))).toBe(false);
     });
+
+    it('treats provider API 422s like Mistral validation rejects: retryable, then invalid-request on exhaustion', () => {
+      const err = Object.assign(
+        new Error('Mistral API error 422: Unprocessable Entity'),
+        { status: 422 },
+      );
+      expect(isRetryableError(err)).toBe(true);
+      expect(isProviderBadRequestError(err)).toBe(true);
+      expect(isRetryableError(new Error('Mistral API error 422: tool messages failed validation'))).toBe(true);
+      expect(isProviderBadRequestError(new Error('Mistral API error 422: tool messages failed validation'))).toBe(true);
+    });
   });
 
   describe('403 model not on this key\'s tier fails over instead of 502 (issue #256)', () => {

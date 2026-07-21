@@ -190,6 +190,13 @@ const DEFAULT_PROVIDER_DAILY_REQUEST_CAPS: Record<string, number> = {
   openrouter: 1000,
 };
 
+const DEFAULT_PROVIDER_DAILY_TOKEN_CAPS: Record<string, number> = {
+  // NavyAI's free plan is one shared 150K-token/day pool per key. Individual
+  // models carry token_multiplier values, so the provider-visible drain can be
+  // higher than the OpenAI usage.total_tokens returned by /chat/completions.
+  navy: 150_000,
+};
+
 export function getProviderDailyRequestCap(platform: string): number | null {
   const raw = process.env[`PROVIDER_DAILY_REQUEST_CAP_${platform.toUpperCase()}`];
   if (raw !== undefined && raw.trim() !== '') {
@@ -197,6 +204,15 @@ export function getProviderDailyRequestCap(platform: string): number | null {
     if (Number.isFinite(n) && n >= 0) return n === 0 ? null : n;
   }
   return DEFAULT_PROVIDER_DAILY_REQUEST_CAPS[platform] ?? null;
+}
+
+export function getProviderDailyTokenCap(platform: string): number | null {
+  const raw = process.env[`PROVIDER_DAILY_TOKEN_CAP_${platform.toUpperCase()}`];
+  if (raw !== undefined && raw.trim() !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n === 0 ? null : n;
+  }
+  return DEFAULT_PROVIDER_DAILY_TOKEN_CAPS[platform] ?? null;
 }
 
 function countPersistedProviderRequests(
@@ -239,6 +255,101 @@ export function canUseProvider(platform: string, keyId: number, now = Date.now()
   const cap = getProviderDailyRequestCap(platform);
   if (cap === null) return true;
   return providerDailyRequestCount(platform, keyId, now) < cap;
+}
+
+type ModelQuotaRow = { tpd_limit: number | null; monthly_token_budget: string | null };
+
+function multiplierFromQuotaRow(row: ModelQuotaRow | undefined, dailyCap: number): number {
+  if (!row) return 1;
+
+  const fromLabel = row.monthly_token_budget?.match(/(?:^|[\u00b7(\s])(\d+(?:\.\d+)?)x\b/i);
+  if (fromLabel) {
+    const n = Number(fromLabel[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+
+  const tpd = row.tpd_limit;
+  if (tpd != null && tpd > 0 && tpd < dailyCap) return dailyCap / tpd;
+  return 1;
+}
+
+function getProviderTokenMultiplier(platform: string, modelId: string, dailyCap: number): number {
+  if (platform !== 'navy') return 1;
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT tpd_limit, monthly_token_budget
+        FROM models
+       WHERE platform = ? AND model_id = ?
+       LIMIT 1
+    `).get(platform, modelId) as ModelQuotaRow | undefined;
+    return multiplierFromQuotaRow(row, dailyCap);
+  }) ?? 1;
+}
+
+function providerBilledTokens(platform: string, modelId: string, rawTokens: number): number {
+  if (rawTokens <= 0) return 0;
+  const dailyCap = getProviderDailyTokenCap(platform);
+  if (dailyCap === null) return rawTokens;
+  const multiplier = getProviderTokenMultiplier(platform, modelId, dailyCap);
+  return Math.ceil(rawTokens * multiplier);
+}
+
+function sumPersistedProviderTokens(
+  platform: string,
+  keyId: number,
+  windowMs: number,
+  now: number,
+): number | undefined {
+  const dailyCap = getProviderDailyTokenCap(platform);
+  if (dailyCap === null) return 0;
+
+  return withDb(db => {
+    const rows = db.prepare(`
+      SELECT rlu.model_id, COALESCE(SUM(rlu.tokens), 0) AS used,
+             m.tpd_limit, m.monthly_token_budget
+        FROM rate_limit_usage rlu
+        LEFT JOIN models m ON m.platform = rlu.platform AND m.model_id = rlu.model_id
+       WHERE rlu.platform = ?
+         AND rlu.key_id = ?
+         AND rlu.kind = 'tokens'
+         AND rlu.created_at_ms > ?
+       GROUP BY rlu.model_id
+    `).all(platform, keyId, now - windowMs) as (ModelQuotaRow & { model_id: string; used: number })[];
+
+    return rows.reduce((sum, row) => {
+      const multiplier = platform === 'navy' ? multiplierFromQuotaRow(row, dailyCap) : 1;
+      return sum + Math.ceil(row.used * multiplier);
+    }, 0);
+  });
+}
+
+export function providerDailyTokenCount(platform: string, keyId: number, now = Date.now()): number {
+  const persisted = sumPersistedProviderTokens(platform, keyId, DAY, now);
+  if (persisted !== undefined) return persisted;
+
+  let total = 0;
+  const suffix = `:${keyId}:tpd`;
+  for (const [key, w] of windows) {
+    if (!key.startsWith(`${platform}:`) || !key.endsWith(suffix)) continue;
+    const modelId = key.slice(platform.length + 1, -suffix.length);
+    w.tokenTimestamps = w.tokenTimestamps.filter(t => t.ts > now - DAY);
+    const raw = w.tokenTimestamps.reduce((sum, t) => sum + t.tokens, 0);
+    total += providerBilledTokens(platform, modelId, raw);
+  }
+  return total;
+}
+
+export function canUseProviderTokens(
+  platform: string,
+  keyId: number,
+  modelId: string,
+  estimatedTokens: number,
+  now = Date.now(),
+): boolean {
+  const cap = getProviderDailyTokenCap(platform);
+  if (cap === null) return true;
+  const used = providerDailyTokenCount(platform, keyId, now);
+  return used + providerBilledTokens(platform, modelId, estimatedTokens) <= cap;
 }
 
 export function recordRequest(platform: string, modelId: string, keyId: number) {

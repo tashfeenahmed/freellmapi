@@ -5,8 +5,9 @@ import type {
   ChatCompletionChunk,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type CompletionOptions } from './base.js';
+import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
+import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 /**
  * AI Horde — free, community-powered inference served by volunteer workers and
@@ -41,7 +42,8 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
 const ANON_KEY = '0000000000';
 const MIN_MAX_TOKENS = 16;
 const DEFAULT_MAX_TOKENS = 512;
-const HORDE_TIMEOUT_MS = 120000;
+// PROVIDER_TIMEOUT_AIHORDE overrides (#547).
+const HORDE_TIMEOUT_MS = providerTimeoutMs('aihorde', 120000);
 
 /** Rough token estimate (~4 chars/token) used only to fill usage when the proxy
  * returns kudos instead of token counts. Good enough for analytics, never
@@ -195,7 +197,7 @@ export class AIHordeProvider extends BaseProvider {
    * confirmed 401/403 is treated as an invalid key. Transport errors propagate
    * to health.ts (marked status='error' without counting a failure).
    */
-  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+  async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     const res = await this.fetchWithTimeout(`${this.baseUrl}/models`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${this.resolveBearer(apiKey)}` },
@@ -207,6 +209,6 @@ export class AIHordeProvider extends BaseProvider {
       quotaPoolKey: quotaContext?.quotaPoolKey,
       endpoint: 'models',
     });
-    return res.status !== 401 && res.status !== 403;
+    return this.validationResult(res);
   }
 }

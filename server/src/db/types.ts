@@ -19,6 +19,8 @@ export interface Db {
   // as "no file backing" and fall back accordingly.
   readonly name?: string;
   readonly memory?: boolean;
+  /** Close the backing connection when the driver exposes that operation. */
+  close?(): void;
 }
 
 /** Factory that opens (or creates) a database at the given resolved path and

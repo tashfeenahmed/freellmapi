@@ -560,7 +560,11 @@ export const openapiSpec = {
         properties: {
           model: { type: 'string', default: 'auto' },
           input: { type: 'string', minLength: 1 },
-          voice: { type: 'string' },
+          voice: {
+            type: 'string',
+            description:
+              'OpenAI voice names are translated to the selected provider voice. Native Gemini and SiliconFlow names are also accepted; unknown names use the provider default.',
+          },
           response_format: { type: 'string', example: 'mp3' },
         },
       },

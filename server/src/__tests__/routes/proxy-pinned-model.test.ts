@@ -70,7 +70,7 @@ describe('requested_model analytics logging', () => {
         return {
           ok: true,
           json: () => Promise.resolve({
-            id: 'chatcmpl-pin', object: 'chat.completion', created: 1, model: groqModelId,
+            id: 'chatcmpl-pin', object: 'chat.completion', created: 1, model: 'default',
             choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
             usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
           }),
@@ -85,11 +85,14 @@ describe('requested_model analytics logging', () => {
   });
 
   it('logs the pinned model id when the client names a model', async () => {
-    const { status } = await request(app, 'POST', '/v1/chat/completions', {
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
       model: groqModelId,
       messages: [{ role: 'user', content: 'hi' }],
     }, authHeaders());
     expect(status).toBe(200);
+    // Provider metadata is not forwarded blindly: Reka returns "default" for
+    // concrete models, and any compatible provider may do the same (#568).
+    expect(body.model).toBe(groqModelId);
 
     const row = getDb().prepare('SELECT model_id, requested_model FROM requests ORDER BY id DESC LIMIT 1').get() as any;
     expect(row.requested_model).toBe(groqModelId);

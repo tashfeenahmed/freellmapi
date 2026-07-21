@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
@@ -34,6 +35,19 @@ const DEFAULT_DASHBOARD_ORIGINS = [
   'http://127.0.0.1:5173',
   'http://[::1]:5173',
 ];
+
+// A build asset is safe to cache forever+immutable when its URL is
+// content-addressed. Vite parks every hashed chunk (JS, CSS, fonts, images)
+// under assets/, so that directory is the reliable signal; the -<hash>.<ext>
+// suffix is a belt-and-braces fallback for any hashed file emitted elsewhere.
+// index.html and other unhashed entries deliberately fall through to no-cache.
+const HASHED_ASSET_RE = /-[A-Za-z0-9_-]{6,}\.[A-Za-z0-9]+$/;
+function isImmutableAsset(filePath: string): boolean {
+  return (
+    filePath.includes(`${path.sep}assets${path.sep}`) ||
+    HASHED_ASSET_RE.test(path.basename(filePath))
+  );
+}
 
 export function createApp(config?: Config) {
   const cfg = config ?? loadConfig();
@@ -127,14 +141,39 @@ export function createApp(config?: Config) {
     const clientDist = cfg.clientDist
       ? path.resolve(cfg.clientDist)
       : path.resolve(__dirname, '../../client/dist');
-    app.use(express.static(clientDist));
+    // Gzip the dashboard bundle (1+ MB uncompressed). Mounted HERE — after
+    // every API/proxy router and the error handler — so it only wraps the
+    // static-file / SPA-fallback responses below it. The /v1 and /api handlers
+    // end their responses upstream and never fall through to this middleware,
+    // so nothing (crucially the /v1/chat/completions SSE streams) gets buffered
+    // or re-encoded by compression.
+    app.use(compression());
+    app.use(express.static(clientDist, {
+      // Vite emits content-hashed build assets under assets/ (index-<hash>.js,
+      // chunk-<hash>.js, *.css, fonts…). The URL changes whenever the bytes do,
+      // so cache them for a year and mark them immutable. index.html and other
+      // unhashed root entries must stay revalidated (no-cache) so a redeploy
+      // propagates the new asset URLs immediately.
+      setHeaders(res, filePath) {
+        res.setHeader(
+          'Cache-Control',
+          isImmutableAsset(filePath)
+            ? 'public, max-age=31536000, immutable'
+            : 'no-cache',
+        );
+      },
+    }));
     // SPA fallback — serve index.html for non-API routes
     app.use((req, res, next) => {
       if (req.path.startsWith('/api/') || req.path.startsWith('/v1/')) {
         next();
         return;
       }
-      res.sendFile(path.join(clientDist, 'index.html'));
+      // Same no-cache policy as the statically-served index.html: SPA deep
+      // links must revalidate so a redeploy propagates new asset URLs.
+      res.sendFile(path.join(clientDist, 'index.html'), {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
     });
   }
 

@@ -3,6 +3,7 @@ import type { Db } from '../db/types.js';
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { MEDIA_PLATFORMS } from './media.js';
+import { EMBEDDING_PLATFORMS } from './embeddings.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import {
@@ -11,6 +12,7 @@ import {
   deleteTombstonedCatalogModels,
   isCatalogModelTombstoned,
 } from './model-state.js';
+import { ensureAllModelsInProfiles } from './profile-models.js';
 
 // Generative-media modalities are routed into the separate media_models table
 // (see services/media.ts), never into the chat `models` table.
@@ -107,11 +109,26 @@ interface CatalogModel {
   mediaNote?: string;
 }
 
+interface CatalogEmbedding {
+  family: string;
+  platform: string;
+  modelId: string;
+  displayName: string;
+  dimensions: number;
+  maxInputTokens: number | null;
+  priority: number;
+  enabled: boolean;
+  quotaLabel: string;
+}
+
 interface Catalog {
   version: string;
   generatedAt: string;
   tier: 'live' | 'monthly';
   models: CatalogModel[];
+  /** Optional for backward compatibility with catalogs published before the
+   * embedding registry joined the signed freshness feed. */
+  embeddings?: CatalogEmbedding[];
   quirks: CatalogQuirk[];
 }
 
@@ -133,6 +150,18 @@ function isCatalog(value: unknown): value is Catalog {
     (c.tier === 'live' || c.tier === 'monthly') &&
     Array.isArray(c.models) &&
     Array.isArray(c.quirks) &&
+    (c.embeddings === undefined ||
+      (Array.isArray(c.embeddings) &&
+        c.embeddings.every(
+          (m) =>
+            typeof m?.family === 'string' &&
+            typeof m?.platform === 'string' &&
+            typeof m?.modelId === 'string' &&
+            typeof m?.displayName === 'string' &&
+            typeof m?.dimensions === 'number' &&
+            typeof m?.priority === 'number' &&
+            typeof m?.enabled === 'boolean',
+        ))) &&
     c.models.every(
       (m) =>
         typeof m?.platform === 'string' &&
@@ -199,10 +228,29 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
     INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
     VALUES (@platform, @modelId, @displayName, @modality, @priority, @enabled, @quotaLabel)
   `);
+  const selectEmbedding = db.prepare(
+    'SELECT id, enabled FROM embedding_models WHERE platform = ? AND model_id = ?',
+  );
+  const updateEmbedding = db.prepare(`
+    UPDATE embedding_models SET
+      family = @family, display_name = @displayName, dimensions = @dimensions,
+      max_input_tokens = @maxInputTokens, priority = @priority,
+      quota_label = @quotaLabel, enabled = @enabled
+    WHERE id = @id
+  `);
+  const insertEmbedding = db.prepare(`
+    INSERT INTO embedding_models
+      (family, platform, model_id, display_name, dimensions, max_input_tokens,
+       priority, enabled, quota_label)
+    VALUES
+      (@family, @platform, @modelId, @displayName, @dimensions, @maxInputTokens,
+       @priority, @enabled, @quotaLabel)
+  `);
 
   const apply = db.transaction(() => {
     const inCatalog = new Set<string>();
     const inMediaCatalog = new Set<string>();
+    const inEmbeddingCatalog = new Set<string>();
 
     for (const m of catalog.models) {
       // Media modalities are gated on MEDIA_PLATFORMS (decoupled from the chat
@@ -270,6 +318,40 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
       }
     }
 
+    // Embeddings are their own full snapshot. Older catalogs omit this field;
+    // in that case retain the app's bundled embedding baseline untouched.
+    if (catalog.embeddings) {
+      for (const m of catalog.embeddings) {
+        if (!EMBEDDING_PLATFORMS.has(m.platform)) {
+          counts.skippedUnknownPlatform++;
+          continue;
+        }
+        inEmbeddingCatalog.add(`${m.platform}:${m.modelId}`);
+        const row = selectEmbedding.get(m.platform, m.modelId) as { id: number; enabled: number } | undefined;
+        const fields = {
+          family: m.family,
+          displayName: m.displayName,
+          dimensions: m.dimensions,
+          maxInputTokens: m.maxInputTokens,
+          priority: m.priority,
+          quotaLabel: m.quotaLabel,
+        };
+        if (row) {
+          const enabled = m.enabled ? row.enabled : 0; // catalog and local disables both win
+          updateEmbedding.run({ ...fields, id: row.id, enabled });
+          counts.updated++;
+        } else {
+          insertEmbedding.run({
+            ...fields,
+            platform: m.platform,
+            modelId: m.modelId,
+            enabled: m.enabled ? 1 : 0,
+          });
+          counts.inserted++;
+        }
+      }
+    }
+
     counts.removed += deleteTombstonedCatalogModels(db);
     applyAllModelOverrides(db);
 
@@ -284,6 +366,7 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
       const addFb = db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)');
       missingFb.forEach((r, i) => addFb.run(r.id, maxPriority + 1 + i));
     }
+    ensureAllModelsInProfiles(db);
 
     // Remove catalog-managed models that the catalog no longer lists.
     const candidates = db
@@ -316,6 +399,24 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
       if (!inMediaCatalog.has(`${c.platform}:${c.model_id}`)) {
         deleteMedia.run(c.id);
         counts.removed++;
+      }
+    }
+
+    if (catalog.embeddings) {
+      const embeddingCandidates = db
+        .prepare(`
+          SELECT id, platform, model_id
+            FROM embedding_models
+           WHERE platform != 'custom' AND key_id IS NULL
+        `)
+        .all() as { id: number; platform: string; model_id: string }[];
+      const deleteEmbedding = db.prepare('DELETE FROM embedding_models WHERE id = ?');
+      for (const c of embeddingCandidates) {
+        if (!EMBEDDING_PLATFORMS.has(c.platform)) continue;
+        if (!inEmbeddingCatalog.has(`${c.platform}:${c.model_id}`)) {
+          deleteEmbedding.run(c.id);
+          counts.removed++;
+        }
       }
     }
 

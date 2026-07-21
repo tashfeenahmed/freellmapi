@@ -9,6 +9,7 @@ import type {
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 import type { ExtendedSamplingOptions } from '../lib/sampling-params.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { providerTimeoutMs, streamStallTimeoutMs } from '../lib/provider-timeout.js';
 
 /** A provider HTTP error carrying the upstream status and, when the response
  *  included a Retry-After header, the parsed delay so the router can bench the
@@ -58,6 +59,14 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
   timeoutMs?: number;
 }
 
+export interface KeyValidationFailure {
+  valid: false;
+  /** Provider-supplied reason suitable for health logs and the local keys UI. */
+  error: string;
+}
+
+export type KeyValidationResult = boolean | KeyValidationFailure;
+
 export abstract class BaseProvider {
   abstract readonly platform: Platform;
   abstract readonly name: string;
@@ -83,13 +92,51 @@ export abstract class BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk>;
 
-  abstract validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean>;
+  abstract validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult>;
+
+  /**
+   * Turn a conventional 401/403 validation response into a diagnostic result.
+   * Providers still return a simple boolean when no useful error body exists,
+   * but preserving the upstream message here lets the health service persist
+   * and display the reason instead of reducing every failure to "invalid".
+   */
+  protected async validationResult(res: Response): Promise<KeyValidationResult> {
+    if (res.status !== 401 && res.status !== 403) return true;
+
+    let body: any = null;
+    try {
+      if (typeof (res as any).json === 'function') body = await res.json();
+    } catch {
+      // A status and provider name are still more useful than no reason.
+    }
+
+    const detail = [
+      body?.error?.message,
+      body?.errors?.[0]?.message,
+      body?.message,
+      body?.detail,
+      body?.title,
+      res.statusText,
+    ].find((value) => typeof value === 'string' && value.trim().length > 0);
+
+    return {
+      valid: false,
+      error: `${this.name} key validation failed (HTTP ${res.status})${detail ? `: ${detail}` : ''}`,
+    };
+  }
 
   protected async fetchWithTimeout(
     url: string,
     init: RequestInit,
-    timeoutMs = 15000,
+    // Adapters that don't pass a timeout inherit the platform's env override
+    // (PROVIDER_TIMEOUT_<PLATFORM>, issue #547) over the historical 15s.
+    timeoutMs = providerTimeoutMs(this.platform, 15000),
   ): Promise<Response> {
+    // timeoutMs <= 0 means "no timeout" (PROVIDER_TIMEOUT_<PLATFORM>=0).
+    // setTimeout(abort, 0) would abort every request on the next macrotask.
+    if (timeoutMs <= 0) {
+      return proxyFetch(url, init, this.platform, 'chat', timeoutMs);
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -123,7 +170,12 @@ export abstract class BaseProvider {
    */
   protected async *readSseStream(
     res: Response,
-    inactivityTimeoutMs = 90000,
+    // The 90s default was hardcoded and silently truncated slow streams — the
+    // gateway ended them with an error frame plus a clean [DONE] that OpenAI
+    // SDK clients swallow, so responses "just stopped" (issue #553). Operators
+    // proxying slow free tiers can now raise it (or 0 to disable) via
+    // PROVIDER_STREAM_STALL_TIMEOUT_MS.
+    inactivityTimeoutMs = streamStallTimeoutMs(),
   ): AsyncGenerator<ChatCompletionChunk> {
     const reader = res.body?.getReader();
     if (!reader) throw new Error('No response body');
@@ -135,15 +187,17 @@ export abstract class BaseProvider {
     try {
       while (true) {
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const result = await Promise.race([
-          reader.read(),
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(
-              () => reject(new Error(`${this.name} stream stalled: no data for ${inactivityTimeoutMs}ms (timeout)`)),
-              inactivityTimeoutMs,
-            );
-          }),
-        ]).finally(() => clearTimeout(timer));
+        const result = inactivityTimeoutMs <= 0
+          ? await reader.read()
+          : await Promise.race([
+              reader.read(),
+              new Promise<never>((_, reject) => {
+                timer = setTimeout(
+                  () => reject(new Error(`${this.name} stream stalled: no data for ${inactivityTimeoutMs}ms (timeout)`)),
+                  inactivityTimeoutMs,
+                );
+              }),
+            ]).finally(() => clearTimeout(timer));
 
         const { done, value } = result;
         if (done) break;

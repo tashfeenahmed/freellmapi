@@ -175,6 +175,23 @@ describe('embeddings service', () => {
       expect(String(fetchMock.mock.calls[0][0])).toContain('feature-extraction');
     });
 
+    it('routes SEA-LION catalog embeddings through its OpenAI-compatible endpoint', async () => {
+      getDb().prepare(`
+        INSERT INTO embedding_models
+          (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label)
+        VALUES
+          ('sea-lion-e5-embedding-600m', 'sealion', 'aisingapore/SEA-LION-E5-Embedding-600M',
+           'SEA-LION E5 Embedding 600M', 1024, 8192, 1, 1, 'free · 10 rpm')
+      `).run();
+      addKey('sealion');
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(1024));
+
+      const result = await runEmbeddings('sea-lion-e5-embedding-600m', ['hello']);
+
+      expect(result.platform).toBe('sealion');
+      expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.sea-lion.ai/v1/embeddings');
+    });
+
     it('rejects malformed upstream payloads and fails over', async () => {
       addKey('nvidia');
       addKey('openrouter');

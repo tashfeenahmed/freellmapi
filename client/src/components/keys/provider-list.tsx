@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, ExternalLink, KeyRound, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, CircleAlert, ExternalLink, KeyRound, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -163,7 +163,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     }
   }, [editingKeyId])
 
-  const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null }>()
+  const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null; lastHealthError: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
   const statusOf = (k: ApiKey) => healthKeyMap.get(k.id)?.status ?? k.status
 
@@ -346,7 +346,9 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                   <div className="rounded-2xl border divide-y bg-card overflow-hidden">
                     {group.keys.map(k => {
                       const status = statusOf(k)
-                      const lastChecked = healthKeyMap.get(k.id)?.lastCheckedAt
+                      const health = healthKeyMap.get(k.id)
+                      const lastChecked = health?.lastCheckedAt ?? k.lastCheckedAt
+                      const lastHealthError = health?.lastHealthError ?? k.lastHealthError
                       const isEditing = editingKeyId === k.id
                       const customModels = k.models ?? []
                       const hasCustomModels = customModels.length > 0
@@ -437,6 +439,12 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               </ConfirmButton>
                             </div>
                           </div>
+                          {lastHealthError && (
+                            <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-destructive" role="status">
+                              <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0" />
+                              <span className="break-words" title={lastHealthError}>{lastHealthError}</span>
+                            </div>
+                          )}
                           {hasCustomModels && isExpanded && (
                             <div className="flex flex-wrap gap-2 border-t bg-muted/20 px-4 py-3 pl-12">
                               {customModels.map(model => {

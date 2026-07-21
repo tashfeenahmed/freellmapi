@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAICompatProvider } from '../../providers/openai-compat.js';
 
 describe('OpenAICompatProvider', () => {
@@ -12,6 +12,27 @@ describe('OpenAICompatProvider', () => {
       extraHeaders: { 'X-Custom': 'test' },
     });
   });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function sseResponse(frames: string[]): any {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const frame of frames) controller.enqueue(encoder.encode(frame));
+        controller.close();
+      },
+    });
+    return { ok: true, body: stream, headers: new Headers() };
+  }
+
+  async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {
+    const out: T[] = [];
+    for await (const chunk of gen) out.push(chunk);
+    return out;
+  }
 
   it('should set platform and name from config', () => {
     expect(provider.platform).toBe('groq');
@@ -46,6 +67,57 @@ describe('OpenAICompatProvider', () => {
     expect(capturedHeaders['Authorization']).toBe('Bearer my-key');
     expect(capturedHeaders['X-Custom']).toBe('test');
     expect(capturedBody.messages[0].role).toBe('user');
+  });
+
+  it('uses a 60s chat timeout by default for OpenAI-compatible providers (#530)', async () => {
+    const delays: number[] = [];
+    const origSetTimeout = global.setTimeout;
+    vi.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      return origSetTimeout(fn, ms);
+    }) as typeof setTimeout);
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        id: 'test-id',
+        object: 'chat.completion',
+        created: 123,
+        model: 'test-model',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+    } as any);
+
+    await provider.chatCompletion('my-key', [{ role: 'user', content: 'test' }], 'test-model');
+
+    expect(delays).toContain(60_000);
+    expect(delays).not.toContain(15_000);
+  });
+
+  it('honors CompletionOptions.timeoutMs for OpenAI-compatible streams (#530)', async () => {
+    const delays: number[] = [];
+    const origSetTimeout = global.setTimeout;
+    vi.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      return origSetTimeout(fn, ms);
+    }) as typeof setTimeout);
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":null}]}\n\n',
+      'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ]));
+
+    const chunks = await collect(provider.streamChatCompletion(
+      'my-key',
+      [{ role: 'user', content: 'test' }],
+      'test-model',
+      { timeoutMs: 12_345 },
+    ));
+
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(delays).toContain(12_345);
+    expect(delays).not.toContain(60_000);
+    expect(delays).not.toContain(15_000);
   });
 
   it('should pass tool-calling params through untouched', async () => {
@@ -247,9 +319,17 @@ describe('OpenAICompatProvider', () => {
     expect(await provider.validateKey('valid')).toBe(true);
   });
 
-  it('validateKey returns false on confirmed 401', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 401 } as any);
-    expect(await provider.validateKey('bad')).toBe(false);
+  it('validateKey preserves the provider reason on confirmed 401', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: () => Promise.resolve({ error: { message: 'This token has expired' } }),
+    } as any);
+    expect(await provider.validateKey('bad')).toEqual({
+      valid: false,
+      error: 'TestProvider key validation failed (HTTP 401): This token has expired',
+    });
   });
 
   it('validateKey propagates transport errors instead of swallowing', async () => {
@@ -291,6 +371,46 @@ describe('OpenAICompatProvider', () => {
 
     const result = await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }], 'm');
     expect(result.choices[0].message.content).toBe('part one part two');
+  });
+
+  it('strips internal reasoning/thought fields before sending messages to Mistral (#530)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const mistral = new OpenAICompatProvider({ platform: 'mistral', name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1' });
+    await mistral.chatCompletion(
+      'k',
+      [{
+        role: 'assistant',
+        content: null,
+        reasoning_content: 'private chain',
+        tool_calls: [{
+          id: 'call_1',
+          type: 'function',
+          function: { name: 'lookup', arguments: '{}' },
+          thought_signature: 'google-private-signature',
+        }],
+      }],
+      'mistral-medium-3',
+    );
+
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0].tool_calls[0]).not.toHaveProperty('thought_signature');
+    expect(body.messages[0].tool_calls[0]).toEqual({
+      id: 'call_1',
+      type: 'function',
+      function: { name: 'lookup', arguments: '{}' },
+    });
   });
 
   it('folds reasoning into content when content is empty (Ollama style — bare `reasoning` field)', async () => {
@@ -382,11 +502,14 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'mistral',    name: 'Mistral',       baseUrl: 'https://api.mistral.ai/v1' },
     { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },
     { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
+    { platform: 'pollinations', name: 'Pollinations', baseUrl: 'https://gen.pollinations.ai/v1' },
     { platform: 'zhipu',      name: 'Zhipu AI',      baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
     { platform: 'opencode',   name: 'OpenCode Zen',  baseUrl: 'https://opencode.ai/zen/v1' },
     { platform: 'aion',       name: 'Aion Labs',     baseUrl: 'https://api.aionlabs.ai/v1' },
     { platform: 'requesty',   name: 'Requesty',      baseUrl: 'https://router.requesty.ai/v1' },
+    { platform: 'navy',       name: 'NavyAI',        baseUrl: 'https://api.navy/v1' },
     { platform: 'nara',       name: 'NaraRouter',    baseUrl: 'https://router.bynara.id/v1' },
+    { platform: 'sealion',    name: 'SEA-LION',      baseUrl: 'https://api.sea-lion.ai/v1' },
   ] as const;
 
   for (const p of platforms) {
@@ -411,6 +534,37 @@ describe('OpenAICompatProvider - platform instances', () => {
       expect(result._routed_via?.platform).toBe(p.platform);
     });
   }
+
+  it('omits greedy temperature=0 for Requesty Leanstral and supplies neutral top_p', async () => {
+    const provider = new OpenAICompatProvider({
+      platform: 'requesty',
+      name: 'Requesty',
+      baseUrl: 'https://router.requesty.ai/v1',
+    });
+    let body: Record<string, unknown> = {};
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse(String((init as RequestInit).body));
+      return {
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'mistral/leanstral-1-5',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    await provider.chatCompletion(
+      'key',
+      [{ role: 'user', content: 'hi' }],
+      'mistral/leanstral-1-5',
+      { temperature: 0 },
+    );
+
+    expect(body.temperature).toBeUndefined();
+    expect(body.top_p).toBe(1);
+  });
 
   // #264: Groq (and others) reject a model's inline tool-call dialect with a 400
   // `tool_use_failed`, handing back the raw text in `error.failed_generation`.

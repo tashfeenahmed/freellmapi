@@ -72,6 +72,28 @@ function existingAsCatalogModels(): AnyCatalog['models'] {
   );
 }
 
+type CatalogEmbedding = NonNullable<AnyCatalog['embeddings']>[number];
+
+function existingAsCatalogEmbeddings(): CatalogEmbedding[] {
+  const rows = getDb().prepare(`
+    SELECT family, platform, model_id, display_name, dimensions,
+           max_input_tokens, priority, enabled, quota_label
+      FROM embedding_models
+     WHERE platform != 'custom' AND key_id IS NULL
+  `).all() as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    family: r.family as string,
+    platform: r.platform as string,
+    modelId: r.model_id as string,
+    displayName: r.display_name as string,
+    dimensions: r.dimensions as number,
+    maxInputTokens: r.max_input_tokens as number | null,
+    priority: r.priority as number,
+    enabled: (r.enabled as number) === 1,
+    quotaLabel: r.quota_label as string,
+  }));
+}
+
 describe('applyCatalog', () => {
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
@@ -217,6 +239,44 @@ describe('applyCatalog', () => {
     const counts = applyCatalog(getDb(), catalogOf(models));
     expect(counts.skippedUnknownPlatform).toBeGreaterThanOrEqual(1);
     expect(getDb().prepare("SELECT id FROM models WHERE platform = 'some-future-provider'").get()).toBeUndefined();
+  });
+
+  it('applies the full embedding snapshot and retires a replaced provider id', () => {
+    const embeddings = existingAsCatalogEmbeddings();
+    const openRouter = embeddings.find(
+      (m) => m.platform === 'openrouter' && m.modelId === 'nvidia/llama-nemotron-embed-vl-1b-v2',
+    );
+    expect(openRouter).toBeDefined();
+    openRouter!.modelId = 'nvidia/llama-nemotron-embed-vl-1b-v2:free';
+    openRouter!.displayName = 'Nemotron Embed VL 1B (OR free)';
+    embeddings.push({
+      family: 'sea-lion-e5-embedding-600m',
+      platform: 'sealion',
+      modelId: 'aisingapore/SEA-LION-E5-Embedding-600M',
+      displayName: 'SEA-LION E5 Embedding 600M',
+      dimensions: 1024,
+      maxInputTokens: 8192,
+      priority: 1,
+      enabled: true,
+      quotaLabel: 'free · 10 rpm',
+    });
+    const catalog = catalogOf(existingAsCatalogModels());
+    catalog.embeddings = embeddings;
+
+    applyCatalog(getDb(), catalog);
+
+    expect(getDb().prepare(`
+      SELECT id FROM embedding_models
+       WHERE platform = 'openrouter' AND model_id = 'nvidia/llama-nemotron-embed-vl-1b-v2'
+    `).get()).toBeUndefined();
+    expect(getDb().prepare(`
+      SELECT id FROM embedding_models
+       WHERE platform = 'openrouter' AND model_id = 'nvidia/llama-nemotron-embed-vl-1b-v2:free'
+    `).get()).toBeDefined();
+    expect(getDb().prepare(`
+      SELECT dimensions FROM embedding_models
+       WHERE platform = 'sealion' AND model_id = 'aisingapore/SEA-LION-E5-Embedding-600M'
+    `).get()).toEqual({ dimensions: 1024 });
   });
 
   it('replaces quirks wholesale', () => {

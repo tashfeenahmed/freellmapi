@@ -35,6 +35,7 @@ import {
   isModelNotFoundError,
   isModelAccessForbiddenError,
   isProviderBadRequestError,
+  isProviderDegradedError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage } from './error-redaction.js';
 import { checkKeyHealth } from '../services/health.js';
@@ -247,6 +248,9 @@ export function classifyAttemptError(err: any): AttemptErrorClass {
   if (isDailyQuotaExhaustedError(err)) return 'daily_quota_exhausted';
   if (isModelNotFoundError(err)) return 'model_not_found';
   if (isModelAccessForbiddenError(err)) return 'forbidden';
+  // A DEGRADED-function 400 (NVIDIA NIM, #522) is provider health, not request
+  // shape — keep it out of provider_bad_request so the trail reads honestly.
+  if (isProviderDegradedError(err)) return 'upstream_error';
   if (isProviderBadRequestError(err)) return 'provider_bad_request';
   const msg = (err?.message ?? '').toLowerCase();
   if (msg.includes('empty completion')) return 'empty_completion';
@@ -341,6 +345,19 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
       message: `All ${attempts.length} attempted provider key(s) failed authentication${budgetNote}. ` +
         'The configured upstream API key(s) look invalid or expired; they are being revalidated now and will be marked invalid automatically. ' +
         `Check the provider keys in the dashboard.${trail} Last error: ${safeLastError}`,
+    };
+  }
+
+  // A chain that died on a DEGRADED-function 400 (NVIDIA NIM, #522) is a
+  // provider-capacity outage, not a bad request: render 503 so clients retry
+  // later instead of "fixing" a request that was never broken.
+  if (isProviderDegradedError(lastError)) {
+    return {
+      kind: 'unavailable',
+      status: 503,
+      type: 'service_unavailable',
+      message: `The routed provider reported the model's hosted deployment as temporarily degraded${budgetNote}. ` +
+        `This is a provider-side condition; retry later or route to another provider.${trail} Last error: ${safeLastError}`,
     };
   }
 
