@@ -154,7 +154,7 @@ describe('GoogleProvider', () => {
     expect(capturedBody.contents[0].role).toBe('user');
   });
 
-  it('folds system prompts into user content and strips function tools for Gemma models (#500)', async () => {
+  it('passes through tools and system instruction for Gemma models like Gemini (#500)', async () => {
     let capturedBody: any;
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
       capturedBody = JSON.parse((init as any).body);
@@ -188,11 +188,10 @@ describe('GoogleProvider', () => {
       },
     );
 
-    expect(capturedBody.systemInstruction).toBeUndefined();
-    expect(capturedBody.tools).toBeUndefined();
-    expect(capturedBody.toolConfig).toBeUndefined();
-    expect(capturedBody.contents[0]).toEqual({ role: 'user', parts: [{ text: 'You are helpful' }] });
-    expect(capturedBody.contents[1]).toEqual({ role: 'user', parts: [{ text: 'Hi' }] });
+    expect(capturedBody.systemInstruction).toEqual({ parts: [{ text: 'You are helpful' }] });
+    expect(capturedBody.tools[0].functionDeclarations[0].name).toBe('get_weather');
+    expect(capturedBody.toolConfig).toBeDefined();
+    expect(capturedBody.contents[0]).toEqual({ role: 'user', parts: [{ text: 'Hi' }] });
   });
 
   it('does not expose Gemini thought parts as visible content (#539)', async () => {
