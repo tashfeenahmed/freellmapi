@@ -1,0 +1,1 @@
+{"nodes": [{"id": "docker_compose", "label": "Docker Compose Configuration", "file_type": "code", "source_file": "docker-compose.yml"}], "edges": [], "hyperedges": []}

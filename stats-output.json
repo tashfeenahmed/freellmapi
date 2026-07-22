@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-07-15T21:17:49.112Z",
+  "baseUrl": "http://localhost:3003",
+  "stats": {
+    "name": "Overall Results",
+    "total": 3,
+    "success": 0,
+    "rateLimited": 3,
+    "authErrors": 0,
+    "serverErrors": 0,
+    "clientErrors": 0,
+    "timeouts": 0,
+    "otherErrors": 0,
+    "avgLatency": 48,
+    "p50Latency": 16,
+    "p95Latency": 116,
+    "p99Latency": 116,
+    "duration": 0,
+    "requestsPerSecond": "N/A",
+    "successRate": "0.0"
+  },
+  "testDetails": [
+    {
+      "name": "auto (auto)",
+      "total": 3,
+      "success": 0,
+      "rateLimited": 3,
+      "authErrors": 0,
+      "serverErrors": 0,
+      "clientErrors": 0,
+      "timeouts": 0,
+      "otherErrors": 0,
+      "avgLatency": 48,
+      "p50Latency": 16,
+      "p95Latency": 116,
+      "p99Latency": 116,
+      "duration": 2.1,
+      "requestsPerSecond": "1.40",
+      "successRate": "0.0"
+    }
+  ]
+}

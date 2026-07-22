@@ -1,0 +1,1 @@
+{"nodes": [{"id": "github_workflows_ci", "label": "CI Workflow", "file_type": "code", "source_file": ".github/workflows/ci.yml"}], "edges": [{"source": "github_workflows_ci", "target": "readme", "relation": "references", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": ".github/workflows/ci.yml"}], "hyperedges": []}
