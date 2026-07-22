@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, ModelListRow } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveRoutingChain, resolveModelGroupCandidates, recordRateLimitHit, recordSuccess, hasEnabledVisionModel, hasEnabledToolsModel, hasOtherUsableKey, routingReserveTokens, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { applyThrottle } from '../services/throttler.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS, learnLimitFromError } from '../services/ratelimit.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { runImageGeneration, runSpeech, MediaError } from '../services/media.js';
@@ -754,6 +755,12 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         model: route.modelId,
         requestedModel: attempt === 0 ? requestedModelLabel : undefined,
       });
+      // Apply throttle based on the ACTUAL resolved model — not the client-sent model.
+      try {
+        await applyThrottle({ platform: route.platform, modelId: route.modelId, modelDbId: route.modelDbId, keyId: route.keyId, requestId: requestGroupId });
+      } catch (throttleErr) {
+        console.error('Throttle error:', throttleErr);
+      }
 
       if (stream) {
         let totalOutputTokens = 0;
@@ -1470,6 +1477,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       model: route.modelId,
       requestedModel: attempt === 0 ? requestedModelLabel : undefined,
     });
+    // Apply throttle based on the ACTUAL resolved model — not the client-sent model.
+    // This runs BEFORE the upstream call so the delay is effective.
+    try {
+      await applyThrottle({ platform: route.platform, modelId: route.modelId, modelDbId: route.modelDbId, keyId: route.keyId, requestId: requestGroupId });
+    } catch (throttleErr) {
+      console.error('Throttle error:', throttleErr);
+    }
     let outboundMessages = messages;
     // Extra input tokens the injected handoff adds on this turn (0 when not
     // injected). Folded into the streaming success accounting, where token

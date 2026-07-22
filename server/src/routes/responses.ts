@@ -10,6 +10,7 @@ import type {
   Platform,
 } from '@freellmapi/shared/types.js';
 import { routeRequest, hasEnabledToolsModel, routingReserveTokens, type RouteResult } from '../services/router.js';
+import { applyThrottle } from '../services/throttler.js';
 import { getUnifiedApiKey } from '../db/index.js';
 import { contentToString } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -437,6 +438,12 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         model: route.modelId,
         requestedModel: attempt === 0 ? requestedModelLabel : undefined,
       });
+      // Apply throttle based on the ACTUAL resolved model — not the client-sent model.
+      try {
+        await applyThrottle({ platform: route.platform, modelId: route.modelId, modelDbId: route.modelDbId, keyId: route.keyId, requestId: requestGroupId });
+      } catch (throttleErr) {
+        console.error('Throttle error:', throttleErr);
+      }
       if (stream) {
         let outputIndex = 0;
         let msgItemId: string | null = null;

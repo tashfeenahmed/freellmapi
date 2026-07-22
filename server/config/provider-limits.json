@@ -1,0 +1,34 @@
+{
+  "providers": {
+    "anthropic": {
+      "rpm": 60,
+      "tpm": 100000,
+      "delayThreshold": 0.5
+    },
+    "openai": {
+      "rpm": 100,
+      "tpm": 200000,
+      "delayThreshold": 0.5
+    },
+    "mistral": {
+      "rpm": 2,
+      "tpm": 100000,
+      "delayThreshold": 0.5
+    },
+    "nvidia": {
+      "rpm": 40,
+      "tpm": 100000,
+      "delayThreshold": 0.5
+    },
+    "groq": {
+      "rpm": 30,
+      "tpm": 5000,
+      "delayThreshold": 0.5
+    },
+    "google": {
+      "rpm": 10,
+      "tpm": 100000,
+      "delayThreshold": 0.5
+    }
+  }
+}
