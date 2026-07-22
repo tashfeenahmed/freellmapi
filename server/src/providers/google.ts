@@ -109,52 +109,12 @@ interface GeminiResponse {
 
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 
-function isGemmaModel(modelId: string): boolean {
-  const normalized = modelId.toLowerCase().replace(/^models\//, '');
-  return /(?:^|[/.:])gemma[-_]/.test(normalized);
-}
-
-function optionsForModel(modelId: string, options?: CompletionOptions): CompletionOptions | undefined {
-  if (!isGemmaModel(modelId) || !options) return options;
-  const { tools: _tools, tool_choice: _toolChoice, parallel_tool_calls: _parallelToolCalls, ...rest } = options;
-  return rest;
-}
-
 function systemInstructionText(systemInstruction: { parts?: Array<{ text?: string }> } | undefined): string | null {
   const text = systemInstruction?.parts
     ?.map(part => part.text ?? '')
     .join('\n\n')
     .trim();
   return text ? text : null;
-}
-
-function contentsForModel(
-  modelId: string,
-  contents: GeminiContent[],
-  systemInstruction: { parts: Array<{ text: string }> } | undefined,
-): { contents: GeminiContent[]; systemInstruction?: { parts: Array<{ text: string }> } } {
-  if (!isGemmaModel(modelId)) return { contents, systemInstruction };
-
-  const cleaned = contents
-    .map((entry): GeminiContent | null => {
-      const parts = entry.parts.filter(part => !part.functionCall && !part.functionResponse);
-      if (parts.length === 0) return null;
-      return { ...entry, parts };
-    })
-    .filter((entry): entry is GeminiContent => entry !== null);
-  const safeContents = cleaned.length > 0
-    ? cleaned
-    : [{ role: 'user' as const, parts: [{ text: '' }] }];
-
-  const systemText = systemInstructionText(systemInstruction);
-  if (!systemText) return { contents: safeContents };
-
-  return {
-    contents: [
-      { role: 'user', parts: [{ text: systemText }] },
-      ...safeContents,
-    ],
-  };
 }
 
 function safeParseObject(raw: string): Record<string, unknown> {
@@ -548,25 +508,23 @@ export class GoogleProvider extends BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
     const translated = await toGeminiContents(messages);
-    const request = contentsForModel(modelId, translated.contents, translated.systemInstruction);
-    const modelOptions = optionsForModel(modelId, options);
 
-    const tools = toGeminiTools(modelOptions?.tools);
+    const tools = toGeminiTools(options?.tools);
     const body: Record<string, unknown> = {
-      contents: request.contents,
+      contents: translated.contents,
       generationConfig: {
-        temperature: modelOptions?.temperature,
-        maxOutputTokens: modelOptions?.max_tokens,
-        topP: modelOptions?.top_p,
-        stopSequences: toGeminiStopSequences(modelOptions?.stop),
-        ...toGeminiExtendedConfig(modelOptions),
+        temperature: options?.temperature,
+        maxOutputTokens: options?.max_tokens,
+        topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
       // functionCallingConfig is only valid when real function tools are present;
       // a grounding-only request (just google_search) must omit it. (#59)
-      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(modelOptions?.tool_choice) : undefined,
+      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
     };
-    if (request.systemInstruction) body.systemInstruction = request.systemInstruction;
+    if (translated.systemInstruction) body.systemInstruction = translated.systemInstruction;
 
     const url = `${API_BASE}/models/${modelId}:generateContent?key=${apiKey}`;
     const res = await this.fetchWithTimeout(url, {
@@ -630,23 +588,21 @@ export class GoogleProvider extends BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk> {
     const translated = await toGeminiContents(messages);
-    const request = contentsForModel(modelId, translated.contents, translated.systemInstruction);
-    const modelOptions = optionsForModel(modelId, options);
 
-    const tools = toGeminiTools(modelOptions?.tools);
+    const tools = toGeminiTools(options?.tools);
     const body: Record<string, unknown> = {
-      contents: request.contents,
+      contents: translated.contents,
       generationConfig: {
-        temperature: modelOptions?.temperature,
-        maxOutputTokens: modelOptions?.max_tokens,
-        topP: modelOptions?.top_p,
-        stopSequences: toGeminiStopSequences(modelOptions?.stop),
-        ...toGeminiExtendedConfig(modelOptions),
+        temperature: options?.temperature,
+        maxOutputTokens: options?.max_tokens,
+        topP: options?.top_p,
+        stopSequences: toGeminiStopSequences(options?.stop),
+        ...toGeminiExtendedConfig(options),
       },
       tools,
-      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(modelOptions?.tool_choice) : undefined,
+      toolConfig: hasFunctionDeclarations(tools) ? toGeminiToolConfig(options?.tool_choice) : undefined,
     };
-    if (request.systemInstruction) body.systemInstruction = request.systemInstruction;
+    if (translated.systemInstruction) body.systemInstruction = translated.systemInstruction;
 
     const url = `${API_BASE}/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
     const res = await this.fetchWithTimeout(url, {
