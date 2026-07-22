@@ -30,8 +30,9 @@ import fr from './locales/fr.json'
 import es from './locales/es.json'
 import ptBR from './locales/pt-BR.json'
 import it from './locales/it.json'
+import fa from './locales/fa.json'
 
-export const SUPPORTED_LOCALES = ['en', 'zh-CN', 'fr', 'es', 'pt-BR', 'it'] as const
+export const SUPPORTED_LOCALES = ['en', 'zh-CN', 'fr', 'es', 'pt-BR', 'it', 'fa'] as const
 export type Locale = (typeof SUPPORTED_LOCALES)[number]
 
 export const DEFAULT_LOCALE: Locale = 'en'
@@ -55,6 +56,7 @@ function detectLocale(): Locale {
   if (lower.startsWith('fr')) return 'fr'
   if (lower.startsWith('es')) return 'es'
   if (lower.startsWith('it')) return 'it'
+  if (lower.startsWith('fa')) return 'fa'
   if (lower.startsWith('en')) return 'en'
   return DEFAULT_LOCALE
 }
@@ -68,6 +70,7 @@ const dictionaries: Record<Locale, Dictionary> = {
   es: es as Dictionary,
   'pt-BR': ptBR as Dictionary,
   it: it as Dictionary,
+  fa: fa as Dictionary,
 }
 
 function lookup(dict: Dictionary, key: string): unknown {
