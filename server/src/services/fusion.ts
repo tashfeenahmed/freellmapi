@@ -133,6 +133,23 @@ export function setSavedFusionConfig(input: SavedFusionConfig): SavedFusionConfi
   return normalized;
 }
 
+export function pruneUnavailableSavedFusionConfig(): SavedFusionConfig {
+  const raw = getSetting(SAVED_FUSION_KEY);
+  if (!raw) return getSavedFusionConfig();
+
+  const saved = getSavedFusionConfig();
+  const models = saved.models.filter(savedModelId => resolveFusionCandidate(savedModelId) != null);
+  const judge = saved.judge && resolveFusionCandidate(saved.judge) != null ? saved.judge : null;
+
+  if (models.length === saved.models.length && judge === saved.judge) return saved;
+
+  return setSavedFusionConfig({
+    ...saved,
+    models,
+    judge,
+  });
+}
+
 /**
  * Merge a request's inline fusion config over the saved dashboard default.
  * Each field present on the request wins; otherwise the saved default applies.
