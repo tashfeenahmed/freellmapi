@@ -10,7 +10,7 @@ import { extendedBodyParams } from '../lib/sampling-params.js';
 import { rescueInlineToolCalls } from '../lib/tool-call-rescue.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
-import { providerTimeoutMs } from '../lib/provider-timeout.js';
+import { streamStallTimeoutMs, providerTimeoutMs } from '../lib/provider-timeout.js';
 
 /**
  * Generic provider for platforms that use an OpenAI-compatible API.
@@ -27,6 +27,7 @@ export class OpenAICompatProvider extends BaseProvider {
    * non-streaming responses until generation completes, and reasoning models can
    * take >15s before first byte. Default 60000. */
   private readonly timeoutMs: number;
+  private readonly streamStallTimeoutMs?: number;
   /** NVIDIA NIM models reject any request that permits parallel tool calls with
    * `400 This model only supports single tool-calls at once!`. When set, pin
    * parallel_tool_calls to false whenever tools are in play. See issue #255. */
@@ -39,6 +40,7 @@ export class OpenAICompatProvider extends BaseProvider {
     extraHeaders?: Record<string, string>;
     validateUrl?: string;
     timeoutMs?: number;
+    streamStallTimeoutMs?: number;
     keyless?: boolean;
     forceSingleToolCall?: boolean;
   }) {
@@ -50,6 +52,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.validateUrl = opts.validateUrl;
     // PROVIDER_TIMEOUT_<PLATFORM> wins over the registration default (#547).
     this.timeoutMs = providerTimeoutMs(opts.platform, opts.timeoutMs ?? 60_000);
+    this.streamStallTimeoutMs = opts.streamStallTimeoutMs;
     this.keyless = opts.keyless ?? false;
     this.forceSingleToolCall = opts.forceSingleToolCall ?? false;
   }
@@ -332,7 +335,7 @@ export class OpenAICompatProvider extends BaseProvider {
       throw providerHttpError(res, `${this.name} API error ${res.status}: ${this.upstreamErrorText(err, res)}`);
     }
 
-    yield* this.readSseStream(res);
+    yield* this.readSseStream(res, streamStallTimeoutMs(this.streamStallTimeoutMs));
   }
 
   async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {

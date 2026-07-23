@@ -7,9 +7,8 @@
 //
 // PROVIDER_STREAM_STALL_TIMEOUT_MS is the streaming counterpart for the
 // mid-stream inactivity watchdog (issue #553): how long an SSE stream may go
-// without a single byte before the gateway gives up on it. It is global, not
-// per-platform: a stall looks the same everywhere, and the per-platform knob
-// above already covers the slow-first-byte case.
+// without a single byte before the gateway gives up on it. The env override is
+// global, while providers may pass a longer built-in default for slow streams.
 
 const warned = new Set<string>();
 
@@ -49,8 +48,8 @@ export const DEFAULT_STREAM_STALL_TIMEOUT_MS = 90_000;
 
 /** Effective mid-stream inactivity timeout (PROVIDER_STREAM_STALL_TIMEOUT_MS,
  * default 90s, 0 disables). Resolved per call so tests can vary the env. */
-export function streamStallTimeoutMs(): number {
-  return parseTimeoutEnv('PROVIDER_STREAM_STALL_TIMEOUT_MS', DEFAULT_STREAM_STALL_TIMEOUT_MS);
+export function streamStallTimeoutMs(defaultMs = DEFAULT_STREAM_STALL_TIMEOUT_MS): number {
+  return parseTimeoutEnv('PROVIDER_STREAM_STALL_TIMEOUT_MS', defaultMs);
 }
 
 /** Test hook: forget which malformed values have already been warned about. */

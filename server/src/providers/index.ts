@@ -7,6 +7,8 @@ import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
 
 const providers = new Map<Platform, BaseProvider>();
+const NVIDIA_NIM_TIMEOUT_MS = 180_000;
+const NVIDIA_NIM_STREAM_STALL_TIMEOUT_MS = 180_000;
 
 function register(provider: BaseProvider) {
   providers.set(provider.platform, provider);
@@ -39,14 +41,15 @@ register(new OpenAICompatProvider({
 // NVIDIA NIM - OpenAI-compatible. Several NIM models reject parallel tool calls
 // ("This model only supports single tool-calls at once!"), so pin
 // parallel_tool_calls to false when tools are present. See issue #255.
-// Reasoning models (deepseek-v4-pro, llama-4-maverick, llama-3.1/3.3-70b) take
-// 30-60s on cold start; the default 15s false-flags them as broken. 90s.
+// Reasoning models (deepseek-v4-pro, llama-4-maverick, llama-3.1/3.3-70b) can
+// spend well over a minute processing large prompts before the first byte.
 register(new OpenAICompatProvider({
   platform: 'nvidia',
   name: 'NVIDIA NIM',
   baseUrl: 'https://integrate.api.nvidia.com/v1',
   forceSingleToolCall: true,
-  timeoutMs: 90_000,
+  timeoutMs: NVIDIA_NIM_TIMEOUT_MS,
+  streamStallTimeoutMs: NVIDIA_NIM_STREAM_STALL_TIMEOUT_MS,
 }));
 
 // Mistral - OpenAI-compatible
