@@ -221,7 +221,11 @@ Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Ke
 
 For repeatable Docker/server installs, FreeLLMAPI can apply a JSON config on
 every boot. Set `FREEAPI_CONFIG_PATH=/path/to/freellmapi.config.json` or put the
-same JSON in `FREEAPI_CONFIG_JSON`. The config is idempotent: existing keys,
+same JSON in `FREEAPI_CONFIG_JSON`. When `FREEAPI_CONFIG_PATH` is used, the
+server watches its directory and reapplies valid atomic replacements without a
+process restart; write a temporary file and rename it over the target. The
+last valid configuration remains active if a replacement is invalid. The
+config is idempotent: existing keys,
 custom providers, model edits, fallback rows, and routing settings are updated
 instead of duplicated.
 

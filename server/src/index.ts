@@ -8,7 +8,8 @@ import { startCatalogSync } from './services/catalog-sync.js';
 import { installProcessSafetyNet } from './lib/process-safety-net.js';
 import { NodeScheduler } from './lib/scheduler.js';
 import { loadConfig } from './lib/config.js';
-import { applyDeclarativeConfigFromEnv } from './services/declarative-config.js';
+import { applyDeclarativeConfig, applyDeclarativeConfigFromEnv } from './services/declarative-config.js';
+import { createDeclarativeConfigReloader } from './services/declarative-config-reloader.js';
 import { restoreDbBackupIfNeeded, startDbBackupPump } from './lib/db-backup.js';
 import { userCount } from './services/auth.js';
 import { generateSetupCode } from './lib/setup-code.js';
@@ -31,7 +32,23 @@ async function main() {
     await restoreDbBackupIfNeeded();
   }
   initDb(config.dbPath ?? undefined);
-  applyDeclarativeConfigFromEnv();
+  const declarativeConfigPath = process.env.FREEAPI_CONFIG_PATH?.trim();
+  if (declarativeConfigPath) {
+    const reloader = createDeclarativeConfigReloader({
+      configPath: declarativeConfigPath,
+      apply: (value, source) => {
+        const result = applyDeclarativeConfig(value, source);
+        console.log(
+          `[config] applied ${source}: ${result.keys} keys, ${result.customModels} custom models, ` +
+          `${result.models} model edits, ${result.fallback} fallback rows${result.routing ? ', routing' : ''}`,
+        );
+      },
+      onError: (error) => console.error(`[config] declarative reload failed: ${error.message}`),
+    });
+    await reloader.start();
+  } else {
+    applyDeclarativeConfigFromEnv();
+  }
 
   // First-run hardening: when the dashboard is still unclaimed, mint a one-time
   // setup code and log it. A loopback browser can finish setup without it; a
