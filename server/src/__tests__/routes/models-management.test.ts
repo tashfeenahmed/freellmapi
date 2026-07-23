@@ -1,10 +1,34 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb } from '../../db/index.js';
+import { initDb, getDb, getSetting, setSetting } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
+
+const PROFILE_SELECTION_SQL = 'SELECT enabled FROM profile_models WHERE profile_id = ? AND model_db_id = ?';
+const FALLBACK_SELECTION_SQL = 'SELECT enabled FROM fallback_config WHERE model_db_id = ?';
+const FUSION_CONFIG_SETTING = 'fusion_config';
+const ACTIVE_PROFILE_SQL = "SELECT id FROM profiles WHERE type = 'default' ORDER BY id LIMIT 1";
+const INSERT_MODEL_SQL = `
+  INSERT INTO models (
+    platform, model_id, display_name, intelligence_rank, speed_rank, size_label, enabled
+  ) VALUES (?, ?, ?, ?, ?, ?, 1)
+`;
+const INSERT_FALLBACK_SQL = 'INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)';
+const INSERT_PROFILE_MODEL_SQL = 'INSERT INTO profile_models (profile_id, model_db_id, priority, enabled) VALUES (?, ?, ?, 1)';
+const TARGET_MODEL_ID = 'canonical-prune-raw-model';
+const TARGET_CANONICAL_ID = 'canonical-prune-target';
+const TARGET_DISPLAY_NAME = 'Canonical Prune Target (Test)';
+const RETAINED_MODEL_ID = 'canonical-prune-retained-raw-model';
+const RETAINED_CANONICAL_ID = 'canonical-prune-retained';
+const RETAINED_DISPLAY_NAME = 'Canonical Prune Retained (Test)';
+const TEST_MODEL_PLATFORM = 'groq';
+const TEST_MODEL_SIZE_LABEL = 'Small';
+const TEST_MODEL_INTELLIGENCE_RANK = 9001;
+const TEST_MODEL_SPEED_RANK = 9001;
+const TARGET_MODEL_PRIORITY = 9001;
+const RETAINED_MODEL_PRIORITY = 9002;
 
 async function request(app: Express, method: string, path: string, body?: any) {
   const server = app.listen(0);
@@ -101,6 +125,64 @@ describe('Model management API', () => {
 
     const override = getDb().prepare("SELECT 1 FROM model_overrides WHERE platform = 'custom' AND model_id = 'cap-edit-model'").get();
     expect(override).toBeUndefined();
+  });
+
+  it('disabling a model also clears its fallback/profile/fusion selection (#499)', async () => {
+    const db = getDb();
+    const profile = db.prepare(ACTIVE_PROFILE_SQL).get() as { id: number };
+    const targetInsert = db.prepare(INSERT_MODEL_SQL).run(
+      TEST_MODEL_PLATFORM,
+      TARGET_MODEL_ID,
+      TARGET_DISPLAY_NAME,
+      TEST_MODEL_INTELLIGENCE_RANK,
+      TEST_MODEL_SPEED_RANK,
+      TEST_MODEL_SIZE_LABEL,
+    );
+    const retainedInsert = db.prepare(INSERT_MODEL_SQL).run(
+      TEST_MODEL_PLATFORM,
+      RETAINED_MODEL_ID,
+      RETAINED_DISPLAY_NAME,
+      TEST_MODEL_INTELLIGENCE_RANK + 1,
+      TEST_MODEL_SPEED_RANK + 1,
+      TEST_MODEL_SIZE_LABEL,
+    );
+    const target = {
+      profile_id: profile.id,
+      model_db_id: Number(targetInsert.lastInsertRowid),
+      model_id: TARGET_MODEL_ID,
+    };
+    const retainedModelDbId = Number(retainedInsert.lastInsertRowid);
+    db.prepare(INSERT_FALLBACK_SQL).run(target.model_db_id, TARGET_MODEL_PRIORITY);
+    db.prepare(INSERT_FALLBACK_SQL).run(retainedModelDbId, RETAINED_MODEL_PRIORITY);
+    db.prepare(INSERT_PROFILE_MODEL_SQL).run(profile.id, target.model_db_id, TARGET_MODEL_PRIORITY);
+    db.prepare(INSERT_PROFILE_MODEL_SQL).run(profile.id, retainedModelDbId, RETAINED_MODEL_PRIORITY);
+    setSetting(FUSION_CONFIG_SETTING, JSON.stringify({
+      mode: 'explicit',
+      models: [target.model_id, TARGET_CANONICAL_ID, RETAINED_CANONICAL_ID],
+      judge: TARGET_CANONICAL_ID,
+      k: 2,
+      strategy: 'synthesize',
+      expose_panel: false,
+    }));
+
+    const { status, body } = await request(app, 'PATCH', `/api/models/${target.model_db_id}`, {
+      enabled: false,
+      fallbackEnabled: true,
+    });
+    expect(status).toBe(200);
+    expect(body.success).toBe(true);
+
+    const profileSelection = db.prepare(PROFILE_SELECTION_SQL)
+      .get(target.profile_id, target.model_db_id) as { enabled: number };
+    const fallbackSelection = db.prepare(FALLBACK_SELECTION_SQL)
+      .get(target.model_db_id) as { enabled: number };
+
+    expect(profileSelection.enabled).toBe(0);
+    expect(fallbackSelection.enabled).toBe(0);
+
+    const savedFusionConfig = JSON.parse(getSetting(FUSION_CONFIG_SETTING)!);
+    expect(savedFusionConfig.models).toEqual([RETAINED_CANONICAL_ID]);
+    expect(savedFusionConfig.judge).toBeNull();
   });
 
   it('deletes a catalog model with a tombstone', async () => {
