@@ -19,6 +19,9 @@ type Listener = (toasts: ToastItem[]) => void
 let items: ToastItem[] = []
 let nextId = 1
 const listeners = new Set<Listener>()
+const MAX_VISIBLE_TOASTS = 4
+const DEFAULT_TOAST_DURATION_MS = 10_000
+const DEFAULT_ERROR_TOAST_DURATION_MS = 12_000
 
 function emit() {
   for (const listener of listeners) listener(items)
@@ -47,8 +50,8 @@ function push(kind: ToastKind, message: string, duration?: number): number {
   // failing poll would otherwise pile up the same error every interval).
   items = [
     ...items.filter(t => !(t.kind === kind && t.message === message)),
-    { id, kind, message, duration: duration ?? (kind === 'error' ? 6000 : 3500) },
-  ].slice(-4)
+    { id, kind, message, duration: duration ?? (kind === 'error' ? DEFAULT_ERROR_TOAST_DURATION_MS : DEFAULT_TOAST_DURATION_MS) },
+  ].slice(-MAX_VISIBLE_TOASTS)
   emit()
   return id
 }
