@@ -1805,6 +1805,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             if (!choice) {
               // Usage-only frame (stream_options.include_usage) — held and
               // re-emitted after our finish chunk to preserve OpenAI ordering.
+              // Captured unconditionally (not gated on include_usage) because
+              // (a) an extra usage frame is harmless to OpenAI-compatible
+              // clients and (b) this preserves existing behaviour for the
+              // many providers that DO echo usage.  Our injection below only
+              // fires when the upstream NEVER echoes one AND the client asked.
               if (anyChunk.usage) usageChunk = anyChunk;
               continue;
             }
