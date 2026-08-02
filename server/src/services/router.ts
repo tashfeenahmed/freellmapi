@@ -26,7 +26,6 @@ import { platformDropsResponseFormat } from '../lib/sampling-params.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from './model-groups.js';
 import { getActiveProfileId } from './profile-models.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
-import { modelStatsKey, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
@@ -388,11 +387,8 @@ interface KeyStats {
   avgTtfbMs: number | null;
 }
 
-// Keyed by modelStatsKey(): "platform:model_id" for catalog models, and
-// "custom:model_id@base_url" for a relay model that carries an endpoint scope
-// (#651). A single-endpoint install produces the same keys it always did.
 let statsCache: Map<string, ModelStats> | null = null;
-let keyStatsCache: Map<string, KeyStats> | null = null; // "platform:model_id:key_id"
+let keyStatsCache: Map<string, KeyStats> | null = null; // "model_db_id:key_id"
 let statsCacheTime = 0;
 
 function decayWeight(ageDays: number): number {
@@ -409,13 +405,6 @@ const IS_TIMEOUT_SQL = `(status != 'success' AND (${
   TIMEOUT_ERROR_MARKERS.map(m => `LOWER(COALESCE(error, '')) LIKE '%${m}%'`).join(' OR ')
 }))`;
 
-/** api_keys.id → endpoint scope, for every custom credential on record (#651). */
-function customEndpointScopes(db: Db): Map<number, string> {
-  const rows = db.prepare("SELECT id, base_url FROM api_keys WHERE platform = 'custom'")
-    .all() as { id: number; base_url: string | null }[];
-  return new Map(rows.map(r => [r.id, endpointScopeForBaseUrl(r.base_url)]));
-}
-
 export function refreshStatsCache(db: Db, force = false): void {
   if (!force && statsCache && Date.now() - statsCacheTime < CACHE_TTL_MS) return;
 
@@ -425,7 +414,14 @@ export function refreshStatsCache(db: Db, force = false): void {
   // 60s-cached shape. Aggregated two ways below: rolled up per model (ordering)
   // and per key (in-model key selection, #580).
   const buckets = db.prepare(`
-    SELECT platform, model_id, key_id,
+    WITH matched_requests AS (
+      SELECT r.*,
+        COALESCE(r.model_db_id, CASE WHEN r.platform != 'custom' THEN (
+          SELECT m.id FROM models m WHERE m.platform = r.platform AND m.model_id = r.model_id
+        ) END) AS resolved_model_db_id
+      FROM requests r WHERE r.created_at >= ?
+    )
+    SELECT resolved_model_db_id AS model_db_id, key_id,
       CAST((julianday('now') - julianday(created_at)) AS INTEGER) AS age_days,
       COUNT(*) AS total,
       SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS successes,
@@ -435,11 +431,11 @@ export function refreshStatsCache(db: Db, force = false): void {
       SUM(CASE WHEN status = 'success' AND ttfb_ms IS NOT NULL THEN 1 ELSE 0 END) AS succ_ttfb_cnt,
       SUM(CASE WHEN ${IS_TIMEOUT_SQL} THEN 1 ELSE 0 END) AS timeouts,
       SUM(CASE WHEN ${IS_TIMEOUT_SQL} THEN MIN(MAX(latency_ms, 0), ${TIMEOUT_LATENCY_CAP_MS}) ELSE 0 END) AS timeout_lat
-    FROM requests
-    WHERE created_at >= ?
-    GROUP BY platform, model_id, key_id, age_days
+    FROM matched_requests
+    WHERE resolved_model_db_id IS NOT NULL
+    GROUP BY resolved_model_db_id, key_id, age_days
   `).all(since) as Array<{
-    platform: string; model_id: string; key_id: number | null; age_days: number; total: number; successes: number;
+    model_db_id: number; key_id: number | null; age_days: number; total: number; successes: number;
     succ_out: number; succ_lat: number; succ_ttfb_sum: number; succ_ttfb_cnt: number;
     timeouts: number; timeout_lat: number;
   }>;
@@ -464,19 +460,10 @@ export function refreshStatsCache(db: Db, force = false): void {
     a.wTtfbCnt += w * (b.succ_ttfb_cnt + b.timeouts);
     a.wTimeouts += w * b.timeouts;
   };
-  // Which endpoint each custom credential belongs to, so a request logged
-  // against relay A's key lands in relay A's bucket and nowhere else (#651).
-  // `requests` has always recorded key_id, so pre-migration history splits
-  // correctly too; rows whose key is gone (or that never had one) fall into the
-  // un-scoped bucket, which only un-scoped rows read.
-  const scopeByKeyId = customEndpointScopes(db);
-  const scopeOf = (platform: string, keyId: number | null): string =>
-    platform === 'custom' && keyId != null ? (scopeByKeyId.get(keyId) ?? '') : '';
-
   const acc = new Map<string, Acc>();
   const keyAcc = new Map<string, Acc>();
   for (const b of buckets) {
-    const key = modelStatsKey(b.platform, b.model_id, scopeOf(b.platform, b.key_id));
+    const key = String(b.model_db_id);
     const w = decayWeight(b.age_days);
     let a = acc.get(key);
     if (!a) acc.set(key, a = emptyAcc());
@@ -491,17 +478,21 @@ export function refreshStatsCache(db: Db, force = false): void {
 
   // Calendar-month token usage per model, for the headroom guardrail.
   const usageRows = db.prepare(`
-    SELECT platform, model_id, key_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-    GROUP BY platform, model_id, key_id
-  `).all() as Array<{ platform: string; model_id: string; key_id: number | null; used: number }>;
-  const usageMap = new Map<string, number>();
-  for (const r of usageRows) {
-    const key = modelStatsKey(r.platform, r.model_id, scopeOf(r.platform, r.key_id));
-    usageMap.set(key, (usageMap.get(key) ?? 0) + r.used);
-  }
+    WITH matched_requests AS (
+      SELECT r.*,
+        COALESCE(r.model_db_id, CASE WHEN r.platform != 'custom' THEN (
+          SELECT m.id FROM models m WHERE m.platform = r.platform AND m.model_id = r.model_id
+        ) END) AS resolved_model_db_id
+      FROM requests r
+      WHERE r.created_at >= datetime('now', 'start of month') AND r.request_type = 'chat'
+    )
+    SELECT resolved_model_db_id AS model_db_id,
+           COALESCE(SUM(input_tokens + output_tokens), 0) AS used
+    FROM matched_requests
+    WHERE resolved_model_db_id IS NOT NULL
+    GROUP BY resolved_model_db_id
+  `).all() as Array<{ model_db_id: number; used: number }>;
+  const usageMap = new Map(usageRows.map(r => [String(r.model_db_id), r.used]));
 
   const next = new Map<string, ModelStats>();
   for (const [key, a] of acc) {
@@ -587,19 +578,15 @@ export function writeObservedSpeedRanks(db: Db): number {
   if (!statsCache || statsCache.size === 0) return 0;
 
   const pinned = modelsWithOverriddenField(db, 'speedRank');
-  const rows = db.prepare('SELECT id, platform, model_id, speed_rank, endpoint_scope FROM models')
-    .all() as { id: number; platform: string; model_id: string; speed_rank: number; endpoint_scope: string }[];
+  const rows = db.prepare('SELECT id, platform, model_id, speed_rank FROM models')
+    .all() as { id: number; platform: string; model_id: string; speed_rank: number }[];
 
   const update = db.prepare('UPDATE models SET speed_rank = ? WHERE id = ?');
   let written = 0;
   const tx = db.transaction(() => {
     for (const row of rows) {
-      // Overrides are keyed (platform, model_id) — they only exist for
-      // catalog-managed rows, which are never endpoint-scoped — while the
-      // measured stats are per endpoint, so each relay's copy gets its own
-      // observed rank instead of one shared number (#651).
-      if (pinned.has(`${row.platform}:${row.model_id}`)) continue;
-      const stats = statsCache!.get(modelStatsKey(row.platform, row.model_id, row.endpoint_scope));
+      if (row.platform !== 'custom' && pinned.has(`${row.platform}:${row.model_id}`)) continue;
+      const stats = statsCache!.get(String(row.id));
       if (!stats || stats.speedSamples < SPEED_RANK_MIN_SAMPLES) continue;
       const rank = observedSpeedRank(speedScore(stats.tokPerSec, stats.avgTtfbMs));
       if (rank === row.speed_rank) continue;
@@ -645,7 +632,7 @@ function scoreChainEntry(
   sampled: boolean,
   keyCounts: Map<string, number>,
 ): ScoredEntry {
-  const stats = statsCache?.get(modelStatsKey(entry.platform, entry.model_id, entry.endpoint_scope));
+  const stats = statsCache?.get(String(entry.model_db_id));
   const successes = stats?.successes ?? 0;
   const failures = stats?.failures ?? 0;
 
@@ -883,7 +870,7 @@ const KEY_SCORE_WEIGHTS = { reliability: 0.75, speed: 0.25 };
  */
 function orderKeysByScore(entry: ChainRow, keys: KeyRow[]): KeyRow[] | null {
   if (keys.length < 2 || !keyStatsCache) return null;
-  const prefix = `${modelStatsKey(entry.platform, entry.model_id, entry.endpoint_scope)}:`;
+  const prefix = `${entry.model_db_id}:`;
   if (!keys.some(k => keyStatsCache!.has(prefix + k.id))) return null;
 
   return keys
@@ -945,9 +932,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   // 60s-TTL aggregate the model-level bandit uses (refresh is a no-op when
   // fresh, and cheap when not). With no data at all, keep the legacy rotation.
   refreshStatsCache(db);
-  // Scoped so two relays offering the same model id don't share one rotation
-  // cursor over the platform's key list (#651).
-  const rrKey = modelStatsKey(entry.platform, entry.model_id, entry.endpoint_scope);
+  const rrKey = String(entry.model_db_id);
   let idx = roundRobinIndex.get(rrKey) ?? 0;
   const ranked = orderKeysByScore(entry, keys);
 
@@ -1452,7 +1437,7 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
 
   const scores: RoutingScore[] = chain.map(entry => {
     const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false, keyCounts);
-    const stats = statsCache?.get(modelStatsKey(entry.platform, entry.model_id, entry.endpoint_scope));
+    const stats = statsCache?.get(String(entry.model_db_id));
     return {
       modelDbId: entry.model_db_id,
       platform: entry.platform,

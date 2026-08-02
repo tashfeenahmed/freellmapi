@@ -29,6 +29,29 @@ function setSettingIfMissing(db: LogTx, key: string, value: string): void {
   `).run(key, value);
 }
 
+// A custom model id can exist on more than one relay. Resolve through the key
+// selected for this request, whose normalized base URL is the row's endpoint
+// scope; catalog models remain uniquely identified by platform + model id.
+function resolveModelDbId(db: LogTx, platform: string, modelId: string, keyId: number): number | null {
+  const row = db.prepare(`
+    SELECT m.id
+      FROM models m
+     WHERE m.platform = ?
+       AND m.model_id = ?
+       AND (
+         m.platform != 'custom'
+         OR m.endpoint_scope = (
+           SELECT rtrim(trim(k.base_url), '/')
+             FROM api_keys k
+            WHERE k.id = ?
+              AND k.platform = 'custom'
+         )
+       )
+     LIMIT 1
+  `).get(platform, modelId, keyId) as { id: number } | undefined;
+  return row?.id ?? null;
+}
+
 // Append a row to the request analytics table. Shared by the chat proxy, the
 // responses path, and the fusion panel so every served (or failed) sub-request
 // is logged identically. Lives in a neutral lib module to avoid an import cycle
@@ -67,10 +90,11 @@ export function logRequest(
     // middleware); null when logging happens outside an HTTP request.
     const client = getClientContext();
     const tx = db.transaction(() => {
+      const modelDbId = resolveModelDbId(db, platform, modelId, keyId);
       const insert = db.prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent);
+        INSERT INTO requests (platform, model_id, model_db_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(platform, modelId, modelDbId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent);
 
       // Report the row id back to the fallback loop's attempt trace (if one is
       // active): the LAST id noted during a loop run is the terminal row the

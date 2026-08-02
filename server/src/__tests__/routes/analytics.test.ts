@@ -253,6 +253,7 @@ describe('Analytics API', () => {
   function insertRaw(opts: {
     platform?: string;
     modelId?: string;
+    modelDbId?: number | null;
     keyId?: number | null;
     status?: 'success' | 'error';
     inputTokens?: number;
@@ -266,6 +267,7 @@ describe('Analytics API', () => {
     const {
       platform = 'test',
       modelId = 'test-model',
+      modelDbId = null,
       keyId = null,
       status = 'success',
       inputTokens = 0,
@@ -277,10 +279,38 @@ describe('Analytics API', () => {
       createdAt,
     } = opts;
     getDb().prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, ttfb_ms, request_type, error, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, ttfbMs, requestType, error, createdAt);
+      INSERT INTO requests (platform, model_id, model_db_id, key_id, status, input_tokens, output_tokens, latency_ms, ttfb_ms, request_type, error, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(platform, modelId, modelDbId, keyId, status, inputTokens, outputTokens, latencyMs, ttfbMs, requestType, error, createdAt);
   }
+
+  it('keeps same-named relay requests attached to their own model rows', async () => {
+    const db = getDb();
+    const modelId = 'shared-relay-analytics-model';
+    const insertModel = db.prepare(`
+      INSERT INTO models (
+        platform, model_id, display_name, intelligence_rank, speed_rank,
+        enabled, source, endpoint_scope, paid_input_per_m, paid_output_per_m
+      ) VALUES ('custom', ?, ?, 50, 50, 1, 'user', ?, ?, 0)
+    `);
+    const relayA = Number(insertModel.run(modelId, 'Relay A', 'http://relay-a.test/v1', 1).lastInsertRowid);
+    const relayB = Number(insertModel.run(modelId, 'Relay B', 'http://relay-b.test/v1', 3).lastInsertRowid);
+
+    insertRaw({ platform: 'custom', modelId, modelDbId: relayA, inputTokens: 1_000_000, createdAt: '2026-05-29 11:00:00' });
+    insertRaw({ platform: 'custom', modelId, modelDbId: relayB, inputTokens: 1_000_000, createdAt: '2026-05-29 11:01:00' });
+
+    const summary = await request(app, '/api/analytics/summary?range=24h');
+    expect(summary.status).toBe(200);
+    expect(summary.body.estimatedCostSavings).toBe(4);
+
+    const byModel = await request(app, '/api/analytics/by-model?range=24h');
+    expect(byModel.status).toBe(200);
+    const rows = byModel.body.filter((row: any) => row.modelId === modelId);
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ displayName: 'Relay A', requests: 1, estimatedCost: 1 }),
+      expect.objectContaining({ displayName: 'Relay B', requests: 1, estimatedCost: 3 }),
+    ]));
+  });
 
   describe('extended summary fields', () => {
     it('returns latency percentiles from the raw rows', async () => {

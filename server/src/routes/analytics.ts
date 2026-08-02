@@ -99,7 +99,9 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
       ELSE 0 END
     ), 0) as est_savings
     FROM requests r
-    LEFT JOIN models m ON m.platform = r.platform AND m.model_id = r.model_id
+    LEFT JOIN models m ON m.id = r.model_db_id
+      OR (r.model_db_id IS NULL AND r.platform != 'custom'
+        AND m.platform = r.platform AND m.model_id = r.model_id)
     WHERE r.created_at >= ?
   `).get(FALLBACK_INPUT_PER_M, FALLBACK_OUTPUT_PER_M, since) as { est_savings: number };
 
@@ -197,8 +199,8 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
 
   const rows = db.prepare(`
     SELECT
-      r.platform,
-      r.model_id,
+      COALESCE(m.platform, r.platform) AS platform,
+      COALESCE(m.model_id, r.model_id) AS model_id,
       m.display_name,
       COUNT(*) as requests,
       SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate,
@@ -211,9 +213,11 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
         r.output_tokens * COALESCE(m.paid_output_per_m, ?) / 1000000.0
       ELSE 0 END) as est_cost
     FROM requests r
-    LEFT JOIN models m ON m.platform = r.platform AND m.model_id = r.model_id
+    LEFT JOIN models m ON m.id = r.model_db_id
+      OR (r.model_db_id IS NULL AND r.platform != 'custom'
+        AND m.platform = r.platform AND m.model_id = r.model_id)
     WHERE r.created_at >= ?
-    GROUP BY r.platform, r.model_id
+    GROUP BY r.model_db_id, r.platform, r.model_id
     ORDER BY requests DESC
   `).all(FALLBACK_INPUT_PER_M, FALLBACK_OUTPUT_PER_M, since) as any[];
 
