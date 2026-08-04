@@ -1,0 +1,122 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { getDb, initDb } from '../../db/index.js';
+import { runCustomModelSync, customModelSyncIntervalMs, startCustomModelSync } from '../../services/custom-model-sync.js';
+import { discoverEndpointModels } from '../../services/model-discovery.js';
+import { endpointScopeForBaseUrl } from '../../lib/endpoint-scope.js';
+
+// The sync pass talks to the outside world ONLY through discoverEndpointModels;
+// stub it so each test controls what an endpoint "serves" today.
+vi.mock('../../services/model-discovery.js', async () => {
+  const actual = await vi.importActual('../../services/model-discovery.js');
+  return { ...actual, discoverEndpointModels: vi.fn() };
+});
+
+// Stored custom credentials are decrypted by the crypto module; make it return
+// a stable plaintext so listCustomEndpoints can read back the rows we insert.
+vi.mock('../../lib/crypto.js', async () => {
+  const actual = await vi.importActual('../../lib/crypto.js');
+  return { ...actual, decrypt: vi.fn(() => 'mocked-api-key') };
+});
+
+const ORIGINAL_INTERVAL = process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS;
+
+function addCustomEndpoint(baseUrl: string, label = 'endpoint'): void {
+  getDb().prepare(`
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+    VALUES ('custom', ?, 'enc', 'iv', 'tag', 'healthy', 1, ?)
+  `).run(label, baseUrl);
+}
+
+function customModelIds(): string[] {
+  const rows = getDb().prepare("SELECT model_id FROM models WHERE platform = 'custom'").all() as { model_id: string }[];
+  return rows.map(r => r.model_id).sort();
+}
+
+describe('custom model sync', () => {
+  beforeEach(() => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
+    initDb(':memory:');
+    // initDb seeds the real catalog; wipe it so each test controls its own rows.
+    getDb().exec('DELETE FROM fallback_config; DELETE FROM api_keys; DELETE FROM models; DELETE FROM requests;');
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_INTERVAL === undefined) {
+      delete process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS;
+    } else {
+      process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS = ORIGINAL_INTERVAL;
+    }
+  });
+
+  it('reports zero endpoints when none are configured', async () => {
+    const result = await runCustomModelSync(getDb());
+    expect(result.endpoints).toBe(0);
+    expect(result.added).toBe(0);
+    expect(result.skipped).toBe(0);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('registers newly discovered models for a configured endpoint', async () => {
+    addCustomEndpoint('http://localhost:9999');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'model-a', ownedBy: null },
+      { id: 'model-b', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.endpoints).toBe(1);
+    expect(result.added).toBe(2);
+    expect(result.skipped).toBe(0);
+    expect(result.failures).toEqual([]);
+    expect(customModelIds()).toEqual(['model-a', 'model-b']);
+  });
+
+  it('skips models already registered on the endpoint and adds the rest', async () => {
+    addCustomEndpoint('http://localhost:9999');
+    getDb().prepare(`
+      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, enabled, endpoint_scope)
+      VALUES ('custom', 'model-a', 'model-a', 50, 50, 'Medium', 1, ?)
+    `).run(endpointScopeForBaseUrl('http://localhost:9999'));
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'model-a', ownedBy: null },
+      { id: 'model-b', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.added).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(customModelIds()).toEqual(['model-a', 'model-b']);
+  });
+
+  it('isolates a failing endpoint and keeps syncing the rest', async () => {
+    addCustomEndpoint('http://bad:9999');
+    addCustomEndpoint('http://good:9999');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce([{ id: 'model-c', ownedBy: null }]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]!.baseUrl).toBe('http://bad:9999');
+    expect(result.failures[0]!.error).toContain('boom');
+    expect(result.added).toBe(1);
+    expect(customModelIds()).toEqual(['model-c']);
+  });
+
+  it('parses the interval env: daily default, 0 disables the scheduled pass', () => {
+    delete process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS;
+    expect(customModelSyncIntervalMs()).toBe(24 * 60 * 60 * 1000);
+
+    process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS = '3600000';
+    expect(customModelSyncIntervalMs()).toBe(3600000);
+
+    process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS = '0';
+    expect(customModelSyncIntervalMs()).toBe(0);
+    expect(startCustomModelSync(getDb(), { every: vi.fn(), after: vi.fn() } as never)).toBeNull();
+  });
+});
