@@ -9,12 +9,11 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { verifyCredentials } from '../services/auth.js';
-import { ensureModelInProfiles } from '../services/profile-models.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential } from '../services/custom-endpoint.js';
-import { customModelSeed } from '../services/custom-model-seed.js';
+import { registerCustomModels } from '../services/custom-model-register.js';
 import { discoverEndpointModels, ModelDiscoveryError } from '../services/model-discovery.js';
-import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
+import { normalizeBaseUrl } from '../lib/endpoint-scope.js';
 
 export const keysRouter = Router();
 
@@ -818,97 +817,9 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     return;
   }
 
-  const upsert = db.transaction(() => {
-    // Key rows are matched on (base_url, secret): a new secret for a known
-    // endpoint is a SECOND credential for it, not a replacement (#619), and a
-    // new base_url is a separate provider (#212). Re-submitting with a blank
-    // key preserves the stored one. A submitted keyId pins WHICH credential of
-    // the pool the new models bind to (#488 bulk registration).
-    const { keyId, storedKey: storedKeyForMask } = resolveCustomEndpointKey(
-      db, baseUrl, providedKey, label, endpoint.keyId ?? undefined,
-    );
-    const endpointKeyIds = customEndpointKeyIds(db, keyId);
-    // The identity discriminator for every row registered in this call (#651).
-    const endpointScope = endpointScopeForBaseUrl(baseUrl);
-    // Unknown ≠ worst: seed the routing ranks at the catalog median so a new
-    // custom model is explored instead of buried at intelligence 0 (#488).
-    const seed = customModelSeed(db);
-
-    const registered: { modelDbId: number; model: string; displayName: string; supportsTools: boolean; supportsVision: boolean; created: boolean }[] = [];
-    for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
-      // Register each model bound to THIS endpoint's key. Custom models carry no
-      // rate limits and sort last in the intelligence preset (size_label tier).
-      // Identity is per endpoint (#651): the same model id on a DIFFERENT relay
-      // is a separate row with its own enabled flag, ranks and stats, instead of
-      // silently rebinding the other endpoint's row as it used to. A model
-      // already on THIS endpoint keeps the key it has, so adding a second
-      // credential doesn't re-bind it (#619).
-      // Capability flags: an unset flag binds NULL so COALESCE picks the insert
-      // default (tools 1, vision 0) on a new row and preserves the existing
-      // value on re-registration. (#470) An omitted display name binds NULL the
-      // same way — it falls back to the model id on a new row and leaves a name
-      // already on the row alone, so the bulk re-registration behind "Fetch
-      // models" (which posts bare ids) can't wipe names the operator set.
-      const bound = db.prepare(
-        "SELECT key_id FROM models WHERE platform = 'custom' AND model_id = ? AND endpoint_scope = ?",
-      ).get(modelId, endpointScope) as { key_id: number | null } | undefined;
-      const created = bound === undefined;
-      const bindKeyId = bound?.key_id != null && endpointKeyIds.has(bound.key_id) ? bound.key_id : keyId;
-      const toolsParam = supportsTools === undefined ? null : (supportsTools ? 1 : 0);
-      const visionParam = supportsVision === undefined ? null : (supportsVision ? 1 : 0);
-      // The seed applies on INSERT only: DO UPDATE deliberately leaves the rank
-      // columns alone so re-registering a model (or bulk-adding alongside it)
-      // never rewrites ranks the operator has since tuned by hand.
-      db.prepare(`
-        INSERT INTO models
-          (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
-           rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id,
-           supports_tools, supports_vision, source, endpoint_scope)
-        VALUES ('custom', @modelId, COALESCE(@displayName, @modelId), @intelligenceRank, @speedRank, @sizeLabel,
-           NULL, NULL, NULL, NULL, '', NULL, 1, @keyId,
-           COALESCE(@tools, 1), COALESCE(@vision, 0), 'user', @endpointScope)
-        ON CONFLICT(platform, model_id, endpoint_scope)
-        DO UPDATE SET
-          display_name = COALESCE(@displayName, display_name),
-          key_id = excluded.key_id,
-          enabled = 1,
-          supports_tools = COALESCE(@tools, supports_tools),
-          supports_vision = COALESCE(@vision, supports_vision)
-      `).run({
-        modelId, displayName, keyId: bindKeyId, tools: toolsParam, vision: visionParam,
-        intelligenceRank: seed.intelligenceRank, speedRank: seed.speedRank, sizeLabel: seed.sizeLabel,
-        endpointScope,
-      });
-
-      // Read back rather than echo the submitted values: an omitted display name
-      // or capability flag resolves in SQL, so the row is the only place that
-      // knows what this model is actually called now.
-      const modelRow = db.prepare(
-        "SELECT id, display_name, supports_tools, supports_vision FROM models WHERE platform = 'custom' AND model_id = ? AND endpoint_scope = ?",
-      ).get(modelId, endpointScope) as { id: number; display_name: string; supports_tools: number; supports_vision: number };
-
-      // Append to the fallback chain if not already present.
-      const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelRow.id);
-      if (!inChain) {
-        const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
-        db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelRow.id, max.m + 1);
-      }
-      ensureModelInProfiles(db, modelRow.id);
-
-      registered.push({
-        modelDbId: modelRow.id,
-        model: modelId,
-        displayName: modelRow.display_name,
-        supportsTools: modelRow.supports_tools === 1,
-        supportsVision: modelRow.supports_vision === 1,
-        created,
-      });
-    }
-
-    return { keyId, registered, storedKeyForMask };
-  });
-
-  const { keyId, registered, storedKeyForMask } = upsert();
+  const { keyId, storedKey, registered } = registerCustomModels(
+    db, baseUrl, providedKey, label, endpoint.keyId ?? undefined, entries,
+  );
   // `model`/`displayName`/`modelDbId` echo the first model for older clients;
   // `models` carries the full set registered in this call.
   const first = registered[0]!;
@@ -927,7 +838,7 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     // picking a whole discovered list re-submits ids that are already there.
     created: registered.filter(m => m.created).length,
     alreadyRegistered: registered.filter(m => !m.created).length,
-    maskedKey: maskKey(storedKeyForMask),
+    maskedKey: maskKey(storedKey),
   });
 });
 

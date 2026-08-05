@@ -6,6 +6,7 @@ import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, flushProxyCache } f
 import { startWakeDetect } from './lib/wake-detect.js';
 import { startCatalogSync } from './services/catalog-sync.js';
 import { startCooldownProbe } from './services/cooldown-probe.js';
+import { startCustomModelSync } from './services/custom-model-sync.js';
 import { installProcessSafetyNet } from './lib/process-safety-net.js';
 import { NodeScheduler } from './lib/scheduler.js';
 import { loadConfig } from './lib/config.js';
@@ -63,6 +64,7 @@ async function main() {
     startCatalogSync(scheduler);
     startCooldownProbe(scheduler);
     startDbBackupPump(getDb(), scheduler, config.dbPath ?? undefined);
+    startCustomModelSync(getDb(), scheduler);
 
     // Post-sleep recovery: while the host was suspended (laptop lid, VM
     // pause) timers and keep-alive sockets froze, so the first requests after

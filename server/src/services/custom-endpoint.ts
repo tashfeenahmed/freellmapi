@@ -169,3 +169,41 @@ export function siblingEndpointKeyId(db: Db, keyId: number, baseUrl: string | nu
   `).get(baseUrl, keyId) as { id: number } | undefined;
   return row?.id ?? null;
 }
+
+export interface CustomEndpointCredential {
+  keyId: number;
+  baseUrl: string;
+  /** Decrypted secret, or null when the row's ciphertext cannot be decrypted. */
+  apiKey: string | null;
+}
+
+/**
+ * Every configured custom endpoint, one entry per distinct base_url, carrying
+ * its first stored credential. Used by the scheduled model sync
+ * (#674/#663/#656) to refresh model lists unattended: the manual route asks
+ * the operator for a key mid-typing, but a scheduled pass can only use what
+ * the endpoint already has on record.
+ */
+export function listCustomEndpoints(db: Db): CustomEndpointCredential[] {
+  const rows = db.prepare(`
+    SELECT base_url, id, encrypted_key, iv, auth_tag
+      FROM api_keys
+     WHERE platform = 'custom' AND base_url IS NOT NULL
+     ORDER BY base_url, id
+  `).all() as Array<{
+    base_url: string;
+    id: number;
+    encrypted_key: string;
+    iv: string;
+    auth_tag: string;
+  }>;
+
+  const seen = new Set<string>();
+  const out: CustomEndpointCredential[] = [];
+  for (const row of rows) {
+    if (seen.has(row.base_url)) continue;
+    seen.add(row.base_url);
+    out.push({ keyId: row.id, baseUrl: row.base_url, apiKey: plaintextOf(row) });
+  }
+  return out;
+}
