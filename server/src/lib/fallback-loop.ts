@@ -806,17 +806,10 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       return;
     }
 
-    // Wall-clock budget: refuse to START another retry once spent. The first
-    // attempt always runs; a slow attempt is never aborted mid-flight (that is
-    // the TODO(fallback-v2) hedging work), it just becomes the last one.
-    if (attempt > 0 && budgetMs > 0 && Date.now() - startedAt >= budgetMs) {
-      hooks.onExhausted(
-        exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
-        { attempts, timedOut: true },
-      );
-      return;
-    }
-
+    // Routing exhaustion (no more keys/candidates) takes priority over the
+    // wall-clock budget below: if there was never another attempt to make,
+    // say so, rather than blaming a budget that nothing was actually cut
+    // short by.
     let route: RouteResult;
     try {
       route = hooks.route(attempt);
@@ -851,11 +844,23 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
 
     // Everything from here to the end of the iteration runs inside a finally that
     // frees the route's in-flight lease. Every exit — success, auth rotation,
-    // retryable continue, fatal, breaker trip, contract violation — passes through
-    // it, so no path can leak a lease and leave the key's concurrency budget short.
-    // Success accounting happens inside dispatch, so the persisted counters are
-    // already written by the time the provisional lease goes away.
+    // retryable continue, fatal, breaker trip, contract violation, wall-clock
+    // budget — passes through it, so no path can leak a lease and leave the
+    // key's concurrency budget short. Success accounting happens inside
+    // dispatch, so the persisted counters are already written by the time the
+    // provisional lease goes away.
     try {
+    // Wall-clock budget: refuse to START another retry once spent. The first
+    // attempt always runs; a slow attempt is never aborted mid-flight (that is
+    // the TODO(fallback-v2) hedging work), it just becomes the last one.
+    if (attempt > 0 && budgetMs > 0 && Date.now() - startedAt >= budgetMs) {
+      hooks.onExhausted(
+        exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
+        { attempts, timedOut: true },
+      );
+      return;
+    }
+
     let outcome: DispatchOutcome;
     try {
       outcome = await hooks.dispatch(route, attempt);
