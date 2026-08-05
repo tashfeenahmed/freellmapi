@@ -111,6 +111,13 @@ and it is unset, the server auto-generates a development key and saves it to a
 installs that kept the key in the database are migrated to this file on first
 boot. Do not rely on that fallback with real provider keys; set `ENCRYPTION_KEY`.
 
+> **Tip for contributors:** instead of the manual steps above, run the
+> idempotent bootstrap script — `scripts/dev-bootstrap.sh` on macOS/Linux. It
+> checks your Node version, installs dependencies only when needed, and writes
+> `.env` from `.env.example` with a fresh `ENCRYPTION_KEY` if `.env` is missing.
+> It never touches an existing `.env`. Windows contributors follow the
+> PowerShell steps above (a `dev-bootstrap.ps1` companion is planned).
+
 Request analytics are retained for 90 days or 100000 request rows by default,
 whichever limit prunes first. Set `REQUEST_ANALYTICS_RETENTION_DAYS=0` or
 `REQUEST_ANALYTICS_MAX_ROWS=0` in `.env` to disable either retention limit.
