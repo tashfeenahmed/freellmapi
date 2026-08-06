@@ -249,54 +249,60 @@ export default function FallbackPage() {
             )}
           </div>
 
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border p-1">
-            {STRATEGIES.map(s => (
-              <Tooltip key={s.key} text={t(`strategies.${s.tKey}Blurb`)}>
+          <div className="inline-flex flex-wrap items-center gap-3">
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border p-1">
+              {STRATEGIES.map(s => (
+                <Tooltip key={s.key} text={t(`strategies.${s.tKey}Blurb`)}>
+                  <button
+                    disabled={strategyMutation.isPending}
+                    onClick={() => strategyMutation.mutate({ strategy: s.key })}
+                    className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                      s.key === strategy
+                        ? 'bg-foreground text-background font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t(`strategies.${s.tKey}`)}
+                  </button>
+                </Tooltip>
+              ))}
+              {strategy === 'custom' && routing && (
+                <CustomWeightsPopover
+                  saved={routing.customWeights}
+                  saving={strategyMutation.isPending}
+                  onSave={w => strategyMutation.mutate({ strategy: 'custom', weights: w })}
+                />
+              )}
+            </div>
+
+            {/* Exploration toggle (#685 follow-up): rendered as a button that
+                matches the strategy group above and sits on the same row —
+                a niche knob that gives unmeasured models a guaranteed chance
+                to be tried so they build reliability/speed data. Hidden in
+                Manual mode, where routeRequest ignores it. */}
+            {!isManual && (
+              <Tooltip text={t('strategies.exploreHint')}>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={routing?.exploreEnabled ?? false}
                   disabled={strategyMutation.isPending}
-                  onClick={() => strategyMutation.mutate({ strategy: s.key })}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                    s.key === strategy
+                  onClick={() => strategyMutation.mutate({ strategy, exploreEnabled: !(routing?.exploreEnabled ?? false) })}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-colors inline-flex items-center gap-1.5 ${
+                    (routing?.exploreEnabled ?? false)
                       ? 'bg-foreground text-background font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
-                  {t(`strategies.${s.tKey}`)}
+                  <span>{t('strategies.explore')}</span>
                 </button>
               </Tooltip>
-            ))}
-            {strategy === 'custom' && routing && (
-              <CustomWeightsPopover
-                saved={routing.customWeights}
-                saving={strategyMutation.isPending}
-                onSave={w => strategyMutation.mutate({ strategy: 'custom', weights: w })}
-              />
             )}
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
             {isManual ? t('strategies.modeManualHint') : t('strategies.modeScoreHint')}
           </p>
-
-          {/* Exploration toggle (#685 follow-up): footnote-level on purpose —
-              a niche knob that gives unmeasured models a guaranteed chance to
-              be tried so they build reliability/speed data. Hidden in Manual
-              mode, where routeRequest ignores it. */}
-          {!isManual && (
-            <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={routing?.exploreEnabled ?? false}
-                disabled={strategyMutation.isPending}
-                onChange={e => strategyMutation.mutate({ strategy, exploreEnabled: e.target.checked })}
-                className="size-3.5 accent-foreground"
-              />
-              <span>{t('strategies.explore')}</span>
-              <Tooltip text={t('strategies.exploreHint')}>
-                <span className="cursor-help underline decoration-dotted underline-offset-2">?</span>
-              </Tooltip>
-            </label>
-          )}
         </section>
 
         <PenaltyInspector />
