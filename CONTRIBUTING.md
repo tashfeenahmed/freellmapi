@@ -1,6 +1,8 @@
-# Contributing
+# Contributing to freellmapi
 
 Contributors are very welcome. This project is a local-first aggregator for free LLM API tiers, so most contributions fall into a few buckets: adding a provider, adding an endpoint, improving the router, polishing the dashboard, or fixing bugs. The README has a "Good first PRs" list if you want a starting point.
+
+AI agents contributing to this repo should read [`AGENTS.md`](AGENTS.md) first — it carries the always-on constraints (validation gates, commit style, security red lines).
 
 ## Development loop
 
@@ -31,6 +33,27 @@ Every PR should:
 - Stay scoped to one change. Smaller PRs get reviewed and merged faster.
 - Avoid adding paid or card-gated services. This catalog only lists tiers that are genuinely free to start using without a credit card.
 
+## Code style
+
+- **Strict TypeScript**; derive types from zod schemas with `z.infer` (e.g. `SearchConfig`), don't hand-write duplicate interfaces
+- **Naming**: camelCase variables/functions, PascalCase components/types, `_` prefix for private
+- **i18n**: user-visible text goes through `t('key')`, never hardcoded strings; new keys are added to all 60 locales
+- **Styling**: Tailwind utility classes + semantic CSS variables (`--muted-foreground`, etc.), never hardcoded hex
+- **Time**: SQLite stores UTC (space-separated format); render in the viewer's local zone with `formatSqliteUtcToLocalTime`
+- Don't refactor unrelated code; keep changes focused on one topic
+
+## Validation (required before commit)
+
+```bash
+cd server && npx tsc --noEmit     # server types
+cd client && npx tsc -b           # client types
+npm run check:i18n                # 60 locales / key parity (run from client/)
+```
+
+- Add tests for new features (vitest: `server/src/__tests__`, `client/src/__tests__`)
+- **Catalog / model changes**: verify live before submitting (`POST /v1/chat/completions` returns 200 on a free account); note the verification date and method in a comment / PR
+- CI runs fmt / tsc / tests / i18n — run them locally first
+
 ## Database migrations
 
 Schema changes must use file-per-migration files under
@@ -43,6 +66,43 @@ npm run db:migration:create --name=add_embedding_index
 npm run db:migration:up
 npm run db:migration:down
 ```
+
+## Catalog conventions
+
+- Add models in `server/src/db/model-pricing.ts` (pricing) + the migrations `additions` array
+- `model_id` uses the exact `/v1/models` id (name:tag, e.g. `gpt-oss:20b`)
+- **Free models only**: add only genuinely free models; ones that move to paid must be removed by a human (#722)
+- Pricing mirrors the same model's paid variant where one exists; otherwise use a reasonable default and comment why
+- Proof of availability goes in a code comment: verification date + method (e.g. "tested 2026-08-06 against Free tier")
+
+## Commits
+
+- Conventional Commits: `feat:` / `fix:` / `docs:` / `test:` / `style:` / `refactor:`
+- Body explains the "why"; reference issues with `Refs #xxx`
+- Append the `Co-Authored-By` trailer (for AI contributors)
+- One PR per topic; don't mix unrelated changes
+
+## Pull requests
+
+PR description template:
+
+```markdown
+## What
+(what changed, for the maintainer)
+
+## Why
+(why it should land; reference issues with `Refs #xxx`)
+
+## Tests
+(evidence: tsc result, test counts, live verification)
+
+## Files
+(key files touched)
+```
+
+- Report test evidence honestly; if you can't verify locally (e.g. no toolchain), say so and rely on CI
+- **No half-finished work**: don't submit "stored but unused" code or fields (#590)
+- Network: if github is unreachable, retry through the VPS proxy (`-x http://llmproxy:...@43.133.45.67:7890`)
 
 ## Translations
 
@@ -64,6 +124,13 @@ That means:
 - **Disclose nothing special required.** You do not need to label a PR as AI-assisted. We care about the result, not the keystrokes.
 
 PRs that are clearly unreviewed model output (broad unexplained diffs, fabricated limits, tests that do not run) will be asked for changes or closed.
+
+## Security
+
+- API keys surfaced only via `maskKey`; no plaintext in logs / PRs / comments
+- Sensitive files 0o600; SSRF checks (`url-guard`); proxy / credential redaction (`redactProxyUrl`)
+- Auth via the unified API key (`timingSafeStringEqual`), never trust socket locality
+- For features touching sensitive data: discuss the permission / redaction approach before implementing
 
 ## Reporting issues
 
