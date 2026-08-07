@@ -119,6 +119,46 @@ describe('proxy stream turn-integrity', () => {
     expect(rows[1].status).toBe('success');
   });
 
+  it('records TTFB at the first reasoning_content chunk, not at first visible text (#764)', async () => {
+    // A reasoning model streams thinking before any visible answer. The proxy
+    // must timestamp TTFB at that first reasoning token — waiting for the
+    // first real text would include the whole thinking window and make the
+    // model look ~0 speed. The upstream emits reasoning at t≈0 and the answer
+    // text ~250ms later, so the two candidate timestamps are far apart.
+    const encoder = new TextEncoder();
+    const reasoningChunk = { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta: { role: 'assistant', reasoning_content: 'let me think about this', content: null }, finish_reason: null }] };
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (!urlStr.includes('api.groq.com')) return origFetch(url as any, init);
+      const upstreamBody = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          controller.enqueue(encoder.encode(sse(reasoningChunk)));
+          await new Promise(r => setTimeout(r, 250));
+          controller.enqueue(encoder.encode(sse(textChunk('The answer.'), finishChunk('stop'), '[DONE]')));
+          controller.close();
+        },
+      });
+      return new Response(upstreamBody, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    });
+
+    const r = await request(app, '/v1/chat/completions', {
+      stream: true, messages: [{ role: 'user', content: 'ttfb reasoning timing test' }],
+    });
+    expect(r.status).toBe(200);
+    // The reasoning trace is forwarded to the client as well.
+    const fs = frames(r.text);
+    expect(fs.some(f => (f.choices?.[0]?.delta as any)?.reasoning_content)).toBe(true);
+
+    const rows = getDb().prepare('SELECT ttfb_ms, latency_ms FROM requests').all() as any[];
+    expect(rows[0].ttfb_ms).not.toBeNull();
+    // Reasoning arrived at t≈0, answer text at t≈250ms: TTFB must be well
+    // below the thinking window. Before the fix it measured ~250ms (the first
+    // visible text), so this asserts the reasoning token counts.
+    expect(rows[0].ttfb_ms).toBeLessThan(150);
+    expect(rows[0].ttfb_ms).toBeGreaterThanOrEqual(0);
+  });
+
   it('synthesizes finish_reason tool_calls and ids for a stream that ends without a terminal reason', async () => {
     // minimax/command-r live shape: valid tool_call deltas, then [DONE] with
     // no finish_reason chunk at all.

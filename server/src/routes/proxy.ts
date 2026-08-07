@@ -1711,7 +1711,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         const flushHeaders = () => {
           if (headerSent) return;
-          ttfbMs = Date.now() - start;
+          // TTFB is captured at the first token (which for reasoning models is
+          // reasoning_content, see the text.length === 0 branch below); a later
+          // flush must never overwrite that earlier timestamp (#764).
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -1801,6 +1804,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
 
             if (text.length === 0) {
+              // Reasoning models stream reasoning_content BEFORE any visible
+              // text. That thinking is the model's first output token, so it
+              // must count toward TTFB — otherwise the recorded TTFB includes
+              // the whole thinking window (or stays null on long-thinking
+              // timeouts) and reasoning models show ~0 speed (#764). Headers
+              // stay held until real payload, so a thinking-only dead turn
+              // can still fail over invisibly.
+              if (ttfbMs === null && typeof choice.delta?.reasoning_content === 'string' && choice.delta.reasoning_content.length > 0) {
+                ttfbMs = Date.now() - start;
+              }
               // Role preamble / keep-alive: hold until first payload decides
               // the mode, forward afterwards. tool_calls and finish_reason are
               // stripped — both are re-emitted complete at the end (OpenRouter
