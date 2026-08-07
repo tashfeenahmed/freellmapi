@@ -69,9 +69,15 @@ export function ProviderChecklistSection({ onAddKey }: { onAddKey: (platform: st
             >
               <Plus className="size-3 text-muted-foreground" />
               {p.name}
-              {p.keyless && (
+              {p.keyless ? (
                 <span className="text-[10px] font-normal text-muted-foreground">
                   {t('keys.checklistKeyless')}
+                </span>
+              ) : (
+                // Needs a key but none added yet — the actionable case. Amber
+                // so the "add this" providers stand out from anonymous ones.
+                <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                  {t('models.noKey')}
                 </span>
               )}
             </button>
