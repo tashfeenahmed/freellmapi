@@ -47,6 +47,9 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: zip
+      arch:
+        - x64
   # electron-builder converts a >=256px PNG to .ico at build time.
   icon: assets/appicon_1024.png
 linux:

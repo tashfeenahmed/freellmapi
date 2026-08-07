@@ -38,6 +38,7 @@ jobs:
             artifact: windows-installer
             glob: |
               desktop/dist-electron/*.exe
+              desktop/dist-electron/*.zip
               desktop/dist-electron/*.blockmap
               desktop/dist-electron/latest.yml
           - os: macos-latest
