@@ -591,7 +591,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
-                    <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} />
+                    <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} tickFormatter={(v: string) => formatSqliteUtcToLocalTime(v, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
                     <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={tooltipStyle} />
                     <Legend wrapperStyle={{ fontSize: 12 }} iconType="line" />
@@ -612,7 +612,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
-                    <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} />
+                    <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} tickFormatter={(v: string) => formatSqliteUtcToLocalTime(v, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
                     <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={(v: number) => formatTokens(v)} />
                     <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatTokens(Number(value))} />
                     <Legend wrapperStyle={{ fontSize: 12 }} iconType="line" />

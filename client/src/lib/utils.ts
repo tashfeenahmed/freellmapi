@@ -12,8 +12,8 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Convert a SQLite UTC datetime string into an ISO-8601 UTC string. */
 export function sqliteUtcToIso(value: string): string {
-  // Already ISO (has 'T' and a zone/offset)? Leave it alone.
-  if (value.includes('T')) return value;
+  // Already carries an explicit timezone marker (Z or ±hh:mm)? Leave it alone.
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) return value;
   return value.replace(' ', 'T') + 'Z';
 }
 
