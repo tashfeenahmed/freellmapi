@@ -33,6 +33,14 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.cerebras.ai/v1',
 }));
 
+// AnyAPI - OpenAI-compatible gateway (anyapi.ai). Free tier: ~15 `:free`
+// models, 20 RPM / 200 RPD, no card required. See #732.
+register(new OpenAICompatProvider({
+  platform: 'anyapi',
+  name: 'AnyAPI',
+  baseUrl: 'https://api.anyapi.ai/v1',
+}));
+
 // SambaNova was dropped in V23 (June 2026): the free tier is permanently gone.
 // The always-free tier was retired in early 2025 for a one-time $5 trial
 // credit (expires in 3 months); once it lapses, every chat call 402s

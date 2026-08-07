@@ -488,6 +488,12 @@ function migrateModelsV2(db: Db) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // AnyAPI free tier (anyapi.ai, #732): ~15 `:free` models, 20 RPM / 200 RPD,
+    // no card required. Model ids + ctx verified in awesome-free-llm-apis#7.
+    ['anyapi', 'meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3 70B (AnyAPI free)', 4, 9, 'Frontier', 20, 200, null, null, '~6M', 131072],
+    ['anyapi', 'qwen/qwen3-coder:free', 'Qwen3 Coder (AnyAPI free)', 3, 9, 'Large', 20, 200, null, null, '~6M', 1048576],
+    ['anyapi', 'nvidia/nemotron-3-ultra-550b-a55b:free', 'Nemotron 3 Ultra 550B (AnyAPI free)', 2, 9, 'Frontier', 20, 200, null, null, '~5-10M', 1048576],
+    ['anyapi', 'google/gemma-4-26b-a4b-it:free', 'Gemma 4 26B (AnyAPI free)', 6, 9, 'Medium', 20, 200, null, null, '~20-30M', 262144],
     // Frontier-tier free models verified in OR catalog 2026-04
     ['openrouter', 'nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super 120B (free)', 2, 9, 'Frontier', 20, 200, null, null, '~6M', 262144],
     ['openrouter', 'qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3-Next 80B (free)', 3, 9, 'Large', 20, 200, null, null, '~6M', 262144],
