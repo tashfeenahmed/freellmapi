@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getDb, initDb } from '../../db/index.js';
-import { runCustomModelSync, customModelSyncIntervalMs, startCustomModelSync } from '../../services/custom-model-sync.js';
+import { runCustomModelSync, customModelSyncIntervalMs, customModelSyncFreePatterns, startCustomModelSync } from '../../services/custom-model-sync.js';
 import { discoverEndpointModels } from '../../services/model-discovery.js';
 import { endpointScopeForBaseUrl } from '../../lib/endpoint-scope.js';
 
@@ -118,5 +118,34 @@ describe('custom model sync', () => {
     process.env.CUSTOM_MODEL_SYNC_INTERVAL_MS = '0';
     expect(customModelSyncIntervalMs()).toBe(0);
     expect(startCustomModelSync(getDb(), { every: vi.fn(), after: vi.fn() } as never)).toBeNull();
+  });
+
+  it('parses free patterns from env', () => {
+    const prev = process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+    delete process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+    expect(customModelSyncFreePatterns()).toEqual([]);
+    process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS = ' *-free, free-* ,paid';
+    expect(customModelSyncFreePatterns()).toEqual(['*-free', 'free-*', 'paid']);
+    if (prev === undefined) delete process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+    else process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS = prev;
+  });
+
+  it('skips models that match no free pattern when FREE_PATTERNS is set', async () => {
+    const prev = process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+    process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS = '*:free,free-*';
+    addCustomEndpoint('http://localhost:9999');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'free-model-a', ownedBy: null },
+      { id: 'gpt-oss:free', ownedBy: null },
+      { id: 'paid-model', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.added).toBe(2);
+    expect(result.paidSkipped).toBe(1);
+    expect(customModelIds()).toEqual(['free-model-a', 'gpt-oss:free']);
+    if (prev === undefined) delete process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+    else process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS = prev;
   });
 });

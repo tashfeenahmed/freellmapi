@@ -34,12 +34,31 @@ export function customModelSyncIntervalMs(): number {
   return Number.isFinite(ms) && ms >= 0 ? ms : DEFAULT_SYNC_INTERVAL_MS;
 }
 
+/** Comma-separated glob patterns of model ids that are known-free (#746).
+ *  When set, the sync registers ONLY models matching a pattern — anything else
+ *  (presumably paid) is skipped, honoring the repo's free-only policy. When
+ *  unset, the sync keeps its legacy behavior of registering everything, so
+ *  existing operators are unaffected. */
+export function customModelSyncFreePatterns(): string[] {
+  const raw = process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
+  if (raw === undefined || raw.trim() === '') return [];
+  return raw.split(',').map(p => p.trim()).filter(p => p.length > 0);
+}
+
+/** Glob match where `*` matches any run of chars (incl. empty). */
+function patternMatches(pattern: string, id: string): boolean {
+  const escaped = pattern.split('*').map(seg => seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${escaped.join('.*')}$`).test(id);
+}
+
 export interface CustomModelSyncResult {
   endpoints: number;
   /** Models registered for the first time. */
   added: number;
   /** Models already on this endpoint that were skipped. */
   skipped: number;
+  /** Models skipped because they matched no free pattern (#746). */
+  paidSkipped: number;
   failures: Array<{ baseUrl: string; error: string }>;
 }
 
@@ -47,7 +66,7 @@ export interface CustomModelSyncResult {
  *  that wants a manual pass) can run it directly without waiting for the timer. */
 export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult> {
   const endpoints = listCustomEndpoints(db);
-  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, failures: [] };
+  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, paidSkipped: 0, failures: [] };
 
   for (const endpoint of endpoints) {
     try {
@@ -62,10 +81,18 @@ export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult>
           .map(row => row.model_id),
       );
 
+      const freePatterns = customModelSyncFreePatterns();
       const fresh: CustomModelEntry[] = [];
       for (const model of discovered) {
         if (registeredIds.has(model.id)) {
           result.skipped += 1;
+          continue;
+        }
+        // Free-only policy (#746): when FREE_PATTERNS is configured, a model
+        // that matches none of the known-free patterns is presumably paid and
+        // is skipped rather than silently registered.
+        if (freePatterns.length > 0 && !freePatterns.some(p => patternMatches(p, model.id))) {
+          result.paidSkipped += 1;
           continue;
         }
         // Bare id only, like the dashboard's bulk "Fetch models" submit: no name
