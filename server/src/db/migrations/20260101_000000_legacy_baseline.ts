@@ -981,6 +981,14 @@ function migrateModelsV10(db: Db) {
     ['ollama', 'devstral-2:123b',      'Devstral 2 123B (Ollama)',      8, 10, 'Large',    null, null, null, null, '~10-20M', 131072],
     ['ollama', 'gpt-oss:20b',          'GPT-OSS 20B (Ollama)',         18, 10, 'Medium',   null, null, null, null, '~20-30M', 131072],
     ['ollama', 'gemma4:31b',           'Gemma 4 31B (Ollama)',         22, 10, 'Medium',   null, null, null, null, '~20-30M', 131072],
+    // Ollama Cloud free additions (#767): verified live against the Free tier
+    // (https://ollama.com/v1, tested 2026-08-06) — the only currently-free
+    // Cloud models beyond gemma4:31b / gpt-oss:120b. model_id is the exact
+    // /v1/models id (name:tag), matching rows like gpt-oss:120b.
+    ['ollama', 'minimax-m3',          'MiniMax M3 (Ollama)',            6,  9, 'Large',    null, null, null, null, '~10-20M', 131072],
+    ['ollama', 'nemotron-3-nano:30b', 'Nemotron 3 Nano 30B (Ollama)',  20, 10, 'Medium',   null, null, null, null, '~20-30M', 131072],
+    ['ollama', 'nemotron-3-super',    'Nemotron 3 Super (Ollama)',      3,  9, 'Frontier', null, null, null, null, '~5-10M',  131072],
+    ['ollama', 'nemotron-3-ultra',    'Nemotron 3 Ultra (Ollama)',      2,  9, 'Frontier', null, null, null, null, '~5-10M',  131072],
   ];
   const apply = db.transaction(() => {
     for (const a of additions) insert.run(...a);

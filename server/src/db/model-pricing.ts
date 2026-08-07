@@ -130,6 +130,12 @@ export const MODEL_PRICING: PricingRow[] = [
   ['ollama', 'mistral-large-3:675b', 0.50, 1.50],
   ['ollama', 'qwen3-coder-next', 0.11, 0.80],
   ['ollama', 'qwen3-coder:480b', 0.22, 1.80],
+  // Ollama Cloud free additions (#767) — priced at the same model's paid
+  // variant where one exists (mirrors the OpenCode Zen rows below).
+  ['ollama', 'minimax-m3', 0.30, 1.20],
+  ['ollama', 'nemotron-3-nano:30b', 0.03, 0.15],
+  ['ollama', 'nemotron-3-super', 0.09, 0.45],
+  ['ollama', 'nemotron-3-ultra', 0.50, 2.50],
 
   // OpenCode Zen (big-pickle is stealth — no equivalent; V24 rows priced at
   // the OpenRouter paid variants, snapshot 2026-06-07)
