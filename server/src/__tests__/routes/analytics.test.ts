@@ -419,6 +419,40 @@ describe('Analytics API', () => {
     });
   });
 
+  describe('timeline tzOffset', () => {
+    it('buckets timeline days by the viewer timezone instead of UTC', async () => {
+      insertRequest('2026-05-28 15:30:00'); // UTC day 05-28; UTC+8 23:30, still day 05-28
+      insertRequest('2026-05-28 17:30:00'); // UTC day 05-28; UTC+8 01:30 on day 05-29
+
+      const utc = await request(app, '/api/analytics/timeline?range=7d');
+      expect(utc.status).toBe(200);
+      expect(utc.body.map((b: any) => b.timestamp)).toEqual(['2026-05-28']);
+
+      const local = await request(app, '/api/analytics/timeline?range=7d&tzOffset=480');
+      expect(local.status).toBe(200);
+      expect(local.body.map((b: any) => b.timestamp)).toEqual(['2026-05-28', '2026-05-29']);
+      expect(local.body.map((b: any) => b.requests)).toEqual([1, 1]);
+    });
+
+    it('shifts hour labels to the viewer timezone', async () => {
+      insertRequest('2026-05-28 17:30:00'); // UTC 17:00 → UTC+8 next-day 01:00
+
+      const { status, body } = await request(app, '/api/analytics/timeline?range=24h&tzOffset=480');
+      expect(status).toBe(200);
+      expect(body.map((b: any) => b.timestamp)).toEqual(['2026-05-29T01:00:00']);
+    });
+
+    it('falls back to UTC bucketing for an invalid tzOffset', async () => {
+      insertRequest('2026-05-28 17:30:00');
+
+      for (const bad of ['abc', '9999', '1.5', '480; DROP TABLE request_hourly']) {
+        const { status, body } = await request(app, `/api/analytics/timeline?range=7d&tzOffset=${encodeURIComponent(bad)}`);
+        expect(status).toBe(200);
+        expect(body.map((b: any) => b.timestamp)).toEqual(['2026-05-28']);
+      }
+    });
+  });
+
   describe('90d range', () => {
     it('accepts range=90d across the analytics endpoints', async () => {
       insertRequest('2026-02-01 12:00:00'); // ~117 days ago — outside 90d

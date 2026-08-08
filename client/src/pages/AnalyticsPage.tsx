@@ -440,9 +440,13 @@ export default function AnalyticsPage() {
     queryFn: () => apiFetch<ByClientRow[]>(`/api/analytics/by-client?range=${range}`),
   })
 
+  // Browser's offset from UTC in minutes (480 = UTC+8), so the server buckets
+  // timeline hours/days on the viewer's wall clock instead of UTC.
+  const tzOffset = -new Date().getTimezoneOffset()
+
   const { data: timeline = [] } = useQuery({
-    queryKey: ['analytics', 'timeline', range],
-    queryFn: () => apiFetch<TimelineBucket[]>(`/api/analytics/timeline?range=${range}`),
+    queryKey: ['analytics', 'timeline', range, tzOffset],
+    queryFn: () => apiFetch<TimelineBucket[]>(`/api/analytics/timeline?range=${range}&tzOffset=${tzOffset}`),
   })
 
   const { data: byModel = [] } = useQuery({

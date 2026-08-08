@@ -380,12 +380,20 @@ analyticsRouter.get('/timeline', (req: Request, res: Response) => {
   // dateFormat is a hardcoded whitelist — never user-controlled.
   const dateFormat = interval === 'hour' ? '%Y-%m-%dT%H:00:00' : '%Y-%m-%d';
 
+  // tzOffset: viewer's local offset from UTC in minutes (480 = UTC+8), sent by
+  // the browser so hour/day bucket boundaries follow the viewer's wall clock
+  // instead of UTC. Whitelisted to a sane integer range; bound as a parameter,
+  // never interpolated into SQL.
+  const rawOffset = Number(req.query.tzOffset);
+  const tzOffset = Number.isInteger(rawOffset) && rawOffset >= -720 && rawOffset <= 840 ? rawOffset : 0;
+  const tzModifier = `${tzOffset >= 0 ? '+' : '-'}${Math.abs(tzOffset)} minutes`;
+
   // Read from request_hourly (hour-bucketed) for both 'hour' and 'day'
   // intervals. Day buckets are rolled up via strftime on the hour column,
   // which keeps the timeline accurate past the raw-row prune window.
   const rows = db.prepare(`
     SELECT
-      strftime('${dateFormat}', hour) as timestamp,
+      strftime(?, hour, ?) as timestamp,
       SUM(total_requests) as requests,
       SUM(success_count) as success_count,
       SUM(error_count) as failure_count,
@@ -393,9 +401,9 @@ analyticsRouter.get('/timeline', (req: Request, res: Response) => {
       SUM(output_tokens) as output_tokens
     FROM request_hourly
     WHERE hour >= ?
-    GROUP BY strftime('${dateFormat}', hour)
+    GROUP BY timestamp
     ORDER BY timestamp ASC
-  `).all(since) as any[];
+  `).all(dateFormat, tzModifier, since) as any[];
 
   res.json(rows.map(r => ({
     timestamp: r.timestamp,
