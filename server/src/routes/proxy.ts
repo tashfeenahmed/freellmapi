@@ -899,7 +899,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
         const flushHeaders = () => {
           if (headerSent) return;
-          ttfbMs = Date.now() - start;
+          // #764: ttfb is recorded on the first token of ANY kind (content or
+          // reasoning_content) in the pump loop below; this call only backfills
+          // streams that reached the commit point without one.
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -923,6 +926,15 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const text = streamChunkText(chunk);
             if (text.length > 0) sawText = true;
+            // #764: reasoning models stream reasoning_content before any visible
+            // text. ttfb must count the first token of ANY kind — otherwise the
+            // speed shown is the thinking tail, or NULL when headers never flush.
+            const delta = (chunk as any)?.choices?.[0]?.delta;
+            const reasoning = typeof delta?.reasoning_content === 'string' ? delta.reasoning_content
+              : typeof delta?.reasoning === 'string' ? delta.reasoning : '';
+            if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
+              ttfbMs = Date.now() - start;
+            }
             const finish = (chunk as any)?.choices?.[0]?.finish_reason;
             if (finish) upstreamFinish = finish;
             totalOutputTokens += Math.ceil(text.length / 4);
@@ -1711,7 +1723,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         const flushHeaders = () => {
           if (headerSent) return;
-          ttfbMs = Date.now() - start;
+          // #764: backfill only — the pump loop already records ttfb on the
+          // first token (content or reasoning_content) it sees.
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -1799,6 +1813,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             normalizeOutboundContent(anyChunk);
             sanitizeResponse(anyChunk);
             const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
+            // #764: ttfb = first token of ANY kind, not just visible content —
+            // reasoning models stream thinking (reasoning_content/reasoning)
+            // long before the first answer token, and the old code deferred
+            // ttfb until header flush (or left it NULL on long-thinking turns).
+            if (ttfbMs === null) {
+              const reasoning = typeof choice.delta?.reasoning_content === 'string' ? choice.delta.reasoning_content
+                : typeof choice.delta?.reasoning === 'string' ? choice.delta.reasoning : '';
+              if (text.length > 0 || reasoning.length > 0) {
+                ttfbMs = Date.now() - start;
+              }
+            }
 
             if (text.length === 0) {
               // Role preamble / keep-alive: hold until first payload decides
