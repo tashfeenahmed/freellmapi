@@ -451,6 +451,17 @@ export function streamChunkText(chunk: any): string {
   return chunk?.choices?.[0]?.delta?.content ?? '';
 }
 
+// Pull the incremental reasoning text out of a streaming chunk. Reasoning
+// models (DeepSeek thinking, GLM, Claude Opus 5, …) stream thinking via
+// `reasoning_content` (OpenAI-style) or `reasoning` (Anthropic-style) before
+// the first visible answer token; both spellings must count for ttfb and
+// output-token estimates. Same shape tolerance as streamChunkText. (#764)
+export function streamReasoningText(chunk: any): string {
+  const delta = chunk?.choices?.[0]?.delta;
+  const r = delta?.reasoning_content ?? delta?.reasoning;
+  return typeof r === 'string' ? r : '';
+}
+
 // OpenAI-compatible embeddings endpoint, routed through the embeddings family
 // catalog: `model: "auto"` (or omitted) → the configured default family; a
 // family name or provider model id → that family's provider chain. Failover
@@ -720,6 +731,16 @@ function completionTextFromChat(result: any): string {
   return contentToString(result?.choices?.[0]?.message?.content ?? '');
 }
 
+// Non-streaming counterpart of streamReasoningText: reasoning models attach
+// thinking to the completed message as `reasoning_content` (OpenAI-style) or
+// `reasoning` (Anthropic-style). Included in the chars/4 output estimate so
+// analytics/rate-limit ledger aren't undercounted for thinking models. (#764)
+export function completionReasoningText(result: any): string {
+  const msg = result?.choices?.[0]?.message;
+  const r = msg?.reasoning_content ?? msg?.reasoning;
+  return typeof r === 'string' ? r : '';
+}
+
 function completionIdFromChat(id: string | undefined): string {
   if (!id) return `cmpl-${Date.now()}`;
   return id.startsWith('cmpl-') ? id : `cmpl-${id}`;
@@ -929,15 +950,15 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             // #764: reasoning models stream reasoning_content before any visible
             // text. ttfb must count the first token of ANY kind — otherwise the
             // speed shown is the thinking tail, or NULL when headers never flush.
-            const delta = (chunk as any)?.choices?.[0]?.delta;
-            const reasoning = typeof delta?.reasoning_content === 'string' ? delta.reasoning_content
-              : typeof delta?.reasoning === 'string' ? delta.reasoning : '';
+            const reasoning = streamReasoningText(chunk);
             if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
               ttfbMs = Date.now() - start;
             }
             const finish = (chunk as any)?.choices?.[0]?.finish_reason;
             if (finish) upstreamFinish = finish;
-            totalOutputTokens += Math.ceil(text.length / 4);
+            // #764: reasoning tokens are real output consumption — count them
+            // so analytics/rate-limit aren't undercounted for thinking models.
+            totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
             const frame = legacyCompletionChunk(route, chunk, text);
             // Commit point: hold headers until the first real text, so a stream
             // that dies before producing any fails over invisibly.
@@ -1034,9 +1055,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
       // Usage fallback: providers that omit `usage` used to be logged as 0
       // tokens, silently undercounting analytics and the rate-limit ledger.
-      // Fall back to the same chars/4 estimate the streaming path uses.
+      // Fall back to the same chars/4 estimate the streaming path uses,
+      // including reasoning tokens (thinking models). (#764)
       const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
-      const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+      const completionTokens = result.usage?.completion_tokens
+        ?? Math.ceil((text.length + completionReasoningText(result).length) / 4);
       const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
       recordUpstreamSuccess(route, totalTokens);
 
@@ -1817,12 +1840,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             // reasoning models stream thinking (reasoning_content/reasoning)
             // long before the first answer token, and the old code deferred
             // ttfb until header flush (or left it NULL on long-thinking turns).
-            if (ttfbMs === null) {
-              const reasoning = typeof choice.delta?.reasoning_content === 'string' ? choice.delta.reasoning_content
-                : typeof choice.delta?.reasoning === 'string' ? choice.delta.reasoning : '';
-              if (text.length > 0 || reasoning.length > 0) {
-                ttfbMs = Date.now() - start;
-              }
+            const reasoning = streamReasoningText(anyChunk);
+            if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
+              ttfbMs = Date.now() - start;
             }
 
             if (text.length === 0) {
@@ -1831,6 +1851,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               // stripped — both are re-emitted complete at the end (OpenRouter
               // attaches tool_call deltas to chunks that also carry role/
               // reasoning keys; forwarding them raw would duplicate the call).
+              // #764: thinking-only chunks still consumed tokens — count them.
+              if (reasoning.length > 0) totalOutputTokens += Math.ceil(reasoning.length / 4);
               if (choice.delta && Object.keys(choice.delta).some(k => k !== 'content' && k !== 'tool_calls' && choice.delta[k] != null)) {
                 const cleaned = { ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] };
                 if (headerSent) writeChunk(cleaned); else preamble.push(cleaned);
@@ -1838,7 +1860,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               continue;
             }
 
-            totalOutputTokens += Math.ceil(text.length / 4);
+            // #764: count reasoning tokens with the same chars/4 estimate so
+            // analytics/rate-limit reflect real consumption of thinking models.
+            totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
 
             if (mode === 'passthrough') {
               writeChunk({ ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] });
@@ -2079,11 +2103,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Usage fallback: providers that omit `usage` used to be logged as 0
         // tokens, silently undercounting analytics and the rate-limit ledger.
         // Fall back to the same chars/4 estimate the streaming path uses (tool
-        // arguments included, mirroring the stream accounting).
+        // arguments included, mirroring the stream accounting; reasoning tokens
+        // included too, so thinking models aren't undercounted — #764).
         const respToolArgChars = (respMsg?.tool_calls ?? []).reduce((n, tc) => n + (tc?.function?.arguments?.length ?? 0), 0);
         const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
         const completionTokens = result.usage?.completion_tokens
-          ?? Math.ceil((contentToString(respMsg?.content ?? '').length + respToolArgChars) / 4);
+          ?? Math.ceil((contentToString(respMsg?.content ?? '').length + completionReasoningText(result).length + respToolArgChars) / 4);
         const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
         recordUpstreamSuccess(route, totalTokens);
         // Use stickyStrategyKey (not the global strategyKey) so a group-pinned
