@@ -16,7 +16,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
-import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError } from '../lib/error-classify.js';
+import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
@@ -451,6 +451,17 @@ export function streamChunkText(chunk: any): string {
   return chunk?.choices?.[0]?.delta?.content ?? '';
 }
 
+// Pull the incremental reasoning text out of a streaming chunk. Reasoning
+// models (DeepSeek thinking, GLM, Claude Opus 5, …) stream thinking via
+// `reasoning_content` (OpenAI-style) or `reasoning` (Anthropic-style) before
+// the first visible answer token; both spellings must count for ttfb and
+// output-token estimates. Same shape tolerance as streamChunkText. (#764)
+export function streamReasoningText(chunk: any): string {
+  const delta = chunk?.choices?.[0]?.delta;
+  const r = delta?.reasoning_content ?? delta?.reasoning;
+  return typeof r === 'string' ? r : '';
+}
+
 // OpenAI-compatible embeddings endpoint, routed through the embeddings family
 // catalog: `model: "auto"` (or omitted) → the configured default family; a
 // family name or provider model id → that family's provider chain. Failover
@@ -720,6 +731,16 @@ function completionTextFromChat(result: any): string {
   return contentToString(result?.choices?.[0]?.message?.content ?? '');
 }
 
+// Non-streaming counterpart of streamReasoningText: reasoning models attach
+// thinking to the completed message as `reasoning_content` (OpenAI-style) or
+// `reasoning` (Anthropic-style). Included in the chars/4 output estimate so
+// analytics/rate-limit ledger aren't undercounted for thinking models. (#764)
+export function completionReasoningText(result: any): string {
+  const msg = result?.choices?.[0]?.message;
+  const r = msg?.reasoning_content ?? msg?.reasoning;
+  return typeof r === 'string' ? r : '';
+}
+
 function completionIdFromChat(id: string | undefined): string {
   if (!id) return `cmpl-${Date.now()}`;
   return id.startsWith('cmpl-') ? id : `cmpl-${id}`;
@@ -855,6 +876,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   // writableEnded distinguishes a real disconnect.
   let clientGone = false;
   const clientAbort = new AbortController();
+  // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
+  // when the wall-clock retry budget expires mid-attempt, canceling the
+  // in-flight upstream instead of waiting for a stalled attempt to time out.
+  const hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
@@ -870,6 +895,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     state,
     attemptLog,
     clientGone: () => clientGone,
+    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
     route: () => routeRequest(
       estimatedTotal,
       state.skipKeys.size > 0 ? state.skipKeys : undefined,
@@ -899,7 +925,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
         const flushHeaders = () => {
           if (headerSent) return;
-          ttfbMs = Date.now() - start;
+          // #764: ttfb is recorded on the first token of ANY kind (content or
+          // reasoning_content) in the pump loop below; this call only backfills
+          // streams that reached the commit point without one.
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -915,7 +944,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             route.apiKey,
             messages,
             route.modelId,
-            { temperature, max_tokens, top_p, stop, signal: clientAbort.signal },
+            { temperature, max_tokens, top_p, stop, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -923,9 +952,18 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             if (clientGone) break; // client hung up: stop pulling; reader.cancel() aborts upstream
             const text = streamChunkText(chunk);
             if (text.length > 0) sawText = true;
+            // #764: reasoning models stream reasoning_content before any visible
+            // text. ttfb must count the first token of ANY kind — otherwise the
+            // speed shown is the thinking tail, or NULL when headers never flush.
+            const reasoning = streamReasoningText(chunk);
+            if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
+              ttfbMs = Date.now() - start;
+            }
             const finish = (chunk as any)?.choices?.[0]?.finish_reason;
             if (finish) upstreamFinish = finish;
-            totalOutputTokens += Math.ceil(text.length / 4);
+            // #764: reasoning tokens are real output consumption — count them
+            // so analytics/rate-limit aren't undercounted for thinking models.
+            totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
             const frame = legacyCompletionChunk(route, chunk, text);
             // Commit point: hold headers until the first real text, so a stream
             // that dies before producing any fails over invisibly.
@@ -1006,7 +1044,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         route.apiKey,
         messages,
         route.modelId,
-        { temperature, max_tokens, top_p, stop, signal: clientAbort.signal },
+        { temperature, max_tokens, top_p, stop, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
         quotaContextForRoute(route, 'chat/completions'),
       );
 
@@ -1022,9 +1060,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
       // Usage fallback: providers that omit `usage` used to be logged as 0
       // tokens, silently undercounting analytics and the rate-limit ledger.
-      // Fall back to the same chars/4 estimate the streaming path uses.
+      // Fall back to the same chars/4 estimate the streaming path uses,
+      // including reasoning tokens (thinking models). (#764)
       const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
-      const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+      const completionTokens = result.usage?.completion_tokens
+        ?? Math.ceil((text.length + completionReasoningText(result).length) / 4);
       const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
       recordUpstreamSuccess(route, totalTokens);
 
@@ -1627,6 +1667,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // writableEnded distinguishes a real disconnect.
   let clientGone = false;
   const clientAbort = new AbortController();
+  // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
+  // when the wall-clock retry budget expires mid-attempt, canceling the
+  // in-flight upstream instead of waiting for a stalled attempt to time out.
+  const hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
@@ -1639,6 +1683,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     state,
     attemptLog,
     clientGone: () => clientGone,
+    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
     route: () => {
       // When a handoff could fire this turn, pad the token estimate so the router's
       // context-window and TPM checks account for the extra system message overhead.
@@ -1711,7 +1756,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
         const flushHeaders = () => {
           if (headerSent) return;
-          ttfbMs = Date.now() - start;
+          // #764: backfill only — the pump loop already records ttfb on the
+          // first token (content or reasoning_content) it sees.
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -1733,7 +1780,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, outboundMessages, route.modelId,
-            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: clientAbort.signal },
+            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -1799,6 +1846,14 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             normalizeOutboundContent(anyChunk);
             sanitizeResponse(anyChunk);
             const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
+            // #764: ttfb = first token of ANY kind, not just visible content —
+            // reasoning models stream thinking (reasoning_content/reasoning)
+            // long before the first answer token, and the old code deferred
+            // ttfb until header flush (or left it NULL on long-thinking turns).
+            const reasoning = streamReasoningText(anyChunk);
+            if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
+              ttfbMs = Date.now() - start;
+            }
 
             if (text.length === 0) {
               // Role preamble / keep-alive: hold until first payload decides
@@ -1806,6 +1861,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               // stripped — both are re-emitted complete at the end (OpenRouter
               // attaches tool_call deltas to chunks that also carry role/
               // reasoning keys; forwarding them raw would duplicate the call).
+              // #764: thinking-only chunks still consumed tokens — count them.
+              if (reasoning.length > 0) totalOutputTokens += Math.ceil(reasoning.length / 4);
               if (choice.delta && Object.keys(choice.delta).some(k => k !== 'content' && k !== 'tool_calls' && choice.delta[k] != null)) {
                 const cleaned = { ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] };
                 if (headerSent) writeChunk(cleaned); else preamble.push(cleaned);
@@ -1813,7 +1870,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               continue;
             }
 
-            totalOutputTokens += Math.ceil(text.length / 4);
+            // #764: count reasoning tokens with the same chars/4 estimate so
+            // analytics/rate-limit reflect real consumption of thinking models.
+            totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
 
             if (mode === 'passthrough') {
               writeChunk({ ...anyChunk, choices: [{ ...choice, delta: { ...choice.delta, tool_calls: undefined }, finish_reason: null }] });
@@ -1963,7 +2022,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, outboundMessages, route.modelId,
-          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: clientAbort.signal },
+          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
           quotaContextForRoute(route, 'chat/completions'),
         );
 
@@ -2054,11 +2113,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Usage fallback: providers that omit `usage` used to be logged as 0
         // tokens, silently undercounting analytics and the rate-limit ledger.
         // Fall back to the same chars/4 estimate the streaming path uses (tool
-        // arguments included, mirroring the stream accounting).
+        // arguments included, mirroring the stream accounting; reasoning tokens
+        // included too, so thinking models aren't undercounted — #764).
         const respToolArgChars = (respMsg?.tool_calls ?? []).reduce((n, tc) => n + (tc?.function?.arguments?.length ?? 0), 0);
         const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
         const completionTokens = result.usage?.completion_tokens
-          ?? Math.ceil((contentToString(respMsg?.content ?? '').length + respToolArgChars) / 4);
+          ?? Math.ceil((contentToString(respMsg?.content ?? '').length + completionReasoningText(result).length + respToolArgChars) / 4);
         const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
         recordUpstreamSuccess(route, totalTokens);
         // Use stickyStrategyKey (not the global strategyKey) so a group-pinned

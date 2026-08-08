@@ -169,6 +169,28 @@ export function isClientAbortError(err: any): boolean {
   return msg.includes('client disconnected');
 }
 
+// ── Fallback time-budget hedging (fallback-v2) ──────────────────────────────
+// When the wall-clock retry budget expires MID-FLIGHT (the current attempt is
+// still waiting on a stalled upstream), the fallback loop aborts the composed
+// fetch signal with this marked error. Same rationale as the client abort: it
+// is NOT a provider-health signal, so it must never bench/cooldown/penalize
+// the model+key, and enrichAbort must pass it through untouched. The loop
+// catches it, renders timedOut exhaustion (the budget is spent — nothing left
+// to try), and stops without failure bookkeeping.
+export function newHedgeAbortError(): Error {
+  const err = new Error('fallback time budget expired — upstream request canceled');
+  (err as Error & { hedgeAbort?: boolean }).hedgeAbort = true;
+  return err;
+}
+
+/** True when an error is (or wraps) the time-budget hedge abort above. */
+export function isHedgeAbortError(err: any): boolean {
+  if (err?.hedgeAbort === true) return true;
+  if (err?.cause && (err.cause as { hedgeAbort?: boolean }).hedgeAbort === true) return true;
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('fallback time budget expired');
+}
+
 /** True for any fetch-abort rejection surfacing out of a body read — the
  * per-attempt timeout ('request'-bounds deadline in fetchWithTimeout), an
  * AbortSignal.timeout, or the client disconnect above. Adapters that wrap

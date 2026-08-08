@@ -129,6 +129,55 @@ describe('POST /v1/responses (#96)', () => {
     expect(completed).toContain('"output_text":"Hello"');
   });
 
+  it('stream: records ttfb on the first reasoning token, not the first visible text (#764)', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() { throw new Error('should not be called'); },
+      async *streamChatCompletion() {
+        // Reasoning models stream thinking before any visible text. ttfb must
+        // count the first token of ANY kind; a real delay between the
+        // reasoning frame and the first text frame makes the two moments
+        // measurable in the requests row.
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { reasoning_content: 'thinking hard…', content: null }, finish_reason: null }] };
+        await new Promise(r => setTimeout(r, 400));
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: null }] };
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+      },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: true }, key);
+    expect(status).toBe(200);
+    expect(text).toContain('event: response.completed');
+    const rows = getDb().prepare("SELECT status, latency_ms, ttfb_ms FROM requests ORDER BY id DESC LIMIT 1").all() as any[];
+    expect(rows[0].status).toBe('success');
+    expect(rows[0].ttfb_ms).not.toBeNull();
+    // ttfb must be the reasoning-head moment (well before the text token that
+    // triggers the commit), not the flush time ≈ latency.
+    expect(rows[0].ttfb_ms).toBeLessThan(rows[0].latency_ms - 250);
+    // The completed Response reports the thinking tokens truthfully instead of
+    // a hardcoded 0: 'thinking hard…' is 14 chars → ceil(14/4) = 4.
+    const completed = text.split('event: response.completed')[1];
+    const payload = JSON.parse(completed.slice(completed.indexOf('{')));
+    expect(payload.response.usage.output_tokens_details.reasoning_tokens).toBe(4);
+  });
+
+  it('non-stream: reports reasoning_tokens from the provider usage when advertised', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'answer', reasoning_content: 'thinking' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 3, completion_tokens: 6, total_tokens: 9, completion_tokens_details: { reasoning_tokens: 2 } },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    expect(status).toBe(200);
+    const body = JSON.parse(text);
+    expect(body.usage.output_tokens_details.reasoning_tokens).toBe(2);
+  });
+
   it('stream: tool-call deltas produce function_call events with assembled arguments', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() { throw new Error('nope'); },

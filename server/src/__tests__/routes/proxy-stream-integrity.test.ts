@@ -290,6 +290,44 @@ describe('proxy stream turn-integrity', () => {
     expect(msg.content).toBeNull();
     expect(r.body.choices[0].finish_reason).toBe('tool_calls');
   });
+
+  it('records ttfb on the first reasoning_content token, not the first visible text (#764)', async () => {
+    // Reasoning models stream thinking (reasoning_content) long before the
+    // first answer token. The regression: ttfb was recorded at header flush,
+    // i.e. the END of the thinking phase, so the Analytics speed shown was the
+    // reasoning tail — or NULL on turns that never flushed. It must count the
+    // first token of ANY kind. We interleave a real delay between the
+    // reasoning frame and the first text frame to make the two moments
+    // measurable.
+    const origFetch = global.fetch;
+    const enc = new TextEncoder();
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (!urlStr.includes('api.groq.com')) return origFetch(url as any, init);
+      const stream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(enc.encode(sse(
+            roleChunk,
+            { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta: { reasoning_content: 'thinking hard…', content: null }, finish_reason: null }] },
+          )));
+          await new Promise(r => setTimeout(r, 400));
+          controller.enqueue(enc.encode(sse(textChunk('Hello world'), finishChunk('stop'), '[DONE]')));
+          controller.close();
+        },
+      });
+      return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    });
+    const r = await request(app, '/v1/chat/completions', {
+      stream: true, messages: [{ role: 'user', content: 'ttfb reasoning test' }],
+    });
+    expect(r.status).toBe(200);
+    const rows = getDb().prepare("SELECT status, latency_ms, ttfb_ms FROM requests ORDER BY id").all() as any[];
+    expect(rows[0].status).toBe('success');
+    expect(rows[0].ttfb_ms).not.toBeNull();
+    // ttfb must be the reasoning-head moment (well before the text token that
+    // triggers header flush), not the flush time ≈ latency.
+    expect(rows[0].ttfb_ms).toBeLessThan(rows[0].latency_ms - 250);
+  });
 });
 
 describe('sticky session integrity', () => {

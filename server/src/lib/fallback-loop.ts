@@ -34,6 +34,7 @@ import {
   isRateLimitSignal,
   isKeyAuthError,
   isClientAbortError,
+  isHedgeAbortError,
   isDailyQuotaExhaustedError,
   isPaymentRequiredError,
   isModelNotFoundError,
@@ -735,6 +736,14 @@ export interface FallbackHooks {
   // resulting client-abort throw stops the loop without any failure
   // bookkeeping (see the isClientAbortError branch below).
   clientGone?: () => boolean;
+  // Fallback-v2 hedging: when provided, the loop starts a per-attempt timer
+  // (remaining wall-clock budget) and calls this to ABORT the in-flight
+  // upstream instead of just refusing to start the next retry behind a
+  // stalled attempt. The surface aborts its composed fetch signal with
+  // newHedgeAbortError() — a non-provider-health signal, so the loop renders
+  // timedOut exhaustion without benching the model+key (see the
+  // isHedgeAbortError branch below). Absent = pre-v2 behavior.
+  abortInFlight?: () => void;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
   // mutate it, and the surface's route() reads it to exclude failed keys/models.
   state: FallbackState;
@@ -907,6 +916,20 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     // it, so no path can leak a lease and leave the key's concurrency budget short.
     // Success accounting happens inside dispatch, so the persisted counters are
     // already written by the time the provisional lease goes away.
+    // Fallback-v2 hedging: arm a timer for the remaining wall-clock budget so a
+    // stalled attempt is aborted mid-flight (abortInFlight) instead of only
+    // refusing to start the next retry behind it. Mirrors the loop-top budget
+    // check — attempt 0 and the first retry always run (#751).
+    let hedgeTimer: NodeJS.Timeout | undefined;
+    if (attempt > 1 && budgetMs > 0 && hooks.abortInFlight) {
+      const remaining = budgetMs - (Date.now() - startedAt);
+      if (remaining > 0) {
+        hedgeTimer = setTimeout(() => {
+          console.log(`[FallbackLoop] retry time budget (${budgetMs}ms) expired mid-attempt on ${route.platform}/${route.modelId} — aborting stalled upstream`);
+          hooks.abortInFlight?.();
+        }, remaining);
+      }
+    }
     try {
     let outcome: DispatchOutcome;
     try {
@@ -929,6 +952,21 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         logRequest(route.platform, route.modelId, route.keyId, 'canceled', 0, 0, elapsedMs,
           `client disconnected after ${(elapsedMs / 1000).toFixed(1)}s; upstream request canceled`);
         traceAttempt('client_abort');
+        return;
+      }
+      // Time-budget hedge abort: the wall-clock retry budget expired while this
+      // attempt was still in flight, and the surface aborted the composed fetch
+      // signal (see newHedgeAbortError). Not a provider-health signal — no
+      // cooldown, no penalty, no failure stats — and the budget is spent, so
+      // render timedOut exhaustion exactly like the loop-top budget check does.
+      if (isHedgeAbortError(err)) {
+        const elapsedMs = Date.now() - startedAt;
+        console.log(`[FallbackLoop] retry time budget expired mid-attempt on ${route.platform}/${route.modelId} after ${(elapsedMs / 1000).toFixed(1)}s — rendering timedOut exhaustion without benching`);
+        hooks.onExhausted(
+          exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
+          { attempts, timedOut: true },
+        );
+        traceAttempt('timeout', err);
         return;
       }
       hooks.logFailure(route, err, attempt);
@@ -987,6 +1025,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     traceAttempt(outcome === 'done' ? 'ok' : 'committed');
     return;
     } finally {
+      if (hedgeTimer) clearTimeout(hedgeTimer);
       route.release?.();
     }
   }
