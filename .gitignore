@@ -19,5 +19,8 @@ server/data/
 deploy-pi.sh
 update-hermes.sh
 
+# Hermes Agent internal files (plans, memory, skills)
+.hermes/
+
 # Monetization planning — private, never committed
 monetization/

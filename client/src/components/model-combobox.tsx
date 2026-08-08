@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronsUpDown, Check, Search } from 'lucide-react'
+import { Check, ChevronsUpDown, Search } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Tooltip } from '@/components/tooltip'
 import { useI18n } from '@/i18n'
@@ -135,18 +136,18 @@ export function ModelCombobox({
                 }`}
               >
                 <Check className={`size-4 shrink-0 ${o.value === value ? 'opacity-100' : 'opacity-0'}`} />
-                <span className={`min-w-0 flex-1 truncate ${o.note ? 'opacity-50' : ''}`}>{o.label}</span>
-                {o.note && (
-                  <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                    {o.note}
-                  </span>
-                )}
-                {o.isNew && (
-                  <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                    {t('models.newBadge')}
-                  </span>
-                )}
-                {o.sub && ((o.platforms?.length ?? 0) > 1 ? (
+		<span className={`min-w-0 flex-1 truncate ${o.note ? 'opacity-50' : ''}`}>{o.label}</span>
+		{o.isNew && o.sub && ['fallback', 'round-robin', 'fusion'].includes(o.sub) ? (
+		  <Badge variant="secondary" className="text-[9px] ml-auto shrink-0">
+		    {o.sub}
+		  </Badge>
+		) : o.note ? (
+		  <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400">
+		    {o.note}
+		  </span>
+		) : null}
+
+                {o.sub && !o.isNew && ((o.platforms?.length ?? 0) > 1 ? (
                   <Tooltip text={t('models.servedBy', { providers: (o.platforms ?? []).join(', ') })}>
                     <span className="shrink-0 text-xs text-muted-foreground underline decoration-dotted underline-offset-2">{o.sub}</span>
                   </Tooltip>

@@ -30,6 +30,7 @@ import PlaygroundPage from '@/pages/PlaygroundPage'
 import FallbackPage from '@/pages/FallbackPage'
 import ModelDetailPage from '@/pages/ModelDetailPage'
 import FusionPage from '@/pages/FusionPage'
+import CombosPage from '@/pages/CombosPage'
 import EmbeddingsPage from '@/pages/EmbeddingsPage'
 import ImagePage from '@/pages/ImagePage'
 import AudioPage from '@/pages/AudioPage'
@@ -70,6 +71,7 @@ const modelItems = [
   { to: '/models/image', labelKey: 'models.imageTab' },
   { to: '/models/audio', labelKey: 'models.audioTab' },
   { to: '/models/fusion', labelKey: 'models.fusionTab' },
+  { to: '/models/combos', labelKey: 'models.combosTab' },
 ]
 
 const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
@@ -352,6 +354,7 @@ function App() {
                       <Route path="/models/chat" element={<FallbackPage />} />
                       <Route path="/models/chat/:id" element={<ModelDetailPage />} />
                       <Route path="/models/fusion" element={<FusionPage />} />
+                      <Route path="/models/combos" element={<CombosPage />} />
                       <Route path="/models/embeddings" element={<EmbeddingsPage />} />
                       <Route path="/models/embeddings/:id" element={<EmbeddingDetailPage />} />
                       <Route path="/models/image" element={<ImagePage />} />

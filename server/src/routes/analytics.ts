@@ -370,6 +370,141 @@ analyticsRouter.get('/by-key', (req: Request, res: Response) => {
   })));
 });
 
+// ── Per-combo analytics ────────────────────────────────────────────────────
+// Aggregate stats grouped by requested_model (combo name). Only rows where
+// requested_model is NOT 'auto', 'fusion', or a pinned model_id (identified by
+// matching requested_model = model_id) are counted as combo requests.
+analyticsRouter.get('/by-combo', (req: Request, res: Response) => {
+  const range = (req.query.range as string) ?? '7d';
+  const since = getSinceTimestamp(range);
+  const db = getDb();
+
+  const combos = db.prepare(`
+    SELECT
+      r.requested_model as combo_name,
+      COUNT(*) as total_requests,
+      SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) as success_count,
+      ROUND(AVG(r.latency_ms), 0) as avg_latency_ms,
+      COALESCE(SUM(r.input_tokens), 0) as total_input_tokens,
+      COALESCE(SUM(r.output_tokens), 0) as total_output_tokens,
+      MIN(r.created_at) as first_seen,
+      MAX(r.created_at) as last_seen
+    FROM requests r
+    WHERE r.created_at >= ?
+      AND r.requested_model IS NOT NULL
+      AND r.requested_model NOT IN ('auto', 'fusion')
+      AND r.requested_model != r.model_id
+    GROUP BY r.requested_model
+    HAVING total_requests > 0
+    ORDER BY total_requests DESC
+  `).all(since) as Array<{
+    combo_name: string;
+    total_requests: number;
+    success_count: number;
+    avg_latency_ms: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    first_seen: string;
+    last_seen: string;
+  }>;
+
+  const modelDist = db.prepare(`
+    SELECT
+      r.requested_model as combo_name,
+      r.model_id,
+      COUNT(*) as count,
+      ROUND(AVG(r.latency_ms), 0) as avg_latency_ms,
+      SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) as success_count
+    FROM requests r
+    WHERE r.created_at >= ?
+      AND r.requested_model IS NOT NULL
+      AND r.requested_model NOT IN ('auto', 'fusion')
+      AND r.requested_model != r.model_id
+    GROUP BY r.requested_model, r.model_id
+    ORDER BY r.requested_model, count DESC
+  `).all(since) as Array<{
+    combo_name: string;
+    model_id: string;
+    count: number;
+    avg_latency_ms: number;
+    success_count: number;
+  }>;
+
+  const fallbackDepth = db.prepare(`
+    SELECT
+      r.requested_model as combo_name,
+      at.ordinal,
+      COUNT(*) as count,
+      at.model_id
+    FROM request_attempts at
+    JOIN requests r ON r.id = at.request_id
+    WHERE r.created_at >= ?
+      AND r.requested_model IS NOT NULL
+      AND r.requested_model NOT IN ('auto', 'fusion')
+      AND r.requested_model != r.model_id
+    GROUP BY r.requested_model, at.ordinal, at.model_id
+    ORDER BY r.requested_model, at.ordinal
+  `).all(since) as Array<{
+    combo_name: string;
+    ordinal: number;
+    count: number;
+    model_id: string;
+  }>;
+
+  const comboMap = new Map<string, {
+    summary: typeof combos[0];
+    modelDistribution: typeof modelDist;
+    fallbackDepth: typeof fallbackDepth;
+  }>();
+
+  for (const c of combos) {
+    comboMap.set(c.combo_name, { summary: c, modelDistribution: [], fallbackDepth: [] });
+  }
+  for (const m of modelDist) {
+    const entry = comboMap.get(m.combo_name);
+    if (entry) entry.modelDistribution.push(m);
+  }
+  for (const f of fallbackDepth) {
+    const entry = comboMap.get(f.combo_name);
+    if (entry) entry.fallbackDepth.push(f);
+  }
+
+  res.json({
+    combos: Array.from(comboMap.values()).map(e => ({
+      comboName: e.summary.combo_name,
+      totalRequests: e.summary.total_requests,
+      successCount: e.summary.success_count,
+      successRate: e.summary.total_requests > 0
+        ? Math.round((e.summary.success_count / e.summary.total_requests) * 1000) / 10
+        : 0,
+      avgLatencyMs: e.summary.avg_latency_ms,
+      totalInputTokens: e.summary.total_input_tokens,
+      totalOutputTokens: e.summary.total_output_tokens,
+      firstSeen: e.summary.first_seen,
+      lastSeen: e.summary.last_seen,
+      modelDistribution: e.modelDistribution.map(m => ({
+        modelId: m.model_id,
+        count: m.count,
+        pct: e.summary.total_requests > 0
+          ? Math.round((m.count / e.summary.total_requests) * 1000) / 10
+          : 0,
+        avgLatencyMs: m.avg_latency_ms,
+        successRate: m.count > 0
+          ? Math.round((m.success_count / m.count) * 1000) / 10
+          : 0,
+      })),
+      fallbackDepth: e.fallbackDepth.map(f => ({
+        ordinal: f.ordinal,
+        modelId: f.model_id,
+        count: f.count,
+        pct: e.summary.total_requests > 0
+          ? Math.round((f.count / e.summary.total_requests) * 1000) / 10
+          : 0,
+      })),
+    })),
+  });
+});
+
 // Timeline data
 analyticsRouter.get('/timeline', (req: Request, res: Response) => {
   const range = (req.query.range as string) ?? '7d';
@@ -519,14 +654,28 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
     res.status(400).json({ error: 'invalid platform filter' });
     return;
   }
+  // requested_model filter: exact-match against the combo name or 'auto'/'fusion'
+  // Auto-routed requests have requested_model = NULL, so 'auto' maps to IS NULL.
+  const requestedModel = req.query.requested_model as string | undefined;
+  if (requestedModel !== undefined && requestedModel.length === 0) {
+    res.status(400).json({ error: 'invalid requested_model filter (expected non-empty string)' });
+    return;
+  }
+  const requestedModelSql = requestedModel === 'auto'
+    ? ' AND requested_model IS NULL'
+    : requestedModel !== undefined
+    ? ' AND requested_model = ?'
+    : '';
   const db = getDb();
 
   const filterSql =
     (status !== undefined ? ' AND status = ?' : '') +
-    (platform !== undefined ? ' AND platform = ?' : '');
+    (platform !== undefined ? ' AND platform = ?' : '') +
+    requestedModelSql;
   const filterParams = [
     ...(status !== undefined ? [status] : []),
     ...(platform !== undefined ? [platform] : []),
+    ...(requestedModel !== undefined && requestedModel !== 'auto' ? [requestedModel] : []),
   ];
 
   const total = (db.prepare(
