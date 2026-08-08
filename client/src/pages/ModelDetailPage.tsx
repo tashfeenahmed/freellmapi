@@ -209,6 +209,11 @@ export default function ModelDetailPage() {
             {/* Summary badges */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: members.length })}</span>
+              {/* The unified model id, visible without hovering (#708). */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted pl-2 pr-0.5 py-0.5">
+                <code className="font-mono text-[11px] text-muted-foreground">{canonicalId}</code>
+                <CopyButton text={canonicalId} label={t('models.copyModelId')} className="size-5 border-0 bg-transparent" />
+              </span>
               {quota && <span title={quota.title} className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground tabular-nums">{quota.text}</span>}
               {vision && <span title={t('models.visionTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>}
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
