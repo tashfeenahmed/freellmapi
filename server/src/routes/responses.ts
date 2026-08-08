@@ -21,6 +21,8 @@ import {
   getRequestGroupId,
   getStickyModel,
   setStickyModel,
+  streamReasoningText,
+  completionReasoningText,
   traceRouteEvent,
   logRequest,
 } from './proxy.js';
@@ -537,6 +539,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         // tool-call accumulator keyed by the provider's tool_call index
         const toolAcc = new Map<number, { outputIndex: number; itemId: string; callId: string; name: string; args: string }>();
         let totalOutputTokens = 0;
+        // #764: ttfb = first token of ANY kind (content or reasoning_content),
+        // recorded in the pump loop; commit() only backfills streams that never
+        // produced one.
+        let ttfbMs: number | null = null;
 
         // Inline-dialect hold window (#231): first text is held until it
         // either matches a tool-call dialect marker (held to the end and
@@ -554,6 +560,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         // on the same connection with no bytes on the wire. Idempotent.
         const commit = () => {
           if (streamStarted) return;
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
@@ -614,8 +621,16 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             // Text deltas → output_text events on a single message item, after
             // the dialect hold window has decided the text is real prose.
             const text = delta.content ?? '';
+            // #764: reasoning models stream thinking (reasoning_content /
+            // reasoning) before the first answer token — count that first token
+            // as ttfb so Analytics speed reflects the real head-of-stream, and
+            // count thinking tokens as real output consumption.
+            const reasoning = streamReasoningText(chunk);
+            if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
+              ttfbMs = Date.now() - start;
+            }
             if (text) {
-              totalOutputTokens += Math.ceil(text.length / 4);
+              totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
               if (dialectMode === 'passthrough') {
                 if (msgItemId === null) openTextItem('');
                 sse('response.output_text.delta', {
@@ -635,6 +650,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
                   }
                 }
               }
+            } else if (reasoning.length > 0) {
+              // #764: thinking-only chunk (no visible text yet) — count tokens.
+              totalOutputTokens += Math.ceil(reasoning.length / 4);
             }
 
             // Tool-call deltas → function_call item + argument deltas.
@@ -769,7 +787,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             inputTokens: estimatedInputTokens,
             outputTokens: totalOutputTokens,
           });
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null);
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs);
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
@@ -792,7 +810,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
               latencyMs: Date.now() - start,
               error: safe,
             });
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safe);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safe, ttfbMs);
             sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } } });
             res.end();
             return 'committed';
@@ -833,7 +851,11 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         }
       }
       const promptTokens = result.usage?.prompt_tokens ?? estimatedInputTokens;
-      const completionTokens = result.usage?.completion_tokens ?? Math.ceil(text.length / 4);
+      // #764: include reasoning tokens (message.reasoning_content / reasoning)
+      // in the chars/4 estimate so thinking models aren't undercounted when the
+      // provider omits `usage`.
+      const completionTokens = result.usage?.completion_tokens
+        ?? Math.ceil((text.length + completionReasoningText(result).length) / 4);
 
       // Empty completion → fail over via the shared loop (see the streaming
       // path); finish_reason 'length' skips the cooldown/penalty.
