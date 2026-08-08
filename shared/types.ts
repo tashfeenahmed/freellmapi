@@ -354,6 +354,11 @@ export interface TokenUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  // OpenAI-standard breakdown some providers advertise alongside the totals.
+  // Optional because many free-tier endpoints omit it; the proxy falls back
+  // to its chars/4 estimate when absent. (#764)
+  completion_tokens_details?: { reasoning_tokens?: number };
+  prompt_tokens_details?: { cached_tokens?: number };
 }
 
 export interface ChatCompletionResponse {

@@ -32,7 +32,7 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isClientAbortError, newClientAbortError } from '../lib/error-classify.js';
+import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 
@@ -258,6 +258,7 @@ export function buildResponseObject(opts: {
   toolCalls: ChatToolCall[];
   promptTokens: number;
   completionTokens: number;
+  reasoningTokens?: number;
 }) {
   const output: any[] = [];
   if (opts.text.length > 0) {
@@ -292,7 +293,7 @@ export function buildResponseObject(opts: {
       input_tokens: opts.promptTokens,
       input_tokens_details: { cached_tokens: 0 },
       output_tokens: opts.completionTokens,
-      output_tokens_details: { reasoning_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: opts.reasoningTokens ?? 0 },
       total_tokens: opts.promptTokens + opts.completionTokens,
     },
   };
@@ -497,13 +498,17 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // writableEnded distinguishes a real disconnect.
   let clientGone = false;
   const clientAbort = new AbortController();
+  // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
+  // when the wall-clock retry budget expires mid-attempt, canceling the
+  // in-flight upstream instead of waiting for a stalled attempt to time out.
+  const hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
       clientAbort.abort(newClientAbortError());
     }
   });
-  const dispatchOpts = { ...completionOpts, signal: clientAbort.signal };
+  const dispatchOpts = { ...completionOpts, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
 
   // Stream bookkeeping (used only when stream === true). `streamStarted` is the
   // commit flag: true once the response.created/in_progress skeleton has left,
@@ -522,6 +527,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     state,
     attemptLog,
     clientGone: () => clientGone,
+    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
     route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, false, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain, completionOpts.response_format !== undefined),
     dispatch: async (route, attempt) => {
       traceRouteEvent('Responses', {
@@ -539,6 +545,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         // tool-call accumulator keyed by the provider's tool_call index
         const toolAcc = new Map<number, { outputIndex: number; itemId: string; callId: string; name: string; args: string }>();
         let totalOutputTokens = 0;
+        // #764: thinking tokens are tracked separately so the final Response
+        // object can report `output_tokens_details.reasoning_tokens` truthfully
+        // instead of a hardcoded 0.
+        let totalReasoningTokens = 0;
         // #764: ttfb = first token of ANY kind (content or reasoning_content),
         // recorded in the pump loop; commit() only backfills streams that never
         // produced one.
@@ -631,6 +641,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             }
             if (text) {
               totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
+              if (reasoning.length > 0) totalReasoningTokens += Math.ceil(reasoning.length / 4);
               if (dialectMode === 'passthrough') {
                 if (msgItemId === null) openTextItem('');
                 sse('response.output_text.delta', {
@@ -653,6 +664,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             } else if (reasoning.length > 0) {
               // #764: thinking-only chunk (no visible text yet) — count tokens.
               totalOutputTokens += Math.ceil(reasoning.length / 4);
+              totalReasoningTokens += Math.ceil(reasoning.length / 4);
             }
 
             // Tool-call deltas → function_call item + argument deltas.
@@ -771,6 +783,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           const finalResponse = buildResponseObject({
             id: responseId, model: route.modelId, text: msgText,
             toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
+            reasoningTokens: totalReasoningTokens,
           });
           sse('response.completed', { response: finalResponse });
           res.end();
@@ -856,6 +869,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       // provider omits `usage`.
       const completionTokens = result.usage?.completion_tokens
         ?? Math.ceil((text.length + completionReasoningText(result).length) / 4);
+      // #764: report reasoning_tokens truthfully — the provider's own count
+      // when advertised, else the same chars/4 estimate of the thinking text.
+      const reasoningTokens = result.usage?.completion_tokens_details?.reasoning_tokens
+        ?? Math.ceil(completionReasoningText(result).length / 4);
 
       // Empty completion → fail over via the shared loop (see the streaming
       // path); finish_reason 'length' skips the cooldown/penalty.
@@ -895,7 +912,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       setFallbackHeaders(res, attempt, attemptLog);
       res.json(buildResponseObject({
         id: responseId, model: route.modelId, text, toolCalls,
-        promptTokens, completionTokens,
+        promptTokens, completionTokens, reasoningTokens,
       }));
 
       traceRouteEvent('Responses', {
