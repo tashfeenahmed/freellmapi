@@ -20,6 +20,7 @@ import {
   observedSpeedRank, TIMEOUT_LATENCY_CAP_MS,
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS } from '../lib/error-classify.js';
+import { applyModelWeightOverride } from './model-weight-overrides.js';
 import { modelsWithOverriddenField } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
 import { platformDropsResponseFormat } from '../lib/sampling-params.js';
@@ -810,7 +811,13 @@ function scoreChainEntry(
   const headroom = headroomFactor(stats?.monthlyUsedTokens ?? 0, budget);
   const rl = rateLimitFactor(getPenalty(entry.model_db_id));
 
-  const score = combineScore({ reliability, speed, intelligence, headroom, rateLimit: rl }, weights);
+  // Per-model env overrides (#738) scale the final score so a slow or
+  // poor-quality model is demoted without being disabled outright — a manual
+  // 'priority' chain can still select it.
+  const score = applyModelWeightOverride(
+    combineScore({ reliability, speed, intelligence, headroom, rateLimit: rl }, weights),
+    entry.model_id,
+  );
   return { axes: { reliability, speed, intelligence }, headroom, rateLimit: rl, score };
 }
 
