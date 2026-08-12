@@ -632,7 +632,8 @@
     "attemptTimingHint": "Startforskydning fra anmodningsstart · Forsøgsvarighed",
     "requestedModel": "Efterspurgt model",
     "ttft": "TTFT",
-    "requestsByAgent": "Anmodninger pr. agent"
+    "requestsByAgent": "Anmodninger pr. agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Legeplads",

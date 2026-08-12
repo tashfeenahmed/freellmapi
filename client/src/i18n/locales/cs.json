@@ -632,7 +632,8 @@
     "attemptTimingHint": "Začít offset od začátku požadavku · Doba trvání pokusu",
     "requestedModel": "Požadovaný model",
     "ttft": "TTFT",
-    "requestsByAgent": "Požadavky podle agenta"
+    "requestsByAgent": "Požadavky podle agenta",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Hřiště",

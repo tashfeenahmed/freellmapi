@@ -632,7 +632,8 @@
     "attemptTimingHint": "વિનંતીથી ઓફસેટ શરૂ કરો પ્રારંભ · પ્રયાસ અવધિ",
     "requestedModel": "વિનંતી કરેલ મોડેલ",
     "ttft": "TTFT",
-    "requestsByAgent": "એજન્ટ પ્રમાણે વિનંતીઓ"
+    "requestsByAgent": "એજન્ટ પ્રમાણે વિનંતીઓ",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "રમતનું મેદાન",

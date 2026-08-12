@@ -632,7 +632,8 @@
     "attemptTimingHint": "Offset dall'inizio della richiesta · durata del tentativo",
     "requestedModel": "Modello richiesto",
     "ttft": "TTFT",
-    "requestsByAgent": "Richieste per agente"
+    "requestsByAgent": "Richieste per agente",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Playground",

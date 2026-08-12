@@ -632,7 +632,8 @@
     "attemptTimingHint": "अनुरोध सुरुबाट अफसेट सुरु गर्नुहोस् · प्रयास अवधि",
     "requestedModel": "अनुरोध गरिएको नमूना",
     "ttft": "TTFT",
-    "requestsByAgent": "एजेन्टद्वारा अनुरोधहरू"
+    "requestsByAgent": "एजेन्टद्वारा अनुरोधहरू",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "खेल मैदान[सम्पादन गर्ने]",

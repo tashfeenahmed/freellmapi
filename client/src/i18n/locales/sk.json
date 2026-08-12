@@ -632,7 +632,8 @@
     "attemptTimingHint": "Začať offset od začiatku požiadavky · Trvanie pokusu",
     "requestedModel": "Požadovaný model",
     "ttft": "TTFT",
-    "requestsByAgent": "Požiadavky podľa agenta"
+    "requestsByAgent": "Požiadavky podľa agenta",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Ihrisko",

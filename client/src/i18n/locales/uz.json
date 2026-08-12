@@ -632,7 +632,8 @@
     "attemptTimingHint": "So'rov boshlanishidan boshlab ofsetni boshlash · urinish davomiyligi",
     "requestedModel": "So'ralgan model",
     "ttft": "TTFT",
-    "requestsByAgent": "Agent bo'yicha so'rovlar"
+    "requestsByAgent": "Agent bo'yicha so'rovlar",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "O'yin maydonchasi",

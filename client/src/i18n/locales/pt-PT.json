@@ -632,7 +632,8 @@
     "attemptTimingHint": "Início deslocado a partir do início do pedido · Duração da tentativa",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Pedidos por agente"
+    "requestsByAgent": "Pedidos por agente",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Parque infantil",

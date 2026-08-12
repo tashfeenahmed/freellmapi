@@ -632,7 +632,8 @@
     "attemptTimingHint": "リクエスト開始からの開始オフセット · 試行期間",
     "requestedModel": "要求されたモデル",
     "ttft": "TTFT",
-    "requestsByAgent": "エージェント別リクエスト"
+    "requestsByAgent": "エージェント別リクエスト",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "遊び場",

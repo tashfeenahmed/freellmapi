@@ -632,7 +632,8 @@
     "attemptTimingHint": "Anza kukabiliana na ombi kuanza · muda wa jaribio",
     "requestedModel": "Umeomba muundo",
     "ttft": "TTFT",
-    "requestsByAgent": "Maombi kwa kila wakala"
+    "requestsByAgent": "Maombi kwa kila wakala",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Uwanja wa michezo",

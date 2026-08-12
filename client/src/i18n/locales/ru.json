@@ -632,7 +632,8 @@
     "attemptTimingHint": "Начальное смещение от начала запроса · продолжительность попытки",
     "requestedModel": "Запрошенная модель",
     "ttft": "TTFT",
-    "requestsByAgent": "Запросы по агентам"
+    "requestsByAgent": "Запросы по агентам",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Детская площадка",

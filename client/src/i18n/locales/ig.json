@@ -632,7 +632,8 @@
     "attemptTimingHint": "Malite nkwụsị site na mmalite arịrịọ · Ogologo oge nwaa",
     "requestedModel": "Ihe nlereanya achọrọ",
     "ttft": "TTFT",
-    "requestsByAgent": "Arịrịọ site na ejenti"
+    "requestsByAgent": "Arịrịọ site na ejenti",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Ebe egwuregwu",

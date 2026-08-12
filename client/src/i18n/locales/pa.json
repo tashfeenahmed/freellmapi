@@ -632,7 +632,8 @@
     "attemptTimingHint": "ਬੇਨਤੀ ਸ਼ੁਰੂ ਤੋਂ ਔਫਸੈੱਟ ਸ਼ੁਰੂ ਕਰੋ · ਕੋਸ਼ਿਸ਼ ਦੀ ਮਿਆਦ",
     "requestedModel": "ਮਾਡਲ ਦੀ ਮੰਗ ਕੀਤੀ",
     "ttft": "TTFT",
-    "requestsByAgent": "ਏਜੰਟ ਦੁਆਰਾ ਬੇਨਤੀਆਂ"
+    "requestsByAgent": "ਏਜੰਟ ਦੁਆਰਾ ਬੇਨਤੀਆਂ",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ਖੇਡ ਦਾ ਮੈਦਾਨ",

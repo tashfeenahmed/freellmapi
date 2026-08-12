@@ -632,7 +632,8 @@
     "attemptTimingHint": "Изместване на старта от заявката за старт · Продължителност на опита",
     "requestedModel": "Поискан модел",
     "ttft": "TTFT",
-    "requestsByAgent": "Заявки по агент"
+    "requestsByAgent": "Заявки по агент",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Детска площадка",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "Početak offseta od početka zahtjeva · Trajanje pokušaja",
     "requestedModel": "Traženi model",
     "ttft": "TTFT",
-    "requestsByAgent": "Zahtjevi po agentu"
+    "requestsByAgent": "Zahtjevi po agentu",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Igralište",

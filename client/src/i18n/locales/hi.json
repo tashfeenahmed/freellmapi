@@ -632,7 +632,8 @@
     "attemptTimingHint": "अनुरोध प्रारंभ · प्रयास अवधि से प्रारंभ ऑफसेट",
     "requestedModel": "अनुरोधित मॉडल",
     "ttft": "TTFT",
-    "requestsByAgent": "एजेंट के अनुसार अनुरोध"
+    "requestsByAgent": "एजेंट के अनुसार अनुरोध",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "खेल का मैदान",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "自請求開始的偏移 · 嘗試耗時",
     "requestedModel": "請求的模型",
     "ttft": "首字延遲",
-    "requestsByAgent": "按代理程式統計的請求"
+    "requestsByAgent": "按代理程式統計的請求",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "遊樂場",

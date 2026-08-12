@@ -632,7 +632,8 @@
     "attemptTimingHint": "Deslocamento desde o início da requisição · duração da tentativa",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Solicitações por agente"
+    "requestsByAgent": "Solicitações por agente",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Playground",

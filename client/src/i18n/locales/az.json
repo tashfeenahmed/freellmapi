@@ -632,7 +632,8 @@
     "attemptTimingHint": "Sorğu başlanğıcından ofset · Cəhd müddəti",
     "requestedModel": "Tələb olunan model",
     "ttft": "TTFT",
-    "requestsByAgent": "Agent üzrə sorğular"
+    "requestsByAgent": "Agent üzrə sorğular",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Uşaq meydançası",

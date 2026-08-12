@@ -632,7 +632,8 @@
     "attemptTimingHint": "شروع افست از شروع درخواست · مدت زمان تلاش",
     "requestedModel": "مدل درخواستی",
     "ttft": "TTFT",
-    "requestsByAgent": "درخواستها بر اساس عامل"
+    "requestsByAgent": "درخواستها بر اساس عامل",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "زمین بازی",

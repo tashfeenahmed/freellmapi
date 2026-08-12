@@ -632,7 +632,8 @@
     "attemptTimingHint": "自请求开始的偏移 · 尝试耗时",
     "requestedModel": "请求的模型",
     "ttft": "首个词元用时",
-    "requestsByAgent": "按智能体统计的请求"
+    "requestsByAgent": "按智能体统计的请求",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "试验场",

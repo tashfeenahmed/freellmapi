@@ -632,7 +632,8 @@
     "attemptTimingHint": "Pradėti poslinkį nuo užklausos pradžios · Bandymo trukmė",
     "requestedModel": "Prašytas modelis",
     "ttft": "TTFT",
-    "requestsByAgent": "Užklausos pagal agentą"
+    "requestsByAgent": "Užklausos pagal agentą",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Žaidimų aikštelė",

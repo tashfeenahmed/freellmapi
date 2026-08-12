@@ -632,7 +632,8 @@
     "attemptTimingHint": "요청 시작부터 시작 오프셋 · 시도 기간",
     "requestedModel": "요청 모델",
     "ttft": "TTFT",
-    "requestsByAgent": "에이전트별 요청"
+    "requestsByAgent": "에이전트별 요청",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "놀이터",

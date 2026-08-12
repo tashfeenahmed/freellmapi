@@ -632,7 +632,8 @@
     "attemptTimingHint": "Fara biya daga farkon buƙatun · lokacin ƙoƙarin",
     "requestedModel": "Samfurin da ake nema",
     "ttft": "Saukewa: TTFT",
-    "requestsByAgent": "Bukatu ta kowane wakili"
+    "requestsByAgent": "Bukatu ta kowane wakili",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "filin wasa",

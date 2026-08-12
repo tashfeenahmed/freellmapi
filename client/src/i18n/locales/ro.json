@@ -632,7 +632,8 @@
     "attemptTimingHint": "Start offset față de începutul cererii · Durata încercării",
     "requestedModel": "Modelul cerut",
     "ttft": "TTFT",
-    "requestsByAgent": "Cereri per agent"
+    "requestsByAgent": "Cereri per agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Locul de joacă",

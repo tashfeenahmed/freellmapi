@@ -115,6 +115,7 @@ export function summarizeExhaustion(
 interface KeyRow {
   id: number;
   platform: string;
+  label: string | null;
   encrypted_key: string;
   iv: string;
   auth_tag: string;
@@ -172,6 +173,8 @@ export interface RouteResult {
   modelDbId: number;
   apiKey: string;
   keyId: number;
+  // Operator-facing key label at route time (#869); null when unlabeled.
+  keyLabel: string | null;
   platform: string;
   displayName: string;
   /**
@@ -1226,6 +1229,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       modelDbId: entry.model_db_id,
       apiKey: decryptedKey,
       keyId: key.id,
+      keyLabel: key.label ?? null,
       // Decrypted once here, at the point the row is already in hand (#590).
       proxyUrl: decryptProxyUrl(key),
       platform: entry.platform,

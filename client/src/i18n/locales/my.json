@@ -632,7 +632,8 @@
     "attemptTimingHint": "တောင်းဆိုမှုစတင်ချိန်မှ စတင်အော့ဖ်ဆက် · ကြိုးစားမှုကြာချိန်",
     "requestedModel": "တောင်းဆိုထားသော မော်ဒယ်",
     "ttft": "TTFT",
-    "requestsByAgent": "အေးဂျင့်အလိုက် တောင်းဆိုမှုများ"
+    "requestsByAgent": "အေးဂျင့်အလိုက် တောင်းဆိုမှုများ",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ကစားကွင်း",

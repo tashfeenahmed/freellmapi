@@ -34,6 +34,11 @@ export interface AttemptTraceRecord {
   // Per-request key ordinal (key1, key2…), same anonymization as the
   // X-Fallback-Trail header — never the internal key id.
   keyOrdinal: number;
+  // Operator-facing key label (api_keys.label) at attempt time (#869). Null
+  // when the key had no label — the dashboard shows the ordinal alone then.
+  // A snapshot, not a live join: renaming the key later must not rewrite
+  // history. Deliberately NOT the internal key id or the key itself.
+  keyLabel: string | null;
   outcome: AttemptOutcome;
   // Milliseconds from the ladder's start to this attempt's dispatch.
   startOffsetMs: number;

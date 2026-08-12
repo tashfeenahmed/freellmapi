@@ -632,7 +632,8 @@
     "attemptTimingHint": "Μετατόπιση έναρξης από την έναρξη αιτήματος · Διάρκεια προσπάθειας",
     "requestedModel": "Ζητούμενο μοντέλο",
     "ttft": "TTFT",
-    "requestsByAgent": "Αιτήματα ανά πράκτορα"
+    "requestsByAgent": "Αιτήματα ανά πράκτορα",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Παιδική χαρά",

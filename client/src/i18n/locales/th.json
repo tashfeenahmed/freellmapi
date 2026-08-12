@@ -632,7 +632,8 @@
     "attemptTimingHint": "เริ่มต้นออฟเซ็ตจากคำขอเริ่มต้น · ระยะเวลาความพยายาม",
     "requestedModel": "รุ่นที่ขอ",
     "ttft": "TTFT",
-    "requestsByAgent": "คำขอตามเอเจนต์"
+    "requestsByAgent": "คำขอตามเอเจนต์",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "สนามเด็กเล่น",

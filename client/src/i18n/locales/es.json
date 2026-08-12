@@ -632,7 +632,8 @@
     "attemptTimingHint": "Desfase desde el inicio de la solicitud · duración del intento",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Solicitudes por agente"
+    "requestsByAgent": "Solicitudes por agente",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Entorno de pruebas",

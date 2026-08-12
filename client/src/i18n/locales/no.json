@@ -632,7 +632,8 @@
     "attemptTimingHint": "Startforskyvning fra forespørselsstart · Forsøksvarighet",
     "requestedModel": "Etterspurt modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Forespørsler per agent"
+    "requestsByAgent": "Forespørsler per agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Lekeplass",

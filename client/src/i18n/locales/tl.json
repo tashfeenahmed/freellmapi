@@ -632,7 +632,8 @@
     "attemptTimingHint": "Start offset mula sa request start · tagal ng pagtatangka",
     "requestedModel": "Hinihiling na modelo",
     "ttft": "TTFT",
-    "requestsByAgent": "Mga kahilingan ayon sa agent"
+    "requestsByAgent": "Mga kahilingan ayon sa agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Palaruan",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "Start offset van verzoek start · Duur van de poging",
     "requestedModel": "Aangevraagd model",
     "ttft": "TTFT",
-    "requestsByAgent": "Verzoeken per agent"
+    "requestsByAgent": "Verzoeken per agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Speeltuin",

@@ -648,7 +648,8 @@
     "keyOrdinal": "key #{n}",
     "attemptTimingHint": "Start offset from request start · attempt duration",
     "requestedModel": "Requested model",
-    "ttft": "TTFT"
+    "ttft": "TTFT",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Playground",

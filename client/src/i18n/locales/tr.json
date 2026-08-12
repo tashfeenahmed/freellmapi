@@ -632,7 +632,8 @@
     "attemptTimingHint": "İstek başlangıcından itibaren başlangıç dengelemesi · deneme süresi",
     "requestedModel": "İstenilen model",
     "ttft": "TTFT",
-    "requestsByAgent": "Ajan başına istekler"
+    "requestsByAgent": "Ajan başına istekler",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Bahçesi",

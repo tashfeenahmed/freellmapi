@@ -632,7 +632,8 @@
     "attemptTimingHint": "Bẹrẹ aiṣedeede lati ibere ibere · Iye akoko igbiyanju",
     "requestedModel": "Awoṣe ti a beere",
     "ttft": "TTFT",
-    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju"
+    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Ibi isereile",

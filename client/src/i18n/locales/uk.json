@@ -632,7 +632,8 @@
     "attemptTimingHint": "Початковий зсув від початку запиту · тривалість спроби",
     "requestedModel": "Запитана модель",
     "ttft": "TTFT",
-    "requestsByAgent": "Запити за агентами"
+    "requestsByAgent": "Запити за агентами",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Дитячий майданчик",

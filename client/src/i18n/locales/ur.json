@@ -632,7 +632,8 @@
     "attemptTimingHint": "درخواست کے آغاز سے آفسیٹ شروع کریں · کوشش کی مدت",
     "requestedModel": "ماڈل کی درخواست کی۔",
     "ttft": "TTFT",
-    "requestsByAgent": "فی ایجنٹ درخواستیں"
+    "requestsByAgent": "فی ایجنٹ درخواستیں",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "کھیل کا میدان",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "بداية الإزاحة من بداية الطلب · مدة المحاولة",
     "requestedModel": "النموذج المطلوب",
     "ttft": "TTFT",
-    "requestsByAgent": "الطلبات حسب الوكيل"
+    "requestsByAgent": "الطلبات حسب الوكيل",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ملعب",

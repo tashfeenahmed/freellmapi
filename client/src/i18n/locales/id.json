@@ -632,7 +632,8 @@
     "attemptTimingHint": "Mulai offset dari awal permintaan · durasi upaya",
     "requestedModel": "Model yang diminta",
     "ttft": "TTFT",
-    "requestsByAgent": "Permintaan per agen"
+    "requestsByAgent": "Permintaan per agen",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Taman bermain",

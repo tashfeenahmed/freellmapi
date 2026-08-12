@@ -632,7 +632,8 @@
     "attemptTimingHint": "Przesunięcie początku od początku żądania · czas trwania próby",
     "requestedModel": "Żądany model",
     "ttft": "TTFT",
-    "requestsByAgent": "Żądania według agenta"
+    "requestsByAgent": "Żądania według agenta",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Plac zabaw",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "התחל הזזה מהבקשה · משך הניסיון",
     "requestedModel": "מודל מבוקש",
     "ttft": "TTFT",
-    "requestsByAgent": "בקשות לפי סוכן"
+    "requestsByAgent": "בקשות לפי סוכן",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "מגרש משחקים",

@@ -632,7 +632,8 @@
     "attemptTimingHint": "ଅନୁରୋଧ ଆରମ୍ଭରୁ ଅଫସେଟ୍ ଆରମ୍ଭ କରନ୍ତୁ · ଉଦ୍ୟମ ଅବଧି",
     "requestedModel": "ଅନୁରୋଧିତ ମଡେଲ୍",
     "ttft": "TTFT",
-    "requestsByAgent": "ଏଜେଣ୍ଟ ଦ୍ୱାରା ଅନୁରୋଧଗୁଡିକ"
+    "requestsByAgent": "ଏଜେଣ୍ଟ ଦ୍ୱାରା ଅନୁରୋଧଗୁଡିକ",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ଖେଳ ପଡିଆ",
