@@ -28,6 +28,7 @@ const CLIENT_PROFILES_FILENAME = '20260805_000002_client_profiles.ts';
 const API_KEY_PROXY_FILENAME = '20260810_000001_api_key_proxy.ts';
 const PLAYGROUND_CONVERSATIONS_FILENAME = '20260820_000001_playground_conversations.ts';
 const ATTEMPT_KEY_LABEL_FILENAME = '20260812_000001_attempt_key_label.ts';
+const RETIRE_GITHUB_MODELS_FILENAME = '20260813_000001_retire_github_models.ts';
 
 interface SchemaRow {
   type: string;
@@ -102,6 +103,7 @@ describe('migration round trip', () => {
         API_KEY_PROXY_FILENAME,
         PLAYGROUND_CONVERSATIONS_FILENAME,
         ATTEMPT_KEY_LABEL_FILENAME,
+        RETIRE_GITHUB_MODELS_FILENAME,
       ]);
     } finally {
       db.close();
