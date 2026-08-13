@@ -23,6 +23,7 @@ import * as clientProfiles from '../migrations/20260805_000002_client_profiles.j
 import * as apiKeyProxy from '../migrations/20260810_000001_api_key_proxy.js';
 import * as playgroundConversations from '../migrations/20260820_000001_playground_conversations.js';
 import * as attemptKeyLabel from '../migrations/20260812_000001_attempt_key_label.js';
+import * as retireGithubModels from '../migrations/20260813_000001_retire_github_models.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -58,6 +59,7 @@ export const CLIENT_PROFILES_FILENAME = '20260805_000002_client_profiles.ts';
 export const API_KEY_PROXY_FILENAME = '20260810_000001_api_key_proxy.ts';
 export const PLAYGROUND_CONVERSATIONS_FILENAME = '20260820_000001_playground_conversations.ts';
 export const ATTEMPT_KEY_LABEL_FILENAME = '20260812_000001_attempt_key_label.ts';
+export const RETIRE_GITHUB_MODELS_FILENAME = '20260813_000001_retire_github_models.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -82,9 +84,7 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: KEY_MODEL_SCOPE_FILENAME, module: keyModelScope },
   { filename: CLIENT_PROFILES_FILENAME, module: clientProfiles },
   { filename: API_KEY_PROXY_FILENAME, module: apiKeyProxy },
-<<<<<<< HEAD
   { filename: PLAYGROUND_CONVERSATIONS_FILENAME, module: playgroundConversations },
-=======
   { filename: ATTEMPT_KEY_LABEL_FILENAME, module: attemptKeyLabel },
->>>>>>> 3cd2dec (feat(ui): attempt key labels on the failover ladder (#869) + rate-limit tooltips (#870))
+  { filename: RETIRE_GITHUB_MODELS_FILENAME, module: retireGithubModels },
 ];

@@ -221,7 +221,6 @@ function isCatalog(value: unknown): value is Catalog {
 }
 
 function routableContextWindow(platform: string, modelId: string, contextWindow: number | null): number | null {
-  if (platform === 'github' && modelId === 'openai/gpt-4.1') return 8000;
   return contextWindow;
 }
 

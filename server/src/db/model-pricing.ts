@@ -45,11 +45,6 @@ export const MODEL_PRICING: PricingRow[] = [
   ['cohere', 'command-r-08-2024', 0.15, 0.60],
   ['cohere', 'command-r-plus-08-2024', 2.50, 10.00],
 
-  // GitHub Models (OpenAI official prices)
-  ['github', 'gpt-4o', 2.50, 10.00],
-  ['github', 'openai/gpt-4.1', 2.00, 8.00],
-  ['github', 'openai/gpt-5', 1.25, 10.00], // legacy
-
   // Google AI Studio (official prices)
   ['google', 'gemini-2.5-flash', 0.30, 2.50],
   ['google', 'gemini-2.5-flash-lite', 0.10, 0.40],

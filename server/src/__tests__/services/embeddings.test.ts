@@ -299,17 +299,6 @@ describe('embeddings service', () => {
         expect(String(fetchMock.mock.calls[0][0])).toContain('generativelanguage.googleapis.com');
       });
 
-      it('forwards dimensions to the github provider', async () => {
-        addKey('github');
-        const fetchMock = mockFetch(async () => okEmbeddingResponse(512));
-
-        await runEmbeddings('text-embedding-3-small', ['hello'], 512);
-
-        const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
-        expect(body.dimensions).toBe(512);
-        expect(String(fetchMock.mock.calls[0][0])).toContain('models.github.ai');
-      });
-
       it('forwards dimensions to the openrouter provider', async () => {
         addKey('openrouter');
         const fetchMock = mockFetch(async () => okEmbeddingResponse(1024));
