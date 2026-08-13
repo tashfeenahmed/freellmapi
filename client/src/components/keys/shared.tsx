@@ -33,7 +33,6 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'nvidia', label: 'NVIDIA NIM', url: 'https://build.nvidia.com/settings/api-keys' },
   { value: 'mistral', label: 'Mistral', url: 'https://console.mistral.ai/api-keys/' },
   { value: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/keys' },
-  { value: 'github', label: 'GitHub Models', url: 'https://github.com/settings/tokens' },
   { value: 'cohere', label: 'Cohere', url: 'https://dashboard.cohere.com/api-keys' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI', url: 'https://dash.cloudflare.com' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
@@ -61,6 +60,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // CATALOG-ANYAPI-SMOKE-2026-08-10 in the ops repo). No quota claim until
   // their free tier demonstrably works.
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
+  { value: 'unorouter', label: 'UnoRouter', url: 'https://unorouter.com' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name
