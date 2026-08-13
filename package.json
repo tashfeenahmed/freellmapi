@@ -23,7 +23,8 @@
     "db:migration:down": "npm run db:migration:down -w server",
     "db:migration:fresh": "npm run db:migration:fresh -w server",
     "db:migration:status": "npm run db:migration:status -w server",
-    "db:migration:create": "npm run db:migration:create -w server"
+    "db:migration:create": "npm run db:migration:create -w server",
+    "start": "node server/dist/index.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

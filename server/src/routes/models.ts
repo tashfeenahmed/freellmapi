@@ -5,15 +5,20 @@ import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
+  clearCatalogModelTombstone,
   isCatalogManagedModel,
   overriddenFieldNames,
   recordCatalogModelTombstone,
   upsertModelOverrides,
   type ModelOverridePatch,
 } from '../services/model-state.js';
+import { ensureFallbackRow } from '../services/declarative-config.js';
+import { customModelSeed } from '../services/custom-model-seed.js';
+import { syncCatalog } from '../services/catalog-sync.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 
 export const modelsRouter = Router();
 
@@ -32,12 +37,26 @@ const modelUpdateSchema = z.object({
   monthlyTokenBudget: z.string().max(80).optional(),
   contextWindow: z.number().int().positive().nullable().optional(),
   enabled: z.boolean().optional(),
+  deprecated: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
   fallbackEnabled: z.boolean().optional(),
 }).strict();
 
-const MODEL_FIELD_COLUMNS: Record<keyof ModelOverridePatch | 'enabled', string> = {
+// Add-model form on the Config page. Only the identity fields are required;
+// the rest default to the catalog median so a hand-added model starts routable
+// (same seeding as the custom-provider path — see customModelSeed).
+const createModelSchema = z.object({
+  platform: z.string().trim().min(1).max(100),
+  modelId: z.string().trim().min(1).max(200),
+  displayName: z.string().trim().max(200).optional(),
+  contextWindow: z.number().int().positive().nullable().optional(),
+  supportsVision: z.boolean().optional(),
+  supportsTools: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+}).strict();
+
+const MODEL_FIELD_COLUMNS: Record<keyof ModelOverridePatch | 'enabled' | 'deprecated', string> = {
   displayName: 'display_name',
   intelligenceRank: 'intelligence_rank',
   speedRank: 'speed_rank',
@@ -51,6 +70,7 @@ const MODEL_FIELD_COLUMNS: Record<keyof ModelOverridePatch | 'enabled', string> 
   supportsVision: 'supports_vision',
   supportsTools: 'supports_tools',
   enabled: 'enabled',
+  deprecated: 'deprecated',
 };
 
 type ModelRow = {
@@ -62,7 +82,7 @@ type ModelRow = {
 };
 
 function dbValue(key: keyof typeof MODEL_FIELD_COLUMNS, value: unknown): unknown {
-  if (key === 'enabled' || key === 'supportsVision' || key === 'supportsTools') return value ? 1 : 0;
+  if (key === 'enabled' || key === 'deprecated' || key === 'supportsVision' || key === 'supportsTools') return value ? 1 : 0;
   return value;
 }
 
@@ -250,6 +270,7 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     monthlyTokenBudget: m.monthly_token_budget,
     contextWindow: m.context_window,
     enabled: m.enabled === 1,
+    deprecated: m.deprecated === 1,
     supportsVision: m.supports_vision === 1,
     supportsTools: m.supports_tools === 1,
     priority: m.priority,
@@ -272,4 +293,68 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
   }));
 
   res.json(result);
+});
+
+/** POST /api/models — add a user-owned model to a native platform. */
+modelsRouter.post('/', (req: Request, res: Response) => {
+  const parsed = createModelSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map((e) => e.message).join(', ') } });
+    return;
+  }
+
+  const { platform, modelId, displayName, contextWindow, supportsVision, supportsTools, enabled } = parsed.data;
+  if (platform === 'custom' || !hasProvider(platform as Platform)) {
+    res.status(400).json({ error: { message: 'Unknown or unsupported platform. Add the platform key on the Keys page first.' } });
+    return;
+  }
+
+  const db = getDb();
+  const duplicate = db.prepare("SELECT id FROM models WHERE platform = ? AND model_id = ? AND endpoint_scope = ''").get(platform, modelId);
+  if (duplicate) {
+    res.status(409).json({ error: { message: 'A model with that ID already exists on this platform.' } });
+    return;
+  }
+
+  // Median ranks/tier so a hand-added model isn't stuck below every catalog
+  // model on the bandit's axes (the router ignores the floor otherwise).
+  const seed = customModelSeed(db);
+  const created = db.prepare(`
+    INSERT INTO models
+      (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+       rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
+       enabled, supports_vision, supports_tools, key_id, source, endpoint_scope, deprecated)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, '', ?, ?, ?, ?, NULL, 'user', '', 0)
+  `).run(
+    platform,
+    modelId,
+    displayName || modelId,
+    seed.intelligenceRank,
+    seed.speedRank,
+    seed.sizeLabel,
+    contextWindow ?? null,
+    enabled === false ? 0 : 1,
+    supportsVision ? 1 : 0,
+    supportsTools ? 1 : 0,
+  );
+
+  const id = Number(created.lastInsertRowid);
+  clearCatalogModelTombstone(db, 'chat', platform, modelId);
+  ensureFallbackRow(db, id, enabled !== false);
+
+  res.status(201).json({ model: { id, platform, modelId, source: 'custom' } });
+});
+
+/**
+ * POST /api/models/sync — the Config page's "sync models" action. Same catalog
+ * sync as Premium's "check for updates", surfaced with its counts so the UI can
+ * report how many models were added/updated/removed.
+ */
+modelsRouter.post('/sync', async (_req: Request, res: Response) => {
+  try {
+    const sync = await syncCatalog(true);
+    res.json({ sync });
+  } catch (err) {
+    res.status(502).json({ error: { message: err instanceof Error ? err.message : 'Model sync failed' } });
+  }
 });

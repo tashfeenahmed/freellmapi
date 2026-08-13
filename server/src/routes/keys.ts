@@ -72,8 +72,12 @@ const updateKeySchema = z.object({
   modelScope: z.array(z.string().trim().min(1).max(200)).max(100).nullable().optional(),
   // #590: '' clears the per-key proxy; absent leaves it unchanged.
   proxyUrl: proxyUrlSchema.optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined, {
-  message: 'At least one of enabled, label, modelScope or proxyUrl must be provided',
+  // Config page's provider editor: replace the secret ('' is ignored) and, for
+  // custom endpoints, point the row at a new base_url.
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.apiKey !== undefined || data.baseUrl !== undefined, {
+  message: 'At least one of enabled, label, modelScope, proxyUrl, apiKey or baseUrl must be provided',
 });
 
 const importKeySchema = z.object({
@@ -1477,8 +1481,9 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
 
-// Update key (toggle enable/disable or edit label)
-keysRouter.patch('/:id', (req: Request, res: Response) => {
+// Update key (toggle enable/disable, edit label, replace secret, or move a
+// custom endpoint to a new base_url)
+keysRouter.patch('/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: { message: 'Invalid key ID' } });
@@ -1491,7 +1496,15 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, apiKey, baseUrl } = parsed.data;
+
+  const db = getDb();
+  const keyRow = db.prepare('SELECT platform, base_url FROM api_keys WHERE id = ?').get(id) as { platform: string; base_url: string | null } | undefined;
+  if (!keyRow) {
+    res.status(404).json({ error: { message: 'Key not found' } });
+    return;
+  }
+
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
 
@@ -1510,6 +1523,13 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     updates.push('proxy_encrypted = ?', 'proxy_iv = ?', 'proxy_auth_tag = ?');
     values.push(proxy.encrypted, proxy.iv, proxy.authTag);
   }
+  // Replacing the secret rewrites the encrypted columns and resets health so a
+  // stale "ok" doesn't hide a now-invalid credential.
+  if (apiKey !== undefined && apiKey.trim() !== '') {
+    const { encrypted, iv, authTag } = encrypt(apiKey.trim());
+    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', "status = 'unknown'");
+    values.push(encrypted, iv, authTag);
+  }
   // Deduped; an empty result stores NULL, which the router reads as "unscoped".
   const scopeIds = modelScope == null ? [] : [...new Set(modelScope)];
   if (modelScope !== undefined) {
@@ -1517,10 +1537,36 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     values.push(scopeIds.length > 0 ? JSON.stringify(scopeIds) : null);
   }
 
+  // Moving a custom endpoint changes its identity, so the row's base_url and the
+  // endpoint_scope of the models bound to it must move together (#651).
+  let normalizedBaseUrl: string | null = null;
+  if (baseUrl !== undefined && baseUrl.trim() !== '' && keyRow.platform === 'custom') {
+    normalizedBaseUrl = normalizeBaseUrl(baseUrl.trim());
+    if (await rejectUnsafeBaseUrl(normalizedBaseUrl, res)) return;
+    if (normalizedBaseUrl === normalizeBaseUrl(keyRow.base_url ?? '')) {
+      normalizedBaseUrl = null;
+    } else {
+      updates.push('base_url = ?');
+      values.push(normalizedBaseUrl);
+    }
+  }
+
+  if (updates.length === 0) {
+    res.json({ success: true });
+    return;
+  }
+
   values.push(id);
 
-  const db = getDb();
-  const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  const apply = db.transaction(() => {
+    const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    if (normalizedBaseUrl !== null) {
+      db.prepare("UPDATE models SET endpoint_scope = ? WHERE platform = 'custom' AND key_id = ?").run(normalizedBaseUrl, id);
+    }
+    return result;
+  });
+
+  const result = apply();
 
   if (result.changes === 0) {
     res.status(404).json({ error: { message: 'Key not found' } });
@@ -1532,5 +1578,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   if (label !== undefined) response.label = label;
   if (proxyUrl !== undefined) response.maskedProxyUrl = maskProxyUrl(proxyUrl);
   if (modelScope !== undefined) response.modelScope = scopeIds.length > 0 ? scopeIds : null;
+  if (apiKey !== undefined && apiKey.trim() !== '') response.maskedKey = maskKey(apiKey.trim());
+  if (normalizedBaseUrl !== null) response.baseUrl = normalizedBaseUrl;
   res.json(response);
 });

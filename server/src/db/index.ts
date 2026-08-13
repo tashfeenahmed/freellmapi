@@ -28,22 +28,42 @@ export function getDefaultDbPath(): string {
   return process.env.FREEAPI_DB_PATH?.trim() || DB_PATH;
 }
 
+/** Loads the better-sqlite3 native module, or null when it is unavailable
+ *  (missing, or compiled for a different ABI). */
+function loadBetterSqlite(): (new (path: string) => unknown) | null {
+  try {
+    return runtimeRequire('better-sqlite3') as new (path: string) => unknown;
+  } catch {
+    return null;
+  }
+}
+
 /** Default factory: opens a better-sqlite3 connection at the given path. */
 function betterSqliteFactory(resolvedPath: string): Db {
-  let BetterSqlite: new (path: string) => unknown;
-  try {
-    BetterSqlite = runtimeRequire('better-sqlite3') as new (path: string) => unknown;
-  } catch (cause) {
+  const BetterSqlite = loadBetterSqlite();
+  if (!BetterSqlite) {
     throw new Error(
-      'better-sqlite3 is not installed. Reinstall dependencies, or use Node.js 22.13+ on Android/Termux.',
-      { cause },
+      'better-sqlite3 is not installed. Reinstall dependencies, or use Node.js 22.13+ for the built-in node:sqlite driver.',
     );
   }
   return new BetterSqlite(resolvedPath) as Db;
 }
 
 export function defaultDbFactory(platform: NodeJS.Platform = process.platform): DbFactory {
-  return platform === 'android' ? nodeSqliteFactory : betterSqliteFactory;
+  if (platform === 'android') return nodeSqliteFactory;
+
+  // On other platforms prefer better-sqlite3, but fall back to Node's built-in
+  // node:sqlite when the native module can't be loaded (no build tools, ABI
+  // mismatch, Termux, restricted environments). node:sqlite is synchronous and
+  // needs no native compilation, but requires Node.js 22.13+.
+  return (resolvedPath: string): Db => {
+    const BetterSqlite = loadBetterSqlite();
+    if (BetterSqlite) {
+      return new BetterSqlite(resolvedPath) as Db;
+    }
+    console.warn('[db] better-sqlite3 is not installed; using the built-in node:sqlite driver (requires Node.js 22.13+).');
+    return nodeSqliteFactory(resolvedPath);
+  };
 }
 
 export function connectDb(
@@ -60,6 +80,16 @@ export function connectDb(
   const isMemory = resolvedPath === ':memory:';
   const ensureDir = opts?.ensureDir ?? true;
   const factory = opts?.factory ?? defaultDbFactory();
+
+  // This build is SQLite-only. The legacy MySQL deployment (the MYSQL_* env
+  // vars used by the old freellmapi-20260709 package) is not wired in, so warn
+  // loudly instead of silently ignoring the operator's MySQL configuration.
+  if (process.env.MYSQL_HOST || process.env.MYSQL_DATABASE) {
+    console.warn(
+      '[db] MYSQL_* environment detected, but this build uses SQLite. ' +
+      'Ignoring the MySQL configuration and continuing with SQLite.',
+    );
+  }
 
   // Gated on ensureDir along with the mkdir: that flag means "this process does
   // not shape the filesystem here", and changing a directory's permissions is

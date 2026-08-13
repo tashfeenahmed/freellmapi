@@ -26,6 +26,9 @@ const CUSTOM_ENDPOINT_HOST_LABELS_FILENAME = '20260802_000001_custom_endpoint_ho
 const KEY_MODEL_SCOPE_FILENAME = '20260805_000001_key_model_scope.ts';
 const CLIENT_PROFILES_FILENAME = '20260805_000002_client_profiles.ts';
 const API_KEY_PROXY_FILENAME = '20260810_000001_api_key_proxy.ts';
+const MODEL_DEPRECATED_FILENAME = '20260813_000001_model_deprecated.ts';
+const BACKUPS_TABLE_FILENAME = '20260813_000002_backups_table.ts';
+const BACKUPS_FILEPATH_FILENAME = '20260813_000003_backups_filepath.ts';
 
 interface SchemaRow {
   type: string;
@@ -98,6 +101,9 @@ describe('migration round trip', () => {
         KEY_MODEL_SCOPE_FILENAME,
         CLIENT_PROFILES_FILENAME,
         API_KEY_PROXY_FILENAME,
+        MODEL_DEPRECATED_FILENAME,
+        BACKUPS_TABLE_FILENAME,
+        BACKUPS_FILEPATH_FILENAME,
       ]);
     } finally {
       db.close();

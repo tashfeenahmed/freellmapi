@@ -37,7 +37,7 @@ import AudioPage from '@/pages/AudioPage'
 import MediaDetailPage from '@/pages/MediaDetailPage'
 import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
-import PremiumPage from '@/pages/PremiumPage'
+import ConfigPage from '@/pages/ConfigPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import AgentsPage from '@/pages/AgentsPage'
 
@@ -365,7 +365,7 @@ function App() {
                       <Route path="/agents" element={<AgentsPage />} />
                       <Route path="/fallback" element={<Navigate to="/models/chat" replace />} />
                       <Route path="/analytics" element={<AnalyticsPage />} />
-                      <Route path="/premium" element={<PremiumPage />} />
+                      <Route path="/premium" element={<ConfigPage />} />
                       <Route path="/test" element={<Navigate to="/playground" replace />} />
                       <Route path="/health" element={<Navigate to="/keys" replace />} />
                       <Route path="*" element={<NotFoundPage />} />

@@ -21,6 +21,9 @@ import * as customEndpointHostLabels from '../migrations/20260802_000001_custom_
 import * as keyModelScope from '../migrations/20260805_000001_key_model_scope.js';
 import * as clientProfiles from '../migrations/20260805_000002_client_profiles.js';
 import * as apiKeyProxy from '../migrations/20260810_000001_api_key_proxy.js';
+import * as modelDeprecated from '../migrations/20260813_000001_model_deprecated.js';
+import * as backupsTable from '../migrations/20260813_000002_backups_table.js';
+import * as backupsFilepath from '../migrations/20260813_000003_backups_filepath.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -54,6 +57,9 @@ export const CUSTOM_ENDPOINT_HOST_LABELS_FILENAME = '20260802_000001_custom_endp
 export const KEY_MODEL_SCOPE_FILENAME = '20260805_000001_key_model_scope.ts';
 export const CLIENT_PROFILES_FILENAME = '20260805_000002_client_profiles.ts';
 export const API_KEY_PROXY_FILENAME = '20260810_000001_api_key_proxy.ts';
+export const MODEL_DEPRECATED_FILENAME = '20260813_000001_model_deprecated.ts';
+export const BACKUPS_TABLE_FILENAME = '20260813_000002_backups_table.ts';
+export const BACKUPS_FILEPATH_FILENAME = '20260813_000003_backups_filepath.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -78,4 +84,7 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: KEY_MODEL_SCOPE_FILENAME, module: keyModelScope },
   { filename: CLIENT_PROFILES_FILENAME, module: clientProfiles },
   { filename: API_KEY_PROXY_FILENAME, module: apiKeyProxy },
+  { filename: MODEL_DEPRECATED_FILENAME, module: modelDeprecated },
+  { filename: BACKUPS_TABLE_FILENAME, module: backupsTable },
+  { filename: BACKUPS_FILEPATH_FILENAME, module: backupsFilepath },
 ];

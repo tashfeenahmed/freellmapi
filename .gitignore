@@ -1,10 +1,12 @@
 node_modules/
 dist/
+deploy/
 server/data/
 # Runtime data dir when the server is launched from the repo root (same
 # contents as server/data — DB + keyfile — so same rule).
 /data/
 *.db
+*.zip
 *.db-wal
 *.db-shm
 *.bak

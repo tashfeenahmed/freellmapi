@@ -29,7 +29,7 @@ function loadNodeSqlite(): NodeSqliteModule {
     return runtimeRequire('node:sqlite') as NodeSqliteModule;
   } catch (cause) {
     throw new Error(
-      'Android/Termux requires Node.js 22.13 or newer for the built-in node:sqlite database driver.',
+      'The built-in node:sqlite driver requires Node.js 22.13 or newer.',
       { cause },
     );
   }

@@ -206,7 +206,7 @@ function normalizeModelEntry(entry: z.infer<typeof modelEntrySchema>): Normalize
   return { ...entry, modelId, displayName: entry.displayName?.trim() || modelId };
 }
 
-function ensureFallbackRow(db: Db, modelDbId: number, enabled = true, updateExisting = true): void {
+export function ensureFallbackRow(db: Db, modelDbId: number, enabled = true, updateExisting = true): void {
   const existing = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelDbId);
   if (existing) {
     if (updateExisting) {
