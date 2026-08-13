@@ -226,6 +226,8 @@
     "rateRpm": "{count} 请求/分钟",
     "rateRpd": "{count} 请求/日",
     "rateTitle": "按速率限制——无固定的每月词元额度",
+    "remainingQuota": "剩余 {count}%",
+    "remainingQuotaTitle": "最紧张提供商配额（来自最新限流响应头/配额信号）的剩余占比",
     "splitOut": "不合并此副本",
     "splitOutHint": "让该提供方的副本作为独立条目显示，而不并入统一模型。可在该副本自己的页面上重新合并。",
     "splitUndo": "重新合并",

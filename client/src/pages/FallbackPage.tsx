@@ -19,6 +19,7 @@ import { Boxes, Search, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
+import type { HealthData } from '@/components/keys/shared'
 import {
   buildGroups,
   groupMaxContext,
@@ -96,6 +97,15 @@ export default function FallbackPage() {
     queryFn: () => apiFetch('/api/fallback/routing'),
     refetchInterval: 15_000,
   })
+
+  // Observed provider quota states — drives the per-group remaining-quota badge
+  // (#876). Refetched on the same 30s cadence as the Keys page health data.
+  const { data: healthData } = useQuery<HealthData>({
+    queryKey: ['health'],
+    queryFn: () => apiFetch('/api/health'),
+    refetchInterval: 30_000,
+  })
+  const quotaStates = healthData?.quotaStates
 
   const saveMutation = useMutation({
     mutationFn: (data: { modelDbId: number; priority: number; enabled: boolean }[]) =>
@@ -391,7 +401,7 @@ export default function FallbackPage() {
                     <SortableContext items={renderedGroups.map(g => `grp:${g.key}`)} strategy={verticalListSortingStrategy}>
                       <tbody>
                         {renderedGroups.map(g => (
-                          <SortableGroupRow key={g.key} group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} />
+                          <SortableGroupRow key={g.key} group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} quotaStates={quotaStates} />
                         ))}
                       </tbody>
                     </SortableContext>
@@ -409,7 +419,7 @@ export default function FallbackPage() {
                         onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
                         className={`group/row border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
                       >
-                        <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} />
+                        <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} quotaStates={quotaStates} />
                       </tr>
                     ))}
                   </tbody>

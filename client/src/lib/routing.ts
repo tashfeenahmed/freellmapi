@@ -2,6 +2,8 @@
 // FallbackPage so the Models page, the per-model detail page, and the command
 // palette share one module instead of importing from a page component.
 
+import type { ProviderQuotaState } from '../../../shared/types'
+
 export interface FallbackEntry {
   modelDbId: number
   priority: number
@@ -280,6 +282,37 @@ export function groupQuotaBadge(
   return null
 }
 
+// #876: a remaining-quota indicator for a model group, driven by the health
+// endpoint's quota observations (ProviderQuotaState[]). Matches each member's
+// platform to the most recent observed state with a known limit/remaining and
+// renders the tightest remaining fraction as the badge text, with the per-
+// platform breakdown in the title. Returns null when no observation exists —
+// the badge simply doesn't render, exactly like an unmeasured axis bar.
+export function groupRemainingQuota(
+  members: Row[],
+  states: ProviderQuotaState[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { text: string; title: string } | null {
+  const platforms = [...new Set(members.map(m => m.platform))]
+  const observed: { platform: string; state: ProviderQuotaState }[] = []
+  for (const platform of platforms) {
+    const match = states
+      .filter(s => s.platform === platform && s.remaining != null && s.limit != null && s.limit > 0)
+      .sort((a, b) => (b.observedAt ?? '').localeCompare(a.observedAt ?? ''))[0]
+    if (match) observed.push({ platform, state: match })
+  }
+  if (observed.length === 0) return null
+  const ratioOf = (s: ProviderQuotaState): number => (s.limit && s.limit > 0 ? (s.remaining ?? 0) / s.limit : 1)
+  const tightest = observed.reduce((a, b) => (ratioOf(b.state) < ratioOf(a.state) ? b : a))
+  const title = observed
+    .map(o => `${o.platform}: ${o.state.remaining ?? '?'}/${o.state.limit ?? '?'} (${o.state.metric})`)
+    .join(' ')
+  return {
+    text: t('models.remainingQuota', { count: Math.round(ratioOf(tightest.state) * 100) }),
+    title,
+  }
+}
+
 export const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',
@@ -307,6 +340,7 @@ export const platformColors: Record<string, string> = {
   sealion:     '#0ea5e9',
   orcarouter:  '#f97316',
   anyapi:      '#0891b2',
+  unorouter:   '#f97316',
   modelscope:  '#624aff',
   aihorde:     '#dc2626',
   qianfan:     '#2932e1',
