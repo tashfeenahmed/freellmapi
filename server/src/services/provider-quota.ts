@@ -146,11 +146,13 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   if (platform === 'anyapi') return 'anyapi::free';
   // ModelScope: one 2000-requests/day quota across the whole account.
   if (platform === 'modelscope') return 'modelscope::account';
+  // AgentRouter: a New-API gateway with account-scoped model group quotas.
+  if (platform === 'agentrouter') return 'agentrouter::account';
   return normalizedModelId ? `${platform}::${normalizedModelId}` : `${platform}::account`;
 }
 
 function isSharedPool(platform: Platform): boolean {
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'anyapi', 'modelscope', 'aihorde', 'agentrouter'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };

@@ -307,6 +307,7 @@ export const platformColors: Record<string, string> = {
   anyapi:      '#0891b2',
   modelscope:  '#624aff',
   aihorde:     '#dc2626',
+  agentrouter: '#7c3aed',
 }
 
 // ── Grouped (unified) rendering ──────────────────────────────────────────────

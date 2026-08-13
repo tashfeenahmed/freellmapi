@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, CircleAlert, FileText, Paperclip, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
@@ -175,6 +175,21 @@ export default function PlaygroundPage() {
   // Unification is always on now (the on/off toggle was removed), so the picker
   // always collapses a model's providers into one option.
   const unifyOn = true
+
+  const { data: combosData } = useQuery({
+    queryKey: ['combos'],
+    queryFn: () => apiFetch<{ combos: Array<{ name: string; strategy: string }> }>('/api/combos'),
+  })
+  const comboOptions = useMemo(
+    () => (combosData?.combos ?? []).map(c => ({
+      value: c.name,
+      label: c.name,
+      sub: c.strategy,
+      isNew: true,
+      platforms: [] as string[],
+    })),
+    [combosData],
+  )
 
   const availableModels = fallbackEntries.filter(e => e.keyCount > 0 && e.enabled)
   // Collapse the same model from multiple providers into one option (value =
@@ -415,6 +430,7 @@ export default function PlaygroundPage() {
   const pickerOptions = [
     { value: 'auto', label: t('playground.autoModel'), sub: '', isNew: false, platforms: [] as string[] },
     { value: 'fusion', label: t('playground.fusionModel'), sub: '', isNew: true, platforms: [] as string[] },
+    ...comboOptions,
     ...modelOptions
       .slice()
       .sort((a, b) =>
@@ -444,7 +460,9 @@ export default function PlaygroundPage() {
     ? t('playground.autoModel')
     : selectedModel === 'fusion'
     ? t('playground.fusionModel')
-    : modelOptions.find(o => o.value === selectedModel)?.label ?? selectedModel
+    : comboOptions.find(c => c.value === selectedModel)?.label
+    ?? modelOptions.find(o => o.value === selectedModel)?.label
+    ?? selectedModel
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">

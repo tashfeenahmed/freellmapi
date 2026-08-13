@@ -138,6 +138,10 @@ export type Platform =
   // aihorde.net key raises queue priority. Has a dedicated AIHordeProvider that
   // normalizes the proxy's OpenAI divergences. See issue #345.
   | 'aihorde'
+  // AgentRouter — OpenAI-compatible aggregator (agentrouter.org/v1). New-API
+  // gateway that whitelists clients by fingerprint; REQUIRES the Roo-Code
+  // extra headers on every request or it 401s "unauthorized client detected".
+  | 'agentrouter'
   // User-configured OpenAI-compatible endpoint (llama.cpp, LM Studio, vLLM,
   // Ollama, any base_url). The endpoint URL lives on the api_keys row; see #117.
   | 'custom';

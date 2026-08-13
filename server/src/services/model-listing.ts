@@ -1,6 +1,7 @@
 import type { ModelListRow } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { isUnifyEnabled, getModelGroups } from './model-groups.js';
+import { getComboModelIds } from './combos.js';
 
 // Shared catalog-listing logic behind both the OpenAI `GET /v1/models` and the
 // Anthropic `GET /v1/models` endpoints, so the two wire formats list the exact
@@ -104,6 +105,23 @@ export function buildModelListing(): ModelListing {
   const autoContextWindow = availableContextWindows.length > 0
     ? Math.max(...availableContextWindows)
     : null;
+
+  // Append user-defined combos as virtual model entries so they appear
+  // in /v1/models as selectable model ids.
+  const comboIds = getComboModelIds(getDb());
+  for (const comboId of comboIds) {
+    allListed.push({
+      id: comboId,
+      name: `Combo: ${comboId}`,
+      ownedBy: 'freellmapi',
+      available: 1,
+      enabled: 1,
+      contextWindow: autoContextWindow,
+      intel: Number.MAX_SAFE_INTEGER,
+      platforms: ['freellmapi'],
+      supportsTools: true,
+    });
+  }
 
   return { models: allListed, autoContextWindow };
 }

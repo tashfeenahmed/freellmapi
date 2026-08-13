@@ -546,6 +546,7 @@ export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['
     // rows — both cases mean "retain the app's bundled embedding baseline
     // untouched". The JS truthy check on a non-empty array object would
     // misfire on `[]`, wiping the seeded rows; gate on length instead.
+
     if (catalog.embeddings && catalog.embeddings.length > 0) {
       const embeddingCandidates = db
         .prepare(`

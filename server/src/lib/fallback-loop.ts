@@ -55,7 +55,7 @@ import { logRequest, persistRequestAttempts } from './request-log.js';
 import { withKeyProxy } from './proxy.js';
 
 // Every surface caps failover hops at the same number.
-export const FALLBACK_MAX_RETRIES = 20;
+export const FALLBACK_MAX_RETRIES = 60;
 
 // ── Model-level failure benching ─────────────────────────────────────────────
 // A model that keeps failing upstream (401/429/5xx/empty-stream/timeout) must

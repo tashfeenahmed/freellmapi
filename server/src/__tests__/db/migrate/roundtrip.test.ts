@@ -20,12 +20,14 @@ const MEDIA_MODEL_META_FILENAME = '20260726_000004_media_model_meta.ts';
 const REQUEST_SERVED_MODEL_FILENAME = '20260726_000005_request_served_model.ts';
 const ATTEMPT_ERROR_SUMMARY_FILENAME = '20260726_000006_attempt_error_summary.ts';
 const AGENT_COMPATIBILITY_FILENAME = '20260727_000001_agent_compatibility.ts';
+const COMBOS_FILENAME = '20260729_000001_combos.ts';
 const TOMBSTONE_PROVENANCE_FILENAME = '20260728_000001_tombstone_provenance.ts';
 const CUSTOM_MODEL_ENDPOINT_IDENTITY_FILENAME = '20260729_000001_custom_model_endpoint_identity.ts';
 const CUSTOM_ENDPOINT_HOST_LABELS_FILENAME = '20260802_000001_custom_endpoint_host_labels.ts';
 const KEY_MODEL_SCOPE_FILENAME = '20260805_000001_key_model_scope.ts';
 const CLIENT_PROFILES_FILENAME = '20260805_000002_client_profiles.ts';
 const API_KEY_PROXY_FILENAME = '20260810_000001_api_key_proxy.ts';
+
 
 interface SchemaRow {
   type: string;
@@ -92,6 +94,7 @@ describe('migration round trip', () => {
         REQUEST_SERVED_MODEL_FILENAME,
         ATTEMPT_ERROR_SUMMARY_FILENAME,
         AGENT_COMPATIBILITY_FILENAME,
+        COMBOS_FILENAME,
         TOMBSTONE_PROVENANCE_FILENAME,
         CUSTOM_MODEL_ENDPOINT_IDENTITY_FILENAME,
         CUSTOM_ENDPOINT_HOST_LABELS_FILENAME,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -244,6 +244,122 @@ function Panel({ icon: Icon, title, actions, children }: { icon: LucideIcon; tit
         {actions}
       </div>
       <div className="p-4">{children}</div>
+    </div>
+  )
+}
+
+// ── ComboAnalyticsCard ────────────────────────────────────────────────────
+
+function ComboAnalyticsCard({ combo }: {
+  combo: {
+    comboName: string
+    totalRequests: number
+    successRate: number
+    avgLatencyMs: number
+    totalInputTokens: number
+    totalOutputTokens: number
+    modelDistribution: Array<{
+      modelId: string
+      count: number
+      pct: number
+      avgLatencyMs: number
+      successRate: number
+    }>
+    fallbackDepth: Array<{
+      ordinal: number
+      modelId: string
+      count: number
+      pct: number
+    }>
+  }
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="rounded-xl border p-4 space-y-4">
+      {/* Summary row */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">{combo.comboName}</h3>
+          <p className="text-xs text-muted-foreground">
+            {combo.totalRequests} requests · {combo.successRate}% success · {combo.avgLatencyMs} ms avg
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+          <span>↑ {formatTokens(combo.totalInputTokens)}</span>
+          <span>↓ {formatTokens(combo.totalOutputTokens)}</span>
+        </div>
+      </div>
+
+      {/* Model distribution bar */}
+      {combo.modelDistribution.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            {t('analytics.modelDistribution') || 'Model distribution'}
+          </p>
+          <div className="flex h-5 rounded-full overflow-hidden text-[10px] font-medium">
+            {combo.modelDistribution.map((m, i) => (
+              <div
+                key={m.modelId}
+                style={{
+                  width: `${m.pct}%`,
+                  backgroundColor: `hsl(${i * 45 + 200}, 55%, ${55 - i * 5}%)`,
+                }}
+                className="flex items-center justify-center text-white/90 last:rounded-r-full first:rounded-l-full min-w-[2px]"
+                title={`${m.modelId}: ${m.pct}% (${m.count} req, ${m.successRate}% success)`}
+              >
+                {m.pct > 12 ? m.modelId.split('/').pop()?.split('-').slice(0, 2).join('-') : ''}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+            {combo.modelDistribution.map((m, i) => (
+              <span key={m.modelId} className="flex items-center gap-1">
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ backgroundColor: `hsl(${i * 45 + 200}, 55%, 55%)` }}
+                />
+                {m.modelId}: {m.pct}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback depth bar */}
+      {combo.fallbackDepth.length > 1 && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            {t('analytics.fallbackDepth') || 'Fallback depth'}
+          </p>
+          <div className="flex h-4 rounded-full overflow-hidden text-[10px] font-medium">
+            {combo.fallbackDepth.map((f, i) => (
+              <div
+                key={f.ordinal}
+                style={{
+                  width: `${f.pct}%`,
+                  backgroundColor: i === 0 ? '#22c55e' : i === 1 ? '#f59e0b' : '#ef4444',
+                }}
+                className="flex items-center justify-center text-white/90 last:rounded-r-full first:rounded-l-full min-w-[8px]"
+                title={`Attempt ${f.ordinal} (${f.modelId}): ${f.pct}%`}
+              >
+                {f.pct > 10 ? `#${f.ordinal}` : ''}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+            {combo.fallbackDepth.map((f, i) => (
+              <span key={f.ordinal} className="flex items-center gap-1">
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ backgroundColor: i === 0 ? '#22c55e' : i === 1 ? '#f59e0b' : '#ef4444' }}
+                />
+                #{f.ordinal} ({f.modelId}): {f.pct}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -494,16 +610,61 @@ export default function AnalyticsPage() {
   // (and caches) each combination on its own.
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [platformFilter, setPlatformFilter] = useState<string>('all')
+  const [requestTypeFilter, setRequestTypeFilter] = useState<string>('all')
+  const { data: combosList } = useQuery({
+    queryKey: ['combos'],
+    queryFn: () => apiFetch<{ combos: Array<{ name: string; strategy: string }> }>('/api/combos'),
+  })
   const [detailId, setDetailId] = useState<number | null>(null)
 
   const { data: recentCalls } = useQuery({
-    queryKey: ['analytics', 'requests', range, statusFilter, platformFilter],
+    queryKey: ['analytics', 'requests', range, statusFilter, platformFilter, requestTypeFilter],
     queryFn: () => {
       const params = new URLSearchParams({ range, limit: '100' })
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (platformFilter !== 'all') params.set('platform', platformFilter)
+      if (requestTypeFilter !== 'all') params.set('requested_model', requestTypeFilter)
       return apiFetch<RecentCallsResponse>(`/api/analytics/requests?${params}`)
     },
+  })
+
+  const requestTypeOptions = useMemo(() => {
+    const comboNames = (combosList?.combos ?? []).map(c => c.name).sort()
+    return [
+      { value: 'all', label: t('analytics.filterAll') },
+      { value: 'auto', label: 'Auto' },
+      { value: 'fusion', label: 'Fusion' },
+      ...comboNames.map(name => ({ value: name, label: `Combo: ${name}` })),
+    ]
+  }, [combosList, t])
+
+  const [showComboAnalytics, setShowComboAnalytics] = useState(false)
+  const { data: comboAnalytics, isLoading: comboAnalyticsLoading } = useQuery({
+    queryKey: ['analytics', 'by-combo', range],
+    queryFn: () => apiFetch<{
+      combos: Array<{
+        comboName: string
+        totalRequests: number
+        successRate: number
+        avgLatencyMs: number
+        totalInputTokens: number
+        totalOutputTokens: number
+        modelDistribution: Array<{
+          modelId: string
+          count: number
+          pct: number
+          avgLatencyMs: number
+          successRate: number
+        }>
+        fallbackDepth: Array<{
+          ordinal: number
+          modelId: string
+          count: number
+          pct: number
+        }>
+      }>
+    }>(`/api/analytics/by-combo?range=${range}`),
+    enabled: showComboAnalytics,
   })
 
   // Savings card shows ONE stable monthly figure regardless of the selected
@@ -820,6 +981,25 @@ export default function AnalyticsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Select value={requestTypeFilter} onValueChange={(v) => setRequestTypeFilter(v ?? 'all')}>
+                    <SelectTrigger size="sm" aria-label="Request type">
+                      <SelectValue>
+                        {(v: string) => {
+                          if (!v || v === 'all') return t('analytics.filterAll')
+                          if (v === 'auto') return 'Auto'
+                          if (v === 'fusion') return 'Fusion'
+                          return `Combo: ${v}`
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {requestTypeOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               }
             >
@@ -834,6 +1014,7 @@ export default function AnalyticsPage() {
                         <TableHead>{t('analytics.clientIp')}</TableHead>
                         <TableHead>{t('analytics.clientAgent')}</TableHead>
                         <TableHead>{t('common.model')}</TableHead>
+                        <TableHead>{t('analytics.requestType') || 'Type'}</TableHead>
                         <TableHead>{t('common.provider')}</TableHead>
                         <TableHead>{t('common.status')}</TableHead>
                         <TableHead className="text-right">{t('analytics.attempts')}</TableHead>
@@ -860,6 +1041,20 @@ export default function AnalyticsPage() {
                             {r.modelId}
                             {r.requestedModel && r.requestedModel !== r.modelId ? ' *' : ''}
                           </TableCell>
+                          <TableCell className="text-xs">
+                            {r.requestedModel === null || r.requestedModel === r.modelId ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : r.requestedModel === 'auto' ? (
+                              <Badge variant="outline" className="text-[10px] font-mono">Auto</Badge>
+                            ) : r.requestedModel === 'fusion' ? (
+                              <Badge variant="outline" className="text-[10px] font-mono">Fusion</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] font-mono" title={`Combo: ${r.requestedModel}`}>
+                                {r.requestedModel}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{r.platform}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {r.platform === 'custom' && r.keyLabel ? r.keyLabel : r.platform}
                           </TableCell>
@@ -1014,6 +1209,41 @@ export default function AnalyticsPage() {
               </Panel>
             </div>
           )}
+
+          {/* ── Combo Analytics (collapsible) ── */}
+          <div className="lg:col-span-2">
+            <Panel
+              title={`${t('analytics.comboAnalytics') || 'Combo Analytics'}`}
+              icon={GitBranch}
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setShowComboAnalytics(v => !v)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showComboAnalytics ? (t('common.hide') || 'Hide') : (t('common.show') || 'Show')}
+                </button>
+              }
+            >
+              {!showComboAnalytics ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  {t('analytics.comboAnalyticsHint') || 'Click Show to view per-combo breakdown.'}
+                </p>
+              ) : comboAnalyticsLoading ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('common.loading')}</p>
+              ) : !comboAnalytics?.combos?.length ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  {t('analytics.noComboData') || 'No combo requests yet — use a combo model in chat, then come back.'}
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {comboAnalytics.combos.map(combo => (
+                    <ComboAnalyticsCard key={combo.comboName} combo={combo} />
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
         </div>
       </div>
 
