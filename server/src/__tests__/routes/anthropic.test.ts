@@ -421,6 +421,19 @@ describe('Anthropic-compatible /v1/messages', () => {
       expect(m.type).toBe('model');
       expect(typeof m.display_name).toBe('string');
       expect(typeof m.created_at).toBe('string');
+      // Issue #880: Claude Desktop Model Discovery reads `model_versions` to
+      // decide which gateway models are usable; a missing array makes it
+      // report "found 0 models". Each entry must carry a singleton version
+      // with the capability flags.
+      expect(Array.isArray(m.model_versions)).toBe(true);
+      expect(m.model_versions.length).toBeGreaterThan(0);
+      for (const v of m.model_versions) {
+        expect(typeof v.id).toBe('string');
+        expect(typeof v.display_name).toBe('string');
+        expect(typeof v.created_at).toBe('string');
+        expect(typeof v.supports_vision).toBe('boolean');
+        expect(typeof v.supports_tools).toBe('boolean');
+      }
     }
   });
 
