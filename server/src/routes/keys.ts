@@ -905,7 +905,25 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
       clearCooldownsForKey(endpoint.keyId);
     }
 
-    res.json({ modelId: probe.modelId, latencyMs: probe.latencyMs });
+    // Phase 1 (#874): a successful tool-call probe is positive evidence the
+    // model speaks the OpenAI tool-call protocol — write it back to the models
+    // row so the tool-aware router can pick it. Only a POSITIVE result writes
+    // (the "only write success samples" philosophy); a negative/unknown result
+    // leaves the existing flag untouched.
+    if (probe.toolCalls) {
+      getDb().prepare(
+        `UPDATE models SET supports_tools = 1 WHERE platform = 'custom' AND model_id = ?`,
+      ).run(probe.modelId);
+    }
+
+    // Response stays { modelId, latencyMs } for backward compat; capability
+    // flags ride along as optional fields the client can opt to render.
+    res.json({
+      modelId: probe.modelId,
+      latencyMs: probe.latencyMs,
+      ...(probe.reasoning !== undefined ? { reasoning: probe.reasoning } : {}),
+      ...(probe.toolCalls !== undefined ? { toolCalls: probe.toolCalls } : {}),
+    });
   } catch (err: any) {
     if (err instanceof ModelDiscoveryError) {
       res.status(err.status).json({ error: { message: err.message } });
