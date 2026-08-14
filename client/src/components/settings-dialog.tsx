@@ -357,6 +357,58 @@ function useCompressionSettings(open: boolean) {
   return { config, stats, busy, setBusy, error, setError, patch, setEngineEnabled, save }
 }
 
+type TelemetryState = ReturnType<typeof useTelemetrySettings>
+
+// Telemetry opt-in + endpoint are loaded once per dialog opening, like the
+// compression settings, so the Advanced section never shows stale state.
+function useTelemetrySettings(open: boolean) {
+  const { t } = useI18n()
+  const [telemetry, setTelemetry] = useState<{ optIn: boolean; endpoint: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    apiFetch<{ optIn: boolean; endpoint: string }>('/api/settings/telemetry')
+      .then(next => {
+        if (cancelled) return
+        setTelemetry(next)
+        setError('')
+      })
+      .catch(reason => {
+        if (cancelled) return
+        setError(reason instanceof Error ? reason.message : t('common.unknownError'))
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false)
+      })
+    return () => { cancelled = true }
+  }, [open, t])
+
+  const patch = useCallback((update: Partial<{ optIn: boolean; endpoint: string }>) => {
+    setTelemetry(current => current ? { ...current, ...update } : current)
+  }, [])
+
+  const save = useCallback(async () => {
+    if (!telemetry) return
+    setBusy(true)
+    setError('')
+    try {
+      setTelemetry(await apiFetch<{ optIn: boolean; endpoint: string }>('/api/settings/telemetry', {
+        method: 'PUT',
+        body: JSON.stringify({ optIn: telemetry.optIn, endpoint: telemetry.endpoint }),
+      }))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t('common.unknownError'))
+    } finally {
+      setBusy(false)
+    }
+  }, [telemetry, t])
+
+  return { telemetry, busy, error, patch, save }
+}
+
 function CompressionSection({ state }: { state: CompressionState }) {
   const { t } = useI18n()
   const { config, patch, setEngineEnabled } = state
@@ -420,10 +472,11 @@ function CompressionSection({ state }: { state: CompressionState }) {
   )
 }
 
-function AdvancedSection({ state }: { state: CompressionState }) {
+function AdvancedSection({ state, telemetryState }: { state: CompressionState; telemetryState: TelemetryState }) {
   const { t } = useI18n()
   const { config, patch } = state
-  if (!config) return null
+  const { telemetry, busy: telemetryBusy, error: telemetryError, patch: patchTelemetry, save: saveTelemetry } = telemetryState
+  if (!config || !telemetry) return null
 
   return (
     <>
@@ -467,6 +520,38 @@ function AdvancedSection({ state }: { state: CompressionState }) {
           />
         )}
       />
+      <Row
+        label={t('settings.telemetryOptIn')}
+        hint={t('settings.telemetryOptInHelp')}
+        control={(
+          <Switch
+            aria-label={t('settings.telemetryOptIn')}
+            checked={telemetry.optIn}
+            onCheckedChange={optIn => patchTelemetry({ optIn })}
+          />
+        )}
+      />
+      <Row label={t('settings.telemetryEndpoint')} hint={t('settings.telemetryEndpointHelp')}>
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            value={telemetry.endpoint}
+            onChange={event => patchTelemetry({ endpoint: event.target.value })}
+            placeholder="https://…"
+            aria-label={t('settings.telemetryEndpoint')}
+            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          />
+          <button
+            type="button"
+            onClick={saveTelemetry}
+            disabled={telemetryBusy}
+            className="shrink-0 rounded-lg bg-foreground px-4 py-2 text-xs font-medium text-background transition-opacity outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          >
+            {telemetryBusy ? t('common.saving') : t('common.saveChanges')}
+          </button>
+        </div>
+        {telemetryError && <p className="mt-1.5 text-xs text-destructive">{telemetryError}</p>}
+      </Row>
     </>
   )
 }
@@ -1003,6 +1088,7 @@ export function SettingsDialog({
   const { t } = useI18n()
   const [section, setSection] = useState<SectionId>('general')
   const state = useCompressionSettings(open)
+  const telemetryState = useTelemetrySettings(open)
   const { config, busy, error, save } = state
   const compressionSection = section !== 'general'
   const loading = compressionSection && !config && busy === 'load'
@@ -1061,7 +1147,7 @@ export function SettingsDialog({
             {compressionSection && config && (
               <>
                 {section === 'compression' && <CompressionSection state={state} />}
-                {section === 'advanced' && <AdvancedSection state={state} />}
+                {section === 'advanced' && <AdvancedSection state={state} telemetryState={telemetryState} />}
                 {section === 'preview' && <PreviewSection state={state} />}
               </>
             )}

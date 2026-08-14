@@ -650,15 +650,18 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     </Button>
                                   </Tooltip>
                                   <Tooltip text={t('keys.probeNow')}>
-                                    <Button
+                                    <ConfirmButton
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => probeKey.mutate(k.id)}
+                                      armedSize="xs"
+                                      confirmLabel={t('keys.probeConfirm')}
+                                      onConfirm={() => probeKey.mutate(k.id)}
                                       disabled={probeKey.isPending}
+                                      title={t('keys.probeNow')}
                                       aria-label={t('keys.probeNow')}
                                     >
                                       <Zap className={`size-3 ${probeKey.isPending ? 'animate-pulse' : ''}`} />
-                                    </Button>
+                                    </ConfirmButton>
                                   </Tooltip>
                                 </>
                               )}
