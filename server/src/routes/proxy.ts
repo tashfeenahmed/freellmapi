@@ -1280,7 +1280,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, top_p, stream } = parsed.data;
+  const { model: requestedModel, temperature, top_p, stream, stream_options } = parsed.data;
   const requestedModelLabel = requestedModel ?? 'auto';
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
@@ -2161,7 +2161,32 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             ? 'tool_calls'
             : (upstreamFinish && upstreamFinish !== 'tool_calls' ? upstreamFinish : 'stop');
           writeChunk(mkChunk({}, finish));
-          if (usageChunk) writeChunk(usageChunk);
+          if (usageChunk) {
+            writeChunk(usageChunk);
+          } else if (stream_options?.include_usage) {
+            // Some OpenAI-compatible upstreams (e.g. OpenCode Zen) never echo
+            // a final usage frame even when stream_options.include_usage is
+            // requested. Strict clients (Hermes, Cline, Continue) treat a
+            // missing usage block as "no accounting happened" and skip
+            // per-call token/cost/billing_provider writes entirely. Inject the
+            // proxy's own estimate (same values the non-stream path already
+            // reports via the `?? estimatedInputTokens` fallback above) so
+            // streaming clients still receive a usage block.
+            const promptTokens = estimatedInputTokens + injectedHandoffTokens;
+            const completionTokens = totalOutputTokens;
+            writeChunk({
+              id: lastMeta.id ?? `chatcmpl-${Date.now()}`,
+              object: 'chat.completion.chunk',
+              created: lastMeta.created ?? Math.floor(Date.now() / 1000),
+              model: lastMeta.model ?? route.modelId,
+              choices: [],
+              usage: {
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: promptTokens + completionTokens,
+              },
+            });
+          }
           res.write('data: [DONE]\n\n');
           res.end();
 
