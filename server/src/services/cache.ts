@@ -235,6 +235,8 @@ export interface CachedResponse {
   keyId: number | null;
   promptTokens: number;
   completionTokens: number;
+  /** #892-3 流式重放：完整成功的 SSE chunk 序列（不含 [DONE]）。非流式条目为 undefined。 */
+  streamFrames?: unknown[];
 }
 
 export interface StoreInput {
@@ -244,6 +246,8 @@ export interface StoreInput {
   keyId: number | null;
   promptTokens: number;
   completionTokens: number;
+  /** #892-3 流式重放：缓存该请求产出的 SSE chunk 序列（不含 [DONE]）。 */
+  streamFrames?: unknown[];
 }
 
 interface CacheEntry {
@@ -256,6 +260,7 @@ interface CacheEntry {
   hitCount: number;
   createdAtMs: number;
   lastHitAtMs: number | null;
+  streamFrames?: unknown[];
 }
 
 // Insertion-ordered map used as an LRU: the first key is the least-recently
@@ -286,13 +291,24 @@ CREATE TABLE IF NOT EXISTS response_cache (
   completion_tokens INTEGER NOT NULL,
   hit_count INTEGER NOT NULL DEFAULT 0,
   created_at_ms INTEGER NOT NULL,
-  last_hit_at_ms INTEGER
+  last_hit_at_ms INTEGER,
+  stream_frames TEXT
 )`;
 
 let schemaReadyDb: unknown = null;
 function ensureSchema(db: Db): void {
   if (schemaReadyDb === db) return;
   db.exec(CACHE_SCHEMA);
+  // #892-3 流式重放：旧库可能缺 stream_frames 列（IF NOT EXISTS 不重建），
+  // 检测缺失时 ALTER 补上。
+  try {
+    const cols = db.prepare('PRAGMA table_info(response_cache)').all() as { name: string }[];
+    if (!cols.some(c => c.name === 'stream_frames')) {
+      db.exec('ALTER TABLE response_cache ADD COLUMN stream_frames TEXT');
+    }
+  } catch {
+    /* best-effort: 查询失败按表不存在处理（后续写入会再建表） */
+  }
   schemaReadyDb = db;
 }
 
@@ -317,6 +333,7 @@ interface CacheRow {
   hit_count: number;
   created_at_ms: number;
   last_hit_at_ms: number | null;
+  stream_frames: string | null;
 }
 
 /**
@@ -336,11 +353,19 @@ export function getCachedResponse(cacheKey: string, now = Date.now()): CachedRes
       ensureSchema(db);
       return db.prepare(
         `SELECT body, platform, model_id, key_id, prompt_tokens, completion_tokens,
-                hit_count, created_at_ms, last_hit_at_ms
+                hit_count, created_at_ms, last_hit_at_ms, stream_frames
            FROM response_cache WHERE cache_key = ?`,
       ).get(cacheKey) as CacheRow | undefined;
     });
     if (row) {
+      let streamFrames: unknown[] | undefined;
+      if (row.stream_frames) {
+        try {
+          streamFrames = JSON.parse(row.stream_frames);
+        } catch {
+          streamFrames = undefined;
+        }
+      }
       entry = {
         body: JSON.parse(row.body),
         platform: row.platform,
@@ -351,6 +376,7 @@ export function getCachedResponse(cacheKey: string, now = Date.now()): CachedRes
         hitCount: row.hit_count,
         createdAtMs: row.created_at_ms,
         lastHitAtMs: row.last_hit_at_ms,
+        streamFrames,
       };
       store.set(cacheKey, entry);
     }
@@ -384,6 +410,7 @@ export function getCachedResponse(cacheKey: string, now = Date.now()): CachedRes
     keyId: entry.keyId,
     promptTokens: entry.promptTokens,
     completionTokens: entry.completionTokens,
+    streamFrames: entry.streamFrames,
   };
 }
 
@@ -402,6 +429,15 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
   } catch {
     return;
   }
+  // 流式条目：frames 也必须可序列化（命中时逐帧重放）。
+  let framesJson: string | null = null;
+  if (input.streamFrames) {
+    try {
+      framesJson = JSON.stringify(input.streamFrames);
+    } catch {
+      return;
+    }
+  }
 
   // Delete-then-set so an overwrite also refreshes recency order.
   store.delete(cacheKey);
@@ -415,6 +451,7 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
     hitCount: 0,
     createdAtMs: now,
     lastHitAtMs: null,
+    streamFrames: input.streamFrames,
   });
 
   // Persist (INSERT OR REPLACE keeps the schema row count bounded to the cap).
@@ -423,11 +460,11 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
     db.prepare(
       `INSERT OR REPLACE INTO response_cache
          (cache_key, body, platform, model_id, key_id, prompt_tokens, completion_tokens,
-          hit_count, created_at_ms, last_hit_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, NULL)`,
+          hit_count, created_at_ms, last_hit_at_ms, stream_frames)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, ?)`,
     ).run(
       cacheKey, bodyJson, input.platform, input.modelId,
-      input.keyId ?? null, input.promptTokens, input.completionTokens, now,
+      input.keyId ?? null, input.promptTokens, input.completionTokens, now, framesJson,
     );
     // Enforce the cap in SQLite too (delete least-recently-used beyond cap).
     const cap = cacheMaxEntries();
