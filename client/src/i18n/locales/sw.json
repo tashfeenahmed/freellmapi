@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Ukaguzi wa masasisho otomatiki",
     "autoUpdateCheckHelp": "Hukagua GitHub mara moja kwa siku kwa toleo jipya na kuonyesha ukumbusho. Imezimwa kwa chaguo-msingi.",
     "openReleases": "Fungua Matoleo ya GitHub",
-    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika."
+    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Mifano",

@@ -182,11 +182,11 @@ function normModel(model: string | undefined): string {
 
 export function computeCacheKey(input: CacheKeyInput): string {
   const canonical = stableStringify({
-    v: 3, // compression fingerprint joined the key
+    v: 4, // #892: explicit-but-default-valued sampling params dropped from key
     model: normModel(input.model),
     messages: input.messages,
     temperature: input.temperature,
-    top_p: input.top_p,
+    top_p: defaultableNumber(input.top_p, 1),
     max_tokens: input.max_tokens,
     // tools/tool_choice are part of the key so a request with a different tool
     // set never collides with (or is served) another's cached answer.
@@ -196,10 +196,10 @@ export function computeCacheKey(input: CacheKeyInput): string {
     // by stableStringify, so requests without them keep hashing identically.
     stop: input.stop,
     response_format: input.response_format,
-    n: input.n,
+    n: defaultableNumber(input.n, 1),
     seed: input.seed,
-    presence_penalty: input.presence_penalty,
-    frequency_penalty: input.frequency_penalty,
+    presence_penalty: defaultableNumber(input.presence_penalty, 0),
+    frequency_penalty: defaultableNumber(input.frequency_penalty, 0),
     logit_bias: input.logit_bias,
     logprobs: input.logprobs,
     top_logprobs: input.top_logprobs,
@@ -209,6 +209,20 @@ export function computeCacheKey(input: CacheKeyInput): string {
     compression: input.compression,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
+// defaultableNumber 把「显式传入但等于 API 默认值」的采样参数归一为
+// undefined（stableStringify 会丢弃），使「总是序列化完整参数」的客户端
+// 与「省略默认参数」的客户端命中同一缓存条目——这是 #892 提高命中率的
+// 核心：否则 top_p:1 / presence_penalty:0 / frequency_penalty:0 等显式
+// 默认值会让两个内容完全相同的请求哈希出不同的 key。
+// 非数字（如 null / 字符串 / 缺失）原样返回，保持既有行为。
+function defaultableNumber(value: unknown, defaultValue: number): unknown {
+  if (typeof value === 'number') {
+    if (value === defaultValue) return undefined;
+    return value;
+  }
+  return value;
 }
 
 // ── Store ──
@@ -248,6 +262,11 @@ interface CacheEntry {
 // at the end (delete + set), so eviction from the front drops the coldest entry.
 const store = new Map<string, CacheEntry>();
 
+// 运行期未命中计数（#892 hit-rate 指标）。miss = getCachedResponse 被调用但
+// 无有效条目（不存在或已过期）。与 store 中的 hitCount 累计互不影响；
+// 由于缓存默认关闭，只有缓存激活时的查询会计入。
+let totalMisses = 0;
+
 /**
  * Look up a cached completion. Returns null on a miss or when the entry has aged
  * past the TTL (expired entries are deleted lazily on read). A hit bumps the
@@ -255,10 +274,14 @@ const store = new Map<string, CacheEntry>();
  */
 export function getCachedResponse(cacheKey: string, now = Date.now()): CachedResponse | null {
   const entry = store.get(cacheKey);
-  if (!entry) return null;
+  if (!entry) {
+    totalMisses += 1;
+    return null;
+  }
 
   if (now - entry.createdAtMs > cacheTtlMs()) {
     store.delete(cacheKey);
+    totalMisses += 1;
     return null;
   }
 
@@ -322,6 +345,8 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
 export interface CacheStats {
   entries: number;
   totalHits: number;
+  misses: number; // 运行期未命中次数（#892 hit-rate 指标）
+  hitRate: number; // 0..1，hits/(hits+misses)；无查询时为 0
   savedPromptTokens: number;
   savedCompletionTokens: number;
 }
@@ -340,7 +365,15 @@ export function getCacheStats(): CacheStats {
     savedPromptTokens += entry.hitCount * entry.promptTokens;
     savedCompletionTokens += entry.hitCount * entry.completionTokens;
   }
-  return { entries: store.size, totalHits, savedPromptTokens, savedCompletionTokens };
+  const lookups = totalHits + totalMisses;
+  return {
+    entries: store.size,
+    totalHits,
+    misses: totalMisses,
+    hitRate: lookups > 0 ? totalHits / lookups : 0,
+    savedPromptTokens,
+    savedCompletionTokens,
+  };
 }
 
 /** Drop every cached entry. Returns the number removed. */

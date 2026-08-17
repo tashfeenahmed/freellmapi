@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Tự động kiểm tra cập nhật",
     "autoUpdateCheckHelp": "Kiểm tra GitHub mỗi ngày một lần để tìm bản phát hành mới và hiển thị lời nhắc. Mặc định tắt.",
     "openReleases": "Mở GitHub Releases",
-    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng."
+    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Người mẫu",

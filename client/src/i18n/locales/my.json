@@ -162,7 +162,14 @@
     "autoUpdateCheck": "အလိုအလျောက် အပ်ဒိတ်စစ်ဆေးမှု",
     "autoUpdateCheckHelp": "တစ်ရက်လျှင် တစ်ကြိမ် ဗားရှင်းအသစ်အတွက် GitHub ကို စစ်ဆေးပြီး သတိပေးချက် ပြသသည်။ မူရင်းအတိုင်း ပိတ်ထားသည်။",
     "openReleases": "GitHub Releases ကို ဖွင့်ရန်",
-    "restartAfterUpdate": "build ပြီးဆုံးပြီးနောက် FreeLLMAPI ကို ပြန်လည်စတင်ပါ။"
+    "restartAfterUpdate": "build ပြီးဆုံးပြီးနောက် FreeLLMAPI ကို ပြန်လည်စတင်ပါ။",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "မော်ဒယ်များ",

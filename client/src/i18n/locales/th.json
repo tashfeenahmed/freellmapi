@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ตรวจสอบการอัปเดตอัตโนมัติ",
     "autoUpdateCheckHelp": "ตรวจสอบ GitHub วันละครั้งว่ามีเวอร์ชันใหม่หรือไม่ และแสดงการแจ้งเตือน ปิดไว้ตามค่าเริ่มต้น",
     "openReleases": "เปิด GitHub Releases",
-    "restartAfterUpdate": "รีสตาร์ต FreeLLMAPI หลังจากบิลด์เสร็จสิ้น"
+    "restartAfterUpdate": "รีสตาร์ต FreeLLMAPI หลังจากบิลด์เสร็จสิ้น",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "โมเดล",

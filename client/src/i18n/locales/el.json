@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Αυτόματος έλεγχος ενημερώσεων",
     "autoUpdateCheckHelp": "Ελέγχει το GitHub μία φορά την ημέρα για νέα έκδοση και εμφανίζει υπενθύμιση. Απενεργοποιημένο από προεπιλογή.",
     "openReleases": "Άνοιγμα εκδόσεων GitHub",
-    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build."
+    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Μοντέλα",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automaattinen päivitystarkistus",
     "autoUpdateCheckHelp": "Tarkistaa GitHubista kerran päivässä, onko uutta julkaisua, ja näyttää muistutuksen. Oletuksena pois päältä.",
     "openReleases": "Avaa GitHub-julkaisut",
-    "restartAfterUpdate": "Käynnistä FreeLLMAPI uudelleen koonnin valmistuttua."
+    "restartAfterUpdate": "Käynnistä FreeLLMAPI uudelleen koonnin valmistuttua.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Mallit",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ସ୍ୱୟଂଚାଳିତ ଅପଡେଟ୍ ଯାଞ୍ଚ",
     "autoUpdateCheckHelp": "ଦିନକୁ ଥରେ ନୂଆ ରିଲିଜ୍ ପାଇଁ GitHub ଯାଞ୍ଚ କରେ ଏବଂ ଏକ ସ୍ମାରକ ଦେଖାଏ। ଡିଫଲ୍ଟ ଭାବେ ବନ୍ଦ।",
     "openReleases": "GitHub Releases ଖୋଲନ୍ତୁ",
-    "restartAfterUpdate": "ବିଲ୍ଡ ସମ୍ପୂର୍ଣ୍ଣ ହେବା ପରେ FreeLLMAPI ପୁନଃ ଚାଲୁ କରନ୍ତୁ।"
+    "restartAfterUpdate": "ବିଲ୍ଡ ସମ୍ପୂର୍ଣ୍ଣ ହେବା ପରେ FreeLLMAPI ପୁନଃ ଚାଲୁ କରନ୍ତୁ।",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "ମଡେଲଗୁଡିକ",

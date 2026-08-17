@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automatikus frissítésellenőrzés",
     "autoUpdateCheckHelp": "Naponta egyszer ellenőrzi a GitHubon az új kiadást, és emlékeztetőt jelenít meg. Alapértelmezés szerint kikapcsolva.",
     "openReleases": "GitHub-kiadások megnyitása",
-    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t."
+    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modellek",

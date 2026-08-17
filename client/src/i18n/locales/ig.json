@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Nyocha mmelite akpaaka",
     "autoUpdateCheckHelp": "Ọ na-enyocha GitHub otu ugboro n'ụbọchị maka ntọhapụ ọhụrụ ma gosi ncheta. A gbanyụrụ ya na ndabara.",
     "openReleases": "Mepee GitHub Releases",
-    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara."
+    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Ụdị",

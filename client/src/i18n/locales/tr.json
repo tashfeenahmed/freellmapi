@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Otomatik güncelleme denetimi",
     "autoUpdateCheckHelp": "Yeni bir sürüm için günde bir kez GitHub'ı denetler ve bir hatırlatma gösterir. Varsayılan olarak kapalıdır.",
     "openReleases": "GitHub Sürümlerini Aç",
-    "restartAfterUpdate": "Derleme tamamlandıktan sonra FreeLLMAPI'yi yeniden başlatın."
+    "restartAfterUpdate": "Derleme tamamlandıktan sonra FreeLLMAPI'yi yeniden başlatın.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modeller",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "സ്വയമേവയുള്ള അപ്ഡേറ്റ് പരിശോധന",
     "autoUpdateCheckHelp": "ദിവസത്തിൽ ഒരിക്കൽ പുതിയ റിലീസിനായി GitHub പരിശോധിച്ച് ഒരു ഓർമ്മപ്പെടുത്തൽ കാണിക്കുന്നു. സ്ഥിരസ്ഥിതിയായി ഓഫ് ആണ്.",
     "openReleases": "GitHub റിലീസുകൾ തുറക്കുക",
-    "restartAfterUpdate": "ബിൽഡ് പൂർത്തിയായ ശേഷം FreeLLMAPI പുനരാരംഭിക്കുക."
+    "restartAfterUpdate": "ബിൽഡ് പൂർത്തിയായ ശേഷം FreeLLMAPI പുനരാരംഭിക്കുക.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "മോഡലുകൾ",

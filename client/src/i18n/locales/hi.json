@@ -162,7 +162,14 @@
     "autoUpdateCheck": "स्वचालित अपडेट जाँच",
     "autoUpdateCheckHelp": "दिन में एक बार नई रिलीज़ के लिए GitHub की जाँच करता है और अनुस्मारक दिखाता है। डिफ़ॉल्ट रूप से बंद।",
     "openReleases": "GitHub रिलीज़ खोलें",
-    "restartAfterUpdate": "बिल्ड पूरा होने के बाद FreeLLMAPI को पुनः आरंभ करें।"
+    "restartAfterUpdate": "बिल्ड पूरा होने के बाद FreeLLMAPI को पुनः आरंभ करें।",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "मॉडल",

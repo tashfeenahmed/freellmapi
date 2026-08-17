@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ការពិនិត្យអាប់ដេតដោយស្វ័យប្រវត្តិ",
     "autoUpdateCheckHelp": "ពិនិត្យ GitHub ម្ដងក្នុងមួយថ្ងៃរកមើលការចេញផ្សាយថ្មី ហើយបង្ហាញការរំលឹក។ បិទតាមលំនាំដើម។",
     "openReleases": "បើក GitHub Releases",
-    "restartAfterUpdate": "ចាប់ផ្តើម FreeLLMAPI ឡើងវិញ បន្ទាប់ពីការបង្កើតបានបញ្ចប់។"
+    "restartAfterUpdate": "ចាប់ផ្តើម FreeLLMAPI ឡើងវិញ បន្ទាប់ពីការបង្កើតបានបញ្ចប់។",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "ម៉ូដែល",

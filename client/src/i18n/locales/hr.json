@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automatska provjera ažuriranja",
     "autoUpdateCheckHelp": "Jednom dnevno provjerava GitHub za novo izdanje i prikazuje podsjetnik. Prema zadanome isključeno.",
     "openReleases": "Otvori izdanja na GitHubu",
-    "restartAfterUpdate": "Ponovno pokrenite FreeLLMAPI nakon dovršetka izgradnje."
+    "restartAfterUpdate": "Ponovno pokrenite FreeLLMAPI nakon dovršetka izgradnje.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modeli",

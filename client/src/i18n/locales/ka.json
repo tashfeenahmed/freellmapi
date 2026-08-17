@@ -162,7 +162,14 @@
     "autoUpdateCheck": "განახლებების ავტომატური შემოწმება",
     "autoUpdateCheckHelp": "დღეში ერთხელ ამოწმებს GitHub-ს ახალი გამოშვებისთვის და აჩვენებს შეხსენებას. ნაგულისხმევად გამორთულია.",
     "openReleases": "GitHub-ის რელიზების გახსნა",
-    "restartAfterUpdate": "ბილდის დასრულების შემდეგ გადატვირთეთ FreeLLMAPI."
+    "restartAfterUpdate": "ბილდის დასრულების შემდეგ გადატვირთეთ FreeLLMAPI.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "მოდელები",
