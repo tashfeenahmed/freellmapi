@@ -48,3 +48,25 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as unknown as MediaQueryList
 }
+
+// @base-ui/react's Switch (and other pointer-based primitives) construct a
+// PointerEvent on click; jsdom doesn't ship one. Provide a minimal subclass of
+// MouseEvent so switch toggles work in tests.
+if (typeof window.PointerEvent === 'undefined') {
+  class PointerEventPolyfill extends MouseEvent {
+    pointerId: number
+    pointerType: string
+    isPrimary: boolean
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params)
+      this.pointerId = params.pointerId ?? 1
+      this.pointerType = params.pointerType ?? 'mouse'
+      this.isPrimary = params.isPrimary ?? true
+    }
+  }
+  Object.defineProperty(window, 'PointerEvent', {
+    value: PointerEventPolyfill,
+    writable: true,
+    configurable: true,
+  })
+}
