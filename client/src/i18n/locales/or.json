@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "ମପାଯାଇନଥିବା ମଡେଲଗୁଡ଼ିକୁ ଅନୁସନ୍ଧାନ କରନ୍ତୁ",
@@ -311,7 +313,7 @@
     "factor": "ସ୍କୋର x{factor}",
     "noCooldown": "କୌଣସି କୁଲଡାଉନ୍ ନାହିଁ",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} ସାମ୍ପ୍ରତିକ ତ୍ରୁଟି",
     "noRecentErrors": "କୌଣସି ସାମ୍ପ୍ରତିକ ତ୍ରୁଟି ନାହିଁ",
     "noKey": "କୌଣସି ଚାବି ନାହିଁ",

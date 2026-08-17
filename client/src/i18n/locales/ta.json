@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "அளவிடப்படாத மாதிரிகளை ஆராயுங்கள்",
@@ -311,7 +313,7 @@
     "factor": "மதிப்பெண் x{factor}",
     "noCooldown": "கூல்டவுன் இல்லை",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} சமீபத்திய பிழைகள்",
     "noRecentErrors": "சமீபத்திய பிழைகள் இல்லை",
     "noKey": "சாவி இல்லை",

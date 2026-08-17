@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Explorar modelos sem medições",
@@ -311,7 +313,7 @@
     "factor": "pontuação x{factor}",
     "noCooldown": "Sem tempo de recarga",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} erros recentes",
     "noRecentErrors": "Sem erros recentes",
     "noKey": "sem chave",

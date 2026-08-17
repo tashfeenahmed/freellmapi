@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "미측정 모델 탐색",
@@ -311,7 +313,7 @@
     "factor": "점수 x{factor}",
     "noCooldown": "쿨다운 없음",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} 최근 오류",
     "noRecentErrors": "최근 오류 없음",
     "noKey": "열쇠 없음",

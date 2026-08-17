@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "ស្វែងរកម៉ូដែលដែលមិនទាន់វាស់វែង",
@@ -311,7 +313,7 @@
     "factor": "ពិន្ទុ x{factor}",
     "noCooldown": "គ្មានពេលត្រឡប់មកវិញ",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count}",
     "noRecentErrors": "គ្មានកំហុសថ្មីៗ",
     "noKey": "គ្មានសោ",
