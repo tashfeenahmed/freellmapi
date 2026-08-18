@@ -14,7 +14,8 @@
     "switchToChinese": "ചൈനീസ് ഭാഷയിലേക്ക് മാറുക",
     "switchToEnglish": "ഇംഗ്ലീഷിലേക്ക് മാറുക",
     "modelsMenu": "മോഡൽ തരങ്ങൾ ബ്രൗസ് ചെയ്യുക",
-    "agents": "ഏജൻ്റുകൾ"
+    "agents": "ഏജൻ്റുകൾ",
+    "freeTier": "Free Tier"
   },
   "auth": {
     "createYourAccount": "നിങ്ങളുടെ അക്കൗണ്ട് സൃഷ്ടിക്കുക",
@@ -862,5 +863,27 @@
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss"
+  },
+  "freeTier": {
+    "title": "Free Tier",
+    "description": "Pool-deduped free-tier budgets across providers.",
+    "documentedMonthly": "Documented monthly tokens",
+    "documentedMonthlyHint": "One budget per pool — never summed across models sharing a pool.",
+    "pools": "Free-tier pools",
+    "creditsBased": "Credits-based",
+    "unpublished": "Unpublished",
+    "generatedAt": "Generated",
+    "liveQuotaHint": "Quota cells show the latest provider-reported observation.",
+    "pool": "Pool",
+    "platform": "Platform",
+    "models": "Models",
+    "budget": "Monthly budget",
+    "kind": "Kind",
+    "kindDocumented": "Documented",
+    "kindCredits": "Credits",
+    "kindUnpublished": "Unpublished",
+    "remaining": "Remaining",
+    "resetAt": "Resets at",
+    "empty": "No enabled models with free-tier budget data."
   }
 }
