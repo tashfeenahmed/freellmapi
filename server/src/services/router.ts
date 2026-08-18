@@ -18,6 +18,7 @@ import {
   BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
   reliabilityPosterior, expectedReliability, sampleBeta,
   speedScore, intelligenceScore, intelligenceComposite, headroomFactor, rateLimitFactor, combineScore,
+  timeOfDayWeights,
   observedSpeedRank, TIMEOUT_LATENCY_CAP_MS,
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS } from '../lib/error-classify.js';
@@ -512,7 +513,11 @@ export function setCommunityPriors(priors: CommunityPriorMap): number {
 function weightsFor(strategy: RoutingStrategy): RoutingWeights | null {
   if (strategy === 'priority') return null;
   if (strategy === 'custom') return getCustomWeights();
-  return BANDIT_PRESETS[strategy];
+  // Bandit presets get the time-of-day adjustment (#760): during local peak
+  // hours (18:00–06:00) free relays are congested, so speed weight is shifted
+  // onto reliability. priority/custom are the operator's explicit choice and
+  // are returned untouched.
+  return timeOfDayWeights(BANDIT_PRESETS[strategy]);
 }
 
 // ── Analytics stats cache (decay-weighted) ──────────────────────────────────

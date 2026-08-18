@@ -50,6 +50,35 @@ export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority' | 'custo
 // dashboard or PUT /api/fallback/routing.
 export const DEFAULT_STRATEGY: RoutingStrategy = 'balanced';
 
+// ── Time-of-day dynamic ranking (#760) ─────────────────────────────────────
+// Local peak hours (18:00–06:00): free relays are congested, so a model's raw
+// throughput is a weaker signal than its reliability. Shift part of the speed
+// weight onto reliability for bandit strategies; off-peak behaviour is
+// unchanged. Custom and priority strategies are the operator's explicit choice
+// and are never rewritten.
+export const PEAK_START_HOUR = 18;
+export const PEAK_END_HOUR = 6; // spans midnight: [18, 24) ∪ [0, 6)
+/** Fraction of the speed weight moved onto reliability during peak hours. */
+export const PEAK_SPEED_TO_RELIABILITY = 0.6;
+
+/** True when `now` (local time) falls inside the congested peak window. */
+export function isPeakHours(now = new Date()): boolean {
+  const h = now.getHours();
+  return h >= PEAK_START_HOUR || h < PEAK_END_HOUR;
+}
+
+/** Time-of-day adjusted weights: during peak hours move PEAK_SPEED_TO_RELIABILITY
+ *  of the speed weight onto reliability; otherwise return the base unchanged. */
+export function timeOfDayWeights(base: RoutingWeights, now = new Date()): RoutingWeights {
+  if (!isPeakHours(now)) return base;
+  const shift = base.speed * PEAK_SPEED_TO_RELIABILITY;
+  return {
+    reliability: base.reliability + shift,
+    speed: base.speed - shift,
+    intelligence: base.intelligence,
+  };
+}
+
 // ── Reliability ───────────────────────────────────────────────────────────
 // Beta(1,1) prior = uniform: an unseen model is genuinely uncertain, not assumed
 // good or bad. With decay-weighted pseudo-counts the alpha/beta are continuous.
