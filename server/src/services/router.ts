@@ -30,6 +30,7 @@ import { getActiveProfileId } from './profile-models.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
 import { modelStatsKey, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { getQuotaStateForKeys, type QuotaObservationView } from '../services/provider-quota.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
@@ -338,7 +339,7 @@ export const EXPLORE_CHANCE = 0.1;
 /** A model counts as "has data" once its decay-weighted success+failure
  *  pseudo-count reaches this many samples. */
 export const EXPLORE_MIN_SAMPLES = 5;
-const VALID_STRATEGIES: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'];
+const VALID_STRATEGIES: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom', 'quota-weighted'];
 
 export function getRoutingStrategy(): RoutingStrategy {
   const raw = getSetting(STRATEGY_KEY);
@@ -512,6 +513,7 @@ export function setCommunityPriors(priors: CommunityPriorMap): number {
 function weightsFor(strategy: RoutingStrategy): RoutingWeights | null {
   if (strategy === 'priority') return null;
   if (strategy === 'custom') return getCustomWeights();
+  if (strategy === 'quota-weighted') return null; // Special handling - computed dynamically
   return BANDIT_PRESETS[strategy];
 }
 
@@ -1115,6 +1117,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   if (keys.length === 0) {
     diag?.push(`${label}: no usable key — ${allKeys.length} key(s) scoped to other models`);
     return null;
+  }
+
+  // #919: least-remaining quota weighted selection. Divert to the dedicated
+  // walk whenever the operator picks this strategy so keys are ordered by how
+  // close each is to exhausting its observed quota (most-used first), keeping
+  // parallel keys draining evenly instead of hammering the roomiest one.
+  if (getRoutingStrategy() === 'quota-weighted') {
+    return selectKeyByQuotaWeight(entry, keys, estimatedTokens, skipKeys, diag, provider);
   }
 
   // Tally the gate that rejected each key, so the exhaustion diagnostic can say
@@ -1790,4 +1800,103 @@ export function hasEnabledVisionModel(): boolean {
 export function hasEnabledToolsModel(): boolean {
   const db = getDb();
   return getActiveChain(db).some(entry => entry.enabled === 1 && entry.supports_tools === 1);
+}
+
+// Select key based on remaining quota weight (least-remaining quota gets higher priority)
+// Implements issue #919: least-remaining quota weighted key selection strategy
+function selectKeyByQuotaWeight(
+  entry: ChainRow,
+  keys: KeyRow[],
+  estimatedTokens: number,
+  skipKeys: Set<string> | undefined,
+  diag: string[] | undefined,
+  provider: BaseProvider
+): RouteResult | null {
+  const db = getDb();
+  const label = `${entry.platform}/${entry.model_id}`;
+
+  // Least-remaining quota weighted selection (#919): prefer the key whose
+  // observed quota is closest to exhaustion so parallel providers drain evenly
+  // instead of hammering the one with the most head-room until it 429s. We rank
+  // by the ratio remaining/limit (most-used first); keys with no observation
+  // data sort last and only get picked when every observed key is gated out.
+  const quotas = getQuotaStateForKeys();
+  const byKey = new Map<number, QuotaObservationView[]>();
+  for (const q of quotas) {
+    if (q.platform !== entry.platform) continue;
+    const arr = byKey.get(q.keyId) ?? [];
+    arr.push(q);
+    byKey.set(q.keyId, arr);
+  }
+
+  const usage = (key: KeyRow): number | null => {
+    const obs = byKey.get(key.id);
+    if (!obs || obs.length === 0) return null;
+    let worst = 0;
+    for (const o of obs) {
+      // Only trust fresh, confident observations.
+      if (o.confidence < 0.7) continue;
+      if (o.limit == null || o.remaining == null || o.limit <= 0) continue;
+      const ratio = 1 - Math.max(0, o.remaining) / o.limit; // 0=full, 1=exhausted
+      if (ratio > worst) worst = ratio;
+    }
+    return worst;
+  };
+
+  // Score-ordered by usage (most-exhausted first); unknown-data keys last.
+  const rankedKeys = [...keys].sort((a, b) => (usage(b) ?? -1) - (usage(a) ?? -1));
+
+  const limits = {
+    rpm: entry.rpm_limit,
+    rpd: entry.rpd_limit,
+    tpm: entry.tpm_limit,
+    tpd: entry.tpd_limit,
+  };
+
+  // Mirror the gate walk of selectKeyForModel, but over the quota-ordered list.
+  for (const key of rankedKeys) {
+    const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
+    if (skipKeys?.has(skipId)) { diag?.push('already-failed-this-request'); continue; }
+    if (isOnCooldown(entry.platform, entry.model_id, key.id)) { diag?.push('cooldown'); continue; }
+    if (!canUseProvider(entry.platform, key.id)) { diag?.push('provider-daily-cap'); continue; }
+    if (!canUseProviderMinute(entry.platform, key.id)) { diag?.push('provider-minute-cap'); continue; }
+    if (!canUseKeyConcurrency(entry.platform, key.id)) { diag?.push('key-concurrency'); continue; }
+    if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { diag?.push('rpm/rpd-limit'); continue; }
+    if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { diag?.push('tpm/tpd-limit'); continue; }
+    if (!canUseProviderTokens(entry.platform, key.id, entry.model_id, estimatedTokens)) { diag?.push('provider-daily-token-cap'); continue; }
+
+    let decryptedKey: string;
+    try {
+      decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
+    } catch {
+      db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
+        .run(key.id);
+      diag?.push('decrypt-error');
+      continue;
+    }
+
+    const resolvedProvider = entry.platform === 'custom'
+      ? resolveProvider('custom', key.base_url)
+      : provider;
+    if (!resolvedProvider) { diag?.push('no-resolved-provider'); continue; }
+
+    const leaseId = acquireLease(entry.platform, entry.model_id, key.id, estimatedTokens);
+    return {
+      provider: resolvedProvider,
+      modelId: entry.model_id,
+      modelDbId: entry.model_db_id,
+      apiKey: decryptedKey,
+      keyId: key.id,
+      proxyUrl: decryptProxyUrl(key),
+      platform: entry.platform,
+      displayName: entry.display_name,
+      endpointScope: entry.endpoint_scope ?? '',
+      rpdLimit: limits.rpd,
+      tpdLimit: limits.tpd,
+      release: () => releaseLease(leaseId),
+    };
+  }
+
+  diag?.push(`${label}: no usable key under quota-weighted strategy`);
+  return null;
 }
