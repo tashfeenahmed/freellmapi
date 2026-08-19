@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Kadar terhad — tiada bajet token bulanan tetap",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Jangan gabungkan salinan ini",
     "splitOutHint": "Berikan salinan pembekal ini entri berasingan sendiri dan bukannya menggabungkannya ke dalam model bersatu. Anda boleh menggabungkannya kembali dari halaman salinan itu sendiri.",
     "splitUndo": "Gabung kembali",

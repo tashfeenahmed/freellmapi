@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Обмежений тариф — без фіксованого щомісячного бюджету токенів",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Не об’єднуйте цю копію",
     "splitOutHint": "Надайте копії цього постачальника окремий запис замість того, щоб об’єднати її в уніфіковану модель. Ви можете об’єднати його назад із власної сторінки копії.",
     "splitUndo": "Об'єднати назад",

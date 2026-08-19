@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Rate-limited — walang fixed na buwanang token budget",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Huwag pagsamahin ang kopyang ito",
     "splitOutHint": "Bigyan ang kopya ng provider na ito ng sarili nitong hiwalay na entry sa halip na isama ito sa pinag-isang modelo. Maaari mo itong muling isama mula sa sariling pahina ng kopya.",
     "splitUndo": "Pagsamahin muli",

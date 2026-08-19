@@ -280,6 +280,54 @@ export function groupQuotaBadge(
   return null
 }
 
+// ── Remaining time-window quota (#876) ───────────────────────────────────────
+// Server-reported per-model RPM/RPD/TPM usage, served by
+// GET /api/fallback/rate-limit-usage (busiest usable key per model).
+
+export interface RateLimitWindow {
+  used: number
+  limit: number
+}
+
+export interface RateLimitUsageRow {
+  modelDbId: number
+  platform: string
+  modelId: string
+  rpm: RateLimitWindow | null
+  rpd: RateLimitWindow | null
+  tpm: RateLimitWindow | null
+}
+
+export interface RateLimitUsageData {
+  generatedAtMs: number
+  rows: RateLimitUsageRow[]
+}
+
+export type RateLimitKind = 'RPM' | 'RPD' | 'TPM'
+
+// The member whose busiest window has the highest used/limit ratio — the
+// constraint that would reject the next request for this logical model.
+export function tightestRateLimit(
+  rows: RateLimitUsageRow[],
+): { kind: RateLimitKind; used: number; limit: number } | null {
+  let best: { kind: RateLimitKind; used: number; limit: number } | null = null
+  let bestRatio = 0
+  for (const row of rows) {
+    const windows: { kind: RateLimitKind; used: number; limit: number }[] = []
+    if (row.rpm) windows.push({ kind: 'RPM', ...row.rpm })
+    if (row.rpd) windows.push({ kind: 'RPD', ...row.rpd })
+    if (row.tpm) windows.push({ kind: 'TPM', ...row.tpm })
+    for (const w of windows) {
+      const ratio = w.limit > 0 ? w.used / w.limit : 0
+      if (ratio > bestRatio) {
+        bestRatio = ratio
+        best = w
+      }
+    }
+  }
+  return best
+}
+
 export const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',

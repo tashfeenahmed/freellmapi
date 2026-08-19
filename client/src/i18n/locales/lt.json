@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Tarifų ribojimas — nėra fiksuoto mėnesinio žetonų biudžeto",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Nejunkite šios kopijos",
     "splitOutHint": "Suteikite šio teikėjo kopijai atskirą įrašą, užuot sujungę ją į vieningą modelį. Galite sujungti jį atgal iš pačios kopijos puslapio.",
     "splitUndo": "Sujungti atgal",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Cheklangan tarif - oylik token byudjeti yo'q",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Bu nusxani birlashtirmang",
     "splitOutHint": "Ushbu provayderning nusxasini birlashtirilgan modelga birlashtirish o'rniga o'zining alohida yozuvini bering. Siz uni nusxaning shaxsiy sahifasidan birlashtira olasiz.",
     "splitUndo": "Orqaga birlashing",

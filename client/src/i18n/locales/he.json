@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ריבית מוגבלת — אין תקציב טוקנים חודשי קבוע",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "אל תמזג את העותק הזה",
     "splitOutHint": "תן לעותק של ספק זה רשומה נפרדת משלו במקום למזג אותו למודל המאוחד. אפשר למזג אותו בחזרה מהעמוד של העותק.",
     "splitUndo": "מזג בחזרה",

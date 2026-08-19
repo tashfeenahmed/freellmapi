@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ದರ-ಸೀಮಿತ — ಸ್ಥಿರ ಮಾಸಿಕ ಟೋಕನ್ ಬಜೆಟ್ ಇಲ್ಲ",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ಈ ಪ್ರತಿಯನ್ನು ವಿಲೀನಗೊಳಿಸಬೇಡಿ",
     "splitOutHint": "ಈ ಪೂರೈಕೆದಾರರ ನಕಲನ್ನು ಏಕೀಕೃತ ಮಾದರಿಯಲ್ಲಿ ವಿಲೀನಗೊಳಿಸುವ ಬದಲು ತನ್ನದೇ ಆದ ಪ್ರತ್ಯೇಕ ನಮೂದನ್ನು ನೀಡಿ. ನೀವು ಅದನ್ನು ನಕಲಿನ ಸ್ವಂತ ಪುಟದಿಂದ ಮತ್ತೆ ವಿಲೀನಗೊಳಿಸಬಹುದು.",
     "splitUndo": "ಮತ್ತೆ ವಿಲೀನಗೊಳಿಸಿ",

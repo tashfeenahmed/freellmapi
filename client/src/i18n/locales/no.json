@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Rentebegrenset — ingen fast månedlig tokenbudsjett",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Ikke slå sammen denne kopien",
     "splitOutHint": "Gi denne leverandørens kopi sin egen separate oppføring i stedet for å slå den sammen til den enhetlige modellen. Du kan flette den tilbake fra kopiens egen side.",
     "splitUndo": "Slå sammen tilbake",

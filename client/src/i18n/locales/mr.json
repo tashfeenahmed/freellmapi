@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "दर-मर्यादित — कोणतेही निश्चित मासिक टोकन बजेट नाही",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ही प्रत एकत्र करू नका",
     "splitOutHint": "या प्रदात्याची प्रत युनिफाइड मॉडेलमध्ये विलीन करण्याऐवजी त्याची स्वतःची स्वतंत्र नोंद द्या. तुम्ही कॉपीच्या स्वतःच्या पृष्ठावरून ते परत विलीन करू शकता.",
     "splitUndo": "परत विलीन करा",

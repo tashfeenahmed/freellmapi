@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "விகிதம் வரையறுக்கப்பட்ட - நிலையான மாதாந்திர டோக்கன் பட்ஜெட் இல்லை",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "இந்த நகலை ஒன்றிணைக்க வேண்டாம்",
     "splitOutHint": "இந்த வழங்குநரின் நகலை ஒருங்கிணைக்கப்பட்ட மாதிரியுடன் இணைப்பதற்குப் பதிலாக அதன் சொந்த தனி உள்ளீட்டைக் கொடுங்கள். நகலின் சொந்தப் பக்கத்திலிருந்து நீங்கள் அதை மீண்டும் இணைக்கலாம்.",
     "splitUndo": "மீண்டும் ஒன்றிணைக்கவும்",

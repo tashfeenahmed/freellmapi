@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Ограничено по ставке — нет фиксированного ежемесячного бюджета токенов",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Не объединять эту копию",
     "splitOutHint": "Сделайте копию этого провайдера отдельной записью вместо того, чтобы объединять ее в единую модель. Вы можете объединить его обратно с собственной страницы копии.",
     "splitUndo": "Объединить обратно",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Tariefbeperkt — geen vast maandelijks tokenbudget",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Voeg deze kopie niet samen",
     "splitOutHint": "Geef de kopie van deze provider een eigen afzonderlijke vermelding in plaats van deze samen te voegen in het uniforme model. U kunt het weer samenvoegen vanaf de eigen pagina van de kopie.",
     "splitUndo": "Terug samenvoegen",

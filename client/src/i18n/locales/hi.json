@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "दर-सीमित - कोई निश्चित मासिक टोकन बजट नहीं",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "इस प्रति को मर्ज न करें",
     "splitOutHint": "इस प्रदाता की प्रति को एकीकृत मॉडल में विलय करने के बजाय उसकी अपनी अलग प्रविष्टि दें। आप इसे कॉपी के अपने पेज से वापस मर्ज कर सकते हैं।",
     "splitUndo": "वापस विलय",

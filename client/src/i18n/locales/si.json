@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ගාස්තු-සීමිත - ස්ථාවර මාසික ටෝකන් අයවැයක් නැත",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "මෙම පිටපත ඒකාබද්ධ නොකරන්න",
     "splitOutHint": "මෙම සැපයුම්කරුගේ පිටපත ඒකාබද්ධ ආකෘතියට ඒකාබද්ධ කිරීම වෙනුවට එහි වෙනම ප්‍රවේශයක් ලබා දෙන්න. ඔබට එය පිටපතෙහිම පිටුවෙන් නැවත ඒකාබද්ධ කළ හැක.",
     "splitUndo": "නැවත ඒකාබද්ධ කරන්න",

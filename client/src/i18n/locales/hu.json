@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Díjkorlátos — nincs fix havi token költségvetés",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Ne egyesítse ezt a példányt",
     "splitOutHint": "Adjon külön bejegyzést ennek a szolgáltatónak a másolatának ahelyett, hogy az egyesített modellbe egyesítené. A másolat saját oldaláról visszaolvaszthatja.",
     "splitUndo": "Egyesítse vissza",

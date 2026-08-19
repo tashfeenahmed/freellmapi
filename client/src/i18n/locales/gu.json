@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "દર-મર્યાદિત — કોઈ નિશ્ચિત માસિક ટોકન બજેટ નથી",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "આ નકલને મર્જ કરશો નહીં",
     "splitOutHint": "આ પ્રદાતાની નકલને એકીકૃત મોડેલમાં મર્જ કરવાને બદલે તેની પોતાની અલગ એન્ટ્રી આપો. તમે તેને નકલના પોતાના પૃષ્ઠ પરથી પાછું મર્જ કરી શકો છો.",
     "splitUndo": "પાછા મર્જ કરો",

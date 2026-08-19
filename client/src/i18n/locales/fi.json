@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Maksurajoitettu — ei kiinteää kuukausittaista token-budjettia",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Älä yhdistä tätä kopiota",
     "splitOutHint": "Anna tämän palveluntarjoajan kopiolle oma erillinen merkintä sen sijaan, että yhdistäisit sen yhtenäiseen malliin. Voit yhdistää sen takaisin kopion omalta sivulta.",
     "splitUndo": "Yhdistä takaisin",

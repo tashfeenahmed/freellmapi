@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "កំណត់អត្រា — មិនមានថវិកាតូខិនប្រចាំខែថេរ",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "កុំបញ្ចូលច្បាប់ចម្លងនេះ។",
     "splitOutHint": "ផ្តល់ឱ្យអ្នកផ្តល់សេវានេះចម្លងធាតុដាច់ដោយឡែករបស់វាជំនួសឱ្យការបញ្ចូលវាទៅក្នុងគំរូបង្រួបបង្រួម។ អ្នកអាចបញ្ចូលវាមកវិញពីទំព័រផ្ទាល់ខ្លួនរបស់ច្បាប់ចម្លង។",
     "splitUndo": "បញ្ចូលគ្នាត្រឡប់មកវិញ",
