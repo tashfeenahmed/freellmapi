@@ -1629,7 +1629,10 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   // Sticky session / Explicit pinning: move preferred model to front of chain
   if (preferredModelDbId) {
     const idx = sortedChain.findIndex(e => e.model_db_id === preferredModelDbId);
+    let preferredModelIdForSiblings: string | null = null;
+
     if (idx >= 0) {
+      preferredModelIdForSiblings = sortedChain[idx].model_id;
       if (idx > 0) {
         const [preferred] = sortedChain.splice(idx, 1);
         sortedChain.unshift(preferred);
@@ -1647,9 +1650,34 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
         FROM models m
         WHERE m.id = ? AND m.enabled = 1
       `).get(preferredModelDbId) as ChainRow | undefined;
-      
+
       if (pinnedRow) {
+        preferredModelIdForSiblings = pinnedRow.model_id;
         sortedChain.unshift(pinnedRow);
+      }
+    }
+
+    // Same-model cross-provider fallback (request-scoped, does not touch the
+    // global routing strategy or active profile): when the client pinned an
+    // explicit model_id that is ALSO served by other enabled providers (a
+    // literal model_id collision across platforms — e.g. two catalog rows
+    // both named "gpt-oss-120b"), cluster those sibling rows immediately
+    // behind the pinned one, ahead of the rest of the chain. sortedChain is
+    // already ordered by the active strategy, so pulling siblings out in
+    // place preserves their existing best-first relative order among
+    // themselves. If the pinned model has no siblings (the common case — most
+    // providers mint their own model ids), this is a no-op and behavior is
+    // unchanged from before. Only kicks in for requests that explicitly named
+    // a model; "auto"/sticky routing is untouched.
+    if (preferredModelIdForSiblings) {
+      const siblingIdxs: number[] = [];
+      for (let i = 1; i < sortedChain.length; i++) {
+        if (sortedChain[i].model_id === preferredModelIdForSiblings) siblingIdxs.push(i);
+      }
+      if (siblingIdxs.length > 0) {
+        const siblings = siblingIdxs.map(i => sortedChain[i]);
+        for (let k = siblingIdxs.length - 1; k >= 0; k--) sortedChain.splice(siblingIdxs[k], 1);
+        sortedChain.splice(1, 0, ...siblings);
       }
     }
   }
