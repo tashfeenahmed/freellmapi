@@ -1955,11 +1955,23 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
 
             if (anyChunk.id) lastMeta = { id: anyChunk.id, model: anyChunk.model, created: anyChunk.created };
 
+            // Capture usage from ANY frame that carries it — a dedicated
+            // usage-only frame OR usage attached to a content frame in a
+            // non-final position. In both cases the estimate below must NOT
+            // fire on top of a real block. The held frame is re-emitted after
+            // our finish chunk with an empty choices array, so a
+            // content-attached usage frame never duplicates content.
+            if (anyChunk.usage) usageChunk = { ...anyChunk, choices: [] };
+
             const choice = anyChunk.choices?.[0];
             if (!choice) {
               // Usage-only frame (stream_options.include_usage) — held and
               // re-emitted after our finish chunk to preserve OpenAI ordering.
-              if (anyChunk.usage) usageChunk = anyChunk;
+              // Captured unconditionally (not gated on include_usage) because
+              // (a) an extra usage frame is harmless to OpenAI-compatible
+              // clients and (b) this preserves existing behaviour for the
+              // many providers that DO echo usage.  Our injection below only
+              // fires when the upstream NEVER echoes one AND the client asked.
               continue;
             }
 
@@ -2134,7 +2146,41 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             ? 'tool_calls'
             : (upstreamFinish && upstreamFinish !== 'tool_calls' ? upstreamFinish : 'stop');
           writeChunk(mkChunk({}, finish));
-          if (usageChunk) writeChunk(usageChunk);
+          if (usageChunk) {
+            writeChunk(usageChunk);
+          } else if (parsed.data.stream_options?.include_usage) {
+            // Some OpenAI-compatible upstreams (e.g. OpenCode Zen) never echo
+            // a final usage frame even when stream_options.include_usage is
+            // requested. Strict clients (Hermes, Cline, Continue) treat a
+            // missing usage block as "no accounting happened" and skip
+            // per-call token/cost/billing_provider writes entirely. Inject the
+            // proxy's own estimate (same values the non-stream path already
+            // reports via the `?? estimatedInputTokens` fallback above) so
+            // streaming clients still receive a usage block.
+            //
+            // NOTE: this frame is an ESTIMATE, not the upstream's final
+            // accounting. The OpenAI wire format has no standard flag for
+            // estimated usage, and adding a custom field here could break
+            // strict clients that reject unknown usage keys — the very
+            // clients this injection exists for. Consumers doing cost
+            // accounting should treat a usage frame on a usage-less upstream
+            // as approximate (token counts are length/4 heuristics, matching
+            // the proxy's non-streaming estimate path).
+            const promptTokens = estimatedInputTokens + injectedHandoffTokens;
+            const completionTokens = totalOutputTokens;
+            writeChunk({
+              id: lastMeta.id ?? `chatcmpl-${Date.now()}`,
+              object: 'chat.completion.chunk',
+              created: lastMeta.created ?? Math.floor(Date.now() / 1000),
+              model: lastMeta.model ?? route.modelId,
+              choices: [],
+              usage: {
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: promptTokens + completionTokens,
+              },
+            });
+          }
           res.write('data: [DONE]\n\n');
           res.end();
 
