@@ -93,6 +93,8 @@ export const PREFIX_MAP: Record<string, string> = {
   XFYUN_: 'xfyun',
   SPARK_: 'xfyun',
   IFLYTEK_: 'xfyun',
+  AMD_: 'amd',
+  LEMONADE_: 'amd',
 };
 
 export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
@@ -128,6 +130,9 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   'any-api': 'anyapi',
   qianfan: 'qianfan',
   baidu: 'qianfan',
+  amd: 'amd',
+  lemonade: 'amd',
+  'lemonade-server': 'amd',
   ernie: 'qianfan',
   volcengine: 'volcengine',
   volc: 'volcengine',
