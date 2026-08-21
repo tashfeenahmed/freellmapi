@@ -1348,6 +1348,30 @@ function getModelChainRow(db: Db, modelDbId: number): ChainRow | undefined {
 }
 
 /**
+ * Safety margin applied when matching an estimated request size against a
+ * model's declared context window. The estimate is a chars/4 heuristic that
+ * under-counts dense payloads (JSON, code, CJK) by up to ~2x; without a margin
+ * those requests were routed to models whose real tokenizer count exceeded the
+ * window and the provider rejected them with a 400 mid-chain (kilo: "maximum
+ * context length is 262144 tokens" on requests estimated <=256000).
+ */
+export const CONTEXT_WINDOW_SAFETY_FACTOR = 1.25;
+
+// Platforms whose pre-dispatch trim guard already caps the dispatched input
+// below the live context ceiling (lib/content.ts truncateMessagesForGithub):
+// the guard — not the routing estimate — is what guarantees the fit there, so
+// applying the factor too would only make that guard unreachable.
+const TRIM_GUARDED_PLATFORMS = new Set(['github']);
+
+/** True when `estimatedTokens` plausibly fits `contextWindow` (null window =
+ * unknown, never filtered — same convention as the auto-router). */
+export function fitsContextWindow(platform: string, contextWindow: number | null | undefined, estimatedTokens: number): boolean {
+  if (contextWindow == null) return true;
+  if (TRIM_GUARDED_PLATFORMS.has(platform)) return estimatedTokens <= contextWindow;
+  return estimatedTokens * CONTEXT_WINDOW_SAFETY_FACTOR <= contextWindow;
+}
+
+/**
  * Route to ONE specific model, hard-pinned. Rotates across that model's keys
  * (cooldowns, quotas, decryption all honored) but NEVER substitutes a different
  * model — returns null if the pinned model can't serve right now. This is what
@@ -1359,7 +1383,7 @@ export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skip
   const db = getDb();
   const entry = getModelChainRow(db, modelDbId);
   if (!entry) return null;
-  if (entry.context_window != null && estimatedTokens > entry.context_window) return null;
+  if (!fitsContextWindow(entry.platform, entry.context_window, estimatedTokens)) return null;
   if (entry.tpm_limit != null && estimatedTokens > entry.tpm_limit) return null;
   return selectKeyForModel(entry, estimatedTokens, skipKeys);
 }
@@ -1482,7 +1506,7 @@ export function getOrderedFusionChain(estimatedTokens: number): FusionCandidate[
   const servable = chain.filter(e => {
     // A null context_window means "unknown", not "zero": same convention the
     // auto-router uses, so an unspecified window is never itself a reason to skip.
-    if (e.context_window != null && estimatedTokens > e.context_window) return false;
+    if (!fitsContextWindow(e.platform, e.context_window, estimatedTokens)) return false;
     const keyIds = keysByPlatform.get(e.platform);
     if (!keyIds) return false;
     // Same endpoint-pool rule the router applies (#619).
@@ -1612,7 +1636,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       if (requireVision && !e.supports_vision) return false;
       if (requireTools && !e.supports_tools) return false;
       if (requireStructured && platformDropsResponseFormat(e.platform)) return false;
-      if (e.context_window != null && estimatedTokens > e.context_window) return false;
+      if (!fitsContextWindow(e.platform, e.context_window, estimatedTokens)) return false;
       if (e.tpm_limit != null && estimatedTokens > e.tpm_limit) return false;
       return true;
     });
@@ -1704,7 +1728,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // fast-path, not the only guard. If every model is too small, the loop falls
     // through and the caller gets the normal "all models exhausted" error rather
     // than a wasted sweep.
-    if (entry.context_window != null && estimatedTokens > entry.context_window) { diag.push(`${label}: context ${entry.context_window} < estimated ${estimatedTokens}`); continue; }
+    if (!fitsContextWindow(entry.platform, entry.context_window, estimatedTokens)) { diag.push(`${label}: context ${entry.context_window} < estimated ${estimatedTokens} (x${CONTEXT_WINDOW_SAFETY_FACTOR} margin)`); continue; }
 
     // Same guard for a model with a small per-minute token budget: a request
     // whose input alone exceeds tpm_limit can never fit one minute of quota and

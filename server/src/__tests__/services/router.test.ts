@@ -172,6 +172,31 @@ describe('Router', () => {
     expect(routeRequest(9000).modelDbId).toBe(groq.id);
   });
 
+  it('applies the context-window safety margin on platforms without a trim guard', () => {
+    const db = getDb();
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'groq', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    const groq = db.prepare(`
+      SELECT id FROM models
+       WHERE platform = 'groq' AND context_window = 131072
+       LIMIT 1
+    `).get() as { id: number };
+
+    db.prepare('UPDATE fallback_config SET priority = 1000, enabled = 1').run();
+    db.prepare('UPDATE fallback_config SET priority = 1 WHERE model_db_id = ?').run(groq.id);
+    db.prepare('UPDATE models SET tpm_limit = NULL, tpd_limit = NULL WHERE id = ?').run(groq.id);
+
+    // CONTEXT_WINDOW_SAFETY_FACTOR: the chars/4 estimate under-counts dense
+    // payloads (JSON, code), so the effective ceiling is window / 1.25.
+    // 131072 / 1.25 = 104857.6 — just under still routes, just over does not.
+    expect(routeRequest(104000).modelDbId).toBe(groq.id);
+    expect(() => routeRequest(106000)).toThrow();
+  });
+
   it('still routes a model with an unknown (null) context window (#167)', () => {
     const db = getDb();
     const groqKey = encrypt('test-groq-key');
