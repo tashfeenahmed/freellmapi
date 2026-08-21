@@ -202,17 +202,13 @@ export function RowContent({
               no translation, and the catalog's own wording ("~10-20M") is kept
               instead of a computed total, which would state a range's high end
               as if it were fact. */}
-          <Tooltip text={t('models.limitTableHint')}>
-            <span className="cursor-help">
-              {[
-                (row.monthlyTokenBudgetTokens ?? 0) > 0
-                  ? t('models.tokPerMonth', { count: row.monthlyTokenBudget }) + (row.keyCount > 1 ? ` × ${row.keyCount}` : '')
-                  : null,
-                row.rpmLimit ? t('models.rpmLimit', { count: row.rpmLimit }) : null,
-                row.rpdLimit ? t('models.rpdLimit', { count: row.rpdLimit }) : null,
-              ].filter(Boolean).join(' · ') || cleanQuotaLabel(row.monthlyTokenBudget) || '—'}
-            </span>
-          </Tooltip>
+          {[
+            (row.monthlyTokenBudgetTokens ?? 0) > 0
+              ? t('models.tokPerMonth', { count: row.monthlyTokenBudget }) + (row.keyCount > 1 ? ` × ${row.keyCount}` : '')
+              : null,
+            row.rpmLimit ? t('models.rpmLimit', { count: row.rpmLimit }) : null,
+            row.rpdLimit ? t('models.rpdLimit', { count: row.rpdLimit }) : null,
+          ].filter(Boolean).join(' · ') || cleanQuotaLabel(row.monthlyTokenBudget) || '—'}
         </div>
       </td>
       {/* Reliability/speed are measured axes: with zero recorded requests the
