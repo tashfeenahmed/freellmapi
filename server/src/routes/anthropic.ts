@@ -25,7 +25,7 @@ import { routedViaValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { resolveAnthropicModel, claudeFamilyDiscoveryEntries } from '../services/anthropic-map.js';
 import type { ReasoningEffort } from '../lib/sampling-params.js';
-import { buildModelListing } from '../services/model-listing.js';
+import { buildModelListing, buildModelVersion, buildVirtualModelVersion, MODEL_CREATED_AT } from '../services/model-listing.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 
@@ -372,10 +372,6 @@ function estimateTokens(messages: ChatMessage[]): number {
 // services/anthropic-map.ts so the dashboard mapping editor and this route
 // share one source of truth. Claude Code keeps its built-in `claude-*` names;
 // by default every family maps to "auto" (the router picks a free model).
-
-// A stable created_at for the Anthropic /v1/models entries; clients only use it
-// for display ordering, so a constant avoids needless churn.
-const MODEL_CREATED_AT = '2026-01-01T00:00:00Z';
 
 // ── Response translation: internal → Anthropic ──────────────────────────────
 function mapStopReason(finishReason: string | null | undefined, hadToolCalls: boolean): AnthropicStopReason {
@@ -1026,6 +1022,9 @@ anthropicRouter.post('/messages/count_tokens', (req: Request, res: Response) => 
 // CLAUDE_FAMILY_ALIASES for why, and note /messages already routed those ids
 // long before they were listed here.
 //
+// Each entry carries a `model_versions` singleton so Claude Desktop's Model
+// Discovery recognises the gateway models (issue #880).
+//
 // Optional `claude/<real-id>` aliases let Claude Code's gateway picker discover
 // the full catalog; /messages strips the synthetic prefix before routing.
 anthropicRouter.get('/models', (req: Request, res: Response, next: NextFunction) => {
@@ -1035,8 +1034,12 @@ anthropicRouter.get('/models', (req: Request, res: Response, next: NextFunction)
   const { models } = buildModelListing();
   const available = models.filter(m => m.available === 1);
   const aliasesEnabled = getSetting('expose_cc_discovery_aliases') === '1';
+  // "auto" can serve whatever the available pool can — advertise the union of
+  // capabilities so Claude Desktop's discovery sees vision/tool support.
+  const autoSupportsVision = available.some(m => m.supportsVision);
+  const autoSupportsTools = available.some(m => m.supportsTools);
   const data = [
-    { type: 'model' as const, id: 'auto', display_name: 'Auto (router picks the best available model)', created_at: MODEL_CREATED_AT },
+    { type: 'model' as const, id: 'auto', display_name: 'Auto (router picks the best available model)', created_at: MODEL_CREATED_AT, model_versions: [buildVirtualModelVersion('auto', 'Auto (router picks the best available model)', autoSupportsVision, autoSupportsTools)] },
     // Only when something can actually serve them: advertising a Sonnet slot
     // backed by an empty pool would trade "0 models" for a model that 503s.
     ...(available.length > 0
@@ -1045,15 +1048,17 @@ anthropicRouter.get('/models', (req: Request, res: Response, next: NextFunction)
         id: a.id,
         display_name: a.displayName,
         created_at: MODEL_CREATED_AT,
+        model_versions: [buildVirtualModelVersion(a.id, a.displayName, autoSupportsVision, autoSupportsTools)],
       }))
       : []),
-    ...available.map(m => ({ type: 'model' as const, id: m.id, display_name: m.name, created_at: MODEL_CREATED_AT })),
+    ...available.map(m => ({ type: 'model' as const, id: m.id, display_name: m.name, created_at: MODEL_CREATED_AT, model_versions: [buildModelVersion(m)] })),
     ...(aliasesEnabled
       ? available.map(m => ({
         type: 'model' as const,
         id: `claude/${m.id}`,
         display_name: `${m.name} (Claude Code)`,
         created_at: MODEL_CREATED_AT,
+        model_versions: [buildModelVersion(m)],
       }))
       : []),
   ];
