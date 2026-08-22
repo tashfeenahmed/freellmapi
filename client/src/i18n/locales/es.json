@@ -904,7 +904,8 @@
     "manualLabel": "Conexión manual",
     "manualHint": "URL base y clave para introducir en los ajustes de la herramienta.",
     "endpoint": "Endpoint",
-    "documentation": "Documentación"
+    "documentation": "Documentación",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

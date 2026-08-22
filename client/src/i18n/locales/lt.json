@@ -904,7 +904,8 @@
     "manualLabel": "Rankinis prijungimas",
     "manualHint": "Bazinis URL ir raktas, kuriuos reikia įvesti paties įrankio nustatymuose.",
     "endpoint": "Galinis taškas",
-    "documentation": "Dokumentacija"
+    "documentation": "Dokumentacija",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

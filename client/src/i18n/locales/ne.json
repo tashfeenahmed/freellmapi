@@ -904,7 +904,8 @@
     "manualLabel": "म्यानुअल जडान",
     "manualHint": "उपकरणकै सेटिङमा राख्न बेस URL र कुञ्जी।",
     "endpoint": "एन्डपोइन्ट",
-    "documentation": "दस्तावेज"
+    "documentation": "दस्तावेज",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

@@ -904,7 +904,8 @@
     "manualLabel": "Kézi csatlakozás",
     "manualHint": "Alap-URL és kulcs az eszköz saját beállításaihoz.",
     "endpoint": "Végpont",
-    "documentation": "Dokumentáció"
+    "documentation": "Dokumentáció",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

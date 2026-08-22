@@ -904,7 +904,8 @@
     "manualLabel": "Ruční připojení",
     "manualHint": "Základní URL a klíč k zadání do vlastního nastavení nástroje.",
     "endpoint": "Endpoint",
-    "documentation": "Dokumentace"
+    "documentation": "Dokumentace",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

@@ -904,7 +904,8 @@
     "manualLabel": "دستی کنکشن",
     "manualHint": "ٹول کی اپنی سیٹنگز میں درج کرنے کے لیے بیس URL اور کلید۔",
     "endpoint": "اینڈ پوائنٹ",
-    "documentation": "دستاویزات"
+    "documentation": "دستاویزات",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

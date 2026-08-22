@@ -904,7 +904,8 @@
     "manualLabel": "ការតភ្ជាប់ដោយដៃ",
     "manualHint": "URL មូលដ្ឋាន និងកូនសោសម្រាប់បញ្ចូលក្នុងការកំណត់របស់ឧបករណ៍។",
     "endpoint": "ចំណុចបញ្ចប់",
-    "documentation": "ឯកសារ"
+    "documentation": "ឯកសារ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

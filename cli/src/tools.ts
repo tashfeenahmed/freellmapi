@@ -49,6 +49,11 @@ function yamlString(value: string): string {
   return JSON.stringify(value);
 }
 
+function tomlString(value: string): string {
+  // TOML basic strings use the same escaping as JSON strings.
+  return JSON.stringify(value);
+}
+
 function claude(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   const directory = ctx.profile === 'default'
@@ -461,20 +466,73 @@ function generic(ctx: GenerateContext): Generation {
   };
 }
 
+// AtomCode (#799): Rust terminal coding agent. TOML config at
+// ~/.atomcode/config.toml (or per-project .atomcode/); `base_url` + `api_key`
+// point at the unified /v1 endpoint.
+function atomcode(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models);
+  return {
+    files: [{
+      path: path.join(ctx.homeDir, '.atomcode', 'config.toml'),
+      format: 'toml',
+      sensitive: true,
+      content: [
+        '# freellmapi:start',
+        `base_url = ${tomlString(v1Url(ctx.url))}`,
+        `api_key = ${tomlString(ctx.apiKey)}`,
+        `model = ${tomlString(model.id)}`,
+        '# freellmapi:end',
+        '',
+      ].join('\n'),
+    }],
+    notes: [
+      `Environment-only alternative: ATOMCODE_API_KEY=${ctx.apiKey || '<unified-key>'} ATOMCODE_BASE_URL=${v1Url(ctx.url)} atomcode --model ${model.id}`,
+    ],
+  };
+}
+
+// MiMo Code (#800): Xiaomi's terminal agent, Claude Code compatible. JSON
+// config under ~/.mimocode/ (or MIMOCODE_CONFIG); provider options accept
+// apiKey + baseURL.
+function mimo(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models);
+  return {
+    files: [{
+      path: path.join(ctx.homeDir, '.mimocode', 'config.json'),
+      format: 'json',
+      sensitive: true,
+      value: {
+        provider: {
+          freellmapi: {
+            apiKey: ctx.apiKey,
+            baseURL: v1Url(ctx.url),
+          },
+        },
+        model: model.id,
+      },
+    }],
+    notes: [
+      `Environment-only alternative: MIMOCODE_API_KEY=${ctx.apiKey || '<unified-key>'} MIMOCODE_BASE_URL=${v1Url(ctx.url)} mimocode --model ${model.id}`,
+    ],
+  };
+}
+
 const metadata = [
-  ['claude', 'Claude Code', 'code', 'file', 'Anthropic Messages', 'root', 'setup-claude', 'https://docs.anthropic.com/en/docs/claude-code', claude],
-  ['codex', 'Codex CLI', 'code', 'file', 'OpenAI Responses', '/v1', 'setup-codex', 'https://developers.openai.com/codex', codex],
-  ['cline', 'Cline', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-cline', 'https://docs.cline.bot', cline],
-  ['continue', 'Continue', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-continue', 'https://docs.continue.dev', continueDev],
-  ['aider', 'Aider', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-aider', 'https://aider.chat/docs', aider],
-  ['opencode', 'OpenCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-opencode', 'https://opencode.ai/docs', opencode],
-  ['goose', 'Goose', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-goose', 'https://block.github.io/goose', goose],
-  ['qwen', 'Qwen Code', 'code', 'file', 'OpenAI or Gemini', '/v1', 'setup-qwen', 'https://qwenlm.github.io/qwen-code-docs', qwen],
-  ['roo', 'Roo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-roo', 'https://docs.roocode.com', roo],
-  ['kilo', 'Kilo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-kilo', 'https://kilocode.ai/docs', kilo],
-  ['crush', 'Crush', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-crush', 'https://github.com/charmbracelet/crush', crush],
-  ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
-  ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
+  ['claude', 'Claude Code', 'code', 'file', 'Anthropic Messages', 'root', 'setup-claude', 'https://docs.anthropic.com/en/docs/claude-code', "Anthropic's terminal coding agent; a good default choice.", claude],
+  ['codex', 'Codex CLI', 'code', 'file', 'OpenAI Responses', '/v1', 'setup-codex', 'https://developers.openai.com/codex', "OpenAI's CLI coding agent.", codex],
+  ['cline', 'Cline', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-cline', 'https://docs.cline.bot', 'VS Code extension that turns your editor into an AI pair programmer.', cline],
+  ['continue', 'Continue', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-continue', 'https://docs.continue.dev', 'Open-source autopilot for VS Code and JetBrains.', continueDev],
+  ['aider', 'Aider', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-aider', 'https://aider.chat/docs', 'Terminal pair-programming agent for git repos.', aider],
+  ['opencode', 'OpenCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-opencode', 'https://opencode.ai/docs', 'Open-source terminal AI coding agent.', opencode],
+  ['atomcode', 'AtomCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-atomcode', 'https://atomcode.atomgit.com/docs/zh/', 'Open-source terminal AI coding agent (Rust).', atomcode],
+  ['mimo', 'MiMo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-mimo', 'https://mimo.xiaomi.com/zh/mimocode', "Xiaomi's terminal coding agent (Claude Code compatible).", mimo],
+  ['goose', 'Goose', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-goose', 'https://block.github.io/goose', "Block's open-source coding agent for desktop and CLI.", goose],
+  ['qwen', 'Qwen Code', 'code', 'file', 'OpenAI or Gemini', '/v1', 'setup-qwen', 'https://qwenlm.github.io/qwen-code-docs', 'Alibaba\'s terminal coding agent (Qwen models).', qwen],
+  ['roo', 'Roo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-roo', 'https://docs.roocode.com', 'VS Code extension that turns your editor into an AI pair programmer.', roo],
+  ['kilo', 'Kilo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-kilo', 'https://kilocode.ai/docs', 'VS Code extension that turns your editor into an AI pair programmer.', kilo],
+  ['crush', 'Crush', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-crush', 'https://github.com/charmbracelet/crush', 'VS Code extension that turns your editor into an AI pair programmer.', crush],
+  ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', 'AI-first code editor.', cursor],
+  ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', 'Any OpenAI-compatible client.', generic],
 ] as const;
 
 export const tools: ToolDefinition[] = metadata.map(([
@@ -486,10 +544,12 @@ export const tools: ToolDefinition[] = metadata.map(([
   baseUrlSupport,
   command,
   docsUrl,
+  description,
   generate,
 ]) => ({
   id,
   name,
+  description,
   category,
   configType,
   protocol,

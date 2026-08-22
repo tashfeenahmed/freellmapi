@@ -904,7 +904,8 @@
     "manualLabel": "Haɗi da hannu",
     "manualHint": "Babban URL da maɓalli don shigarwa cikin saitunan kayan aikin.",
     "endpoint": "Endpoint",
-    "documentation": "Takardun bayani"
+    "documentation": "Takardun bayani",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

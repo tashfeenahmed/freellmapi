@@ -574,7 +574,8 @@
     "manualLabel": "Manual connection",
     "manualHint": "Base URL and key to enter in the tool's own settings.",
     "endpoint": "Endpoint",
-    "documentation": "Documentation"
+    "documentation": "Documentation",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "analytics": {
     "title": "Analytics",

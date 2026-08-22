@@ -904,7 +904,8 @@
     "manualLabel": "Ručno povezivanje",
     "manualHint": "Osnovni URL i ključ za unos u postavke samog alata.",
     "endpoint": "Krajnja točka",
-    "documentation": "Dokumentacija"
+    "documentation": "Dokumentacija",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

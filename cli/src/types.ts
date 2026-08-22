@@ -33,6 +33,10 @@ export interface Generation {
 export interface ToolDefinition {
   id: string;
   name: string;
+  // Plain-language one-liner shown on the Agents page card so a new user can
+  // tell the tools apart without having heard of them. Locale-independent by
+  // design, like the copied setup snippets.
+  description: string;
   category: 'code' | 'agent';
   configType: 'env' | 'file' | 'guide';
   protocol: string;

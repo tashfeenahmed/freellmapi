@@ -904,7 +904,8 @@
     "manualLabel": "חיבור ידני",
     "manualHint": "כתובת URL בסיסית ומפתח להזנה בהגדרות של הכלי עצמו.",
     "endpoint": "נקודת קצה",
-    "documentation": "תיעוד"
+    "documentation": "תיעוד",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

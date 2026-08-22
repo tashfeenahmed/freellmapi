@@ -904,7 +904,8 @@
     "manualLabel": "മാനുവൽ കണക്ഷൻ",
     "manualHint": "ഉപകരണത്തിന്റെ സ്വന്തം ക്രമീകരണങ്ങളിൽ നൽകാനുള്ള ബേസ് URL ഉം കീയും.",
     "endpoint": "എൻഡ്‌പോയിൻ്റ്",
-    "documentation": "ഡോക്യുമെൻ്റേഷൻ"
+    "documentation": "ഡോക്യുമെൻ്റേഷൻ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

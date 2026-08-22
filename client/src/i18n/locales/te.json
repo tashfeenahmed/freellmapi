@@ -904,7 +904,8 @@
     "manualLabel": "మాన్యువల్ కనెక్షన్",
     "manualHint": "సాధనం సొంత సెట్టింగ్‌లలో నమోదు చేయడానికి బేస్ URL మరియు కీ.",
     "endpoint": "ఎండ్‌పాయింట్",
-    "documentation": "డాక్యుమెంటేషన్"
+    "documentation": "డాక్యుమెంటేషన్",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

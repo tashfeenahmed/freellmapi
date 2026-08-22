@@ -904,7 +904,8 @@
     "manualLabel": "Manuaalinen yhteys",
     "manualHint": "Perus-URL ja avain työkalun omiin asetuksiin.",
     "endpoint": "Päätepiste",
-    "documentation": "Dokumentaatio"
+    "documentation": "Dokumentaatio",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

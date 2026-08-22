@@ -904,7 +904,8 @@
     "manualLabel": "ਦਸਤੀ ਕਨੈਕਸ਼ਨ",
     "manualHint": "ਟੂਲ ਦੀਆਂ ਆਪਣੀਆਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਭਰਨ ਲਈ ਬੇਸ URL ਅਤੇ ਕੁੰਜੀ।",
     "endpoint": "ਐਂਡਪੁਆਇੰਟ",
-    "documentation": "ਦਸਤਾਵੇਜ਼"
+    "documentation": "ਦਸਤਾਵੇਜ਼",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

@@ -904,7 +904,8 @@
     "manualLabel": "ম্যানুয়াল সংযোগ",
     "manualHint": "টুলের নিজস্ব সেটিংসে দেওয়ার জন্য বেস URL এবং কী।",
     "endpoint": "এন্ডপয়েন্ট",
-    "documentation": "ডকুমেন্টেশন"
+    "documentation": "ডকুমেন্টেশন",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

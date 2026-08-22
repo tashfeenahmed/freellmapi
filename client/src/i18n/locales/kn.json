@@ -904,7 +904,8 @@
     "manualLabel": "ಹಸ್ತಚಾಲಿತ ಸಂಪರ್ಕ",
     "manualHint": "ಸಾಧನದ ಸ್ವಂತ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ನಮೂದಿಸಲು ಬೇಸ್ URL ಮತ್ತು ಕೀ.",
     "endpoint": "ಅಂತಿಮ ಬಿಂದು",
-    "documentation": "ದಾಖಲಾತಿ"
+    "documentation": "ದಾಖಲಾತಿ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

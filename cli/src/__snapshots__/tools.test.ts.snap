@@ -21,6 +21,27 @@ model: "openai/fast-coder"
 }
 `;
 
+exports[`tool generators > setup-atomcode has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "content": "# freellmapi:start
+base_url = "http://localhost:3000/v1"
+api_key = "freellmapi-test-key"
+model = "fast-coder"
+# freellmapi:end
+",
+      "format": "toml",
+      "path": "/home/tester/.atomcode/config.toml",
+      "sensitive": true,
+    },
+  ],
+  "notes": [
+    "Environment-only alternative: ATOMCODE_API_KEY=freellmapi-test-key ATOMCODE_BASE_URL=http://localhost:3000/v1 atomcode --model fast-coder",
+  ],
+}
+`;
+
 exports[`tool generators > setup-claude has stable golden output 1`] = `
 {
   "files": [
@@ -337,6 +358,30 @@ exports[`tool generators > setup-kilo has stable golden output 1`] = `
   ],
   "notes": [
     "Export FREELLMAPI_API_KEY before starting Kilo; global config is trusted for {env:…} expansion.",
+  ],
+}
+`;
+
+exports[`tool generators > setup-mimo has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "format": "json",
+      "path": "/home/tester/.mimocode/config.json",
+      "sensitive": true,
+      "value": {
+        "model": "fast-coder",
+        "provider": {
+          "freellmapi": {
+            "apiKey": "freellmapi-test-key",
+            "baseURL": "http://localhost:3000/v1",
+          },
+        },
+      },
+    },
+  ],
+  "notes": [
+    "Environment-only alternative: MIMOCODE_API_KEY=freellmapi-test-key MIMOCODE_BASE_URL=http://localhost:3000/v1 mimocode --model fast-coder",
   ],
 }
 `;

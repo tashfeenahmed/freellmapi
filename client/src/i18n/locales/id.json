@@ -904,7 +904,8 @@
     "manualLabel": "Koneksi manual",
     "manualHint": "URL dasar dan kunci untuk dimasukkan ke pengaturan alat itu sendiri.",
     "endpoint": "Titik akhir",
-    "documentation": "Dokumentasi"
+    "documentation": "Dokumentasi",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

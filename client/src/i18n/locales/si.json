@@ -904,7 +904,8 @@
     "manualLabel": "අතින් සම්බන්ධ කිරීම",
     "manualHint": "මෙවලමේම සැකසුම් තුළ ඇතුළත් කිරීමට මූලික URL සහ යතුර.",
     "endpoint": "අන්ත ලක්ෂ්‍යය",
-    "documentation": "ලේඛන"
+    "documentation": "ලේඛන",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

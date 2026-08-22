@@ -904,7 +904,8 @@
     "manualLabel": "Qo'lda ulanish",
     "manualHint": "Vositaning o'z sozlamalariga kiritish uchun asosiy URL va kalit.",
     "endpoint": "So'nggi nuqta",
-    "documentation": "Hujjatlar"
+    "documentation": "Hujjatlar",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

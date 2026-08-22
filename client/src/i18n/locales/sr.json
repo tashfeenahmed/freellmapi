@@ -904,7 +904,8 @@
     "manualLabel": "Ручно повезивање",
     "manualHint": "Основни URL и кључ за унос у сопствена подешавања алата.",
     "endpoint": "Крајња тачка",
-    "documentation": "Документација"
+    "documentation": "Документација",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

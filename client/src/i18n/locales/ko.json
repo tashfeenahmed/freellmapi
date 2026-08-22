@@ -904,7 +904,8 @@
     "manualLabel": "수동 연결",
     "manualHint": "도구 자체 설정에 입력할 기본 URL과 키입니다.",
     "endpoint": "엔드포인트",
-    "documentation": "문서"
+    "documentation": "문서",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

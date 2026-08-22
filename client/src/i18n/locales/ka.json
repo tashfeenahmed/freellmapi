@@ -904,7 +904,8 @@
     "manualLabel": "ხელით დაკავშირება",
     "manualHint": "საბაზისო URL და გასაღები ხელსაწყოს საკუთარ პარამეტრებში შესატანად.",
     "endpoint": "საბოლოო წერტილი",
-    "documentation": "დოკუმენტაცია"
+    "documentation": "დოკუმენტაცია",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

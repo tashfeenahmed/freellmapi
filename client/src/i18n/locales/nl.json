@@ -904,7 +904,8 @@
     "manualLabel": "Handmatige verbinding",
     "manualHint": "Basis-URL en sleutel om in de eigen instellingen van de tool in te vullen.",
     "endpoint": "Endpoint",
-    "documentation": "Documentatie"
+    "documentation": "Documentatie",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

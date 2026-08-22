@@ -904,7 +904,8 @@
     "manualLabel": "Ìsopọ̀ àfọwọ́ṣe",
     "manualHint": "URL ìpìlẹ̀ àti kọ́kọ́rọ́ láti tẹ̀ sínú ètò irinṣẹ́ náà.",
     "endpoint": "Ebute",
-    "documentation": "Iwe akọsilẹ"
+    "documentation": "Iwe akọsilẹ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

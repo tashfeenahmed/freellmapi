@@ -904,7 +904,8 @@
     "manualLabel": "Manwal na koneksyon",
     "manualHint": "Base URL at key na ilalagay sa sariling settings ng tool.",
     "endpoint": "Endpoint",
-    "documentation": "Dokumentasyon"
+    "documentation": "Dokumentasyon",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

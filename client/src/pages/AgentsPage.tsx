@@ -87,12 +87,13 @@ export default function AgentsPage() {
       <section className="mb-6 rounded-3xl border bg-card p-5">
         <h2 className="text-sm font-medium">{t('agents.quickstartTitle')}</h2>
         <p className="mt-0.5 max-w-prose text-xs text-muted-foreground">{t('agents.quickstart')}</p>
+        <p className="mt-1 max-w-prose text-xs text-muted-foreground">{t('agents.quickstartHint')}</p>
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
           <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs">
-            npx freellmapi setup-claude --url {origin}
+            npx freellmapi {toolCatalog[0].command} --url {origin}
           </code>
           <CopyButton
-            text={`npx freellmapi setup-claude --url ${origin}`}
+            text={`npx freellmapi ${toolCatalog[0].command} --url ${origin}`}
             className="size-7 shrink-0"
             label={t('common.copy')}
           />
@@ -118,7 +119,7 @@ export default function AgentsPage() {
                 <AgentIcon id={tool.id} name={tool.name} className="mb-1.5" />
                 <CardTitle>{tool.name}</CardTitle>
                 <CardDescription className="text-xs">
-                  {tool.protocol} · {tool.baseUrlSupport}
+                  {tool.description ?? `${tool.protocol} · ${tool.baseUrlSupport}`}
                 </CardDescription>
                 <CardAction>
                   {traffic && (

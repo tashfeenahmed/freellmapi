@@ -904,7 +904,8 @@
     "manualLabel": "Ръчна връзка",
     "manualHint": "Базов URL и ключ за въвеждане в настройките на самия инструмент.",
     "endpoint": "Крайна точка",
-    "documentation": "Документация"
+    "documentation": "Документация",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

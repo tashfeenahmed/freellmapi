@@ -904,7 +904,8 @@
     "manualLabel": "Manuell anslutning",
     "manualHint": "Bas-URL och nyckel att ange i verktygets egna inställningar.",
     "endpoint": "Slutpunkt",
-    "documentation": "Dokumentation"
+    "documentation": "Dokumentation",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

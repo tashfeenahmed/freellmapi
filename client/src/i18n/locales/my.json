@@ -904,7 +904,8 @@
     "manualLabel": "လက်ဖြင့် ချိတ်ဆက်ခြင်း",
     "manualHint": "ကိရိယာ၏ ကိုယ်ပိုင်ဆက်တင်များတွင် ထည့်ရန် အခြေခံ URL နှင့် သော့။",
     "endpoint": "Endpoint",
-    "documentation": "စာရွက်စာတမ်းများ"
+    "documentation": "စာရွက်စာတမ်းများ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

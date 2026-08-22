@@ -904,7 +904,8 @@
     "manualLabel": "मैन्युअल कनेक्शन",
     "manualHint": "टूल की अपनी सेटिंग्स में डालने के लिए बेस URL और कुंजी।",
     "endpoint": "समापन बिंदु",
-    "documentation": "दस्तावेज़ीकरण"
+    "documentation": "दस्तावेज़ीकरण",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

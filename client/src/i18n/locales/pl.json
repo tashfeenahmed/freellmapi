@@ -904,7 +904,8 @@
     "manualLabel": "Połączenie ręczne",
     "manualHint": "Bazowy adres URL i klucz do wpisania w ustawieniach samego narzędzia.",
     "endpoint": "Punkt końcowy",
-    "documentation": "Dokumentacja"
+    "documentation": "Dokumentacja",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

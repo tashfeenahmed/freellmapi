@@ -904,7 +904,8 @@
     "manualLabel": "Χειροκίνητη σύνδεση",
     "manualHint": "Βασικό URL και κλειδί για καταχώριση στις ρυθμίσεις του ίδιου του εργαλείου.",
     "endpoint": "Τελικό σημείο",
-    "documentation": "Τεκμηρίωση"
+    "documentation": "Τεκμηρίωση",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

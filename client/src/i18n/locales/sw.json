@@ -904,7 +904,8 @@
     "manualLabel": "Muunganisho wa mikono",
     "manualHint": "URL msingi na ufunguo wa kuweka katika mipangilio ya zana yenyewe.",
     "endpoint": "Kituo cha mwisho",
-    "documentation": "Nyaraka"
+    "documentation": "Nyaraka",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

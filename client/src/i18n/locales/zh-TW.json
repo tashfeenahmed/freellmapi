@@ -904,7 +904,8 @@
     "manualLabel": "手動連線",
     "manualHint": "在該工具的設定中輸入基礎 URL 和金鑰。",
     "endpoint": "端點",
-    "documentation": "文件"
+    "documentation": "文件",
+    "quickstartHint": "或在下方任选一个智能体——每张卡片都带有它自己的一键配置命令。"
   },
   "update": {
     "available": "发现新版本",

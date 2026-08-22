@@ -904,7 +904,8 @@
     "manualLabel": "ମାନୁଆଲ ସଂଯୋଗ",
     "manualHint": "ଟୁଲର ନିଜ ସେଟିଂସରେ ଦେବା ପାଇଁ ବେସ୍ URL ଏବଂ କୀ।",
     "endpoint": "ଏଣ୍ଡପଏଣ୍ଟ",
-    "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍"
+    "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

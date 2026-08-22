@@ -904,7 +904,8 @@
     "manualLabel": "મેન્યુઅલ કનેક્શન",
     "manualHint": "ટૂલની પોતાની સેટિંગ્સમાં દાખલ કરવા માટે બેઝ URL અને કી.",
     "endpoint": "એન્ડપોઇન્ટ",
-    "documentation": "દસ્તાવેજીકરણ"
+    "documentation": "દસ્તાવેજીકરણ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

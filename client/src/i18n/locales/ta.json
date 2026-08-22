@@ -904,7 +904,8 @@
     "manualLabel": "கைமுறை இணைப்பு",
     "manualHint": "கருவியின் சொந்த அமைப்புகளில் உள்ளிட வேண்டிய அடிப்படை URL மற்றும் விசை.",
     "endpoint": "எண்ட்பாயிண்ட்",
-    "documentation": "ஆவணங்கள்"
+    "documentation": "ஆவணங்கள்",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

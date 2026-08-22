@@ -904,7 +904,8 @@
     "manualLabel": "اتصال دستی",
     "manualHint": "نشانی پایه و کلید برای وارد کردن در تنظیمات خودِ ابزار.",
     "endpoint": "نقطه پایانی",
-    "documentation": "مستندات"
+    "documentation": "مستندات",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

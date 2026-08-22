@@ -904,7 +904,8 @@
     "manualLabel": "Əl ilə qoşulma",
     "manualHint": "Alətin öz parametrlərinə daxil ediləcək əsas URL və açar.",
     "endpoint": "Endpoint",
-    "documentation": "Sənədlər"
+    "documentation": "Sənədlər",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

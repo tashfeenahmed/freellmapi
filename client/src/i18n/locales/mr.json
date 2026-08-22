@@ -904,7 +904,8 @@
     "manualLabel": "मॅन्युअल कनेक्शन",
     "manualHint": "साधनाच्या स्वतःच्या सेटिंग्जमध्ये टाकण्यासाठी बेस URL आणि की.",
     "endpoint": "एंडपॉइंट",
-    "documentation": "दस्तऐवजीकरण"
+    "documentation": "दस्तऐवजीकरण",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

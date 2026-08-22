@@ -205,6 +205,14 @@ const brands: Record<string, Brand> = {
   crush: {
     tint: '[--mk:#6B50FF] dark:[--mk:#6B50FF]',
   },
+  // No vector mark exists — lettermark fallback tinted with the brand colour
+  // (a Rust-orange for AtomCode, a Xiaomi-orange for MiMo Code).
+  atomcode: {
+    tint: '[--mk:#FF6600] dark:[--mk:#FF6600]',
+  },
+  mimo: {
+    tint: '[--mk:#FF6900] dark:[--mk:#FF6900]',
+  },
   // Any other OpenAI-compatible client: our own terminal glyph, not a brand
   // mark, so it keeps the page foreground colour on both tiles.
   generic: {

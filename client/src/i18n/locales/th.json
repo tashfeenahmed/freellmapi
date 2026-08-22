@@ -904,7 +904,8 @@
     "manualLabel": "เชื่อมต่อด้วยตนเอง",
     "manualHint": "Base URL และคีย์สำหรับกรอกในการตั้งค่าของเครื่องมือเอง",
     "endpoint": "เอนด์พอยต์",
-    "documentation": "เอกสารประกอบ"
+    "documentation": "เอกสารประกอบ",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

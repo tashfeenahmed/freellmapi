@@ -904,7 +904,8 @@
     "manualLabel": "Conexiune manuală",
     "manualHint": "URL de bază și cheia de introdus în setările instrumentului.",
     "endpoint": "Endpoint",
-    "documentation": "Documentație"
+    "documentation": "Documentație",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

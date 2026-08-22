@@ -904,7 +904,8 @@
     "manualLabel": "Njikọ aka",
     "manualHint": "Isi URL na igodo ị ga-etinye na ntọala nke ngwá ọrụ ahụ.",
     "endpoint": "Njedebe",
-    "documentation": "Akwụkwọ ntuziaka"
+    "documentation": "Akwụkwọ ntuziaka",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

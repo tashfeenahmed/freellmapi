@@ -904,7 +904,8 @@
     "manualLabel": "اتصال يدوي",
     "manualHint": "عنوان URL الأساسي والمفتاح لإدخالهما في إعدادات الأداة نفسها.",
     "endpoint": "نقطة النهاية",
-    "documentation": "التوثيق"
+    "documentation": "التوثيق",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

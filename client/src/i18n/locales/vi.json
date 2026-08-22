@@ -904,7 +904,8 @@
     "manualLabel": "Kết nối thủ công",
     "manualHint": "URL cơ sở và khóa để nhập vào cài đặt của chính công cụ.",
     "endpoint": "Điểm cuối",
-    "documentation": "Tài liệu"
+    "documentation": "Tài liệu",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

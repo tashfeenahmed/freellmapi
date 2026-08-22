@@ -904,7 +904,8 @@
     "manualLabel": "Ручне підключення",
     "manualHint": "Базовий URL і ключ для введення в налаштуваннях самого інструмента.",
     "endpoint": "Кінцева точка",
-    "documentation": "Документація"
+    "documentation": "Документація",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

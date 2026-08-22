@@ -904,7 +904,8 @@
     "manualLabel": "Manuel bağlantı",
     "manualHint": "Aracın kendi ayarlarına girilecek temel URL ve anahtar.",
     "endpoint": "Uç nokta",
-    "documentation": "Dokümantasyon"
+    "documentation": "Dokümantasyon",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

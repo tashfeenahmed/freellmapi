@@ -904,7 +904,8 @@
     "manualLabel": "በእጅ መገናኘት",
     "manualHint": "በመሣሪያው ራሱ ቅንብሮች ውስጥ የሚገባ የመሠረት URL እና ቁልፍ።",
     "endpoint": "የመዳረሻ ነጥብ",
-    "documentation": "ሰነዶች"
+    "documentation": "ሰነዶች",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",

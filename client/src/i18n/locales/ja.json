@@ -904,7 +904,8 @@
     "manualLabel": "手動接続",
     "manualHint": "ツール自身の設定に入力するベース URL とキーです。",
     "endpoint": "エンドポイント",
-    "documentation": "ドキュメント"
+    "documentation": "ドキュメント",
+    "quickstartHint": "Or pick any agent below — each card shows its own one-line setup command."
   },
   "update": {
     "available": "New version available",
