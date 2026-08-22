@@ -211,18 +211,27 @@ describe('bandit router', () => {
   });
 
   it('getRoutingScores returns a per-axis breakdown ranked by score', () => {
-    addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
-    addHistory('google', 'm1', { successes: 30, failures: 0, outTokens: 500, latencyMs: 1000, ttfbMs: 200 });
-    setRoutingStrategy('balanced');
-    refreshStatsCache(getDb(), true);
-    const { strategy, weights, scores } = getRoutingScores();
-    expect(strategy).toBe('balanced');
-    expect(weights).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
-    expect(scores).toHaveLength(1);
-    expect(scores[0]).toMatchObject({ modelId: 'm1', enabled: true });
-    expect(scores[0].reliability).toBeGreaterThan(0.9);
-    expect(scores[0].score).toBeGreaterThan(0);
-    expect(scores[0].score).toBeLessThanOrEqual(1);
+    // The time-of-day adjustment (#760) rewrites bandit weights during local
+    // peak hours (18:00–06:00), so pin the clock to off-peak noon to make the
+    // balanced-preset assertion deterministic regardless of when CI runs.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-15T12:00:00'));
+    try {
+      addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+      addHistory('google', 'm1', { successes: 30, failures: 0, outTokens: 500, latencyMs: 1000, ttfbMs: 200 });
+      setRoutingStrategy('balanced');
+      refreshStatsCache(getDb(), true);
+      const { strategy, weights, scores } = getRoutingScores();
+      expect(strategy).toBe('balanced');
+      expect(weights).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+      expect(scores).toHaveLength(1);
+      expect(scores[0]).toMatchObject({ modelId: 'm1', enabled: true });
+      expect(scores[0].reliability).toBeGreaterThan(0.9);
+      expect(scores[0].score).toBeGreaterThan(0);
+      expect(scores[0].score).toBeLessThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('exploration toggle persists and defaults to off', () => {
