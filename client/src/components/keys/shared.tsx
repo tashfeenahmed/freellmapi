@@ -56,6 +56,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'nara', label: 'NaraRouter (free key)', url: 'https://router.bynara.id' },
   { value: 'sealion', label: 'SEA-LION (free key)', url: 'https://sea-lion.ai' },
   { value: 'orcarouter', label: 'OrcaRouter (free key)', url: 'https://www.orcarouter.ai' },
+  { value: 'unorouter', label: 'UnoRouter (free key)', url: 'https://unorouter.com' },
   // AnyAPI advertises 100K tokens/day free, but live testing on 2026-08-10
   // could not get a single free-tier request served (see
   // CATALOG-ANYAPI-SMOKE-2026-08-10 in the ops repo). No quota claim until

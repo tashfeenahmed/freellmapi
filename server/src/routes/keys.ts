@@ -31,7 +31,7 @@ const PLATFORMS = [
   'google', 'groq', 'cerebras', 'bai', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'modelscope',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
 ] as const;
 

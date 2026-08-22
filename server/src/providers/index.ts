@@ -376,6 +376,24 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.orcarouter.ai/v1',
 }));
 
+// UnoRouter (unorouter.com) — OpenAI-compatible aggregator. The web app is a
+// Next.js site at unorouter.com (which redirects /v1/* to the marketing app,
+// NOT the API); the real API is api.unorouter.com/v1. Free key from
+// unorouter.com (no card); free models carry a `:free` suffix and a per-minute
+// rate limit (429 on cap — "1 request(s) every 1 min per account").
+// Live-probed 2026-08-22: GET /v1/models and POST /v1/chat/completions both
+// answer 401 "Invalid token" without a key, so the default /v1/models key
+// validation is a real check (no validateUrl override needed, unlike xkiro
+// whose /v1/models is public). Catalog rows live in the hosted catalog
+// (premium now, free after the 30-day model-age gate); the model ids in #875
+// are candidates for catalog authoring, where a bad id is caught by the health
+// check instead of shipped as a default.
+register(new OpenAICompatProvider({
+  platform: 'unorouter',
+  name: 'UnoRouter',
+  baseUrl: 'https://api.unorouter.com/v1',
+}));
+
 // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
 // (api-inference.modelscope.cn/v1, Bearer auth). Free tier: 2000 requests/day
 // account-wide. Token from modelscope.cn/my/myaccesstoken, BUT calls only work

@@ -132,6 +132,15 @@ export type Platform =
   // (never fall back to paid). Catalog rows live in the Oracle catalog
   // (premium now, free after the 30-day model-age gate).
   | 'orcarouter'
+  // UnoRouter (unorouter.com) — OpenAI-compatible aggregator. The web app is a
+  // Next.js site at unorouter.com; the API lives at api.unorouter.com/v1. Free
+  // key from unorouter.com (no card); free models carry a `:free` suffix and a
+  // per-minute rate limit (429 on cap, e.g. "1 request(s) every 1 min").
+  // Live-probed 2026-08-22: /v1/models and /v1/chat/completions both 401
+  // "Invalid token" without a key, so default key validation works. Catalog
+  // rows live in the hosted catalog (premium now, free after the 30-day
+  // model-age gate).
+  | 'unorouter'
   // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
   // (api-inference.modelscope.cn/v1). Free tier is 2000 requests/day
   // account-wide, but calls only work after the ModelScope account is bound to

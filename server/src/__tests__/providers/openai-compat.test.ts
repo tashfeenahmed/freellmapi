@@ -516,6 +516,9 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'nara',       name: 'NaraRouter',    baseUrl: 'https://router.bynara.id/v1' },
     { platform: 'sealion',    name: 'SEA-LION',      baseUrl: 'https://api.sea-lion.ai/v1' },
     { platform: 'orcarouter', name: 'OrcaRouter',    baseUrl: 'https://api.orcarouter.ai/v1' },
+    // unorouter's /v1/models requires auth (401 without a key), so default
+    // key validation works — no validateUrl override, unlike xkiro.
+    { platform: 'unorouter', name: 'UnoRouter',      baseUrl: 'https://api.unorouter.com/v1' },
     // modelscope registers a ModelScopeProvider subclass (custom validateKey,
     // see providers/modelscope.test.ts) but chat routing is stock openai-compat.
     { platform: 'modelscope', name: 'ModelScope',    baseUrl: 'https://api-inference.modelscope.cn/v1' },
