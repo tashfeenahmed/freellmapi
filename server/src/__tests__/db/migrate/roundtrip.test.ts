@@ -101,9 +101,9 @@ describe('migration round trip', () => {
         KEY_MODEL_SCOPE_FILENAME,
         CLIENT_PROFILES_FILENAME,
         API_KEY_PROXY_FILENAME,
-        PLAYGROUND_CONVERSATIONS_FILENAME,
         ATTEMPT_KEY_LABEL_FILENAME,
         RETIRE_GITHUB_MODELS_FILENAME,
+        PLAYGROUND_CONVERSATIONS_FILENAME,
       ]);
     } finally {
       db.close();

@@ -84,7 +84,7 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: KEY_MODEL_SCOPE_FILENAME, module: keyModelScope },
   { filename: CLIENT_PROFILES_FILENAME, module: clientProfiles },
   { filename: API_KEY_PROXY_FILENAME, module: apiKeyProxy },
-  { filename: PLAYGROUND_CONVERSATIONS_FILENAME, module: playgroundConversations },
   { filename: ATTEMPT_KEY_LABEL_FILENAME, module: attemptKeyLabel },
   { filename: RETIRE_GITHUB_MODELS_FILENAME, module: retireGithubModels },
+  { filename: PLAYGROUND_CONVERSATIONS_FILENAME, module: playgroundConversations },
 ];
