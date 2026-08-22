@@ -4,9 +4,11 @@ import http from 'http';
 import https from 'https';
 import {
   applyProxyUrl,
+  applyProxyMode,
   applyProxyEnabled,
   applyProxyBypass,
   getProxyUrl,
+  getProxyMode,
   isProxyEnabled,
   getProxyBypassPlatforms,
   getNoProxyRules,
@@ -14,6 +16,7 @@ import {
   isSocksProxyUrl,
   socksHostnameLookup,
   PROXY_SCHEMES,
+  PROXY_MODES,
   proxyFetch,
   describeAbort,
   withKeyProxy,
@@ -30,6 +33,7 @@ import {
 // reason.
 const PROXY_ENV_VARS = [
   'PROXY_URL',
+  'PROXY_MODE',
   'ALL_PROXY',
   'HTTPS_PROXY',
   'HTTP_PROXY',
@@ -52,6 +56,7 @@ beforeEach(() => {
   applyProxyEnabled(true);
   applyProxyBypass('');
   applyProxyUrl(''); // clears the URL and the dispatcher cache
+  applyProxyMode('forward');
 });
 
 afterEach(() => {
@@ -71,6 +76,25 @@ describe('proxy config accessors', () => {
   it('falls back to the DB value when no env var is set', () => {
     applyProxyUrl('http://db-proxy:3128');
     expect(getProxyUrl()).toBe('http://db-proxy:3128');
+  });
+
+  it('defaults to forward and accepts an explicit fetch-relay mode', () => {
+    expect(PROXY_MODES).toEqual(['forward', 'fetch-relay']);
+    expect(getProxyMode()).toBe('forward');
+    applyProxyUrl('https://relay.example.test/secret');
+    applyProxyMode('fetch-relay');
+    expect(getProxyMode()).toBe('fetch-relay');
+  });
+
+  it('keeps a legacy PROXY_URL in forward mode unless PROXY_MODE is explicit', () => {
+    process.env.PROXY_URL = 'http://legacy-proxy:8080';
+    applyProxyUrl('https://saved-relay.example.test');
+    applyProxyMode('fetch-relay');
+    expect(getProxyMode()).toBe('forward');
+
+    process.env.PROXY_MODE = 'fetch-relay';
+    applyProxyMode('forward');
+    expect(getProxyMode()).toBe('fetch-relay');
   });
 
   it('parses the comma-separated bypass list', () => {
@@ -373,6 +397,15 @@ describe('proxy source logging (#353)', () => {
     await proxyFetch('https://api.example.com/v1', undefined, 'groq');
     const logged = err.mock.calls.flat().join(' ');
     expect(logged).not.toContain('hunter2');
+  });
+
+  it('never logs a Fetch Relay secret path or query string', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    applyProxyUrl('https://relay.example.test/super-secret-path?token=also-secret');
+    const logged = log.mock.calls.flat().join(' ');
+    expect(logged).toContain('https://relay.example.test/[redacted]');
+    expect(logged).not.toContain('super-secret-path');
+    expect(logged).not.toContain('also-secret');
   });
 });
 
