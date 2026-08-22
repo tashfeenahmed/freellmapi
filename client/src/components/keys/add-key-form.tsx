@@ -188,7 +188,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
             emptyText={t('keys.noFilterMatch')}
             align="start"
             ariaInvalid={addAttempted && !!platformError}
-            triggerClassName={`flex h-8 w-[220px] items-center justify-between gap-2 whitespace-nowrap rounded-lg border bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 ${addAttempted && platformError ? 'border-destructive' : 'border-input'}`}
+            triggerClassName={`flex h-8 w-[280px] items-center justify-between gap-2 whitespace-nowrap rounded-lg border bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 ${addAttempted && platformError ? 'border-destructive' : 'border-input'}`}
             header={
               <div className="flex items-center gap-2 border-b px-3 py-2">
                 <input
