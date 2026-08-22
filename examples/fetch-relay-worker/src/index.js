@@ -49,25 +49,60 @@ function validateTarget(value, allowlist) {
   }
 }
 
+async function secretPathMatches(actual, expected) {
+  if (!expected) return false;
+  const encoder = new TextEncoder();
+  const [actualHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(actual)),
+    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
+  ]);
+  return crypto.subtle.timingSafeEqual(actualHash, expectedHash);
+}
+
+function writeLog(level, event, fields) {
+  const entry = JSON.stringify({ event, ...fields });
+  if (level === 'error') console.error(entry);
+  else if (level === 'warn') console.warn(entry);
+  else console.log(entry);
+}
+
 export default {
   async fetch(request, env) {
     const relayUrl = new URL(request.url);
+    const requestId = request.headers.get('cf-ray') ?? crypto.randomUUID();
+    const started = Date.now();
+    const baseLog = {
+      requestId,
+      method: request.method,
+      colo: request.cf?.colo ?? 'unknown',
+      country: request.cf?.country ?? 'unknown',
+    };
 
     // RELAY_PATH is a bearer secret. Fail closed when it or the allowlist is
     // absent, and use a 404 for wrong paths so the endpoint is not advertised.
-    if (!env.RELAY_PATH || relayUrl.pathname !== env.RELAY_PATH) {
+    if (!env.RELAY_PATH) {
+      writeLog('error', 'relay_misconfigured', { ...baseLog, reason: 'missing_secret' });
+      return new Response('Relay is not configured', { status: 503 });
+    }
+    if (!(await secretPathMatches(relayUrl.pathname, env.RELAY_PATH))) {
+      writeLog('warn', 'relay_rejected', { ...baseLog, reason: 'invalid_path' });
       return new Response('Not found', { status: 404 });
     }
 
     const allowlist = allowedHosts(env.ALLOWED_UPSTREAM_HOSTS);
     if (allowlist.size === 0) {
+      writeLog('error', 'relay_misconfigured', { ...baseLog, reason: 'empty_allowlist' });
       return new Response('Relay allowlist is not configured', { status: 503 });
     }
 
     const target = validateTarget(targetFrom(request), allowlist);
     if (!target) {
+      writeLog('warn', 'relay_rejected', { ...baseLog, reason: 'target_not_allowed' });
       return new Response('Target not allowed', { status: 403 });
     }
+
+    const requestLog = { ...baseLog, targetHost: target.hostname };
+    writeLog('info', 'relay_request', requestLog);
 
     const headers = new Headers(request.headers);
     for (const name of REQUEST_HEADERS_TO_REMOVE) headers.delete(name);
@@ -81,14 +116,48 @@ export default {
         signal: request.signal,
       });
 
+      writeLog('info', 'relay_upstream_headers', {
+        ...requestLog,
+        status: upstream.status,
+        durationMs: Date.now() - started,
+        contentType: upstream.headers.get('content-type') ?? 'unknown',
+      });
+
+      const responseHeaders = new Headers(upstream.headers);
+      responseHeaders.set('X-FreeLLMAPI-Relay-Request-ID', requestId);
+
+      let responseBody = upstream.body;
+      if (responseBody) {
+        let responseBytes = 0;
+        responseBody = responseBody.pipeThrough(new TransformStream({
+          transform(chunk, controller) {
+            responseBytes += chunk.byteLength;
+            controller.enqueue(chunk);
+          },
+          flush() {
+            writeLog('info', 'relay_response_complete', {
+              ...requestLog,
+              status: upstream.status,
+              durationMs: Date.now() - started,
+              responseBytes,
+            });
+          },
+        }));
+      }
+
       // Passing the ReadableStream through is what keeps SSE, audio, and other
       // streamed responses incremental. Do not call arrayBuffer/text/json.
-      return new Response(upstream.body, {
+      return new Response(responseBody, {
         status: upstream.status,
         statusText: upstream.statusText,
-        headers: upstream.headers,
+        headers: responseHeaders,
       });
-    } catch {
+    } catch (error) {
+      writeLog('error', 'relay_upstream_error', {
+        ...requestLog,
+        durationMs: Date.now() - started,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
       // Do not expose target URLs, provider credentials, or runtime details.
       return new Response('Upstream request failed', { status: 502 });
     }

@@ -55,3 +55,18 @@ PROXY_URL=https://freellmapi-fetch-relay.<your-subdomain>.workers.dev/<secret-pa
   form avoids putting provider query parameters in URL logs.
 - Browser CORS headers are intentionally absent because this is a server-to-
   server transport, not a public browser proxy.
+
+## Observability
+
+Workers Logs is enabled with 100% head sampling in `wrangler.jsonc`. The Worker
+emits structured JSON events for accepted requests, upstream response headers,
+completed response streams, rejected requests, configuration errors, and
+upstream failures. Logged fields are limited to a request ID, method, target
+hostname, Cloudflare colo/country, status, content type, duration, byte count,
+and a fixed error category.
+
+Provider credentials, request/response bodies, target paths and query strings,
+and the relay secret path are not written by the Worker. Treat Cloudflare's
+invocation metadata as sensitive operational data and restrict access to the
+Workers Logs dashboard. For a high-volume deployment, lower
+`head_sampling_rate` after collecting enough baseline data.

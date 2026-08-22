@@ -8,5 +8,11 @@
   ],
   "vars": {
     "ALLOWED_UPSTREAM_HOSTS": "api.openai.com,api.groq.com,generativelanguage.googleapis.com"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "head_sampling_rate": 1
+    }
   }
 }
