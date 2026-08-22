@@ -385,6 +385,10 @@
     "proxyUrl": "פרוקסי URL",
     "saveProxy": "שמור",
     "savingProxy": "מצילה...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "לא הצלחתי לטעון את הגדרות הפרוקסי.",
     "addCustom": "הוסף מודל מותאם אישית לתואם OpenAI",
     "addCustomDescription": "צ'אט נקודתי, הטמעה, מודלים של תמונה או אודיו בכל נקודת קצה תואמת OpenAI. מפתח API הוא אופציונלי לשרתים מקומיים.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "למחוק {count}?",
     "bulkResult": "עודכנו {done}; נכשלו {failed}.",
     "bulkDeleteResult": "נמחקו {done}; נכשלו {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "בריא",

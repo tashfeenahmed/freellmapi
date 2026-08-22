@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "រក្សាទុក",
     "savingProxy": "កំពុងសន្សំ...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "មិនអាចផ្ទុកការកំណត់ប្រូកស៊ីបានទេ។",
     "addCustom": "បន្ថែមម៉ូដែលផ្ទាល់ខ្លួនដែលគាំទ្រ OpenAI",
     "addCustomDescription": "បង្ហាញការជជែក ការបញ្ចូល រូបភាព ឬម៉ូដែលសំឡេងទៅកាន់ចំណុចចុងក្រោយណាមួយដែលគាំទ្រ OpenAI។ កូនសោ API គឺជាជម្រើសសម្រាប់ម៉ាស៊ីនបម្រើក្នុងស្រុក។",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "លុប {count}?",
     "bulkResult": "បានធ្វើបច្ចុប្បន្នភាព {done}; បរាជ័យ {failed}។",
     "bulkDeleteResult": "បានលុប {done}; បរាជ័យ {failed}។",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "មានសុខភាពល្អ",

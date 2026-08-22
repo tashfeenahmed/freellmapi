@@ -385,6 +385,10 @@
     "proxyUrl": "URL do proxy",
     "saveProxy": "Salvar",
     "savingProxy": "Salvando…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Não foi possível carregar as configurações do proxy.",
     "addCustom": "Adicionar um modelo personalizado compatível com OpenAI",
     "addCustomDescription": "Aponte para qualquer endpoint compatível com OpenAI: llama.cpp, LM Studio, vLLM, um Ollama local ou um gateway remoto. Liste um modelo por linha (ou separados por vírgula) para adicionar vários de uma vez; todos compartilham o mesmo endpoint. A chave de API é opcional (a maioria dos servidores locais não precisa).",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Excluir {count}?",
     "bulkResult": "Atualizadas {done}; falharam {failed}.",
     "bulkDeleteResult": "Excluídas {done}; falharam {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "saudável",

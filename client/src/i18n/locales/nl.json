@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "Sla op",
     "savingProxy": "Redden...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Proxy-instellingen konden niet laden.",
     "addCustom": "Voeg een aangepast OpenAI-compatibel model toe",
     "addCustomDescription": "Point chat-, embedding-, afbeeldings- of audiomodellen op elk OpenAI-compatibel eindpunt. De API-sleutel is optioneel voor lokale servers.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} verwijderen?",
     "bulkResult": "Bijgewerkt {done}; mislukt {failed}.",
     "bulkDeleteResult": "Verwijderd {done}; mislukt {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "Gezond",

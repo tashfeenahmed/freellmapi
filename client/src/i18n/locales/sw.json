@@ -385,6 +385,10 @@
     "proxyUrl": "Wakala URL",
     "saveProxy": "Hifadhi",
     "savingProxy": "Inahifadhi...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Haikuweza kupakia mipangilio ya seva mbadala.",
     "addCustom": "Ongeza muundo maalum unaooana na OpenAI",
     "addCustomDescription": "Elekeza gumzo, upachikaji, picha au miundo ya sauti katika sehemu yoyote ya mwisho inayooana na OpenAI. Kitufe cha API ni cha hiari kwa seva za ndani.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Futa {count}?",
     "bulkResult": "Zimesasishwa {done}; zimeshindwa {failed}.",
     "bulkDeleteResult": "Zimefutwa {done}; zimeshindwa {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "afya",

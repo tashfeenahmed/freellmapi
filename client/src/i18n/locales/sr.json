@@ -385,6 +385,10 @@
     "proxyUrl": "Прокси URL",
     "saveProxy": "Сачувај",
     "savingProxy": "Чување…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Није могуће учитати подешавања проксија.",
     "addCustom": "Додајте прилагођени модел компатибилан са OpenAI",
     "addCustomDescription": "Усмерите ћаскање, уграђивање, слике или аудио моделе на било коју крајњу тачку компатибилну са OpenAI. Кључ API је опциони за локалне сервере.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Избрисати {count}?",
     "bulkResult": "Ажурирано {done}; неуспешно {failed}.",
     "bulkDeleteResult": "Избрисано {done}; неуспешно {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "здраво",

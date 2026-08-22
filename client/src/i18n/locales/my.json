@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "သိမ်းဆည်းပါ",
     "savingProxy": "သိမ်းဆည်းနေသည်...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Proxy ဆက်တင်များ မတင်နိုင်ပါ။",
     "addCustom": "စိတ်ကြိုက် OpenAI ကိုက်ညီသော မော်ဒယ်တစ်ခု ထည့်သွင်းပါ",
     "addCustomDescription": "စကားပြောခြင်း၊ ထည့်သွင်းခြင်း၊ ပုံရိပ် သို့မဟုတ် အသံ မော်ဒယ်များကို OpenAI ကိုက်ညီသော အဆုံးတွင် ဦးတည်ပါ။ API key သည် ဒေသခံဆာဗာများအတွက် ရွေးချယ်စရာဖြစ်သည်။",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} ခု ဖျက်မလား?",
     "bulkResult": "{done} ခု အပ်ဒိတ်လုပ်ပြီး၊ {failed} ခု မအောင်မြင်ပါ။",
     "bulkDeleteResult": "{done} ခု ဖျက်ပြီး၊ {failed} ခု မအောင်မြင်ပါ။",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ကျန်းမာသော",

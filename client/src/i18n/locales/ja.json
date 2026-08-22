@@ -385,6 +385,10 @@
     "proxyUrl": "プロキシ URL",
     "saveProxy": "保存",
     "savingProxy": "保存中…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "プロキシ設定を読み込めませんでした。",
     "addCustom": "カスタム OpenAI 互換モデルを追加",
     "addCustomDescription": "OpenAI 互換エンドポイントでチャット、埋め込み、画像、または音声モデルをポイントします。 API キーは、ローカル サーバーの場合はオプションです。",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} 件を削除しますか？",
     "bulkResult": "{done} 件を更新しました。{failed} 件が失敗しました。",
     "bulkDeleteResult": "{done} 件を削除しました。{failed} 件が失敗しました。",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "健康な",

@@ -385,6 +385,10 @@
     "proxyUrl": "پراکسی URL",
     "saveProxy": "محفوظ کریں۔",
     "savingProxy": "محفوظ ہو رہا ہے…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "پراکسی ترتیبات کو لوڈ نہیں کیا جا سکا۔",
     "addCustom": "اپنی مرضی کے مطابق OpenAI- موافق ماڈل شامل کریں۔",
     "addCustomDescription": "کسی بھی OpenAI سے ہم آہنگ اینڈ پوائنٹ پر چیٹ، ایمبیڈنگ، امیج، یا آڈیو ماڈلز کو پوائنٹ کریں۔ API کلید مقامی سرورز کے لیے اختیاری ہے۔",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} حذف کریں؟",
     "bulkResult": "{done} اپ ڈیٹ ہوئے؛ {failed} ناکام۔",
     "bulkDeleteResult": "{done} حذف ہوئے؛ {failed} ناکام۔",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "صحت مند",

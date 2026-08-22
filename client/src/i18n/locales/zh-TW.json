@@ -551,7 +551,12 @@
     "bulkDelete": "批次刪除",
     "bulkDeleteConfirm": "刪除 {count} 個？",
     "bulkResult": "已更新 {done} 個；失敗 {failed} 個。",
-    "bulkDeleteResult": "已刪除 {done} 個；失敗 {failed} 個。"
+    "bulkDeleteResult": "已刪除 {done} 個；失敗 {failed} 個。",
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "健康",

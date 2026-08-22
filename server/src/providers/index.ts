@@ -489,3 +489,76 @@ export function getAllProviders(): BaseProvider[] {
 export function hasProvider(platform: Platform): boolean {
   return providers.has(platform);
 }
+
+/**
+ * Default quota ownership semantics per platform.
+ *
+ * - 'per-key': each key has its own independent quota (most providers — Groq,
+ *   Cerebras, NVIDIA, Mistral, OpenRouter, etc.). Adding more keys stacks the
+ *   total available quota.
+ * - 'per-account': quota is shared across all keys of the same account/project.
+ *   Adding more keys does NOT increase total quota. Known examples: Google
+ *   Gemini bills per Cloud Project (all keys under one project share the same
+ *   quota pool); some aggregators billed per account.
+ * - 'unknown': billing model not confirmed. Treated as 'per-key' for pool-dedup
+ *   but surfaced in the UI as "unknown — consult platform docs".
+ *
+ * Operators can override this per-key via ApiKey.quotaOwnershipOverride.
+ */
+export const QUOTA_OWNERSHIP: Record<Platform, 'per-key' | 'per-account' | 'unknown'> = {
+  // Google Gemini bills per Cloud Project — multiple keys under the same project
+  // share the quota pool and do NOT stack.
+  google: 'per-account',
+  // Most providers bill per key.
+  groq: 'per-key',
+  cerebras: 'per-key',
+  nvidia: 'per-key',
+  mistral: 'per-key',
+  openrouter: 'per-key',
+  cohere: 'per-key',
+  cloudflare: 'per-key',
+  zhipu: 'per-key',
+  huggingface: 'per-key',
+  opencode: 'per-key',
+  ovh: 'per-key',
+  agnes: 'per-key',
+  reka: 'per-key',
+  siliconflow: 'per-key',
+  routeway: 'per-key',
+  bazaarlink: 'per-key',
+  ainative: 'per-key',
+  aion: 'per-key',
+  requesty: 'per-key',
+  navy: 'per-key',
+  nara: 'per-key',
+  sealion: 'per-key',
+  modelscope: 'per-key',
+  qianfan: 'per-key',
+  volcengine: 'per-account',
+  longcat: 'per-key',
+  xfyun: 'per-key',
+  bai: 'per-key',
+  anyapi: 'per-key',
+  orcarouter: 'per-key',
+  aihorde: 'per-key',
+  kilo: 'per-key',
+  pollinations: 'per-key',
+  llm7: 'per-key',
+  ollama: 'per-key',
+  // GitHub Models was retired (V23) but kept for historical data.
+  github: 'per-key',
+  sambanova: 'per-key',
+  // Custom endpoints — unknown until the operator tells us.
+  custom: 'unknown',
+};
+
+/** Resolve the quota ownership for a platform, accounting for a per-key override. */
+export function resolveQuotaOwnership(
+  platform: Platform,
+  override?: 'per-key' | 'per-account' | 'unknown' | null,
+): 'per-key' | 'per-account' | 'unknown' {
+  if (override === 'per-key' || override === 'per-account' || override === 'unknown') {
+    return override;
+  }
+  return QUOTA_OWNERSHIP[platform] ?? 'unknown';
+}

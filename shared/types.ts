@@ -247,6 +247,8 @@ export interface ApiKeyCooldown {
   remainingMs: number;
 }
 
+export type QuotaOwnership = 'per-key' | 'per-account' | 'unknown';
+
 export interface ApiKey {
   id: number;
   platform: Platform;
@@ -267,6 +269,18 @@ export interface ApiKey {
   modelScope?: string[] | null;
   models?: ApiKeyModel[];
   cooldowns?: ApiKeyCooldown[];
+  /**
+   * Quota ownership semantics for this key's platform. 'per-key' means each
+   * key has its own independent quota (most providers). 'per-account' means
+   * the quota is shared across all keys of the same account/project (e.g.
+   * Gemini bills per Google Cloud project, so adding more keys does NOT stack
+   * the quota). 'unknown' means the platform's billing model is not confirmed.
+   * Operators can override this per-key to match their actual billing setup.
+   */
+  quotaOwnership?: QuotaOwnership;
+  /** Per-key override of the platform default. When set, the dashboard and
+   *  pool-dedup calculations use this value instead of the platform default. */
+  quotaOwnershipOverride?: QuotaOwnership | null;
 }
 
 export interface ApiKeyCreate {

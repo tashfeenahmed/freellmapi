@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "Xilas et",
     "savingProxy": "Qurtarmaq...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Proxy parametrlərini yükləmək mümkün olmadı.",
     "addCustom": "Xüsusi OpenAI uyğun model əlavə edin",
     "addCustomDescription": "Hər hansı OpenAI uyğun son nöqtədə nöqtə çat, yerləşdirmə, şəkil və ya audio modelləri qura bilərsiniz. API düyməsi yerli serverlər üçün seçimlidir.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} silinsin?",
     "bulkResult": "Yeniləndi {done}; uğursuz {failed}.",
     "bulkDeleteResult": "Silindi {done}; uğursuz {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "sağlam",

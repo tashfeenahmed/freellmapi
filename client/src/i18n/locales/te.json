@@ -385,6 +385,10 @@
     "proxyUrl": "ప్రాక్సీ URL",
     "saveProxy": "సేవ్ చేయండి",
     "savingProxy": "సేవ్ చేస్తోంది...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "ప్రాక్సీ సెట్టింగ్‌లను లోడ్ చేయడం సాధ్యపడలేదు.",
     "addCustom": "అనుకూల OpenAI-అనుకూల మోడల్‌ను జోడించండి",
     "addCustomDescription": "ఏదైనా OpenAI-అనుకూల ముగింపు పాయింట్ వద్ద పాయింట్ చాట్, పొందుపరచడం, ఇమేజ్ లేదా ఆడియో మోడల్‌లు. API కీ స్థానిక సర్వర్‌లకు ఐచ్ఛికం.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} తొలగించాలా?",
     "bulkResult": "{done} నవీకరించబడింది; {failed} విఫలమైంది.",
     "bulkDeleteResult": "{done} తొలగించబడింది; {failed} విఫలమైంది.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ఆరోగ్యకరమైన",

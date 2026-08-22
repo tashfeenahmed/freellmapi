@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "Speichern",
     "savingProxy": "Sparen…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Die Proxy-Einstellungen konnten nicht geladen werden.",
     "addCustom": "Fügen Sie ein benutzerdefiniertes OpenAI-kompatibles Modell hinzu",
     "addCustomDescription": "Zeigen Sie Chat-, Einbettungs-, Bild- oder Audiomodelle an jedem OpenAI-kompatiblen Endpunkt an. Der Schlüssel API ist für lokale Server optional.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} löschen?",
     "bulkResult": "Aktualisiert {done}; fehlgeschlagen {failed}.",
     "bulkDeleteResult": "Gelöscht {done}; fehlgeschlagen {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "gesund",

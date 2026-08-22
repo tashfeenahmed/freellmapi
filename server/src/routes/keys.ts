@@ -4,7 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
-import { resolveProvider, getAllProviders } from '../providers/index.js';
+import { resolveProvider, getAllProviders, resolveQuotaOwnership } from '../providers/index.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
@@ -317,6 +317,12 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       status: row.status,
       enabled: row.enabled === 1,
       keyless: resolveProvider(row.platform)?.keyless === true,
+      // Quota ownership for this key's platform — per-key (independent quota
+      // per key), per-account (shared across all keys of the same project, e.g.
+      // Gemini), or unknown. Frontend uses this to explain why adding more keys
+      // may not stack quota on per-account platforms.
+      quotaOwnership: resolveQuotaOwnership(row.platform as any),
+      quotaOwnershipOverride: null,
       // Lets the export dialog count exactly what the export will write.
       exportable: isExportableKey({ platform: row.platform, baseUrl: row.base_url ?? null, key: realKey }),
       createdAt: row.created_at,

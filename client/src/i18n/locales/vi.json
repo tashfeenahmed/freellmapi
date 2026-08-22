@@ -385,6 +385,10 @@
     "proxyUrl": "Ủy quyền URL",
     "saveProxy": "Lưu",
     "savingProxy": "Đang lưu…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Không thể tải cài đặt proxy.",
     "addCustom": "Thêm mô hình tương thích OpenAI tùy chỉnh",
     "addCustomDescription": "Trò chuyện điểm, nhúng, hình ảnh hoặc mô hình âm thanh tại bất kỳ điểm cuối tương thích OpenAI nào. Khóa API là tùy chọn cho máy chủ cục bộ.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Xóa {count}?",
     "bulkResult": "Đã cập nhật {done}; {failed} không thành công.",
     "bulkDeleteResult": "Đã xóa {done}; {failed} không thành công.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "khỏe mạnh",

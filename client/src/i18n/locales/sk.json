@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "Uložiť",
     "savingProxy": "Ukladanie...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Nastavenia proxy sa nepodarilo načítať.",
     "addCustom": "Pridajte vlastný model kompatibilný s OpenAI",
     "addCustomDescription": "Bodujte chat, embedding, obrazové alebo zvukové modely na ľubovoľnom OpenAI-kompatibilnom koncovom bode. Kľúč API je voliteľný pre lokálne servery.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Vymazať {count}?",
     "bulkResult": "Aktualizované {done}; zlyhalo {failed}.",
     "bulkDeleteResult": "Vymazané {done}; zlyhalo {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "zdravé",

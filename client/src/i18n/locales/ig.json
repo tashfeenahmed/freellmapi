@@ -385,6 +385,10 @@
     "proxyUrl": "Onye nnọchi anya URL",
     "saveProxy": "Chekwa",
     "savingProxy": "Na-echekwa…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Enweghị ike ibunye ntọala proxy.",
     "addCustom": "Tinye ụdị dakọtara OpenAI omenala",
     "addCustomDescription": "Kpatụ nkata, ntinye, onyonyo, ma ọ bụ ụdị ọdịyo n'ọgwụgwụ OpenAI ọ bụla dakọtara. Igodo API bụ nhọrọ maka sava mpaghara.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Hichapụ {count}?",
     "bulkResult": "Emelitere {done}; {failed} dara.",
     "bulkDeleteResult": "Ehichapụrụ {done}; {failed} dara.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ahụike",

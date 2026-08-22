@@ -385,6 +385,10 @@
     "proxyUrl": "ପ୍ରକ୍ସି URL",
     "saveProxy": "ସଞ୍ଚୟ କରନ୍ତୁ",
     "savingProxy": "ସଞ୍ଚୟ ହେଉଛି...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "ପ୍ରକ୍ସି ସେଟିଂସ୍ ଲୋଡ୍ କରିପାରିବେ ନାହିଁ।",
     "addCustom": "ଏକ କଷ୍ଟମ୍ OpenAI-ସୁସଙ୍ଗତ ମଡେଲ୍ ଯୋଡନ୍ତୁ",
     "addCustomDescription": "ଯେକୌଣସି OpenAI-ସୁସଙ୍ଗତ ଏଣ୍ଡପଏଣ୍ଟରେ ଚାଟ୍, ଏମ୍ବେଡିଂ, ଫଟୋ, କିମ୍ୱା ଅଡିଓ ମଡେଲ୍ ପଏଣ୍ଟ କରନ୍ତୁ। ସ୍ଥାନୀୟ ସର୍ଭର୍ ଗୁଡିକ ପାଇଁ API କୀ ବୈକଳ୍ପିକ ଅଟେ।",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} ବିଲୋପ କରିବେ?",
     "bulkResult": "{done} ଅଦ୍ୟତନ ହୋଇଛି; {failed} ବିଫଳ ହୋଇଛି।",
     "bulkDeleteResult": "{done} ବିଲୋପ ହୋଇଛି; {failed} ବିଫଳ ହୋଇଛି।",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ସୁସ୍ଥ",

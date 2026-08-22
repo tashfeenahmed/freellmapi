@@ -385,6 +385,10 @@
     "proxyUrl": "ப்ராக்ஸி URL",
     "saveProxy": "சேமிக்கவும்",
     "savingProxy": "சேமிக்கிறது…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "ப்ராக்ஸி அமைப்புகளை ஏற்ற முடியவில்லை.",
     "addCustom": "தனிப்பயன் OpenAI-இணக்கமான மாதிரியைச் சேர்க்கவும்",
     "addCustomDescription": "எந்த OpenAI-இணக்கமான இறுதிப்புள்ளியிலும் புள்ளி அரட்டை, உட்பொதித்தல், படம் அல்லது ஆடியோ மாதிரிகள். API விசை உள்ளூர் சேவையகங்களுக்கு விருப்பமானது.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} நீக்கவா?",
     "bulkResult": "{done} புதுப்பிக்கப்பட்டது; {failed} தோல்வி.",
     "bulkDeleteResult": "{done} நீக்கப்பட்டது; {failed} தோல்வி.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ஆரோக்கியமான",

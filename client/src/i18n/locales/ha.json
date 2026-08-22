@@ -385,6 +385,10 @@
     "proxyUrl": "Wakilin URL",
     "saveProxy": "Ajiye",
     "savingProxy": "Ana ajiyewa…",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "An kasa loda saitunan wakili.",
     "addCustom": "Ƙara samfurin OpenAI na al'ada mai jituwa",
     "addCustomDescription": "Nuna taɗi, haɗawa, hoto, ko ƙirar sauti a kowane madaidaicin madaidaicin OpenAI. Maɓallin API zaɓi ne don sabar gida.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "A share {count}?",
     "bulkResult": "An sabunta {done}; ya kasa {failed}.",
     "bulkDeleteResult": "An share {done}; ya kasa {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "lafiya",

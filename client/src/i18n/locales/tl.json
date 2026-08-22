@@ -385,6 +385,10 @@
     "proxyUrl": "Proxy URL",
     "saveProxy": "I-save",
     "savingProxy": "Pag-iipon...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "Hindi ma-load ang proxy settings.",
     "addCustom": "Magdagdag ng custom na modelong compatible sa OpenAI",
     "addCustomDescription": "I-point ang chat, embedding, image, o audio models sa anumang endpoint na compatible sa OpenAI. Opsyonal ang API key para sa mga lokal na server.",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "Tanggalin ang {count}?",
     "bulkResult": "Na-update {done}; nabigo {failed}.",
     "bulkDeleteResult": "Natanggal {done}; nabigo {failed}.",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "malusog",

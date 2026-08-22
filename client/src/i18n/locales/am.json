@@ -385,6 +385,10 @@
     "proxyUrl": "ተኪ URL",
     "saveProxy": "አስቀምጥ",
     "savingProxy": "በማስቀመጥ ላይ...",
+    "testProxy": "Test",
+    "testingProxy": "Testing…",
+    "proxyTestOk": "Proxy works — {ms}ms round trip",
+    "proxyTestFail": "Proxy failed: {reason}",
     "proxyLoadFailed": "የተኪ ቅንብሮችን መጫን አልተቻለም።",
     "addCustom": "ብጁ OpenAI-ተኳሃኝ ሞዴል ያክሉ",
     "addCustomDescription": "በማንኛውም OpenAI-ተኳሃኝ የመጨረሻ ነጥብ ላይ የውይይት፣ መክተት፣ ምስል ወይም የድምጽ ሞዴሎችን ያመልክቱ። API ቁልፍ ለአካባቢያዊ አገልጋዮች አማራጭ ነው።",
@@ -548,10 +552,11 @@
     "bulkDeleteConfirm": "{count} ይሰረዙ?",
     "bulkResult": "{done} ተዘምኗል፤ {failed} አልተሳካም።",
     "bulkDeleteResult": "{done} ተሰርዟል፤ {failed} አልተሳካም።",
-    "testProxy": "Test",
-    "testingProxy": "Testing…",
-    "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "quotaOwnership": "Quota ownership",
+    "quotaOwnershipHint": "How this platform bills quota. Per key = each key has its own independent quota (adding keys stacks). Per account = all keys under the same project/account share one pool (adding keys does NOT stack). Unknown = consult the platform docs.",
+    "quotaOwnershipPerKey": "Per key (independent)",
+    "quotaOwnershipPerAccount": "Per account (shared, doesn't stack)",
+    "quotaOwnershipUnknown": "Unknown — check platform docs"
   },
   "status": {
     "healthy": "ጤናማ",
