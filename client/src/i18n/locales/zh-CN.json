@@ -4,6 +4,7 @@
     "playground": "试验场",
     "keys": "密钥",
     "analytics": "分析",
+    "freeTier": "免费额度",
     "premium": "高级版",
     "upgrade": "升级",
     "settings": "设置",
@@ -914,5 +915,27 @@
     "openRelease": "打开发布页",
     "dismissVersion": "忽略此版本",
     "dismiss": "忽略"
+  },
+  "freeTier": {
+    "title": "免费额度",
+    "description": "各提供商免费额度的池去重汇总（同一池只计一次）。",
+    "documentedMonthly": "文档化月度额度",
+    "documentedMonthlyHint": "每个池只计一次预算，不重复累加共享同一池的模型。",
+    "pools": "免费额度池",
+    "creditsBased": "积分制",
+    "unpublished": "未公布",
+    "generatedAt": "生成时间",
+    "liveQuotaHint": "额度列显示提供商最近上报的观测值。",
+    "pool": "额度池",
+    "platform": "提供商",
+    "models": "模型数",
+    "budget": "月度额度",
+    "kind": "类型",
+    "kindDocumented": "文档化",
+    "kindCredits": "积分",
+    "kindUnpublished": "未公布",
+    "remaining": "剩余",
+    "resetAt": "重置时间",
+    "empty": "没有启用且带免费额度数据的模型。"
   }
 }

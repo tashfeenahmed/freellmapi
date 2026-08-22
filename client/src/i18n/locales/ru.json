@@ -14,7 +14,8 @@
     "switchToChinese": "Переключиться на китайский",
     "switchToEnglish": "Переключиться на английский",
     "modelsMenu": "Просмотр типов моделей",
-    "agents": "Агенты"
+    "agents": "Агенты",
+    "freeTier": "Free Tier"
   },
   "auth": {
     "createYourAccount": "Создайте свою учетную запись",
@@ -914,5 +915,27 @@
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss"
+  },
+  "freeTier": {
+    "title": "Free Tier",
+    "description": "Pool-deduped free-tier budgets across providers.",
+    "documentedMonthly": "Documented monthly tokens",
+    "documentedMonthlyHint": "One budget per pool — never summed across models sharing a pool.",
+    "pools": "Free-tier pools",
+    "creditsBased": "Credits-based",
+    "unpublished": "Unpublished",
+    "generatedAt": "Generated",
+    "liveQuotaHint": "Quota cells show the latest provider-reported observation.",
+    "pool": "Pool",
+    "platform": "Platform",
+    "models": "Models",
+    "budget": "Monthly budget",
+    "kind": "Kind",
+    "kindDocumented": "Documented",
+    "kindCredits": "Credits",
+    "kindUnpublished": "Unpublished",
+    "remaining": "Remaining",
+    "resetAt": "Resets at",
+    "empty": "No enabled models with free-tier budget data."
   }
 }

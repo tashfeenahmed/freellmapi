@@ -14,7 +14,8 @@
     "switchToChinese": "切換為中文",
     "switchToEnglish": "切換為英文",
     "modelsMenu": "瀏覽模型類型",
-    "agents": "代理程式"
+    "agents": "代理程式",
+    "freeTier": "Free Tier"
   },
   "auth": {
     "createYourAccount": "建立您的帳號",
@@ -914,5 +915,27 @@
     "openRelease": "打开发布页",
     "dismissVersion": "忽略此版本",
     "dismiss": "忽略"
+  },
+  "freeTier": {
+    "title": "Free Tier",
+    "description": "Pool-deduped free-tier budgets across providers.",
+    "documentedMonthly": "Documented monthly tokens",
+    "documentedMonthlyHint": "One budget per pool — never summed across models sharing a pool.",
+    "pools": "Free-tier pools",
+    "creditsBased": "Credits-based",
+    "unpublished": "Unpublished",
+    "generatedAt": "Generated",
+    "liveQuotaHint": "Quota cells show the latest provider-reported observation.",
+    "pool": "Pool",
+    "platform": "Platform",
+    "models": "Models",
+    "budget": "Monthly budget",
+    "kind": "Kind",
+    "kindDocumented": "Documented",
+    "kindCredits": "Credits",
+    "kindUnpublished": "Unpublished",
+    "remaining": "Remaining",
+    "resetAt": "Resets at",
+    "empty": "No enabled models with free-tier budget data."
   }
 }
