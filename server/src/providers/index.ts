@@ -209,6 +209,22 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://opencode.ai/zen/v1',
 }));
 
+// AMD AI Developer Program (#781) — OpenAI-compatible endpoint served by
+// Lemonade Server (https://developer.amd.com/playbooks/lemonade-getting-started),
+// the AMD local/cloud AI inference gateway. Defaults to the local Lemonade
+// endpoint; Developer Cloud users point base_url at their provisioned
+// vLLM instance. Keyless rows work with the anonymous local server.
+// Free-tier note: the bundled Lemonade Server is a self-hosted local gateway
+// (no card, no recurring quota claim from AMD for the local path); Developer
+// Cloud provisioning is a free program but per-instance, so no recurring
+// daily/monthly free quota is asserted here per the #274 standard.
+register(new OpenAICompatProvider({
+  platform: 'amd',
+  name: 'AMD (Lemonade)',
+  baseUrl: 'http://localhost:13305/api/v1',
+  keyless: true,
+}));
+
 // OVHcloud AI Endpoints — OpenAI-compatible. Two free modes: anonymous
 // (documented 2 req/min per IP per model — observed even stricter across
 // models in practice) and authenticated (400 req/min), but an API key
