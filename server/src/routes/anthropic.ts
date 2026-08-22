@@ -1048,6 +1048,7 @@ anthropicRouter.get('/models', (req: Request, res: Response, next: NextFunction)
         id: a.id,
         display_name: a.displayName,
         created_at: MODEL_CREATED_AT,
+        model_versions: [buildVirtualModelVersion(a.id, a.displayName, autoSupportsVision, autoSupportsTools)],
       }))
       : []),
     ...available.map(m => ({ type: 'model' as const, id: m.id, display_name: m.name, created_at: MODEL_CREATED_AT, model_versions: [buildModelVersion(m)] })),
