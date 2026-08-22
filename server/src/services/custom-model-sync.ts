@@ -2,6 +2,7 @@ import type { Db } from '../db/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import { discoverEndpointModels } from './model-discovery.js';
 import { registerCustomModels, type CustomModelEntry } from './custom-model-register.js';
+import { isCustomModelTombstoned } from './custom-model-tombstone.js';
 import { listCustomEndpoints } from './custom-endpoint.js';
 import { endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 
@@ -59,6 +60,8 @@ export interface CustomModelSyncResult {
   skipped: number;
   /** Models skipped because they matched no free pattern (#746). */
   paidSkipped: number;
+  /** Models skipped because the operator deleted them and they must stay deleted (#926). */
+  tombstoned: number;
   failures: Array<{ baseUrl: string; error: string }>;
 }
 
@@ -66,7 +69,7 @@ export interface CustomModelSyncResult {
  *  that wants a manual pass) can run it directly without waiting for the timer. */
 export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult> {
   const endpoints = listCustomEndpoints(db);
-  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, paidSkipped: 0, failures: [] };
+  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, paidSkipped: 0, tombstoned: 0, failures: [] };
 
   for (const endpoint of endpoints) {
     try {
@@ -86,6 +89,13 @@ export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult>
       for (const model of discovered) {
         if (registeredIds.has(model.id)) {
           result.skipped += 1;
+          continue;
+        }
+        // #926: the operator deleted this model (or the key that owned it) and
+        // expects it to stay gone. The sync's "add only" contract must not turn
+        // a deliberate deletion into the next pass's "new model".
+        if (isCustomModelTombstoned(db, scope, model.id)) {
+          result.tombstoned += 1;
           continue;
         }
         // Free-only policy (#746): when FREE_PATTERNS is configured, a model

@@ -13,7 +13,8 @@ import {
 } from '../services/model-state.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
 import { getActiveProfileId } from '../services/profile-models.js';
-import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
+import { endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
+import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
 
 export const modelsRouter = Router();
 
@@ -80,13 +81,16 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT id, key_id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number; key_id: number | null } | undefined;
+  const row = db.prepare("SELECT id, key_id, model_id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number; key_id: number | null; model_id: string } | undefined;
   if (!row) {
     res.status(404).json({ error: { message: `Unknown custom model ${id}` } });
     return;
   }
 
   const remove = db.transaction(() => {
+    // #926: keep this deletion across the scheduled custom-model sync, or the
+    // next daily pass re-registers a model the operator removed on purpose.
+    recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
     db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
     db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(id);
     deleteUnusedCustomEndpointKey(db, row.key_id);
@@ -189,6 +193,10 @@ modelsRouter.delete('/:id', (req: Request, res: Response) => {
   const remove = db.transaction(() => {
     if (isCatalogManagedModel(row)) {
       recordCatalogModelTombstone(db, 'chat', row.platform, row.model_id);
+    } else if (row.platform === 'custom') {
+      // #926: same "keep it deleted" contract for custom relay models — the
+      // scheduled custom-model sync must not resurrect this row.
+      recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
     }
     db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
     db.prepare('DELETE FROM models WHERE id = ?').run(id);

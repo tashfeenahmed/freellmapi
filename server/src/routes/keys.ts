@@ -17,6 +17,7 @@ import { registerCustomModels, registerCustomChatModels } from '../services/cust
 import { discoverEndpointModels, probeEndpointModel, ModelDiscoveryError } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
+import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
 import type { Db } from '../db/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
@@ -1318,6 +1319,12 @@ keysRouter.delete('/:id', (req: Request, res: Response) => {
     // so they never linger in the fallback chain forever (#189).
     if (row.platform === 'custom') {
       const defaultEmbedding = db.prepare("SELECT value FROM settings WHERE key = 'embeddings_default_family'").get() as { value: string } | undefined;
+      // #926: the scheduled custom-model sync only knows a model by "is it in
+      // the table yet". Without a tombstone, a key the operator deleted to get
+      // rid of its models would have them all re-registered by the next pass.
+      const scope = endpointScopeForBaseUrl(row.base_url);
+      const doomed = db.prepare("SELECT model_id FROM models WHERE platform = 'custom' AND key_id = ?").all(id) as { model_id: string }[];
+      for (const m of doomed) recordCustomModelTombstone(db, scope, m.model_id);
       db.prepare("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'custom' AND key_id = ?)").run(id);
       db.prepare("DELETE FROM models WHERE platform = 'custom' AND key_id = ?").run(id);
       db.prepare("DELETE FROM embedding_models WHERE platform = 'custom' AND key_id = ?").run(id);

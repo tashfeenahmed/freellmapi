@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getDb, initDb } from '../../db/index.js';
 import { runCustomModelSync, customModelSyncIntervalMs, customModelSyncFreePatterns, startCustomModelSync } from '../../services/custom-model-sync.js';
 import { discoverEndpointModels } from '../../services/model-discovery.js';
+import { registerCustomModels } from '../../services/custom-model-register.js';
+import { recordCustomModelTombstone } from '../../services/custom-model-tombstone.js';
 import { endpointScopeForBaseUrl } from '../../lib/endpoint-scope.js';
 
 // The sync pass talks to the outside world ONLY through discoverEndpointModels;
@@ -185,5 +187,63 @@ describe('custom model sync', () => {
     expect(customModelIds()).toEqual(['free-model-a', 'gpt-oss:free']);
     if (prev === undefined) delete process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS;
     else process.env.CUSTOM_MODEL_SYNC_FREE_PATTERNS = prev;
+  });
+
+  it('does not resurrect a model the operator deleted (tombstoned)', async () => {
+    addCustomEndpoint('http://localhost:9999');
+    const scope = endpointScopeForBaseUrl('http://localhost:9999');
+    // The operator deleted this model from the list; the tombstone records that.
+    recordCustomModelTombstone(getDb(), scope, 'model-a');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'model-a', ownedBy: null },
+      { id: 'model-b', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.tombstoned).toBe(1);
+    expect(result.added).toBe(1);
+    expect(customModelIds()).toEqual(['model-b']);
+  });
+
+  it('keeps the tombstone scoped: a deletion on one relay never hides the same id on another', async () => {
+    addCustomEndpoint('http://relay-a:9999');
+    addCustomEndpoint('http://relay-b:9999');
+    recordCustomModelTombstone(getDb(), endpointScopeForBaseUrl('http://relay-a:9999'), 'shared-model');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'shared-model', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    expect(result.tombstoned).toBe(1);
+    expect(result.added).toBe(1);
+    // relay-b still registered its copy: only relay-a's deletion is honored.
+    const rows = getDb().prepare(
+      "SELECT model_id, endpoint_scope FROM models WHERE platform = 'custom' AND model_id = 'shared-model'",
+    ).all() as { model_id: string; endpoint_scope: string }[];
+    expect(rows).toEqual([{ model_id: 'shared-model', endpoint_scope: endpointScopeForBaseUrl('http://relay-b:9999') }]);
+  });
+
+  it('an explicit re-registration clears the tombstone so the next sync can add it again', async () => {
+    addCustomEndpoint('http://localhost:9999');
+    const scope = endpointScopeForBaseUrl('http://localhost:9999');
+    recordCustomModelTombstone(getDb(), scope, 'model-a');
+    // Operator changes their mind and explicitly re-adds the model.
+    registerCustomModels(getDb(), 'http://localhost:9999', undefined, 'endpoint', undefined, [
+      { modelId: 'model-a', displayName: null },
+    ]);
+
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'model-a', ownedBy: null },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+
+    // Tombstone is gone: model-a is already registered again, so the pass just
+    // sees an existing row (skipped), never a tombstoned one.
+    expect(result.tombstoned).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(customModelIds()).toEqual(['model-a']);
   });
 });
