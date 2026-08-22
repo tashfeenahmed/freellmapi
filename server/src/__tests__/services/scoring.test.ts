@@ -3,6 +3,7 @@ import {
   BANDIT_PRESETS, combineScore, speedScore, intelligenceScore, intelligenceComposite,
   headroomFactor, rateLimitFactor, sampleBeta, reliabilityPosterior,
   expectedReliability, SPEED_PRIOR, HEADROOM_FLOOR,
+  isPeakHours, timeOfDayWeights, PEAK_START_HOUR, PEAK_END_HOUR, PEAK_SPEED_TO_RELIABILITY,
 } from '../../services/scoring.js';
 
 describe('scoring: reliability posterior', () => {
@@ -199,5 +200,55 @@ describe('scoring: Beta sampler (Thompson exploration)', () => {
       if (sampleBeta(12, 4) > sampleBeta(20, 2)) weakerWonAtLeastOnce = true;
     }
     expect(weakerWonAtLeastOnce).toBe(true);
+  });
+});
+
+describe('scoring: time-of-day dynamic ranking (#760)', () => {
+  function at(hour: number, minute = 0): Date {
+    return new Date(2026, 7, 18, hour, minute); // local time, Aug 18
+  }
+
+  it('marks peak hours 18:00–06:00 (inclusive start, exclusive end)', () => {
+    expect(isPeakHours(at(PEAK_START_HOUR))).toBe(true);      // 18:00 → peak
+    expect(isPeakHours(at(23, 59))).toBe(true);               // late night → peak
+    expect(isPeakHours(at(0))).toBe(true);                    // midnight → peak
+    expect(isPeakHours(at(5, 59))).toBe(true);                // just before 06:00 → peak
+    expect(isPeakHours(at(PEAK_END_HOUR))).toBe(false);       // 06:00 → off-peak
+    expect(isPeakHours(at(12))).toBe(false);                  // noon → off-peak
+  });
+
+  it('keeps off-peak weights unchanged', () => {
+    const base = BANDIT_PRESETS.balanced;
+    expect(timeOfDayWeights(base, at(12))).toEqual(base);
+    expect(timeOfDayWeights(base, at(PEAK_END_HOUR))).toEqual(base);
+  });
+
+  it('shifts speed→reliability during peak hours, intelligence untouched', () => {
+    const base = BANDIT_PRESETS.balanced; // { reliability: 0.5, speed: 0.25, intelligence: 0.25 }
+    const peak = timeOfDayWeights(base, at(20));
+    const shift = base.speed * PEAK_SPEED_TO_RELIABILITY;
+    expect(peak.reliability).toBeCloseTo(base.reliability + shift, 5);
+    expect(peak.speed).toBeCloseTo(base.speed - shift, 5);
+    expect(peak.intelligence).toBe(base.intelligence);
+    // Weights still sum to 1.
+    expect(peak.reliability + peak.speed + peak.intelligence).toBeCloseTo(1, 5);
+  });
+
+  it('never returns a negative speed weight for any preset', () => {
+    for (const preset of Object.values(BANDIT_PRESETS)) {
+      const peak = timeOfDayWeights(preset, at(21));
+      expect(peak.speed).toBeGreaterThanOrEqual(0);
+      expect(peak.reliability + peak.speed + peak.intelligence).toBeCloseTo(1, 5);
+    }
+  });
+
+  it('defaults to the current wall-clock time', () => {
+    const now = new Date();
+    const base = BANDIT_PRESETS.balanced;
+    if (isPeakHours(now)) {
+      expect(timeOfDayWeights(base)).not.toEqual(base);
+    } else {
+      expect(timeOfDayWeights(base)).toEqual(base);
+    }
   });
 });
