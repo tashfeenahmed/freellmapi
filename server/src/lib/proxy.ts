@@ -1,7 +1,8 @@
 import http from 'http';
 import https from 'https';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { assertProviderUrlAllowed } from './url-guard.js';
+import { getSetting } from '../db/index.js';
+import { assertProviderUrlAllowed, isLoopbackOrPrivateHostname } from './url-guard.js';
 
 // #590 (per-key proxy): the SAME provider may be reached through different
 // exit IPs per key (geo-ban / risk-control avoidance). Providers are process
@@ -131,6 +132,8 @@ let _proxyUrl = '';
 let _proxyEnabled = true;
 let _bypassPlatforms = new Set<string>();
 let _noProxyRules: string[] = [];
+// Escape hatch for the `ssh -D` tunnel case — see shouldBypassProxy.
+let _proxyLocalDestinations = false;
 let _initialized = false;
 
 // Cache.
@@ -178,16 +181,36 @@ export function applyProxyUrl(dbValue: string): void {
   const { url, source } = resolveProxySource(dbValue);
   _proxyUrl = url;
   _noProxyRules = parseNoProxy(readEnv('NO_PROXY'));
+  _proxyLocalDestinations = /^(1|true|yes)$/i.test(readEnv('FREEAPI_PROXY_LOCAL_DESTINATIONS'));
   cached = null;
   if (_proxyUrl) {
     console.log(`[proxy] Configured → ${redactProxyUrl(_proxyUrl)} (source: ${source})`);
     if (_noProxyRules.length > 0) {
       console.log(`[proxy] NO_PROXY direct for: ${_noProxyRules.join(', ')}`);
     }
+    if (_proxyLocalDestinations) {
+      console.log('[proxy] FREEAPI_PROXY_LOCAL_DESTINATIONS is set — localhost/LAN destinations go through the proxy too.');
+    }
   } else {
     console.log('[proxy] Not configured — outbound requests go direct.');
   }
   _initialized = true;
+}
+
+/**
+ * Hydrate the process-wide proxy state from the settings table.
+ *
+ * The standalone server does this in index.ts after initDb; the desktop
+ * embedder (desktop/src/server-host.ts) builds the app without index.ts and
+ * must call this itself — otherwise the URL saved by PUT /api/settings/proxy
+ * sits in the DB but the process starts with an empty proxy and every
+ * outbound request goes direct until the user re-saves the setting (#949).
+ * Safe to call more than once; it is idempotent.
+ */
+export function restoreProxySettings(): void {
+  applyProxyUrl(getSetting('proxy_url') ?? '');
+  applyProxyEnabled(getSetting('proxy_enabled') !== '0'); // default: enabled
+  applyProxyBypass(getSetting('proxy_bypass') ?? '');
 }
 
 export function getProxyUrl(): string {
@@ -229,18 +252,37 @@ export function getNoProxyRules(): string[] {
 /**
  * Returns true when a request should NOT use the proxy.
  * True when: proxy is disabled globally, the platform is in the bypass list,
- * or the upstream host is covered by NO_PROXY.
+ * the upstream host is covered by NO_PROXY, or the upstream is a local/LAN
+ * destination (#951 — see below).
+ *
+ * A loopback (127.0.0.0/8, ::1, 0.0.0.0, `localhost`) or private/LAN
+ * (RFC1918, ULA, CGNAT) destination is unreachable through a remote proxy:
+ * that proxy has no route to your own 127.0.0.1 and, on any network but
+ * yours, none to 192.168.1.20 either. Routing it there is never useful and,
+ * for SOCKS, actively harmful: an IP literal must go on the wire as ATYP 0x01
+ * (an IP) no matter what the `socks5h` suffix promises, so Tor logs "giving
+ * Tor only an IP address" and may refuse the connection. The
+ * Ollama/llama.cpp/LM Studio case — the app's primary documented local use,
+ * "on localhost or the LAN" — is exactly this.
+ *
+ * FREEAPI_PROXY_LOCAL_DESTINATIONS=true opts out, for the one setup where
+ * proxying a local address IS the point: an `ssh -D` dynamic tunnel, where
+ * http://127.0.0.1:11434 sent through the SOCKS proxy resolves at the far end
+ * and reaches the REMOTE host's Ollama.
  */
 function shouldBypassProxy(url: string, platform?: string): boolean {
   if (!_proxyEnabled) return true;
   if (platform && _bypassPlatforms.has(platform.toLowerCase())) return true;
-  if (_noProxyRules.length > 0) {
-    try {
-      if (noProxyMatches(new URL(url).hostname)) return true;
-    } catch {
-      // Unparseable URL — leave the routing decision to the caller/fetch.
-    }
+
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    // Unparseable URL — leave the routing decision to the caller/fetch.
+    return false;
   }
+  if (_noProxyRules.length > 0 && noProxyMatches(hostname)) return true;
+  if (!_proxyLocalDestinations && isLoopbackOrPrivateHostname(hostname)) return true;
   return false;
 }
 
@@ -583,10 +625,10 @@ async function dispatchFetch(
   const perKeyUrl = perKeyProxyStore.getStore() ?? '';
   if (perKeyUrl) {
     // Every bypass still applies, unchanged: the global on/off switch, the
-    // per-platform bypass list, and NO_PROXY. A per-key override says WHICH
-    // proxy to use, not that this request must be proxied — an operator who
-    // turned proxying off, or listed the upstream in NO_PROXY, still gets a
-    // direct connection.
+    // per-platform bypass list, NO_PROXY, and local/LAN destinations. A
+    // per-key override says WHICH proxy to use, not that this request must be
+    // proxied — an operator who turned proxying off, listed the upstream in
+    // NO_PROXY, or points at a local box still gets a direct connection.
     if (!shouldBypassProxy(url, platform)) {
       const resolved = await resolvePerKeyDispatcher(perKeyUrl);
       if (resolved) {
@@ -599,8 +641,9 @@ async function dispatchFetch(
     // Per-key proxy failed to build → fall through to the global/direct path.
   }
 
-  // Bypass check: disabled globally, this platform is exempt, or the upstream
-  // host is listed in NO_PROXY.
+  // Bypass check: disabled globally, this platform is exempt, the upstream
+  // host is listed in NO_PROXY, or it is a local/LAN destination no proxy can
+  // reach (#951).
   if (shouldBypassProxy(url, platform)) {
     return fetch(url, init);
   }

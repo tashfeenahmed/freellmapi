@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import type { Server } from 'node:http';
 import { createApp } from '../../server/src/app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../server/src/db/index.js';
+import { restoreProxySettings } from '../../server/src/lib/proxy.js';
 import { startHealthChecker } from '../../server/src/services/health.js';
 import { startCatalogSync } from '../../server/src/services/catalog-sync.js';
 import { userCount, createUser, createSession } from '../../server/src/services/auth.js';
@@ -40,6 +41,11 @@ export async function startServer(opts: StartOptions): Promise<ServerHandle> {
   // 0.0.0.0, and a remote viewer must still enter the password.
   process.env.FREEAPI_DESKTOP = '1';
   initDb(opts.dbPath);
+  // #949: the standalone server hydrates its proxy state in index.ts after
+  // initDb; this embedder builds the app without index.ts, so without this
+  // the URL saved in the settings table is ignored on every restart and the
+  // outbound proxy fields appear empty until re-saved.
+  restoreProxySettings();
   const app = createApp();
   const { server, port } = await listenWithScan(app, opts.host, opts.preferredPort);
   // Background timers need a Scheduler since the abstraction landed (4cbb571);

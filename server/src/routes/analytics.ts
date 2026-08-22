@@ -2,8 +2,23 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getDb } from '../db/index.js';
 import { FALLBACK_INPUT_PER_M, FALLBACK_OUTPUT_PER_M } from '../db/model-pricing.js';
+import { providerIdFor, providerDisplayName } from '../lib/provider-identity.js';
+import { normalizeBaseUrl } from '../lib/endpoint-scope.js';
 
 export const analyticsRouter = Router();
+
+// The endpoint identity of a request, in SQL: the serving key's base_url, ''
+// when the key is gone or carries none (every catalog key). Custom endpoints
+// all share the platform id 'custom' (services/custom-endpoint.ts), so any
+// view that groups by `platform` alone collapses every relay into one row and
+// the operator cannot tell which endpoint did what (#889) — this expression is
+// the second half of the grouping key everywhere that matters.
+//
+// rtrim/trim mirror lib/endpoint-scope.normalizeBaseUrl so the SQL side agrees
+// with the ids providerIdFor() builds: keys.ts normalizes base_url on write,
+// but rows stored before it did would otherwise split one endpoint in two.
+// Requires the query to LEFT JOIN api_keys as `k`.
+const ENDPOINT_ID_SQL = "COALESCE(rtrim(trim(k.base_url), '/'), '')";
 
 // Format UTC timestamps the same way SQLite stores created_at text values.
 const toSqliteDateTime = (timestamp: number) =>
@@ -195,7 +210,20 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
   });
 });
 
-// Stats grouped by model
+// Stats grouped by model.
+//
+// The grouping key is (platform, endpoint, model_id), not (platform, model_id):
+// the same model id served by two different custom relays is two different
+// things — different latency, different failure modes — and merging them into
+// one row labelled "custom" is the #889 collision in its most misleading form,
+// because the merged row's numbers describe neither endpoint.
+//
+// The models join is endpoint-scoped for the same reason. `models` is unique on
+// (platform, model_id, endpoint_scope) since #651, so joining on
+// (platform, model_id) alone matches ONE row per relay that registered the
+// model and multiplies every request row by that count. Adding endpoint_scope
+// to the ON clause picks the row belonging to the endpoint that actually served
+// the request — the only one whose display name and pricing apply.
 analyticsRouter.get('/by-model', (req: Request, res: Response) => {
   const range = (req.query.range as string) ?? '7d';
   const since = getSinceTimestamp(range);
@@ -204,6 +232,7 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
   const rows = db.prepare(`
     SELECT
       r.platform,
+      ${ENDPOINT_ID_SQL} as base_url,
       r.model_id,
       m.display_name,
       COUNT(*) as requests,
@@ -218,14 +247,21 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
         r.output_tokens * COALESCE(m.paid_output_per_m, ?) / 1000000.0
       ELSE 0 END) as est_cost
     FROM requests r
-    LEFT JOIN models m ON m.platform = r.platform AND m.model_id = r.model_id
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    LEFT JOIN models m
+      ON m.platform = r.platform AND m.model_id = r.model_id
+     AND m.endpoint_scope = ${ENDPOINT_ID_SQL}
     WHERE r.created_at >= ?
-    GROUP BY r.platform, r.model_id
+    GROUP BY r.platform, ${ENDPOINT_ID_SQL}, r.model_id
     ORDER BY requests DESC
   `).all(FALLBACK_INPUT_PER_M, FALLBACK_OUTPUT_PER_M, since) as any[];
 
   res.json(rows.map(r => ({
     platform: r.platform,
+    // Same row identity as /by-platform, so a model row and a provider row for
+    // one endpoint carry the same id and the same operator-readable name.
+    providerId: providerIdFor(r.platform, r.base_url || null),
+    endpoint: providerDisplayName(r.platform, r.base_url || null),
     modelId: r.model_id,
     displayName: r.display_name ?? r.model_id,
     requests: r.requests,
@@ -240,7 +276,16 @@ analyticsRouter.get('/by-model', (req: Request, res: Response) => {
   })));
 });
 
-// Stats grouped by platform
+// Stats grouped by platform.
+//
+// Custom endpoints all share the platform id 'custom' (services/custom-
+// endpoint.ts), so grouping by `platform` alone would collapse every custom
+// relay into one row and the operator could not tell which endpoint did what
+// (#889). We therefore also group by the serving key's base_url — the canonical
+// endpoint identity (custom-endpoint.ts pools credentials by base_url, and the
+// router treats every key sharing a base_url as one endpoint). Non-custom keys
+// carry no base_url, so COALESCE(base_url,'') keeps each of them in a single
+// per-platform group exactly as before.
 analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
   const range = (req.query.range as string) ?? '7d';
   const since = getSinceTimestamp(range);
@@ -248,31 +293,37 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
 
   const rows = db.prepare(`
     SELECT
-      platform,
+      r.platform,
+      ${ENDPOINT_ID_SQL} as base_url,
       COUNT(*) as requests,
-      COUNT(latency_ms) as latency_count,
-      SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) * 100.0 / NULLIF(SUM(CASE WHEN status <> 'canceled' THEN 1 ELSE 0 END), 0) as success_rate,
-      AVG(latency_ms) as avg_latency_ms,
-      AVG(ttfb_ms) as avg_ttfb_ms,
-      SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
-      AVG(CASE WHEN output_tokens > 0 AND latency_ms > 0
-        THEN output_tokens / (latency_ms / 1000.0) ELSE NULL END) as avg_tokens_per_second,
-      SUM(input_tokens) as total_input_tokens,
-      SUM(output_tokens) as total_output_tokens
-    FROM requests
-    WHERE created_at >= ?
-    GROUP BY platform
+      COUNT(r.latency_ms) as latency_count,
+      SUM(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) * 100.0 / NULLIF(SUM(CASE WHEN r.status <> 'canceled' THEN 1 ELSE 0 END), 0) as success_rate,
+      AVG(r.latency_ms) as avg_latency_ms,
+      AVG(r.ttfb_ms) as avg_ttfb_ms,
+      SUM(CASE WHEN r.status = 'error' THEN 1 ELSE 0 END) as error_count,
+      AVG(CASE WHEN r.output_tokens > 0 AND r.latency_ms > 0
+        THEN r.output_tokens / (r.latency_ms / 1000.0) ELSE NULL END) as avg_tokens_per_second,
+      SUM(r.input_tokens) as total_input_tokens,
+      SUM(r.output_tokens) as total_output_tokens
+    FROM requests r
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    WHERE r.created_at >= ?
+    GROUP BY r.platform, ${ENDPOINT_ID_SQL}
     ORDER BY requests DESC
   `).all(since) as any[];
 
   // P95 latency is a per-group percentile; SQLite has no native percentile
-  // aggregate, so we take the nearest-rank value per platform with a small
-  // ORDER BY/OFFSET query. The platform count is tiny (one row per provider),
-  // so the extra round-trips are negligible and keep the SQL readable.
+  // aggregate, so we take the nearest-rank value per group with a small
+  // ORDER BY/OFFSET query. The group count is tiny (one row per provider /
+  // custom endpoint), so the extra round-trips are negligible and keep the SQL
+  // readable. The WHERE must match the grouping exactly — platform AND the
+  // endpoint's base_url — or a custom endpoint's p95 would bleed in latency
+  // from every other custom endpoint.
   const p95Stmt = db.prepare(`
-    SELECT latency_ms FROM requests
-    WHERE created_at >= ? AND platform = ? AND latency_ms IS NOT NULL
-    ORDER BY latency_ms ASC
+    SELECT r.latency_ms FROM requests r
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    WHERE r.created_at >= ? AND r.platform = ? AND ${ENDPOINT_ID_SQL} = ? AND r.latency_ms IS NOT NULL
+    ORDER BY r.latency_ms ASC
     LIMIT 1 OFFSET ?
   `);
 
@@ -281,11 +332,20 @@ analyticsRouter.get('/by-platform', (req: Request, res: Response) => {
     // latency rows (latency_count), so a NULL can neither be counted into the
     // denominator nor selected as the p95 value.
     const latencyCount = r.latency_count ?? 0;
+    const baseUrl: string | null = r.base_url || null;
     const p95Row = latencyCount > 0
-      ? (p95Stmt.get(since, r.platform, Math.floor((latencyCount - 1) * 0.95)) as { latency_ms: number } | undefined)
+      ? (p95Stmt.get(since, r.platform, r.base_url, Math.floor((latencyCount - 1) * 0.95)) as { latency_ms: number } | undefined)
       : undefined;
     return {
       platform: r.platform,
+      // Stable, unique id for this row: the platform slug for catalog providers,
+      // 'custom:<base_url>' for custom endpoints (falls back to 'custom' when
+      // the key is gone). The client uses this as the chart key and the
+      // recent-calls filter value.
+      providerId: providerIdFor(r.platform, baseUrl),
+      // The short identifier the operator actually reads: the endpoint host for
+      // custom rows, the platform slug otherwise.
+      endpoint: providerDisplayName(r.platform, baseUrl),
       requests: r.requests,
       successRate: Math.round((r.success_rate ?? 0) * 10) / 10,
       avgLatencyMs: Math.round(r.avg_latency_ms),
@@ -465,14 +525,29 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
     ORDER BY count DESC
   `).all(since) as any[];
 
-  // Errors by platform
-  const byPlatform = db.prepare(`
-    SELECT platform, COUNT(*) as count
-    FROM requests
-    WHERE status = 'error' AND created_at >= ?
-    GROUP BY platform
+  // Errors by provider. Endpoint-scoped like /by-platform: one bar per custom
+  // relay, not one bar pooling every relay's failures under "custom" (#889) —
+  // a bar the operator cannot act on, because it never says which endpoint is
+  // the one failing.
+  const byPlatformRows = db.prepare(`
+    SELECT r.platform, ${ENDPOINT_ID_SQL} as base_url, COUNT(*) as count
+    FROM requests r
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    WHERE r.status = 'error' AND r.created_at >= ?
+    GROUP BY r.platform, ${ENDPOINT_ID_SQL}
     ORDER BY count DESC
   `).all(since) as any[];
+
+  const byPlatform = byPlatformRows.map(r => {
+    const baseUrl: string | null = r.base_url || null;
+    return {
+      // `platform` stays the raw slug: it is what the chart colors by.
+      platform: r.platform,
+      providerId: providerIdFor(r.platform, baseUrl),
+      endpoint: providerDisplayName(r.platform, baseUrl),
+      count: r.count,
+    };
+  });
 
   res.json({
     byCategory,
@@ -487,22 +562,32 @@ analyticsRouter.get('/errors', (req: Request, res: Response) => {
   const since = getSinceTimestamp(range);
   const db = getDb();
 
+  // Joined to the serving key so each error names the endpoint it came from.
+  // Without it every custom relay's failures read as a bare "custom" in the
+  // panel (#889) and the operator has to guess which one broke.
   const rows = db.prepare(`
-    SELECT id, platform, model_id, error, latency_ms, created_at
-    FROM requests
-    WHERE status = 'error' AND created_at >= ?
-    ORDER BY created_at DESC
+    SELECT r.id, r.platform, ${ENDPOINT_ID_SQL} as base_url, r.model_id, r.error,
+           r.latency_ms, r.created_at
+    FROM requests r
+    LEFT JOIN api_keys k ON k.id = r.key_id
+    WHERE r.status = 'error' AND r.created_at >= ?
+    ORDER BY r.created_at DESC
     LIMIT 50
   `).all(since) as any[];
 
-  res.json(rows.map(r => ({
-    id: r.id,
-    platform: r.platform,
-    modelId: r.model_id,
-    error: r.error,
-    latencyMs: r.latency_ms,
-    createdAt: r.created_at,
-  })));
+  res.json(rows.map(r => {
+    const baseUrl: string | null = r.base_url || null;
+    return {
+      id: r.id,
+      platform: r.platform,
+      providerId: providerIdFor(r.platform, baseUrl),
+      endpoint: providerDisplayName(r.platform, baseUrl),
+      modelId: r.model_id,
+      error: r.error,
+      latencyMs: r.latency_ms,
+      createdAt: r.created_at,
+    };
+  }));
 });
 
 // Recent calls — one row per proxied request, newest first, with the caller's
@@ -515,32 +600,74 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 100, 1), 500);
   const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-  // Optional filters. Both are validated (whitelist / shape) and applied as
+  // Optional filters. All are validated (whitelist / shape) and applied as
   // bound parameters; absent filters keep the default behavior identical.
   const status = req.query.status as string | undefined;
   if (status !== undefined && status !== 'success' && status !== 'error' && status !== 'canceled') {
     res.status(400).json({ error: "invalid status filter (expected 'success', 'error' or 'canceled')" });
     return;
   }
-  // Platform ids are short slugs ('groq', 'pt-custom_1'); anything else is a
-  // client bug, not a filter.
+  // Provider filter. The `provider` param carries the stable row id returned by
+  // /by-platform: a platform slug ('groq') or 'custom:<base_url>' for a custom
+  // endpoint (#889 — every custom relay shares the 'custom' platform id, so the
+  // endpoint's base_url is what actually selects one). The legacy `platform`
+  // param still works for old clients. Both are bound parameters, never
+  // interpolated, so the only validation needed is shape.
+  const provider = req.query.provider as string | undefined;
   const platform = req.query.platform as string | undefined;
-  if (platform !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(platform)) {
-    res.status(400).json({ error: 'invalid platform filter' });
-    return;
+  let providerFilterSql = '';
+  const providerFilterParams: string[] = [];
+  if (provider !== undefined) {
+    if (provider.length > 256 || /[\r\n]/.test(provider)) {
+      res.status(400).json({ error: 'invalid provider filter' });
+      return;
+    }
+    if (provider === 'custom') {
+      // The BARE 'custom' id is the orphan bucket, not "all custom traffic":
+      // /by-platform emits it only for rows whose endpoint is unknown (the key
+      // was deleted, or never carried a base_url). Falling through to the slug
+      // branch below would filter on `platform = 'custom'` and return every
+      // relay's traffic — a list that contradicts the very row the user
+      // clicked, which counted the orphans alone. Match what that row counted.
+      providerFilterSql = ` AND r.platform = 'custom' AND ${ENDPOINT_ID_SQL} = ''`;
+    } else if (provider.startsWith('custom:')) {
+      // Select one custom endpoint by its base_url. Normalized on the way in
+      // for the same reason ENDPOINT_ID_SQL normalizes on the way out.
+      providerFilterSql = ` AND r.platform = 'custom' AND ${ENDPOINT_ID_SQL} = ?`;
+      providerFilterParams.push(normalizeBaseUrl(provider.slice('custom:'.length)));
+    } else if (/^[A-Za-z0-9_-]{1,64}$/.test(provider)) {
+      providerFilterSql = ' AND r.platform = ?';
+      providerFilterParams.push(provider);
+    } else {
+      res.status(400).json({ error: 'invalid provider filter' });
+      return;
+    }
+  } else if (platform !== undefined) {
+    // The legacy param keeps its pre-#889 meaning: `platform=custom` is every
+    // custom relay's traffic. Only the `provider` ids are endpoint-scoped.
+    // Platform ids are short slugs ('groq', 'pt-custom_1'); anything else is a
+    // client bug, not a filter.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(platform)) {
+      res.status(400).json({ error: 'invalid platform filter' });
+      return;
+    }
+    providerFilterSql = ' AND r.platform = ?';
+    providerFilterParams.push(platform);
   }
   const db = getDb();
 
   const filterSql =
     (status !== undefined ? ' AND r.status = ?' : '') +
-    (platform !== undefined ? ' AND r.platform = ?' : '');
+    providerFilterSql;
   const filterParams = [
     ...(status !== undefined ? [status] : []),
-    ...(platform !== undefined ? [platform] : []),
+    ...providerFilterParams,
   ];
 
   const total = (db.prepare(
-    `SELECT COUNT(*) as c FROM requests r WHERE r.created_at >= ?${filterSql}`
+    `SELECT COUNT(*) as c FROM requests r
+       LEFT JOIN api_keys k ON k.id = r.key_id
+      WHERE r.created_at >= ?${filterSql}`
   ).get(since, ...filterParams) as { c: number }).c;
 
   const rows = db.prepare(`

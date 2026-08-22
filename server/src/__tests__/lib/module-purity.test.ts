@@ -34,6 +34,7 @@ const PURE_MODULES = [
   'budget.ts',
   'error-classify.ts',
   'header-value.ts',
+  'provider-identity.ts',
   'structured-output.ts',
   'tool-args.ts',
   'tool-call-rescue.ts',

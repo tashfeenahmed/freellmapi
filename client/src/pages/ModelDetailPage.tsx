@@ -498,8 +498,9 @@ function ProviderSettingsRow({
       {/* Router inputs: the two ranks feed the scoring axes, the four limits
           feed rate-limit accounting. Editable because the catalog can be wrong
           for a given account, or silent about a brand-new model (#551). The
-          capability tier drives the intelligence axis — a custom model without
-          a recognized tier scores 0, so it gets a picker here (#685). */}
+          capability tier sets the intelligence axis — a custom model without
+          a recognized tier sits at the floor of it, so it gets a picker here
+          (#685). */}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-7">
         {/* Full-width on the 2/3-column layouts so the six number fields
             below still tile evenly; one row of seven on desktop. */}

@@ -477,4 +477,350 @@ describe('Analytics API', () => {
       expect(byKey.status).toBe(200);
     });
   });
+
+  // #889 — custom endpoints all share the platform id 'custom', so the
+  // provider breakdown must split them by the serving key's base_url (the
+  // canonical endpoint identity) instead of collapsing every relay into one
+  // "custom" row. These tests seed two distinct custom endpoints (plus a
+  // pooled second key on the first) and assert the split, the per-endpoint
+  // p95 scoping, and the recent-calls provider filter.
+  describe('custom endpoint identifiers (#889)', () => {
+    // Seed a custom endpoint key and return its id. base_url is the endpoint
+    // identity; the credential itself is a placeholder (never read here).
+    function insertCustomKey(id: number, baseUrl: string, label: string): void {
+      getDb().prepare(`
+        INSERT INTO api_keys (id, platform, label, encrypted_key, iv, auth_tag, base_url)
+        VALUES (?, 'custom', ?, 'x', 'x', 'x', ?)
+      `).run(id, label, baseUrl);
+    }
+
+    // A model row belonging to ONE endpoint (#651): `models` is unique on
+    // (platform, model_id, endpoint_scope), so two relays can each hold their
+    // own row for the same model id.
+    function insertScopedModel(modelId: string, displayName: string, endpointScope: string): void {
+      getDb().prepare(`
+        INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, endpoint_scope)
+        VALUES ('custom', ?, ?, 50, 50, ?)
+      `).run(modelId, displayName, endpointScope);
+    }
+
+    beforeEach(() => {
+      getDb().prepare('DELETE FROM api_keys').run();
+      // Only endpoint-scoped rows; the seeded catalog ('' scope) stays put.
+      getDb().prepare("DELETE FROM models WHERE endpoint_scope <> ''").run();
+    });
+
+    it('splits custom endpoints into per-endpoint rows instead of one "custom" row', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+
+      // Two requests on relay A, one on relay B.
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 120, createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 900, createdAt: '2026-05-29 11:02:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      // Two distinct custom rows — NOT a single collapsed "custom" row.
+      const customRows = body.filter((r: any) => r.platform === 'custom');
+      expect(customRows).toHaveLength(2);
+
+      const a = body.find((r: any) => r.providerId === 'custom:https://relay-a.example.com/v1');
+      const b = body.find((r: any) => r.providerId === 'custom:https://relay-b.example.com/v1');
+      expect(a).toBeDefined();
+      expect(b).toBeDefined();
+      expect(a.requests).toBe(2);
+      expect(b.requests).toBe(1);
+      // The operator-readable identifier is the endpoint host.
+      expect(a.endpoint).toBe('relay-a.example.com');
+      expect(b.endpoint).toBe('relay-b.example.com');
+      // Each row keeps the raw platform id for the platform-dot coloring.
+      expect(a.platform).toBe('custom');
+      expect(b.platform).toBe('custom');
+    });
+
+    it('groups a pooled endpoint (several keys, one base_url) into a single row', async () => {
+      // Two credentials for the SAME relay — the pooling case (#619). They
+      // share a base_url, so they must read as ONE endpoint, not two rows.
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A key 1');
+      insertCustomKey(2, 'https://relay-a.example.com/v1', 'Relay A key 2');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 110, createdAt: '2026-05-29 11:01:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const customRows = body.filter((r: any) => r.platform === 'custom');
+      expect(customRows).toHaveLength(1);
+      expect(customRows[0].providerId).toBe('custom:https://relay-a.example.com/v1');
+      expect(customRows[0].requests).toBe(2);
+    });
+
+    it('scopes p95 latency per endpoint, not across all custom traffic', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+
+      // Relay A: fast (100ms x10). Relay B: slow (1000ms x10). If p95 bled
+      // across the whole "custom" platform, A's p95 would be ~1000, not 100.
+      for (let i = 0; i < 10; i++) {
+        insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: `2026-05-29 10:${String(i).padStart(2, '0')}:00` });
+      }
+      for (let i = 0; i < 10; i++) {
+        insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 1000, createdAt: `2026-05-29 10:${String(i).padStart(2, '0')}:30` });
+      }
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const a = body.find((r: any) => r.providerId === 'custom:https://relay-a.example.com/v1');
+      const b = body.find((r: any) => r.providerId === 'custom:https://relay-b.example.com/v1');
+      expect(a.p95LatencyMs).toBe(100);
+      expect(b.p95LatencyMs).toBe(1000);
+    });
+
+    it('keeps catalog providers on their bare platform id (no custom: prefix)', async () => {
+      insertRaw({ platform: 'groq', keyId: null, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const groq = body.find((r: any) => r.platform === 'groq');
+      expect(groq.providerId).toBe('groq');
+      expect(groq.endpoint).toBe('groq');
+    });
+
+    it('falls back to the plain "custom" id when the key was deleted', async () => {
+      // A custom request whose key no longer exists: base_url is unknown, so
+      // the row keeps the pre-fix "custom" shape rather than a fake host.
+      insertRaw({ platform: 'custom', keyId: 99, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const row = body.find((r: any) => r.platform === 'custom');
+      expect(row.providerId).toBe('custom');
+      expect(row.endpoint).toBe('custom');
+    });
+
+    it('filters recent calls by a custom endpoint providerId', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 120, createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 900, createdAt: '2026-05-29 11:02:00' });
+
+      const a = await request(app, '/api/analytics/requests?range=24h&provider=' + encodeURIComponent('custom:https://relay-a.example.com/v1'));
+      expect(a.status).toBe(200);
+      expect(a.body.total).toBe(2);
+      expect(a.body.rows.every((r: any) => r.keyLabel === 'Relay A')).toBe(true);
+
+      const b = await request(app, '/api/analytics/requests?range=24h&provider=' + encodeURIComponent('custom:https://relay-b.example.com/v1'));
+      expect(b.status).toBe(200);
+      expect(b.body.total).toBe(1);
+      expect(b.body.rows[0].keyLabel).toBe('Relay B');
+    });
+
+    it('tells two endpoints on the same host apart', async () => {
+      // One gateway, two tenants. Host alone is the same string for both, so a
+      // host-only display name would show two identical rows the operator
+      // cannot match to an endpoint — the #889 collision one level down.
+      insertCustomKey(1, 'https://gw.example.com/tenant-a/v1', 'Tenant A');
+      insertCustomKey(2, 'https://gw.example.com/tenant-b/v1', 'Tenant B');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 200, createdAt: '2026-05-29 11:01:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const rows = body.filter((r: any) => r.platform === 'custom');
+      expect(rows).toHaveLength(2);
+      const names = rows.map((r: any) => r.endpoint).sort();
+      expect(names).toEqual(['gw.example.com/tenant-a/v1', 'gw.example.com/tenant-b/v1']);
+      // Distinct names, one per endpoint — not 'gw.example.com' twice.
+      expect(new Set(names).size).toBe(2);
+    });
+
+    it('groups an endpoint stored with and without a trailing slash as one row', async () => {
+      // keys.ts normalizes base_url on write, but rows written before it did
+      // carry the raw string. Same endpoint, so: one row, one id.
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A key 1');
+      insertCustomKey(2, 'https://relay-a.example.com/v1/', 'Relay A key 2');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'success', latencyMs: 110, createdAt: '2026-05-29 11:01:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-platform?range=24h');
+      expect(status).toBe(200);
+
+      const rows = body.filter((r: any) => r.platform === 'custom');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].providerId).toBe('custom:https://relay-a.example.com/v1');
+      expect(rows[0].requests).toBe(2);
+    });
+
+    it('names the endpoint behind each recent error', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'error', error: 'relay A exploded', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'error', error: 'relay B exploded', createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ platform: 'groq', keyId: null, status: 'error', error: 'groq exploded', createdAt: '2026-05-29 11:02:00' });
+
+      const { status, body } = await request(app, '/api/analytics/errors?range=24h');
+      expect(status).toBe(200);
+
+      const a = body.find((r: any) => r.error === 'relay A exploded');
+      const b = body.find((r: any) => r.error === 'relay B exploded');
+      const groq = body.find((r: any) => r.error === 'groq exploded');
+      // Each error says WHICH relay failed instead of a bare 'custom'.
+      expect(a.providerId).toBe('custom:https://relay-a.example.com/v1');
+      expect(a.endpoint).toBe('relay-a.example.com');
+      expect(b.providerId).toBe('custom:https://relay-b.example.com/v1');
+      expect(b.endpoint).toBe('relay-b.example.com');
+      // The platform slug is still there for the client's dot coloring.
+      expect(a.platform).toBe('custom');
+      // Catalog providers are untouched.
+      expect(groq.providerId).toBe('groq');
+      expect(groq.endpoint).toBe('groq');
+      // An orphaned custom error keeps the pre-fix shape.
+      insertRaw({ platform: 'custom', keyId: 99, status: 'error', error: 'orphan exploded', createdAt: '2026-05-29 11:03:00' });
+      const again = await request(app, '/api/analytics/errors?range=24h');
+      const orphan = again.body.find((r: any) => r.error === 'orphan exploded');
+      expect(orphan.providerId).toBe('custom');
+      expect(orphan.endpoint).toBe('custom');
+    });
+
+    it('splits one model id across the relays that served it', async () => {
+      // The same model name behind two relays is two different services with
+      // two different latencies; one merged 'custom' row describes neither.
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+      insertScopedModel('shared-model', 'Shared (A)', 'https://relay-a.example.com/v1');
+      insertScopedModel('shared-model', 'Shared (B)', 'https://relay-b.example.com/v1');
+
+      insertRaw({ platform: 'custom', keyId: 1, modelId: 'shared-model', status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 1, modelId: 'shared-model', status: 'success', latencyMs: 100, createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ platform: 'custom', keyId: 2, modelId: 'shared-model', status: 'success', latencyMs: 900, createdAt: '2026-05-29 11:02:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-model?range=24h');
+      expect(status).toBe(200);
+
+      const rows = body.filter((r: any) => r.modelId === 'shared-model');
+      expect(rows).toHaveLength(2);
+
+      const a = rows.find((r: any) => r.providerId === 'custom:https://relay-a.example.com/v1');
+      const b = rows.find((r: any) => r.providerId === 'custom:https://relay-b.example.com/v1');
+      expect(a.requests).toBe(2);
+      expect(b.requests).toBe(1);
+      // Counts are per endpoint, not the fan-out of one endpoint's requests
+      // across every models row that shares the id.
+      expect(a.requests + b.requests).toBe(3);
+      expect(a.endpoint).toBe('relay-a.example.com');
+      expect(b.endpoint).toBe('relay-b.example.com');
+      // Each row's latency is its own endpoint's, not the pooled average.
+      expect(a.avgLatencyMs).toBe(100);
+      expect(b.avgLatencyMs).toBe(900);
+      // The display name comes from the model row of the serving endpoint.
+      expect(a.displayName).toBe('Shared (A)');
+      expect(b.displayName).toBe('Shared (B)');
+    });
+
+    it('keeps catalog models on one row per platform in by-model', async () => {
+      insertRaw({ platform: 'groq', keyId: null, modelId: 'llama-3.1-8b-instant', status: 'success', latencyMs: 50, createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'groq', keyId: null, modelId: 'llama-3.1-8b-instant', status: 'success', latencyMs: 70, createdAt: '2026-05-29 11:01:00' });
+
+      const { status, body } = await request(app, '/api/analytics/by-model?range=24h');
+      expect(status).toBe(200);
+
+      const rows = body.filter((r: any) => r.platform === 'groq');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].requests).toBe(2);
+      expect(rows[0].providerId).toBe('groq');
+      expect(rows[0].endpoint).toBe('groq');
+    });
+
+    it('splits the error distribution per custom endpoint', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertCustomKey(2, 'https://relay-b.example.com/v1', 'Relay B');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'error', error: '429 rate limit', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 1, status: 'error', error: '429 rate limit', createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ platform: 'custom', keyId: 2, status: 'error', error: 'timeout', createdAt: '2026-05-29 11:02:00' });
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', createdAt: '2026-05-29 11:03:00' });
+
+      const { status, body } = await request(app, '/api/analytics/error-distribution?range=24h');
+      expect(status).toBe(200);
+
+      const custom = body.byPlatform.filter((r: any) => r.platform === 'custom');
+      // Two bars, one per relay — not one 'custom' bar of 3 that names no
+      // endpoint the operator could go and fix.
+      expect(custom).toHaveLength(2);
+      const a = custom.find((r: any) => r.providerId === 'custom:https://relay-a.example.com/v1');
+      const b = custom.find((r: any) => r.providerId === 'custom:https://relay-b.example.com/v1');
+      expect(a.count).toBe(2);
+      expect(a.endpoint).toBe('relay-a.example.com');
+      expect(b.count).toBe(1);
+      expect(b.endpoint).toBe('relay-b.example.com');
+      // Category totals are endpoint-agnostic and must not change shape.
+      expect(body.byCategory.find((c: any) => c.category === 'Rate Limited (429)').count).toBe(2);
+    });
+
+    it('filters recent calls by the bare "custom" id to the orphaned rows only', async () => {
+      // The bare id is what /by-platform emits for rows whose endpoint is
+      // unknown. Selecting it must return exactly the rows that row counted —
+      // not every relay's traffic, which would contradict the count clicked.
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', createdAt: '2026-05-29 11:01:00' });
+      // Key deleted after the fact (dangling id) and a row that never had one.
+      insertRaw({ platform: 'custom', keyId: 99, status: 'success', createdAt: '2026-05-29 11:02:00' });
+      insertRaw({ platform: 'custom', keyId: null, status: 'success', createdAt: '2026-05-29 11:03:00' });
+
+      const platforms = await request(app, '/api/analytics/by-platform?range=24h');
+      const orphanRow = platforms.body.find((r: any) => r.providerId === 'custom');
+      expect(orphanRow.requests).toBe(2);
+
+      const filtered = await request(app, '/api/analytics/requests?range=24h&provider=custom');
+      expect(filtered.status).toBe(200);
+      // The list agrees with the row: 2, not all 4 custom requests.
+      expect(filtered.body.total).toBe(orphanRow.requests);
+      expect(filtered.body.rows.every((r: any) => r.keyLabel === null)).toBe(true);
+
+      // The named endpoint still filters to itself...
+      const relayA = await request(app, '/api/analytics/requests?range=24h&provider=' + encodeURIComponent('custom:https://relay-a.example.com/v1'));
+      expect(relayA.body.total).toBe(2);
+      // ...and the legacy platform param keeps its pre-#889 meaning: all of it.
+      const legacy = await request(app, '/api/analytics/requests?range=24h&platform=custom');
+      expect(legacy.body.total).toBe(4);
+    });
+
+    it('still accepts the legacy platform filter and rejects malformed provider ids', async () => {
+      insertCustomKey(1, 'https://relay-a.example.com/v1', 'Relay A');
+      insertRaw({ platform: 'custom', keyId: 1, status: 'success', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ platform: 'groq', keyId: null, status: 'success', createdAt: '2026-05-29 11:01:00' });
+
+      // Legacy platform filter still works.
+      const legacy = await request(app, '/api/analytics/requests?range=24h&platform=groq');
+      expect(legacy.status).toBe(200);
+      expect(legacy.body.total).toBe(1);
+
+      // A 'custom:' id carries an arbitrary base_url, but it is applied as a
+      // BOUND parameter (never interpolated), so a hostile-looking value is
+      // safe — it simply matches nothing.
+      const customNoMatch = await request(app, '/api/analytics/requests?range=24h&provider=' + encodeURIComponent('custom:https://relay-a.example.com/v1; DROP TABLE requests'));
+      expect(customNoMatch.status).toBe(200);
+      expect(customNoMatch.body.total).toBe(0);
+
+      // Non-custom ids must be short slugs; anything else is a client bug.
+      for (const bad of ['has spaces', 'a\nb']) {
+        const res = await request(app, '/api/analytics/requests?range=24h&provider=' + encodeURIComponent(bad));
+        expect(res.status).toBe(400);
+      }
+    });
+  });
 });

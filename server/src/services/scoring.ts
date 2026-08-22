@@ -167,9 +167,12 @@ export function observedSpeedRank(speed: number): number {
 // Inside a tier, though, rank is no longer a near-invisible tiebreak: it now
 // has a real, visible effect on the composite ACROSS providers by design, so
 // that a user's rank edit actually moves the axis and the routing order
-// (#673). A label we don't recognize scores below every real tier, which is
-// also why a model seeded with a placeholder label can never win an
-// auto-route (#488).
+// (#673). A label we don't recognize scores below every real tier — it is the
+// FLOOR of this axis, not an exclusion from routing: intelligence is one
+// weighted term in the convex combination below, so an untiered model with
+// strong reliability and speed still wins routes under most presets. Custom
+// models are seeded at the catalog median tier for the same reason
+// (custom-model-seed.ts, #488) — "unknown" is no opinion, not "worst".
 export const TIER_VALUE: Record<string, number> = { Frontier: 4, Large: 3, Medium: 2, Small: 1 };
 
 export function tierValue(sizeLabel: string): number {

@@ -132,6 +132,26 @@ export function classifyIp(ip: string): AddressClass {
 }
 
 /**
+ * Hostname half of {@link isLoopbackOrPrivateUrl}: true when a bare hostname
+ * names THIS machine or the LAN. Callers that already parsed the URL (the
+ * proxy router, which needs the hostname for NO_PROXY anyway) use this
+ * directly so the URL is parsed once.
+ *
+ * Normalises the two spellings a URL hostname can arrive in: IPv6 literals are
+ * bracketed (`[::1]`), and the FQDN form carries a trailing dot (`localhost.`
+ * — a real, resolvable spelling that must not slip past as a public name).
+ */
+export function isLoopbackOrPrivateHostname(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (net.isIP(host)) {
+    const cls = classifyIp(host);
+    return cls === 'loopback' || cls === 'private';
+  }
+  return false;
+}
+
+/**
  * Synchronous locality check for a stored provider base_url: true when the URL
  * points at THIS machine or the LAN (loopback, RFC1918/ULA private, 'localhost').
  * Used by the rate limiter to exempt local inference servers (Ollama/llama.cpp/
@@ -151,13 +171,7 @@ export function isLoopbackOrPrivateUrl(rawUrl: string | null | undefined): boole
   } catch {
     return false;
   }
-  const hostname = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
-  if (net.isIP(hostname)) {
-    const cls = classifyIp(hostname);
-    return cls === 'loopback' || cls === 'private';
-  }
-  return false;
+  return isLoopbackOrPrivateHostname(url.hostname);
 }
 
 export interface UrlAssessment {

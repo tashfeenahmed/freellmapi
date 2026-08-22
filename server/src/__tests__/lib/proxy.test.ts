@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import http from 'http';
 import https from 'https';
 import {
   applyProxyUrl,
@@ -23,7 +24,19 @@ import {
 // Every env var the proxy config reads, in both the upper- and lower-case
 // spellings the convention allows. Cleared around each test so a developer
 // machine that genuinely sits behind a corporate proxy doesn't fail the suite.
-const PROXY_ENV_VARS = ['PROXY_URL', 'ALL_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'];
+// FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is not a proxy knob, but the local/LAN
+// cases below call proxyFetch with platform 'custom', which re-runs the SSRF
+// guard — an operator machine that exports it would fail them for the wrong
+// reason.
+const PROXY_ENV_VARS = [
+  'PROXY_URL',
+  'ALL_PROXY',
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'NO_PROXY',
+  'FREEAPI_PROXY_LOCAL_DESTINATIONS',
+  'FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS',
+];
 
 function clearProxyEnv(): void {
   for (const name of PROXY_ENV_VARS) {
@@ -117,22 +130,31 @@ describe('SOCKS scheme detection (#630)', () => {
 // with a SocksProxyAgent. Stubbing https.request lets us assert *which* agent
 // the dispatcher picked (and that socks5h parsed into a real SOCKS5 agent)
 // without opening a socket.
+const fakeRequest = ((_opts: any, cb: any) => {
+  const req = new EventEmitter() as any;
+  req.write = () => {};
+  req.destroy = () => {};
+  req.end = () => {
+    const res = new EventEmitter() as any;
+    res.statusCode = 200;
+    res.statusMessage = 'OK';
+    res.headers = {};
+    res.destroy = () => {};
+    cb(res);
+    setImmediate(() => res.emit('end'));
+  };
+  return req;
+}) as any;
+
 function stubHttpsRequest() {
-  return vi.spyOn(https, 'request').mockImplementation(((_opts: any, cb: any) => {
-    const req = new EventEmitter() as any;
-    req.write = () => {};
-    req.destroy = () => {};
-    req.end = () => {
-      const res = new EventEmitter() as any;
-      res.statusCode = 200;
-      res.statusMessage = 'OK';
-      res.headers = {};
-      res.destroy = () => {};
-      cb(res);
-      setImmediate(() => res.emit('end'));
-    };
-    return req;
-  }) as any);
+  return vi.spyOn(https, 'request').mockImplementation(fakeRequest);
+}
+
+// A plain `http://` destination rides http.request, not https.request — the
+// local-endpoint cases (#951) are all http, so both transports need stubbing
+// before a test can claim nothing reached the wire.
+function stubHttpRequest() {
+  return vi.spyOn(http, 'request').mockImplementation(fakeRequest);
 }
 
 describe('proxyFetch dispatcher selection for SOCKS schemes (#630)', () => {
@@ -464,6 +486,111 @@ describe('proxyFetch routing', () => {
     await proxyFetch('https://api.example.com/v1', undefined, 'google');
     const [, init] = spy.mock.calls[0];
     expect((init as any)?.dispatcher).toBeUndefined();
+  });
+});
+
+// #951: a local destination — Ollama/llama.cpp/LM Studio on 127.0.0.1, or on
+// the LAN at 192.168.1.20 — is unreachable through a remote proxy, and because
+// an IP literal must go on the wire as ATYP 0x01 (an IP) regardless of the
+// `socks5h` suffix, it is exactly what makes Tor log "giving Tor only an IP
+// address" and may get the connection refused. Loopback and private/LAN
+// addresses therefore always bypass the proxy, unless the operator opts out
+// with FREEAPI_PROXY_LOCAL_DESTINATIONS.
+describe('local and LAN destinations bypass the proxy (#951)', () => {
+  /** Run one request through the SOCKS-configured proxy and report the route. */
+  const routeOf = async (url: string): Promise<'direct' | 'proxied'> => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    const httpsSpy = stubHttpsRequest();
+    const httpSpy = stubHttpRequest();
+    await proxyFetch(url, { method: 'POST' }, 'custom');
+    // A SOCKS route never touches fetch(): it goes out through http/https.request
+    // with a SocksProxyAgent attached.
+    if (httpsSpy.mock.calls.length + httpSpy.mock.calls.length > 0) {
+      expect(fetchSpy).not.toHaveBeenCalled();
+      return 'proxied';
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // Direct means no dispatcher was injected either.
+    expect((fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher).toBeUndefined();
+    return 'direct';
+  };
+
+  beforeEach(() => {
+    applyProxyUrl('socks5h://127.0.0.1:9050');
+  });
+
+  const directCases: Array<[string, string]> = [
+    ['IPv4 loopback', 'http://127.0.0.1:11434/api/chat'],
+    ['the 127/8 range beyond .0.1', 'http://127.0.0.2:11434/api/chat'],
+    ['"this host" 0.0.0.0', 'http://0.0.0.0:11434/api/chat'],
+    ['bracketed IPv6 loopback', 'http://[::1]:11434/api/chat'],
+    ['the localhost name', 'http://localhost:11434/api/chat'],
+    ['a *.localhost subdomain', 'http://ollama.localhost:11434/api/chat'],
+    ['the trailing-dot FQDN form of localhost', 'http://localhost.:11434/api/chat'],
+    ['an RFC1918 LAN address', 'http://192.168.1.20:11434/api/chat'],
+    ['a 10/8 LAN address', 'http://10.0.0.5:11434/api/chat'],
+    ['a 172.16/12 LAN address', 'http://172.16.4.2:11434/api/chat'],
+    ['an IPv6 ULA address', 'http://[fd12:3456::1]:11434/api/chat'],
+  ];
+
+  for (const [label, url] of directCases) {
+    it(`sends ${label} direct`, async () => {
+      expect(await routeOf(url)).toBe('direct');
+    });
+  }
+
+  it('still routes a public destination through the SOCKS proxy', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const reqSpy = stubHttpsRequest();
+
+    await proxyFetch('https://api.openai.com/v1/models', { method: 'GET' }, 'openai');
+
+    // Public host still goes through the SOCKS agent (port 9050).
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((reqSpy.mock.calls[0][0] as any).agent?.proxy?.port).toBe(9050);
+  });
+
+  it('applies to the per-key proxy path too', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    const httpsSpy = stubHttpsRequest();
+    const httpSpy = stubHttpRequest();
+
+    await withKeyProxy('socks5h://127.0.0.1:9051', () =>
+      proxyFetch('http://192.168.1.20:11434/api/chat', { method: 'POST' }, 'custom'));
+
+    expect(httpsSpy).not.toHaveBeenCalled();
+    expect(httpSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect((fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher).toBeUndefined();
+  });
+
+  // The `ssh -D` case: the tunnel's far end is where 127.0.0.1:11434 is meant
+  // to resolve, so the operator can force local destinations back through it.
+  describe('FREEAPI_PROXY_LOCAL_DESTINATIONS opt-out', () => {
+    it('routes loopback through the proxy when set', async () => {
+      process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS = 'true';
+      applyProxyUrl('socks5h://127.0.0.1:9050');
+      expect(await routeOf('http://127.0.0.1:11434/api/chat')).toBe('proxied');
+    });
+
+    it('routes a LAN address through the proxy when set', async () => {
+      process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS = '1';
+      applyProxyUrl('socks5h://127.0.0.1:9050');
+      expect(await routeOf('http://192.168.1.20:11434/api/chat')).toBe('proxied');
+    });
+
+    it('is ignored when set to a non-truthy value', async () => {
+      process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS = 'false';
+      applyProxyUrl('socks5h://127.0.0.1:9050');
+      expect(await routeOf('http://127.0.0.1:11434/api/chat')).toBe('direct');
+    });
+
+    it('still honours the global off switch', async () => {
+      process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS = 'true';
+      applyProxyUrl('socks5h://127.0.0.1:9050');
+      applyProxyEnabled(false);
+      expect(await routeOf('http://127.0.0.1:11434/api/chat')).toBe('direct');
+    });
   });
 });
 
