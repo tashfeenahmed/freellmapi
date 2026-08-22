@@ -248,6 +248,17 @@ export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPoli
   // Groq documents logprobs / top_logprobs / logit_bias as unsupported and
   // rejects requests that include them.
   groq: { drop: ['logprobs', 'top_logprobs', 'logit_bias'] },
+  // GitHub Models sits on Azure OpenAI, which 400s "Unrecognized request
+  // argument" for knobs outside the OpenAI set. Its reasoning_effort enum is
+  // the older low/medium/high one, so 'none'/'minimal' are clamped rather
+  // than sent. Its free tier also refuses any max_tokens above
+  // GITHUB_MAX_OUTPUT_TOKENS, so the cap is clamped here instead of being
+  // spent as a wasted fallback hop.
+  github: {
+    drop: ['top_k', 'min_p', 'repetition_penalty'],
+    reasoningEfforts: ['low', 'medium', 'high'],
+    maxTokensCap: GITHUB_MAX_OUTPUT_TOKENS,
+  },
   // Gemini's generationConfig has no equivalents for these; the adapter
   // translates the rest natively (topK, seed, penalties, responseSchema, and
   // reasoning_effort → thinkingConfig — see toGeminiExtendedConfig).
