@@ -471,6 +471,8 @@ export function isContextTooLargeError(err: any): boolean {
     || /input token count[^.]*exceeds/.test(msg)
     || msg.includes('exceeds the maximum number of tokens')
     || msg.includes('request too large')
+    || msg.includes('prompt exceeds max length')
+    || msg.includes('exceeds max length')
     || msg.includes('payload too large')
     || msg.includes('request entity too large')
     || msg.includes('request body too large')

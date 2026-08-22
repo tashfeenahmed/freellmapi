@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Utforska omätta modeller",
@@ -311,7 +313,7 @@
     "factor": "score x{factor}",
     "noCooldown": "Ingen cooldown",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} senaste felen",
     "noRecentErrors": "Inga nyligen inträffade fel",
     "noKey": "Ingen nyckel",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Startförskjutning från begäran start · Försökslängd",
     "requestedModel": "Efterfrågad modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Begäranden per agent"
+    "requestsByAgent": "Begäranden per agent",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Lekplats",

@@ -742,7 +742,7 @@ analyticsRouter.get('/requests/:id', (req: Request, res: Response) => {
   }
 
   const attempts = db.prepare(`
-    SELECT ordinal, platform, model_id, key_ordinal, outcome, start_offset_ms, duration_ms, error_summary
+    SELECT ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary
     FROM request_attempts
     WHERE request_id = ?
     ORDER BY ordinal ASC
@@ -772,6 +772,7 @@ analyticsRouter.get('/requests/:id', (req: Request, res: Response) => {
       platform: a.platform,
       modelId: a.model_id,
       keyOrdinal: a.key_ordinal,
+      keyLabel: a.key_label ?? null,
       outcome: a.outcome,
       startOffsetMs: a.start_offset_ms,
       durationMs: a.duration_ms,

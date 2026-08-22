@@ -68,11 +68,13 @@ export type Platform =
   // published. Catalog rows live in the hosted catalog (premium now, free after
   // 30 days).
   | 'anyapi'
+  // UnoRouter — open-source OpenAI-compatible gateway; `:free` model ids are a
+  // genuine no-card free tier (~1 req/min per user, 429 + Retry-After).
+  | 'unorouter'
   | 'nvidia'
   | 'mistral'
   | 'sambanova'
   | 'openrouter'
-  | 'github'
   | 'cohere'
   | 'cloudflare'
   | 'zhipu'

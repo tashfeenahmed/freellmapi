@@ -503,7 +503,6 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'nvidia',     name: 'NVIDIA NIM',    baseUrl: 'https://integrate.api.nvidia.com/v1' },
     { platform: 'mistral',    name: 'Mistral',       baseUrl: 'https://api.mistral.ai/v1' },
     { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },
-    { platform: 'github',     name: 'GitHub Models', baseUrl: 'https://models.github.ai/inference' },
     // pollinations registers a PollinationsProvider subclass (custom
     // validateKey, see providers/pollinations.test.ts) but chat routing is
     // stock openai-compat.

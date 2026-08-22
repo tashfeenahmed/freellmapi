@@ -131,7 +131,6 @@ describe('reasoning_effort (request-side reasoning control)', () => {
   it('forwarded verbatim on openai-compat platforms without a droplist entry', () => {
     expect(extendedBodyParams('groq', { reasoning_effort: 'medium' }).reasoning_effort).toBe('medium');
     expect(extendedBodyParams('cerebras', { reasoning_effort: 'none' }).reasoning_effort).toBe('none');
-    expect(extendedBodyParams('github', { reasoning_effort: 'high' }).reasoning_effort).toBe('high');
   });
 
   it('stripped for platforms with no support (never 400s a strict upstream)', () => {
@@ -189,12 +188,10 @@ describe('reasoning_effort normalization (#619 — off-scale values must not 400
     expect(pickSamplingParams({ reasoning_effort: 'nonsense', seed: 3 })).toEqual({ seed: 3 });
   });
 
-  it('per-platform clamping: github takes only low/medium/high', () => {
-    expect(extendedBodyParams('github', { reasoning_effort: 'none' }).reasoning_effort).toBe('low');
-    expect(extendedBodyParams('github', { reasoning_effort: 'minimal' }).reasoning_effort).toBe('low');
-    expect(extendedBodyParams('github', { reasoning_effort: 'medium' }).reasoning_effort).toBe('medium');
-    // Platforms without a restriction still get the value verbatim.
+  it('per-platform clamping: platforms without a restriction get the value verbatim', () => {
     expect(extendedBodyParams('groq', { reasoning_effort: 'none' }).reasoning_effort).toBe('none');
+    expect(extendedBodyParams('cerebras', { reasoning_effort: 'minimal' }).reasoning_effort).toBe('minimal');
+    expect(extendedBodyParams('cerebras', { reasoning_effort: 'medium' }).reasoning_effort).toBe('medium');
   });
 });
 

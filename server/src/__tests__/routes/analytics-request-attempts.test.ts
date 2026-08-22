@@ -89,9 +89,9 @@ describe('per-attempt traces in the analytics requests API', () => {
       latencyMs: 1234,
     });
     expect(body.attempts).toEqual([
-      { ordinal: 0, platform: 'groq', modelId: 'llama-x', keyOrdinal: 1, outcome: 'rate_limited', startOffsetMs: 0, durationMs: 210, errorSummary: '429 rate limit reached, retry in 7m12s' },
-      { ordinal: 1, platform: 'google', modelId: 'gemini-y', keyOrdinal: 2, outcome: 'timeout', startOffsetMs: 215, durationMs: 10000, errorSummary: 'upstream timeout after 10000ms' },
-      { ordinal: 2, platform: 'cerebras', modelId: 'qwen-z', keyOrdinal: 3, outcome: 'ok', startOffsetMs: 10220, durationMs: 900, errorSummary: null },
+      { ordinal: 0, platform: 'groq', modelId: 'llama-x', keyOrdinal: 1, keyLabel: null, outcome: 'rate_limited', startOffsetMs: 0, durationMs: 210, errorSummary: '429 rate limit reached, retry in 7m12s' },
+      { ordinal: 1, platform: 'google', modelId: 'gemini-y', keyOrdinal: 2, keyLabel: null, outcome: 'timeout', startOffsetMs: 215, durationMs: 10000, errorSummary: 'upstream timeout after 10000ms' },
+      { ordinal: 2, platform: 'cerebras', modelId: 'qwen-z', keyOrdinal: 3, keyLabel: null, outcome: 'ok', startOffsetMs: 10220, durationMs: 900, errorSummary: null },
     ]);
   });
 

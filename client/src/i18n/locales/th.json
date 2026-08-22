@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "สำรวจโมเดลที่ยังไม่ได้วัดผล",
@@ -311,7 +313,7 @@
     "factor": "คะแนน x{factor}",
     "noCooldown": "ไม่มีคูลดาวน์",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "ข้อผิดพลาดล่าสุด {count}",
     "noRecentErrors": "ไม่มีข้อผิดพลาดล่าสุด",
     "noKey": "ไม่มีกุญแจ",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "เริ่มต้นออฟเซ็ตจากคำขอเริ่มต้น · ระยะเวลาความพยายาม",
     "requestedModel": "รุ่นที่ขอ",
     "ttft": "TTFT",
-    "requestsByAgent": "คำขอตามเอเจนต์"
+    "requestsByAgent": "คำขอตามเอเจนต์",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "สนามเด็กเล่น",

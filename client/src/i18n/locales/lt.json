@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Tyrinėti neišmatuotus modelius",
@@ -311,7 +313,7 @@
     "factor": "score x{factor}",
     "noCooldown": "Nėra atvėsimo laiko",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} pastarųjų klaidų",
     "noRecentErrors": "Jokių naujausių klaidų",
     "noKey": "Be rakto",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Pradėti poslinkį nuo užklausos pradžios · Bandymo trukmė",
     "requestedModel": "Prašytas modelis",
     "ttft": "TTFT",
-    "requestsByAgent": "Užklausos pagal agentą"
+    "requestsByAgent": "Užklausos pagal agentą",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Žaidimų aikštelė",

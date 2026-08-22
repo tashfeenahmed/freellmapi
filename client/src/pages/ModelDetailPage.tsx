@@ -16,8 +16,10 @@ import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { ModelTableHead, RowContent } from '@/components/model-table'
+import type { HealthData } from '@/components/keys/shared'
 import {
   groupQuotaBadge,
+  groupRemainingQuota,
   isMemberSplit,
   memberEndpointTitle,
   memberOverrideKey,
@@ -77,6 +79,15 @@ export default function ModelDetailPage() {
     queryKey: ['unify'],
     queryFn: () => apiFetch('/api/settings/unify'),
   })
+
+  // Observed provider quota states — drives the remaining-quota badge on the
+  // summary row (#876). Same 30s cadence as the Keys page health data.
+  const { data: healthData } = useQuery<HealthData>({
+    queryKey: ['health'],
+    queryFn: () => apiFetch('/api/health'),
+    refetchInterval: 30_000,
+  })
+  const quotaStates = healthData?.quotaStates
 
   // Toggling a provider persists immediately (no save bar on this page): send the
   // full entries list with this one flipped, then refresh.
@@ -191,6 +202,7 @@ export default function ModelDetailPage() {
 
   const label = members[0]?.groupLabel ?? members[0]?.displayName ?? canonicalId
   const quota = members.length ? groupQuotaBadge(members, t) : null
+  const remaining = members.length && quotaStates ? groupRemainingQuota(members, quotaStates, t) : null
   const vision = members.some(m => m.supportsVision)
   const tools = members.some(m => m.supportsTools)
 
@@ -247,6 +259,7 @@ export default function ModelDetailPage() {
               </span>
               <span className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: members.length })}</span>
               {quota && <span title={quota.title} className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground tabular-nums">{quota.text}</span>}
+              {remaining && <span title={remaining.title} className="text-[11px] rounded-full px-2 py-0.5 bg-emerald-600/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-400 tabular-nums">{remaining.text}</span>}
               {vision && <span title={t('models.visionTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>}
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
             </div>

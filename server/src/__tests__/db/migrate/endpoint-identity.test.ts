@@ -75,6 +75,7 @@ describe('custom model endpoint identity migration', () => {
       const fallbackBefore = chainOf();
       const profileBefore = profileOf();
       const totalBefore = (db.prepare('SELECT COUNT(*) AS n FROM models').get() as { n: number }).n;
+      const githubBefore = (db.prepare("SELECT COUNT(*) AS n FROM models WHERE platform = 'github'").get() as { n: number }).n;
 
       await runMigrations(db, 'up');
 
@@ -87,9 +88,10 @@ describe('custom model endpoint identity migration', () => {
       expect(chainOf()).toEqual(fallbackBefore);
       expect(profileOf()).toEqual(profileBefore);
       expect(db.pragma('foreign_key_check')).toEqual([]);
-      // Nothing was dropped on the way through (later migrations only add rows).
+      // Nothing was dropped on the way through except the rows the
+      // retire_github_models migration intentionally removes (#877).
       expect((db.prepare('SELECT COUNT(*) AS n FROM models').get() as { n: number }).n)
-        .toBeGreaterThanOrEqual(totalBefore);
+        .toBeGreaterThanOrEqual(totalBefore - githubBefore);
     } finally {
       db.close();
     }

@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "కొలవని మోడల్స్‌ను అన్వేషించండి",
@@ -311,7 +313,7 @@
     "factor": "స్కోర్ x{factor}",
     "noCooldown": "కూల్‌డౌన్ లేదు",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} ఇటీవలి లోపాలు",
     "noRecentErrors": "ఇటీవలి లోపాలు లేవు",
     "noKey": "కీ లేదు",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "అభ్యర్థన ప్రారంభం నుండి ఆఫ్‌సెట్ ప్రారంభించండి · ప్రయత్న వ్యవధి",
     "requestedModel": "అభ్యర్థించిన మోడల్",
     "ttft": "TTFT",
-    "requestsByAgent": "ఏజెంట్ వారీగా అభ్యర్థనలు"
+    "requestsByAgent": "ఏజెంట్ వారీగా అభ్యర్థనలు",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ప్లేగ్రౌండ్",

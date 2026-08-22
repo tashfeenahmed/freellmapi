@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Istraži nemjerene modele",
@@ -311,7 +313,7 @@
     "factor": "score x{factor}",
     "noCooldown": "Nema cooldowna",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} nedavne pogreške",
     "noRecentErrors": "Nema nedavnih pogrešaka",
     "noKey": "Nema ključa",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Početak offseta od početka zahtjeva · Trajanje pokušaja",
     "requestedModel": "Traženi model",
     "ttft": "TTFT",
-    "requestsByAgent": "Zahtjevi po agentu"
+    "requestsByAgent": "Zahtjevi po agentu",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Igralište",

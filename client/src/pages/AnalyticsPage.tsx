@@ -199,6 +199,10 @@ interface RequestAttempt {
   platform: string
   modelId: string
   keyOrdinal: number
+  // Operator-facing key label captured at attempt time (#869); null when the
+  // key had no label. Shown in a tooltip on the key badge so a multi-key
+  // provider's ladder says WHICH key was tried, not just key1/key2.
+  keyLabel: string | null
   outcome: string
   startOffsetMs: number
   durationMs: number
@@ -392,7 +396,9 @@ function RequestDetailDialog({ requestId, onClose }: { requestId: number | null;
                         <PlatformDot platform={a.platform} />
                         <span className="font-medium">{a.platform}</span>
                         <span className="text-muted-foreground truncate" title={a.modelId}>{a.modelId}</span>
-                        <Badge variant="outline">{t('analytics.keyOrdinal', { n: a.keyOrdinal })}</Badge>
+                        <HoverTooltip text={a.keyLabel ? `${t('analytics.keyBadge', { n: a.keyOrdinal })} · ${a.keyLabel}` : t('analytics.keyBadge', { n: a.keyOrdinal })}>
+                          <Badge variant="outline">{t('analytics.keyOrdinal', { n: a.keyOrdinal })}</Badge>
+                        </HoverTooltip>
                         {/* client_abort is the caller's doing, not a hop failure. */}
                         <Badge variant={a.outcome === 'ok' || a.outcome === 'committed' ? 'secondary' : a.outcome === 'client_abort' ? 'outline' : 'destructive'}>
                           {a.outcome}

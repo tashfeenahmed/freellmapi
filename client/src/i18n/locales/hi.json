@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "बिना मापे गए मॉडल एक्सप्लोर करें",
@@ -311,7 +313,7 @@
     "factor": "स्कोर x{factor}",
     "noCooldown": "कोई ठंडक नहीं",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} हाल की त्रुटियाँ",
     "noRecentErrors": "कोई हालिया त्रुटि नहीं",
     "noKey": "कोई कुंजी नहीं",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "अनुरोध प्रारंभ · प्रयास अवधि से प्रारंभ ऑफसेट",
     "requestedModel": "अनुरोधित मॉडल",
     "ttft": "TTFT",
-    "requestsByAgent": "एजेंट के अनुसार अनुरोध"
+    "requestsByAgent": "एजेंट के अनुसार अनुरोध",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "खेल का मैदान",

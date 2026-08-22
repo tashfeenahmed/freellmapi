@@ -6,11 +6,13 @@ import { useI18n } from '@/i18n'
 import { CopyButton } from '@/components/copy-button'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip } from '@/components/tooltip'
+import type { ProviderQuotaState } from '../../../shared/types'
 import {
   cleanQuotaLabel,
   formatContext,
   groupMaxContext,
   groupQuotaBadge,
+  groupRemainingQuota,
   memberEndpointTitle,
   memberProviderLabel,
   providerLabel,
@@ -242,7 +244,7 @@ export const dragDots = (
 // The collapsed header row for a logical-model group: name, provider count,
 // union vision/tools badges, the best member's axis bars + score, and a single
 // switch that enables/disables every provider in the group.
-export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRows }: {
+export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRows, quotaStates }: {
   group: ModelGroupRow
   rank: number
   dragHandle?: ReactNode
@@ -251,6 +253,9 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   // model id land in different display groups the moment one copy is renamed,
   // so the group's own members are not a complete sibling set (#651).
   allRows?: readonly Row[]
+  // Observed provider quota states (from /api/health) for the remaining-quota
+  // badge (#876). Optional: when absent, the badge simply doesn't render.
+  quotaStates?: ProviderQuotaState[]
 }) {
   const { t } = useI18n()
   const anyEnabled = group.members.some(m => m.enabled)
@@ -271,6 +276,7 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   const vision = group.members.some(m => m.supportsVision)
   const tools = group.members.some(m => m.supportsTools)
   const quota = groupQuotaBadge(group.members, t)
+  const remaining = quotaStates ? groupRemainingQuota(group.members, quotaStates, t) : null
   const maxCtx = groupMaxContext(group.members)
   // The model name links to its own page, which lists every provider that serves
   // it (replaces the old inline expansion).
@@ -293,6 +299,11 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
             {quota && (
               <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
                 {quota.text}
+              </span>
+            )}
+            {remaining && (
+              <span title={remaining.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-emerald-600/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-400 tabular-nums">
+                {remaining.text}
               </span>
             )}
             {maxCtx > 0 && (
@@ -341,11 +352,12 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   )
 }
 
-export function SortableGroupRow({ group, rank, onToggleGroup, allRows }: {
+export function SortableGroupRow({ group, rank, onToggleGroup, allRows, quotaStates }: {
   group: ModelGroupRow
   rank: number
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
   allRows?: readonly Row[]
+  quotaStates?: ProviderQuotaState[]
 }) {
   const { t } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
@@ -370,7 +382,7 @@ export function SortableGroupRow({ group, rank, onToggleGroup, allRows }: {
       onClick={() => navigate(`/models/chat/${detailId}`)}
       className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
-      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} />
+      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} quotaStates={quotaStates} />
     </tr>
   )
 }

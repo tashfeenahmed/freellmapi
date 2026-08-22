@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "کاوش مدل‌های اندازه‌گیری‌نشده",
@@ -311,7 +313,7 @@
     "factor": "امتیاز x{factor}",
     "noCooldown": "بدون خنک شدن",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "خطاهای اخیر {count}",
     "noRecentErrors": "هیچ خطای اخیر",
     "noKey": "بدون کلید",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "شروع افست از شروع درخواست · مدت زمان تلاش",
     "requestedModel": "مدل درخواستی",
     "ttft": "TTFT",
-    "requestsByAgent": "درخواستها بر اساس عامل"
+    "requestsByAgent": "درخواستها بر اساس عامل",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "زمین بازی",

@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Досліджувати невиміряні моделі",
@@ -311,7 +313,7 @@
     "factor": "оцінка x{factor}",
     "noCooldown": "Немає перезарядки",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} останні помилки",
     "noRecentErrors": "Немає останніх помилок",
     "noKey": "немає ключа",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Початковий зсув від початку запиту · тривалість спроби",
     "requestedModel": "Запитана модель",
     "ttft": "TTFT",
-    "requestsByAgent": "Запити за агентами"
+    "requestsByAgent": "Запити за агентами",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Дитячий майданчик",

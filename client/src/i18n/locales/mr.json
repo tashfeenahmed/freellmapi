@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "न मोजलेले मॉडेल्स एक्सप्लोर करा",
@@ -311,7 +313,7 @@
     "factor": "गुण x{factor}",
     "noCooldown": "कूलडाउन नाही",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} अलीकडील त्रुटी",
     "noRecentErrors": "अलीकडील त्रुटी नाहीत",
     "noKey": "चावी नाही",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "विनंती पासून ऑफसेट सुरू करा प्रारंभ · प्रयत्न कालावधी",
     "requestedModel": "मॉडेलची विनंती केली",
     "ttft": "TTFT",
-    "requestsByAgent": "एजंटनुसार विनंत्या"
+    "requestsByAgent": "एजंटनुसार विनंत्या",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "खेळाचे मैदान",

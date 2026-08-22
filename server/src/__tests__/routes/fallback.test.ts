@@ -66,9 +66,14 @@ describe('Fallback API', () => {
 
   it('GET /api/fallback/token-usage reports per-model chat usage for configured platforms', async () => {
     const db = getDb();
+    // GitHub Models was retired (#877), so the seeded github rows are gone —
+    // pick a catalog model that is actually in the fallback chain (the endpoint
+    // only reports models with keys that are on the chain).
     const target = db.prepare(`
-      SELECT id, platform, model_id FROM models
-       WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'
+      SELECT m.id, m.platform, m.model_id FROM models m
+       JOIN fallback_config fc ON fc.model_db_id = m.id
+       WHERE m.platform <> 'custom' AND m.enabled = 1
+       ORDER BY fc.priority ASC LIMIT 1
     `).get() as { id: number; platform: string; model_id: string };
     const other = db.prepare(`
       SELECT platform, model_id FROM models

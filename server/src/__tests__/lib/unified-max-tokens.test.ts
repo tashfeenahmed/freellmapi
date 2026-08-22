@@ -17,7 +17,6 @@ import {
   resolveMaxTokens,
   defaultMaxTokensFor,
   maxTokensCapFor,
-  GITHUB_MAX_OUTPUT_TOKENS,
   UNIFIED_MAX_TOKENS_SETTING,
   UNIFIED_MAX_TOKENS_AUTO,
 } from '../../lib/sampling-params.js';
@@ -99,32 +98,31 @@ describe('resolveMaxTokens under the cap', () => {
 });
 
 describe('per-platform max_tokens ceiling', () => {
-  it('is declared only for platforms whose API rejects large values', () => {
-    expect(maxTokensCapFor('github')).toBe(GITHUB_MAX_OUTPUT_TOKENS);
+  it('is no longer declared once GitHub Models retired (#877)', () => {
+    expect(maxTokensCapFor('github')).toBeUndefined();
     expect(maxTokensCapFor('groq')).toBeUndefined();
     expect(maxTokensCapFor('nonsense-platform')).toBeUndefined();
   });
 
-  it('clamps an oversized request even with the operator cap off', () => {
+  it('passes an oversized request through when no platform cap applies', () => {
     expect(unifiedMaxTokensCap()).toBeNull();
-    expect(resolveMaxTokens('github', 65536)).toBe(GITHUB_MAX_OUTPUT_TOKENS);
+    expect(resolveMaxTokens('github', 65536)).toBe(65536);
     // Other platforms keep the historical pass-through behaviour.
     expect(resolveMaxTokens('groq', 65536)).toBe(65536);
   });
 
-  it('leaves a request at or below the platform ceiling alone', () => {
+  it('leaves a request alone when no platform ceiling exists', () => {
     expect(resolveMaxTokens('github', 128)).toBe(128);
-    expect(resolveMaxTokens('github', GITHUB_MAX_OUTPUT_TOKENS)).toBe(GITHUB_MAX_OUTPUT_TOKENS);
   });
 
   it('sends nothing when the client sent nothing and the platform has no floor', () => {
     expect(resolveMaxTokens('github', undefined)).toBeUndefined();
   });
 
-  it('takes the tighter of the platform ceiling and the operator cap', () => {
+  it('applies only the operator cap when no platform cap exists', () => {
     settingStore.set(UNIFIED_MAX_TOKENS_SETTING, 'auto'); // 32768 — looser
-    expect(resolveMaxTokens('github', 65536)).toBe(GITHUB_MAX_OUTPUT_TOKENS);
-    settingStore.set(UNIFIED_MAX_TOKENS_SETTING, '128'); // tighter than the platform
+    expect(resolveMaxTokens('github', 65536)).toBe(32768);
+    settingStore.set(UNIFIED_MAX_TOKENS_SETTING, '128'); // tighter
     expect(resolveMaxTokens('github', 65536)).toBe(128);
   });
 });

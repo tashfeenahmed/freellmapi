@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Tutki mittaamattomia malleja",
@@ -311,7 +313,7 @@
     "factor": "pisteet x{factor}",
     "noCooldown": "Ei jäähdytysaikaa",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} viimeaikaiset virheet",
     "noRecentErrors": "Ei viimeaikaisia virheitä",
     "noKey": "ei avainta",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Aloita siirtymä pyynnön alusta · Yrityksen kesto",
     "requestedModel": "Pyydetty malli",
     "ttft": "TTFT",
-    "requestsByAgent": "Pyynnöt agenteittain"
+    "requestsByAgent": "Pyynnöt agenteittain",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Leikkipaikka",

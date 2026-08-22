@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "ಅಳೆಯದ ಮಾದರಿಗಳನ್ನು ಅನ್ವೇಷಿಸಿ",
@@ -311,7 +313,7 @@
     "factor": "ಸ್ಕೋರ್ x{factor}",
     "noCooldown": "ಕೂಲ್‌ಡೌನ್ ಇಲ್ಲ",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} ಇತ್ತೀಚಿನ ದೋಷಗಳು",
     "noRecentErrors": "ಇತ್ತೀಚಿನ ದೋಷಗಳಿಲ್ಲ",
     "noKey": "ಕೀ ಇಲ್ಲ",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "ವಿನಂತಿಯ ಪ್ರಾರಂಭದಿಂದ ಆಫ್‌ಸೆಟ್ ಪ್ರಾರಂಭಿಸಿ · ಪ್ರಯತ್ನದ ಅವಧಿ",
     "requestedModel": "ವಿನಂತಿಸಿದ ಮಾದರಿ",
     "ttft": "TTFT",
-    "requestsByAgent": "ಏಜೆಂಟ್ ಪ್ರಕಾರ ವಿನಂತಿಗಳು"
+    "requestsByAgent": "ಏಜೆಂಟ್ ಪ್ರಕಾರ ವಿನಂತಿಗಳು",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "ಆಟದ ಮೈದಾನ",

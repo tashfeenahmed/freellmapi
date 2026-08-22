@@ -63,6 +63,19 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.anyapi.ai/v1',
 }));
 
+// UnoRouter — OpenAI-compatible gateway (unorouter.com), the open-source
+// OpenRouter alternative. One key, 426+ models; `:free`-suffixed ids are a
+// genuine free tier ($0, no card) at roughly 1 request/minute per user — the
+// cap returns HTTP 429 with a Retry-After header, which the existing
+// rate-limit / cooldown machinery already honors (issue #875). Model rows are
+// authored in the hosted catalog and arrive via catalog-sync once the
+// platform is registered, exactly like AnyAPI above.
+register(new OpenAICompatProvider({
+  platform: 'unorouter',
+  name: 'UnoRouter',
+  baseUrl: 'https://api.unorouter.com/v1',
+}));
+
 // SambaNova was dropped in V23 (June 2026): the free tier is permanently gone.
 // The always-free tier was retired in early 2025 for a one-time $5 trial
 // credit (expires in 3 months); once it lapses, every chat call 402s
@@ -100,15 +113,6 @@ register(new OpenAICompatProvider({
     'HTTP-Referer': 'http://localhost:3001',
     'X-Title': 'FreeLLMAPI',
   },
-}));
-
-// GitHub Models — OpenAI-compatible. Catalog uses `<publisher>/<model>` ids
-// (e.g. `openai/gpt-4.1`); the old Azure endpoint rejects that prefix with
-// "Unknown model", so route to the current models.github.ai endpoint.
-register(new OpenAICompatProvider({
-  platform: 'github',
-  name: 'GitHub Models',
-  baseUrl: 'https://models.github.ai/inference',
 }));
 
 // Cohere - OpenAI-compatible via Cohere compatibility endpoint

@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "Ṣawari awọn awoṣe ti a ko ti wọn",
@@ -311,7 +313,7 @@
     "factor": "Dimegilio x{factor}",
     "noCooldown": "Ko si itura",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} to šẹšẹ aṣiṣe",
     "noRecentErrors": "Ko si awọn aṣiṣe aipẹ",
     "noKey": "ko si bọtini",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "Bẹrẹ aiṣedeede lati ibere ibere · Iye akoko igbiyanju",
     "requestedModel": "Awoṣe ti a beere",
     "ttft": "TTFT",
-    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju"
+    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "Ibi isereile",

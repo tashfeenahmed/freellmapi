@@ -268,7 +268,9 @@
     "aliasMergeHeading": "Merge model aliases",
     "aliasMergeHint": "Requests for the unified model id are also served through these custom-provider aliases (e.g. custom:my-alias).",
     "aliasMergeAdd": "Add",
-    "aliasMergeRemove": "Remove"
+    "aliasMergeRemove": "Remove",
+    "remainingQuota": "{count}% left",
+    "remainingQuotaTitle": "Remaining share of the tightest observed provider quota (from the latest rate-limit headers / quota signals)"
   },
   "strategies": {
     "explore": "ያልተለኩ ሞዴሎችን ያስሱ",
@@ -311,7 +313,7 @@
     "factor": "ውጤት x{factor}",
     "noCooldown": "ማቀዝቀዝ የለም",
     "cooldownChip": "{key} - {time}",
-    "resetCooldown": "Reset cooldown",
+    "resetCooldown": "Reset this key's cooldowns now",
     "errorsHeading": "{count} የቅርብ ጊዜ ስህተቶች",
     "noRecentErrors": "ምንም የቅርብ ጊዜ ስህተቶች የሉም",
     "noKey": "ቁልፍ የለም",
@@ -632,7 +634,8 @@
     "attemptTimingHint": "ከጥያቄ ጅምር ማካካሻ ጀምር · የሙከራ ጊዜ",
     "requestedModel": "የተጠየቀው ሞዴል",
     "ttft": "TTFT",
-    "requestsByAgent": "ጥያቄዎች በወኪል"
+    "requestsByAgent": "ጥያቄዎች በወኪል",
+    "keyBadge": "Key #{n}"
   },
   "playground": {
     "title": "የመጫወቻ ሜዳ",

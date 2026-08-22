@@ -121,6 +121,14 @@ describe('isContextTooLargeError', () => {
     expect(isContextTooLargeError(new Error('Cloudflare API error 413: content too large'))).toBe(true);
   });
 
+  it('flags Zhipu / Z.ai "Prompt exceeds max length" 400s (bare wording, no code field) (#873)', () => {
+    expect(isContextTooLargeError(Object.assign(
+      new Error('Zhipu API error 400: Prompt exceeds max length'),
+      { status: 400 },
+    ))).toBe(true);
+    expect(isContextTooLargeError(new Error('API error 400: prompt exceeds max length'))).toBe(true);
+  });
+
   it('does not flag rate limits, ordinary 400s, or upstream errors', () => {
     expect(isContextTooLargeError(Object.assign(new Error('429 Too Many Requests'), { status: 429 }))).toBe(false);
     expect(isContextTooLargeError(Object.assign(new Error('Groq API error 429: Rate limit reached on requests per day (RPD): Limit 1000'), { status: 429 }))).toBe(false);
@@ -134,6 +142,10 @@ describe('isContextTooLargeError', () => {
     // bad-request rule would otherwise swallow.
     expect(classifyAttemptError(Object.assign(
       new Error("OpenAI-compat API error 400: This model's maximum context length is 8192 tokens."),
+      { status: 400 },
+    ))).toBe('context_too_large');
+    expect(classifyAttemptError(Object.assign(
+      new Error('Zhipu API error 400: Prompt exceeds max length'),
       { status: 400 },
     ))).toBe('context_too_large');
     expect(classifyAttemptError(Object.assign(new Error('API error 413: Payload Too Large'), { status: 413 }))).toBe('context_too_large');
