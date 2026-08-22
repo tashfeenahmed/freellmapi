@@ -59,61 +59,8 @@ relay controlled by an operator you trust. A production relay should:
 
 ## Cloudflare Worker reference
 
-Set `RELAY_PATH` to a long random path such as `/a-long-random-secret` and
-`ALLOWED_UPSTREAM_HOSTS` to a comma-separated exact hostname allowlist. The
-secret path is a bearer credential: do not log it, publish it, or reuse it.
-
-```js
-const TARGET_HEADER = 'X-FreeLLMAPI-Target-URL';
-
-export default {
-  async fetch(request, env) {
-    const relayUrl = new URL(request.url);
-    if (!env.RELAY_PATH || relayUrl.pathname !== env.RELAY_PATH) {
-      return new Response('Not found', { status: 404 });
-    }
-
-    const targetValue = request.headers.get(TARGET_HEADER)
-      ?? relayUrl.searchParams.get('url');
-    let target;
-    try {
-      target = new URL(targetValue);
-    } catch {
-      return new Response('Invalid target', { status: 400 });
-    }
-
-    const allowedHosts = new Set(
-      (env.ALLOWED_UPSTREAM_HOSTS ?? '')
-        .split(',')
-        .map(host => host.trim().toLowerCase())
-        .filter(Boolean),
-    );
-    if (target.protocol !== 'https:' || !allowedHosts.has(target.hostname.toLowerCase())) {
-      return new Response('Target not allowed', { status: 403 });
-    }
-
-    const headers = new Headers(request.headers);
-    for (const name of [TARGET_HEADER, 'host', 'content-length', 'connection']) {
-      headers.delete(name);
-    }
-
-    const upstream = await fetch(target, {
-      method: request.method,
-      headers,
-      body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,
-      redirect: 'manual',
-    });
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers: upstream.headers,
-    });
-  },
-};
-```
-
-The Worker intentionally has no browser CORS policy: FreeLLMAPI calls it
-server-to-server. It also returns `upstream.body` directly; calling
-`arrayBuffer()`, `text()`, or `json()` here would buffer SSE and other streamed
-responses.
+A deployable implementation, Wrangler configuration, and setup instructions
+live in [`examples/fetch-relay-worker`](../examples/fetch-relay-worker/README.md).
+It fails closed without a secret path and exact upstream-host allowlist, strips
+hop-by-hop and Relay-only headers, preserves cancellation, uses manual redirect
+handling, and returns `upstream.body` directly so SSE is not buffered.
