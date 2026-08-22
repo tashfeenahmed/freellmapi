@@ -9,6 +9,7 @@ import {
   routeRequest,
   setRoutingStrategy,
 } from '../../services/router.js';
+import { recordQuotaObservation } from '../../services/provider-quota.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let app: Express;
@@ -157,5 +158,42 @@ describe('routing semantics', () => {
     const routed = routeRequest(100, undefined, undefined, false, false, undefined, groupChain);
     expect(routed.modelDbId).toBe(disabledId);
     expect(routed.modelId).toBe('direct-only-model');
+  });
+
+  it('#919: quota-weighted strategy picks the most-exhausted key first', () => {
+    const db = getDb();
+    db.prepare('DELETE FROM api_keys').run();
+    // Two keys for the same groq model.
+    const seedKey = (label: string): number => {
+      const secret = encrypt(`${label}-quota-key`);
+      const ins = db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+        VALUES ('groq', ?, ?, ?, ?, 'healthy', 1)
+      `).run(label, secret.encrypted, secret.iv, secret.authTag);
+      return Number(ins.lastInsertRowid);
+    };
+    const nearExhausted = seedKey('near-exhausted');
+    const roomy = seedKey('roomy');
+
+    // Roomier key has 900/1000 remaining; near-exhausted has 100/1000.
+    recordQuotaObservation({
+      platform: 'groq', keyId: roomy, quotaPoolKey: 'groq::account',
+      metric: 'requests', limit: 1000, remaining: 900, source: 'header',
+    });
+    recordQuotaObservation({
+      platform: 'groq', keyId: nearExhausted, quotaPoolKey: 'groq::account',
+      metric: 'requests', limit: 1000, remaining: 100, source: 'header',
+    });
+
+    db.prepare('DELETE FROM fallback_config').run();
+    db.prepare('DELETE FROM profile_models').run();
+    const modelId = addSyntheticModel('quota-weighted-model', 1, true     );
+    setRoutingStrategy('quota-weighted');
+
+    const routed = routeRequest(100);
+    // Most-exhausted key (closest to 429) wins under the quota-weighted walk.
+    expect(routed.platform).toBe('groq');
+    expect(routed.keyId).toBe(nearExhausted);
+    expect(modelId).toBeTruthy();
   });
 });
