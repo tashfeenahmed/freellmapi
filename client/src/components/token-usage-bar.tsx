@@ -44,7 +44,7 @@ export function TokenUsageBar({ data }: { data: TokenUsageData }) {
 
   return (
     <section className="rounded-3xl border bg-card p-5">
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-3">
         <h2 className="text-sm font-medium">{t('models.monthlyTokenBudget')}</h2>
         <span className="text-xs text-muted-foreground tabular-nums">
           <span className="text-foreground font-medium">{formatTokens(remaining)}</span> {t('models.remaining')}
