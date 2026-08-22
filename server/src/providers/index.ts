@@ -376,6 +376,16 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.orcarouter.ai/v1',
 }));
 
+// xKiro — OpenAI-compatible aggregator (api.xkiro.com/v1). One key for
+// DeepSeek/Claude/ChatGPT/Gemini + hundreds more; 20+ free models with a
+// recurring 100K tokens/day free tier (no card). Also exposes an
+// Anthropic-compatible endpoint (/v1/messages). Key from xkiro.com.
+register(new OpenAICompatProvider({
+  platform: 'xkiro',
+  name: 'xKiro',
+  baseUrl: 'https://api.xkiro.com/v1',
+}));
+
 // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
 // (api-inference.modelscope.cn/v1, Bearer auth). Free tier: 2000 requests/day
 // account-wide. Token from modelscope.cn/my/myaccesstoken, BUT calls only work

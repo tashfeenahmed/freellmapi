@@ -132,6 +132,11 @@ export type Platform =
   // (never fall back to paid). Catalog rows live in the Oracle catalog
   // (premium now, free after the 30-day model-age gate).
   | 'orcarouter'
+  // xKiro — OpenAI-compatible aggregator (api.xkiro.com/v1). One key for
+  // DeepSeek/Claude/ChatGPT/Gemini + hundreds more; 20+ free models with a
+  // recurring 100K tokens/day free tier (no card). Also exposes an
+  // Anthropic-compatible endpoint. Catalog rows live in the hosted catalog.
+  | 'xkiro'
   // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
   // (api-inference.modelscope.cn/v1). Free tier is 2000 requests/day
   // account-wide, but calls only work after the ModelScope account is bound to
