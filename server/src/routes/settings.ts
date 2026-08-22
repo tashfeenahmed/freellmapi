@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getUnifiedApiKey, regenerateUnifiedKey, getSetting, setSetting, getDb } from '../db/index.js';
-import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, isProxyActive, getProxyUrl, isProxyEnabled, getProxyBypassPlatforms, probeProxyUrl, DEFAULT_PROXY_PROBE_TARGET, PROXY_SCHEMES } from '../lib/proxy.js';
+import { applyProxyUrl, applyProxyMode, applyProxyEnabled, applyProxyBypass, isProxyActive, getProxyUrl, getProxyMode, isProxyEnabled, getProxyBypassPlatforms, probeProxyUrl, DEFAULT_PROXY_PROBE_TARGET, PROXY_MODES, PROXY_SCHEMES } from '../lib/proxy.js';
 import { getProvider } from '../providers/index.js';
 import type { Platform } from '@freellmapi/shared/types.js';
+import type { ProxyMode } from '@freellmapi/shared/types.js';
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
@@ -316,46 +317,66 @@ settingsRouter.post('/api-key/regenerate', (_req: Request, res: Response) => {
 settingsRouter.get('/proxy', (_req: Request, res: Response) => {
   res.json({
     proxyUrl: getProxyUrl(),
+    proxyMode: getProxyMode(),
     enabled: isProxyEnabled(),
     bypassPlatforms: getProxyBypassPlatforms(),
     active: isProxyActive(),
   });
 });
 
-// Set the proxy settings. Accepts partial updates: proxyUrl, enabled, bypassPlatforms.
+function proxyUrlError(proxyUrl: string, proxyMode: ProxyMode): string | undefined {
+  if (!proxyUrl) return undefined;
+  try {
+    const protocol = new URL(proxyUrl).protocol;
+    const allowed = proxyMode === 'fetch-relay'
+      ? ['http:', 'https:']
+      : PROXY_SCHEMES;
+    if (!allowed.includes(protocol)) {
+      return proxyMode === 'fetch-relay'
+        ? 'Fetch Relay URL must use http or https scheme'
+        : 'Proxy URL must use http, https, socks5, socks5h, socks4, or socks4a scheme';
+    }
+  } catch {
+    return 'Invalid proxy URL — must be a valid URL like socks5://host:port';
+  }
+  return undefined;
+}
+
+// Set the proxy settings. Accepts partial updates.
 settingsRouter.put('/proxy', (req: Request, res: Response) => {
-  const { proxyUrl, enabled, bypassPlatforms } = req.body as {
+  const { proxyUrl, proxyMode, enabled, bypassPlatforms } = req.body as {
     proxyUrl?: string;
+    proxyMode?: ProxyMode;
     enabled?: boolean;
     bypassPlatforms?: string[];
   };
 
+  if (proxyMode !== undefined && !PROXY_MODES.includes(proxyMode)) {
+    res.status(400).json({
+      error: { message: 'Proxy mode must be forward or fetch-relay', type: 'invalid_request_error' },
+    });
+    return;
+  }
+
+  const nextMode = proxyMode ?? getProxyMode();
+  const nextUrl = typeof proxyUrl === 'string' ? proxyUrl.trim() : getProxyUrl();
+  const urlError = proxyUrlError(nextUrl, nextMode);
+  if (urlError) {
+    res.status(400).json({ error: { message: urlError, type: 'invalid_request_error' } });
+    return;
+  }
+
   // --- proxyUrl ---
   if (typeof proxyUrl === 'string') {
     const trimmed = proxyUrl.trim();
-    if (trimmed) {
-      try {
-        const u = new URL(trimmed);
-        if (!PROXY_SCHEMES.includes(u.protocol)) {
-          res.status(400).json({
-            error: {
-              message: 'Proxy URL must use http, https, socks5, socks5h, socks4, or socks4a scheme',
-              type: 'invalid_request_error',
-            },
-          });
-          return;
-        }
-      } catch {
-        res.status(400).json({
-          error: { message: 'Invalid proxy URL — must be a valid URL like socks5://host:port', type: 'invalid_request_error' },
-        });
-        return;
-      }
-      setSetting('proxy_url', trimmed);
-    } else {
-      setSetting('proxy_url', '');
-    }
+    setSetting('proxy_url', trimmed);
     applyProxyUrl(trimmed);
+  }
+
+  // --- proxyMode ---
+  if (proxyMode !== undefined) {
+    setSetting('proxy_mode', proxyMode);
+    applyProxyMode(proxyMode);
   }
 
   // --- enabled ---
@@ -373,6 +394,7 @@ settingsRouter.put('/proxy', (req: Request, res: Response) => {
 
   res.json({
     proxyUrl: getProxyUrl(),
+    proxyMode: getProxyMode(),
     enabled: isProxyEnabled(),
     bypassPlatforms: getProxyBypassPlatforms(),
     active: isProxyActive(),
@@ -423,7 +445,18 @@ function proxyProbeTarget(): string {
 }
 
 settingsRouter.post('/proxy/test', async (req: Request, res: Response) => {
-  const { proxyUrl } = (req.body ?? {}) as { proxyUrl?: string };
-  const result = await probeProxyUrl(proxyUrl, { targetUrl: proxyProbeTarget() });
+  const { proxyUrl, proxyMode } = (req.body ?? {}) as { proxyUrl?: string; proxyMode?: ProxyMode };
+  if (proxyMode !== undefined && !PROXY_MODES.includes(proxyMode)) {
+    res.status(400).json({ error: { message: 'Proxy mode must be forward or fetch-relay', type: 'invalid_request_error' } });
+    return;
+  }
+  const mode = proxyMode ?? getProxyMode();
+  const url = (proxyUrl ?? '').trim() || getProxyUrl();
+  const urlError = proxyUrlError(url, mode);
+  if (urlError) {
+    res.status(400).json({ error: { message: urlError, type: 'invalid_request_error' } });
+    return;
+  }
+  const result = await probeProxyUrl(proxyUrl, { targetUrl: proxyProbeTarget(), mode });
   res.json(result);
 });

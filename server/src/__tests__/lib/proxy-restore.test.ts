@@ -3,10 +3,12 @@ import { initDb, getDb, setSetting } from '../../db/index.js';
 import {
   restoreProxySettings,
   getProxyUrl,
+  getProxyMode,
   isProxyEnabled,
   getProxyBypassPlatforms,
   getNoProxyRules,
   applyProxyUrl,
+  applyProxyMode,
   applyProxyEnabled,
   applyProxyBypass,
 } from '../../lib/proxy.js';
@@ -18,7 +20,7 @@ import {
 // is the single hydration step both entry points now call after initDb; this
 // test pins that the DB value actually reaches the process state.
 
-const PROXY_ENV_VARS = ['PROXY_URL', 'ALL_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'];
+const PROXY_ENV_VARS = ['PROXY_URL', 'PROXY_MODE', 'ALL_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'];
 
 function clearProxyEnv(): void {
   for (const name of PROXY_ENV_VARS) {
@@ -33,6 +35,7 @@ beforeEach(() => {
   clearProxyEnv();
   // Reset to the module defaults so each case starts from "fresh process".
   applyProxyUrl('');
+  applyProxyMode('forward');
   applyProxyEnabled(true);
   applyProxyBypass('');
 });
@@ -78,6 +81,7 @@ describe('restoreProxySettings (desktop embedder hydration, #949)', () => {
     restoreProxySettings();
 
     expect(getProxyUrl()).toBe('');
+    expect(getProxyMode()).toBe('forward');
     expect(isProxyEnabled()).toBe(true);
     expect(getProxyBypassPlatforms()).toEqual([]);
   });
@@ -91,6 +95,30 @@ describe('restoreProxySettings (desktop embedder hydration, #949)', () => {
     restoreProxySettings();
 
     expect(getProxyUrl()).toBe('http://env:8080');
+    expect(getProxyMode()).toBe('forward');
+  });
+
+  it('restores an explicitly saved Fetch Relay mode', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    setSetting('proxy_url', 'https://relay.example.test/secret');
+    setSetting('proxy_mode', 'fetch-relay');
+
+    restoreProxySettings();
+
+    expect(getProxyUrl()).toBe('https://relay.example.test/secret');
+    expect(getProxyMode()).toBe('fetch-relay');
+  });
+
+  it('lets PROXY_MODE opt an environment PROXY_URL into Fetch Relay', () => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    process.env.PROXY_URL = 'https://relay.example.test/secret';
+    process.env.PROXY_MODE = 'fetch-relay';
+
+    restoreProxySettings();
+
+    expect(getProxyMode()).toBe('fetch-relay');
   });
 });
 

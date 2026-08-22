@@ -3,7 +3,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb } from '../../db/index.js';
 import { mintDashboardToken } from '../helpers/auth.js';
-import { applyProxyUrl } from '../../lib/proxy.js';
+import { applyProxyMode, applyProxyUrl } from '../../lib/proxy.js';
 
 async function request(app: Express, method: string, path: string, body: any, token: string) {
   const server = app.listen(0, '127.0.0.1');
@@ -30,13 +30,17 @@ describe('PUT /api/settings/proxy scheme validation', () => {
 
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
-    delete process.env.PROXY_URL;
+    for (const name of ['PROXY_MODE', 'PROXY_URL', 'ALL_PROXY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY']) {
+      delete process.env[name];
+      delete process.env[name.toLowerCase()];
+    }
     initDb(':memory:');
     app = createApp();
     token = mintDashboardToken();
   });
 
   afterAll(() => {
+    applyProxyMode('forward');
     applyProxyUrl('');
   });
 
@@ -80,5 +84,37 @@ describe('PUT /api/settings/proxy scheme validation', () => {
     const { status, body } = await request(app, 'PUT', '/api/settings/proxy', { proxyUrl: '' }, token);
     expect(status).toBe(200);
     expect(body.proxyUrl).toBe('');
+  });
+
+  it('saves fetch-relay mode with an HTTPS endpoint', async () => {
+    const { status, body } = await request(app, 'PUT', '/api/settings/proxy', {
+      proxyMode: 'fetch-relay',
+      proxyUrl: 'https://relay.example.workers.dev/secret',
+    }, token);
+    expect(status).toBe(200);
+    expect(body.proxyMode).toBe('fetch-relay');
+    expect(body.proxyUrl).toBe('https://relay.example.workers.dev/secret');
+  });
+
+  it('rejects a SOCKS URL in fetch-relay mode without changing either setting', async () => {
+    const before = await request(app, 'GET', '/api/settings/proxy', undefined, token);
+    const { status, body } = await request(app, 'PUT', '/api/settings/proxy', {
+      proxyMode: 'fetch-relay',
+      proxyUrl: 'socks5://127.0.0.1:1080',
+    }, token);
+    const after = await request(app, 'GET', '/api/settings/proxy', undefined, token);
+
+    expect(status).toBe(400);
+    expect(body.error.message).toMatch(/http or https/);
+    expect(after.body.proxyMode).toBe(before.body.proxyMode);
+    expect(after.body.proxyUrl).toBe(before.body.proxyUrl);
+  });
+
+  it('rejects an unknown proxy mode', async () => {
+    const { status, body } = await request(app, 'PUT', '/api/settings/proxy', {
+      proxyMode: 'transparent',
+    }, token);
+    expect(status).toBe(400);
+    expect(body.error.message).toMatch(/forward or fetch-relay/);
   });
 });

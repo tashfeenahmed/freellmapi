@@ -5,10 +5,20 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Globe } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { PLATFORMS, CUSTOM_GROUP } from './shared'
 import type { ApiKey } from '../../../../shared/types'
+import type { ProxyMode } from '../../../../shared/types'
+
+interface ProxySettings {
+  proxyUrl: string
+  proxyMode: ProxyMode
+  enabled: boolean
+  bypassPlatforms: string[]
+  active: boolean
+}
 
 /** Host of a probe target, for display. Falls back to the raw value so a
  *  malformed override still shows something rather than vanishing. */
@@ -20,8 +30,9 @@ export function ProxySettingsSection() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
   const [proxyUrl, setProxyUrl] = useState('')
+  const [proxyMode, setProxyMode] = useState<ProxyMode>('forward')
 
-  const { data, isError } = useQuery<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>({
+  const { data, isError } = useQuery<ProxySettings>({
     queryKey: ['proxy-url'],
     queryFn: () => apiFetch('/api/settings/proxy'),
   })
@@ -40,16 +51,20 @@ export function ProxySettingsSection() {
   // Sync from server when the query refetches; keep the user's typed value
   // in between (controlled input).
   useEffect(() => {
-    if (data) setProxyUrl(data.proxyUrl)
-  }, [data?.proxyUrl])
+    if (data) {
+      setProxyUrl(data.proxyUrl)
+      setProxyMode(data.proxyMode)
+    }
+  }, [data?.proxyUrl, data?.proxyMode])
 
   const saveProxy = useMutation({
     meta: { silenceToast: true },
-    mutationFn: (body: { proxyUrl?: string; enabled?: boolean; bypassPlatforms?: string[] }) =>
-      apiFetch<{ proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }>('/api/settings/proxy', { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: (result: { proxyUrl: string; enabled: boolean; bypassPlatforms: string[]; active: boolean }) => {
+    mutationFn: (body: { proxyUrl?: string; proxyMode?: ProxyMode; enabled?: boolean; bypassPlatforms?: string[] }) =>
+      apiFetch<ProxySettings>('/api/settings/proxy', { method: 'PUT', body: JSON.stringify(body) }),
+    onSuccess: (result: ProxySettings) => {
       queryClient.invalidateQueries({ queryKey: ['proxy-url'] })
       setProxyUrl(result.proxyUrl)
+      setProxyMode(result.proxyMode)
     },
   })
 
@@ -57,13 +72,13 @@ export function ProxySettingsSection() {
   // without saving anything. Result shown inline; failures carry the reason.
   const testProxy = useMutation({
     meta: { silenceToast: true },
-    mutationFn: (body: { proxyUrl?: string }) =>
+    mutationFn: (body: { proxyUrl?: string; proxyMode?: ProxyMode }) =>
       apiFetch<{ ok: boolean; latencyMs: number; status?: number; error?: string; target?: string }>('/api/settings/proxy/test', { method: 'POST', body: JSON.stringify(body) }),
   })
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    saveProxy.mutate({ proxyUrl })
+    saveProxy.mutate({ proxyUrl, proxyMode })
   }
 
   const enabled = data?.enabled ?? true
@@ -98,13 +113,23 @@ export function ProxySettingsSection() {
       {isError ? (
         <p className="text-xs text-muted-foreground">{t('keys.proxyLoadFailed')}</p>
       ) : (
-        <form onSubmit={submit} className="flex items-end gap-3">
+        <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t('settings.compressionMode')}</Label>
+            <Select value={proxyMode} onValueChange={value => setProxyMode(value as ProxyMode)}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="forward" label="forward">forward</SelectItem>
+                <SelectItem value="fetch-relay" label="fetch-relay">fetch-relay</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5 flex-1">
             <Label className="text-xs">{t('keys.proxyUrl')}</Label>
             <Input
               value={proxyUrl}
               onChange={e => setProxyUrl(e.target.value)}
-              placeholder="socks5://127.0.0.1:1080"
+              placeholder={proxyMode === 'fetch-relay' ? 'https://relay.example.workers.dev/secret-path' : 'socks5://127.0.0.1:1080'}
               className="font-mono text-xs"
             />
           </div>
@@ -113,7 +138,7 @@ export function ProxySettingsSection() {
             size="sm"
             variant="outline"
             disabled={testProxy.isPending}
-            onClick={() => testProxy.mutate({ proxyUrl })}
+            onClick={() => testProxy.mutate({ proxyUrl, proxyMode })}
           >
             {testProxy.isPending ? t('keys.testingProxy') : t('keys.testProxy')}
           </Button>
@@ -182,12 +207,20 @@ export function ProxySettingsSection() {
         <p>
           {t('keys.proxyEnvHintBefore')}<code className="font-mono">PROXY_URL</code>{t('keys.proxyEnvHintAfter')}
         </p>
-        <ul className="list-disc list-inside mt-1 space-y-0.5">
-          <li><code className="font-mono">socks5://127.0.0.1:1080</code></li>
-          <li><code className="font-mono">socks5h://127.0.0.1:1080</code></li>
-          <li><code className="font-mono">http://proxy.corp.com:8080</code></li>
-          <li><code className="font-mono">socks5://user:pass@proxy:1080</code></li>
-        </ul>
+        {proxyMode === 'fetch-relay' ? (
+          <p className="mt-1">
+            <code className="font-mono">X-FreeLLMAPI-Target-URL</code>
+            {' / '}
+            <code className="font-mono">{'?url={url}'}</code>
+          </p>
+        ) : (
+          <ul className="list-disc list-inside mt-1 space-y-0.5">
+            <li><code className="font-mono">socks5://127.0.0.1:1080</code></li>
+            <li><code className="font-mono">socks5h://127.0.0.1:1080</code></li>
+            <li><code className="font-mono">http://proxy.corp.com:8080</code></li>
+            <li><code className="font-mono">socks5://user:pass@proxy:1080</code></li>
+          </ul>
+        )}
       </div>
     </section>
   )

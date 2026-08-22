@@ -3,6 +3,7 @@ import https from 'https';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getSetting } from '../db/index.js';
 import { assertProviderUrlAllowed, isLoopbackOrPrivateHostname } from './url-guard.js';
+import type { ProxyMode } from '@freellmapi/shared/types.js';
 
 // #590 (per-key proxy): the SAME provider may be reached through different
 // exit IPs per key (geo-ban / risk-control avoidance). Providers are process
@@ -46,6 +47,8 @@ const SOCKS_SCHEMES = ['socks5:', 'socks5h:', 'socks4:', 'socks4a:'] as const;
 
 /** Every proxy scheme the app accepts. Shared with the settings validator. */
 export const PROXY_SCHEMES: readonly string[] = ['http:', 'https:', ...SOCKS_SCHEMES];
+export const PROXY_MODES: readonly ProxyMode[] = ['forward', 'fetch-relay'];
+export const FETCH_RELAY_TARGET_HEADER = 'x-freellmapi-target-url';
 
 /** True when the URL names a SOCKS scheme (so it needs SocksProxyAgent, not undici). */
 export function isSocksProxyUrl(url: string): boolean {
@@ -54,9 +57,18 @@ export function isSocksProxyUrl(url: string): boolean {
   return (SOCKS_SCHEMES as readonly string[]).includes(url.slice(0, colon + 1).toLowerCase());
 }
 
-/** Strip any `user:pass@` userinfo so a proxy URL is safe to log. */
+/** Reduce a proxy/relay URL to a safe connection hint. Relay paths commonly
+ * act as bearer secrets, while query strings may contain target templates or
+ * credentials, so neither is safe to print. */
 function redactProxyUrl(url: string): string {
-  return url.replace(/\/\/[^@/]*@/, '//***@');
+  try {
+    const parsed = new URL(url);
+    const credentials = parsed.username || parsed.password ? '***@' : '';
+    const path = parsed.pathname && parsed.pathname !== '/' ? '/[redacted]' : '';
+    return `${parsed.protocol}//${credentials}${parsed.host}${path}`;
+  } catch {
+    return '[invalid proxy URL]';
+  }
 }
 
 // Standard proxy env vars, in the order they are consulted. PROXY_URL is the
@@ -129,6 +141,8 @@ function noProxyMatches(hostname: string): boolean {
 
 // Module-level proxy URL.
 let _proxyUrl = '';
+let _proxyUrlSource = 'none';
+let _proxyMode: ProxyMode = 'forward';
 let _proxyEnabled = true;
 let _bypassPlatforms = new Set<string>();
 let _noProxyRules: string[] = [];
@@ -180,6 +194,10 @@ function rememberPerKeyDispatcher(proxyUrl: string, entry: { dispatcher: unknown
 export function applyProxyUrl(dbValue: string): void {
   const { url, source } = resolveProxySource(dbValue);
   _proxyUrl = url;
+  _proxyUrlSource = source;
+  // A saved relay mode must never reinterpret legacy/ambient proxy variables.
+  // PROXY_MODE is the only way an environment-sourced URL becomes a relay.
+  if (source !== 'dashboard' && !readEnv('PROXY_MODE')) _proxyMode = 'forward';
   _noProxyRules = parseNoProxy(readEnv('NO_PROXY'));
   _proxyLocalDestinations = /^(1|true|yes)$/i.test(readEnv('FREEAPI_PROXY_LOCAL_DESTINATIONS'));
   cached = null;
@@ -209,12 +227,26 @@ export function applyProxyUrl(dbValue: string): void {
  */
 export function restoreProxySettings(): void {
   applyProxyUrl(getSetting('proxy_url') ?? '');
+  applyProxyMode(getSetting('proxy_mode') ?? 'forward');
   applyProxyEnabled(getSetting('proxy_enabled') !== '0'); // default: enabled
   applyProxyBypass(getSetting('proxy_bypass') ?? '');
 }
 
 export function getProxyUrl(): string {
   return _proxyUrl;
+}
+
+/** Set how the global proxy URL is used. An explicit PROXY_MODE wins. A legacy
+ * PROXY_URL (or an ambient standard proxy variable) without PROXY_MODE always
+ * stays a forward proxy, regardless of a saved dashboard mode. */
+export function applyProxyMode(dbValue: string): void {
+  const envMode = readEnv('PROXY_MODE');
+  const candidate = envMode || (_proxyUrlSource === 'dashboard' ? dbValue.trim() : 'forward');
+  _proxyMode = candidate === 'fetch-relay' ? 'fetch-relay' : 'forward';
+}
+
+export function getProxyMode(): ProxyMode {
+  return _proxyMode;
 }
 
 /** Toggle the proxy on/off without losing the URL. */
@@ -648,6 +680,10 @@ async function dispatchFetch(
     return fetch(url, init);
   }
 
+  if (_proxyMode === 'fetch-relay' && _proxyUrl) {
+    return fetchRelayFetch(_proxyUrl, url, init);
+  }
+
   const resolved = await resolveDispatcher();
 
   // No dispatcher (no proxy URL configured, or it failed to build) → direct
@@ -662,6 +698,36 @@ async function dispatchFetch(
 
   // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
   return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+}
+
+/** Send an application-layer HTTP request through a user-controlled fetch
+ * relay. The original body remains a stream/body object and the returned
+ * Response is passed through untouched, so neither direction is buffered.
+ * Redirects from the relay are deliberately exposed to the caller: following
+ * one here could silently turn a relayed request into a direct request. */
+async function fetchRelayFetch(
+  relayUrl: string,
+  targetUrl: string,
+  init: RequestInit | undefined,
+): Promise<Response> {
+  const usesTemplate = relayUrl.includes('{url}');
+  const destination = usesTemplate
+    ? relayUrl.replaceAll('{url}', encodeURIComponent(targetUrl))
+    : relayUrl;
+  const headers = new Headers(init?.headers);
+
+  // These describe the provider connection and must be recalculated for the
+  // relay connection. The relay reference implementation removes the target
+  // header before calling the provider.
+  headers.delete('host');
+  headers.delete('content-length');
+  if (!usesTemplate) headers.set(FETCH_RELAY_TARGET_HEADER, targetUrl);
+
+  return fetch(destination, {
+    ...init,
+    headers,
+    redirect: 'manual',
+  });
 }
 
 /** Build (and TTL-cache) a dispatcher for a per-key proxy URL. Returns
@@ -775,7 +841,7 @@ export const DEFAULT_PROXY_PROBE_TARGET = 'https://www.cloudflare.com/cdn-cgi/tr
  */
 export async function probeProxyUrl(
   proxyUrl: string | undefined,
-  options: { targetUrl?: string; timeoutMs?: number } = {},
+  options: { targetUrl?: string; timeoutMs?: number; mode?: ProxyMode } = {},
 ): Promise<ProxyProbeResult> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const started = Date.now();
@@ -788,6 +854,11 @@ export async function probeProxyUrl(
     let response: Response;
     if (!url) {
       response = await fetch(target, { signal: AbortSignal.timeout(timeoutMs) });
+    } else if ((options.mode ?? getProxyMode()) === 'fetch-relay') {
+      response = await fetchRelayFetch(url, target, {
+        method: 'GET',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
     } else {
       const resolved = await resolvePerKeyDispatcher(url);
       if (!resolved) {
