@@ -162,7 +162,14 @@
     "autoUpdateCheck": "தானியங்கு புதுப்பிப்புச் சரிபார்ப்பு",
     "autoUpdateCheckHelp": "நாளொன்றுக்கு ஒருமுறை புதிய வெளியீட்டிற்காக GitHub-ஐச் சரிபார்த்து நினைவூட்டலைக் காட்டும். இயல்பாக அணைக்கப்பட்டுள்ளது.",
     "openReleases": "GitHub வெளியீடுகளைத் திற",
-    "restartAfterUpdate": "உருவாக்கம் முடிந்ததும் FreeLLMAPI-ஐ மறுதொடக்கம் செய்யவும்."
+    "restartAfterUpdate": "உருவாக்கம் முடிந்ததும் FreeLLMAPI-ஐ மறுதொடக்கம் செய்யவும்.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "மாதிரிகள்",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ራስ-ሰር የዝማኔ ፍተሻ",
     "autoUpdateCheckHelp": "በቀን አንድ ጊዜ ለአዲስ ልቀት GitHubን ይፈትሻል እና ማስታወሻ ያሳያል። በነባሪነት ጠፍቷል።",
     "openReleases": "የGitHub ልቀቶችን ክፈት",
-    "restartAfterUpdate": "ግንባታው ከተጠናቀቀ በኋላ FreeLLMAPIን እንደገና ያስጀምሩ።"
+    "restartAfterUpdate": "ግንባታው ከተጠናቀቀ በኋላ FreeLLMAPIን እንደገና ያስጀምሩ።",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "ሞዴሎች",

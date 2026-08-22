@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automatická kontrola aktualizací",
     "autoUpdateCheckHelp": "Jednou denně zkontroluje na GitHubu novou verzi a zobrazí připomenutí. Ve výchozím nastavení vypnuto.",
     "openReleases": "Otevřít vydání na GitHubu",
-    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI."
+    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modely",

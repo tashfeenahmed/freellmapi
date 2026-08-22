@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Pemeriksaan pembaruan otomatis",
     "autoUpdateCheckHelp": "Memeriksa GitHub sekali sehari untuk rilis baru dan menampilkan pengingat. Nonaktif secara bawaan.",
     "openReleases": "Buka Rilis GitHub",
-    "restartAfterUpdate": "Mulai ulang FreeLLMAPI setelah proses build selesai."
+    "restartAfterUpdate": "Mulai ulang FreeLLMAPI setelah proses build selesai.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Model",

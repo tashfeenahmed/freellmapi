@@ -162,7 +162,14 @@
     "autoUpdateCheck": "自動檢查更新",
     "autoUpdateCheckHelp": "每天檢查一次 GitHub 上是否有新版本，並顯示提醒。預設關閉。",
     "openReleases": "開啟 GitHub Releases",
-    "restartAfterUpdate": "建置完成後重新啟動 FreeLLMAPI。"
+    "restartAfterUpdate": "建置完成後重新啟動 FreeLLMAPI。",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "模型",

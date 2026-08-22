@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Автоматична проверка за актуализации",
     "autoUpdateCheckHelp": "Проверява GitHub веднъж дневно за ново издание и показва напомняне. По подразбиране е изключено.",
     "openReleases": "Отвори изданията в GitHub",
-    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията."
+    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Модели",

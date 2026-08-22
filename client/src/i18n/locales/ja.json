@@ -162,7 +162,14 @@
     "autoUpdateCheck": "自動アップデートチェック",
     "autoUpdateCheckHelp": "1日1回、新しいリリースがないかGitHubを確認し、通知を表示します。既定では無効です。",
     "openReleases": "GitHub Releasesを開く",
-    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。"
+    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "モデル",

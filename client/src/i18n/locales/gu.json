@@ -162,7 +162,14 @@
     "autoUpdateCheck": "આપમેળે અપડેટ તપાસ",
     "autoUpdateCheckHelp": "દિવસમાં એક વાર નવા રિલીઝ માટે GitHub તપાસે છે અને રિમાઇન્ડર બતાવે છે. મૂળભૂત રીતે બંધ.",
     "openReleases": "GitHub રિલીઝ ખોલો",
-    "restartAfterUpdate": "બિલ્ડ પૂર્ણ થયા પછી FreeLLMAPI ફરી શરૂ કરો."
+    "restartAfterUpdate": "બિલ્ડ પૂર્ણ થયા પછી FreeLLMAPI ફરી શરૂ કરો.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "મોડલ્સ",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ස්වයංක්‍රීය යාවත්කාලීන පරීක්ෂාව",
     "autoUpdateCheckHelp": "නව නිකුතුවක් සඳහා දිනකට වරක් GitHub පරීක්ෂා කර මතක් කිරීමක් පෙන්වයි. පෙරනිමියෙන් ක්‍රියාවිරහිතයි.",
     "openReleases": "GitHub Releases විවෘත කරන්න",
-    "restartAfterUpdate": "ගොඩනැගීම සම්පූර්ණ වූ පසු FreeLLMAPI නැවත ආරම්භ කරන්න."
+    "restartAfterUpdate": "ගොඩනැගීම සම්පූර්ණ වූ පසු FreeLLMAPI නැවත ආරම්භ කරන්න.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "ආකෘති",

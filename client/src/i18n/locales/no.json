@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automatisk oppdateringssjekk",
     "autoUpdateCheckHelp": "Sjekker GitHub én gang om dagen for en ny utgivelse og viser en påminnelse. Av som standard.",
     "openReleases": "Åpne GitHub Releases",
-    "restartAfterUpdate": "Start FreeLLMAPI på nytt etter at byggingen er fullført."
+    "restartAfterUpdate": "Start FreeLLMAPI på nytt etter at byggingen er fullført.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modeller",

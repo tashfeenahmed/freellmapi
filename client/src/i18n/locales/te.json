@@ -162,7 +162,14 @@
     "autoUpdateCheck": "స్వయంచాలక నవీకరణ తనిఖీ",
     "autoUpdateCheckHelp": "రోజుకు ఒకసారి కొత్త విడుదల కోసం GitHubను తనిఖీ చేసి రిమైండర్‌ను చూపుతుంది. అప్రమేయంగా ఆఫ్‌లో ఉంటుంది.",
     "openReleases": "GitHub విడుదలలను తెరవండి",
-    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి."
+    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "మోడల్స్",

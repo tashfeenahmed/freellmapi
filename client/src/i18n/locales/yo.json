@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Àyẹ̀wò ìmúdójúìwọ̀n aládàáṣe",
     "autoUpdateCheckHelp": "Ó ń ṣàyẹ̀wò GitHub lẹ́ẹ̀kan lóòjọ́ fún ìtújáde tuntun, ó sì ń fi ìránnilétí hàn. Ó pa ní àtìbẹ̀rẹ̀.",
     "openReleases": "Ṣí àwọn ìtújáde GitHub",
-    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí."
+    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Awọn awoṣe",

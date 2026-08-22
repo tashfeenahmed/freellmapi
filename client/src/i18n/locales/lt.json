@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Automatinis atnaujinimų tikrinimas",
     "autoUpdateCheckHelp": "Kartą per dieną patikrina „GitHub“, ar yra nauja laida, ir parodo priminimą. Pagal numatytuosius nustatymus išjungta.",
     "openReleases": "Atverti GitHub leidimus",
-    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo."
+    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modeliai",

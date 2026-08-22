@@ -162,7 +162,14 @@
     "autoUpdateCheck": "자동 업데이트 확인",
     "autoUpdateCheckHelp": "하루에 한 번 GitHub에서 새 릴리스를 확인하고 알림을 표시합니다. 기본값은 꺼짐입니다.",
     "openReleases": "GitHub 릴리스 열기",
-    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요."
+    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "모델",

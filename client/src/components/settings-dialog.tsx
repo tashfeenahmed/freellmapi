@@ -423,11 +423,60 @@ function CompressionSection({ state }: { state: CompressionState }) {
 function AdvancedSection({ state }: { state: CompressionState }) {
   const { t } = useI18n()
   const { config, patch } = state
+  const [cacheStats, setCacheStats] = useState<{
+    enabled: boolean
+    totalHits: number
+    misses: number
+    hitRate: number
+    savedTokens: number
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<{
+      enabled: boolean
+      totalHits: number
+      misses: number
+      hitRate: number
+      savedTokens: number
+    }>('/api/cache/stats')
+      .then(s => { if (!cancelled) setCacheStats(s) })
+      .catch(() => { /* cache stats are best-effort */ })
+    return () => { cancelled = true }
+  }, [])
+
   if (!config) return null
 
   return (
     <>
       <SectionHeader title={t('settings.sectionAdvanced')} description={t('settings.advancedDescription')} />
+      <SectionHeader title={t('settings.cacheTitle')} description={t('settings.cacheDescription')} />
+      {cacheStats ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-xl border px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('settings.cacheHits')}</div>
+            <div className="mt-0.5 font-mono text-sm tabular-nums">{cacheStats.totalHits}</div>
+          </div>
+          <div className="rounded-xl border px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('settings.cacheMisses')}</div>
+            <div className="mt-0.5 font-mono text-sm tabular-nums">{cacheStats.misses}</div>
+          </div>
+          <div className="rounded-xl border px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('settings.cacheHitRate')}</div>
+            <div className="mt-0.5 font-mono text-sm tabular-nums">
+              {cacheStats.totalHits + cacheStats.misses > 0
+                ? `${Math.round(cacheStats.hitRate * 100)}%`
+                : '—'}
+            </div>
+          </div>
+          <div className="rounded-xl border px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('settings.cacheSavedTokens')}</div>
+            <div className="mt-0.5 font-mono text-sm tabular-nums">{cacheStats.savedTokens.toLocaleString()}</div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{t('settings.cacheNoData')}</p>
+      )}
       <Row
         label={t('settings.compressionAutoTrigger')}
         hint={t('settings.compressionAutoTriggerHelp')}

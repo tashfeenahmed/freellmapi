@@ -162,7 +162,14 @@
     "autoUpdateCheck": "בדיקת עדכונים אוטומטית",
     "autoUpdateCheckHelp": "בודקת ב-GitHub פעם ביום אם יצאה גרסה חדשה ומציגה תזכורת. כבויה כברירת מחדל.",
     "openReleases": "פתיחת מהדורות GitHub",
-    "restartAfterUpdate": "הפעל מחדש את FreeLLMAPI לאחר השלמת הבנייה."
+    "restartAfterUpdate": "הפעל מחדש את FreeLLMAPI לאחר השלמת הבנייה.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "דגמים",

@@ -162,7 +162,14 @@
     "autoUpdateCheck": "Avtomatik yangilanish tekshiruvi",
     "autoUpdateCheckHelp": "Kuniga bir marta yangi nashr uchun GitHub'ni tekshiradi va eslatma ko'rsatadi. Sukut bo'yicha o'chirilgan.",
     "openReleases": "GitHub relizlarini ochish",
-    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring."
+    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "Modellar",

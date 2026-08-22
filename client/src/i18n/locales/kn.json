@@ -162,7 +162,14 @@
     "autoUpdateCheck": "ಸ್ವಯಂಚಾಲಿತ ನವೀಕರಣ ಪರಿಶೀಲನೆ",
     "autoUpdateCheckHelp": "ದಿನಕ್ಕೊಮ್ಮೆ ಹೊಸ ಬಿಡುಗಡೆಗಾಗಿ GitHub ಅನ್ನು ಪರಿಶೀಲಿಸುತ್ತದೆ ಮತ್ತು ಜ್ಞಾಪನೆ ತೋರಿಸುತ್ತದೆ. ಪೂರ್ವನಿಯೋಜಿತವಾಗಿ ಆಫ್ ಆಗಿದೆ.",
     "openReleases": "GitHub ಬಿಡುಗಡೆಗಳನ್ನು ತೆರೆಯಿರಿ",
-    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ."
+    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "ಮಾದರಿಗಳು",

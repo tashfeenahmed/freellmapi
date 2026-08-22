@@ -194,7 +194,7 @@ describe('Response cache (proxy integration)', () => {
     }
   });
 
-  it('a streaming request bypasses the cache: never served from it, never populates it', async () => {
+  it('a streaming request populates the cache and a later stream is replayed from it (#892-3)', async () => {
     const counter = mockGroq('cached four');
 
     // A non-streaming request populates the cache.
@@ -202,19 +202,17 @@ describe('Response cache (proxy integration)', () => {
     expect(first.headers.get('x-freellm-cache')).toBe('MISS');
     expect(counter.calls).toBe(1);
 
-    // An identical STREAMING request must not be served from the cache, so it
-    // reaches the provider's streaming endpoint despite the cached entry.
+    // An identical STREAMING request reaches the provider (populates a
+    // streaming entry), then a following identical streaming request is served
+    // from the cache — the provider is never called a second time for it.
     const streamed = await chat({ stream: true });
     expect(streamed.status).toBe(200);
     expect(counter.streamCalls).toBe(1);
-
-    // And it did not overwrite/populate a cache entry: a following identical
-    // non-streaming request is still a HIT served from the original entry, with
-    // no new non-streaming provider call.
-    const third = await chat();
-    expect(third.headers.get('x-freellm-cache')).toBe('HIT');
-    expect(third.body.choices[0].message.content).toBe('cached four');
-    expect(counter.calls).toBe(1);
+    const streamedAgain = await chat({ stream: true });
+    expect(streamedAgain.headers.get('x-freellm-cache')).toBe('HIT');
+    expect(counter.streamCalls).toBe(1);
+    // 清理本测试写入的缓存条目，避免污染后续 stats/clear 测试的计数断言。
+    await request(app, 'DELETE', '/api/cache');
   });
 
   it('exposes cache stats and savings on the admin endpoint', async () => {

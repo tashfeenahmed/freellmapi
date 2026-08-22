@@ -1608,7 +1608,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // per-request `X-FreeLLM-Cache` header can force or bypass. Off unless enabled
   // via the RESPONSE_CACHE env var or the response_cache_enabled setting.
   const cacheDirective = parseCacheDirective(req.headers['x-freellm-cache'], req.headers['cache-control']);
-  const cacheKey = (!stream && cacheActive(cacheDirective) && isCacheableTemperature(temperature))
+  // #892-3: streaming requests are cacheable too (SSE chunk sequence is stored
+  // and replayed); non-cacheable temperatures still bypass.
+  const cacheKey = (cacheActive(cacheDirective) && isCacheableTemperature(temperature))
     ? computeCacheKey({
         model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
         // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
@@ -1641,8 +1643,33 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // The savings are reported separately by GET /api/cache/stats.
       res.setHeader('X-Routed-Via', 'cache');
       res.setHeader('X-FreeLLM-Cache', 'HIT');
-      res.json(hit.body);
-      return;
+      if (stream) {
+        if (hit.streamFrames) {
+          // #892-3: streamed hit — replay the recorded SSE chunk sequence.
+          res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          for (const frame of hit.streamFrames) {
+            try {
+              res.write(`data: ${JSON.stringify(frame)}\n\n`);
+            } catch {
+              break; // socket gone
+            }
+          }
+          try {
+            res.write('data: [DONE]\n\n');
+            res.end();
+          } catch {
+            /* socket gone */
+          }
+          return;
+        }
+        // 流式请求命中非流式条目：无法把 JSON body 当 SSE 重放，视为 miss
+        // 继续走下游（不 return），让缓存条目被新流式结果覆盖。
+      } else {
+        res.json(hit.body);
+        return;
+      }
     }
   }
 
@@ -1898,6 +1925,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Only evidence when a provider serves a different model than routed
         // (#534); compared/persisted on success via observeServedModel.
         let upstreamModel: string | null = null;
+        // #892-3 流式重放：收集完整成功时写给客户端的 SSE chunk 序列
+        // （不含 [DONE]），成功收尾后写入缓存。abort/error 路径不收集不缓存。
+        const streamFrames: unknown[] = [];
 
         const flushHeaders = () => {
           if (headerSent) return;
@@ -1913,7 +1943,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // Committed: the answer is on its way, so the retry budget must no
           // longer cancel this attempt (it could not fail over now anyway).
           ctx.disarmHedge();
-          for (const p of preamble) res.write(`data: ${JSON.stringify(p)}\n\n`);
+          for (const p of preamble) {
+            streamFrames.push(p);
+            res.write(`data: ${JSON.stringify(p)}\n\n`);
+          }
           preamble.length = 0;
         };
         const mkChunk = (delta: Record<string, unknown>, finish: string | null) => ({
@@ -1923,7 +1956,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           model: lastMeta.model ?? route.modelId,
           choices: [{ index: 0, delta, finish_reason: finish }],
         });
-        const writeChunk = (c: unknown) => res.write(`data: ${JSON.stringify(c)}\n\n`);
+        const writeChunk = (c: unknown) => {
+          streamFrames.push(c);
+          res.write(`data: ${JSON.stringify(c)}\n\n`);
+        };
 
         try {
           const gen = route.provider.streamChatCompletion(
@@ -2169,6 +2205,22 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           const inputTokens = upstreamUsage?.prompt_tokens ?? (estimatedInputTokens + injectedHandoffTokens);
           const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const totalTokens = upstreamUsage?.total_tokens ?? (inputTokens + outputTokens);
+          // #892-3: cache the streamed turn (SSE chunk sequence) so an identical
+          // later streaming request replays it without touching a provider.
+          // Truncated turns (finish 'length') are NOT cached, matching the
+          // non-stream path — replaying a cut-off answer forever is worse than
+          // regenerating. body is a placeholder: streamed hits replay frames.
+          if (cacheKey && finish !== 'length' && streamFrames.length > 0) {
+            storeCachedResponse(cacheKey, {
+              body: { object: 'chat.completion.chunk', stream: true },
+              platform: route.platform,
+              modelId: route.modelId,
+              keyId: route.keyId,
+              promptTokens: inputTokens,
+              completionTokens: outputTokens,
+              streamFrames,
+            });
+          }
           recordUpstreamSuccess(route, totalTokens);
           setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });

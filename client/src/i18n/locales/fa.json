@@ -162,7 +162,14 @@
     "autoUpdateCheck": "بررسی خودکار به‌روزرسانی",
     "autoUpdateCheckHelp": "روزی یک بار GitHub را برای انتشار نسخهٔ جدید بررسی می‌کند و یادآوری نشان می‌دهد. به‌طور پیش‌فرض خاموش است.",
     "openReleases": "باز کردن نسخه‌های منتشرشده در GitHub",
-    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید."
+    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید.",
+    "cacheTitle": "Response cache",
+    "cacheDescription": "Hits replay a cached answer and consume zero provider quota (the only caching free tiers allow).",
+    "cacheHits": "Hits",
+    "cacheMisses": "Misses",
+    "cacheHitRate": "Hit rate",
+    "cacheSavedTokens": "Quota saved",
+    "cacheNoData": "Cache disabled or no lookups yet"
   },
   "models": {
     "title": "مدل ها",
