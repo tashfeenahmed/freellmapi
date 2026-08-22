@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ტარიფი შეზღუდულია - არ არის ფიქსირებული ყოველთვიური სიმბოლური ბიუჯეტი",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "არ გააერთიანოთ ეს ასლი",
     "splitOutHint": "მიეცით ამ პროვაიდერის ასლს საკუთარი ცალკე ჩანაწერი, ნაცვლად იმისა, რომ გაერთიანებულიყო ერთიან მოდელში. შეგიძლიათ დააბრუნოთ ის ასლის საკუთარი გვერდიდან.",
     "splitUndo": "შერწყმა უკან",

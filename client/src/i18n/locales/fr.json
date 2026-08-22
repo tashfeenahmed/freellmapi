@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Limité en débit : pas de budget mensuel de tokens fixe",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Ne pas fusionner cette copie",
     "splitOutHint": "Donne à la copie de ce fournisseur sa propre entrée séparée au lieu de la fusionner dans le modèle unifié. Vous pourrez la re-fusionner depuis la page de la copie.",
     "splitUndo": "Re-fusionner",

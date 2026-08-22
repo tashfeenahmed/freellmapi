@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ହାର-ସୀମିତ - କୌଣସି ସ୍ଥିର ମାସିକ ଟୋକେନ୍ ବଜେଟ୍ ନାହିଁ",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ଏହି କପି ମିଶ୍ରଣ କରନ୍ତୁ ନାହିଁ |",
     "splitOutHint": "ୟୁନିଫାଏଡ୍ ମଡେଲରେ ମିଶ୍ରଣ କରିବା ପରିବର୍ତ୍ତେ ଏହି ପ୍ରଦାନକାରୀଙ୍କ କପିକୁ ନିଜର ପୃଥକ ପ୍ରବେଶ ଦିଅନ୍ତୁ | ଆପଣ ଏହାକୁ କପି ର ନିଜ ପୃଷ୍ଠାରୁ ପୁନର୍ବାର ମିଶ୍ରଣ କରିପାରିବେ |",
     "splitUndo": "ପୁନର୍ବାର ମିଶ୍ରଣ କରନ୍ତୁ |",

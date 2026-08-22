@@ -2,7 +2,9 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '@/i18n'
+import { apiFetch } from '@/lib/api'
 import { CopyButton } from '@/components/copy-button'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip } from '@/components/tooltip'
@@ -14,7 +16,9 @@ import {
   memberEndpointTitle,
   memberProviderLabel,
   providerLabel,
+  tightestRateLimit,
   type ModelGroupRow,
+  type RateLimitUsageData,
   type Row,
 } from '@/lib/routing'
 
@@ -257,6 +261,15 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   const solo = group.members.length === 1
   const best = group.members.reduce((b, m) => ((m.score ?? -1) > (b.score ?? -1) ? m : b), group.members[0])
   const guard = (best.headroom ?? 1) * (best.rateLimit ?? 1)
+  // Remaining time-window quota for this group's members (#876): busiest usable
+  // window across the members decides the badge.
+  const { data: rateUsage } = useQuery<RateLimitUsageData>({
+    queryKey: ['fallback', 'rate-limit-usage'],
+    queryFn: () => apiFetch('/api/fallback/rate-limit-usage'),
+    refetchInterval: 15_000,
+  })
+  const memberIds = new Set(group.members.map(m => m.modelDbId))
+  const tightest = tightestRateLimit((rateUsage?.rows ?? []).filter(r => memberIds.has(r.modelDbId)))
   // Honest group display (#580): reliability/speed ranges come only from
   // members that were actually measured; when none were, show "no data" rather
   // than the shared exploration priors. Intelligence is catalog metadata, so
@@ -293,6 +306,11 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
             {quota && (
               <span title={quota.title} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
                 {quota.text}
+              </span>
+            )}
+            {tightest && (
+              <span title={t('models.rateLimitUsageTitle')} className={`text-[10px] rounded-full px-1.5 py-0.5 tabular-nums ${tightest.used >= tightest.limit ? 'bg-red-600/15 text-red-700 dark:text-red-400' : tightest.used / tightest.limit >= 0.7 ? 'bg-amber-600/15 text-amber-700 dark:text-amber-400' : 'bg-muted text-muted-foreground'}`}>
+                {t('models.rateLimitUsage', { kind: tightest.kind, used: tightest.used, limit: tightest.limit })}
               </span>
             )}
             {maxCtx > 0 && (

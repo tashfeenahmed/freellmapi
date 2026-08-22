@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Taxa limitada — sem orçamento mensal fixo para tokens",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Não mescle esta cópia",
     "splitOutHint": "Dê à cópia deste fornecedor a sua própria entrada separada em vez de a fundir no modelo unificado. Pode mesclá-lo na própria página da cópia.",
     "splitUndo": "Mesclar de volta",

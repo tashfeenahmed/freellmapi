@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "రేట్-పరిమితం — స్థిర నెలవారీ టోకెన్ బడ్జెట్ లేదు",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ఈ కాపీని విలీనం చేయవద్దు",
     "splitOutHint": "ఈ ప్రొవైడర్ కాపీని ఏకీకృత మోడల్‌లో విలీనం చేయడానికి బదులుగా దాని స్వంత ప్రత్యేక ఎంట్రీని ఇవ్వండి. మీరు దానిని కాపీ స్వంత పేజీ నుండి తిరిగి విలీనం చేయవచ్చు.",
     "splitUndo": "తిరిగి విలీనం చేయండి",

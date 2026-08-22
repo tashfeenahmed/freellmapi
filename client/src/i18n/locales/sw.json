@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Viwango-vidogo - hakuna bajeti maalum ya kila mwezi ya tokeni",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Usiunganishe nakala hii",
     "splitOutHint": "Ipe nakala ya mtoa huduma huyu ingizo lake tofauti badala ya kuiunganisha katika muundo uliounganishwa. Unaweza kuiunganisha kutoka kwa ukurasa wa nakala yenyewe.",
     "splitUndo": "Unganisha nyuma",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Ograniczona stawka — brak stałego miesięcznego budżetu na tokeny",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Nie łącz tej kopii",
     "splitOutHint": "Daj kopii tego dostawcy własny, oddzielny wpis, zamiast łączyć ją w ujednolicony model. Możesz scalić go z powrotem z własnej strony kopii.",
     "splitUndo": "Połącz z powrotem",

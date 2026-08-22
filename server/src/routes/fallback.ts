@@ -15,6 +15,7 @@ import { getPenaltyInspector } from '../services/penalty-inspector.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
+import { getRateLimitStatus } from '../services/ratelimit.js';
 
 export const fallbackRouter = Router();
 
@@ -395,4 +396,63 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     totalUsed,
     models: modelBudgets,
   });
+});
+
+// Per-model time-window rate-limit usage (RPM/RPD/TPM: used vs limit), for the
+// dashboard's remaining-quota display (#876). The monthly-budget metric says
+// nothing about windowed limits, so this surfaces what the router actually
+// enforces. Each model is checked per usable key (enabled + healthy/unknown,
+// same set the router routes to), and the busiest key's usage is reported —
+// that is the constraint that will reject the next request.
+fallbackRouter.get('/rate-limit-usage', (_req: Request, res: Response) => {
+  const db = getDb();
+  const now = Date.now();
+
+  const models = db.prepare(`
+    SELECT id AS model_db_id, platform, model_id, rpm_limit, rpd_limit, tpm_limit, tpd_limit
+      FROM models
+     WHERE enabled = 1
+  `).all() as Array<{
+    model_db_id: number;
+    platform: string;
+    model_id: string;
+    rpm_limit: number | null;
+    rpd_limit: number | null;
+    tpm_limit: number | null;
+    tpd_limit: number | null;
+  }>;
+
+  const keys = db.prepare(`
+    SELECT id, platform FROM api_keys
+     WHERE enabled = 1 AND status IN ('healthy', 'unknown')
+  `).all() as Array<{ id: number; platform: string }>;
+  const keysByPlatform = new Map<string, number[]>();
+  for (const k of keys) {
+    const list = keysByPlatform.get(k.platform) ?? [];
+    list.push(k.id);
+    keysByPlatform.set(k.platform, list);
+  }
+
+  const rows = models.map(m => {
+    const keyIds = keysByPlatform.get(m.platform) ?? [];
+    const limits = { rpm: m.rpm_limit, rpd: m.rpd_limit, tpm: m.tpm_limit, tpd: m.tpd_limit };
+    // Busiest usable key decides remaining headroom.
+    let rpmUsed = 0, rpdUsed = 0, tpmUsed = 0;
+    for (const keyId of keyIds) {
+      const s = getRateLimitStatus(m.platform, m.model_id, keyId, limits);
+      if (s.rpm.used > rpmUsed) rpmUsed = s.rpm.used;
+      if (s.rpd.used > rpdUsed) rpdUsed = s.rpd.used;
+      if (s.tpm.used > tpmUsed) tpmUsed = s.tpm.used;
+    }
+    return {
+      modelDbId: m.model_db_id,
+      platform: m.platform,
+      modelId: m.model_id,
+      rpm: m.rpm_limit != null ? { used: rpmUsed, limit: m.rpm_limit } : null,
+      rpd: m.rpd_limit != null ? { used: rpdUsed, limit: m.rpd_limit } : null,
+      tpm: m.tpm_limit != null ? { used: tpmUsed, limit: m.tpm_limit } : null,
+    };
+  });
+
+  res.json({ generatedAtMs: now, rows });
 });

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "दर-सीमित - कुनै निश्चित मासिक टोकन बजेट छैन",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "यो प्रतिलिपि मर्ज नगर्नुहोस्",
     "splitOutHint": "यस प्रदायकको प्रतिलिपिलाई एकीकृत मोडेलमा मर्ज गर्नुको सट्टा यसको आफ्नै छुट्टै प्रविष्टि दिनुहोस्। तपाइँ यसलाई प्रतिलिपिको आफ्नै पृष्ठबाट फिर्ता मर्ज गर्न सक्नुहुन्छ।",
     "splitUndo": "फिर्ता मर्ज गर्नुहोस्",

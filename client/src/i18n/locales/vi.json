@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Tỷ lệ giới hạn - không có ngân sách mã thông báo cố định hàng tháng",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Không hợp nhất bản sao này",
     "splitOutHint": "Cung cấp cho bản sao của nhà cung cấp này một mục nhập riêng thay vì hợp nhất nó vào mô hình thống nhất. Bạn có thể hợp nhất nó lại từ trang riêng của bản sao.",
     "splitUndo": "Hợp nhất lại",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "হার-সীমিত — কোনো নির্দিষ্ট মাসিক টোকেন বাজেট নেই",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "এই অনুলিপি একত্রিত করবেন না",
     "splitOutHint": "এই প্রদানকারীর অনুলিপিটিকে ইউনিফাইড মডেলে মার্জ করার পরিবর্তে এর নিজস্ব আলাদা এন্ট্রি দিন৷ আপনি অনুলিপির নিজস্ব পৃষ্ঠা থেকে এটি আবার মার্জ করতে পারেন।",
     "splitUndo": "ফিরে একত্রিত",

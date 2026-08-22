@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Oke-oke - enweghị ego mmefu ego nke ọnwa ọ bụla",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Ejikọtala oyiri a",
     "splitOutHint": "Nye nnomi nke onye na-eweta nke a ntinye dị iche iche kama ijikọ ya na ụdị ejikọtara ọnụ. Ị nwere ike ijikọ ya azụ site na ibe nke ya.",
     "splitUndo": "Jikọọ azụ",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "レート制限 — 毎月の固定トークン予算なし",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "このコピーをマージしないでください",
     "splitOutHint": "このプロバイダーのコピーを統合モデルにマージするのではなく、独自の別個のエントリーを与えます。 コピー自体のページからマージし直すことができます。",
     "splitUndo": "マージバック",

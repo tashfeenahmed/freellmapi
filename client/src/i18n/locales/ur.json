@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "شرح محدود - کوئی مقررہ ماہانہ ٹوکن بجٹ نہیں۔",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "اس کاپی کو ضم نہ کریں۔",
     "splitOutHint": "اس فراہم کنندہ کی کاپی کو یونیفائیڈ ماڈل میں ضم کرنے کے بجائے اس کا اپنا الگ اندراج دیں۔ آپ اسے کاپی کے اپنے صفحہ سے واپس ضم کر سکتے ہیں۔",
     "splitUndo": "واپس ضم کریں۔",

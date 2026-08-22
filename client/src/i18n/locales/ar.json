@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "السعر محدود – لا توجد ميزانية رمزية شهرية ثابتة",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "لا تقم بدمج هذه النسخة",
     "splitOutHint": "امنح نسخة هذا الموفر إدخالاً منفصلاً خاصًا بها بدلاً من دمجها في النموذج الموحد. يمكنك دمجها مرة أخرى من الصفحة الخاصة بالنسخة.",
     "splitUndo": "دمج مرة أخرى",

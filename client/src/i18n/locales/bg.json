@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Ограничен процент — няма фиксиран месечен токен бюджет",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Не обединявайте това копие",
     "splitOutHint": "Дайте на копието на този доставчик собствен отделен запис, вместо да го обедините в единния модел. Можете да го обедините обратно от собствената страница на копието.",
     "splitUndo": "Обединяване обратно",

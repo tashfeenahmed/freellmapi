@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Begrenzte Rate – kein festes monatliches Token-Budget",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Führen Sie diese Kopie nicht zusammen",
     "splitOutHint": "Geben Sie der Kopie dieses Anbieters einen eigenen separaten Eintrag, anstatt sie im einheitlichen Modell zusammenzuführen. Sie können es von der eigenen Seite der Kopie aus wieder zusammenführen.",
     "splitUndo": "Zurück verschmelzen",

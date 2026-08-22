@@ -226,6 +226,8 @@
     "rateRpm": "{count} 請求/分鐘",
     "rateRpd": "{count} 請求/日",
     "rateTitle": "按速率限制——無固定的每月 Token 額度",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "不合併此副本",
     "splitOutHint": "讓該提供者的副本作為獨立項目顯示，而不併入統一模型。可在該副本自己的頁面上重新合併。",
     "splitUndo": "重新合併",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "ਦਰ-ਸੀਮਤ — ਕੋਈ ਨਿਸ਼ਚਿਤ ਮਾਸਿਕ ਟੋਕਨ ਬਜਟ ਨਹੀਂ",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ਇਸ ਕਾਪੀ ਨੂੰ ਮਿਲਾਓ ਨਾ",
     "splitOutHint": "ਇਸ ਪ੍ਰਦਾਤਾ ਦੀ ਕਾਪੀ ਨੂੰ ਯੂਨੀਫਾਈਡ ਮਾਡਲ ਵਿੱਚ ਮਿਲਾਉਣ ਦੀ ਬਜਾਏ ਇਸਦੀ ਆਪਣੀ ਵੱਖਰੀ ਐਂਟਰੀ ਦਿਓ। ਤੁਸੀਂ ਇਸਨੂੰ ਕਾਪੀ ਦੇ ਆਪਣੇ ਪੰਨੇ ਤੋਂ ਵਾਪਸ ਮਿਲਾ ਸਕਦੇ ਹੋ।",
     "splitUndo": "ਵਾਪਸ ਮਿਲਾਓ",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "نرخ محدود - بدون بودجه رمز ماهانه ثابت",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "این کپی را ادغام نکنید",
     "splitOutHint": "به جای ادغام آن در مدل یکپارچه، به کپی این ارائه دهنده ورودی جداگانه خود بدهید. می توانید آن را از صفحه خود کپی ادغام کنید.",
     "splitUndo": "ادغام مجدد",

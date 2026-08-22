@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Omezení sazeb — žádný pevný měsíční rozpočet tokenů",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Neslučujte tuto kopii",
     "splitOutHint": "Dejte kopii tohoto poskytovatele vlastní samostatnou položku místo toho, abyste ji slučovali do jednotného modelu. Můžete jej sloučit zpět z vlastní stránky kopie.",
     "splitUndo": "Sloučit zpět",

@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "နှုန်းထားကန့်သတ် — လစဉ် တိုကင်ဘတ်ဂျက် သတ်မှတ်ထားခြင်း မရှိပါ",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ဤကော်ပီကို မပေါင်းပါနှင့်",
     "splitOutHint": "ဤဝန်ဆောင်မှုပေးသူ၏ မိတ္တူကို တစ်စုတစ်စည်းတည်းပုံစံသို့ ပေါင်းစည်းမည့်အစား ၎င်း၏ကိုယ်ပိုင် သီးခြားထည့်သွင်းမှုကို ပေးပါ။ ၎င်းကို မိတ္တူ၏ကိုယ်ပိုင်စာမျက်နှာမှ ပြန်လည်ပေါင်းစည်းနိုင်သည်။",
     "splitUndo": "ပြန်ပေါင်းစည်းပါ။",

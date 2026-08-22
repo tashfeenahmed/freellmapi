@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "Περιορισμένος ρυθμός — χωρίς σταθερό μηνιαίο προϋπολογισμό token",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "Μην συγχωνεύσετε αυτό το αντίγραφο",
     "splitOutHint": "Δώστε στο αντίγραφο αυτού του παρόχου τη δική του ξεχωριστή καταχώρηση αντί να το συγχωνεύσετε στο ενοποιημένο μοντέλο. Μπορείτε να το συγχωνεύσετε από τη σελίδα του αντιγράφου.",
     "splitUndo": "Συγχώνευση πίσω",

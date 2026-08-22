@@ -226,6 +226,8 @@
     "rateRpm": "{count} RPM",
     "rateRpd": "{count} RPD",
     "rateTitle": "നിരക്ക്-പരിമിതം - നിശ്ചിത പ്രതിമാസ ടോക്കൺ ബജറ്റ് ഇല്ല",
+    "rateLimitUsage": "{kind} {used}/{limit}",
+    "rateLimitUsageTitle": "Time-window rate-limit usage (used / limit), busiest provider window",
     "splitOut": "ഈ പകർപ്പ് ലയിപ്പിക്കരുത്",
     "splitOutHint": "ഈ ദാതാവിൻ്റെ പകർപ്പ് ഏകീകൃത മോഡലിലേക്ക് ലയിപ്പിക്കുന്നതിന് പകരം അതിൻ്റേതായ പ്രത്യേക എൻട്രി നൽകുക. പകർപ്പിൻ്റെ സ്വന്തം പേജിൽ നിന്ന് നിങ്ങൾക്ക് ഇത് വീണ്ടും ലയിപ്പിക്കാം.",
     "splitUndo": "തിരികെ ലയിപ്പിക്കുക",
