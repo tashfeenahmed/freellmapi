@@ -59,6 +59,7 @@ jobs:
               desktop/dist-electron/*.AppImage
               desktop/dist-electron/*.tar.xz
               desktop/dist-electron/*.deb
+              desktop/dist-electron/*.rpm
               desktop/dist-electron/latest-linux.yml
     steps:
       - uses: actions/checkout@v4
