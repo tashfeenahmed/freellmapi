@@ -132,6 +132,12 @@ export type Platform =
   // (never fall back to paid). Catalog rows live in the Oracle catalog
   // (premium now, free after the 30-day model-age gate).
   | 'orcarouter'
+  // xkiro.com — OpenAI-compatible gateway (https://xkiro.com/v1). Free key
+  // from xkiro.com (no card); advertises a free tier alongside paid top-ups.
+  // /v1/models is public (200 with no key), so key validation must probe
+  // /v1/usage, which 401s on a missing/invalid ClientApiKey. Catalog rows live
+  // in the hosted catalog (premium now, free after the 30-day model-age gate).
+  | 'xkiro'
   // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
   // (api-inference.modelscope.cn/v1). Free tier is 2000 requests/day
   // account-wide, but calls only work after the ModelScope account is bound to

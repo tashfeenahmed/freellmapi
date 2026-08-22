@@ -57,6 +57,7 @@ describe('key parser', () => {
     expect(detectPlatform('SEALION_')).toBe('sealion');
     expect(detectPlatform('ORCAROUTER_')).toBe('orcarouter');
     expect(detectPlatform('ORCA_')).toBe('orcarouter');
+    expect(detectPlatform('XKIRO_')).toBe('xkiro');
     expect(detectPlatform('MODELSCOPE_')).toBe('modelscope');
     expect(detectPlatform('ANYAPI_')).toBe('anyapi');
     expect(detectPlatform('ANY_API_')).toBe('anyapi');

@@ -376,6 +376,23 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.orcarouter.ai/v1',
 }));
 
+// xkiro.com — OpenAI-compatible gateway (https://xkiro.com/v1). Free key from
+// xkiro.com (no card); advertises a free tier alongside paid top-ups.
+// Live-probed 2026-08-22: GET /v1/models answers 200 with NO key (public
+// catalog), so the default /v1/models key validation would be a false
+// positive — validateUrl points at /v1/usage instead, which 401s on a missing
+// or invalid ClientApiKey ("Invalid or disabled ClientApiKey"). Accepts
+// Authorization: Bearer or x-api-key. Catalog rows live in the hosted catalog
+// (premium now, free after the 30-day model-age gate); the ids in #947 are
+// unverified against a live account and are candidates for catalog authoring,
+// where a bad id is caught by the health check instead of shipped as a default.
+register(new OpenAICompatProvider({
+  platform: 'xkiro',
+  name: 'xkiro',
+  baseUrl: 'https://xkiro.com/v1',
+  validateUrl: 'https://xkiro.com/v1/usage',
+}));
+
 // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
 // (api-inference.modelscope.cn/v1, Bearer auth). Free tier: 2000 requests/day
 // account-wide. Token from modelscope.cn/my/myaccesstoken, BUT calls only work
