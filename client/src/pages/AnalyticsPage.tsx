@@ -639,7 +639,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                  <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                     <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                     <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} tickFormatter={formatTimelineTick} />
                     <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
@@ -660,7 +660,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                  <LineChart data={timeline} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                     <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                     <XAxis dataKey="timestamp" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} tickFormatter={formatTimelineTick} />
                     <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={(v: number) => formatTokens(v)} />
@@ -679,7 +679,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                   <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                   <XAxis dataKey={(row: ByPlatformRow) => row.endpoint ?? row.platform} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} {...categoryAxisProps(byPlatform.length)} />
                   <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
@@ -695,7 +695,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={byClient} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                <BarChart data={byClient} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                   <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                   <XAxis dataKey="clientAgent" tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} {...categoryAxisProps(byClient.length)} />
                   <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
@@ -712,7 +712,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                   <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                   <XAxis dataKey={(row: ByPlatformRow) => row.endpoint ?? row.platform} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} {...categoryAxisProps(byPlatform.length)} />
                   <YAxis unit="ms" tick={axisStyle} tickLine={false} axisLine={false} />
@@ -733,7 +733,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.ttftEmpty')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                <BarChart data={byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                   <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                   <XAxis dataKey={(row: ByPlatformRow) => row.endpoint ?? row.platform} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} {...categoryAxisProps(byPlatform.length)} />
                   <YAxis unit="ms" tick={axisStyle} tickLine={false} axisLine={false} />
@@ -766,7 +766,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noErrors')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={errorDist.byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 0 }}>
+                <BarChart data={errorDist.byPlatform} margin={{ top: 6, right: 6, left: -12, bottom: 12 }}>
                   <CartesianGrid strokeDasharray="2 4" stroke={gridStyle} />
                   <XAxis dataKey={(row: ErrorDistribution['byPlatform'][number]) => row.endpoint ?? row.platform} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStyle }} {...categoryAxisProps(errorDist.byPlatform.length)} />
                   <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
