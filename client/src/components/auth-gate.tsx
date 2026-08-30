@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field-error'
@@ -18,10 +19,12 @@ interface AuthStatus {
 }
 
 function Centered({ children }: { children: ReactNode }) {
+  // dvh, not vh: on mobile the collapsing URL bar and the software keyboard both
+  // change the viewport, and 100vh leaves the card parked mid-scroll.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <main className="min-h-dvh flex items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">{children}</div>
-    </div>
+    </main>
   )
 }
 
@@ -52,6 +55,9 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
     : isSetup && password.length < PASSWORD_MIN
       ? t('validation.passwordMin', { min: PASSWORD_MIN })
       : null
+
+  const showEmailError = attempted && !!emailError
+  const showPasswordError = attempted && !!passwordError
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,25 +97,27 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
         <span className="font-semibold tracking-tight text-sm">FreeLLMAPI</span>
       </div>
       <div className="rounded-3xl border bg-card p-6">
-        <h1 className="text-base font-medium">{isSetup ? t('auth.createYourAccount') : t('auth.signIn')}</h1>
-        <p className="text-xs text-muted-foreground mt-1 mb-4">
+        <h1 className="text-lg font-semibold tracking-tight">{isSetup ? t('auth.createYourAccount') : t('auth.signIn')}</h1>
+        <p className="text-sm text-muted-foreground mt-1.5 mb-6">
           {isSetup
             ? t('auth.setupDescription')
             : t('auth.loginDescription')}
         </p>
-        <form onSubmit={submit} className="space-y-3" noValidate>
+        <form onSubmit={submit} className="space-y-4" noValidate>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="auth-email">{t('auth.email')}</Label>
             <Input
               id="auth-email"
               type="email"
               autoComplete="username"
+              autoFocus
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder={t('auth.emailPlaceholder')}
-              aria-invalid={attempted && !!emailError}
+              aria-invalid={showEmailError}
+              aria-describedby={showEmailError ? 'auth-email-error' : undefined}
             />
-            {attempted && <FieldError error={emailError} />}
+            {attempted && <FieldError id="auth-email-error" error={emailError} />}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs" htmlFor="auth-password">{t('auth.password')}</Label>
@@ -120,9 +128,10 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder={isSetup ? t('auth.passwordPlaceholderSetup') : t('auth.passwordPlaceholderLogin')}
-              aria-invalid={attempted && !!passwordError}
+              aria-invalid={showPasswordError}
+              aria-describedby={showPasswordError ? 'auth-password-error' : undefined}
             />
-            {attempted && <FieldError error={passwordError} />}
+            {attempted && <FieldError id="auth-password-error" error={passwordError} />}
           </div>
           {isSetup && codeRequired && (
             <div className="space-y-1.5">
@@ -134,12 +143,20 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
                 value={setupCode}
                 onChange={e => setSetupCode(e.target.value)}
                 placeholder={t('auth.setupCodePlaceholder')}
+                aria-describedby="auth-setup-code-hint"
               />
-              <p className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
+              <p id="auth-setup-code-hint" className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
             </div>
           )}
-          {error && <p className="text-destructive text-xs">{error}</p>}
-          <Button type="submit" className="w-full" disabled={busy}>
+          {/* A server rejection is the one error nobody can predict; it gets the same
+              announcement and the same visual weight as the inline field errors. */}
+          {error && (
+            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {error}
+            </p>
+          )}
+          <Button type="submit" className="w-full h-10" disabled={busy}>
+            {busy && <Loader2 className="animate-spin" aria-hidden />}
             {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}
           </Button>
         </form>
@@ -169,11 +186,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
     refetch()
   }
 
-  if (isLoading) return <Centered><p className="text-sm text-muted-foreground text-center">{t('auth.loading')}</p></Centered>
+  if (isLoading) {
+    return (
+      <Centered>
+        <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          {t('auth.loading')}
+        </p>
+      </Centered>
+    )
+  }
   if (isError || !data) {
     return (
       <Centered>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
           {t('auth.serverUnreachableBefore')}<code className="font-mono">npm run dev</code>{t('auth.serverUnreachableAfter')}
         </div>
       </Centered>
