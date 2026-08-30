@@ -50,18 +50,44 @@ message Key {
   int64 total_requests = 9;
 }
 
+// ChainEntry — one model+platform entry inside a chain.
 message ChainEntry {
   string model_id = 1;
   string platform = 2;
   int32 priority = 3;             // lower = tried first
   bool enabled = 4;
+
+  // ---- Advanced routing metadata ----
+  bool is_paid_model = 10;        // true if this model requires a paid quota
+  string api_key_id = 11;         // specific API key ID to use (overrides round-robin)
+  double user_preference = 12;    // -1.0 .. +1.0  (user favourite score)
+  bool is_fallback = 13;          // explicitly marked as fallback entry
+  string model_type = 14;         // "chat" | "embedding" | "vision" | "reasoning" | "custom"
+  map<string, string> parameters = 15; // provider params: temperature, top_p, max_tokens, etc.
+  map<string, string> metadata = 16;   // arbitrary user metadata (not sent to provider)
 }
 
+enum ChainType {
+  CHAIN_TYPE_UNSPECIFIED = 0;
+  CHAIN_TYPE_MAIN = 1;            // primary chain (user-defined order)
+  CHAIN_TYPE_FALLBACK = 2;        // auto fallback when main fails
+  CHAIN_TYPE_ESCALATION = 3;      // escalation chain: free -> cheap -> expensive
+  CHAIN_TYPE_SPECIALIZED = 4;     // specialized (vision-only, tools-only, etc.)
+}
+
+// Chain — a named fallback / escalation / main chain.
 message Chain {
   string id = 1;
   string name = 2;
   Tier tier = 3;
   repeated ChainEntry entries = 4;
+
+  // ---- Chain-level metadata ----
+  ChainType type = 10;            // MAIN | FALLBACK | ESCALATION | SPECIALIZED
+  string description = 11;
+  repeated string tags = 12;      // e.g. ["coding", "trading", "analysis"]
+  bool auto_skip_exhausted = 13;  // skip paid models when quota exhausted (402/429)
+  map<string, string> metadata = 14;
 }
 
 // ---------- Routing ----------
@@ -205,4 +231,153 @@ service JiMesh {
   rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
   rpc CheckHealth(CheckHealthRequest) returns (ProviderHealth);
   rpc CostReport(ReportRequest) returns (ReportResponse);
+}
+
+// ============================================================
+// LLM Helper — Smart orchestration layer
+// ============================================================
+
+// CapabilityRequirements describes what a task needs.
+message CapabilityRequirements {
+  bool require_vision = 1;
+  bool require_tools = 2;
+  bool require_structured_output = 3;
+  bool require_reasoning = 4;
+  int32 min_context_window = 5;
+  int32 max_latency_ms = 6;       // latency budget
+  double max_cost_per_m = 7;      // cost budget per 1M tokens
+  repeated string preferred_platforms = 8;
+  map<string, string> custom = 9;
+}
+
+// TaskAnalysis is the result of analyzing a user prompt/task.
+message TaskAnalysis {
+  string task_id = 1;
+  CapabilityRequirements requirements = 2;
+  string suggested_chain_type = 3;     // MAIN | FALLBACK | ESCALATION | SPECIALIZED
+  repeated string recommended_tags = 4; // e.g. ["coding", "trading"]
+  double confidence = 5;               // 0..1
+  string reasoning = 6;
+}
+
+// ChainRecommendationRequest asks for the best chain for a task.
+message ChainRecommendationRequest {
+  CapabilityRequirements requirements = 1;
+  string preferred_chain_id = 2;        // optional override
+  ChainType chain_type = 3;             // MAIN | FALLBACK | ESCALATION | SPECIALIZED
+}
+
+// ChainRecommendation is the recommended chain with rationale.
+message ChainRecommendation {
+  string chain_id = 1;
+  string chain_name = 2;
+  double confidence = 3;                // 0..1
+  string reasoning = 4;
+  repeated string alternative_chain_ids = 5;
+}
+
+// FailureContext describes a routing failure for fallback orchestration.
+message FailureContext {
+  string trace_id = 1;
+  string model_id = 2;
+  string platform = 3;
+  int32 chain_position = 4;             // position in chain (0-based)
+  string failure_reason = 5;            // "429" | "402" | "5xx" | "timeout" | "error"
+  int64 latency_ms = 6;
+}
+
+// FallbackDecision describes what to do after a failure.
+enum FallbackAction {
+  FALLBACK_ACTION_UNSPECIFIED = 0;
+  FALLBACK_RETRY_SAME = 1;         // retry same model (maybe with backoff)
+  FALLBACK_NEXT_IN_CHAIN = 2;      // move to next entry in current chain
+  FALLBACK_ESCALATE_CHAIN = 3;     // switch to escalation chain
+  FALLBACK_SUPERVISOR = 4;         // escalate to supervisor model
+  FALLBACK_HUMAN = 5;              // require human intervention
+}
+
+message FallbackDecision {
+  FallbackAction action = 1;
+  string target_chain_id = 2;       // if action is ESCALATE_CHAIN or SUPERVISOR
+  string target_model_id = 3;       // if action is SUPERVISOR
+  string reasoning = 4;
+  double confidence = 5;
+}
+
+// CrewRole defines one role in a multi-agent crew.
+message CrewRole {
+  string role_id = 1;               // e.g. "screener", "expert_vision", "risk_manager"
+  string chain_id = 2;              // chain to use for this role
+  int32 priority = 3;               // execution order (lower first)
+  repeated string depends_on = 4;   // role_ids that must complete first
+  map<string, string> config = 5;   // role-specific config
+}
+
+// CrewPlan is a multi-agent execution plan.
+message CrewPlan {
+  string crew_id = 1;
+  repeated CrewRole roles = 2;
+  map<string, string> shared_context = 3; // context passed between roles
+  int64 timeout_ms = 4;
+}
+
+// CrewRequest asks the helper to build a crew for a task.
+message CrewRequest {
+  string task_description = 1;
+  CapabilityRequirements requirements = 2;
+  map<string, string> context = 3;
+  int64 budget_usd = 4;             // total budget for the crew
+}
+
+// SubtaskRequest delegates a structured subtask to another model.
+message SubtaskRequest {
+  string parent_trace_id = 1;
+  string model_id = 2;              // target model
+  string platform = 3;
+  string prompt = 4;                // structured prompt
+  map<string, string> input_schema = 5; // expected input schema
+  map<string, string> output_schema = 6; // expected output schema
+  map<string, string> context = 7;
+}
+
+// SubtaskResult is the result of a delegated subtask.
+message SubtaskResult {
+  string trace_id = 1;
+  string model_id = 2;
+  string platform = 3;
+  bool success = 4;
+  string output = 5;                // JSON output matching output_schema
+  string error = 6;
+  int64 latency_ms = 7;
+}
+
+// ============================================================
+// LLMHelper Service — Smart orchestration layer
+// ============================================================
+
+service LLMHelper {
+  // Analyze a task and return capability requirements + suggested chain type
+  rpc AnalyzeTask(TaskRequest) returns (TaskAnalysis);
+
+  // Recommend the best chain for given requirements
+  rpc RecommendChain(ChainRecommendationRequest) returns (ChainRecommendation);
+
+  // Given a failure, decide what to do next (retry, escalate, supervisor, human)
+  rpc OrchestrateFallback(FailureContext) returns (FallbackDecision);
+
+  // Assemble a multi-agent crew for a complex task
+  rpc AssembleCrew(CrewRequest) returns (CrewPlan);
+
+  // Delegate a subtask to another model (A -> B)
+  rpc DelegateSubtask(SubtaskRequest) returns (SubtaskResult);
+
+  // Stream crew execution events
+  rpc StreamCrewEvents(StreamEventsRequest) returns (stream RouteEvent);
+}
+
+// Reuse TaskRequest from JiMesh service but add custom field for LLMHelper
+message TaskRequest {
+  string prompt = 1;
+  CapabilityRequirements requirements = 2;
+  map<string, string> metadata = 3;
 }

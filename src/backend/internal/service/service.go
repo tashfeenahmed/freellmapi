@@ -77,66 +77,135 @@ func (s *Service) ListChains(ctx context.Context) ([]*pb.Chain, error) {
 		ents := make([]*pb.ChainEntry, len(r.Entries))
 		for j, e := range r.Entries {
 			ents[j] = &pb.ChainEntry{
-				ModelId:  e.ModelID,
-				Platform: e.Platform,
-				Priority: e.Priority,
-				Enabled:  e.Enabled,
+				ModelId:        e.ModelID,
+				Platform:       e.Platform,
+				Priority:       e.Priority,
+				Enabled:        e.Enabled,
+				IsPaidModel:    e.IsPaidModel,
+				ApiKeyId:       e.APIKeyID,
+				UserPreference: e.UserPreference,
+				IsFallback:     e.IsFallback,
+				ModelType:      e.ModelType,
+				Parameters:     e.Parameters,
+				Metadata:       e.Metadata,
 			}
 		}
+		// Map store chain type string to protobuf enum
+		var chainType pb.ChainType
+		switch r.Type {
+		case "MAIN":
+			chainType = pb.ChainType_CHAIN_TYPE_MAIN
+		case "FALLBACK":
+			chainType = pb.ChainType_CHAIN_TYPE_FALLBACK
+		case "ESCALATION":
+			chainType = pb.ChainType_CHAIN_TYPE_ESCALATION
+		case "SPECIALIZED":
+			chainType = pb.ChainType_CHAIN_TYPE_SPECIALIZED
+		default:
+			chainType = pb.ChainType_CHAIN_TYPE_UNSPECIFIED
+		}
 		out[i] = &pb.Chain{
-			Id:      r.ID,
-			Name:    r.Name,
-			Tier:    pb.Tier(pb.Tier_value[r.Tier]),
-			Entries: ents,
+			Id:                r.ID,
+			Name:              r.Name,
+			Tier:              pb.Tier(pb.Tier_value[r.Tier]),
+			Entries:           ents,
+			Type:              chainType,
+			Description:       r.Description,
+			Tags:              r.Tags,
+			AutoSkipExhausted: r.AutoSkipExhausted,
+			Metadata:          r.Metadata,
 		}
 	}
 	return out, nil
 }
 
 func (s *Service) UpsertChain(ctx context.Context, in *pb.Chain) (*pb.Chain, error) {
+	// Map protobuf ChainType enum to store string
+	var chainType string
+	switch in.Type {
+	case pb.ChainType_CHAIN_TYPE_MAIN:
+		chainType = "MAIN"
+	case pb.ChainType_CHAIN_TYPE_FALLBACK:
+		chainType = "FALLBACK"
+	case pb.ChainType_CHAIN_TYPE_ESCALATION:
+		chainType = "ESCALATION"
+	case pb.ChainType_CHAIN_TYPE_SPECIALIZED:
+		chainType = "SPECIALIZED"
+	default:
+		chainType = "MAIN"
+	}
+
 	c := store.ChainRow{
-		ID:   in.Id,
-		Name: in.GetName(),
-		Tier: strings.ToLower(in.Tier.String()),
+		ID:                in.Id,
+		Name:              in.GetName(),
+		Tier:              strings.ToLower(in.Tier.String()),
+		Type:              chainType,
+		Description:       in.GetDescription(),
+		Tags:              in.GetTags(),
+		AutoSkipExhausted: in.GetAutoSkipExhausted(),
+		Metadata:          in.GetMetadata(),
 	}
 	for _, e := range in.Entries {
 		c.Entries = append(c.Entries, store.ChainEntryRow{
-			ModelID:  e.GetModelId(),
-			Platform: e.GetPlatform(),
-			Priority: e.GetPriority(),
-			Enabled:  e.GetEnabled(),
+			ModelID:        e.GetModelId(),
+			Platform:       e.GetPlatform(),
+			Priority:       e.GetPriority(),
+			Enabled:        e.GetEnabled(),
+			IsPaidModel:    e.GetIsPaidModel(),
+			APIKeyID:       e.GetApiKeyId(),
+			UserPreference: e.GetUserPreference(),
+			IsFallback:     e.GetIsFallback(),
+			ModelType:      e.GetModelType(),
+			Parameters:     e.GetParameters(),
+			Metadata:       e.GetMetadata(),
 		})
 	}
 	if err := s.Store.UpsertChain(c); err != nil {
 		return nil, err
 	}
 	// reload to return authoritative version
-	out, err := s.Store.ListChains()
+	out, err := s.Store.ChainByID(in.Id)
 	if err != nil {
 		return nil, err
 	}
-	for _, ch := range out {
-		if ch.ID == in.Id {
-			return &pb.Chain{
-				Id:   ch.ID,
-				Name: ch.Name,
-				Tier: pb.Tier(pb.Tier_value[ch.Tier]),
-				Entries: func() []*pb.ChainEntry {
-					out := make([]*pb.ChainEntry, len(ch.Entries))
-					for j, e := range ch.Entries {
-						out[j] = &pb.ChainEntry{
-							ModelId:  e.ModelID,
-							Platform: e.Platform,
-							Priority: e.Priority,
-							Enabled:  e.Enabled,
-						}
-					}
-					return out
-				}(),
-			}, nil
+	ents := make([]*pb.ChainEntry, len(out.Entries))
+	for j, e := range out.Entries {
+		ents[j] = &pb.ChainEntry{
+			ModelId:        e.ModelID,
+			Platform:       e.Platform,
+			Priority:       e.Priority,
+			Enabled:        e.Enabled,
+			IsPaidModel:    e.IsPaidModel,
+			ApiKeyId:       e.APIKeyID,
+			UserPreference: e.UserPreference,
+			IsFallback:     e.IsFallback,
+			ModelType:      e.ModelType,
+			Parameters:     e.Parameters,
+			Metadata:       e.Metadata,
 		}
 	}
-	return nil, fmt.Errorf("chain not found after upsert: %s", in.Id)
+	var respType pb.ChainType
+	switch out.Type {
+	case "MAIN":
+		respType = pb.ChainType_CHAIN_TYPE_MAIN
+	case "FALLBACK":
+		respType = pb.ChainType_CHAIN_TYPE_FALLBACK
+	case "ESCALATION":
+		respType = pb.ChainType_CHAIN_TYPE_ESCALATION
+	case "SPECIALIZED":
+		respType = pb.ChainType_CHAIN_TYPE_SPECIALIZED
+	}
+	return &pb.Chain{
+		Id:                out.ID,
+		Name:              out.Name,
+		Tier:              pb.Tier(pb.Tier_value[out.Tier]),
+		Entries:           ents,
+		Type:              respType,
+		Description:       out.Description,
+		Tags:              out.Tags,
+		AutoSkipExhausted: out.AutoSkipExhausted,
+		Metadata:          out.Metadata,
+	}, nil
 }
 
 // ---------- Routing ----------

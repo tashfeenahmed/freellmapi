@@ -129,16 +129,34 @@ func (s *Server) handleChainsGet(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleChainsPost(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-		Tier string `json:"tier"`
+		ID                string            `json:"id"`
+		Name              string            `json:"name"`
+		Tier              string            `json:"tier"`
+		Type              string            `json:"type"`
+		Description       string            `json:"description"`
+		Tags              []string          `json:"tags"`
+		AutoSkipExhausted *bool             `json:"auto_skip_exhausted"`
+		Metadata          map[string]string `json:"metadata"`
+		Entries           []struct {
+			ModelID        string            `json:"model_id"`
+			Platform       string            `json:"platform"`
+			Priority       int32             `json:"priority"`
+			Enabled        bool              `json:"enabled"`
+			IsPaidModel    bool              `json:"is_paid_model"`
+			APIKeyID       string            `json:"api_key_id"`
+			UserPreference float64           `json:"user_preference"`
+			IsFallback     bool              `json:"is_fallback"`
+			ModelType      string            `json:"model_type"`
+			Parameters     map[string]string `json:"parameters"`
+			Metadata       map[string]string `json:"metadata"`
+		} `json:"entries"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		s.errorJSON(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 	if in.ID == "" || in.Name == "" || in.Tier == "" {
-		s.errorJSON(w, http.StatusBadRequest, "missing required fields")
+		s.errorJSON(w, http.StatusBadRequest, "missing required fields: id, name, tier")
 		return
 	}
 	var t pb.Tier
@@ -147,18 +165,54 @@ func (s *Server) handleChainsPost(w http.ResponseWriter, r *http.Request) {
 	} else if val, ok := pb.Tier_value[strings.ToUpper(in.Tier)]; ok {
 		t = pb.Tier(val)
 	}
-	chain, err := s.svc.UpsertChain(r.Context(), &pb.Chain{
-		Id:   in.ID,
-		Name: in.Name,
-		Tier: t,
-	})
+	var ct pb.ChainType
+	switch strings.ToUpper(in.Type) {
+	case "FALLBACK":
+		ct = pb.ChainType_CHAIN_TYPE_FALLBACK
+	case "ESCALATION":
+		ct = pb.ChainType_CHAIN_TYPE_ESCALATION
+	case "SPECIALIZED":
+		ct = pb.ChainType_CHAIN_TYPE_SPECIALIZED
+	default:
+		ct = pb.ChainType_CHAIN_TYPE_MAIN
+	}
+	autoSkip := true
+	if in.AutoSkipExhausted != nil {
+		autoSkip = *in.AutoSkipExhausted
+	}
+	chain := &pb.Chain{
+		Id:                in.ID,
+		Name:              in.Name,
+		Tier:              t,
+		Type:              ct,
+		Description:       in.Description,
+		Tags:              in.Tags,
+		AutoSkipExhausted: autoSkip,
+		Metadata:          in.Metadata,
+	}
+	for _, e := range in.Entries {
+		chain.Entries = append(chain.Entries, &pb.ChainEntry{
+			ModelId:        e.ModelID,
+			Platform:       e.Platform,
+			Priority:       e.Priority,
+			Enabled:        e.Enabled,
+			IsPaidModel:    e.IsPaidModel,
+			ApiKeyId:       e.APIKeyID,
+			UserPreference: e.UserPreference,
+			IsFallback:     e.IsFallback,
+			ModelType:      e.ModelType,
+			Parameters:     e.Parameters,
+			Metadata:       e.Metadata,
+		})
+	}
+	result, err := s.svc.UpsertChain(r.Context(), chain)
 	if err != nil {
 		s.errorJSON(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(chain)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {

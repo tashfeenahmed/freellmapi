@@ -4,6 +4,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	_ "modernc.org/sqlite"
@@ -46,23 +47,37 @@ func migrate(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS chains (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
-			tier TEXT NOT NULL
+			tier TEXT NOT NULL,
+			type TEXT DEFAULT 'MAIN',
+			description TEXT,
+			tags TEXT DEFAULT '[]',
+			auto_skip_exhausted INTEGER DEFAULT 1,
+			metadata TEXT DEFAULT '{}'
 		);`,
 		`CREATE TABLE IF NOT EXISTS chain_entries (
 			chain_id TEXT NOT NULL REFERENCES chains(id) ON DELETE CASCADE,
 			model_id TEXT NOT NULL,
 			platform TEXT NOT NULL,
 			priority INTEGER NOT NULL,
-			enabled INTEGER DEFAULT 1
+			enabled INTEGER DEFAULT 1,
+			is_paid_model INTEGER DEFAULT 0,
+			api_key_id TEXT,
+			user_preference REAL DEFAULT 0.0,
+			is_fallback INTEGER DEFAULT 0,
+			model_type TEXT,
+			parameters TEXT DEFAULT '{}',
+			metadata TEXT DEFAULT '{}'
 		);`,
 		`CREATE TABLE IF NOT EXISTS keys (
 			id INTEGER PRIMARY KEY,
 			platform TEXT NOT NULL,
 			label TEXT,
+			value TEXT,
 			enabled INTEGER DEFAULT 1
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_models_platform ON models(platform);`,
 		`CREATE INDEX IF NOT EXISTS idx_chain_entries ON chain_entries(chain_id, priority);`,
+		`CREATE INDEX IF NOT EXISTS idx_chains_type ON chains(type);`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -140,22 +155,35 @@ func (d *DB) ListModels(tier string, enabledOnly bool) ([]ModelRow, error) {
 
 // ChainRow is a fallback chain with its entries.
 type ChainRow struct {
-	ID      string
-	Name    string
-	Tier    string
-	Entries []ChainEntryRow
+	ID                  string
+	Name                string
+	Tier                string
+	Type                string              // MAIN | FALLBACK | ESCALATION | SPECIALIZED
+	Description         string
+	Tags                []string
+	AutoSkipExhausted   bool
+	Metadata            map[string]string
+	Entries             []ChainEntryRow
 }
 
 type ChainEntryRow struct {
-	ModelID  string
-	Platform string
-	Priority int32
-	Enabled  bool
+	ModelID          string
+	Platform         string
+	Priority         int32
+	Enabled          bool
+	IsPaidModel      bool
+	APIKeyID         string
+	UserPreference   float64
+	IsFallback       bool
+	ModelType        string
+	Parameters       map[string]string
+	Metadata         map[string]string
 }
 
 // ListChains loads all chains + entries.
 func (d *DB) ListChains() ([]ChainRow, error) {
-	rows, err := d.sql.Query(`SELECT id, name, tier FROM chains ORDER BY tier, id`)
+	rows, err := d.sql.Query(`SELECT id, name, tier, type, description, tags, auto_skip_exhausted, metadata 
+		FROM chains ORDER BY tier, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -163,9 +191,14 @@ func (d *DB) ListChains() ([]ChainRow, error) {
 	var out []ChainRow
 	for rows.Next() {
 		var c ChainRow
-		if err := rows.Scan(&c.ID, &c.Name, &c.Tier); err != nil {
+		var tagsJSON, metaJSON string
+		var autoSkip int
+		if err := rows.Scan(&c.ID, &c.Name, &c.Tier, &c.Type, &c.Description, &tagsJSON, &autoSkip, &metaJSON); err != nil {
 			return nil, err
 		}
+		c.AutoSkipExhausted = autoSkip == 1
+		c.Tags = parseJSONArray(tagsJSON)
+		c.Metadata = parseJSONMap(metaJSON)
 		out = append(out, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -182,7 +215,8 @@ func (d *DB) ListChains() ([]ChainRow, error) {
 }
 
 func (d *DB) chainEntries(chainID string) ([]ChainEntryRow, error) {
-	rows, err := d.sql.Query(`SELECT model_id, platform, priority, enabled
+	rows, err := d.sql.Query(`SELECT model_id, platform, priority, enabled, 
+		is_paid_model, api_key_id, user_preference, is_fallback, model_type, parameters, metadata
 		FROM chain_entries WHERE chain_id = ? ORDER BY priority`, chainID)
 	if err != nil {
 		return nil, err
@@ -191,11 +225,18 @@ func (d *DB) chainEntries(chainID string) ([]ChainEntryRow, error) {
 	var out []ChainEntryRow
 	for rows.Next() {
 		var e ChainEntryRow
-		var en int
-		if err := rows.Scan(&e.ModelID, &e.Platform, &e.Priority, &en); err != nil {
+		var en, paid, fallback int
+		var paramsJSON, metaJSON string
+		if err := rows.Scan(&e.ModelID, &e.Platform, &e.Priority, &en,
+			&paid, &e.APIKeyID, &e.UserPreference, &fallback, &e.ModelType, &paramsJSON, &metaJSON); err != nil {
 			return nil, err
 		}
 		e.Enabled = en == 1
+		e.IsPaidModel = paid == 1
+		e.IsFallback = fallback == 1
+		// Parse JSON maps
+		e.Parameters = parseJSONMap(paramsJSON)
+		e.Metadata = parseJSONMap(metaJSON)
 		out = append(out, e)
 	}
 	return out, rows.Err()
@@ -208,17 +249,31 @@ func (d *DB) UpsertChain(c ChainRow) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`INSERT INTO chains (id, name, tier) VALUES (?,?,?)
-		ON CONFLICT(id) DO UPDATE SET name=excluded.name, tier=excluded.tier`,
-		c.ID, c.Name, c.Tier); err != nil {
+	
+	tagsJSON, _ := json.Marshal(c.Tags)
+	metaJSON, _ := json.Marshal(c.Metadata)
+	
+	if _, err := tx.Exec(`INSERT INTO chains (id, name, tier, type, description, tags, auto_skip_exhausted, metadata)
+		VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(id) DO UPDATE SET 
+			name=excluded.name, tier=excluded.tier, type=excluded.type,
+			description=excluded.description, tags=excluded.tags,
+			auto_skip_exhausted=excluded.auto_skip_exhausted, metadata=excluded.metadata`,
+		c.ID, c.Name, c.Tier, c.Type, c.Description, string(tagsJSON), b2i(c.AutoSkipExhausted), string(metaJSON)); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM chain_entries WHERE chain_id = ?`, c.ID); err != nil {
 		return err
 	}
 	for _, e := range c.Entries {
-		if _, err := tx.Exec(`INSERT INTO chain_entries (chain_id, model_id, platform, priority, enabled)
-			VALUES (?,?,?,?,?)`, c.ID, e.ModelID, e.Platform, e.Priority, b2i(e.Enabled)); err != nil {
+		paramsJSON, _ := json.Marshal(e.Parameters)
+		entryMetaJSON, _ := json.Marshal(e.Metadata)
+		if _, err := tx.Exec(`INSERT INTO chain_entries 
+			(chain_id, model_id, platform, priority, enabled, is_paid_model, api_key_id, user_preference, is_fallback, model_type, parameters, metadata)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			c.ID, e.ModelID, e.Platform, e.Priority, b2i(e.Enabled),
+			b2i(e.IsPaidModel), e.APIKeyID, e.UserPreference, b2i(e.IsFallback), e.ModelType,
+			string(paramsJSON), string(entryMetaJSON)); err != nil {
 			return err
 		}
 	}
@@ -300,13 +355,43 @@ func b2i(b bool) int {
 // Close closes the DB.
 func (d *DB) Close() error { return d.sql.Close() }
 
+func parseJSONMap(s string) map[string]string {
+	if s == "" || s == "{}" {
+		return map[string]string{}
+	}
+	var m map[string]string
+	_ = json.Unmarshal([]byte(s), &m)
+	if m == nil {
+		return map[string]string{}
+	}
+	return m
+}
+
+func parseJSONArray(s string) []string {
+	if s == "" || s == "[]" {
+		return []string{}
+	}
+	var a []string
+	_ = json.Unmarshal([]byte(s), &a)
+	if a == nil {
+		return []string{}
+	}
+	return a
+}
+
 // ChainByID loads a single chain by ID.
 func (d *DB) ChainByID(id string) (ChainRow, error) {
 	var c ChainRow
-	err := d.sql.QueryRow(`SELECT id, name, tier FROM chains WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Tier)
+	var tagsJSON, metaJSON string
+	var autoSkip int
+	err := d.sql.QueryRow(`SELECT id, name, tier, type, description, tags, auto_skip_exhausted, metadata 
+		FROM chains WHERE id = ?`, id).Scan(&c.ID, &c.Name, &c.Tier, &c.Type, &c.Description, &tagsJSON, &autoSkip, &metaJSON)
 	if err != nil {
 		return ChainRow{}, err
 	}
+	c.AutoSkipExhausted = autoSkip == 1
+	c.Tags = parseJSONArray(tagsJSON)
+	c.Metadata = parseJSONMap(metaJSON)
 	ents, err := d.chainEntries(c.ID)
 	if err != nil {
 		return ChainRow{}, err
@@ -318,10 +403,16 @@ func (d *DB) ChainByID(id string) (ChainRow, error) {
 // ChainByTier loads a single chain by tier.
 func (d *DB) ChainByTier(tier string) (ChainRow, error) {
 	var c ChainRow
-	err := d.sql.QueryRow(`SELECT id, name, tier FROM chains WHERE lower(tier) = lower(?) LIMIT 1`, tier).Scan(&c.ID, &c.Name, &c.Tier)
+	var tagsJSON, metaJSON string
+	var autoSkip int
+	err := d.sql.QueryRow(`SELECT id, name, tier, type, description, tags, auto_skip_exhausted, metadata 
+		FROM chains WHERE lower(tier) = lower(?) LIMIT 1`, tier).Scan(&c.ID, &c.Name, &c.Tier, &c.Type, &c.Description, &tagsJSON, &autoSkip, &metaJSON)
 	if err != nil {
 		return ChainRow{}, err
 	}
+	c.AutoSkipExhausted = autoSkip == 1
+	c.Tags = parseJSONArray(tagsJSON)
+	c.Metadata = parseJSONMap(metaJSON)
 	ents, err := d.chainEntries(c.ID)
 	if err != nil {
 		return ChainRow{}, err

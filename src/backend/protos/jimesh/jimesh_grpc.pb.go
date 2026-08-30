@@ -618,3 +618,324 @@ var JiMesh_ServiceDesc = grpc.ServiceDesc{
 	},
 	Metadata: "jimesh/jimesh.proto",
 }
+
+const (
+	LLMHelper_AnalyzeTask_FullMethodName         = "/jimesh.v1.LLMHelper/AnalyzeTask"
+	LLMHelper_RecommendChain_FullMethodName      = "/jimesh.v1.LLMHelper/RecommendChain"
+	LLMHelper_OrchestrateFallback_FullMethodName = "/jimesh.v1.LLMHelper/OrchestrateFallback"
+	LLMHelper_AssembleCrew_FullMethodName        = "/jimesh.v1.LLMHelper/AssembleCrew"
+	LLMHelper_DelegateSubtask_FullMethodName     = "/jimesh.v1.LLMHelper/DelegateSubtask"
+	LLMHelper_StreamCrewEvents_FullMethodName    = "/jimesh.v1.LLMHelper/StreamCrewEvents"
+)
+
+// LLMHelperClient is the client API for LLMHelper service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type LLMHelperClient interface {
+	// Analyze a task and return capability requirements + suggested chain type
+	AnalyzeTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*TaskAnalysis, error)
+	// Recommend the best chain for given requirements
+	RecommendChain(ctx context.Context, in *ChainRecommendationRequest, opts ...grpc.CallOption) (*ChainRecommendation, error)
+	// Given a failure, decide what to do next (retry, escalate, supervisor, human)
+	OrchestrateFallback(ctx context.Context, in *FailureContext, opts ...grpc.CallOption) (*FallbackDecision, error)
+	// Assemble a multi-agent crew for a complex task
+	AssembleCrew(ctx context.Context, in *CrewRequest, opts ...grpc.CallOption) (*CrewPlan, error)
+	// Delegate a subtask to another model (A -> B)
+	DelegateSubtask(ctx context.Context, in *SubtaskRequest, opts ...grpc.CallOption) (*SubtaskResult, error)
+	// Stream crew execution events
+	StreamCrewEvents(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (LLMHelper_StreamCrewEventsClient, error)
+}
+
+type lLMHelperClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewLLMHelperClient(cc grpc.ClientConnInterface) LLMHelperClient {
+	return &lLMHelperClient{cc}
+}
+
+func (c *lLMHelperClient) AnalyzeTask(ctx context.Context, in *TaskRequest, opts ...grpc.CallOption) (*TaskAnalysis, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TaskAnalysis)
+	err := c.cc.Invoke(ctx, LLMHelper_AnalyzeTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lLMHelperClient) RecommendChain(ctx context.Context, in *ChainRecommendationRequest, opts ...grpc.CallOption) (*ChainRecommendation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChainRecommendation)
+	err := c.cc.Invoke(ctx, LLMHelper_RecommendChain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lLMHelperClient) OrchestrateFallback(ctx context.Context, in *FailureContext, opts ...grpc.CallOption) (*FallbackDecision, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FallbackDecision)
+	err := c.cc.Invoke(ctx, LLMHelper_OrchestrateFallback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lLMHelperClient) AssembleCrew(ctx context.Context, in *CrewRequest, opts ...grpc.CallOption) (*CrewPlan, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CrewPlan)
+	err := c.cc.Invoke(ctx, LLMHelper_AssembleCrew_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lLMHelperClient) DelegateSubtask(ctx context.Context, in *SubtaskRequest, opts ...grpc.CallOption) (*SubtaskResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubtaskResult)
+	err := c.cc.Invoke(ctx, LLMHelper_DelegateSubtask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *lLMHelperClient) StreamCrewEvents(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (LLMHelper_StreamCrewEventsClient, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &LLMHelper_ServiceDesc.Streams[0], LLMHelper_StreamCrewEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &lLMHelperStreamCrewEventsClient{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type LLMHelper_StreamCrewEventsClient interface {
+	Recv() (*RouteEvent, error)
+	grpc.ClientStream
+}
+
+type lLMHelperStreamCrewEventsClient struct {
+	grpc.ClientStream
+}
+
+func (x *lLMHelperStreamCrewEventsClient) Recv() (*RouteEvent, error) {
+	m := new(RouteEvent)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// LLMHelperServer is the server API for LLMHelper service.
+// All implementations must embed UnimplementedLLMHelperServer
+// for forward compatibility
+type LLMHelperServer interface {
+	// Analyze a task and return capability requirements + suggested chain type
+	AnalyzeTask(context.Context, *TaskRequest) (*TaskAnalysis, error)
+	// Recommend the best chain for given requirements
+	RecommendChain(context.Context, *ChainRecommendationRequest) (*ChainRecommendation, error)
+	// Given a failure, decide what to do next (retry, escalate, supervisor, human)
+	OrchestrateFallback(context.Context, *FailureContext) (*FallbackDecision, error)
+	// Assemble a multi-agent crew for a complex task
+	AssembleCrew(context.Context, *CrewRequest) (*CrewPlan, error)
+	// Delegate a subtask to another model (A -> B)
+	DelegateSubtask(context.Context, *SubtaskRequest) (*SubtaskResult, error)
+	// Stream crew execution events
+	StreamCrewEvents(*StreamEventsRequest, LLMHelper_StreamCrewEventsServer) error
+	mustEmbedUnimplementedLLMHelperServer()
+}
+
+// UnimplementedLLMHelperServer must be embedded to have forward compatible implementations.
+type UnimplementedLLMHelperServer struct {
+}
+
+func (UnimplementedLLMHelperServer) AnalyzeTask(context.Context, *TaskRequest) (*TaskAnalysis, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AnalyzeTask not implemented")
+}
+func (UnimplementedLLMHelperServer) RecommendChain(context.Context, *ChainRecommendationRequest) (*ChainRecommendation, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecommendChain not implemented")
+}
+func (UnimplementedLLMHelperServer) OrchestrateFallback(context.Context, *FailureContext) (*FallbackDecision, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method OrchestrateFallback not implemented")
+}
+func (UnimplementedLLMHelperServer) AssembleCrew(context.Context, *CrewRequest) (*CrewPlan, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssembleCrew not implemented")
+}
+func (UnimplementedLLMHelperServer) DelegateSubtask(context.Context, *SubtaskRequest) (*SubtaskResult, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DelegateSubtask not implemented")
+}
+func (UnimplementedLLMHelperServer) StreamCrewEvents(*StreamEventsRequest, LLMHelper_StreamCrewEventsServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamCrewEvents not implemented")
+}
+func (UnimplementedLLMHelperServer) mustEmbedUnimplementedLLMHelperServer() {}
+
+// UnsafeLLMHelperServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to LLMHelperServer will
+// result in compilation errors.
+type UnsafeLLMHelperServer interface {
+	mustEmbedUnimplementedLLMHelperServer()
+}
+
+func RegisterLLMHelperServer(s grpc.ServiceRegistrar, srv LLMHelperServer) {
+	s.RegisterService(&LLMHelper_ServiceDesc, srv)
+}
+
+func _LLMHelper_AnalyzeTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LLMHelperServer).AnalyzeTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LLMHelper_AnalyzeTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LLMHelperServer).AnalyzeTask(ctx, req.(*TaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LLMHelper_RecommendChain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChainRecommendationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LLMHelperServer).RecommendChain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LLMHelper_RecommendChain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LLMHelperServer).RecommendChain(ctx, req.(*ChainRecommendationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LLMHelper_OrchestrateFallback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailureContext)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LLMHelperServer).OrchestrateFallback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LLMHelper_OrchestrateFallback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LLMHelperServer).OrchestrateFallback(ctx, req.(*FailureContext))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LLMHelper_AssembleCrew_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CrewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LLMHelperServer).AssembleCrew(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LLMHelper_AssembleCrew_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LLMHelperServer).AssembleCrew(ctx, req.(*CrewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LLMHelper_DelegateSubtask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubtaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LLMHelperServer).DelegateSubtask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LLMHelper_DelegateSubtask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LLMHelperServer).DelegateSubtask(ctx, req.(*SubtaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LLMHelper_StreamCrewEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(LLMHelperServer).StreamCrewEvents(m, &lLMHelperStreamCrewEventsServer{ServerStream: stream})
+}
+
+type LLMHelper_StreamCrewEventsServer interface {
+	Send(*RouteEvent) error
+	grpc.ServerStream
+}
+
+type lLMHelperStreamCrewEventsServer struct {
+	grpc.ServerStream
+}
+
+func (x *lLMHelperStreamCrewEventsServer) Send(m *RouteEvent) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+// LLMHelper_ServiceDesc is the grpc.ServiceDesc for LLMHelper service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var LLMHelper_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "jimesh.v1.LLMHelper",
+	HandlerType: (*LLMHelperServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AnalyzeTask",
+			Handler:    _LLMHelper_AnalyzeTask_Handler,
+		},
+		{
+			MethodName: "RecommendChain",
+			Handler:    _LLMHelper_RecommendChain_Handler,
+		},
+		{
+			MethodName: "OrchestrateFallback",
+			Handler:    _LLMHelper_OrchestrateFallback_Handler,
+		},
+		{
+			MethodName: "AssembleCrew",
+			Handler:    _LLMHelper_AssembleCrew_Handler,
+		},
+		{
+			MethodName: "DelegateSubtask",
+			Handler:    _LLMHelper_DelegateSubtask_Handler,
+		},
+	},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamCrewEvents",
+			Handler:       _LLMHelper_StreamCrewEvents_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "jimesh/jimesh.proto",
+}
