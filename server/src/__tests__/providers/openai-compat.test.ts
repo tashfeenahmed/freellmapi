@@ -413,6 +413,31 @@ describe('OpenAICompatProvider', () => {
     });
   });
 
+  it('strips replayed reasoning_content before sending messages to Groq (#1070)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const groq = new OpenAICompatProvider({ platform: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' });
+    await groq.chatCompletion(
+      'k',
+      [{ role: 'assistant', content: 'previous answer', reasoning_content: 'replayed trace' }],
+      'llama-3.3-70b-versatile',
+    );
+
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'previous answer' });
+  });
+
   it('folds reasoning into content when content is empty (Ollama style — bare `reasoning` field)', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,

@@ -140,9 +140,12 @@ export class OpenAICompatProvider extends BaseProvider {
 
   /** Mistral's OpenAI-compatible endpoint is strict about unknown nested fields
    * and returns 422 for provider-private replay fields that other gateways
-   * ignore. Keep the OpenAI wire shape, but strip our internal reasoning /
-   * thought-signature extensions before sending to Mistral. */
+   * ignore. Groq also rejects replayed `reasoning_content`. Keep the OpenAI wire
+   * shape, but strip only the extensions each provider does not accept. */
   private messagesForPlatform(messages: ChatMessage[]): ChatMessage[] {
+    if (this.platform === 'groq') {
+      return messages.map(({ reasoning_content: _reasoningContent, ...message }) => message);
+    }
     if (this.platform !== 'mistral') return messages;
 
     return messages.map((m) => {
