@@ -1,39 +1,50 @@
 services:
-  freellmapi:
-    image: ghcr.io/tashfeenahmed/freellmapi:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # Redis Streams backend for real-time pub/sub (like Trading Bot)
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # JiMesh Go backend (gRPC + HTTP/1.1+2, HTTP/3 TODO)
+  jimesh:
+    image: golang:1.23-bookworm
+    working_dir: /src
+    user: "0:0"
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      PORT: 3001
-    # Bound to localhost by default — FreeLLMAPI is single-user and must not be
-    # exposed to the internet. Set HOST_BIND=0.0.0.0 to reach it from your LAN.
+      PORT: 3010
+      HOST_BIND: 0.0.0.0
+      REDIS_URL: "redis://redis:6379"
+      REDIS_ENABLED: "true"
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${PORT:-3001}:3001"
+      - "${HOST_BIND:-0.0.0.0}:3010:3010"          # HTTP/1.1+2 REST
+      - "${HOST_BIND:-0.0.0.0}:3009:3009"       # gRPC
     volumes:
-      - freellmapi-data:/app/server/data
-    # Makes `host.docker.internal` resolve to the host from inside the
-    # container. Docker Desktop provides it already; plain Docker on Linux does
-    # not, and without it the documented way to reach a proxy running on the
-    # host (PROXY_URL=http://host.docker.internal:7890) fails to resolve.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - jimesh-data:/data
+      - ./src/backend:/src
+      - /home/ji/go/pkg/mod:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    command: ["go", "run", "cmd/server/main.go", "-sqlite-path=/data/jimesh.db", "-http-port=3010", "-grpc-port=3009"]
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3001/api/ping').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1));"
-        ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--timeout=2", "--spider", "http://localhost:3010/health", "||", "exit", "1"]
       interval: 30s
-      timeout: 5s
-      start_period: 15s
+      timeout: 10s
       retries: 3
 
 volumes:
-  freellmapi-data:
+  jimesh-data:
+  redis-data:
+  go-build:

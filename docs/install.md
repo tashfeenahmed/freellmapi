@@ -4,7 +4,7 @@
 
 [← Back to README](../README.md) · [Documentation index](README.md)
 
-Everything about getting FreeLLMAPI running: the one-liner, Docker Compose, local development, declarative config, production builds, the desktop app, where your data lives, and how to reset a password, read the logs, or uninstall.
+Everything about getting JiMesh running: the one-liner, Docker Compose, local development, declarative config, production builds, the desktop app, where your data lives, and how to reset a password, read the logs, or uninstall.
 
 - [Quick start (one-liner)](#quick-start-one-liner)
 - [Docker Compose](#docker-compose)
@@ -17,21 +17,21 @@ Everything about getting FreeLLMAPI running: the one-liner, Docker Compose, loca
 
 ## Quick start (one-liner)
 
-Docker required — sets up `~/freellmapi`, generates an encryption key, pulls the image, and starts the container:
+Docker required — sets up `~/JiMesh`, generates an encryption key, pulls the image, and starts the container:
 
 ```bash
-curl -fsSL https://freellmapi.co/install.sh | bash
+curl -fsSL https://JiMesh.co/install.sh | bash
 ```
 
-Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
+Prefer to read before you pipe to bash? [The script is here](https://JiMesh.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
-On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** ([below](#desktop-app)); the Docker steps work in WSL or any bash shell.
+On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/JiMesh/releases/latest)** ([below](#desktop-app)); the Docker steps work in WSL or any bash shell.
 
 On Android, see the experimental [Termux installation guide](install/android-termux.md). It uses Node's built-in SQLite driver and does not require the Android NDK.
 
 Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 
-Your install keeps itself updated from the signed catalog feed. The current full catalog is listed at [freellmapi.co/models](https://freellmapi.co/models.html).
+Your install keeps itself updated from the signed catalog feed. The current full catalog is listed at [JiMesh.co/models](https://JiMesh.co/models.html).
 
 ## Docker Compose
 
@@ -41,8 +41,8 @@ Runs the API and dashboard together on port 3001 and persists SQLite in a named 
 
 *On macOS / Linux (Bash):*
 ```bash
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 
 # Generate an encryption key for at-rest key storage
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
@@ -53,8 +53,8 @@ docker compose up -d
 
 *On Windows (PowerShell):*
 ```powershell
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 
 $Bytes = New-Object Byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($Bytes)
@@ -73,13 +73,13 @@ docker compose up -d
 
 > **Providers unreachable from the container, but fine from the host?** A container has its own network stack, so two things that work on your machine do not carry over:
 >
-> - **A proxy on `127.0.0.1` is not your machine.** Inside the container, loopback is the container itself. If you reach providers through a proxy client on the host (Clash, v2rayN, sing-box, a corporate proxy), point FreeLLMAPI at the host instead: `PROXY_URL=socks5h://host.docker.internal:7890`. The bundled `docker-compose.yml` maps `host.docker.internal` to the host gateway, so this works on plain Linux Docker as well as Docker Desktop. The proxy also has to accept connections from outside loopback (in Clash, `allow-lan: true`).
+> - **A proxy on `127.0.0.1` is not your machine.** Inside the container, loopback is the container itself. If you reach providers through a proxy client on the host (Clash, v2rayN, sing-box, a corporate proxy), point JiMesh at the host instead: `PROXY_URL=socks5h://host.docker.internal:7890`. The bundled `docker-compose.yml` maps `host.docker.internal` to the host gateway, so this works on plain Linux Docker as well as Docker Desktop. The proxy also has to accept connections from outside loopback (in Clash, `allow-lan: true`).
 > - **An IPv6-only host needs IPv6 enabled in Docker.** The default bridge network is IPv4-only, so on a host with no IPv4 route the container cannot reach anything, DNS included. Enable it in `/etc/docker/daemon.json` with `"ipv6": true`, `"ip6tables": true` and a `"fixed-cidr-v6"` range, then restart Docker.
 >
 > To see which of these you are hitting, ask the container directly:
 >
 > ```bash
-> docker compose exec freellmapi node -e "fetch('https://generativelanguage.googleapis.com/').then(r=>console.log('ok',r.status)).catch(e=>console.log('fail',e.cause?.code||e.message))"
+> docker compose exec JiMesh node -e "fetch('https://generativelanguage.googleapis.com/').then(r=>console.log('ok',r.status)).catch(e=>console.log('fail',e.cause?.code||e.message))"
 > ```
 
 ## Local development
@@ -88,8 +88,8 @@ docker compose up -d
 
 *On macOS / Linux (Bash):*
 ```bash
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 npm install
 ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
 printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
@@ -98,8 +98,8 @@ npm run dev
 
 *On Windows (PowerShell):*
 ```powershell
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 npm install
 $ENCRYPTION_KEY = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 "ENCRYPTION_KEY=$ENCRYPTION_KEY`nPORT=3001" | Out-File -Encoding utf8 .env
@@ -129,8 +129,8 @@ node server/dist/index.js     # server + dashboard both served on :3001
 
 ## Declarative startup config
 
-For repeatable Docker/server installs, FreeLLMAPI can apply a JSON config on
-every boot. Set `FREEAPI_CONFIG_PATH=/path/to/freellmapi.config.json` or put the
+For repeatable Docker/server installs, JiMesh can apply a JSON config on
+every boot. Set `FREEAPI_CONFIG_PATH=/path/to/JiMesh.config.json` or put the
 same JSON in `FREEAPI_CONFIG_JSON`. The config is idempotent: existing keys,
 custom providers, model edits, fallback rows, and routing settings are updated
 instead of duplicated.
@@ -178,10 +178,10 @@ than one endpoint is rejected rather than applied to an arbitrary one:
 
 ## Docker image & operations
 
-FreeLLMAPI publishes a single production image that contains the Express server and the built React dashboard:
+JiMesh publishes a single production image that contains the Express server and the built React dashboard:
 
 ```bash
-docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # or pin a release, e.g. :v1.2.3
+docker pull ghcr.io/tashfeenahmed/JiMesh:latest   # or pin a release, e.g. :v1.2.3
 ```
 
 The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
@@ -190,30 +190,30 @@ The included `docker-compose.yml` is the recommended install path:
 
 ```bash
 docker compose up -d
-docker compose logs -f freellmapi
+docker compose logs -f JiMesh
 ```
 
 By default the container's port is bound to `127.0.0.1` (localhost only). To reach the dashboard/API from another machine on your network, publish it on all interfaces with `HOST_BIND=0.0.0.0 docker compose up -d` — only on a trusted LAN, since the proxy is single-user.
 
 Plain HTTP over a LAN address works as-is: the security headers that only apply to HTTPS (`upgrade-insecure-requests`, `Cross-Origin-Opener-Policy`, `Origin-Agent-Cluster`) are emitted only when the request actually arrived over TLS — or over loopback, which browsers already treat as a secure context. Behind an HTTPS reverse proxy they come back on automatically, as long as the proxy forwards `X-Forwarded-Proto`. `CSP_UPGRADE_INSECURE_REQUESTS=true|false` overrides the upgrade directive if your setup needs it.
 
-SQLite data is stored in the `freellmapi-data` volume at `/app/server/data`.
+SQLite data is stored in the `JiMesh-data` volume at `/app/server/data`.
 Keep the same `.env` `ENCRYPTION_KEY` and volume when upgrading, because
 provider keys are encrypted at rest. If your host only persists a specific
-directory, set `FREEAPI_DB_PATH=/that/path/freellmapi.db`.
+directory, set `FREEAPI_DB_PATH=/that/path/JiMesh.db`.
 
 On hosts with ephemeral disks, configure an encrypted backup target:
 
 ```env
-FREEAPI_DB_BACKUP_PATH=/app/server/data/freellmapi.db.backup
+FREEAPI_DB_BACKUP_PATH=/app/server/data/JiMesh.db.backup
 # or:
-FREEAPI_DB_BACKUP_URL=https://example.com/freellmapi.db.backup
+FREEAPI_DB_BACKUP_URL=https://example.com/JiMesh.db.backup
 FREEAPI_DB_BACKUP_TOKEN=optional-bearer-token
 FREEAPI_DB_BACKUP_KEY=64-char-hex-backup-key
 FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 ```
 
-When the database file is missing at startup, FreeLLMAPI restores the backup
+When the database file is missing at startup, JiMesh restores the backup
 before migrations run. While the server is running it uploads a fresh encrypted
 backup periodically. If `FREEAPI_DB_BACKUP_KEY` is omitted, the app uses
 `ENCRYPTION_KEY` for the backup envelope too.
@@ -226,17 +226,17 @@ A native menu-bar app lives in [`desktop/`](../desktop): the entire router +
 dashboard running locally from your tray, with a glass popover showing live
 request stats.
 
-![FreeLLMAPI desktop app](../repo-assets/desktop.png)
+![JiMesh desktop app](../repo-assets/desktop.png)
 
-**[Download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](../.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
+**[Download from Releases](https://github.com/tashfeenahmed/JiMesh/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](../.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
 
 > **Note for Windows users building from source:** Building the desktop app requires compiling native SQLite modules for Electron. You must have [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) installed (specifically the "Desktop development with C++" workload) and Python installed before running `npm install`.
 
 ```bash
 npm install
 npm install --prefix desktop  # install desktop dependencies
-npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist          # macOS  → desktop/dist-electron/JiMesh-…-arm64.dmg
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/JiMesh Setup ….exe"
 ```
 
 > Locally built apps are unsigned, so Windows SmartScreen may warn on first run
@@ -251,7 +251,7 @@ build signs the dashboard in automatically with a hidden local account, so
 you're never prompted for credentials and never need one.
 
 The only credential you need is your **unified API key** — the
-`freellmapi-…` token your OpenAI/Anthropic client points at. Get it from:
+`JiMesh-…` token your OpenAI/Anthropic client points at. Get it from:
 
 - the tray popover — click the tray icon, then **Copy Key**, or
 - the dashboard **Keys** page header (tray → **Open Dashboard**).
@@ -263,9 +263,9 @@ another machine or into a container):
 
 | OS | Location |
 |----|----------|
-| Windows | `%APPDATA%\FreeLLMAPI\` (e.g. `C:\Users\<you>\AppData\Roaming\FreeLLMAPI\`) |
-| macOS | `~/Library/Application Support/FreeLLMAPI/` |
-| Linux | `~/.config/FreeLLMAPI/` |
+| Windows | `%APPDATA%\JiMesh\` (e.g. `C:\Users\<you>\AppData\Roaming\JiMesh\`) |
+| macOS | `~/Library/Application Support/JiMesh/` |
+| Linux | `~/.config/JiMesh/` |
 
 That folder holds `freeapi.db` (all keys, models, settings, encrypted at rest),
 `config.json` (window/theme/port/LAN preferences) and `logs/freeapi.log` (what
@@ -304,16 +304,16 @@ rather than clicking repeatedly.
 
 | Install method | Where the log goes |
 |----------------|--------------------|
-| Docker Compose | `docker compose logs -f freellmapi` |
+| Docker Compose | `docker compose logs -f JiMesh` |
 | Plain Docker | `docker logs -f <container>` (`docker ps` lists the name) |
-| One-liner install | `cd ~/freellmapi && docker compose logs -f freellmapi` |
+| One-liner install | `cd ~/JiMesh && docker compose logs -f JiMesh` |
 | `npm run dev` / `node server/dist/index.js` | the terminal the server is running in |
 | Desktop app | `<data dir>/logs/freeapi.log` — tray icon → right-click → **Open Logs Folder** |
 
 The desktop app has no terminal attached, so it also tees everything it prints
 to a file: `freeapi.log` in the `logs` folder inside the data directory listed
 [above](#credentials-and-where-your-data-lives) — for example
-`~/Library/Application Support/FreeLLMAPI/logs/freeapi.log` on macOS. It keeps
+`~/Library/Application Support/JiMesh/logs/freeapi.log` on macOS. It keeps
 the current file plus one rotated `freeapi.log.1`, 1 MB each. Open it in any
 text editor; the reset code above appears there too.
 
@@ -325,23 +325,23 @@ the top.
 
 **Desktop app**
 
-1. Quit from the tray menu (**Quit FreeLLMAPI**). If you turned on *Start at
+1. Quit from the tray menu (**Quit JiMesh**). If you turned on *Start at
    login* in the popover, switch it off first so no stale login item is left.
 2. Remove the application:
-   - **macOS** — drag `FreeLLMAPI.app` from `/Applications` to the Trash.
-   - **Windows** — *Settings → Apps → Installed apps → FreeLLMAPI → Uninstall*.
-   - **Linux** — delete the AppImage, or `sudo apt remove freellmapi` for the `.deb`.
+   - **macOS** — drag `JiMesh.app` from `/Applications` to the Trash.
+   - **Windows** — *Settings → Apps → Installed apps → JiMesh → Uninstall*.
+   - **Linux** — delete the AppImage, or `sudo apt remove JiMesh` for the `.deb`.
 3. Delete the data directory to remove your keys, settings and logs for good:
-   - **Windows** — `%APPDATA%\FreeLLMAPI\`
-   - **macOS** — `~/Library/Application Support/FreeLLMAPI/`
-   - **Linux** — `~/.config/FreeLLMAPI/`
+   - **Windows** — `%APPDATA%\JiMesh\`
+   - **macOS** — `~/Library/Application Support/JiMesh/`
+   - **Linux** — `~/.config/JiMesh/`
 
 **Docker**
 
 ```bash
-docker compose down -v            # -v also drops the freellmapi-data volume
-docker image rm ghcr.io/tashfeenahmed/freellmapi:latest
-rm -rf ~/freellmapi               # the one-liner's directory: .env + compose file
+docker compose down -v            # -v also drops the JiMesh-data volume
+docker image rm ghcr.io/tashfeenahmed/JiMesh:latest
+rm -rf ~/JiMesh               # the one-liner's directory: .env + compose file
 ```
 
 Leave off `-v` if you want to keep the database for a later reinstall.

@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+package jimesh.v1;
+
+option go_package = "github.com/ji-podhead/jimesh/backend/protos/jimesh;jimeshpb";
+option java_multiple_files = true;
+option java_package = "ai.jimesh.v1";
+
+// ============================================================
+// JiMesh v1 — LLM Mesh Router
+// Schemas are the SSOT for every language (go/python/ts/rust/...)
+// Generate with: make proto  (or the Dockerfile codegen stage)
+// ============================================================
+
+// ---------- Enums ----------
+
+enum Tier {
+  TIER_UNSPECIFIED = 0;
+  TIER_S = 1;
+  TIER_A = 2;
+  TIER_B = 3;
+}
+
+// ---------- Core entities ----------
+
+message Model {
+  string id = 1;                  // e.g. "auto:s-tier" or "groq/openai/gpt-oss-120b"
+  string platform = 2;            // provider, e.g. "groq"
+  string display_name = 3;
+  int32 intelligence_rank = 4;    // 1 = best
+  int32 speed_rank = 5;
+  int32 context_window = 6;
+  bool supports_vision = 7;
+  bool supports_tools = 8;
+  bool enabled = 9;
+  double input_price_per_m = 10;  // USD / 1M input tokens
+  double output_price_per_m = 11; // USD / 1M output tokens
+  Tier tier = 12;
+}
+
+message Key {
+  int64 id = 1;
+  string platform = 2;
+  string label = 3;
+  bool enabled = 4;
+  string status = 5;              // "ok" | "cooldown" | "disabled"
+  int64 cooldown_until_unix_ms = 6;
+  double reliability = 7;         // beta posterior mean 0..1
+  double speed = 8;               // 0..1
+  int64 total_requests = 9;
+}
+
+message ChainEntry {
+  string model_id = 1;
+  string platform = 2;
+  int32 priority = 3;             // lower = tried first
+  bool enabled = 4;
+}
+
+message Chain {
+  string id = 1;
+  string name = 2;
+  Tier tier = 3;
+  repeated ChainEntry entries = 4;
+}
+
+// ---------- Routing ----------
+
+message RouteRequest {
+  string chain_id = 1;            // explicit chain (wins over tier)
+  Tier tier = 2;                  // auto chain for tier
+  int32 estimated_tokens = 3;     // default 1000
+  bool require_vision = 4;
+  bool require_tools = 5;
+  bool require_structured = 6;
+  map<string, string> metadata = 7;
+}
+
+message RouteDecision {
+  string trace_id = 1;
+  string model_id = 2;
+  string platform = 3;
+  Key key = 4;
+  double score = 5;               // bandit score of the chosen entry
+  string strategy = 6;            // "exploit" | "explore" | "prior"
+  repeated ChainEntry fallbacks = 7; // remaining chain after the pick
+}
+
+message RouteEvent {
+  string trace_id = 1;
+  string model_id = 2;
+  string platform = 3;
+  int64 key_id = 4;
+  bool success = 5;
+  string failure_reason = 6;
+  int64 latency_ms = 7;
+  int32 input_tokens = 8;
+  int32 output_tokens = 9;
+  double cost_usd = 10;
+  bool cached = 11;               // DSH prompt-cache hit
+  int64 ts_unix_ms = 12;
+}
+
+// ---------- Analytics ----------
+
+message ScoreSnapshot {
+  string model_id = 1;
+  string platform = 2;
+  double score = 3;
+  double reliability = 4;         // beta posterior mean
+  double speed = 5;
+  int64 samples = 6;
+  int64 successes = 7;
+  int64 failures = 8;
+  int64 ts_unix_ms = 9;
+}
+
+message ProviderHealth {
+  string platform = 1;
+  bool healthy = 2;
+  int32 latency_ms = 3;
+  double uptime_pct = 4;
+  int64 last_check_unix_ms = 5;
+  string error = 6;
+}
+
+message CostReport {
+  string period = 1;              // "2026-08-30" or "2026-08"
+  double total_cost_usd = 2;
+  double cached_cost_usd = 3;
+  double savings_usd = 4;         // saved by DSH prompt caching
+  double cache_hit_rate = 5;
+  int64 total_requests = 6;
+  int64 input_tokens = 7;
+  int64 output_tokens = 8;
+  map<string, double> cost_by_platform = 9;
+}
+
+// ---------- Requests / Responses ----------
+
+message ListModelsRequest {
+  Tier tier = 1;                  // filter, UNSPECIFIED = all
+  bool enabled_only = 2;
+}
+message ListModelsResponse { repeated Model models = 1; }
+
+message ListChainsRequest {}
+message ListChainsResponse { repeated Chain chains = 1; }
+
+message UpsertChainRequest { Chain chain = 1; }
+message UpsertChainResponse { Chain chain = 1; }
+
+message GetScoresRequest { Tier tier = 1; }
+message GetScoresResponse { repeated ScoreSnapshot scores = 1; }
+
+message StreamEventsRequest {
+  // empty = tail the whole mesh; optional filters
+  string platform = 1;
+  string model_id = 2;
+}
+message StreamScoresRequest { int64 interval_ms = 1; }
+message StreamHealthRequest { int64 interval_ms = 1; }
+
+message ListProvidersRequest {}
+message ListProvidersResponse {
+  repeated ProviderHealth health = 1;
+  repeated Key keys = 2;
+}
+
+message CheckHealthRequest { string platform = 1; }
+
+message ReportRequest { string period = 1; } // "day"|"month"|ISO date
+message ReportResponse { CostReport report = 1; }
+
+// Sync models from the FreeLLMAPI catalog
+message SyncRequest {}
+message SyncResponse {
+  int32 models_added = 1;
+  int32 models_updated = 2;
+  int32 models_removed = 3;
+  repeated string new_platforms = 4;
+}
+
+// ---------- Service ----------
+
+service JiMesh {
+  // Catalog
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+  rpc SyncCatalog(SyncRequest) returns (SyncResponse);
+
+  // Chains
+  rpc ListChains(ListChainsRequest) returns (ListChainsResponse);
+  rpc UpsertChain(UpsertChainRequest) returns (UpsertChainResponse);
+
+  // Routing (fast path)
+  rpc Route(RouteRequest) returns (RouteDecision);
+
+  // Realtime — backed by Redis Streams consumer groups
+  rpc StreamEvents(StreamEventsRequest) returns (stream RouteEvent);
+  rpc StreamScores(StreamScoresRequest) returns (stream ScoreSnapshot);
+  rpc StreamHealth(StreamHealthRequest) returns (stream ProviderHealth);
+
+  // Analytics / Providers
+  rpc GetScores(GetScoresRequest) returns (GetScoresResponse);
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  rpc CheckHealth(CheckHealthRequest) returns (ProviderHealth);
+  rpc CostReport(ReportRequest) returns (ReportResponse);
+}

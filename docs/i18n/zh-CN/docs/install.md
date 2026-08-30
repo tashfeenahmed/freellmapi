@@ -4,7 +4,7 @@
 
 [← 返回 README](../README.md) · [文档索引](README.md)
 
-把 FreeLLMAPI 跑起来所需的一切：一行命令、Docker Compose、本地开发、声明式配置、生产构建、桌面应用，以及你的数据存放在哪里。
+把 JiMesh 跑起来所需的一切：一行命令、Docker Compose、本地开发、声明式配置、生产构建、桌面应用，以及你的数据存放在哪里。
 
 - [快速开始](#快速开始)
 - [Docker Compose](#docker-compose)
@@ -16,21 +16,21 @@
 
 ## 快速开始
 
-需要 Docker。它会建好 `~/freellmapi`、生成加密密钥、拉取镜像并启动容器：
+需要 Docker。它会建好 `~/JiMesh`、生成加密密钥、拉取镜像并启动容器：
 
 ```bash
-curl -fsSL https://freellmapi.co/install.sh | bash
+curl -fsSL https://JiMesh.co/install.sh | bash
 ```
 
-不放心直接管道给 bash？[脚本在这里](https://freellmapi.co/install.sh)。重复执行是安全的：你的 `.env`（以及加密密钥）会被保留，容器会更新到 `:latest`。可以用 `FREELLMAPI_DIR`、`PORT` 或 `HOST_BIND` 环境变量覆盖默认值。
+不放心直接管道给 bash？[脚本在这里](https://JiMesh.co/install.sh)。重复执行是安全的：你的 `.env`（以及加密密钥）会被保留，容器会更新到 `:latest`。可以用 `FREELLMAPI_DIR`、`PORT` 或 `HOST_BIND` 环境变量覆盖默认值。
 
-在 Windows 上，最省事的方式是桌面版 **[Releases 里的 `.exe` 安装包](https://github.com/tashfeenahmed/freellmapi/releases/latest)**（见[下文](#桌面应用)）；上面的 Docker 步骤在 WSL 或任意 bash shell 里同样可用。
+在 Windows 上，最省事的方式是桌面版 **[Releases 里的 `.exe` 安装包](https://github.com/tashfeenahmed/JiMesh/releases/latest)**（见[下文](#桌面应用)）；上面的 Docker 步骤在 WSL 或任意 bash shell 里同样可用。
 
 在 Android 上，参见实验性的 [Termux 安装指南](../../../install/android-termux.md)。它使用 Node 内置的 SQLite 驱动，不需要 Android NDK。
 
 打开 http://localhost:3001 ，在 **密钥** 页添加你的提供方密钥，按喜好调整 **回退链** 的顺序，然后在 **密钥** 页顶部拿到你的统一 API 密钥。这个统一密钥就是你的 OpenAI SDK 要指向的东西。
 
-你的部署会自行从签名的目录源保持更新。当前的完整目录列在 [freellmapi.co/models](https://freellmapi.co/models.html)。
+你的部署会自行从签名的目录源保持更新。当前的完整目录列在 [JiMesh.co/models](https://JiMesh.co/models.html)。
 
 ## Docker Compose
 
@@ -40,8 +40,8 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 *在 macOS / Linux 上（Bash）：*
 ```bash
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 
 # 生成用于静态存储密钥的加密密钥
 ENCRYPTION_KEY="$(openssl rand -hex 32)"
@@ -52,8 +52,8 @@ docker compose up -d
 
 *在 Windows 上（PowerShell）：*
 ```powershell
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 
 $Bytes = New-Object Byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($Bytes)
@@ -72,13 +72,13 @@ docker compose up -d
 
 > **宿主机连得上提供方，容器里却连不上？** 容器有自己独立的网络栈，所以有两件在你机器上成立的事，到了容器里并不成立：
 >
-> - **`127.0.0.1` 在容器里指的是容器自己，不是你的机器。** 如果你是通过宿主机上的代理客户端（Clash、v2rayN、sing-box，或公司代理）访问提供方，请把 FreeLLMAPI 指向宿主机：`PROXY_URL=socks5h://host.docker.internal:7890`。仓库自带的 `docker-compose.yml` 已经把 `host.docker.internal` 映射到宿主网关，所以在 Linux 上的原生 Docker 里同样可用，不只是 Docker Desktop。另外代理本身也要允许来自 loopback 以外的连接（Clash 里是 `allow-lan: true`）。
+> - **`127.0.0.1` 在容器里指的是容器自己，不是你的机器。** 如果你是通过宿主机上的代理客户端（Clash、v2rayN、sing-box，或公司代理）访问提供方，请把 JiMesh 指向宿主机：`PROXY_URL=socks5h://host.docker.internal:7890`。仓库自带的 `docker-compose.yml` 已经把 `host.docker.internal` 映射到宿主网关，所以在 Linux 上的原生 Docker 里同样可用，不只是 Docker Desktop。另外代理本身也要允许来自 loopback 以外的连接（Clash 里是 `allow-lan: true`）。
 > - **纯 IPv6 的宿主机需要在 Docker 里开启 IPv6。** 默认的 bridge 网络只有 IPv4，所以在没有 IPv4 出口的宿主机上，容器什么都连不上，连 DNS 也一样。在 `/etc/docker/daemon.json` 里加上 `"ipv6": true`、`"ip6tables": true` 和一个 `"fixed-cidr-v6"` 网段，然后重启 Docker。
 >
 > 想知道自己属于哪一种，直接问容器：
 >
 > ```bash
-> docker compose exec freellmapi node -e "fetch('https://generativelanguage.googleapis.com/').then(r=>console.log('ok',r.status)).catch(e=>console.log('fail',e.cause?.code||e.message))"
+> docker compose exec JiMesh node -e "fetch('https://generativelanguage.googleapis.com/').then(r=>console.log('ok',r.status)).catch(e=>console.log('fail',e.cause?.code||e.message))"
 > ```
 
 ## 本地开发
@@ -87,8 +87,8 @@ docker compose up -d
 
 *在 macOS / Linux 上（Bash）：*
 ```bash
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 npm install
 ENCRYPTION_KEY="$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')"
 printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
@@ -97,8 +97,8 @@ npm run dev
 
 *在 Windows 上（PowerShell）：*
 ```powershell
-git clone https://github.com/tashfeenahmed/freellmapi.git
-cd freellmapi
+git clone https://github.com/tashfeenahmed/JiMesh.git
+cd JiMesh
 npm install
 $ENCRYPTION_KEY = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 "ENCRYPTION_KEY=$ENCRYPTION_KEY`nPORT=3001" | Out-File -Encoding utf8 .env
@@ -122,7 +122,7 @@ node server/dist/index.js     # 服务和仪表盘都在 :3001 上提供
 
 ## 声明式启动配置
 
-为了让 Docker 或服务器安装可以重复复现，FreeLLMAPI 支持在每次启动时应用一份 JSON 配置。设置 `FREEAPI_CONFIG_PATH=/path/to/freellmapi.config.json`，或者把同样的 JSON 放进 `FREEAPI_CONFIG_JSON`。这份配置是幂等的：已存在的密钥、自定义提供方、模型改动、回退链条目和路由设置会被更新，而不是重复添加。
+为了让 Docker 或服务器安装可以重复复现，JiMesh 支持在每次启动时应用一份 JSON 配置。设置 `FREEAPI_CONFIG_PATH=/path/to/JiMesh.config.json`，或者把同样的 JSON 放进 `FREEAPI_CONFIG_JSON`。这份配置是幂等的：已存在的密钥、自定义提供方、模型改动、回退链条目和路由设置会被更新，而不是重复添加。
 
 ```json
 {
@@ -164,10 +164,10 @@ node server/dist/index.js     # 服务和仪表盘都在 :3001 上提供
 
 ## Docker 镜像与运维
 
-FreeLLMAPI 发布一个生产镜像，里面包含 Express 服务和构建好的 React 仪表盘：
+JiMesh 发布一个生产镜像，里面包含 Express 服务和构建好的 React 仪表盘：
 
 ```bash
-docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # 也可以固定到某个版本，例如 :v1.2.3
+docker pull ghcr.io/tashfeenahmed/JiMesh:latest   # 也可以固定到某个版本，例如 :v1.2.3
 ```
 
 镜像是多架构的（`linux/amd64` 和 `linux/arm64`，所以树莓派上也能跑）。发布的标签有：`latest`（默认分支）、`v*.*.*`（git 发布标签）和 `sha-<commit>`。
@@ -176,27 +176,27 @@ docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # 也可以固定到某个
 
 ```bash
 docker compose up -d
-docker compose logs -f freellmapi
+docker compose logs -f JiMesh
 ```
 
 容器端口默认绑定在 `127.0.0.1`（仅本机）。想从网络里的另一台机器访问仪表盘或 API，用 `HOST_BIND=0.0.0.0 docker compose up -d` 把它发布到所有网卡上。只在可信的局域网里这么做，因为这个代理是单用户的。
 
 用局域网地址走纯 HTTP 是可以直接工作的：那些只对 HTTPS 生效的安全响应头（`upgrade-insecure-requests`、`Cross-Origin-Opener-Policy`、`Origin-Agent-Cluster`）只有在请求确实经由 TLS 到达时才会发出，或者是在 loopback 上，因为浏览器本来就把 loopback 当作安全上下文。放在 HTTPS 反向代理后面时它们会自动恢复，只要代理转发了 `X-Forwarded-Proto`。如果你的部署有特殊需要，`CSP_UPGRADE_INSECURE_REQUESTS=true|false` 可以强制开关那条升级指令。
 
-SQLite 数据存放在 `freellmapi-data` 卷的 `/app/server/data` 下。升级时请保持 `.env` 里的 `ENCRYPTION_KEY` 和这个卷不变，因为提供方密钥是加密存储的。如果你的宿主机只持久化某个特定目录，可以设置 `FREEAPI_DB_PATH=/that/path/freellmapi.db`。
+SQLite 数据存放在 `JiMesh-data` 卷的 `/app/server/data` 下。升级时请保持 `.env` 里的 `ENCRYPTION_KEY` 和这个卷不变，因为提供方密钥是加密存储的。如果你的宿主机只持久化某个特定目录，可以设置 `FREEAPI_DB_PATH=/that/path/JiMesh.db`。
 
 在磁盘不持久的宿主机上，配置一个加密备份目标：
 
 ```env
-FREEAPI_DB_BACKUP_PATH=/app/server/data/freellmapi.db.backup
+FREEAPI_DB_BACKUP_PATH=/app/server/data/JiMesh.db.backup
 # 或者：
-FREEAPI_DB_BACKUP_URL=https://example.com/freellmapi.db.backup
+FREEAPI_DB_BACKUP_URL=https://example.com/JiMesh.db.backup
 FREEAPI_DB_BACKUP_TOKEN=optional-bearer-token
 FREEAPI_DB_BACKUP_KEY=64-char-hex-backup-key
 FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 ```
 
-启动时如果数据库文件不存在，FreeLLMAPI 会先恢复备份，再执行迁移。服务运行期间，它会定期上传一份新的加密备份。如果没有设置 `FREEAPI_DB_BACKUP_KEY`，备份信封也会使用 `ENCRYPTION_KEY`。
+启动时如果数据库文件不存在，JiMesh 会先恢复备份，再执行迁移。服务运行期间，它会定期上传一份新的加密备份。如果没有设置 `FREEAPI_DB_BACKUP_KEY`，备份信封也会使用 `ENCRYPTION_KEY`。
 
 更多 Docker 运维内容和示例在 [docker/README.md](../../../../docker/README.md)。
 
@@ -204,17 +204,17 @@ FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 
 [`desktop/`](../../../../desktop) 里有一个原生的菜单栏应用：整个路由器加仪表盘就在你的托盘里本地运行，还有一个玻璃质感的悬浮窗显示实时请求统计。
 
-![FreeLLMAPI 桌面应用](../../../../repo-assets/desktop.png)
+![JiMesh 桌面应用](../../../../repo-assets/desktop.png)
 
-**[从 Releases 下载](https://github.com/tashfeenahmed/freellmapi/releases/latest)** —— macOS 的 `.dmg` 和 Windows 的 `.exe` 安装包由 [`desktop-release`](../../../../.github/workflows/desktop-release.yml) 工作流在每个版本发布时构建并附带。你也可以花几分钟从本仓库自己构建：
+**[从 Releases 下载](https://github.com/tashfeenahmed/JiMesh/releases/latest)** —— macOS 的 `.dmg` 和 Windows 的 `.exe` 安装包由 [`desktop-release`](../../../../.github/workflows/desktop-release.yml) 工作流在每个版本发布时构建并附带。你也可以花几分钟从本仓库自己构建：
 
 > **Windows 用户从源码构建的注意事项：** 构建桌面应用需要为 Electron 编译原生 SQLite 模块。在执行 `npm install` 之前，你必须先装好 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（具体来说是「使用 C++ 的桌面开发」工作负载）以及 Python。
 
 ```bash
 npm install
 npm install --prefix desktop  # 安装桌面端依赖
-npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist          # macOS  → desktop/dist-electron/JiMesh-…-arm64.dmg
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/JiMesh Setup ….exe"
 ```
 
 > 本地构建出来的应用没有签名，所以 Windows SmartScreen 首次运行时可能会警告（点「更多信息」→「仍要运行」）；macOS 构建则不会触发 Gatekeeper 提示。
@@ -224,7 +224,7 @@ npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Se
 
 桌面应用 **不需要设置用户名或密码**。服务器版会用邮箱加密码的账号把仪表盘挡在登录后面，而桌面版不同：它用一个隐藏的本地账号自动登录仪表盘，所以你永远不会被要求输入凭据，也不需要有一个。
 
-你唯一需要的凭据是那把 **统一 API 密钥**，也就是你的 OpenAI/Anthropic 客户端要指向的 `freellmapi-…` 令牌。可以从这两个地方拿到：
+你唯一需要的凭据是那把 **统一 API 密钥**，也就是你的 OpenAI/Anthropic 客户端要指向的 `JiMesh-…` 令牌。可以从这两个地方拿到：
 
 - 托盘悬浮窗：点击托盘图标，然后点 **复制密钥**；或者
 - 仪表盘 **密钥** 页的顶部（托盘 → **打开仪表盘**）。
@@ -235,8 +235,8 @@ npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Se
 
 | 操作系统 | 位置 |
 |----|----------|
-| Windows | `%APPDATA%\FreeLLMAPI\`（例如 `C:\Users\<你>\AppData\Roaming\FreeLLMAPI\`） |
-| macOS | `~/Library/Application Support/FreeLLMAPI/` |
-| Linux | `~/.config/FreeLLMAPI/` |
+| Windows | `%APPDATA%\JiMesh\`（例如 `C:\Users\<你>\AppData\Roaming\JiMesh\`） |
+| macOS | `~/Library/Application Support/JiMesh/` |
+| Linux | `~/.config/JiMesh/` |
 
 这个文件夹里有 `freeapi.db`（全部密钥、模型和设置，加密存储）和 `config.json`（窗口、主题、端口、局域网偏好）。搬迁安装时两个都要复制。对于服务器（非桌面）部署，对应的状态是 `.env` 文件和位于 `server/data/freeapi.db`（或者 `FREEAPI_DB_PATH` 指向的位置）的 SQLite 数据库。
