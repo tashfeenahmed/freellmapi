@@ -44,7 +44,27 @@ services:
       timeout: 10s
       retries: 3
 
+  # JiMesh React Admin Dashboard Frontend (Vite + React)
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./src/frontend:/app
+      - /app/node_modules                         # Keeps node_modules inside container, away from host!
+      - node-cache:/root/.npm                     # Cache npm packages across restarts
+    ports:
+      - "5173:5173"
+    environment:
+      - PORT=5173
+      - NODE_ENV=development
+      - VITE_BACKEND_HOST=jimesh
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      - jimesh
+    restart: unless-stopped
+
 volumes:
   jimesh-data:
   redis-data:
   go-build:
+  node-cache:

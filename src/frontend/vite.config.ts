@@ -5,7 +5,8 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
-  const serverPort = env.PORT ?? process.env.PORT ?? 3001
+  const serverPort = env.PORT ?? process.env.PORT ?? 3010
+  const backendHost = env.VITE_BACKEND_HOST ?? process.env.VITE_BACKEND_HOST ?? '127.0.0.1'
 
   return {
     plugins: [react(), tailwindcss()],
@@ -23,8 +24,8 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // Force IPv4 — on Windows + Node 17+, `localhost` resolves to ::1 first,
         // which can collide with wslrelay / Docker Desktop listeners on the same port.
-        '/api': `http://127.0.0.1:${serverPort}`,
-        '/v1': `http://127.0.0.1:${serverPort}`,
+        '/api': `http://${backendHost}:${serverPort}`,
+        '/v1': `http://${backendHost}:${serverPort}`,
       },
     },
   }

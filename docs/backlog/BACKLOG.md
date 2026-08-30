@@ -16,14 +16,17 @@
 - [x] Start stack + verify /health + gRPC reflection (defaults seeded automatically)
 
 ### Task 4.3: Flexible Fallback Chain System 🔥 🚧 IN PROGRESS
-- [ ] Protobuf: ChainType enum (MAIN, FALLBACK, ESCALATION, SPECIALIZED)
-- [ ] Protobuf: ChainEntry extensions (is_paid_model, api_key_id, user_preference, model_type, parameters, metadata)
-- [ ] Protobuf: Chain extensions (auto_skip_exhausted, description, tags, metadata)
-- [ ] Router: User preference blending (0.7*bandit + 0.3*user_pref)
-- [ ] Router: Paid model auto-skip on 402/429
-- [ ] Router: Per-key model assignment (api_key_id binding)
-- [ ] Router: Pre-call throttle/cooldown check (NO useless API calls)
-- [ ] Router: Escalation chain (free → cheap → expensive)
+- [x] **Protobuf: ChainType enum** (MAIN, FALLBACK, ESCALATION, SPECIALIZED)
+- [x] **Protobuf: ChainEntry extensions** (is_paid_model, api_key_id, user_preference, model_type, parameters, metadata, is_fallback)
+- [x] **Protobuf: Chain extensions** (auto_skip_exhausted, description, tags, metadata, type)
+- [x] **SQLite Store** - Migrations + JSON serialization for maps/arrays
+- [x] **Service Layer** - ListChains/UpsertChain full field mapping
+- [x] **Gateway** - POST /v1/chains accepts all advanced fields
+- [ ] **Router: User preference blending** (0.7*bandit + 0.3*user_pref)
+- [ ] **Router: Paid model auto-skip** on 402/429 (chain.auto_skip_exhausted)
+- [ ] **Router: Per-key model assignment** (api_key_id binding)
+- [ ] **Router: Pre-call throttle/cooldown check** (NO useless API calls)
+- [ ] **Router: Escalation chain** (free → cheap → expensive)
 
 ### Task 4.4: API Key Auto-Discovery ✅ DONE
 - [x] `POST /api/v1/keys/discover` / `AutoDiscoverKeys` on startup
@@ -36,7 +39,12 @@
 - [ ] ALPN negotiation (h3/h2/http/1.1)
 - [ ] Connection migration support
 
-### Task 4.6: Language SDKs (Generated + Ergonomic Wrappers) 🔥 📋 PLANNED
+### Task 4.6: LLMHelper Service (Proto Defined, Impl Pending) 🔥
+- [x] **Protobuf Definitions** - AnalyzeTask, RecommendChain, OrchestrateFallback, AssembleCrew, DelegateSubtask
+- [x] **Message Types** - CapabilityRequirements, TaskAnalysis, ChainRecommendation, FailureContext, FallbackDecision, CrewRole, CrewPlan, CrewRequest, SubtaskRequest, SubtaskResult
+- [ ] **Go gRPC Implementation** - Service handlers in main.go
+
+### Task 4.7: Language SDKs (Generated + Ergonomic Wrappers) 🔥 📋 PLANNED
 - [ ] **Go SDK** - `clients/go/` - Native gRPC, builder patterns, streaming helpers
 - [ ] **Python SDK** - `clients/python/` - Async/await, Pydantic, context managers → PyPI
 - [ ] **TypeScript SDK** - `clients/typescript/` - Type-safe, React hooks, SSE/WS → npm
@@ -47,20 +55,11 @@
   - `ChainEntryBuilder` - `.with_user_preference()`, `.with_api_key()`, `.with_parameters()`, `.with_metadata()`
   - `AgentSessionHelper` - create session, stream logs, get/update metadata
 
-### Task 4.7: LLM Helper Agent (Smart Routing Core) 🔥 📋 PLANNED
-- [ ] **TaskAnalysis** - Input prompt → required capabilities (vision, tools, reasoning, context_window)
-- [ ] **ChainRecommendation** - Best chain for task type (coding, trading, analysis, chat)
-- [ ] **FallbackOrchestration** - On failure: retry same? cheaper model? escalate? supervisor?
-- [ ] **CrewAssembly** - Spawn sub-agents (screener, expert, risk) with own chains
-- [ ] **SubtaskDelegation** - Model A → Model B with structured handoff
-- [ ] **FreeModelBudgetManager** - Tracks free tier quotas, prefers free when quality sufficient
-- [ ] **gRPC Service** - `AnalyzeTask`, `RecommendChain`, `OrchestrateFallback`, `AssembleCrew`, `DelegateSubtask`
-
-### Task 4.8: Parameters & Metadata System 📋 PLANNED
-- [ ] ChainEntry.parameters (provider params: temp, top_p, max_tokens, response_format, custom)
-- [ ] ChainEntry.metadata (arbitrary, queryable, not sent to provider)
-- [ ] Chain.metadata (chain-level metadata)
-- [ ] Store: Persist and query by metadata/tags
+### Task 4.8: Parameters & Metadata System ✅ PROTO DONE
+- [x] ChainEntry.parameters (provider params: temp, top_p, max_tokens, response_format, custom)
+- [x] ChainEntry.metadata (arbitrary, queryable, not sent to provider)
+- [x] Chain.metadata (chain-level metadata)
+- [x] Store: Persist and query by metadata/tags
 - [ ] SDK: Pass through parameters, attach metadata
 
 ### Task 4.9: FlexGrid/RaphBuilder UI Components 📋 PLANNED
@@ -69,10 +68,10 @@
 - [ ] ChainVisualizer - Live routing decisions, fallback path, latency/cost per hop
 - [ ] ParameterEditor - Per-node parameter + metadata editor
 
-### Task 4.10: Redis Streams + gRPC Integration Patterns 📋 PLANNED
-- [ ] Topics: `jimesh:events`, `jimesh:scores`, `jimesh:health`, `jimesh:requests`
-- [ ] Consumer Groups: `analytics`, `tracing`, `alerting`, `dsh-bridge`, `feedback-loop`
-- [ ] gRPC Streaming via `TailGroup()` per RPC
+### Task 4.10: Redis Streams + gRPC Integration Patterns ✅ STREAMS WORKING
+- [x] Topics: `jimesh:events`, `jimesh:scores`, `jimesh:health`, `jimesh:requests`
+- [x] Consumer Groups: `analytics`, `tracing`, `alerting`, `dsh-bridge`, `feedback-loop`
+- [x] gRPC Streaming via `TailGroup()` per RPC
 
 ### Task 4.11: DSH Integration Endpoints 📋 PLANNED
 - [ ] Agent Schema: agent_type, fallback_chain_id, memory_config, tags, default_metadata
@@ -189,9 +188,9 @@
 
 ### Advanced Analytics
 - [ ] **Custom Date Range** - Not just 24h/7d/30d/90d
-- [ ] **Drill-Down** - Click for details
-- [ ] **Export** - CSV/JSON for reports
-- [ ] **Alerts** - Slack/Discord on anomalies (success rate drop, latency spike)
+- [ ] **Drill-Down** - Click für Details
+- [ ] **Export** - CSV/JSON für Reports
+- [ ] **Alerts** - Slack/Discord bei Anomalien (success rate drop, latency spike)
 - [ ] **Grafana Integration** - Pre-built dashboards
 
 ---
@@ -212,12 +211,12 @@
 ## 💡 Ideas (Not Prioritized)
 
 - LightLLM wrapper (only OpenAI endpoint → needs wrapper for other formats)
-- DeepSeek Harness directly in container
+- DeepSeek Harness direkt in Container integrieren
 - Traces: LangSmith / DSH / OpenTelemetry-kompatibel
 - Trace Storage: Redis (7d) + SurrealDB (long-term)
 - Trace Search & Replay
-- Auto-Scaling (more keys at high load)
-- Custom Date Range for Analytics
+- Auto-Scaling (mehr Keys bei High Load)
+- Custom Date Range für Analytics
 - Drill-Down in Analytics
 - Grafana Integration
-- Alerts (Slack/Discord on anomalies)
+- Alerts (Slack/Discord bei Anomalien)

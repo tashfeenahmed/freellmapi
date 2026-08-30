@@ -43,6 +43,7 @@ type config struct {
 	redisURL    string
 	redisEnable bool
 	shutdownSec int
+	staticDir   string
 }
 
 func loadConfig() *config {
@@ -53,6 +54,7 @@ func loadConfig() *config {
 	flag.StringVar(&c.redisURL, "redis-url", "", "Redis URL (default redis://localhost:6379)")
 	flag.BoolVar(&c.redisEnable, "redis-enable", true, "Enable Redis PubSub")
 	flag.IntVar(&c.shutdownSec, "shutdown-sec", 10, "Graceful shutdown timeout (seconds)")
+	flag.StringVar(&c.staticDir, "static-dir", "/frontend-dist", "Path to frontend static assets directory")
 	flag.Parse()
 	return c
 }
@@ -121,7 +123,7 @@ func main() {
 	log.Printf("gRPC listening on %s", grpcLis.Addr())
 
 	// ---------- HTTP Gateway ----------
-	gw := gateway.New(fmt.Sprintf(":%d", c.httpPort), svc)
+	gw := gateway.New(fmt.Sprintf(":%d", c.httpPort), svc, c.staticDir)
 	log.Printf("HTTP listening on %s", gw.Addr())
 
 	// ---------- Run servers ----------

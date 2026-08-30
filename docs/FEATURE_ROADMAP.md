@@ -13,7 +13,7 @@
 
 ---
 
-## ✅ Completed Features (Sprint 0-1)
+## ✅ Completed Features (Sprint 0-1 + Sprint 4 Core)
 
 ### Sprint 0: Foundation (Completed)
 - [x] **Repo klonen** - JiMesh als Basis
@@ -26,30 +26,36 @@
 - [x] **Provider-Level Skip** - Vermeidet 5xx/Timeout auf ganzem Provider
 - [x] **Free Model Prioritization** - Kürzere Cooldowns für Free Models
 
+### Sprint 4: Go Backend Core ✅ DONE (2026-08-30)
+- [x] **Go Backend Migration** - Node.js → Go (gRPC + HTTP REST)
+- [x] **gRPC + Protobuf as SSOT** - Single source of truth for Go/Python/TS/Rust
+- [x] **Redis Streams Pub/Sub** - Real-time event streaming (like Trading Bot)
+- [x] **Protobuf Schema Extensions**:
+  - ChainType enum (MAIN/FALLBACK/ESCALATION/SPECIALIZED)
+  - ChainEntry: is_paid_model, api_key_id, user_preference, parameters, metadata
+  - Chain: description, tags, auto_skip_exhausted, metadata
+  - LLMHelper service (AnalyzeTask, RecommendChain, OrchestrateFallback, AssembleCrew, DelegateSubtask)
+- [x] **SQLite Store** - Migrations, JSON serialization for maps/arrays
+- [x] **Service Layer** - Full mapping Protobuf ↔ Store
+- [x] **Gateway (HTTP REST)** - POST /v1/chains with full advanced fields
+- [x] **API Key Auto-Discovery** - Scans env vars, registers keys, generates defaults
+- [x] **Docker Dev Mode** - Hot reload via volume mount
+
 ---
 
-## 🚧 In Progress (Sprint 2)
+## 🚧 In Progress (Sprint 4 Remaining)
 
-### Sprint 2: Smart Routing & Mesh
-- [ ] **Bandit Routing** - Thompson Sampling für Model-Selection
-- [ ] **Community Prior** - Geteilte Reliability-Stats
-- [ ] **Quota Weighting** - Headroom-aware Key Selection
-- [ ] **Task-Aware Routing** - Vision/Tools/Context als Gates
-- [ ] **Fallback Chains** - Automatische Key → Model → Provider Fallbacks
-- [ ] **Health Checks** - Periodische Provider Health Probes
-
----
-
-## 🚧 In Progress (Sprint 4)
-
-### Sprint 4: Go Backend Architecture - gRPC + Redis Streams + HTTP/3
-- [ ] **Go Backend Migration** - Replace Node.js/TypeScript backend with Go
-- [ ] **gRPC + Protobuf as SSOT** - Single source of truth for all languages
-- [ ] **Redis Streams Pub/Sub** - Real-time event streaming (like Trading Bot)
-- [ ] **HTTP/3 Support** - quic-go for efficient REST
-- [ ] **Flexible Fallback Chains** - User favorites, paid model tags, per-key model assignment
-- [ ] **FlexGrid/RaphBuilder UI** - Drag-drop chain builder with smart routing overlay
-- [ ] **API Key Auto-Discovery** - Auto-detect and register provider keys
+### Sprint 4: Router Logic + LLMHelper + SDKs
+- [ ] **Router: User-Preference Blending** — `final_score = 0.7*bandit + 0.3*user_preference`
+- [ ] **Router: Paid Auto-Skip** — On 402/429, skip to next non-paid entry or FALLBACK chain
+- [ ] **Router: Per-Key Binding** — `entry.api_key_id` pins specific key (no round-robin)
+- [ ] **Router: Pre-call Throttle Check** — Check KeyPool cooldown BEFORE returning candidate
+- [ ] **Router: Escalation Chain Support** — Type=ESCALATION orders by cost (free→cheap→expensive)
+- [ ] **LLMHelper gRPC Implementation** — AnalyzeTask, RecommendChain, OrchestrateFallback, AssembleCrew, DelegateSubtask
+- [ ] **Language SDKs** — Go/Python/TS/Rust wrappers (clients/ subdirs)
+- [ ] **FlexGrid/RaphBuilder UI** — React Flow drag-drop chain builder
+- [ ] **HTTP/3 (quic-go)** — quic-go listener with ALPN negotiation
+- [ ] **DSH Integration Endpoints** — AgentSchema, CreateAgentSession, StreamAgentLogs
 
 ---
 
@@ -69,7 +75,7 @@
 
 #### DeepSeek Harness Integration
 - [ ] **DSH SDK** - DeepSeek Harness als Provider integrieren
-- [ ] **Caching Layer** - Token-sparend durch Prompt-Caching
+- [ ] **Caching Layer** - Token-sparend durch Prompt-Caching (96% cost reduction)
 - [ ] **Workflow Engine** - Multi-Step Workflows (DSH → JiMesh → Model)
 - [ ] **Cost Tracking** - Cached vs Uncached Token Counts
 - [ ] **Cache Invalidation** - TTL + Event-basiert
@@ -183,7 +189,7 @@
 - [ ] **Dependency Updates** - Automated PRs
 
 ### Documentation
-- [ ] **API Docs** - OpenAPI/Swagger
+- [x] **API Docs** - OpenAPI/Swagger (→ `docs/GO_BACKEND_API.md`)
 - [ ] **Architecture Diagrams** - C4 Model
 - [ ] **Runbooks** - Für Operations
 - [ ] **ADRs** - Architecture Decision Records
@@ -192,10 +198,10 @@
 
 ### DevOps
 - [ ] **CI/CD** - GitHub Actions
-- [ ] **Docker** - Multi-stage Builds
+- [x] **Docker** - Multi-stage Builds (done for dev)
 - [ ] **Kubernetes** - Helm Charts
 - [ ] **Monitoring** - Prometheus + Grafana
-- [ ] **Logging** - Structured Logs (pino)
+- [ ] **Logging** - Structured Logs (zap)
 - [ ] **Tracing** - OpenTelemetry
 
 ---
@@ -219,3 +225,16 @@
 - **10+ Providers** Integrated
 - **5+ Chat Presets** Built-in
 - **Community** - GitHub Stars, Discord Members
+
+---
+
+## 📁 Documentation Files
+
+| File | Purpose |
+|------|---------|
+| `docs/GO_BACKEND_API.md` | Complete HTTP/gRPC/Streams API reference |
+| `docs/sprints/SPRINT-4-PROGRESS-LOG.md` | This session's implementation details |
+| `docs/sprints/SPRINT-4-GO-BACKEND-ARCHITECTURE.md` | Full sprint plan |
+| `docs/backlog/BACKLOG.md` | Task-level backlog |
+| `docs/prompts/CHAT_LOG.md` | Original user prompts |
+| `src/backend/protos/jimesh/jimesh.proto` | Protobuf SSOT (all schemas) |

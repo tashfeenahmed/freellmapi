@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -19,11 +21,12 @@ import (
 
 // Server bundles the mux and dependencies.
 type Server struct {
-	mux  *http.ServeMux
-	svc  *service.Service
-	addr string
-	srv  *http.Server
-	log  *log.Logger
+	mux       *http.ServeMux
+	svc       *service.Service
+	addr      string
+	staticDir string
+	srv       *http.Server
+	log       *log.Logger
 }
 
 // Addr returns the configured listening address.
@@ -31,14 +34,33 @@ func (s *Server) Addr() string {
 	return s.addr
 }
 
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path := filepath.Join(h.staticPath, r.URL.Path)
+
+	fi, err := os.Stat(path)
+	if err != nil || fi.IsDir() {
+		// File does not exist or is a directory, serve index.html (SPA fallback)
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	}
+
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
+
 // New creates a server that listens on addr and uses svc for logic.
-func New(addr string, svc *service.Service) *Server {
+func New(addr string, svc *service.Service, staticDir string) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
-		mux:  mux,
-		svc:  svc,
-		addr: addr,
-		log:  log.New(log.Writer(), "[gateway] ", log.LstdFlags),
+		mux:       mux,
+		svc:       svc,
+		addr:      addr,
+		staticDir: staticDir,
+		log:       log.New(log.Writer(), "[gateway] ", log.LstdFlags),
 	}
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/ready", s.handleReady)
@@ -47,8 +69,14 @@ func New(addr string, svc *service.Service) *Server {
 	mux.HandleFunc("/v1/route", s.handleRoute)
 	mux.HandleFunc("/v1/score", s.handleGetScores)
 	mux.HandleFunc("/v1/providers", s.handleProviders)
-	// catch-all for unimplemented endpoints
-	mux.HandleFunc("/", s.handleNotFound)
+	
+	if staticDir != "" {
+		s.log.Printf("serving static files from %s", staticDir)
+		mux.Handle("/", spaHandler{staticPath: staticDir, indexPath: "index.html"})
+	} else {
+		// catch-all for unimplemented endpoints
+		mux.HandleFunc("/", s.handleNotFound)
+	}
 	return s
 }
 
