@@ -927,6 +927,22 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     fusionSse('response.created', { response: skeleton });
     fusionSse('response.in_progress', { response: skeleton });
 
+    // Fusion fans out to several upstream models before the judge can emit a
+    // token.  That gap can exceed the ~15s idle timeout used by Codex's
+    // Responses client even though the HTTP connection is healthy.  SSE
+    // comments are deliberately invisible to the Responses event parser, but
+    // still refresh the transport so a slow panel does not look disconnected.
+    const fusionHeartbeat = setInterval(() => {
+      if (res.writableEnded || res.destroyed) return;
+      try {
+        res.write(': fusion-keepalive\n\n');
+      } catch {
+        // The close listener aborts the in-flight fan-out; a late heartbeat
+        // racing socket teardown is harmless.
+      }
+    }, 5000);
+    fusionHeartbeat.unref?.();
+
     let textItemId: string | null = null;
     const textOutputIndex = 0;
     let streamedText = '';
@@ -1053,6 +1069,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         },
       });
       res.end();
+    } finally {
+      clearInterval(fusionHeartbeat);
     }
     return;
   }
