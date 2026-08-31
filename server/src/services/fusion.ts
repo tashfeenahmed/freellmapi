@@ -632,10 +632,11 @@ export async function runFusion(params: {
       messages, slotOptions, estimatedTokens, MAX_SLOT_ATTEMPTS,
     ).then((outcome): PanelAnswer => {
       const returnedToolCalls = outcome.toolCalls;
+      const forbiddenToolCall = options.tool_choice === 'none' && !!returnedToolCalls?.length;
       const wrongNamedTool = !!requiredToolName
         && !!returnedToolCalls?.length
         && returnedToolCalls.some(tc => tc.function?.name !== requiredToolName);
-      const answer: PanelAnswer = outcome.ok && !wrongNamedTool
+      const answer: PanelAnswer = outcome.ok && !wrongNamedTool && !forbiddenToolCall
         ? {
             modelDbId: cand.modelDbId,
             platform: cand.platform,
@@ -655,6 +656,8 @@ export async function runFusion(params: {
             status: 'failed',
             error: wrongNamedTool
               ? `provider returned a tool call other than required function '${requiredToolName}'`
+              : forbiddenToolCall
+              ? 'provider returned a tool call despite tool_choice=none'
               : outcome.error,
           };
       hooks?.onPanel?.({ platform: answer.platform, model: answer.modelId, status: answer.status, content: answer.content, tool_calls: answer.toolCalls, error: answer.error });
