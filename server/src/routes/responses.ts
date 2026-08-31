@@ -928,14 +928,14 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     fusionSse('response.in_progress', { response: skeleton });
 
     // Fusion fans out to several upstream models before the judge can emit a
-    // token.  That gap can exceed the ~15s idle timeout used by Codex's
-    // Responses client even though the HTTP connection is healthy.  SSE
-    // comments are deliberately invisible to the Responses event parser, but
-    // still refresh the transport so a slow panel does not look disconnected.
+    // token. That gap can exceed the ~15s idle timeout used by Codex's
+    // Responses client even though the HTTP connection is healthy. A standard
+    // in-progress event keeps the client-side event watchdog alive; comments
+    // are ignored by Codex's watchdog even though they refresh curl's stream.
     const fusionHeartbeat = setInterval(() => {
       if (res.writableEnded || res.destroyed) return;
       try {
-        res.write(': fusion-keepalive\n\n');
+        fusionSse('response.in_progress', { response: skeleton });
       } catch {
         // The close listener aborts the in-flight fan-out; a late heartbeat
         // racing socket teardown is harmless.
