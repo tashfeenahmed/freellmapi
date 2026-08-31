@@ -604,6 +604,9 @@ export async function runFusion(params: {
   const requireTools = (options.tools?.length ?? 0) > 0;
   const requiresToolCall = options.tool_choice === 'required'
     || (typeof options.tool_choice === 'object' && options.tool_choice !== null);
+  const requiredToolName = typeof options.tool_choice === 'object'
+    ? options.tool_choice.function.name
+    : undefined;
   // `tool_choice=auto` (or an omitted choice) still allows a model to emit a
   // structured call. Continue past a prose-only candidate so a later capable
   // model gets a chance; `none` is the explicit opt-out and may stop at prose.
@@ -628,7 +631,11 @@ export async function runFusion(params: {
       (skipKeys) => routePinnedModel(cand.modelDbId, estimatedTokens, skipKeys),
       messages, slotOptions, estimatedTokens, MAX_SLOT_ATTEMPTS,
     ).then((outcome): PanelAnswer => {
-      const answer: PanelAnswer = outcome.ok
+      const returnedToolCalls = outcome.toolCalls;
+      const wrongNamedTool = !!requiredToolName
+        && !!returnedToolCalls?.length
+        && returnedToolCalls.some(tc => tc.function?.name !== requiredToolName);
+      const answer: PanelAnswer = outcome.ok && !wrongNamedTool
         ? {
             modelDbId: cand.modelDbId,
             platform: cand.platform,
@@ -640,7 +647,16 @@ export async function runFusion(params: {
             rawChoice: outcome.rawChoice,
             usage: outcome.usage,
           }
-        : { modelDbId: cand.modelDbId, platform: cand.platform, modelId: cand.modelId, displayName: cand.displayName, status: 'failed', error: outcome.error };
+        : {
+            modelDbId: cand.modelDbId,
+            platform: cand.platform,
+            modelId: cand.modelId,
+            displayName: cand.displayName,
+            status: 'failed',
+            error: wrongNamedTool
+              ? `provider returned a tool call other than required function '${requiredToolName}'`
+              : outcome.error,
+          };
       hooks?.onPanel?.({ platform: answer.platform, model: answer.modelId, status: answer.status, content: answer.content, tool_calls: answer.toolCalls, error: answer.error });
       return answer;
     });
