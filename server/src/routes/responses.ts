@@ -878,7 +878,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           res.status(err.status).json({
             error: {
               message: err.message,
-              type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error',
+              type: err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error',
             },
           });
         } else {
@@ -1059,7 +1059,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         ? err.message
         : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
       const type = err instanceof FusionError
-        ? (err.status === 429 ? 'rate_limit_error' : 'invalid_request_error')
+        ? (err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error')
         : 'server_error';
       fusionSse('response.failed', {
         response: {

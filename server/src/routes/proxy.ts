@@ -1615,6 +1615,24 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }
   max_tokens = budgetCheck.maxTokens;
 
+  // Client-disconnect fan-out: the flag stops the loop before the NEXT
+  // attempt; the AbortController (threaded to the provider as
+  // CompletionOptions.signal) additionally cancels the IN-FLIGHT upstream
+  // fetch and any body/stream read, so tokens stop burning and the in-flight
+  // lease frees immediately. 'close' also fires on normal completion —
+  // writableEnded distinguishes a real disconnect.
+  //
+  // This controller is declared before the Fusion branch because Fusion uses
+  // the same cancellation signal as the ordinary fallback loop below.
+  let clientGone = false;
+  const clientAbort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientGone = true;
+      clientAbort.abort(newClientAbortError());
+    }
+  });
+
   // ── Fusion: multi-model synthesis ──────────────────────────────────────────
   // The virtual "fusion" model fans the prompt out to a panel of diverse models
   // in parallel, then a judge synthesizes one answer. It routes each panel/judge
@@ -1623,7 +1641,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Image requests run on vision-capable panel members; tool requests run on
   // tool-capable members and return the first structured tool call directly.
   if (isFusionModel(requestedModel)) {
-    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams };
+    // Keep Fusion's sequential tool fallback tied to the caller's socket. The
+    // Responses route already threads this signal; the legacy Chat surface
+    // needs the same cancellation so a disconnected client does not leave a
+    // bounded-but-expensive provider call running in the background.
+    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: clientAbort.signal };
     const fusionConfig = parsed.data.fusion ?? {};
 
     if (stream) {
@@ -1687,7 +1709,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
       } catch (err: any) {
         const message = err instanceof FusionError ? err.message : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
-        const type = err instanceof FusionError && err.status === 429 ? 'rate_limit_error' : 'server_error';
+        const type = err instanceof FusionError
+          ? (err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error')
+          : 'server_error';
         writeFrame({ error: { message, type } });
       }
       try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
@@ -1724,7 +1748,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       res.json(response);
     } catch (err: any) {
       if (err instanceof FusionError) {
-        res.status(err.status).json({ error: { message: err.message, type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error' } });
+        res.status(err.status).json({
+          error: {
+            message: err.message,
+            type: err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error',
+          },
+        });
       } else {
         res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' } });
       }
@@ -1914,14 +1943,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // stream turn-integrity framing.
   const state = newFallbackState();
   const attemptLog: AttemptRecord[] = [];
-  // Client-disconnect fan-out: the flag stops the loop before the NEXT
-  // attempt; the AbortController (threaded to the provider as
-  // CompletionOptions.signal) additionally cancels the IN-FLIGHT upstream
-  // fetch and any body/stream read, so tokens stop burning and the in-flight
-  // lease frees immediately. 'close' also fires on normal completion —
-  // writableEnded distinguishes a real disconnect.
-  let clientGone = false;
-  const clientAbort = new AbortController();
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
