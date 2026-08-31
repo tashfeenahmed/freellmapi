@@ -21,6 +21,16 @@ describe('Responses → chat translation (#96)', () => {
     expect(msgs[1]).toEqual({ role: 'user', content: 'hi' });
   });
 
+  it('drops Codex additional_tools metadata without creating an empty turn', () => {
+    const msgs = toChatMessages({
+      input: [
+        { type: 'additional_tools', id: 'at_1', role: 'developer', tools: [{ type: 'shell' }] },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hello' }] },
+      ],
+    } as any);
+    expect(msgs).toEqual([{ role: 'user', content: 'hello' }]);
+  });
+
   it('flattens message items with content parts and maps the developer role to system', () => {
     const msgs = toChatMessages({
       input: [

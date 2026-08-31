@@ -151,6 +151,19 @@ const localShellCallItemSchema = z.object({
   id: z.string().optional(),
 }).passthrough();
 
+// Codex sends its client-side tool inventory as an `additional_tools` input
+// item on every Responses turn.  It is metadata for the harness, not a chat
+// message, so the translator deliberately drops it below.  Keep the schema
+// permissive because Codex may add fields (or tool shapes) as the inventory
+// evolves; rejecting the whole request here turns an otherwise valid launch
+// into a misleading `input: Invalid input` 400.
+const additionalToolsItemSchema = z.object({
+  type: z.literal('additional_tools'),
+  id: z.string().optional(),
+  role: z.string().optional(),
+  tools: z.array(z.record(z.string(), z.unknown())).optional(),
+}).passthrough();
+
 // The rest of the official ResponseInputItemParam union: built-in tool calls
 // (web_search, file_search, code interpreter, image generation), MCP items,
 // and item references. None has a chat-completions equivalent — validated
@@ -172,6 +185,7 @@ const inputItemSchema = z.union([
   computerCallOutputItemSchema,
   reasoningItemSchema,
   localShellCallItemSchema,
+  additionalToolsItemSchema,
   otherKnownItemSchema,
   messageItemSchema,
 ]);
