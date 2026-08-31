@@ -29,6 +29,12 @@ async function post(app: Express, body: unknown, key: string) {
   return { status: response.status, text, headers: response.headers };
 }
 
+function eventPayload(text: string, event: string): any {
+  const frame = text.split(`event: ${event}\n`).at(-1)?.split('\n\n')[0];
+  const data = frame?.split('\n').find(line => line.startsWith('data: '));
+  return data ? JSON.parse(data.slice('data: '.length)) : undefined;
+}
+
 function fusionResult(text = 'fused answer') {
   return {
     response: {
@@ -82,8 +88,15 @@ describe('POST /v1/responses virtual Fusion model', () => {
     expect(body.output_text).toBe('fused answer');
     expect(body.output[0]).toMatchObject({ type: 'message', role: 'assistant' });
     expect(body.usage).toMatchObject({ input_tokens: 5, output_tokens: 7, total_tokens: 12 });
-    expect(body._fusion).toMatchObject({ synthesized: false });
-    expect(body.x_fusion).toMatchObject({ strategy: 'best_of' });
+    expect(body).not.toHaveProperty('_fusion');
+    expect(body).not.toHaveProperty('x_fusion');
+    expect(body.metadata).toMatchObject({
+      fusion: 'true',
+      fusion_panel: 'google/gemini-3.5-flash-lite',
+      fusion_judge: 'none',
+      fusion_synthesized: 'false',
+      fusion_strategy: 'best_of',
+    });
     expect(headers.get('x-routed-via')).toBe('fusion(google/gemini-3.5-flash-lite)');
 
     expect(mockRunFusion).toHaveBeenCalledTimes(1);
@@ -124,8 +137,14 @@ describe('POST /v1/responses virtual Fusion model', () => {
     }
     expect(text).toContain('"delta":"fused "');
     expect(text).toContain('"delta":"stream"');
-    const completed = text.split('event: response.completed')[1];
-    expect(completed).toContain('"output_text":"fused stream"');
+    const completed = eventPayload(text, 'response.completed');
+    expect(completed.response.output_text).toBe('fused stream');
+    expect(completed.response).not.toHaveProperty('_fusion');
+    expect(completed.response).not.toHaveProperty('x_fusion');
+    expect(completed.response.metadata).toMatchObject({ fusion: 'true', fusion_synthesized: 'false' });
+    expect(headers.get('x-routed-via')).toBe('fusion');
+    expect(text).not.toContain('"_fusion"');
+    expect(text).not.toContain('"x_fusion"');
     expect(mockRunFusion).toHaveBeenCalledTimes(1);
     expect(mockRunFusion.mock.calls[0]?.[0]?.hooks).toBeDefined();
   });
