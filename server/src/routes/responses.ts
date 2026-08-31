@@ -470,6 +470,7 @@ export function buildResponseObject(opts: {
   promptTokens: number;
   completionTokens: number;
   reasoningTokens?: number;
+  metadata?: Record<string, string>;
 }) {
   const output: any[] = [];
   if (opts.text.length > 0) {
@@ -507,19 +508,22 @@ export function buildResponseObject(opts: {
       output_tokens_details: { reasoning_tokens: opts.reasoningTokens ?? 0 },
       total_tokens: opts.promptTokens + opts.completionTokens,
     },
+    ...(opts.metadata ? { metadata: opts.metadata } : {}),
   };
 }
 
 /**
  * Translate the chat-shaped result returned by the Fusion service into the
- * Responses object clients expect. Fusion keeps its routing metadata in
- * additive `_fusion`/`x_fusion` fields; preserve both so the dashboard and
- * callers that opt into the panel trace do not lose provenance at this wire
- * boundary.
+ * Responses object clients expect. Chat Fusion uses additive `_fusion` and
+ * `x_fusion` fields, but those are not part of the Responses schema and strict
+ * SDKs (including Codex) reject them while decoding `response.completed`.
+ * Preserve the portable routing summary in the standard string-valued
+ * `metadata` map instead; the chat surface keeps its richer fields unchanged.
  */
 function buildFusionResponseObject(id: string, result: FusionResult): Record<string, unknown> {
   const fusionResponse = result.response as FusionResult['response'] & {
     _fusion?: unknown;
+    x_fusion?: unknown;
   };
   const message = fusionResponse.choices?.[0]?.message;
   const usage = fusionResponse.usage;
@@ -531,11 +535,49 @@ function buildFusionResponseObject(id: string, result: FusionResult): Record<str
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
     reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
+    metadata: fusionResponseMetadata(fusionResponse),
   }) as Record<string, unknown>;
 
-  if (fusionResponse._fusion !== undefined) response._fusion = fusionResponse._fusion;
-  if ((fusionResponse as any).x_fusion !== undefined) response.x_fusion = (fusionResponse as any).x_fusion;
   return response;
+}
+
+function fusionResponseMetadata(result: FusionResult['response'] & { _fusion?: unknown; x_fusion?: unknown }): Record<string, string> {
+  const metadata: Record<string, string> = { fusion: 'true' };
+  const summary = result._fusion && typeof result._fusion === 'object' && !Array.isArray(result._fusion)
+    ? result._fusion as Record<string, unknown>
+    : undefined;
+  const details = result.x_fusion && typeof result.x_fusion === 'object' && !Array.isArray(result.x_fusion)
+    ? result.x_fusion as Record<string, unknown>
+    : undefined;
+
+  if (Array.isArray(summary?.panel)) {
+    const panel = summary.panel
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const item = entry as Record<string, unknown>;
+        return typeof item.platform === 'string' && typeof item.model === 'string'
+          ? `${item.platform}/${item.model}`
+          : null;
+      })
+      .filter((entry): entry is string => entry !== null);
+    if (panel.length > 0) metadata.fusion_panel = panel.join(',');
+  }
+
+  if (summary && 'judge' in summary) {
+    const judge = summary.judge;
+    if (judge && typeof judge === 'object') {
+      const item = judge as Record<string, unknown>;
+      if (typeof item.platform === 'string' && typeof item.model === 'string') {
+        metadata.fusion_judge = `${item.platform}/${item.model}`;
+      }
+    } else {
+      metadata.fusion_judge = 'none';
+    }
+  }
+
+  if (typeof summary?.synthesized === 'boolean') metadata.fusion_synthesized = String(summary.synthesized);
+  if (typeof details?.strategy === 'string') metadata.fusion_strategy = details.strategy;
+  return metadata;
 }
 
 /** Apply the same structured-output contract to Fusion as the chat route. */
@@ -857,6 +899,10 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    // The detailed panel is only known after runFusion settles, but the
+    // standard header can still identify this stream as Fusion before the
+    // response is committed. The final metadata carries panel/judge details.
+    res.setHeader('X-Routed-Via', FUSION_MODEL_ID);
     let fusionSequence = 0;
     const fusionSse = (event: string, payload: Record<string, unknown>) => {
       if (res.writableEnded) return;
@@ -876,6 +922,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       model: FUSION_MODEL_ID,
       output: [],
       output_text: '',
+      metadata: { fusion: 'true' },
     };
     fusionSse('response.created', { response: skeleton });
     fusionSse('response.in_progress', { response: skeleton });
