@@ -330,6 +330,42 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
   });
 
+  it('does not forward a tool call that violates a named tool_choice', async () => {
+    const wrongCall = [{
+      id: 'call_wrong',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+    }];
+    const rightCall = [{
+      id: 'call_right',
+      type: 'function',
+      function: { name: 'exec_command', arguments: '{"cmd":"pwd"}' },
+    }];
+    const upstream = mockUpstreams({
+      'api.groq.com': { content: null, tool_calls: wrongCall, finish_reason: 'tool_calls' },
+      'api.cerebras.ai': { content: null, tool_calls: rightCall, finish_reason: 'tool_calls' },
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      messages: [{ role: 'user', content: 'run the command' }],
+      tools: [{
+        type: 'function',
+        function: { name: 'exec_command', parameters: { type: 'object', properties: { cmd: { type: 'string' } } } },
+      }],
+      tool_choice: { type: 'function', function: { name: 'exec_command' } },
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel },
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].finish_reason).toBe('tool_calls');
+    expect(body.choices[0].message.tool_calls).toEqual(rightCall);
+    expect(upstream.calls.some(c => c.url.includes('api.groq.com'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('api.cerebras.ai'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+  });
+
   it('times out a stalled tool candidate before falling back sequentially', async () => {
     // Keep the unit test fast while exercising the same AbortSignal path used
     // by the hosted 12s tool deadline. The first provider never answers; the
