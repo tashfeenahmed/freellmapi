@@ -273,6 +273,15 @@ function routableContextWindow(platform: string, modelId: string, contextWindow:
  *    dead-model migrations do (fallback_config row first, FK order).
  */
 export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['counts']> {
+  // One transaction for the whole apply (#1047): the body runs hundreds of
+  // individual statements, and under WAL each one outside a transaction is its
+  // own commit + fsync executed on the event loop. On slow storage that made
+  // the 12-hourly sync freeze every in-flight request — including the 3-query
+  // profile-activate POST — for minutes.
+  return db.transaction(() => applyCatalogInner(db, catalog))();
+}
+
+function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['counts']> {
   const counts = { updated: 0, inserted: 0, removed: 0, skippedUnknownPlatform: 0, quirks: 0 };
 
   const selectModel = db.prepare('SELECT id, enabled, source FROM models WHERE platform = ? AND model_id = ?');
