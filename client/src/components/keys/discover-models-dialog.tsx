@@ -25,6 +25,9 @@ export interface DiscoveredModel {
   isFree?: boolean
   /** True when the upstream advertises image input. */
   vision?: boolean
+  /** Present only when the model is discernibly NOT a chat model (#1051). The
+   *  server routes it to the matching table on register; video is skipped. */
+  kind?: 'embedding' | 'image' | 'audio' | 'transcription' | 'video'
 }
 
 interface DiscoverResponse {
@@ -168,6 +171,13 @@ export function DiscoverModelsDialog({
                   {model.vision && (
                     <span title={t('models.visionTitle')} className="shrink-0 rounded-full bg-cyan-600/15 px-1.5 py-0.5 text-[10px] text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">
                       {t('models.vision')}
+                    </span>
+                  )}
+                  {/* #1051: a non-chat model registers into its own table (or,
+                      for video, is skipped), so say what the row IS up front. */}
+                  {model.kind && (
+                    <span className="shrink-0 rounded-full bg-violet-600/15 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">
+                      {model.kind}
                     </span>
                   )}
                   {model.contextWindow !== undefined && model.contextWindow > 0 && (

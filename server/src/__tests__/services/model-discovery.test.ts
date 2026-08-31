@@ -247,3 +247,77 @@ describe('vision inferred from the model id (#1051)', () => {
     expect(m.vision).toBe(true);
   });
 });
+
+// #1051, the non-vision half: SiliconFlow-style upstreams answer /v1/models
+// with bare ids, so a diffusion, whisper or video model used to register as a
+// chat model and 404 forever. The id (or explicit type metadata) now yields a
+// `kind`; absent kind still means "chat as far as anyone can tell".
+describe('non-chat kind inferred from the model id (#1051)', () => {
+  const kindOf = (id: string) => parseModelCatalog({ data: [{ id }] })[0]!.kind;
+
+  it('classifies the SiliconFlow ids from the issue', () => {
+    expect(kindOf('stabilityai/stable-diffusion-3-5-large')).toBe('image');
+    expect(kindOf('black-forest-labs/FLUX.1-dev')).toBe('image');
+    expect(kindOf('Kwai-Kolors/Kolors')).toBe('image');
+    expect(kindOf('FunAudioLLM/SenseVoiceSmall')).toBe('transcription');
+    expect(kindOf('FunAudioLLM/CosyVoice2-0.5B')).toBe('audio');
+    expect(kindOf('Wan-AI/Wan2.2-T2V-A14B')).toBe('video');
+    expect(kindOf('Wan-AI/Wan2.2-I2V-A14B')).toBe('video');
+  });
+
+  it('classifies the common whisper/tts/video families', () => {
+    expect(kindOf('whisper-large-v3')).toBe('transcription');
+    expect(kindOf('openai/whisper-large-v3-turbo')).toBe('transcription');
+    expect(kindOf('gpt-tts-1')).toBe('audio');
+    expect(kindOf('Lightricks/LTX-Video-0.9.5')).toBe('video');
+    expect(kindOf('tencent/HunyuanVideo')).toBe('video');
+    expect(kindOf('sdxl-turbo')).toBe('image');
+    expect(kindOf('sd3-medium')).toBe('image');
+    expect(kindOf('dall-e-3')).toBe('image');
+  });
+
+  it('classifies embedding ids, including bare `embed` tokens', () => {
+    expect(kindOf('text-embedding-3-small')).toBe('embedding');
+    expect(kindOf('nomic-embed-text')).toBe('embedding');
+    expect(kindOf('BAAI/bge-m3')).toBe('embedding');
+  });
+
+  it('leaves chat models without a kind key at all', () => {
+    expect(parseModelCatalog({ data: [{ id: 'qwen3-4b' }] })).toEqual([
+      { id: 'qwen3-4b', ownedBy: null },
+    ]);
+    expect(kindOf('deepseek-chat')).toBeUndefined();
+    expect(kindOf('claude-sonnet-5')).toBeUndefined();
+  });
+
+  it('a VL model stays a chat model that sees, never a media model', () => {
+    const [m] = parseModelCatalog({ data: [{ id: 'Qwen/Qwen2.5-VL-72B-Instruct' }] });
+    expect(m.vision).toBe(true);
+    expect(m.kind).toBeUndefined();
+  });
+
+  it('does not read markers out of longer tokens', () => {
+    expect(kindOf('sdk-helper-7b')).toBeUndefined();       // sdk is not sd
+    expect(kindOf('tootsie-8b')).toBeUndefined();          // no tts token
+    expect(kindOf('wandering-llama-3b')).toBeUndefined();  // wandering is not wan
+    expect(kindOf('videosaurus')).toBe('video');           // but a video token anywhere counts
+  });
+
+  it('classifies bare string entries the same way', () => {
+    expect(parseModelCatalog(['whisper-1'])).toEqual([
+      { id: 'whisper-1', ownedBy: null, kind: 'transcription' },
+    ]);
+  });
+
+  it('prefers explicit upstream type metadata over the id', () => {
+    const [m] = parseModelCatalog({ data: [{ id: 'mystery-model-9', type: 'text-to-image' }] });
+    expect(m.kind).toBe('image');
+    const [n] = parseModelCatalog({ data: [{ id: 'plain-9', object: 'embedding' }] });
+    expect(n.kind).toBe('embedding');
+  });
+
+  it("ignores OpenAI's uninformative object:'model'", () => {
+    const [m] = parseModelCatalog({ data: [{ id: 'gpt-x', object: 'model' }] });
+    expect(m.kind).toBeUndefined();
+  });
+});
