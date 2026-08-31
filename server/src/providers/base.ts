@@ -452,7 +452,7 @@ export abstract class BaseProvider {
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed || !trimmed.startsWith('data:')) continue;
-          const data = trimmed.slice(5).replace(/^\s/, '');
+          const data = trimmed.slice(5).replace(/^ /, '');
           if (data === '[DONE]') return;
           try {
             const chunk = JSON.parse(data) as ChatCompletionChunk;
