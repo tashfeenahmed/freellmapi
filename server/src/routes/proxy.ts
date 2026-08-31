@@ -1947,12 +1947,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
   const hedgeAbort = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) {
-      clientGone = true;
-      clientAbort.abort(newClientAbortError());
-    }
-  });
 
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
