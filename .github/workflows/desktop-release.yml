@@ -88,7 +88,7 @@ jobs:
           echo "desktop/package.json $VERSION matches tag $GITHUB_REF_NAME."
 
       - name: Install workspace dependencies
-        run: npm install
+        run: npm ci
 
       # `npm ci` rather than `install`: install rewrites desktop/package-lock.json
       # in place, which would quietly repair a stale lockfile version before the
