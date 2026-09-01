@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 // The Playground only scrolls inside its transcript pane if every ancestor
 // between <body> and that pane carries a definite height. One unconditional
 // `min-h-screen` on the shell breaks it: min-height is a floor, not a ceiling,
-// so the shell grows with the chat and the document scrolls instead (#391 was
-// exactly this). The contract lives in a couple of class strings in App.tsx
+// so the shell grows with the chat and the document scrolls instead. The
+// contract lives in a couple of class strings in App.tsx
 // and regresses silently, so it is pinned here like the chain manager pins
 // its routing.
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -33,6 +33,6 @@ describe('app shell heights', () => {
   })
 
   it('keeps /playground in the full-bleed set', () => {
-    expect(app).toContain("FULL_BLEED_ROUTES = new Set(['/playground'])")
+    expect(app).toMatch(/FULL_BLEED_ROUTES = new Set\(\[[^\]]*'\/playground'[^\]]*\]\)/)
   })
 })
