@@ -4,6 +4,7 @@ Revision history for `docs/providers/`, listing the upstream commits that shaped
 
 | Commit | Date | Summary |
 | --- | --- | --- |
+| Unreleased | 2026-09-01 | Add the native Sail Research background Responses adapter and catalog-ready platform wiring. |
 | `ef4519a` | 2026-08-23 | feat(providers): add xkiro.com as OpenAI-compatible provider (#967) |
 | `68ddca4` | 2026-08-23 | feat(providers): add UnoRouter (unorouter.com) as OpenAI-compatible provider (#875) |
 | `df1000a` | 2026-08-20 | Qianfan/Volcengine Ark/LongCat/iFlytek Spark (#936) — four Chinese domestic OpenAI-compat platforms. |

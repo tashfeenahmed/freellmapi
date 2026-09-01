@@ -64,6 +64,10 @@ export type Platform =
   | 'google'
   | 'groq'
   | 'cerebras'
+  // Sail Research — native Responses API provider. $5 in free credits refreshes
+  // monthly when a payment method is attached; usage beyond the grant is
+  // pay-as-you-go. Background polling is required for its flex-only models.
+  | 'sail'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'

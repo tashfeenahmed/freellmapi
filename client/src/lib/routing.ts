@@ -376,6 +376,7 @@ export const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
+  sail:        '#0ea5e9',
   bai:         '#111827',
   nvidia:      '#76b900',
   mistral:     '#f59e0b',
