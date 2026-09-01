@@ -21,6 +21,7 @@ import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import {
   buildGroups,
+  groupMatchesQuery,
   groupMaxContext,
   type FallbackEntry,
   type ModelGroupRow,
@@ -241,16 +242,7 @@ export default function FallbackPage() {
     if (filterVision && !g.members.some(m => m.supportsVision)) return false
     if (filterTools && !g.members.some(m => m.supportsTools)) return false
     if (minContext > 0 && groupMaxContext(g.members) < minContext) return false
-    if (query) {
-      const hay = [
-        g.label,
-        g.members[0].canonicalId ?? '',
-        ...g.members.map(m => m.platform),
-        ...g.members.map(m => m.displayName),
-        ...g.members.map(m => m.modelId),
-      ].join(' ').toLowerCase()
-      if (!hay.includes(query)) return false
-    }
+    if (query && !groupMatchesQuery(g, query)) return false
     return true
   }), [orderedGroups, filterVision, filterTools, minContext, query])
   const draggable = isManual && !filtersActive
