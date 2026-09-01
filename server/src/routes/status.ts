@@ -7,6 +7,7 @@ import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { getProvider } from '../providers/index.js';
 import { getSoonestCooldownExpiry } from '../services/ratelimit.js';
 import { getQuotaStateForKeys } from '../services/provider-quota.js';
+import { getQuotaForecast } from '../services/quota-forecast.js';
 import { openapiSpec } from '../docs/openapi.js';
 
 // Machine-readable operational endpoints for meta-gateways / orchestrators that
@@ -205,4 +206,25 @@ providersRouter.get('/providers', (req: Request, res: Response) => {
     });
 
   res.json({ providers, counts });
+});
+
+// GET /quota-forecast — per-pool daily headroom + low-balance warning (#1104).
+// Machine-readable sibling of /v1/providers: same unified-key auth, no key
+// material, no PII. A meta-gateway can gate its own routing on `low_balance`
+// BEFORE spending a request that would 429, and know `seconds_until_reset` for
+// "the window resets soon, hold off" scheduling.
+providersRouter.get('/quota-forecast', (req: Request, res: Response) => {
+  const token = extractApiToken(req);
+  const unifiedKey = getUnifiedApiKey();
+  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    return;
+  }
+
+  const forecast = getQuotaForecast();
+  res.json({
+    generated_at: new Date().toISOString(),
+    low_balance_threshold: { pct: 0.1, absolute: 20 },
+    pools: forecast,
+  });
 });
