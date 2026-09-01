@@ -228,6 +228,68 @@ describe('proxy stream turn-integrity', () => {
     expect(frames(r.text).some(f => f.choices?.[0]?.delta?.content?.includes('Non-empty'))).toBe(true);
   });
 
+  it('fails over a stream whose model answers in prose despite response_format json_object (#933)', async () => {
+    // The whole point of #933: a streamed structured-output request must not
+    // ship an essay as a "success". The first model ignores the format; the
+    // second honors it. Headers are held in 'json' hold mode, so the first
+    // attempt can still fail over invisibly.
+    const up = mockUpstream([
+      { body: sse(roleChunk, textChunk('Here is your answer in prose form, sorry.'), finishChunk('stop'), '[DONE]') },
+      { body: sse(roleChunk, textChunk('{"city":"Paris"}'), finishChunk('stop'), '[DONE]') },
+    ]);
+    const r = await request(app, '/v1/chat/completions', {
+      stream: true,
+      messages: [{ role: 'user', content: 'give me json' }],
+      response_format: { type: 'json_object' },
+    });
+    expect(r.status).toBe(200);
+    expect(up.calls()).toBe(2);
+    expect(r.headers.get('x-fallback-attempts')).toBe('1');
+    const fs = frames(r.text);
+    expect(fs.some(f => f.choices?.[0]?.delta?.content?.includes('prose form'))).toBe(false);
+    expect(fs.some(f => f.choices?.[0]?.delta?.content?.includes('Paris'))).toBe(true);
+    const rows = getDb().prepare("SELECT status, error FROM requests ORDER BY id").all() as any[];
+    expect(rows[0].status).toBe('error');
+    expect(rows[0].error).toMatch(/ignored response_format/);
+    expect(rows[1].status).toBe('success');
+  });
+
+  it('heals a fenced JSON block streamed for a json_object request (#933)', async () => {
+    // Prose-wrapped/fenced output is the common "almost right" shape: heal it
+    // in place and deliver only the JSON, same as the non-stream path.
+    mockUpstream([
+      { body: sse(roleChunk, textChunk('```json\n{"answer": 42}\n```'), finishChunk('stop'), '[DONE]') },
+    ]);
+    const r = await request(app, '/v1/chat/completions', {
+      stream: true,
+      messages: [{ role: 'user', content: 'give me json' }],
+      response_format: { type: 'json_object' },
+    });
+    expect(r.status).toBe(200);
+    const fs = frames(r.text);
+    const content = fs.map(f => f.choices?.[0]?.delta?.content ?? '').join('');
+    expect(content).toContain('"answer"');
+    expect(content).not.toContain('```');
+    const rows = getDb().prepare("SELECT status FROM requests ORDER BY id").all() as any[];
+    expect(rows[0].status).toBe('success');
+  });
+
+  it('passes a clean JSON stream through untouched for a json_object request (#933)', async () => {
+    mockUpstream([
+      { body: sse(roleChunk, textChunk('{"ok":true,"items":[1,2,3]}'), finishChunk('stop'), '[DONE]') },
+    ]);
+    const r = await request(app, '/v1/chat/completions', {
+      stream: true,
+      messages: [{ role: 'user', content: 'give me json' }],
+      response_format: { type: 'json_object' },
+    });
+    expect(r.status).toBe(200);
+    const content = frames(r.text).map(f => f.choices?.[0]?.delta?.content ?? '').join('');
+    expect(content).toBe('{"ok":true,"items":[1,2,3]}');
+    const rows = getDb().prepare("SELECT status FROM requests ORDER BY id").all() as any[];
+    expect(rows[0].status).toBe('success');
+  });
+
   it('never leaks raw tool_call deltas riding on role/reasoning chunks (OpenRouter shape)', async () => {
     // OpenRouter attaches tool_call fragments to chunks that also carry a
     // role or reasoning key. Those must be accumulated, not forwarded raw —

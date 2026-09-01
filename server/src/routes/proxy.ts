@@ -2067,9 +2067,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let ttfbMs: number | null = null;
 
         // Hold-window state: 'undecided' until the first text either matches
-        // a dialect marker (→ 'dialect': buffer everything, rescue at end) or
-        // provably cannot (→ 'passthrough': flush and stream normally).
-        let mode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+        // a dialect marker (→ 'dialect': buffer everything, rescue at end),
+        // carries a structured-output request (→ 'json': buffer everything,
+        // enforce JSON at end) or provably cannot (→ 'passthrough': flush and
+        // stream normally).
+        let mode: 'undecided' | 'passthrough' | 'dialect' | 'json' = 'undecided';
         let heldText = '';
         const preamble: unknown[] = []; // role-only chunks held until flush
         const toolCallAcc = new Map<number, { id?: string; name: string; args: string }>();
@@ -2231,11 +2233,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
 
             heldText += text;
-            if (mode === 'dialect') continue;
+            if (mode === 'dialect' || mode === 'json') continue;
 
             const probe = heldText.trimStart();
             if (wantsTools && startsWithDialectMarker(probe)) {
               mode = 'dialect';
+            } else if (samplingParams.response_format) {
+              // Structured-output request (#933): hold ALL text until the
+              // stream ends, then enforce JSON (mirrors the non-stream check
+              // below). Streaming bytes are already committed once headers
+              // flush, so a model that answers in prose despite the forwarded
+              // response_format must be caught here, before any byte leaves —
+              // the client asked for machine-readable output, not an essay.
+              mode = 'json';
             } else if (!wantsTools || !couldBecomeDialectMarker(probe) || probe.length > 256) {
               mode = 'passthrough';
               flushHeaders();
@@ -2327,6 +2337,28 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               new Error(`empty completion from ${route.displayName} (upstream classification output)`),
               upstreamFinish === 'length' ? { skipBench: true } : {},
             );
+          }
+
+          // Structured-output enforcement for streams (#933): the non-stream
+          // path checks JSON before returning; the stream path must too, or a
+          // model that answers in prose despite the forwarded response_format
+          // ships the essay as a "success" — the worst case for a
+          // machine-readable request. json mode held every byte (headers never
+          // flushed), so failing over here is free: skipBench (provider
+          // healthy, the MODEL misbehaved) + skipModelForRequest (a sibling
+          // key would misbehave identically). Mirrors proxy.ts non-stream.
+          if (mode === 'json' && samplingParams.response_format && completedCalls.length === 0) {
+            const enforced = enforceJsonContent(heldText);
+            if (!enforced.ok) {
+              const truncated = upstreamFinish === 'length';
+              throw Object.assign(
+                new Error(truncated
+                  ? `truncated JSON from ${route.displayName} (finish_reason=length — raise max_tokens for this ${samplingParams.response_format.type} request)`
+                  : `${route.displayName} ignored response_format (returned non-JSON despite ${samplingParams.response_format.type})`),
+                { skipBench: true, skipModelForRequest: true },
+              );
+            }
+            if (enforced.healed) heldText = enforced.content;
           }
 
           flushHeaders();

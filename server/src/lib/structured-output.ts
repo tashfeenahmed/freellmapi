@@ -14,8 +14,11 @@
 //      provider is healthy, the MODEL ignored the format — no cooldown, no
 //      penalty; the chain just tries the next candidate)
 //
-// Streaming responses can't be retro-checked (bytes are already on the wire),
-// so enforcement is non-stream only — same boundary as the response cache.
+// Streaming responses used to skip enforcement entirely (bytes already on
+// the wire). Since #933 the proxy's stream path buffers structured-output
+// requests in a 'json' hold mode — headers are held until the stream ends,
+// so the same check/heal/fail-over applies there too. The response cache
+// remains non-stream only.
 
 export type JsonEnforcement =
   | { ok: true; content: string; healed: boolean }

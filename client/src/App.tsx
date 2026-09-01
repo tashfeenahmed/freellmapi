@@ -405,6 +405,21 @@ function PageContainer({ children }: { children: ReactNode }) {
   )
 }
 
+// The shell column. Padded routes keep `min-h-screen` and scroll as a document;
+// a full-bleed route pins the shell to the dynamic viewport instead, because
+// min-height alone is a floor, not a ceiling: with an indefinite shell height
+// every flex-1 container below grows with its content and the document scrolls
+// rather than the one pane (the Playground transcript) that means to.
+function AppShell({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  const fullBleed = FULL_BLEED_ROUTES.has(location.pathname)
+  return (
+    <div className={`flex flex-col ${fullBleed ? 'h-dvh overflow-hidden' : 'min-h-screen'} ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
+      {children}
+    </div>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -416,7 +431,7 @@ function App() {
                   leaves without anyone having to know how tall the navbar is.
                   Fixed-position children (toaster, palette, reminder) are out of
                   flow, and a padded route stretches to nothing it can show. */}
-              <div className={`flex min-h-screen flex-col ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
+              <AppShell>
                 <Navbar />
                 <PageContainer>
                   <PageBoundary>
@@ -451,7 +466,7 @@ function App() {
                 <Toaster />
                 <CommandPalette />
                 <UpdateReminder />
-              </div>
+              </AppShell>
             </AuthGate>
           </BrowserRouter>
         </I18nProvider>
