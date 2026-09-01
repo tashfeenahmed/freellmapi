@@ -284,7 +284,11 @@
     "disableAll": "सभी बंद करें",
     "enableAllHint": "दिखाए गए सभी मॉडल चालू करें, फिर सहेजें",
     "disableAllHint": "दिखाए गए सभी मॉडल बंद करें, फिर सहेजें",
-    "enabledOfShown": "दिखाए गए {shown} में से {enabled} मॉडल चेन में हैं"
+    "enabledOfShown": "दिखाए गए {shown} में से {enabled} मॉडल चेन में हैं",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "बिना मापे गए मॉडल एक्सप्लोर करें",
@@ -564,6 +568,12 @@
     "modelScopeClear": "दायरा हटाएँ",
     "modelScopeBadgeOne": "सीमित · 1 मॉडल",
     "modelScopeBadgeOther": "सीमित · {count} मॉडल",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "यह कुंजी कौन-से मॉडल के लिए काम करेगी?",
       "hint": "आपकी {provider} कुंजी जोड़ दी गई है और अभी यह नीचे दिए गए हर मॉडल के लिए काम करती है। जिन मॉडलों के लिए इस कुंजी का उपयोग नहीं होना चाहिए, उनका चयन हटा दें — राउटर उनके लिए इसे छोड़ देगा।",

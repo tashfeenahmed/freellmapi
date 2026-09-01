@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "ਬਿਨਾਂ ਮਾਪੇ ਮਾਡਲਾਂ ਦੀ ਖੋਜ ਕਰੋ",
@@ -564,6 +568,12 @@
     "modelScopeClear": "ਦਾਇਰਾ ਹਟਾਓ",
     "modelScopeBadgeOne": "ਸੀਮਤ · 1 ਮਾਡਲ",
     "modelScopeBadgeOther": "ਸੀਮਤ · {count} ਮਾਡਲ",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ਇਹ ਕੁੰਜੀ ਕਿਹੜੇ ਮਾਡਲਾਂ ਲਈ ਕੰਮ ਕਰੇ?",
       "hint": "ਤੁਹਾਡੀ {provider} ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ ਅਤੇ ਇਸ ਵੇਲੇ ਇਹ ਹੇਠਾਂ ਦਿੱਤੇ ਹਰ ਮਾਡਲ ਲਈ ਕੰਮ ਕਰਦੀ ਹੈ। ਜਿਨ੍ਹਾਂ ਮਾਡਲਾਂ ਲਈ ਇਹ ਕੁੰਜੀ ਨਹੀਂ ਵਰਤੀ ਜਾਣੀ ਚਾਹੀਦੀ, ਉਹਨਾਂ ਦੀ ਚੋਣ ਹਟਾ ਦਿਓ — ਰਾਊਟਰ ਉਹਨਾਂ ਲਈ ਇਸਨੂੰ ਛੱਡ ਦੇਵੇਗਾ।",

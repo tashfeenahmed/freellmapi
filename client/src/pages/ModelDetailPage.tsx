@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, Merge, Save, Split, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, Merge, Save, Split, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { addAlias, aliasesFor, removeAlias } from '@/lib/alias-merge'
+import { moveProviderMember, orderedProviderMembers, providerOrderForSave } from '@/lib/provider-preferences'
 import { Button } from '@/components/ui/button'
 import { ConfirmButton } from '@/components/confirm-button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { CopyButton } from '@/components/copy-button'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/tooltip'
@@ -46,6 +48,11 @@ type UnifyOverrides = {
   splits: { member: string; groupKey?: string }[]
 }
 
+type ProviderPreferences = {
+  version: 1
+  groups: Record<string, { mode: 'automatic' | 'preferred'; memberOrder: string[] }>
+}
+
 // What the per-provider split control should do for one member row.
 export type SplitAction = {
   kind: 'split' | 'undo'
@@ -74,7 +81,7 @@ export default function ModelDetailPage() {
     queryKey: ['unified-key'],
     queryFn: () => apiFetch('/api/settings/api-key'),
   })
-  const { data: unify } = useQuery<{ enabled: boolean; overrides: UnifyOverrides }>({
+  const { data: unify } = useQuery<{ enabled: boolean; overrides: UnifyOverrides; providerPreferences: ProviderPreferences }>({
     queryKey: ['unify'],
     queryFn: () => apiFetch('/api/settings/unify'),
   })
@@ -154,6 +161,15 @@ export default function ModelDetailPage() {
     },
   })
 
+  const providerPreferenceMutation = useMutation({
+    mutationFn: (providerPreferences: ProviderPreferences) =>
+      apiFetch('/api/settings/unify', {
+        method: 'PUT',
+        body: JSON.stringify({ providerPreferences }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['unify'] }),
+  })
+
   const splits = unify?.overrides.splits ?? []
   // New splits are written against ONE row: an unqualified "platform:modelId"
   // matches every relay that serves the id, so splitting one relay's card used
@@ -187,6 +203,29 @@ export default function ModelDetailPage() {
     .filter(e => e.keyCount > 0 && (e.canonicalId ?? e.modelId) === canonicalId)
     .map(e => ({ ...(scoreById.get(e.modelDbId) ?? {}), ...e }))
     .sort((a, b) => (isManual ? a.priority - b.priority : (b.score ?? 0) - (a.score ?? 0)))
+
+  const groupKey = members[0]?.groupKey ?? ''
+  const savedPreference = groupKey ? unify?.providerPreferences?.groups[groupKey] : undefined
+  const preferenceMode = savedPreference?.mode ?? 'automatic'
+  const preferredMembers = orderedProviderMembers(members, savedPreference, memberOverrideKey)
+
+  function saveProviderPreference(mode: 'automatic' | 'preferred', ordered: Row[] = preferredMembers) {
+    if (!groupKey) return
+    providerPreferenceMutation.mutate({
+      version: 1,
+      groups: {
+        ...(unify?.providerPreferences?.groups ?? {}),
+        [groupKey]: {
+          mode,
+          memberOrder: providerOrderForSave(ordered, savedPreference?.memberOrder, memberOverrideKey),
+        },
+      },
+    })
+  }
+
+  function movePreferredMember(index: number, delta: -1 | 1) {
+    saveProviderPreference('preferred', moveProviderMember(preferredMembers, index, delta))
+  }
   // Endpoint disambiguation keys on (platform, model_id) across EVERY configured
   // row — a relay whose copy was renamed sits in a DIFFERENT display group, so
   // `members` is not a complete sibling set and scoping to it would hide the
@@ -262,6 +301,44 @@ export default function ModelDetailPage() {
               <RateLimitBadge size="md" rows={members.flatMap(m => rateUsageByModel.get(m.modelDbId) ?? [])} />
               {vision && <span title={t('models.visionTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>}
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
+            </div>
+
+            <div className="rounded-2xl border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-medium">{t('models.providerRouting')}</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t('models.providerRoutingDescription')}
+                  </p>
+                </div>
+                <SegmentedControl
+                  value={preferenceMode}
+                  onValueChange={mode => saveProviderPreference(mode)}
+                  options={[
+                    { value: 'automatic', label: t('models.providerRoutingAutomatic') },
+                    { value: 'preferred', label: t('models.providerRoutingPreferred') },
+                  ]}
+                  ariaLabel={t('models.providerRouting')}
+                />
+              </div>
+              {preferenceMode === 'preferred' && (
+                <ol className="mt-4 space-y-1.5">
+                  {preferredMembers.map((member, index) => (
+                    <li key={member.modelDbId} className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs">
+                      <span className="w-5 text-right tabular-nums text-muted-foreground">{index + 1}</span>
+                      <span className="min-w-0 flex-1 truncate" title={memberEndpointTitle(member, siblings)}>
+                        {memberProviderLabel(member, siblings)}
+                      </span>
+                      <Button variant="ghost" size="icon-xs" disabled={index === 0 || providerPreferenceMutation.isPending} onClick={() => movePreferredMember(index, -1)} aria-label={t('embeddings.moveUp')}>
+                        <ArrowUp className="size-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon-xs" disabled={index === preferredMembers.length - 1 || providerPreferenceMutation.isPending} onClick={() => movePreferredMember(index, 1)} aria-label={t('embeddings.moveDown')}>
+                        <ArrowDown className="size-3" />
+                      </Button>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
 
             {/* Per-provider stats (same columns as the Models table) */}

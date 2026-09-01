@@ -5,6 +5,10 @@ import {
   getQuotaStateForKeys,
   parseQuotaObservationsFromResponse,
   inferQuotaPoolKey,
+  resolveQuotaPolicy,
+  isQuotaPoolAvailable,
+  getKeyQuotaHeadroom,
+  invalidateKeyQuotaHeadroom,
 } from '../../services/provider-quota.js';
 import { pruneQuotaObservations } from '../../services/request-retention.js';
 
@@ -19,9 +23,12 @@ function insertState(row: {
 }) {
   getDb().prepare(`
     INSERT INTO provider_quota_state
-      (platform, key_id, quota_pool_key, metric, limit_value, remaining_value, reset_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+      (platform, key_id, quota_pool_key, metric, limit_value, remaining_value, reset_at, source, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'header', 1)
   `).run(row.platform, row.keyId, row.pool, row.metric, row.limit, row.remaining, row.resetAt);
+  // Production writes go through recordQuotaObservation, which performs this
+  // invalidation. Direct fixture inserts must preserve the same boundary.
+  invalidateKeyQuotaHeadroom(row.platform as any);
 }
 
 function readState(platform: string, keyId: number, pool: string, metric: string) {
@@ -38,10 +45,15 @@ describe('provider-quota: pool inference', () => {
     initDb(':memory:');
   });
 
-  it('buckets shared-pool providers per account and openrouter free vs account', () => {
-    expect(inferQuotaPoolKey('groq')).toBe('groq::account');
+  it('distinguishes shared pools from independent model pools', () => {
+    expect(inferQuotaPoolKey('groq', 'openai/gpt-oss-120b')).toBe('groq::model::openai/gpt-oss-120b');
+    expect(inferQuotaPoolKey('groq', 'qwen/qwen3-32b')).toBe('groq::model::qwen/qwen3-32b');
+    expect(inferQuotaPoolKey('google', 'gemini-2.5-flash')).toBe('google::project-model::gemini-2.5-flash');
     expect(inferQuotaPoolKey('openrouter', 'meta-llama/llama-3.1-8b-instruct:free')).toBe('openrouter::free');
+    expect(inferQuotaPoolKey('openrouter', 'qwen/qwen3:free')).toBe('openrouter::free');
     expect(inferQuotaPoolKey('openrouter', 'openai/gpt-4o')).toBe('openrouter::account');
+    expect(inferQuotaPoolKey('huggingface', 'openai/gpt-oss-120b')).toBe('huggingface::router');
+    expect(inferQuotaPoolKey('custom', 'remote-model', 'https://relay.example/v1')).toBe('custom::remote-model');
     // AnyAPI's 100K tokens/day is one account-wide budget, so every model on
     // the platform shares a single pool.
     expect(inferQuotaPoolKey('anyapi')).toBe('anyapi::free');
@@ -49,6 +61,90 @@ describe('provider-quota: pool inference', () => {
     // Unknown platform falls back to platform::model or platform::account.
     expect(inferQuotaPoolKey('acme' as any, 'x')).toBe('acme::x');
     expect(inferQuotaPoolKey('acme' as any)).toBe('acme::account');
+  });
+
+  it('describes quota economics without conflating scope and accounting', () => {
+    expect(resolveQuotaPolicy('openrouter', 'qwen/qwen3:free')).toMatchObject({
+      scope: 'shared_pool', accounting: 'metered', metrics: ['requests'],
+    });
+    expect(resolveQuotaPolicy('groq', 'openai/gpt-oss-120b')).toMatchObject({
+      scope: 'model', accounting: 'metered', metrics: ['requests', 'tokens'],
+    });
+    expect(resolveQuotaPolicy('google', 'gemini-2.5-flash')).toMatchObject({
+      scope: 'project', accounting: 'metered', metrics: ['requests', 'tokens'],
+    });
+    expect(resolveQuotaPolicy('huggingface', 'openai/gpt-oss-120b')).toMatchObject({
+      scope: 'shared_pool', accounting: 'metered', metrics: ['credits'],
+    });
+    expect(resolveQuotaPolicy('sail', 'zai-org/GLM-5.2-FP8')).toMatchObject({
+      poolKey: 'sail::monthly-credit',
+      scope: 'shared_pool',
+      accounting: 'metered',
+      metrics: ['credits'],
+      reset: { strategy: 'fixed_calendar', period: 'month' },
+    });
+    expect(resolveQuotaPolicy('opencode', 'nemotron-3-ultra-free')).toMatchObject({
+      accounting: 'unknown', reset: { strategy: 'unknown' },
+    });
+    expect(resolveQuotaPolicy('custom', 'llama3', 'http://127.0.0.1:11434/v1')).toMatchObject({
+      accounting: 'unmetered', metrics: [],
+    });
+  });
+});
+
+describe('provider-quota: routing eligibility', () => {
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  beforeEach(() => {
+    getDb().prepare('DELETE FROM provider_quota_state').run();
+    getDb().prepare('DELETE FROM provider_quota_observations').run();
+  });
+
+  it('shared OpenRouter exhaustion applies to every free model on the credential', () => {
+    const resetAt = new Date(Date.now() + 60_000).toISOString();
+    insertState({ platform: 'openrouter', keyId: 8, pool: 'openrouter::free', metric: 'requests', limit: 50, remaining: 0, resetAt });
+
+    expect(isQuotaPoolAvailable('openrouter', 8, 'qwen/qwen3:free')).toBe(false);
+    expect(isQuotaPoolAvailable('openrouter', 8, 'nvidia/nemotron:free')).toBe(false);
+  });
+
+  it('Groq model exhaustion does not suppress another model on the same credential', () => {
+    const resetAt = new Date(Date.now() + 60_000).toISOString();
+    insertState({ platform: 'groq', keyId: 9, pool: 'groq::model::model-a', metric: 'requests', limit: 100, remaining: 0, resetAt });
+
+    expect(isQuotaPoolAvailable('groq', 9, 'model-a')).toBe(false);
+    expect(isQuotaPoolAvailable('groq', 9, 'model-b')).toBe(true);
+  });
+
+  it('headroom is calculated for the applicable pool rather than the provider-wide worst pool', () => {
+    const resetAt = new Date(Date.now() + 60_000).toISOString();
+    insertState({ platform: 'groq', keyId: 10, pool: 'groq::model::model-a', metric: 'requests', limit: 100, remaining: 0, resetAt });
+    insertState({ platform: 'groq', keyId: 10, pool: 'groq::model::model-b', metric: 'requests', limit: 100, remaining: 80, resetAt });
+
+    expect(getKeyQuotaHeadroom('groq', 'groq::model::model-a').get(10)).toBe(0);
+    expect(getKeyQuotaHeadroom('groq', 'groq::model::model-b').get(10)).toBe(0.8);
+  });
+
+  it('reads legacy Groq account observations until exact model-pool data arrives', () => {
+    const resetAt = new Date(Date.now() + 60_000).toISOString();
+    insertState({ platform: 'groq', keyId: 11, pool: 'groq::account', metric: 'requests', limit: 100, remaining: 0, resetAt });
+
+    expect(isQuotaPoolAvailable('groq', 11, 'model-a')).toBe(false);
+    expect(getKeyQuotaHeadroom('groq', 'groq::model::model-a').get(11)).toBe(0);
+
+    insertState({ platform: 'groq', keyId: 11, pool: 'groq::model::model-a', metric: 'requests', limit: 100, remaining: 75, resetAt });
+    expect(isQuotaPoolAvailable('groq', 11, 'model-a')).toBe(true);
+    expect(getKeyQuotaHeadroom('groq', 'groq::model::model-a').get(11)).toBe(0.75);
+  });
+
+  it('reads legacy Google project exhaustion for a project/model pool', () => {
+    const resetAt = new Date(Date.now() + 60_000).toISOString();
+    insertState({ platform: 'google', keyId: 12, pool: 'google::project', metric: 'requests', limit: 20, remaining: 0, resetAt });
+
+    expect(isQuotaPoolAvailable('google', 12, 'gemini-2.5-flash')).toBe(false);
   });
 });
 

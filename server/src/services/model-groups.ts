@@ -24,6 +24,7 @@ import {
 // ── Settings keys ────────────────────────────────────────────────────────────
 export const UNIFY_ENABLED_KEY = 'unify_models_enabled';
 export const UNIFY_OVERRIDES_KEY = 'model_unify_overrides';
+export const PROVIDER_PREFERENCES_KEY = 'model_provider_preferences';
 
 export const unifyOverridesSchema = z.object({
   // Coalesce several grouping tokens into one group keyed by `into`. Each key is
@@ -42,7 +43,18 @@ export const unifyOverridesSchema = z.object({
 
 export type UnifyOverrides = z.infer<typeof unifyOverridesSchema>;
 
+export const providerPreferencesSchema = z.object({
+  version: z.literal(1).default(1),
+  groups: z.record(z.string().min(1), z.object({
+    mode: z.enum(['automatic', 'preferred']).default('automatic'),
+    memberOrder: z.array(z.string().min(1)).default([]),
+  })).default({}),
+}).default({ version: 1, groups: {} });
+
+export type ProviderPreferences = z.infer<typeof providerPreferencesSchema>;
+
 const EMPTY_OVERRIDES: UnifyOverrides = { merges: [], splits: [] };
+const EMPTY_PROVIDER_PREFERENCES: ProviderPreferences = { version: 1, groups: {} };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // The minimal row shape grouping needs. Catalog queries select more columns;
@@ -111,6 +123,22 @@ export function setUnifyOverrides(input: unknown): UnifyOverrides {
   return norm;
 }
 
+export function getProviderPreferences(): ProviderPreferences {
+  const raw = getSetting(PROVIDER_PREFERENCES_KEY);
+  if (!raw) return EMPTY_PROVIDER_PREFERENCES;
+  try {
+    const parsed = providerPreferencesSchema.safeParse(JSON.parse(raw));
+    if (parsed.success) return parsed.data;
+  } catch { /* corrupt JSON -> safe automatic routing */ }
+  return EMPTY_PROVIDER_PREFERENCES;
+}
+
+export function setProviderPreferences(input: unknown): ProviderPreferences {
+  const norm = providerPreferencesSchema.parse(input);
+  setSetting(PROVIDER_PREFERENCES_KEY, JSON.stringify(norm));
+  return norm;
+}
+
 // ── Normalization ────────────────────────────────────────────────────────────
 // Catalog display names tag the provider/variant in a trailing parenthetical:
 // "GPT-OSS 120B (Groq)", "Llama 3.3 70B (HF)", "... (free)". Strip ONE trailing
@@ -155,6 +183,11 @@ export function slugifyGroupLabel(label: string): string {
 // ── Grouping ─────────────────────────────────────────────────────────────────
 function memberId(row: GroupableRow): string {
   return `${row.platform}:${row.model_id}`;
+}
+
+/** Stable persisted identity for provider preference ordering. */
+export function routingMemberId(row: GroupableRow): string {
+  return qualifiedMemberId(row) ?? memberId(row);
 }
 
 /**

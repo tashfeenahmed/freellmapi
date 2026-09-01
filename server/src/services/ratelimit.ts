@@ -583,7 +583,22 @@ const DEFAULT_PROVIDER_MINUTE_REQUEST_CAPS: Record<string, number> = {
   nvidia: 40,
 };
 
-export function getProviderDailyRequestCap(platform: string): number | null {
+function getKeyProviderLimit(keyId: number | undefined, column: 'provider_rpm_limit' | 'provider_rpd_limit' | 'provider_tpd_limit'): number | undefined {
+  if (keyId === undefined) return undefined;
+  return withDb(db => {
+    const row = db.prepare(`SELECT ${column} AS value FROM api_keys WHERE id = ?`).get(keyId) as { value: number | null } | undefined;
+    return row?.value ?? undefined;
+  });
+}
+
+function normalizedProviderLimit(value: number | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
+  return value === 0 ? null : value;
+}
+
+export function getProviderDailyRequestCap(platform: string, keyId?: number): number | null {
+  const account = normalizedProviderLimit(getKeyProviderLimit(keyId, 'provider_rpd_limit'));
+  if (account !== undefined) return account;
   const raw = process.env[`PROVIDER_DAILY_REQUEST_CAP_${platform.toUpperCase()}`];
   if (raw !== undefined && raw.trim() !== '') {
     const n = Number(raw);
@@ -594,7 +609,9 @@ export function getProviderDailyRequestCap(platform: string): number | null {
 
 /** Account-wide requests-per-minute cap, or null when the provider has none.
  *  `PROVIDER_MINUTE_REQUEST_CAP_<PLATFORM>=0` disables the gate for that platform. */
-export function getProviderMinuteRequestCap(platform: string): number | null {
+export function getProviderMinuteRequestCap(platform: string, keyId?: number): number | null {
+  const account = normalizedProviderLimit(getKeyProviderLimit(keyId, 'provider_rpm_limit'));
+  if (account !== undefined) return account;
   const raw = process.env[`PROVIDER_MINUTE_REQUEST_CAP_${platform.toUpperCase()}`];
   if (raw !== undefined && raw.trim() !== '') {
     const n = Number(raw);
@@ -603,7 +620,9 @@ export function getProviderMinuteRequestCap(platform: string): number | null {
   return DEFAULT_PROVIDER_MINUTE_REQUEST_CAPS[platform] ?? null;
 }
 
-export function getProviderDailyTokenCap(platform: string): number | null {
+export function getProviderDailyTokenCap(platform: string, keyId?: number): number | null {
+  const account = normalizedProviderLimit(getKeyProviderLimit(keyId, 'provider_tpd_limit'));
+  if (account !== undefined) return account;
   const raw = process.env[`PROVIDER_DAILY_TOKEN_CAP_${platform.toUpperCase()}`];
   if (raw !== undefined && raw.trim() !== '') {
     const n = Number(raw);
@@ -654,7 +673,7 @@ export function providerDailyRequestCount(platform: string, keyId: number, now =
 // False when this provider account+key has hit its shared daily request cap, so
 // the router skips every model on that provider for this key until UTC-ish reset.
 export function canUseProvider(platform: string, keyId: number, now = Date.now()): boolean {
-  const cap = getProviderDailyRequestCap(platform);
+  const cap = getProviderDailyRequestCap(platform, keyId);
   if (cap === null) return true;
   const used = providerDailyRequestCount(platform, keyId, now) + provisionalProviderRequests(platform, keyId, now);
   return used < cap;
@@ -678,7 +697,7 @@ export function providerMinuteRequestCount(platform: string, keyId: number, now 
 // budget, so the router skips every model on that provider rather than learning
 // the limit again from a 429 on each one in turn.
 export function canUseProviderMinute(platform: string, keyId: number, now = Date.now()): boolean {
-  const cap = getProviderMinuteRequestCap(platform);
+  const cap = getProviderMinuteRequestCap(platform, keyId);
   if (cap === null) return true;
   const used = providerMinuteRequestCount(platform, keyId, now) + provisionalProviderRequests(platform, keyId, now);
   return used < cap;
@@ -713,11 +732,14 @@ function getProviderTokenMultiplier(platform: string, modelId: string, dailyCap:
   }) ?? 1;
 }
 
-function providerBilledTokens(platform: string, modelId: string, rawTokens: number): number {
+function providerBilledTokens(platform: string, keyId: number, modelId: string, rawTokens: number): number {
   if (rawTokens <= 0) return 0;
-  const dailyCap = getProviderDailyTokenCap(platform);
+  const dailyCap = getProviderDailyTokenCap(platform, keyId);
   if (dailyCap === null) return rawTokens;
-  const multiplier = getProviderTokenMultiplier(platform, modelId, dailyCap);
+  // A per-account cap changes the size of the pool, not the provider's billing
+  // multiplier. Keep multiplier inference anchored to the provider/env cap.
+  const billingCap = getProviderDailyTokenCap(platform) ?? dailyCap;
+  const multiplier = getProviderTokenMultiplier(platform, modelId, billingCap);
   return Math.ceil(rawTokens * multiplier);
 }
 
@@ -727,8 +749,9 @@ function sumPersistedProviderTokens(
   windowMs: number,
   now: number,
 ): number | undefined {
-  const dailyCap = getProviderDailyTokenCap(platform);
+  const dailyCap = getProviderDailyTokenCap(platform, keyId);
   if (dailyCap === null) return 0;
+  const billingCap = getProviderDailyTokenCap(platform) ?? dailyCap;
 
   return withDb(db => {
     const rows = db.prepare(`
@@ -744,7 +767,7 @@ function sumPersistedProviderTokens(
     `).all(platform, keyId, now - windowMs) as (ModelQuotaRow & { model_id: string; used: number })[];
 
     return rows.reduce((sum, row) => {
-      const multiplier = platform === 'navy' ? multiplierFromQuotaRow(row, dailyCap) : 1;
+      const multiplier = platform === 'navy' ? multiplierFromQuotaRow(row, billingCap) : 1;
       return sum + Math.ceil(row.used * multiplier);
     }, 0);
   });
@@ -766,7 +789,7 @@ export function providerDailyTokenCount(platform: string, keyId: number, now = D
     const raw = w.tokenTimestamps
       .filter(t => t.ts > now - windowMs)
       .reduce((sum, t) => sum + t.tokens, 0);
-    total += providerBilledTokens(platform, modelId, raw);
+    total += providerBilledTokens(platform, keyId, modelId, raw);
   }
   return total;
 }
@@ -778,11 +801,11 @@ export function canUseProviderTokens(
   estimatedTokens: number,
   now = Date.now(),
 ): boolean {
-  const cap = getProviderDailyTokenCap(platform);
+  const cap = getProviderDailyTokenCap(platform, keyId);
   if (cap === null) return true;
   const used = providerDailyTokenCount(platform, keyId, now)
-    + providerBilledTokens(platform, modelId, provisionalProviderTokens(platform, keyId, now));
-  return used + providerBilledTokens(platform, modelId, estimatedTokens) <= cap;
+    + providerBilledTokens(platform, keyId, modelId, provisionalProviderTokens(platform, keyId, now));
+  return used + providerBilledTokens(platform, keyId, modelId, estimatedTokens) <= cap;
 }
 
 // ── Degraded-mode memory windows ─────────────────────────────────────────────

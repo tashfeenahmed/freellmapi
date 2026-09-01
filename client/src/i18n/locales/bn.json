@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "অপরিমাপিত মডেল অন্বেষণ করুন",
@@ -564,6 +568,12 @@
     "modelScopeClear": "পরিধি মুছুন",
     "modelScopeBadgeOne": "সীমিত · 1টি মডেল",
     "modelScopeBadgeOther": "সীমিত · {count}টি মডেল",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "এই কী কোন মডেলগুলির জন্য কাজ করবে?",
       "hint": "আপনার {provider} কী যোগ করা হয়েছে এবং এটি এখন নিচের প্রতিটি মডেলের জন্য কাজ করে। যেসব মডেলে এই কী ব্যবহার করা উচিত নয়, সেগুলির টিক তুলে দিন — রাউটার সেগুলির জন্য এই কী এড়িয়ে যাবে।",

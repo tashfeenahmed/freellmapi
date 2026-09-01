@@ -284,7 +284,11 @@
     "disableAll": "すべて無効化",
     "enableAllHint": "表示中のモデルをすべて有効にして保存します",
     "disableAllHint": "表示中のモデルをすべて無効にして保存します",
-    "enabledOfShown": "表示中の {shown} 件のうち {enabled} 件がチェーンに入っています"
+    "enabledOfShown": "表示中の {shown} 件のうち {enabled} 件がチェーンに入っています",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "未計測のモデルを探索",
@@ -564,6 +568,12 @@
     "modelScopeClear": "スコープを解除",
     "modelScopeBadgeOne": "限定 · 1 モデル",
     "modelScopeBadgeOther": "限定 · {count} モデル",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "このキーをどのモデルで使用しますか？",
       "hint": "{provider} のキーを追加しました。現在は以下のすべてのモデルで使用されます。このキーを使用できないモデルはチェックを外してください。それらのモデルではルーターがこのキーをスキップします。",

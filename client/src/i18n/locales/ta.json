@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "அளவிடப்படாத மாதிரிகளை ஆராயுங்கள்",
@@ -564,6 +568,12 @@
     "modelScopeClear": "வரம்பை நீக்கு",
     "modelScopeBadgeOne": "வரம்பிடப்பட்டது · 1 மாடல்",
     "modelScopeBadgeOther": "வரம்பிடப்பட்டது · {count} மாடல்கள்",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "இந்த விசை எந்த மாடல்களுக்குச் சேவை செய்ய வேண்டும்?",
       "hint": "உங்கள் {provider} விசை சேர்க்கப்பட்டது, தற்போது இது கீழே உள்ள எல்லா மாடல்களுக்கும் சேவை செய்கிறது. இந்த விசை பயன்படுத்தக் கூடாத மாடல்களின் தேர்வை நீக்கவும் — அவற்றுக்கு ரூட்டர் இதைத் தவிர்க்கும்.",

@@ -89,7 +89,7 @@ function quotaContextForRoute(route: RouteResult, endpoint: string): QuotaObserv
     platform: route.platform as Platform,
     keyId: route.keyId,
     modelId: route.modelId,
-    quotaPoolKey: inferQuotaPoolKey(route.platform as Platform, route.modelId),
+    quotaPoolKey: inferQuotaPoolKey(route.platform as Platform, route.modelId, route.providerBaseUrl),
     endpoint,
     origin: 'proxy',
   };

@@ -284,7 +284,11 @@
     "disableAll": "تعطيل الكل",
     "enableAllHint": "فعّل كل النماذج المعروضة ثم احفظ",
     "disableAllHint": "عطّل كل النماذج المعروضة ثم احفظ",
-    "enabledOfShown": "{enabled} من {shown} من النماذج المعروضة داخل السلسلة"
+    "enabledOfShown": "{enabled} من {shown} من النماذج المعروضة داخل السلسلة",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "استكشاف النماذج غير المقيسة",
@@ -564,6 +568,12 @@
     "modelScopeClear": "مسح النطاق",
     "modelScopeBadgeOne": "مقيّد · نموذج واحد",
     "modelScopeBadgeOther": "مقيّد · {count} نماذج",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ما النماذج التي ينبغي أن يخدمها هذا المفتاح؟",
       "hint": "تمت إضافة مفتاح {provider} الخاص بك، وهو يخدم حاليًا كل نموذج أدناه. ألغِ تحديد أي نموذج لا يُسمح لهذا المفتاح باستخدامه — سيتخطاه الموجّه لتلك النماذج.",

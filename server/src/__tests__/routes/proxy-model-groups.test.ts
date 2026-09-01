@@ -3,7 +3,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { setUnifyEnabled, setUnifyOverrides } from '../../services/model-groups.js';
+import { setUnifyEnabled, setUnifyOverrides, setProviderPreferences } from '../../services/model-groups.js';
 import { setRoutingStrategy } from '../../services/router.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
@@ -82,8 +82,11 @@ describe('Model unification (group the same model across providers)', () => {
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM rate_limit_cooldowns').run();
     db.prepare('DELETE FROM rate_limit_usage').run();
+    db.prepare('DELETE FROM provider_quota_state').run();
+    db.prepare('DELETE FROM provider_quota_observations').run();
     setUnifyEnabled(true);
     setUnifyOverrides({ merges: [], splits: [] });
+    setProviderPreferences({ version: 1, groups: {} });
     setRoutingStrategy('priority');
     addModel('groq', 'tum-groq', 'Test Unify Model', 1);
     addModel('cerebras', 'tum-cerebras', 'Test Unify Model', 2);
@@ -264,6 +267,98 @@ describe('Model unification (group the same model across providers)', () => {
     expect(undo.status).toBe(200);
     const after = await request(app, 'GET', '/v1/models', undefined, authHeaders());
     expect(after.body.data.filter((m: any) => m.name === 'Test Unify Model')).toHaveLength(1);
+  });
+
+  it('persists preferred provider order and uses it without changing the unified model id', async () => {
+    const put = await request(app, 'PUT', '/api/settings/unify', {
+      providerPreferences: {
+        version: 1,
+        groups: {
+          'test unify model': {
+            mode: 'preferred',
+            memberOrder: ['cerebras:tum-cerebras', 'groq:tum-groq'],
+          },
+        },
+      },
+    });
+    expect(put.status).toBe(200);
+    expect(put.body.providerPreferences.groups['test unify model'].memberOrder)
+      .toEqual(['cerebras:tum-cerebras', 'groq:tum-groq']);
+
+    const orig = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+      if (String(url).includes('localhost') || String(url).includes('127.0.0.1')) return orig(url, init);
+      if (String(url).includes('api.cerebras.ai')) return completion('tum-cerebras', 'preferred');
+      return completion('tum-groq', 'automatic');
+    });
+
+    const response = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'test-unify-model',
+      messages: [{ role: 'user', content: 'hi' }],
+    }, authHeaders());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-routed-via')).toContain('cerebras');
+  });
+
+  it('preferred order still fails over when the first provider is unavailable', async () => {
+    setProviderPreferences({
+      version: 1,
+      groups: {
+        'test unify model': {
+          mode: 'preferred',
+          memberOrder: ['cerebras:tum-cerebras', 'groq:tum-groq'],
+        },
+      },
+    });
+    getDb().prepare("UPDATE api_keys SET enabled = 0 WHERE platform = 'cerebras'").run();
+
+    const orig = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+      if (String(url).includes('localhost') || String(url).includes('127.0.0.1')) return orig(url, init);
+      return completion('tum-groq', 'fallback');
+    });
+
+    const response = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'test-unify-model',
+      messages: [{ role: 'user', content: 'hi' }],
+    }, authHeaders());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-routed-via')).toContain('groq');
+  });
+
+  it('preferred order skips a provider whose applicable quota pool is known exhausted', async () => {
+    setProviderPreferences({
+      version: 1,
+      groups: {
+        'test unify model': {
+          mode: 'preferred',
+          memberOrder: ['cerebras:tum-cerebras', 'groq:tum-groq'],
+        },
+      },
+    });
+    const key = getDb().prepare("SELECT id FROM api_keys WHERE platform = 'cerebras'").get() as { id: number };
+    getDb().prepare(`
+      INSERT INTO provider_quota_state
+        (platform, key_id, quota_pool_key, metric, limit_value, remaining_value, reset_at, source, confidence)
+      VALUES ('cerebras', ?, 'cerebras::shared', 'requests', 30, 0, ?, 'header', 1)
+    `).run(key.id, new Date(Date.now() + 60_000).toISOString());
+
+    const upstreams: string[] = [];
+    const orig = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+      const target = String(url);
+      if (target.includes('localhost') || target.includes('127.0.0.1')) return orig(url, init);
+      upstreams.push(target);
+      return completion('tum-groq', 'quota fallback');
+    });
+
+    const response = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'test-unify-model',
+      messages: [{ role: 'user', content: 'hi' }],
+    }, authHeaders());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-routed-via')).toContain('groq');
+    expect(upstreams.some(url => url.includes('api.cerebras.ai'))).toBe(false);
   });
 
   it('unification is always on: the toggle was removed, so /v1/models stays collapsed even after setUnifyEnabled(false)', async () => {

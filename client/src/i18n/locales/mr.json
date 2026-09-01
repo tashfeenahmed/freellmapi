@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "न मोजलेले मॉडेल्स एक्सप्लोर करा",
@@ -564,6 +568,12 @@
     "modelScopeClear": "व्याप्ती काढा",
     "modelScopeBadgeOne": "मर्यादित · 1 मॉडेल",
     "modelScopeBadgeOther": "मर्यादित · {count} मॉडेल",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ही की कोणत्या मॉडेल्ससाठी वापरली जावी?",
       "hint": "तुमची {provider} की जोडली गेली आहे आणि सध्या ती खालील प्रत्येक मॉडेलसाठी वापरली जाते. ज्या मॉडेल्ससाठी ही की वापरता येणार नाही त्यांची निवड काढून टाका — राउटर त्यांच्यासाठी ती वगळेल.",

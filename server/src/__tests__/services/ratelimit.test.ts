@@ -306,6 +306,19 @@ describe('Rate Limiter', () => {
       recordRequest('openrouter', 'model-c', testId);
       expect(canUseProvider('openrouter', testId)).toBe(false); // 3 >= 3
     });
+
+    it('applies a per-account RPD override before the platform default', () => {
+      initDb(':memory:');
+      const key = getDb().prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, provider_rpd_limit)
+        VALUES ('openrouter', 'limited', 'x', 'x', 'x', 'healthy', 1, 2)
+      `).run();
+      const keyId = Number(key.lastInsertRowid);
+      recordRequest('openrouter', 'model-a', keyId);
+      expect(canUseProvider('openrouter', keyId)).toBe(true);
+      recordRequest('openrouter', 'model-b', keyId);
+      expect(canUseProvider('openrouter', keyId)).toBe(false);
+    });
   });
 
   describe('provider-wide daily token cap (NavyAI)', () => {
@@ -377,6 +390,17 @@ describe('Rate Limiter', () => {
 
       expect(canUseProviderTokens('navy', testId, 'gemini-2.5-flash', 400)).toBe(true);
       expect(canUseProviderTokens('navy', testId, 'gemini-2.5-flash', 600)).toBe(false);
+    });
+
+    it('applies a per-account TPD override independently of the model cap', () => {
+      const key = getDb().prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, provider_tpd_limit)
+        VALUES ('groq', 'limited', 'x', 'x', 'x', 'healthy', 1, 100)
+      `).run();
+      const keyId = Number(key.lastInsertRowid);
+      recordTokens('groq', 'model-a', keyId, 90);
+      expect(canUseProviderTokens('groq', keyId, 'model-b', 10)).toBe(true);
+      expect(canUseProviderTokens('groq', keyId, 'model-b', 11)).toBe(false);
     });
   });
 });

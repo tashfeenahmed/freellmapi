@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "สำรวจโมเดลที่ยังไม่ได้วัดผล",
@@ -564,6 +568,12 @@
     "modelScopeClear": "ล้างขอบเขต",
     "modelScopeBadgeOne": "จำกัด · 1 โมเดล",
     "modelScopeBadgeOther": "จำกัด · {count} โมเดล",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "คีย์นี้ควรให้บริการโมเดลใดบ้าง",
       "hint": "เพิ่มคีย์ {provider} ของคุณแล้ว และตอนนี้ให้บริการทุกโมเดลด้านล่าง ยกเลิกการเลือกโมเดลที่ไม่อนุญาตให้คีย์นี้ใช้ — เราเตอร์จะข้ามคีย์นี้สำหรับโมเดลเหล่านั้น",

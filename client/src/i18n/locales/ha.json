@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Bincika samfuran da ba a auna ba",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Share iyaka",
     "modelScopeBadgeOne": "iyakantacce · samfuri 1",
     "modelScopeBadgeOther": "iyakantacce · samfura {count}",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Waɗanne samfura wannan maɓalli zai yi wa hidima?",
       "hint": "An ƙara maɓallin {provider} naka kuma a yanzu yana yi wa duk samfuran da ke ƙasa hidima. Cire alamar duk samfurin da ba a yarda wannan maɓalli ya yi amfani da shi ba — router zai tsallake shi ga waɗannan.",

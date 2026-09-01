@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Εξερεύνηση μη μετρημένων μοντέλων",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Καθαρισμός εύρους",
     "modelScopeBadgeOne": "περιορισμένο · 1 μοντέλο",
     "modelScopeBadgeOther": "περιορισμένο · {count} μοντέλα",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Ποια μοντέλα να εξυπηρετεί αυτό το κλειδί;",
       "hint": "Το κλειδί σας για {provider} προστέθηκε και αυτή τη στιγμή εξυπηρετεί όλα τα παρακάτω μοντέλα. Αποεπιλέξτε όσα δεν επιτρέπεται να χρησιμοποιεί αυτό το κλειδί — ο δρομολογητής θα το παρακάμπτει για αυτά.",

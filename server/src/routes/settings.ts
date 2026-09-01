@@ -6,7 +6,7 @@ import { getProvider } from '../providers/index.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { ProxyMode } from '@freellmapi/shared/types.js';
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
-import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
+import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema, getProviderPreferences, setProviderPreferences, providerPreferencesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
 import { getGeminiModelMap, setGeminiModelMap } from '../services/gemini-map.js';
 import { getOllamaEmulationMode } from './ollama.js';
@@ -91,12 +91,13 @@ settingsRouter.put('/compression', (req: Request, res: Response) => {
 // merge/split overrides. Governs the dashboard grouping, /v1/models grouping,
 // and cross-provider pin failover.
 settingsRouter.get('/unify', (_req: Request, res: Response) => {
-  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides() });
+  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides(), providerPreferences: getProviderPreferences() });
 });
 
 const unifyPutSchema = z.object({
   enabled: z.boolean().optional(),
   overrides: unifyOverridesSchema.optional(),
+  providerPreferences: providerPreferencesSchema.optional(),
 });
 
 // Update the unify toggle and/or overrides. Partial: send just `enabled` to
@@ -110,7 +111,8 @@ settingsRouter.put('/unify', (req: Request, res: Response) => {
   }
   if (parsed.data.enabled !== undefined) setUnifyEnabled(parsed.data.enabled);
   if (parsed.data.overrides) setUnifyOverrides(parsed.data.overrides);
-  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides() });
+  if (parsed.data.providerPreferences) setProviderPreferences(parsed.data.providerPreferences);
+  res.json({ enabled: isUnifyEnabled(), overrides: getUnifyOverrides(), providerPreferences: getProviderPreferences() });
 });
 
 // Get the saved fusion default config (panel mode, models, judge, k, strategy).

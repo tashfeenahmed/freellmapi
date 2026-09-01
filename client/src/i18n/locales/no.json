@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Utforsk umålte modeller",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Fjern avgrensning",
     "modelScopeBadgeOne": "begrenset · 1 modell",
     "modelScopeBadgeOther": "begrenset · {count} modeller",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Hvilke modeller skal denne nøkkelen betjene?",
       "hint": "{provider}-nøkkelen din er lagt til og betjener for øyeblikket alle modellene nedenfor. Fjern haken ved modellene nøkkelen ikke får brukes til — ruteren hopper da over den for disse.",

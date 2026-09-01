@@ -290,11 +290,11 @@ describe('key selection by remaining quota (#919)', () => {
     expect(picks).toEqual([first, second, first]);
   });
 
-  it('does not reorder keys on an account-scoped quota pool', () => {
+  it('orders distinct provider accounts by their observed shared-pool headroom', () => {
     clearChain();
-    // groq pools every key of the account into one budget ('groq::account'), so
-    // per-key headroom is the same number for all of them and reordering would
-    // only churn the rotation.
+    // Each configured credential represents a distinct account. A pool may be
+    // shared across models inside one account, but headroom still differs
+    // between accounts and the roomier credential should win.
     const firstKey = addKey('groq', 'first');
     const secondKey = addKey('groq', 'second');
     observeQuota('groq', firstKey, 'groq::account', 10);
@@ -304,10 +304,10 @@ describe('key selection by remaining quota (#919)', () => {
 
     const routed = routeRequest(100);
     routed.release?.();
-    expect(routed.keyId).toBe(firstKey);
+    expect(routed.keyId).toBe(secondKey);
   });
 
-  it('still confines a custom model to its own endpoint\'s keys', () => {
+  it('keeps local custom endpoints unmetered and confined to their own keys', () => {
     clearChain();
     const endpointA = 'http://127.0.0.1:11434/v1';
     const endpointB = 'http://127.0.0.1:8080/v1';
@@ -325,7 +325,11 @@ describe('key selection by remaining quota (#919)', () => {
     const routed = routeRequest(100);
     routed.release?.();
     expect(routed.platform).toBe('custom');
-    expect(routed.keyId).toBe(aRoomy);
+    // Loopback inference is unmetered: quota observations must not reorder its
+    // normal rotation. Endpoint isolation still excludes the even-roomier key
+    // belonging to endpoint B.
+    expect(routed.keyId).toBe(aDrained);
+    expect(routed.keyId).not.toBe(aRoomy);
     expect(routed.keyId).not.toBe(bRoomiest);
   });
 

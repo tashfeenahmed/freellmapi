@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "కొలవని మోడల్స్‌ను అన్వేషించండి",
@@ -564,6 +568,12 @@
     "modelScopeClear": "పరిధిని తొలగించండి",
     "modelScopeBadgeOne": "పరిమితం · 1 మోడల్",
     "modelScopeBadgeOther": "పరిమితం · {count} మోడళ్లు",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ఈ కీ ఏ మోడల్‌లకు సేవ అందించాలి?",
       "hint": "మీ {provider} కీ జోడించబడింది, ప్రస్తుతం ఇది కింది ప్రతి మోడల్‌కు సేవ అందిస్తుంది. ఈ కీని ఉపయోగించకూడని మోడల్‌ల ఎంపికను తీసివేయండి — వాటికి రూటర్ ఈ కీని దాటవేస్తుంది.",

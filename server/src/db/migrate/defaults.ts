@@ -30,6 +30,7 @@ import * as profileAutoInclude from '../migrations/20260823_000004_profile_auto_
 import * as idempotencyClaims from '../migrations/20260901_000001_idempotency_claims.js';
 import * as quotaObservationLookup from '../migrations/20260901_000002_quota_observation_lookup.js';
 import * as analyticsLatencyPercentileIndex from '../migrations/20260902_000001_analytics_latency_percentile_index.js';
+import * as providerAccountLimits from '../migrations/20260902_000002_provider_account_limits.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -72,6 +73,7 @@ export const PROFILE_AUTO_INCLUDE_FILENAME = '20260823_000004_profile_auto_inclu
 export const IDEMPOTENCY_CLAIMS_FILENAME = '20260901_000001_idempotency_claims.ts';
 export const QUOTA_OBSERVATION_LOOKUP_FILENAME = '20260901_000002_quota_observation_lookup.ts';
 export const ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME = '20260902_000001_analytics_latency_percentile_index.ts';
+export const PROVIDER_ACCOUNT_LIMITS_FILENAME = '20260902_000002_provider_account_limits.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -105,4 +107,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: IDEMPOTENCY_CLAIMS_FILENAME, module: idempotencyClaims },
   { filename: QUOTA_OBSERVATION_LOOKUP_FILENAME, module: quotaObservationLookup },
   { filename: ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME, module: analyticsLatencyPercentileIndex },
+  { filename: PROVIDER_ACCOUNT_LIMITS_FILENAME, module: providerAccountLimits },
 ];

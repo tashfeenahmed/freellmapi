@@ -35,6 +35,7 @@ const PROFILE_AUTO_INCLUDE_FILENAME = '20260823_000004_profile_auto_include.ts';
 const IDEMPOTENCY_CLAIMS_FILENAME = '20260901_000001_idempotency_claims.ts';
 const QUOTA_OBSERVATION_LOOKUP_FILENAME = '20260901_000002_quota_observation_lookup.ts';
 const ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME = '20260902_000001_analytics_latency_percentile_index.ts';
+const PROVIDER_ACCOUNT_LIMITS_FILENAME = '20260902_000002_provider_account_limits.ts';
 
 interface SchemaRow {
   type: string;
@@ -116,6 +117,7 @@ describe('migration round trip', () => {
         IDEMPOTENCY_CLAIMS_FILENAME,
         QUOTA_OBSERVATION_LOOKUP_FILENAME,
         ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME,
+        PROVIDER_ACCOUNT_LIMITS_FILENAME,
       ]);
     } finally {
       db.close();

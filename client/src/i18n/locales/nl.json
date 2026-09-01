@@ -284,7 +284,11 @@
     "disableAll": "Alles uit",
     "enableAllHint": "Zet alle getoonde modellen aan en sla op",
     "disableAllHint": "Zet alle getoonde modellen uit en sla op",
-    "enabledOfShown": "{enabled} van {shown} getoonde modellen zitten in de keten"
+    "enabledOfShown": "{enabled} van {shown} getoonde modellen zitten in de keten",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Ongemeten modellen verkennen",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Bereik wissen",
     "modelScopeBadgeOne": "beperkt · 1 model",
     "modelScopeBadgeOther": "beperkt · {count} modellen",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Welke modellen moet deze sleutel bedienen?",
       "hint": "Je {provider}-sleutel is toegevoegd en bedient op dit moment alle modellen hieronder. Vink de modellen uit waarvoor deze sleutel niet gebruikt mag worden — de router slaat de sleutel daarvoor over.",

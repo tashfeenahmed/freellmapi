@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "မတိုင်းတာရသေးသော မော်ဒယ်များကို စူးစမ်းရန်",
@@ -564,6 +568,12 @@
     "modelScopeClear": "အတိုင်းအတာ ဖယ်ရှားရန်",
     "modelScopeBadgeOne": "ကန့်သတ် · မော်ဒယ် 1 ခု",
     "modelScopeBadgeOther": "ကန့်သတ် · မော်ဒယ် {count} ခု",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ဤကီးသည် မည်သည့်မော်ဒယ်များကို ဝန်ဆောင်ပေးသင့်သလဲ?",
       "hint": "သင်၏ {provider} ကီးကို ထည့်ပြီးပါပြီ၊ လက်ရှိတွင် အောက်ပါ မော်ဒယ်အားလုံးကို ဝန်ဆောင်ပေးနေပါသည်။ ဤကီးကို အသုံးပြုခွင့်မရှိသည့် မော်ဒယ်များ၏ အမှန်ခြစ်ကို ဖြုတ်ပါ — router သည် ထိုမော်ဒယ်များအတွက် ၎င်းကို ကျော်သွားပါမည်။",

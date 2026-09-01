@@ -101,9 +101,35 @@ describe('Keys API — model scope', () => {
     expect(list.body.find((k: any) => k.id === id).modelScope).toEqual(['m1']);
   });
 
+  it('persists and surfaces per-account provider limits independently', async () => {
+    const id = insertKey();
+    const patch = await request(app, 'PATCH', `/api/keys/${id}`, {
+      providerRpmLimit: 30,
+      providerRpdLimit: 750,
+      providerTpdLimit: 125000,
+    });
+    expect(patch.status).toBe(200);
+
+    const list = await request(app, 'GET', '/api/keys');
+    const key = list.body.find((candidate: any) => candidate.id === id);
+    expect(key).toMatchObject({
+      providerRpmLimit: 30,
+      providerRpdLimit: 750,
+      providerTpdLimit: 125000,
+    });
+
+    const clear = await request(app, 'PATCH', `/api/keys/${id}`, {
+      providerRpmLimit: null,
+      providerRpdLimit: 0,
+      providerTpdLimit: null,
+    });
+    expect(clear.status).toBe(200);
+    expect(clear.body).toMatchObject({ providerRpmLimit: null, providerRpdLimit: 0, providerTpdLimit: null });
+  });
+
   it('rejects malformed payloads', async () => {
     const id = insertKey();
-    for (const modelScope of ['not-an-array', [''], [42], [{ id: 'x' }], ['x'.repeat(201)], Array.from({ length: 101 }, (_, i) => `m${i}`)]) {
+    for (const modelScope of ['not-an-array', [''], [42], [{ id: 'x' }], ['x'.repeat(201)], Array.from({ length: 501 }, (_, i) => `m${i}`)]) {
       const patch = await request(app, 'PATCH', `/api/keys/${id}`, { modelScope });
       expect(patch.status, JSON.stringify(modelScope).slice(0, 60)).toBe(400);
     }

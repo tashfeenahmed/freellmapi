@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "അളക്കാത്ത മോഡലുകൾ പര്യവേക്ഷണം ചെയ്യുക",
@@ -564,6 +568,12 @@
     "modelScopeClear": "പരിധി നീക്കം ചെയ്യുക",
     "modelScopeBadgeOne": "പരിമിതം · 1 മോഡൽ",
     "modelScopeBadgeOther": "പരിമിതം · {count} മോഡലുകൾ",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "ഈ കീ ഏതൊക്കെ മോഡലുകൾക്കായി പ്രവർത്തിക്കണം?",
       "hint": "നിങ്ങളുടെ {provider} കീ ചേർത്തു, ഇപ്പോൾ അത് താഴെയുള്ള എല്ലാ മോഡലുകൾക്കും സേവനം നൽകുന്നു. ഈ കീ ഉപയോഗിക്കാൻ പാടില്ലാത്ത മോഡലുകളുടെ ടിക് ഒഴിവാക്കുക — അവയ്ക്കായി റൂട്ടർ ഇത് ഒഴിവാക്കും.",

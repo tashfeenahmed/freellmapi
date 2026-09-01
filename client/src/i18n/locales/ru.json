@@ -284,7 +284,11 @@
     "disableAll": "Выключить все",
     "enableAllHint": "Включить все показанные модели, затем сохранить",
     "disableAllHint": "Выключить все показанные модели, затем сохранить",
-    "enabledOfShown": "В цепочке {enabled} из {shown} показанных моделей"
+    "enabledOfShown": "В цепочке {enabled} из {shown} показанных моделей",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Исследовать неизмеренные модели",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Очистить область",
     "modelScopeBadgeOne": "ограничен · 1 модель",
     "modelScopeBadgeOther": "ограничен · {count} моделей",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Какие модели должен обслуживать этот ключ?",
       "hint": "Ваш ключ {provider} добавлен и сейчас обслуживает все модели ниже. Снимите отметки с тех, которые этому ключу использовать нельзя — для них маршрутизатор его пропустит.",

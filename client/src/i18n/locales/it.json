@@ -284,7 +284,11 @@
     "disableAll": "Disattiva tutti",
     "enableAllHint": "Attiva tutti i modelli mostrati, poi salva",
     "disableAllHint": "Disattiva tutti i modelli mostrati, poi salva",
-    "enabledOfShown": "{enabled} dei {shown} modelli mostrati sono nella catena"
+    "enabledOfShown": "{enabled} dei {shown} modelli mostrati sono nella catena",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Esplora i modelli non misurati",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Cancella ambito",
     "modelScopeBadgeOne": "limitata · 1 modello",
     "modelScopeBadgeOther": "limitata · {count} modelli",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Quali modelli deve servire questa chiave?",
       "hint": "La tua chiave {provider} è stata aggiunta e al momento serve tutti i modelli qui sotto. Deseleziona quelli che questa chiave non può usare — il router la salterà per quei modelli.",

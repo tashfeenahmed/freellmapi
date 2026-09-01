@@ -284,7 +284,11 @@
     "disableAll": "Wyłącz wszystkie",
     "enableAllHint": "Włącz wszystkie pokazane modele, potem zapisz",
     "disableAllHint": "Wyłącz wszystkie pokazane modele, potem zapisz",
-    "enabledOfShown": "{enabled} z {shown} pokazanych modeli jest w łańcuchu"
+    "enabledOfShown": "{enabled} z {shown} pokazanych modeli jest w łańcuchu",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Eksploruj niezmierzone modele",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Wyczyść zakres",
     "modelScopeBadgeOne": "ograniczony · 1 model",
     "modelScopeBadgeOther": "ograniczony · {count} modeli",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Które modele ma obsługiwać ten klucz?",
       "hint": "Twój klucz {provider} został dodany i obsługuje obecnie wszystkie modele poniżej. Odznacz te, których ten klucz nie może używać — router pominie go dla nich.",

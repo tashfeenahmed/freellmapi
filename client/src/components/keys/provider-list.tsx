@@ -608,6 +608,11 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                 {t(k.modelScope!.length === 1 ? 'keys.modelScopeBadgeOne' : 'keys.modelScopeBadgeOther', { count: k.modelScope!.length })}
                               </Badge>
                             )}
+                            {(k.providerRpmLimit != null || k.providerRpdLimit != null || k.providerTpdLimit != null) && (
+                              <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                                {t('keys.accountLimits')}
+                              </Badge>
+                            )}
                             <div className="flex-1" />
                             {lastChecked && (
                               <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -679,12 +684,12 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               {/* Deliberately secondary (#657): a small hover-cluster affordance,
                                   not a first-fold control. */}
                               {!k.keyless && (
-                                <Tooltip text={t('keys.modelScope')}>
+                                <Tooltip text={t('keys.modelsAndAccountLimits')}>
                                   <Button
                                     variant="ghost"
                                     size="icon-xs"
                                     onClick={() => setScopeKeyId(k.id)}
-                                    aria-label={t('keys.modelScope')}
+                                    aria-label={t('keys.modelsAndAccountLimits')}
                                   >
                                     <ListFilter className="size-3" />
                                   </Button>

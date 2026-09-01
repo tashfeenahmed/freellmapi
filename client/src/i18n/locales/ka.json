@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "გაუზომავი მოდელების შესწავლა",
@@ -564,6 +568,12 @@
     "modelScopeClear": "ფარგლების გასუფთავება",
     "modelScopeBadgeOne": "შეზღუდული · 1 მოდელი",
     "modelScopeBadgeOther": "შეზღუდული · {count} მოდელი",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "რომელ მოდელებს უნდა ემსახუროს ეს გასაღები?",
       "hint": "თქვენი {provider}-ის გასაღები დაემატა და ამჟამად ემსახურება ქვემოთ ჩამოთვლილ ყველა მოდელს. მოხსენით მონიშვნა იმ მოდელებს, რომლებზეც ამ გასაღების გამოყენება ნებადართული არ არის — რაუტერი მათთვის ამ გასაღებს გამოტოვებს.",

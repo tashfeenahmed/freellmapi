@@ -51,6 +51,7 @@ function observe(row: {
 describe('free-tier pool overview (#905)', () => {
   let app: Express;
   let groqKey = 0;
+  let groqModelIds: string[] = [];
   let cerebrasA = 0;
   let cerebrasB = 0;
 
@@ -64,13 +65,14 @@ describe('free-tier pool overview (#905)', () => {
     // Narrow the catalog down to a handful of rows across three platforms.
     db.prepare('UPDATE models SET enabled = 0').run();
     const groq = db.prepare("SELECT id, model_id FROM models WHERE platform = 'groq' ORDER BY id LIMIT 3").all() as { id: number; model_id: string }[];
+    groqModelIds = groq.map(model => model.model_id);
     const cerebras = db.prepare("SELECT id FROM models WHERE platform = 'cerebras' ORDER BY id LIMIT 2").all() as { id: number }[];
     const google = db.prepare("SELECT id FROM models WHERE platform = 'google' ORDER BY id LIMIT 1").all() as { id: number }[];
     const on = db.prepare('UPDATE models SET enabled = 1 WHERE id = ?');
     for (const m of [...groq, ...cerebras, ...google]) on.run(m.id);
 
-    // Three groq models in ONE pool with different labels: the pool takes the
-    // largest documented budget once, never the sum of the three.
+    // Groq publishes independent per-model allowances, so each model's label
+    // belongs to a separate pool even though one credential serves all three.
     const budget = db.prepare('UPDATE models SET monthly_token_budget = ? WHERE id = ?');
     budget.run('~6M', groq[0].id);
     budget.run('~15M', groq[1].id);
@@ -95,23 +97,22 @@ describe('free-tier pool overview (#905)', () => {
 
     // groq: an older `tokens` reading and a newer `requests` one (a 429 writes
     // exactly this). Latest-wins would report 5,000 requests as the headroom.
-    observe({ platform: 'groq', keyId: groqKey, pool: 'groq::account', metric: 'tokens', limit: 15_000_000, remaining: 12_400_000, resetAt: future(600), observedAt: '2026-01-01 00:00:00' });
-    observe({ platform: 'groq', keyId: groqKey, pool: 'groq::account', metric: 'requests', limit: 14_400, remaining: 5_000, resetAt: future(120), observedAt: '2026-01-02 00:00:00' });
+    const observedGroqPool = `groq::model::${groqModelIds[1]}`;
+    observe({ platform: 'groq', keyId: groqKey, pool: observedGroqPool, metric: 'tokens', limit: 15_000_000, remaining: 12_400_000, resetAt: future(600), observedAt: '2026-01-01 00:00:00' });
+    observe({ platform: 'groq', keyId: groqKey, pool: observedGroqPool, metric: 'requests', limit: 14_400, remaining: 5_000, resetAt: future(120), observedAt: '2026-01-02 00:00:00' });
     // cerebras: the same pool seen through two keys — two accounts, two allowances.
     observe({ platform: 'cerebras', keyId: cerebrasA, pool: 'cerebras::shared', metric: 'tokens', limit: 30_000_000, remaining: 20_000_000, resetAt: future(300), observedAt: '2026-01-01 00:00:00' });
     observe({ platform: 'cerebras', keyId: cerebrasB, pool: 'cerebras::shared', metric: 'tokens', limit: 30_000_000, remaining: 8_000_000, resetAt: future(180), observedAt: '2026-01-03 00:00:00' });
   });
 
-  it('reports one row per pool with a single deduped budget', async () => {
+  it('reports independent Groq model pools without collapsing their budgets', async () => {
     const { status, body } = await get(app, '/api/free-tier');
     expect(status).toBe(200);
 
-    const groq = body.pools.find((p: any) => p.poolKey === 'groq::account');
-    expect(groq).toBeDefined();
-    // Three models, ONE budget: the largest label in the pool (~15M), scaled by
-    // the single usable key — not 6M + 15M + 6M.
-    expect(groq.modelCount).toBe(3);
-    expect(groq.documentedBudget).toBe(15_000_000);
+    const groq = body.pools.filter((p: any) => p.platform === 'groq');
+    expect(groq).toHaveLength(3);
+    expect(groq.map((p: any) => p.modelCount)).toEqual([1, 1, 1]);
+    expect(groq.reduce((sum: number, p: any) => sum + p.documentedBudget, 0)).toBe(27_000_000);
     expect(body.summary.poolCount).toBe(body.pools.length);
   });
 
@@ -121,12 +122,12 @@ describe('free-tier pool overview (#905)', () => {
     // Two healthy keys = two accounts = twice the documented ~30M allowance.
     expect(cerebras.keyCount).toBe(2);
     expect(cerebras.documentedBudget).toBe(60_000_000);
-    expect(body.summary.documentedMonthlyTokens).toBe(60_000_000 + 15_000_000);
+    expect(body.summary.documentedMonthlyTokens).toBe(60_000_000 + 27_000_000);
   });
 
   it('prefers the tokens observation over a newer requests one and always names the metric', async () => {
     const { body } = await get(app, '/api/free-tier');
-    const groq = body.pools.find((p: any) => p.poolKey === 'groq::account');
+    const groq = body.pools.find((p: any) => p.poolKey === `groq::model::${groqModelIds[1]}`);
     expect(groq.quota.metric).toBe('tokens');
     expect(groq.quota.remaining).toBe(12_400_000);
     expect(groq.quota.limit).toBe(15_000_000);
@@ -148,28 +149,26 @@ describe('free-tier pool overview (#905)', () => {
 
   it('keeps chain-disabled rows in the pool but marks them', async () => {
     const { body } = await get(app, '/api/free-tier');
-    const groq = body.pools.find((p: any) => p.poolKey === 'groq::account');
-    expect(groq.modelCount).toBe(3);
-    expect(groq.disabledModelCount).toBe(1);
-    // The disabled row does not reduce the pool's documented budget.
-    expect(groq.documentedBudget).toBe(15_000_000);
+    const disabledGroq = body.pools.find((p: any) => p.poolKey === `groq::model::${groqModelIds[2]}`);
+    expect(disabledGroq.modelCount).toBe(1);
+    expect(disabledGroq.disabledModelCount).toBe(1);
+    expect(disabledGroq.documentedBudget).toBe(6_000_000);
   });
 
   it('names the models in each pool so the legend can group its rows', async () => {
     const { body } = await get(app, '/api/free-tier');
-    const groq = body.pools.find((p: any) => p.poolKey === 'groq::account');
-    // The legend joins its own per-model rows on platform + model id, so the
-    // pool has to name its members; the count has to agree with modelCount, and
-    // the chain-disabled row is a member like any other.
-    expect(groq.memberModelIds).toHaveLength(groq.modelCount);
-    expect(new Set(groq.memberModelIds).size).toBe(groq.modelCount);
+    const groqPools = body.pools.filter((p: any) => p.platform === 'groq');
+    for (const pool of groqPools) {
+      expect(pool.memberModelIds).toHaveLength(1);
+      expect(pool.memberModelIds).toHaveLength(pool.modelCount);
+    }
 
     const usage = await get(app, '/api/fallback/token-usage');
     const chainIds = (usage.body.models as any[])
       .filter(m => m.platform === 'groq')
       .map(m => m.modelId)
       .sort();
-    expect([...groq.memberModelIds].sort()).toEqual(chainIds);
+    expect(groqPools.flatMap((pool: any) => pool.memberModelIds).sort()).toEqual(chainIds);
 
     // Every model of every pool maps back to exactly one pool: the join the
     // legend does cannot put one row under two headers.

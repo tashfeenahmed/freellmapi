@@ -284,7 +284,11 @@
     "disableAll": "Tắt tất cả",
     "enableAllHint": "Bật mọi mô hình đang hiển thị rồi lưu",
     "disableAllHint": "Tắt mọi mô hình đang hiển thị rồi lưu",
-    "enabledOfShown": "{enabled} trong {shown} mô hình đang hiển thị nằm trong chuỗi"
+    "enabledOfShown": "{enabled} trong {shown} mô hình đang hiển thị nằm trong chuỗi",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Khám phá các mô hình chưa được đo",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Xóa phạm vi",
     "modelScopeBadgeOne": "giới hạn · 1 mô hình",
     "modelScopeBadgeOther": "giới hạn · {count} mô hình",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Khóa này nên phục vụ những mô hình nào?",
       "hint": "Khóa {provider} của bạn đã được thêm và hiện phục vụ mọi mô hình bên dưới. Hãy bỏ chọn những mô hình mà khóa này không được phép dùng — bộ định tuyến sẽ bỏ qua khóa này với chúng.",

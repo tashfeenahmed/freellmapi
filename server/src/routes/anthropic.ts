@@ -29,6 +29,8 @@ import type { ReasoningEffort } from '../lib/sampling-params.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
+import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 
 // Anthropic-compatible Messages API (`POST /v1/messages`). This is a thin
 // translation layer over the SAME router/fallback/analytics machinery the
@@ -49,6 +51,17 @@ const MAX_RETRIES = 20;
 // default when a client somehow omits it.
 const DEFAULT_MAX_TOKENS = 1024;
 const IMAGE_TOKEN_ESTIMATE = 1000;
+
+function quotaContextForRoute(route: RouteResult, endpoint: string): QuotaObservationContext {
+  return {
+    platform: route.platform as Platform,
+    keyId: route.keyId,
+    modelId: route.modelId,
+    quotaPoolKey: inferQuotaPoolKey(route.platform as Platform, route.modelId, route.providerBaseUrl),
+    endpoint,
+    origin: 'proxy',
+  };
+}
 
 // ── Request schema ──────────────────────────────────────────────────────────
 // Permissive on purpose: the Anthropic content-block vocabulary grows over
@@ -630,7 +643,13 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         }
       }
 
-      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, dispatchOptions);
+      const result = await route.provider.chatCompletion(
+        route.apiKey,
+        messages,
+        route.modelId,
+        dispatchOptions,
+        quotaContextForRoute(route, 'messages'),
+      );
       const respMsg = result.choices?.[0]?.message;
       const respText = contentToString(respMsg?.content ?? '');
       let respToolCalls = respMsg?.tool_calls ?? [];
@@ -844,7 +863,13 @@ async function streamCompletion(
   };
 
   try {
-    const gen = route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, options);
+    const gen = route.provider.streamChatCompletion(
+      route.apiKey,
+      messages,
+      route.modelId,
+      options,
+      quotaContextForRoute(route, 'messages'),
+    );
 
     for await (const chunk of gen) {
       if (ctx.clientGone()) break; // client hung up: stop pulling; reader.cancel() aborts upstream

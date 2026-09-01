@@ -284,7 +284,11 @@
     "disableAll": "전체 해제",
     "enableAllHint": "표시된 모델을 모두 켠 뒤 저장하세요",
     "disableAllHint": "표시된 모델을 모두 끈 뒤 저장하세요",
-    "enabledOfShown": "표시된 {shown}개 중 {enabled}개가 체인에 있습니다"
+    "enabledOfShown": "표시된 {shown}개 중 {enabled}개가 체인에 있습니다",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "미측정 모델 탐색",
@@ -564,6 +568,12 @@
     "modelScopeClear": "범위 지우기",
     "modelScopeBadgeOne": "제한됨 · 모델 1개",
     "modelScopeBadgeOther": "제한됨 · 모델 {count}개",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "이 키로 어떤 모델을 제공할까요?",
       "hint": "{provider} 키가 추가되었으며 현재 아래의 모든 모델에 사용됩니다. 이 키를 사용할 수 없는 모델은 체크를 해제하세요. 해당 모델에는 라우터가 이 키를 건너뜁니다.",

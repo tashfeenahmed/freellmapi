@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "I-explore ang mga hindi pa nasusukat na modelo",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Burahin ang saklaw",
     "modelScopeBadgeOne": "limitado · 1 modelo",
     "modelScopeBadgeOther": "limitado · {count} na modelo",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Aling mga modelo ang dapat pagsilbihan ng key na ito?",
       "hint": "Naidagdag na ang iyong {provider} key at kasalukuyan nitong pinagsisilbihan ang lahat ng modelo sa ibaba. Alisan ng tsek ang alinmang hindi pinapayagang gamitin ng key na ito — laktawan ito ng router para sa mga iyon.",

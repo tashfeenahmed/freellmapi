@@ -45,6 +45,18 @@ describe('provider-wide per-minute request cap', () => {
     expect(getProviderMinuteRequestCap('nvidia')).toBeNull();
   });
 
+  it('uses a per-account override ahead of provider defaults and env settings', () => {
+    process.env.PROVIDER_MINUTE_REQUEST_CAP_NVIDIA = '5';
+    const row = getDb().prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, provider_rpm_limit)
+      VALUES ('nvidia', 'account', 'x', 'x', 'x', 'healthy', 1, 12)
+    `).run();
+    const id = Number(row.lastInsertRowid);
+    expect(getProviderMinuteRequestCap('nvidia', id)).toBe(12);
+    getDb().prepare('UPDATE api_keys SET provider_rpm_limit = 0 WHERE id = ?').run(id);
+    expect(getProviderMinuteRequestCap('nvidia', id)).toBeNull();
+  });
+
   it('sums usage across every model on the same account+key', () => {
     const now = Date.now();
     // The whole point: three different models, one shared budget.

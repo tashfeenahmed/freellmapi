@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "کاوش مدل‌های اندازه‌گیری‌نشده",
@@ -564,6 +568,12 @@
     "modelScopeClear": "پاک کردن محدوده",
     "modelScopeBadgeOne": "محدود · 1 مدل",
     "modelScopeBadgeOther": "محدود · {count} مدل",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "این کلید به کدام مدل‌ها سرویس بدهد؟",
       "hint": "کلید {provider} شما اضافه شد و در حال حاضر به همه مدل‌های زیر سرویس می‌دهد. تیک هر مدلی را که این کلید اجازه استفاده از آن را ندارد بردارید — مسیریاب برای آن مدل‌ها از این کلید صرف‌نظر می‌کند.",

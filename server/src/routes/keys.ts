@@ -73,11 +73,15 @@ const addKeySchema = z.object({
 const updateKeySchema = z.object({
   enabled: z.boolean().optional(),
   label: z.string().optional(),
-  modelScope: z.array(z.string().trim().min(1).max(200)).max(100).nullable().optional(),
+  modelScope: z.array(z.string().trim().min(1).max(200)).max(500).nullable().optional(),
   // #590: '' clears the per-key proxy; absent leaves it unchanged.
   proxyUrl: proxyUrlSchema.optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined, {
-  message: 'At least one of enabled, label, modelScope or proxyUrl must be provided',
+  providerRpmLimit: z.number().int().min(0).nullable().optional(),
+  providerRpdLimit: z.number().int().min(0).nullable().optional(),
+  providerTpdLimit: z.number().int().min(0).nullable().optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined
+  || data.providerRpmLimit !== undefined || data.providerRpdLimit !== undefined || data.providerTpdLimit !== undefined, {
+  message: 'At least one key setting must be provided',
 });
 
 const importKeySchema = z.object({
@@ -326,6 +330,9 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       lastHealthError: row.last_health_error ?? null,
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
+      providerRpmLimit: row.provider_rpm_limit ?? null,
+      providerRpdLimit: row.provider_rpd_limit ?? null,
+      providerTpdLimit: row.provider_tpd_limit ?? null,
       // The per-key proxy override with its password masked (#590). '' = no
       // override. Enough for the dashboard to show that a key routes through
       // its own exit, without handing the proxy credentials back out.
@@ -1512,7 +1519,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, providerRpmLimit, providerRpdLimit, providerTpdLimit } = parsed.data;
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
 
@@ -1537,6 +1544,16 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     updates.push('model_scope_json = ?');
     values.push(scopeIds.length > 0 ? JSON.stringify(scopeIds) : null);
   }
+  for (const [column, value] of [
+    ['provider_rpm_limit', providerRpmLimit],
+    ['provider_rpd_limit', providerRpdLimit],
+    ['provider_tpd_limit', providerTpdLimit],
+  ] as const) {
+    if (value !== undefined) {
+      updates.push(`${column} = ?`);
+      values.push(value);
+    }
+  }
 
   values.push(id);
 
@@ -1553,5 +1570,8 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   if (label !== undefined) response.label = label;
   if (proxyUrl !== undefined) response.maskedProxyUrl = maskProxyUrl(proxyUrl);
   if (modelScope !== undefined) response.modelScope = scopeIds.length > 0 ? scopeIds : null;
+  if (providerRpmLimit !== undefined) response.providerRpmLimit = providerRpmLimit;
+  if (providerRpdLimit !== undefined) response.providerRpdLimit = providerRpdLimit;
+  if (providerTpdLimit !== undefined) response.providerTpdLimit = providerTpdLimit;
   res.json(response);
 });

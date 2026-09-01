@@ -148,6 +148,8 @@ describe('Anthropic-compatible /v1/messages', () => {
     db.prepare('DELETE FROM requests').run();
     db.prepare('DELETE FROM rate_limit_cooldowns').run();
     db.prepare('DELETE FROM rate_limit_usage').run();
+    db.prepare('DELETE FROM provider_quota_state').run();
+    db.prepare('DELETE FROM provider_quota_observations').run();
     db.prepare("DELETE FROM settings WHERE key = 'anthropic_model_map'").run();
     db.prepare(`
       INSERT INTO settings (key, value)
@@ -187,6 +189,41 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(body.usage).toEqual({ input_tokens: 11, output_tokens: 7 });
     expect(body.id).toMatch(/^msg_/);
     expect(headers.get('x-routed-via')).toMatch(/^groq\//);
+  });
+
+  it('attributes Anthropic quota observations to the actual credential and model pool', async () => {
+    const original = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (String(url).includes('api.groq.com/openai/v1/chat/completions')) {
+        return new Response(JSON.stringify(textCompletion('quota context')), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-ratelimit-limit-requests': '100',
+            'x-ratelimit-remaining-requests': '75',
+            'x-ratelimit-reset-requests': '60',
+          },
+        });
+      }
+      return original(url as any, init);
+    });
+
+    const { status } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, anthropicHeaders());
+    expect(status).toBe(200);
+
+    const key = getDb().prepare("SELECT id FROM api_keys WHERE platform = 'groq'").get() as { id: number };
+    const observation = getDb().prepare(`
+      SELECT key_id AS keyId, model_id AS modelId, quota_pool_key AS poolKey, endpoint
+        FROM provider_quota_observations
+       WHERE platform = 'groq' AND metric = 'requests'
+       ORDER BY created_at DESC LIMIT 1
+    `).get() as { keyId: number; modelId: string; poolKey: string; endpoint: string };
+    expect(observation.keyId).toBe(key.id);
+    expect(observation.poolKey).toBe(`groq::model::${observation.modelId}`);
+    expect(observation.endpoint).toBe('chat/completions');
   });
 
   it('forwards the system prompt and tools, returns a tool_use block (stop_reason tool_use)', async () => {

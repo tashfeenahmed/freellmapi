@@ -284,7 +284,11 @@
     "disableAll": "Nonaktifkan semua",
     "enableAllHint": "Aktifkan semua model yang tampil, lalu simpan",
     "disableAllHint": "Nonaktifkan semua model yang tampil, lalu simpan",
-    "enabledOfShown": "{enabled} dari {shown} model yang tampil ada di rantai"
+    "enabledOfShown": "{enabled} dari {shown} model yang tampil ada di rantai",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "Jelajahi model yang belum terukur",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Hapus cakupan",
     "modelScopeBadgeOne": "dibatasi · 1 model",
     "modelScopeBadgeOther": "dibatasi · {count} model",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Model mana saja yang boleh dilayani kunci ini?",
       "hint": "Kunci {provider} Anda telah ditambahkan dan saat ini melayani semua model di bawah. Hapus centang pada model yang tidak boleh dipakai kunci ini — router akan melewatinya untuk model tersebut.",

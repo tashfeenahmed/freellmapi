@@ -289,6 +289,11 @@ export interface ApiKey {
   /** Model ids this key is limited to; null = serves every model of its
    *  platform (#657). */
   modelScope?: string[] | null;
+  /** Per-account provider quota overrides. NULL inherits provider/env defaults;
+   *  zero explicitly disables that account-wide gate. */
+  providerRpmLimit?: number | null;
+  providerRpdLimit?: number | null;
+  providerTpdLimit?: number | null;
   models?: ApiKeyModel[];
   cooldowns?: ApiKeyCooldown[];
 }
@@ -525,6 +530,20 @@ export interface RateLimitStatus {
 export type QuotaMetric = 'requests' | 'tokens' | 'credits' | 'neurons';
 export type QuotaResetStrategy = 'fixed_calendar' | 'rolling_window' | 'token_bucket' | 'provider_reported' | 'unknown';
 export type QuotaObservationSource = 'header' | 'quota_api' | 'error_body' | 'local_usage' | 'documentation' | 'probe';
+export type QuotaScope = 'model' | 'account' | 'project' | 'shared_pool';
+export type QuotaAccounting = 'metered' | 'unknown' | 'unmetered';
+export type QuotaResetPeriod = 'minute' | 'day' | 'month';
+
+/** Describes the resource an endpoint consumes. Scope and accounting are
+ * deliberately separate: an account can be unmetered, and a shared pool can
+ * have unknown capacity. */
+export interface QuotaPolicy {
+  poolKey: string;
+  scope: QuotaScope;
+  accounting: QuotaAccounting;
+  metrics: QuotaMetric[];
+  reset: { strategy: QuotaResetStrategy; period?: QuotaResetPeriod };
+}
 
 export interface ProviderQuotaState {
   platform: Platform;

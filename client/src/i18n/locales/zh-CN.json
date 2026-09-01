@@ -284,7 +284,11 @@
     "disableAll": "全部停用",
     "enableAllHint": "启用所有显示的模型，然后保存",
     "disableAllHint": "停用所有显示的模型，然后保存",
-    "enabledOfShown": "显示的 {shown} 个模型中有 {enabled} 个在链中"
+    "enabledOfShown": "显示的 {shown} 个模型中有 {enabled} 个在链中",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "探索未测模型",
@@ -568,6 +572,12 @@
     "modelScopeClear": "清除范围",
     "modelScopeBadgeOne": "限定 · 1 个模型",
     "modelScopeBadgeOther": "限定 · {count} 个模型",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "此密钥应服务哪些模型？",
       "hint": "您的 {provider} 密钥已添加，目前可服务下方全部模型。请取消勾选此密钥不可使用的模型——路由器会为这些模型跳过此密钥。",

@@ -284,7 +284,11 @@
     "disableAll": "Disable all",
     "enableAllHint": "Turn on every model shown, then Save",
     "disableAllHint": "Turn off every model shown, then Save",
-    "enabledOfShown": "{enabled} of {shown} shown models are in the chain"
+    "enabledOfShown": "{enabled} of {shown} shown models are in the chain",
+    "providerRouting": "Provider routing",
+    "providerRoutingDescription": "Automatic uses live routing scores. Preferred order tries your list first while retaining health, quota, cooldown and failover protections.",
+    "providerRoutingAutomatic": "Automatic",
+    "providerRoutingPreferred": "Preferred order"
   },
   "strategies": {
     "explore": "O'lchanmagan modellarni o'rganish",
@@ -564,6 +568,12 @@
     "modelScopeClear": "Doirani tozalash",
     "modelScopeBadgeOne": "cheklangan · 1 model",
     "modelScopeBadgeOther": "cheklangan · {count} model",
+    "catalogLoadFailed": "Could not load the curated model catalog.",
+    "liveModelsFallback": "No curated rows are available for this provider, so these models come from its live API.",
+    "providerAccountLimits": "Provider account limits",
+    "providerAccountLimitsHint": "Blank inherits the provider default. Zero disables that account-wide gate.",
+    "accountLimits": "account limits",
+    "modelsAndAccountLimits": "Models & account limits",
     "modelPicker": {
       "title": "Bu kalit qaysi modellarga xizmat qilsin?",
       "hint": "{provider} kalitingiz qo‘shildi va hozirda quyidagi barcha modellarga xizmat qilmoqda. Bu kalitdan foydalanishga ruxsat berilmagan modellardan belgini olib tashlang — router ular uchun bu kalitni o‘tkazib yuboradi.",
