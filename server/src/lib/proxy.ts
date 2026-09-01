@@ -1,8 +1,11 @@
 import http from 'http';
 import https from 'https';
+import { execFileSync } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getSetting } from '../db/index.js';
+import { decrypt, encrypt } from './crypto.js';
 import { assertProviderUrlAllowed, isLoopbackOrPrivateHostname } from './url-guard.js';
+import type { ProxyMode } from '@freellmapi/shared/types.js';
 
 // #590 (per-key proxy): the SAME provider may be reached through different
 // exit IPs per key (geo-ban / risk-control avoidance). Providers are process
@@ -46,6 +49,36 @@ const SOCKS_SCHEMES = ['socks5:', 'socks5h:', 'socks4:', 'socks4a:'] as const;
 
 /** Every proxy scheme the app accepts. Shared with the settings validator. */
 export const PROXY_SCHEMES: readonly string[] = ['http:', 'https:', ...SOCKS_SCHEMES];
+export const PROXY_MODES: readonly ProxyMode[] = ['forward', 'fetch-relay'];
+export const FETCH_RELAY_TARGET_HEADER = 'fetch-relay-target';
+export const FETCH_RELAY_AUTH_HEADER = 'fetch-relay-authorization';
+
+// A Fetch Relay carries the provider API key AND the relay token inside the
+// request it forwards, so the hop to the relay must be encrypted. Plain http
+// is only tolerable when the relay never leaves the machine.
+const LOOPBACK_RELAY_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/** True for a hostname that cannot leave the local machine. `new URL()` keeps
+ *  the brackets on an IPv6 literal, hence both spellings of ::1. */
+export function isLoopbackRelayHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return LOOPBACK_RELAY_HOSTNAMES.has(host) || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+}
+
+/** Why a URL cannot serve as a Fetch Relay endpoint, or undefined when it can.
+ *  Shared by the settings validator and the boot-time env guard so the
+ *  dashboard and a headless install agree on what a usable relay looks like. */
+export function fetchRelayUrlError(url: string): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'Invalid Fetch Relay URL. Use a full URL like https://relay.example.workers.dev';
+  }
+  if (parsed.protocol === 'https:') return undefined;
+  if (parsed.protocol === 'http:' && isLoopbackRelayHostname(parsed.hostname)) return undefined;
+  return 'Fetch Relay URL must use https, or http only for a loopback relay. The provider API key and the relay token travel inside the relayed request.';
+}
 
 /** True when the URL names a SOCKS scheme (so it needs SocksProxyAgent, not undici). */
 export function isSocksProxyUrl(url: string): boolean {
@@ -54,9 +87,18 @@ export function isSocksProxyUrl(url: string): boolean {
   return (SOCKS_SCHEMES as readonly string[]).includes(url.slice(0, colon + 1).toLowerCase());
 }
 
-/** Strip any `user:pass@` userinfo so a proxy URL is safe to log. */
+/** Reduce a proxy/relay URL to a safe connection hint. Relay paths commonly
+ * act as bearer secrets, while query strings may contain target templates or
+ * credentials, so neither is safe to print. */
 function redactProxyUrl(url: string): string {
-  return url.replace(/\/\/[^@/]*@/, '//***@');
+  try {
+    const parsed = new URL(url);
+    const credentials = parsed.username || parsed.password ? '***@' : '';
+    const path = parsed.pathname && parsed.pathname !== '/' ? '/[redacted]' : '';
+    return `${parsed.protocol}//${credentials}${parsed.host}${path}`;
+  } catch {
+    return '[invalid proxy URL]';
+  }
 }
 
 // Standard proxy env vars, in the order they are consulted. PROXY_URL is the
@@ -90,7 +132,88 @@ function resolveProxySource(dbValue: string): { url: string; source: string } {
     const value = readEnv(name);
     if (value) return { url: value, source: name };
   }
+
+  // #353: last resort — read the system-wide proxy settings (macOS System
+  // Settings / Windows Internet Options / GNOME desktop) so the app works
+  // without duplicating the OS config. Best-effort: every failure here just
+  // falls through to the direct (no-proxy) path.
+  const system = detectSystemProxy();
+  if (system.url) return system;
   return { url: '', source: 'none' };
+}
+
+/**
+ * Read the OS-wide proxy configuration. Synchronous and best-effort: never
+ * throws, returns '' when the platform is unsupported or the command fails.
+ *
+ * - macOS: `scutil --proxy` (System Settings → Network → Proxies)
+ * - Windows: Internet Options registry (ProxyEnable + ProxyServer)
+ * - Linux: GNOME gsettings (the most common desktop), manual mode only
+ */
+export function detectSystemProxy(): { url: string; source: string } {
+  try {
+    if (process.platform === 'darwin') {
+      const out = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 2000 });
+      return parseScutilProxy(out);
+    }
+    if (process.platform === 'win32') {
+      const enable = execFileSync(
+        'reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyEnable'],
+        { encoding: 'utf8', timeout: 2000 },
+      );
+      const server = execFileSync(
+        'reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyServer'],
+        { encoding: 'utf8', timeout: 2000 },
+      );
+      return parseRegProxy(enable, server);
+    }
+    if (process.platform === 'linux') {
+      return parseGsettingsProxy();
+    }
+  } catch {
+    // fall through to no-proxy
+  }
+  return { url: '', source: 'none' };
+}
+
+/** Parse `scutil --proxy` output: HTTPEnable/HTTPProxy/HTTPPort first, then SOCKS. */
+export function parseScutilProxy(out: string): { url: string; source: string } {
+  const kv = (key: string) => out.match(new RegExp(`^\\s*${key}\\s*:\\s*(.+)$`, 'm'))?.[1]?.trim();
+  const httpEnabled = kv('HTTPEnable') === '1';
+  const httpHost = kv('HTTPProxy');
+  const httpPort = kv('HTTPPort') || '80';
+  if (httpEnabled && httpHost) {
+    return { url: `${httpHost}:${httpPort}`, source: 'system(macOS)' };
+  }
+  const socksEnabled = kv('SOCKSEnable') === '1';
+  const socksHost = kv('SOCKSProxy');
+  const socksPort = kv('SOCKSPort') || '1080';
+  if (socksEnabled && socksHost) {
+    return { url: `socks5://${socksHost}:${socksPort}`, source: 'system(macOS)' };
+  }
+  return { url: '', source: 'none' };
+}
+
+/** Parse Windows registry output; ProxyServer may be "host:port" or "http=…;https=…". */
+export function parseRegProxy(enableOut: string, serverOut: string): { url: string; source: string } {
+  // reg query prints: `    ProxyEnable    REG_DWORD    0x1`
+  if (!/ProxyEnable\s+REG_DWORD\s+0x1/.test(enableOut)) return { url: '', source: 'none' };
+  const m = serverOut.match(/ProxyServer\s+REG_SZ\s+(.+)$/m);
+  if (!m) return { url: '', source: 'none' };
+  const raw = m[1].trim();
+  const http = raw.split(';').find(p => p.startsWith('http='))?.slice('http='.length) ?? raw;
+  if (!http) return { url: '', source: 'none' };
+  return { url: http, source: 'system(Windows)' };
+}
+
+/** GNOME desktop proxy in manual mode (gsettings). */
+function parseGsettingsProxy(): { url: string; source: string } {
+  const mode = execFileSync('gsettings', ['get', 'org.gnome.system.proxy', 'mode'], { encoding: 'utf8', timeout: 2000 }).trim();
+  if (mode !== "'manual'") return { url: '', source: 'none' };
+  const host = execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'host'], { encoding: 'utf8', timeout: 2000 }).trim().replace(/^'|'$/g, '');
+  const port = execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'port'], { encoding: 'utf8', timeout: 2000 }).trim();
+  if (!host || !port) return { url: '', source: 'none' };
+  return { url: `${host}:${port}`, source: 'system(GNOME)' };
 }
 
 /**
@@ -129,6 +252,9 @@ function noProxyMatches(hostname: string): boolean {
 
 // Module-level proxy URL.
 let _proxyUrl = '';
+let _proxyUrlSource = 'none';
+let _proxyMode: ProxyMode = 'forward';
+let _fetchRelayToken = '';
 let _proxyEnabled = true;
 let _bypassPlatforms = new Set<string>();
 let _noProxyRules: string[] = [];
@@ -180,6 +306,10 @@ function rememberPerKeyDispatcher(proxyUrl: string, entry: { dispatcher: unknown
 export function applyProxyUrl(dbValue: string): void {
   const { url, source } = resolveProxySource(dbValue);
   _proxyUrl = url;
+  _proxyUrlSource = source;
+  // A saved relay mode must never reinterpret legacy/ambient proxy variables.
+  // PROXY_MODE is the only way an environment-sourced URL becomes a relay.
+  if (source !== 'dashboard' && !readEnv('PROXY_MODE')) _proxyMode = 'forward';
   _noProxyRules = parseNoProxy(readEnv('NO_PROXY'));
   _proxyLocalDestinations = /^(1|true|yes)$/i.test(readEnv('FREEAPI_PROXY_LOCAL_DESTINATIONS'));
   cached = null;
@@ -194,7 +324,29 @@ export function applyProxyUrl(dbValue: string): void {
   } else {
     console.log('[proxy] Not configured — outbound requests go direct.');
   }
+  enforceRelayUrlPolicy();
   _initialized = true;
+}
+
+/**
+ * Refuse to run a relay over a URL it cannot speak. A relay hop is an ordinary
+ * HTTP request, so a socks5:// (or otherwise non-HTTP) endpoint would fail
+ * every provider call at runtime with an opaque error. Say so once at boot and
+ * degrade to a forward proxy, which is what such a URL was always good for. A
+ * plaintext relay to a remote host does work, but leaks the provider key and
+ * the relay token it carries, so that one only earns a warning.
+ */
+function enforceRelayUrlPolicy(): void {
+  if (_proxyMode !== 'fetch-relay' || !_proxyUrl) return;
+  let protocol = '';
+  try { protocol = new URL(_proxyUrl).protocol; } catch { /* handled below */ }
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    console.warn(`[proxy] fetch-relay mode needs an http(s) relay URL; ${redactProxyUrl(_proxyUrl)} is not one. Falling back to a forward proxy.`);
+    _proxyMode = 'forward';
+    return;
+  }
+  const error = fetchRelayUrlError(_proxyUrl);
+  if (error) console.warn(`[proxy] ${error}`);
 }
 
 /**
@@ -209,12 +361,59 @@ export function applyProxyUrl(dbValue: string): void {
  */
 export function restoreProxySettings(): void {
   applyProxyUrl(getSetting('proxy_url') ?? '');
+  applyProxyMode(getSetting('proxy_mode') ?? 'forward');
+  applyFetchRelayToken(decodeFetchRelayToken(getSetting('fetch_relay_token') ?? ''));
   applyProxyEnabled(getSetting('proxy_enabled') !== '0'); // default: enabled
   applyProxyBypass(getSetting('proxy_bypass') ?? '');
 }
 
 export function getProxyUrl(): string {
   return _proxyUrl;
+}
+
+/** Set how the global proxy URL is used. An explicit PROXY_MODE wins. A legacy
+ * PROXY_URL (or an ambient standard proxy variable) without PROXY_MODE always
+ * stays a forward proxy, regardless of a saved dashboard mode. */
+export function applyProxyMode(dbValue: string): void {
+  const envMode = readEnv('PROXY_MODE');
+  const candidate = envMode || (_proxyUrlSource === 'dashboard' ? dbValue.trim() : 'forward');
+  _proxyMode = candidate === 'fetch-relay' ? 'fetch-relay' : 'forward';
+  enforceRelayUrlPolicy();
+}
+
+export function getProxyMode(): ProxyMode {
+  return _proxyMode;
+}
+
+/** Set the bearer token used only to authenticate FreeLLMAPI to a Fetch Relay.
+ * The environment wins so headless deployments never expose or overwrite it
+ * through the dashboard. This token is separate from the provider's
+ * Authorization header, which is preserved for the upstream request. */
+export function applyFetchRelayToken(dbValue: string): void {
+  _fetchRelayToken = readEnv('FETCH_RELAY_TOKEN') || dbValue.trim();
+}
+
+export function getFetchRelayToken(): string {
+  return _fetchRelayToken;
+}
+
+/** Encrypt the dashboard-saved Relay credential at rest. The environment form
+ * never enters the database. */
+export function encodeFetchRelayToken(value: string): string {
+  const trimmed = value.trim();
+  return trimmed ? JSON.stringify(encrypt(trimmed)) : '';
+}
+
+function decodeFetchRelayToken(value: string): string {
+  if (!value) return '';
+  try {
+    const parsed = JSON.parse(value) as { encrypted?: string; iv?: string; authTag?: string };
+    if (!parsed.encrypted || !parsed.iv || !parsed.authTag) return '';
+    return decrypt(parsed.encrypted, parsed.iv, parsed.authTag);
+  } catch {
+    console.warn('[proxy] Saved Fetch Relay token could not be decrypted; configure it again.');
+    return '';
+  }
 }
 
 /** Toggle the proxy on/off without losing the URL. */
@@ -648,6 +847,10 @@ async function dispatchFetch(
     return fetch(url, init);
   }
 
+  if (_proxyMode === 'fetch-relay' && _proxyUrl) {
+    return fetchRelayFetch(_proxyUrl, url, init, _fetchRelayToken);
+  }
+
   const resolved = await resolveDispatcher();
 
   // No dispatcher (no proxy URL configured, or it failed to build) → direct
@@ -662,6 +865,38 @@ async function dispatchFetch(
 
   // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
   return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+}
+
+/** Send an application-layer HTTP request through a user-controlled fetch
+ * relay. The original body remains a stream/body object and the returned
+ * Response is passed through untouched, so neither direction is buffered.
+ * Redirects from the relay are deliberately exposed to the caller: following
+ * one here could silently turn a relayed request into a direct request. */
+async function fetchRelayFetch(
+  relayUrl: string,
+  targetUrl: string,
+  init: RequestInit | undefined,
+  relayToken: string,
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+
+  // These describe the provider connection and must be recalculated for the
+  // relay connection. The relay reference implementation removes the target
+  // header before calling the provider.
+  headers.delete('host');
+  headers.delete('content-length');
+  headers.set(FETCH_RELAY_TARGET_HEADER, targetUrl);
+  // Always overwrite caller-supplied Relay control headers. They belong to
+  // this hop and must not let an upstream request choose another target or
+  // credential. An empty token supports deliberately unauthenticated relays.
+  if (relayToken) headers.set(FETCH_RELAY_AUTH_HEADER, `Bearer ${relayToken}`);
+  else headers.delete(FETCH_RELAY_AUTH_HEADER);
+
+  return fetch(relayUrl, {
+    ...init,
+    headers,
+    redirect: 'manual',
+  });
 }
 
 /** Build (and TTL-cache) a dispatcher for a per-key proxy URL. Returns
@@ -775,7 +1010,7 @@ export const DEFAULT_PROXY_PROBE_TARGET = 'https://www.cloudflare.com/cdn-cgi/tr
  */
 export async function probeProxyUrl(
   proxyUrl: string | undefined,
-  options: { targetUrl?: string; timeoutMs?: number } = {},
+  options: { targetUrl?: string; timeoutMs?: number; mode?: ProxyMode; relayToken?: string } = {},
 ): Promise<ProxyProbeResult> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const started = Date.now();
@@ -784,10 +1019,17 @@ export async function probeProxyUrl(
   // routes/settings.ts); the constant is only the no-providers fallback.
   const target = (options.targetUrl ?? '').trim() || DEFAULT_PROXY_PROBE_TARGET;
 
+  const relayMode = Boolean(url) && (options.mode ?? getProxyMode()) === 'fetch-relay';
+
   try {
     let response: Response;
     if (!url) {
       response = await fetch(target, { signal: AbortSignal.timeout(timeoutMs) });
+    } else if (relayMode) {
+      response = await fetchRelayFetch(url, target, {
+        method: 'GET',
+        signal: AbortSignal.timeout(timeoutMs),
+      }, options.relayToken ?? getFetchRelayToken());
     } else {
       const resolved = await resolvePerKeyDispatcher(url);
       if (!resolved) {
@@ -799,8 +1041,23 @@ export async function probeProxyUrl(
         response = await fetch(target, { ...{ signal: AbortSignal.timeout(timeoutMs) }, dispatcher: resolved.dispatcher } as unknown as RequestInit);
       }
     }
-    // Any HTTP response proves the proxy route works; the upstream may still
-    // answer 401/403 without a key, which is connectivity, not proxy failure.
+    // A relay answers on the same connection it forwards over, so a 401/403
+    // here is far more likely to be the relay refusing our token than the
+    // provider refusing a key we never sent. Reporting that as a pass is what
+    // makes a misconfigured token look like a working relay, so fail it and
+    // name the hop. A provider that genuinely answers 401 through a good relay
+    // is the rare false negative, and the reason still points at the token.
+    if (relayMode && (response.status === 401 || response.status === 403)) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - started,
+        status: response.status,
+        target,
+        error: `relay rejected the token (${response.status})`,
+      };
+    }
+    // Any other HTTP response proves the proxy route works; the upstream may
+    // still answer 4xx without a key, which is connectivity, not proxy failure.
     return { ok: true, latencyMs: Date.now() - started, status: response.status, target };
   } catch (err: any) {
     return { ok: false, latencyMs: Date.now() - started, target, error: err?.message ?? String(err) };

@@ -413,6 +413,68 @@ describe('OpenAICompatProvider', () => {
     });
   });
 
+  it('strips assistant reasoning_content before sending messages to Groq (#1070)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const groq = new OpenAICompatProvider({ platform: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' });
+    await groq.chatCompletion(
+      'k',
+      [{
+        role: 'assistant',
+        content: 'replayed turn',
+        reasoning_content: 'private chain from a prior thinking turn',
+      }],
+      'llama-3.3-70b-versatile',
+    );
+
+    // Groq is strict about unknown fields: reasoning_content must NOT reach the wire.
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'replayed turn' });
+  });
+
+  it('strips assistant reasoning_content before sending messages to Cerebras (#1070)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const cerebras = new OpenAICompatProvider({ platform: 'cerebras', name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1' });
+    await cerebras.chatCompletion(
+      'k',
+      [{
+        role: 'assistant',
+        content: 'replayed turn',
+        reasoning_content: 'private chain from a prior thinking turn',
+      }],
+      'zai-glm-4.7',
+    );
+
+    // Cerebras is strict about unknown fields: reasoning_content must NOT reach
+    // the wire (verified: 400 wrong_api_format 'property ... reasoning_content
+    // is unsupported', see vercel/ai#15042 / opencode#26762).
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'replayed turn' });
+  });
+
   it('folds reasoning into content when content is empty (Ollama style — bare `reasoning` field)', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,

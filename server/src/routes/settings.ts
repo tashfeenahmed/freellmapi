@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getUnifiedApiKey, regenerateUnifiedKey, getSetting, setSetting, getDb } from '../db/index.js';
-import { applyProxyUrl, applyProxyEnabled, applyProxyBypass, isProxyActive, getProxyUrl, isProxyEnabled, getProxyBypassPlatforms, probeProxyUrl, DEFAULT_PROXY_PROBE_TARGET, PROXY_SCHEMES } from '../lib/proxy.js';
+import { applyProxyUrl, applyProxyMode, applyProxyEnabled, applyProxyBypass, applyFetchRelayToken, encodeFetchRelayToken, isProxyActive, getProxyUrl, getProxyMode, getFetchRelayToken, isProxyEnabled, getProxyBypassPlatforms, probeProxyUrl, fetchRelayUrlError, DEFAULT_PROXY_PROBE_TARGET, PROXY_MODES, PROXY_SCHEMES } from '../lib/proxy.js';
 import { getProvider } from '../providers/index.js';
 import type { Platform } from '@freellmapi/shared/types.js';
+import type { ProxyMode } from '@freellmapi/shared/types.js';
 import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, getFusionMaxK } from '../services/fusion.js';
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
@@ -351,46 +352,84 @@ settingsRouter.post('/api-key/regenerate', (_req: Request, res: Response) => {
 settingsRouter.get('/proxy', (_req: Request, res: Response) => {
   res.json({
     proxyUrl: getProxyUrl(),
+    proxyMode: getProxyMode(),
+    fetchRelayTokenConfigured: Boolean(getFetchRelayToken()),
     enabled: isProxyEnabled(),
     bypassPlatforms: getProxyBypassPlatforms(),
     active: isProxyActive(),
   });
 });
 
-// Set the proxy settings. Accepts partial updates: proxyUrl, enabled, bypassPlatforms.
+// A forward proxy only tunnels the TLS session, so plain http to the proxy is
+// fine. A relay is the opposite: the provider API key and the relay token ride
+// inside the request it forwards, in the clear, so the hop to the relay has to
+// be https unless the relay is on this machine. fetchRelayUrlError owns that
+// rule and the boot-time env guard applies the same one.
+function proxyUrlError(proxyUrl: string, proxyMode: ProxyMode): string | undefined {
+  if (!proxyUrl) return undefined;
+  if (proxyMode === 'fetch-relay') return fetchRelayUrlError(proxyUrl);
+  try {
+    const protocol = new URL(proxyUrl).protocol;
+    if (!PROXY_SCHEMES.includes(protocol)) {
+      return 'Proxy URL must use http, https, socks5, socks5h, socks4, or socks4a scheme';
+    }
+  } catch {
+    return 'Invalid proxy URL — must be a valid URL like socks5://host:port';
+  }
+  return undefined;
+}
+
+// Set the proxy settings. Accepts partial updates.
 settingsRouter.put('/proxy', (req: Request, res: Response) => {
-  const { proxyUrl, enabled, bypassPlatforms } = req.body as {
+  const { proxyUrl, proxyMode, fetchRelayToken, enabled, bypassPlatforms } = req.body as {
     proxyUrl?: string;
+    proxyMode?: ProxyMode;
+    fetchRelayToken?: string;
     enabled?: boolean;
     bypassPlatforms?: string[];
   };
 
+  if (proxyMode !== undefined && !PROXY_MODES.includes(proxyMode)) {
+    res.status(400).json({
+      error: { message: 'Proxy mode must be forward or fetch-relay', type: 'invalid_request_error' },
+    });
+    return;
+  }
+
+  // Only validate the URL when this request actually decides it. A body that
+  // touches neither proxyUrl nor proxyMode — the enabled switch, the
+  // per-platform bypass list — must not 400 on an ambient ALL_PROXY value the
+  // dashboard never set and cannot fix (getProxyUrl may return exactly that).
+  if (typeof proxyUrl === 'string' || proxyMode !== undefined) {
+    const nextMode = proxyMode ?? getProxyMode();
+    const nextUrl = typeof proxyUrl === 'string' ? proxyUrl.trim() : getProxyUrl();
+    const urlError = proxyUrlError(nextUrl, nextMode);
+    if (urlError) {
+      res.status(400).json({ error: { message: urlError, type: 'invalid_request_error' } });
+      return;
+    }
+  }
+
   // --- proxyUrl ---
   if (typeof proxyUrl === 'string') {
     const trimmed = proxyUrl.trim();
-    if (trimmed) {
-      try {
-        const u = new URL(trimmed);
-        if (!PROXY_SCHEMES.includes(u.protocol)) {
-          res.status(400).json({
-            error: {
-              message: 'Proxy URL must use http, https, socks5, socks5h, socks4, or socks4a scheme',
-              type: 'invalid_request_error',
-            },
-          });
-          return;
-        }
-      } catch {
-        res.status(400).json({
-          error: { message: 'Invalid proxy URL — must be a valid URL like socks5://host:port', type: 'invalid_request_error' },
-        });
-        return;
-      }
-      setSetting('proxy_url', trimmed);
-    } else {
-      setSetting('proxy_url', '');
-    }
+    setSetting('proxy_url', trimmed);
     applyProxyUrl(trimmed);
+  }
+
+  // --- proxyMode ---
+  if (proxyMode !== undefined) {
+    setSetting('proxy_mode', proxyMode);
+    applyProxyMode(proxyMode);
+  }
+
+  // --- fetchRelayToken ---
+  // Never return this value from the API. Undefined retains the saved token;
+  // an explicit empty string clears it.
+  if (typeof fetchRelayToken === 'string') {
+    const trimmed = fetchRelayToken.trim();
+    setSetting('fetch_relay_token', encodeFetchRelayToken(trimmed));
+    applyFetchRelayToken(trimmed);
   }
 
   // --- enabled ---
@@ -408,6 +447,8 @@ settingsRouter.put('/proxy', (req: Request, res: Response) => {
 
   res.json({
     proxyUrl: getProxyUrl(),
+    proxyMode: getProxyMode(),
+    fetchRelayTokenConfigured: Boolean(getFetchRelayToken()),
     enabled: isProxyEnabled(),
     bypassPlatforms: getProxyBypassPlatforms(),
     active: isProxyActive(),
@@ -458,7 +499,28 @@ function proxyProbeTarget(): string {
 }
 
 settingsRouter.post('/proxy/test', async (req: Request, res: Response) => {
-  const { proxyUrl } = (req.body ?? {}) as { proxyUrl?: string };
-  const result = await probeProxyUrl(proxyUrl, { targetUrl: proxyProbeTarget() });
+  const { proxyUrl, proxyMode, fetchRelayToken } = (req.body ?? {}) as {
+    proxyUrl?: string;
+    proxyMode?: ProxyMode;
+    fetchRelayToken?: string;
+  };
+  if (proxyMode !== undefined && !PROXY_MODES.includes(proxyMode)) {
+    res.status(400).json({ error: { message: 'Proxy mode must be forward or fetch-relay', type: 'invalid_request_error' } });
+    return;
+  }
+  const mode = proxyMode ?? getProxyMode();
+  const url = (proxyUrl ?? '').trim() || getProxyUrl();
+  const urlError = proxyUrlError(url, mode);
+  if (urlError) {
+    res.status(400).json({ error: { message: urlError, type: 'invalid_request_error' } });
+    return;
+  }
+  const result = await probeProxyUrl(proxyUrl, {
+    targetUrl: proxyProbeTarget(),
+    mode,
+    relayToken: typeof fetchRelayToken === 'string' && fetchRelayToken.trim()
+      ? fetchRelayToken.trim()
+      : getFetchRelayToken(),
+  });
   res.json(result);
 });

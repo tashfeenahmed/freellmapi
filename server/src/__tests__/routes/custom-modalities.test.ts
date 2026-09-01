@@ -363,4 +363,54 @@ describe('custom provider modalities', () => {
     ).get() as any;
     expect(row.display_name).toBe('My Voice');
   });
+
+  it('classifies mixed ids posted to /api/keys/custom into the right tables (#1051)', async () => {
+    const fetchMock = vi.fn(async () => embeddingResponse(4));
+    globalThis.fetch = fetchMock as any;
+
+    const { status, body } = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:8484/v1',
+      apiKey: 'mix-secret',
+      models: [
+        'glm-chat-mini',
+        'stable-diffusion-3-5-large',
+        'whisper-large-v3',
+        'CosyVoice2-0.5B',
+        'Wan2.2-T2V-A14B',
+        'nomic-embed-mini',
+      ],
+    });
+
+    expect(status).toBe(201);
+    // Only the chat model lands in the chat table.
+    const chatIds = (getDb().prepare("SELECT model_id FROM models WHERE platform = 'custom'").all() as any[])
+      .map(r => r.model_id).sort();
+    expect(chatIds).toEqual(['glm-chat-mini']);
+    // Media ids land in media_models with the inferred modality.
+    const mediaRows = (getDb().prepare("SELECT model_id, modality FROM media_models WHERE platform = 'custom'").all() as any[])
+      .map(r => `${r.modality}:${r.model_id}`).sort();
+    expect(mediaRows).toEqual([
+      'audio:CosyVoice2-0.5B',
+      'image:stable-diffusion-3-5-large',
+      'transcription:whisper-large-v3',
+    ]);
+    // The embedding id is probed and lands in embedding_models.
+    const embedRow = getDb().prepare("SELECT dimensions FROM embedding_models WHERE platform = 'custom' AND model_id = 'nomic-embed-mini'").get() as any;
+    expect(embedRow?.dimensions).toBe(4);
+    // Video has no custom serving path: reported, never registered.
+    expect(body.videoSkipped).toEqual(['Wan2.2-T2V-A14B']);
+    expect(body.created).toBe(5);
+  });
+
+  it('an explicit capability flag keeps a media-looking id in the chat table (#1051)', async () => {
+    const { status } = await post(app, '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:8585/v1',
+      apiKey: 'override-secret',
+      models: [{ model: 'my-sd-chat-relay', supportsTools: true }],
+    });
+    expect(status).toBe(201);
+    const row = getDb().prepare("SELECT model_id FROM models WHERE platform = 'custom' AND model_id = 'my-sd-chat-relay'").get();
+    expect(row).toBeTruthy();
+    expect(getDb().prepare("SELECT 1 FROM media_models WHERE model_id = 'my-sd-chat-relay'").get()).toBeUndefined();
+  });
 });

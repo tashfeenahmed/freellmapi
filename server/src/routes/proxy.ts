@@ -22,6 +22,7 @@ import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModel
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
+import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
@@ -193,6 +194,11 @@ function rememberReasoning(sessionKey: string | undefined, modelKey: string, rea
 // The remembered trace for this session, or undefined when there is none, it
 // expired, or it came from a different model than the one about to be called.
 // An expired entry is dropped on read rather than left for the size sweep.
+export function clearReasoningMemory() {
+  reasoningMemory.clear();
+  stickySessionMap.clear();
+}
+
 function rememberedReasoningFor(sessionKey: string, modelKey: string): string | undefined {
   if (!sessionKey) return undefined;
   const entry = reasoningMemory.get(sessionKey);
@@ -1779,6 +1785,50 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
   }
 
+  // ── Idempotency-Key (services/idempotency.ts) ──
+  // Optional caller-scoped dedup for NON-streaming requests: a client that
+  // times out and retries with the same Idempotency-Key gets the ORIGINAL
+  // response replayed (zero provider cost) instead of burning a second
+  // free-tier slot. Only a SHA-256 hash of the key is stored. Reusing a key
+  // with different request content is a 409 conflict. Streaming always
+  // bypasses (like the response cache) — a stream cannot be replayed as a
+  // unit, and the open connection is itself the retry signal.
+  const idemKeyRaw = req.headers['idempotency-key'] ?? req.headers['Idempotency-Key'];
+  const idemKey = !stream ? normalizeIdempotencyKey(idemKeyRaw) : null;
+  const idemFingerprint = idemKey
+    ? computeIdempotencyFingerprint({
+        model: requestedModel,
+        messages,
+        temperature,
+        top_p,
+        max_tokens,
+        tools,
+        tool_choice,
+      })
+    : null;
+  if (idemKey && idemFingerprint) {
+    const keyHash = hashIdempotencyKey(idemKey);
+    const claim = lookupIdempotencyReplay(keyHash, idemFingerprint);
+    if (claim.kind === 'replay') {
+      // Replay consumes NO provider quota — same zero-cost rationale as a
+      // cache hit, so request/usage bookkeeping is skipped here too.
+      res.setHeader('X-Routed-Via', 'idempotency');
+      res.status(claim.status).json(claim.body);
+      return;
+    }
+    if (claim.kind === 'conflict') {
+      res.status(409).json({
+        error: {
+          message: 'idempotency_key_conflict',
+          type: 'invalid_request_error',
+        },
+      });
+      return;
+    }
+    // kind === 'miss': no prior claim (or it expired) — proceed normally
+    // and persist the result on success below.
+  }
+
   // Optional client-managed session affinity (see getSessionKey). Express
   // lower-cases header names; a repeated header arrives as an array — take
   // the first value.
@@ -2294,12 +2344,47 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             ? 'tool_calls'
             : (upstreamFinish && upstreamFinish !== 'tool_calls' ? upstreamFinish : 'stop');
           writeChunk(mkChunk({}, finish));
-          if (usageChunk) writeChunk(usageChunk);
+          // One prompt-token estimate for both the injected usage frame below
+          // and the accounting fallback after it, so a client that reads the
+          // frame and the row this request writes can never disagree. Images
+          // are billed at the same flat per-image estimate the routing budget
+          // uses (the chars/4 pass sees text only).
+          const estimatedPromptTokens = estimatedInputTokens + injectedHandoffTokens + imageCount * IMAGE_TOKEN_ESTIMATE;
+          if (usageChunk) {
+            writeChunk(usageChunk);
+          } else if (parsed.data.stream_options?.include_usage) {
+            // Some OpenAI-compatible upstreams (e.g. OpenCode Zen) never echo
+            // a final usage frame even when stream_options.include_usage is
+            // requested. Strict clients (Hermes, Cline, Continue) treat a
+            // missing usage block as "no accounting happened" and skip
+            // per-call token/cost/billing_provider writes entirely.
+            //
+            // Injected ONLY when the client asked for usage via
+            // stream_options.include_usage AND the upstream never sent one;
+            // the numbers are this gateway's own chars/4 estimate (the same
+            // total the accounting below records), never the upstream's
+            // accounting, so the block is flagged `estimated: true` rather
+            // than passed off as real counts.
+            const completionTokens = totalOutputTokens;
+            writeChunk({
+              id: lastMeta.id ?? `chatcmpl-${Date.now()}`,
+              object: 'chat.completion.chunk',
+              created: lastMeta.created ?? Math.floor(Date.now() / 1000),
+              model: lastMeta.model ?? route.modelId,
+              choices: [],
+              usage: {
+                prompt_tokens: estimatedPromptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: estimatedPromptTokens + completionTokens,
+                estimated: true,
+              },
+            });
+          }
           res.write('data: [DONE]\n\n');
           res.end();
 
           const upstreamUsage = (usageChunk as { usage?: TokenUsage } | null)?.usage;
-          const inputTokens = upstreamUsage?.prompt_tokens ?? (estimatedInputTokens + injectedHandoffTokens);
+          const inputTokens = upstreamUsage?.prompt_tokens ?? estimatedPromptTokens;
           const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const totalTokens = upstreamUsage?.total_tokens ?? (inputTokens + outputTokens);
           recordUpstreamSuccess(route, totalTokens);
@@ -2511,6 +2596,25 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Normalize array-shaped message.content to a string on the way out (#166).
         const outboundBody = sanitizeResponse(normalizeOutboundContent(result));
         res.setHeader('X-FreeLLM-Cache', cacheKey ? 'MISS' : 'OFF');
+
+        // Persist the completed response for Idempotency-Key replays. Only
+        // non-streaming requests with a valid key reach here; a truncated turn
+        // (finish_reason 'length') is NOT stored — replaying a cut-off answer
+        // would be worse than regenerating, matching the cache policy below.
+        if (
+          idemKey
+          && idemFingerprint
+          && result.choices?.[0]?.finish_reason !== 'length'
+        ) {
+          storeIdempotencyResult(
+            hashIdempotencyKey(idemKey),
+            idemFingerprint,
+            200,
+            outboundBody,
+            requestGroupId,
+          );
+        }
+
         res.json(outboundBody);
 
         // Cache the freshly-generated answer so an identical later request is

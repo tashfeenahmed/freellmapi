@@ -189,9 +189,24 @@ function orderProfileRows(rows: any[]): any[] {
 }
 
 // Get fallback chain (with dynamic penalties)
-fallbackRouter.get('/', (_req: Request, res: Response) => {
+fallbackRouter.get('/', (req: Request, res: Response) => {
   const db = getDb();
-  const activeProfileId = getActiveProfileId(db);
+  // #1047: an explicit ?profile= pins the read to that chain, so a client
+  // caching per-chain can never have "the active chain, whichever that is right
+  // now" written into a specific chain's cache entry. During an activation the
+  // active id changes between the client's two fetches; that race is how chain
+  // B's rows ended up rendered (and nearly saved) under chain A's name.
+  let activeProfileId = getActiveProfileId(db);
+  const requestedRaw = req.query.profile;
+  if (requestedRaw !== undefined) {
+    const requested = Number.parseInt(String(requestedRaw), 10);
+    if (!Number.isInteger(requested) || requested <= 0
+      || !db.prepare('SELECT 1 FROM profiles WHERE id = ?').get(requested)) {
+      res.status(404).json({ error: { message: `no such profile: ${String(requestedRaw)}` } });
+      return;
+    }
+    activeProfileId = requested;
+  }
   // `fallback_config` is the chain only for an install that has no profiles at
   // all. Once one is active it is authoritative even when it is empty — falling
   // through to the global table there is what made two different empty chains

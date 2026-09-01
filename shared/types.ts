@@ -1,5 +1,9 @@
 // ---- Platform & Model Types ----
 
+/** How the global outbound proxy URL is interpreted. Per-key proxies always
+ * use the traditional forward-proxy transport. */
+export type ProxyMode = 'forward' | 'fetch-relay';
+
 /** A model declared beside a custom endpoint in an import file (#382). A
  *  capability flag is present only when the paste declared it via a trailing
  *  -TOOLS / -VISION suffix. */

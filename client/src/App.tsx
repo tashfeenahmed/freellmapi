@@ -47,6 +47,12 @@ import AgentsPage from '@/pages/AgentsPage'
 // silently. A page that already shows the failure inline can opt out with
 // `meta: { silenceToast: true }` on the mutation.
 const queryClient = new QueryClient({
+  // A short staleTime dedupes the mount storm (#1047): the Models page alone
+  // mounts ~13 queries, several of them the same endpoint from different
+  // components, and staleTime 0 refetched every one of them on every
+  // navigation and window focus. Pollers use refetchInterval and mutations
+  // invalidate explicitly, so nothing user-visible goes stale.
+  defaultOptions: { queries: { staleTime: 5_000 } },
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
       if (mutation.meta?.silenceToast) return
