@@ -712,7 +712,9 @@
     "attemptTimingHint": "自请求开始的偏移 · 尝试耗时",
     "requestedModel": "请求的模型",
     "ttft": "首个词元用时",
-    "requestsByAgent": "按智能体统计的请求"
+    "requestsByAgent": "按智能体统计的请求",
+    "sortBy": "按{column}排序",
+    "sortHint": "排序仅作用于已加载的 {count} 行"
   },
   "logs": {
     "title": "日志",

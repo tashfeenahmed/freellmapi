@@ -712,7 +712,9 @@
     "attemptTimingHint": "Startforskyvning fra forespørselsstart · Forsøksvarighet",
     "requestedModel": "Etterspurt modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Forespørsler per agent"
+    "requestsByAgent": "Forespørsler per agent",
+    "sortBy": "Sorter etter {column}",
+    "sortHint": "Sorteringen gjelder de {count} innlastede radene"
   },
   "logs": {
     "title": "Logg",

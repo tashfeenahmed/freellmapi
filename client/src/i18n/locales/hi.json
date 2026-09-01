@@ -712,7 +712,9 @@
     "attemptTimingHint": "अनुरोध प्रारंभ · प्रयास अवधि से प्रारंभ ऑफसेट",
     "requestedModel": "अनुरोधित मॉडल",
     "ttft": "TTFT",
-    "requestsByAgent": "एजेंट के अनुसार अनुरोध"
+    "requestsByAgent": "एजेंट के अनुसार अनुरोध",
+    "sortBy": "{column} के अनुसार क्रमबद्ध करें",
+    "sortHint": "क्रमबद्धता केवल लोड की गई {count} पंक्तियों पर लागू होती है"
   },
   "logs": {
     "title": "लॉग",

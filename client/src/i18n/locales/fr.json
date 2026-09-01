@@ -712,7 +712,9 @@
     "attemptTimingHint": "Décalage depuis le début de la requête · durée de la tentative",
     "requestedModel": "Modèle demandé",
     "ttft": "TTFT",
-    "requestsByAgent": "Requêtes par agent"
+    "requestsByAgent": "Requêtes par agent",
+    "sortBy": "Trier par {column}",
+    "sortHint": "Le tri s'applique aux {count} lignes chargées"
   },
   "logs": {
     "title": "Journaux",

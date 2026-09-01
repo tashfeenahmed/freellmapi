@@ -712,7 +712,9 @@
     "attemptTimingHint": "Offset dall'inizio della richiesta · durata del tentativo",
     "requestedModel": "Modello richiesto",
     "ttft": "TTFT",
-    "requestsByAgent": "Richieste per agente"
+    "requestsByAgent": "Richieste per agente",
+    "sortBy": "Ordina per {column}",
+    "sortHint": "L'ordinamento si applica alle {count} righe caricate"
   },
   "logs": {
     "title": "Log",

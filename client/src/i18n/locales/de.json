@@ -712,7 +712,9 @@
     "attemptTimingHint": "Startoffset vom Anforderungsstart · Versuchsdauer",
     "requestedModel": "Angefragtes Modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Anfragen nach Agent"
+    "requestsByAgent": "Anfragen nach Agent",
+    "sortBy": "Nach {column} sortieren",
+    "sortHint": "Die Sortierung gilt für die {count} geladenen Zeilen"
   },
   "logs": {
     "title": "Protokoll",

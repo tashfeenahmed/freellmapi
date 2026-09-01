@@ -712,7 +712,9 @@
     "attemptTimingHint": "So'rov boshlanishidan boshlab ofsetni boshlash · urinish davomiyligi",
     "requestedModel": "So'ralgan model",
     "ttft": "TTFT",
-    "requestsByAgent": "Agent bo'yicha so'rovlar"
+    "requestsByAgent": "Agent bo'yicha so'rovlar",
+    "sortBy": "{column} bo‘yicha saralash",
+    "sortHint": "Saralash faqat yuklangan {count} ta qatorga qo‘llanadi"
   },
   "logs": {
     "title": "Jurnal",

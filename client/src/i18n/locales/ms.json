@@ -712,7 +712,9 @@
     "attemptTimingHint": "Offset mula dari permintaan mula · tempoh cubaan",
     "requestedModel": "Model yang diminta",
     "ttft": "TTFT",
-    "requestsByAgent": "Permintaan mengikut ejen"
+    "requestsByAgent": "Permintaan mengikut ejen",
+    "sortBy": "Isih mengikut {column}",
+    "sortHint": "Pengisihan hanya digunakan pada {count} baris yang dimuatkan"
   },
   "logs": {
     "title": "Log",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "Изместване на старта от заявката за старт · Продължителност на опита",
     "requestedModel": "Поискан модел",
     "ttft": "TTFT",
-    "requestsByAgent": "Заявки по агент"
+    "requestsByAgent": "Заявки по агент",
+    "sortBy": "Сортиране по {column}",
+    "sortHint": "Сортирането се прилага за {count} заредени реда"
   },
   "logs": {
     "title": "Логове",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "İstek başlangıcından itibaren başlangıç dengelemesi · deneme süresi",
     "requestedModel": "İstenilen model",
     "ttft": "TTFT",
-    "requestsByAgent": "Ajan başına istekler"
+    "requestsByAgent": "Ajan başına istekler",
+    "sortBy": "{column} ölçütüne göre sırala",
+    "sortHint": "Sıralama yalnızca yüklenen {count} satıra uygulanır"
   },
   "logs": {
     "title": "Günlükler",

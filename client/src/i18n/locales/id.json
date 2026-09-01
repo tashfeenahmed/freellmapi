@@ -712,7 +712,9 @@
     "attemptTimingHint": "Mulai offset dari awal permintaan · durasi upaya",
     "requestedModel": "Model yang diminta",
     "ttft": "TTFT",
-    "requestsByAgent": "Permintaan per agen"
+    "requestsByAgent": "Permintaan per agen",
+    "sortBy": "Urutkan berdasarkan {column}",
+    "sortHint": "Pengurutan berlaku untuk {count} baris yang dimuat"
   },
   "logs": {
     "title": "Log",

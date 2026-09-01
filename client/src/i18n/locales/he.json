@@ -712,7 +712,9 @@
     "attemptTimingHint": "התחל הזזה מהבקשה · משך הניסיון",
     "requestedModel": "מודל מבוקש",
     "ttft": "TTFT",
-    "requestsByAgent": "בקשות לפי סוכן"
+    "requestsByAgent": "בקשות לפי סוכן",
+    "sortBy": "מיון לפי {column}",
+    "sortHint": "המיון חל על {count} השורות שנטענו בלבד"
   },
   "logs": {
     "title": "יומן",

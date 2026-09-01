@@ -712,7 +712,9 @@
     "attemptTimingHint": "Aloita siirtymä pyynnön alusta · Yrityksen kesto",
     "requestedModel": "Pyydetty malli",
     "ttft": "TTFT",
-    "requestsByAgent": "Pyynnöt agenteittain"
+    "requestsByAgent": "Pyynnöt agenteittain",
+    "sortBy": "Lajittele: {column}",
+    "sortHint": "Lajittelu koskee vain ladattuja {count} riviä"
   },
   "logs": {
     "title": "Lokit",

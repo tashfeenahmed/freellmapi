@@ -712,7 +712,9 @@
     "attemptTimingHint": "ਬੇਨਤੀ ਸ਼ੁਰੂ ਤੋਂ ਔਫਸੈੱਟ ਸ਼ੁਰੂ ਕਰੋ · ਕੋਸ਼ਿਸ਼ ਦੀ ਮਿਆਦ",
     "requestedModel": "ਮਾਡਲ ਦੀ ਮੰਗ ਕੀਤੀ",
     "ttft": "TTFT",
-    "requestsByAgent": "ਏਜੰਟ ਦੁਆਰਾ ਬੇਨਤੀਆਂ"
+    "requestsByAgent": "ਏਜੰਟ ਦੁਆਰਾ ਬੇਨਤੀਆਂ",
+    "sortBy": "{column} ਅਨੁਸਾਰ ਕ੍ਰਮਬੱਧ ਕਰੋ",
+    "sortHint": "ਕ੍ਰਮਬੱਧਤਾ ਸਿਰਫ਼ ਲੋਡ ਕੀਤੀਆਂ {count} ਕਤਾਰਾਂ 'ਤੇ ਲਾਗੂ ਹੁੰਦੀ ਹੈ"
   },
   "logs": {
     "title": "ਲੌਗ",

@@ -745,7 +745,9 @@
     "keyBadge": "Key #{n}",
     "attemptTimingHint": "Start offset from request start · attempt duration",
     "requestedModel": "Requested model",
-    "ttft": "TTFT"
+    "ttft": "TTFT",
+    "sortBy": "Sort by {column}",
+    "sortHint": "Sorting applies to the {count} loaded rows"
   },
   "logs": {
     "title": "Logs",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "Przesunięcie początku od początku żądania · czas trwania próby",
     "requestedModel": "Żądany model",
     "ttft": "TTFT",
-    "requestsByAgent": "Żądania według agenta"
+    "requestsByAgent": "Żądania według agenta",
+    "sortBy": "Sortuj według: {column}",
+    "sortHint": "Sortowanie dotyczy {count} załadowanych wierszy"
   },
   "logs": {
     "title": "Logi",

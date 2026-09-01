@@ -712,7 +712,9 @@
     "attemptTimingHint": "A kérelmű elejétől kezdj el · Próbálkozás időtartama",
     "requestedModel": "Kért modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Kérések ügynökönként"
+    "requestsByAgent": "Kérések ügynökönként",
+    "sortBy": "Rendezés: {column}",
+    "sortHint": "A rendezés a betöltött {count} sorra vonatkozik"
   },
   "logs": {
     "title": "Napló",

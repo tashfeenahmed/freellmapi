@@ -712,7 +712,9 @@
     "attemptTimingHint": "Deslocamento desde o início da requisição · duração da tentativa",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Solicitações por agente"
+    "requestsByAgent": "Solicitações por agente",
+    "sortBy": "Ordenar por {column}",
+    "sortHint": "A ordenação se aplica às {count} linhas carregadas"
   },
   "logs": {
     "title": "Logs",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "Bắt đầu bù đắp từ khi bắt đầu yêu cầu · thời gian thử",
     "requestedModel": "Mô hình được yêu cầu",
     "ttft": "TTFT",
-    "requestsByAgent": "Yêu cầu theo tác nhân"
+    "requestsByAgent": "Yêu cầu theo tác nhân",
+    "sortBy": "Sắp xếp theo {column}",
+    "sortHint": "Sắp xếp chỉ áp dụng cho {count} hàng đã tải"
   },
   "logs": {
     "title": "Nhật ký",

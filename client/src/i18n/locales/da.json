@@ -712,7 +712,9 @@
     "attemptTimingHint": "Startforskydning fra anmodningsstart · Forsøgsvarighed",
     "requestedModel": "Efterspurgt model",
     "ttft": "TTFT",
-    "requestsByAgent": "Anmodninger pr. agent"
+    "requestsByAgent": "Anmodninger pr. agent",
+    "sortBy": "Sortér efter {column}",
+    "sortHint": "Sorteringen gælder de {count} indlæste rækker"
   },
   "logs": {
     "title": "Log",

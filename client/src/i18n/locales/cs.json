@@ -712,7 +712,9 @@
     "attemptTimingHint": "Začít offset od začátku požadavku · Doba trvání pokusu",
     "requestedModel": "Požadovaný model",
     "ttft": "TTFT",
-    "requestsByAgent": "Požadavky podle agenta"
+    "requestsByAgent": "Požadavky podle agenta",
+    "sortBy": "Seřadit podle: {column}",
+    "sortHint": "Řazení se vztahuje na {count} načtených řádků"
   },
   "logs": {
     "title": "Logy",

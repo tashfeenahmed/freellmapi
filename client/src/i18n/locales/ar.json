@@ -712,7 +712,9 @@
     "attemptTimingHint": "بداية الإزاحة من بداية الطلب · مدة المحاولة",
     "requestedModel": "النموذج المطلوب",
     "ttft": "TTFT",
-    "requestsByAgent": "الطلبات حسب الوكيل"
+    "requestsByAgent": "الطلبات حسب الوكيل",
+    "sortBy": "ترتيب حسب {column}",
+    "sortHint": "يُطبَّق الترتيب على الصفوف المحمَّلة البالغ عددها {count}"
   },
   "logs": {
     "title": "السجلات",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "リクエスト開始からの開始オフセット · 試行期間",
     "requestedModel": "要求されたモデル",
     "ttft": "TTFT",
-    "requestsByAgent": "エージェント別リクエスト"
+    "requestsByAgent": "エージェント別リクエスト",
+    "sortBy": "{column}で並べ替え",
+    "sortHint": "並べ替えは読み込み済みの {count} 行にのみ適用されます"
   },
   "logs": {
     "title": "ログ",

@@ -712,7 +712,9 @@
     "attemptTimingHint": "Malite nkwụsị site na mmalite arịrịọ · Ogologo oge nwaa",
     "requestedModel": "Ihe nlereanya achọrọ",
     "ttft": "TTFT",
-    "requestsByAgent": "Arịrịọ site na ejenti"
+    "requestsByAgent": "Arịrịọ site na ejenti",
+    "sortBy": "Hazie site na {column}",
+    "sortHint": "Nhazi ahụ metụtara naanị ahịrị {count} ebugoro"
   },
   "logs": {
     "title": "Ndekọ",

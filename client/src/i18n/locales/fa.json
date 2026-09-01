@@ -712,7 +712,9 @@
     "attemptTimingHint": "شروع افست از شروع درخواست · مدت زمان تلاش",
     "requestedModel": "مدل درخواستی",
     "ttft": "TTFT",
-    "requestsByAgent": "درخواستها بر اساس عامل"
+    "requestsByAgent": "درخواستها بر اساس عامل",
+    "sortBy": "مرتب‌سازی بر اساس {column}",
+    "sortHint": "مرتب‌سازی فقط روی {count} ردیف بارگذاری‌شده اعمال می‌شود"
   },
   "logs": {
     "title": "لاگ‌ها",

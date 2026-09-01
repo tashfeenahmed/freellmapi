@@ -712,7 +712,9 @@
     "attemptTimingHint": "Fara biya daga farkon buƙatun · lokacin ƙoƙarin",
     "requestedModel": "Samfurin da ake nema",
     "ttft": "Saukewa: TTFT",
-    "requestsByAgent": "Bukatu ta kowane wakili"
+    "requestsByAgent": "Bukatu ta kowane wakili",
+    "sortBy": "Tsara bisa {column}",
+    "sortHint": "Tsarawar ta shafi layuka {count} da aka ɗora kawai"
   },
   "logs": {
     "title": "Logs",

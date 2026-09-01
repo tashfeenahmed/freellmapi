@@ -712,7 +712,9 @@
     "attemptTimingHint": "विनंती पासून ऑफसेट सुरू करा प्रारंभ · प्रयत्न कालावधी",
     "requestedModel": "मॉडेलची विनंती केली",
     "ttft": "TTFT",
-    "requestsByAgent": "एजंटनुसार विनंत्या"
+    "requestsByAgent": "एजंटनुसार विनंत्या",
+    "sortBy": "{column} नुसार क्रमवारी लावा",
+    "sortHint": "क्रमवारी फक्त लोड केलेल्या {count} ओळींना लागू होते"
   },
   "logs": {
     "title": "लॉग",

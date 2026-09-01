@@ -712,7 +712,9 @@
     "attemptTimingHint": "Desfase desde el inicio de la solicitud · duración del intento",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Solicitudes por agente"
+    "requestsByAgent": "Solicitudes por agente",
+    "sortBy": "Ordenar por {column}",
+    "sortHint": "La ordenación se aplica a las {count} filas cargadas"
   },
   "logs": {
     "title": "Registros",

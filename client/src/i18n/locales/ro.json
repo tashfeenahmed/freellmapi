@@ -712,7 +712,9 @@
     "attemptTimingHint": "Start offset față de începutul cererii · Durata încercării",
     "requestedModel": "Modelul cerut",
     "ttft": "TTFT",
-    "requestsByAgent": "Cereri per agent"
+    "requestsByAgent": "Cereri per agent",
+    "sortBy": "Sortează după {column}",
+    "sortHint": "Sortarea se aplică celor {count} rânduri încărcate"
   },
   "logs": {
     "title": "Jurnale",

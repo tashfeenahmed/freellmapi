@@ -712,7 +712,9 @@
     "attemptTimingHint": "เริ่มต้นออฟเซ็ตจากคำขอเริ่มต้น · ระยะเวลาความพยายาม",
     "requestedModel": "รุ่นที่ขอ",
     "ttft": "TTFT",
-    "requestsByAgent": "คำขอตามเอเจนต์"
+    "requestsByAgent": "คำขอตามเอเจนต์",
+    "sortBy": "เรียงตาม{column}",
+    "sortHint": "การเรียงลำดับใช้กับ {count} แถวที่โหลดแล้วเท่านั้น"
   },
   "logs": {
     "title": "บันทึก",
