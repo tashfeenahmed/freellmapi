@@ -13,8 +13,11 @@
 //     replayed for later requests with the same key + fingerprint — zero
 //     provider cost, mirroring what the response cache does for exact-match
 //     hits, but scoped per caller (key) instead of per request content.
-//   - A duplicate arriving while the original request is still running is
-//     rejected with 409 idempotency_request_in_progress.
+//   - A duplicate that arrives while the original request is still running is
+//     NOT deduplicated: only completed responses are claimed, so both attempts
+//     execute. Guarding the in-flight window needs a pending-claim state with
+//     its own (short) TTL so a crash cannot wedge a key for a day; that is
+//     deliberately out of scope here.
 //
 // Storage is the idempotency_claims table (see db/migrations). All writes are
 // guarded so a DB failure degrades to "no idempotency" rather than throwing in
