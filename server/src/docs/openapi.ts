@@ -171,6 +171,37 @@ export const openapiSpec = {
         },
       },
     },
+    '/v1/videos/generations': {
+      post: {
+        tags: ['Media'],
+        operationId: 'createVideo',
+        summary: 'Generate video',
+        description:
+          'Text-to-video generation routed through the dedicated video catalog. Omit `model` (or set ' +
+          '`auto`) to fail over across configured providers. The completed video is returned as MP4 bytes; ' +
+          'provider-specific options that are unsupported by the selected model are ignored.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/VideoRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'The generated video.',
+            content: {
+              'video/mp4': { schema: { type: 'string', format: 'binary' } },
+            },
+          },
+          '400': { $ref: '#/components/responses/BadRequest' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '429': { $ref: '#/components/responses/RateLimited' },
+          '502': { $ref: '#/components/responses/UpstreamError' },
+        },
+      },
+    },
     '/v1/audio/speech': {
       post: {
         tags: ['Media'],
@@ -871,6 +902,24 @@ export const openapiSpec = {
           },
           model: { type: 'string' },
           provider: { type: 'string' },
+        },
+      },
+      VideoRequest: {
+        type: 'object',
+        required: ['prompt'],
+        properties: {
+          model: { type: 'string', default: 'auto' },
+          prompt: { type: 'string', minLength: 1 },
+          duration: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 120,
+            description: 'Requested duration in seconds. Supported values are model-specific; nova-reel accepts multiples of 6.',
+          },
+          aspect_ratio: { type: 'string', enum: ['16:9', '9:16'] },
+          image: { type: 'string', format: 'uri', description: 'Optional starting-frame image URL.' },
+          seed: { type: 'integer', minimum: -1, maximum: 2147483647 },
+          audio: { type: 'boolean', description: 'Request generated audio when the selected model supports it.' },
         },
       },
       SpeechRequest: {

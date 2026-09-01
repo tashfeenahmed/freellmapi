@@ -40,6 +40,8 @@ const analyticsIds: Record<string, string> = {
   roo: 'roo',
   kilo: 'kilo-code',
   crush: 'crush',
+  dsh: 'deepseek-harness',
+  mimo: 'mimo-code',
   cursor: 'cursor',
 }
 
@@ -112,13 +114,21 @@ export default function AgentsPage() {
           // locale-independent.
           const realConnection = `BASE_URL=${endpoint}\nAPI_KEY=${keyData?.apiKey ?? '<unified-key>'}`
           const shownConnection = `BASE_URL=${endpoint}\nAPI_KEY=${shownKey}`
+          // What the tool actually is, in one plain sentence. `t` echoes the
+          // key back when neither the active locale nor English defines it, so
+          // a catalog entry added ahead of its copy falls back to the wire
+          // details rather than printing a dotted key at the reader.
+          const descriptionKey = `agents.descriptions.${tool.id}`
+          const description = t(descriptionKey)
           return (
             <Card key={tool.id} size="sm">
               <CardHeader>
                 <AgentIcon id={tool.id} name={tool.name} className="mb-1.5" />
                 <CardTitle>{tool.name}</CardTitle>
                 <CardDescription className="text-xs">
-                  {tool.protocol} · {tool.baseUrlSupport}
+                  {description === descriptionKey
+                    ? `${tool.protocol} · ${tool.baseUrlSupport}`
+                    : description}
                 </CardDescription>
                 <CardAction>
                   {traffic && (

@@ -87,6 +87,37 @@ describe('response cache', () => {
         .not.toBe(computeCacheKey({ model: 'auto', messages, temperature: 0.9 }));
     });
 
+    // Explicit-but-default-valued sampling params must NOT change the key: a
+    // client that always serializes top_p:1 / n:1 / presence_penalty:0 /
+    // frequency_penalty:0 must hit the same entry as one that omits them.
+    it('ignores explicit default-valued sampling params', () => {
+      const messages = [msg('user', 'hello')];
+      const minimal = computeCacheKey({ model: 'auto', messages, temperature: 0.2 });
+      const verbose = computeCacheKey({
+        model: 'auto',
+        messages,
+        temperature: 0.2,
+        top_p: 1,
+        presence_penalty: 0,
+        frequency_penalty: 0,
+        n: 1,
+      });
+      expect(verbose).toBe(minimal);
+    });
+
+    it('still keys non-default sampling param values', () => {
+      const messages = [msg('user', 'hello')];
+      const baseline = computeCacheKey({ model: 'auto', messages, temperature: 0.2 });
+      expect(computeCacheKey({ model: 'auto', messages, temperature: 0.2, top_p: 0.9 }))
+        .not.toBe(baseline);
+      expect(computeCacheKey({ model: 'auto', messages, temperature: 0.2, presence_penalty: 0.5 }))
+        .not.toBe(baseline);
+      expect(computeCacheKey({ model: 'auto', messages, temperature: 0.2, frequency_penalty: 0.5 }))
+        .not.toBe(baseline);
+      expect(computeCacheKey({ model: 'auto', messages, temperature: 0.2, n: 2 }))
+        .not.toBe(baseline);
+    });
+
     it('distinguishes a pinned model from auto', () => {
       const messages = [msg('user', 'hello')];
       expect(computeCacheKey({ model: 'gpt-oss-120b', messages }))

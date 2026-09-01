@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Tray, Menu, app, nativeImage } from 'electron';
 import { togglePopover } from './popover.js';
 import { openDashboard } from './window.js';
+import { openLogsFolder, openBackupsFolder } from './logger.js';
 import { dt, type NativeLocale } from './i18n.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,12 @@ export function buildTray(
       { type: 'separator' },
       // Toggling relaunches the app (the bind host is fixed at server start).
       { label: dt(locale, 'lanAccess'), type: 'checkbox', checked: lanOn, click: () => onToggleLanAccess() },
+      // #824: the password-reset code is printed to the log and nowhere else,
+      // so the folder holding it needs to be reachable without a terminal.
+      { label: dt(locale, 'openLogs'), click: () => openLogsFolder() },
+      // Scheduled/manual backups land in <userData>/backups; the dashboard
+      // only shows relative paths, so the tray is the discovery point.
+      { label: dt(locale, 'openBackups'), click: () => openBackupsFolder() },
       { type: 'separator' },
       { label: dt(locale, 'quitApp'), click: () => app.quit() },
     ]));

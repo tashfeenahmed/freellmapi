@@ -31,9 +31,14 @@ function seedModels() {
   `);
   insert.run('cloudflare', 'flux-1-schnell', 'FLUX.1 [schnell]', 'image', 1, 1, 'Shared 10k neurons/day');
   insert.run('pollinations', 'turbo', 'Turbo', 'image', 2, 1, '1024x1024 - 40 req/min free');
+  insert.run('pollinations', 'nova-reel', 'Nova Reel', 'video', 1, 1, 'Recurring daily Pollen refill');
   insert.run('groq', 'playai-tts', 'PlayAI TTS', 'audio', 1, 1, 'WAV/PCM - 30+ voices');
   // Disabled rows stay out of the summary entirely.
   insert.run('cloudflare', 'melotts', 'MeloTTS', 'audio', 2, 0, 'Shared 10k neurons/day');
+  // STT models live in the same table with modality='transcription'; the
+  // Audio tab lists them under the TTS section, so the usage summary has to
+  // accept the modality too (it used to 400).
+  insert.run('groq', 'whisper-large-v3', 'Whisper Large v3', 'transcription', 1, 1, 'MP3 output - multilingual');
 }
 
 function seedRequest(platform: string, modelId: string, type: string, when: string) {
@@ -56,7 +61,7 @@ describe('GET /api/media/usage', () => {
 
   it('rejects a missing or unknown modality', async () => {
     expect((await get(app, '/api/media/usage')).status).toBe(400);
-    expect((await get(app, '/api/media/usage?modality=video')).status).toBe(400);
+    expect((await get(app, '/api/media/usage?modality=not-real')).status).toBe(400);
   });
 
   it('counts this month\'s requests per model and separates today', async () => {
@@ -83,9 +88,11 @@ describe('GET /api/media/usage', () => {
 
   it('scopes to one modality and skips disabled rows', async () => {
     const image = await get(app, '/api/media/usage?modality=image');
+    const video = await get(app, '/api/media/usage?modality=video');
     const audio = await get(app, '/api/media/usage?modality=audio');
 
     expect(image.body.models.map((m: any) => m.modelId).sort()).toEqual(['flux-1-schnell', 'turbo']);
+    expect(video.body.models.map((m: any) => m.modelId)).toEqual(['nova-reel']);
     // MeloTTS is disabled, so only PlayAI is reported.
     expect(audio.body.models.map((m: any) => m.modelId)).toEqual(['playai-tts']);
   });
@@ -100,6 +107,27 @@ describe('GET /api/media/usage', () => {
     const { body } = await get(app, '/api/media/usage?modality=image');
     const flux = body.models.find((m: any) => m.modelId === 'flux-1-schnell');
     expect(flux.requestsMonth).toBe(0);
+  });
+
+  it('reports transcription usage from the same tagged request log', async () => {
+    seedRequest('groq', 'whisper-large-v3', 'transcription', "datetime('now')");
+    seedRequest('groq', 'whisper-large-v3', 'transcription', "datetime('now', 'start of month')");
+    // Same provider AND model id, but TTS traffic: the join must exclude it by
+    // request_type, not just by platform + model_id.
+    seedRequest('groq', 'whisper-large-v3', 'audio', "datetime('now')");
+
+    const { status, body } = await get(app, '/api/media/usage?modality=transcription');
+    expect(status).toBe(200);
+    expect(body.modality).toBe('transcription');
+    expect(body.models.map((m: any) => m.modelId)).toEqual(['whisper-large-v3']);
+
+    const whisper = body.models[0];
+    // Exactly the two transcription requests — the audio one is filtered out
+    // by request_type even though it shares platform and model id.
+    expect(whisper.requestsMonth).toBe(2);
+    expect(whisper.requestsToday).toBeGreaterThanOrEqual(1);
+    expect(whisper.quotaLabel).toBe('MP3 output - multilingual');
+    expect(body.totalRequestsMonth).toBe(2);
   });
 
   it('reports no budget field — media quota labels are not token budgets', async () => {

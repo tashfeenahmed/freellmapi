@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { app, dialog, ipcMain, clipboard, nativeTheme, shell } from 'electron';
 import { startServer, ensureSessionToken, getUnifiedApiKey } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
+import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale } from './tray.js';
 import { openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
@@ -20,6 +21,11 @@ app.setPath('userData', path.join(app.getPath('appData'), 'FreeLLMAPI'));
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  // Before anything else can print: a packaged app has no attached stdout, so
+  // without this the server's console output — the password-reset code above
+  // all (#824) — is written nowhere the user can read it.
+  installFileLogger();
+
   let resolvedPort = DEFAULT_PORT;
   let sessionToken = '';
   // The dashboard owns the theme (its Settings dialog); the popover and the

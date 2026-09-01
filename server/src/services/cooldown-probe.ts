@@ -35,6 +35,7 @@ import {
   type ProbeableCooldown,
 } from './ratelimit.js';
 import { probeKeyValidity, type KeyProbeOutcome } from './health.js';
+import { providerLog } from '../lib/server-logs.js';
 
 // How often the scanner wakes up to look at the cooldown table. Scanning is one
 // cheap indexed SELECT; actual probes are gated far harder below.
@@ -162,9 +163,13 @@ export async function runCooldownProbePass(opts: ProbePassOptions = {}): Promise
         clearedCooldowns++;
       }
       keyState.delete(keyId);
-      console.log(
+      // Structured so the dashboard log viewer can filter recoveries by
+      // provider; providerLog still writes the same line to stdout.
+      providerLog(
+        'info',
         `[CooldownProbe] key ${keyId} validated — cleared ${cooldownsForKey.length} cooldown(s) early ` +
         `(${cooldownsForKey.map(c => `${c.platform}/${c.modelId}`).join(', ')})`,
+        { provider: cooldownsForKey[0]?.platform, event: 'cooldown_recovered' },
       );
     } else {
       // Failed or inconclusive: the bench stays EXACTLY as it was — a probe

@@ -34,6 +34,21 @@ describe('client agent classification', () => {
     expect(classifyClientAgent(request('/v1/chat/completions', {
       'user-agent': 'crush/0.8',
     }))).toBe('crush');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'deepseek-harness/0.3.1 (+https://github.com/deepseek-ai/deepseek-harness)',
+    }))).toBe('deepseek-harness');
+  });
+
+  it('separates MiMo Code from the OpenCode it derives from', () => {
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'mimo/0.4.0',
+    }))).toBe('mimo-code');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'MiMo-Code/0.4.0 (opencode)',
+    }))).toBe('mimo-code');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'opencode/1.2.3',
+    }))).toBe('opencode');
   });
 
   it('recognizes Claude Code by its real claude-cli user agent', () => {

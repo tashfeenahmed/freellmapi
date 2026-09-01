@@ -182,11 +182,11 @@ function normModel(model: string | undefined): string {
 
 export function computeCacheKey(input: CacheKeyInput): string {
   const canonical = stableStringify({
-    v: 3, // compression fingerprint joined the key
+    v: 4, // explicit-but-default-valued sampling params dropped from the key
     model: normModel(input.model),
     messages: input.messages,
     temperature: input.temperature,
-    top_p: input.top_p,
+    top_p: defaultableNumber(input.top_p, 1),
     max_tokens: input.max_tokens,
     // tools/tool_choice are part of the key so a request with a different tool
     // set never collides with (or is served) another's cached answer.
@@ -196,10 +196,10 @@ export function computeCacheKey(input: CacheKeyInput): string {
     // by stableStringify, so requests without them keep hashing identically.
     stop: input.stop,
     response_format: input.response_format,
-    n: input.n,
+    n: defaultableNumber(input.n, 1),
     seed: input.seed,
-    presence_penalty: input.presence_penalty,
-    frequency_penalty: input.frequency_penalty,
+    presence_penalty: defaultableNumber(input.presence_penalty, 0),
+    frequency_penalty: defaultableNumber(input.frequency_penalty, 0),
     logit_bias: input.logit_bias,
     logprobs: input.logprobs,
     top_logprobs: input.top_logprobs,
@@ -209,6 +209,21 @@ export function computeCacheKey(input: CacheKeyInput): string {
     compression: input.compression,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
+// Normalizes a sampling param that was passed explicitly but equals the API
+// default down to undefined (stableStringify drops undefined), so a client that
+// always serializes the full param set shares a cache entry with one that omits
+// the defaults. Without this, top_p:1 / n:1 / presence_penalty:0 /
+// frequency_penalty:0 make two otherwise identical requests hash to different
+// keys and miss each other. Non-numbers (null, strings, absent) pass through
+// unchanged so existing behaviour is preserved.
+function defaultableNumber(value: unknown, defaultValue: number): unknown {
+  if (typeof value === 'number') {
+    if (value === defaultValue) return undefined;
+    return value;
+  }
+  return value;
 }
 
 // ── Store ──

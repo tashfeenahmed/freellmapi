@@ -25,7 +25,7 @@ function fakeRoute(overrides: Partial<RouteResult> = {}): RouteResult {
   const n = ++keySeq;
   return {
     provider: {} as any, modelId: 'fake-model', modelDbId: 787000 + n, apiKey: 'k',
-    keyId: n, platform: 'fake', displayName: 'Fake Model',
+    keyId: n, keyLabel: null, platform: 'fake', displayName: 'Fake Model',
     rpdLimit: null, tpdLimit: null,
     ...overrides,
   };
@@ -51,6 +51,7 @@ interface AttemptRow {
   platform: string;
   model_id: string;
   key_ordinal: number;
+  key_label: string | null;
   outcome: string;
   start_offset_ms: number;
   duration_ms: number;
@@ -59,7 +60,7 @@ interface AttemptRow {
 
 function allAttempts(): AttemptRow[] {
   return getDb().prepare(
-    'SELECT request_id, ordinal, platform, model_id, key_ordinal, outcome, start_offset_ms, duration_ms, error_summary FROM request_attempts ORDER BY ordinal',
+    'SELECT request_id, ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary FROM request_attempts ORDER BY ordinal',
   ).all() as AttemptRow[];
 }
 
@@ -124,6 +125,36 @@ describe('per-attempt routing traces', () => {
     for (const { id } of errorIds) {
       const c = getDb().prepare('SELECT COUNT(*) as c FROM request_attempts WHERE request_id = ?').get(id) as { c: number };
       expect(c.c).toBe(0);
+    }
+  });
+
+  it('snapshots the operator-facing key label per attempt, and leaves it null for unlabeled keys (#869)', async () => {
+    const routes = [
+      fakeRoute({ platform: 'groq', modelId: 'llama-x', keyLabel: 'work laptop' }),
+      fakeRoute({ platform: 'groq', modelId: 'llama-x', keyLabel: null }),
+      fakeRoute({ platform: 'cerebras', modelId: 'qwen-z', keyLabel: 'billing account' }),
+    ];
+
+    await runFallbackLoop(hooksSkeleton({
+      route: (attempt) => routes[Math.min(attempt, routes.length - 1)],
+      dispatch: async (route, attempt) => {
+        if (attempt < 2) throw Object.assign(new Error('429 Too Many Requests'), { status: 429 });
+        logRequest(route.platform, route.modelId, route.keyId, 'success', 10, 5, 42, null);
+        return 'done';
+      },
+      logFailure: (route, err) =>
+        logRequest(route.platform, route.modelId, route.keyId, 'error', 10, 0, 5, err.message),
+    }));
+
+    const rows = allAttempts();
+    expect(rows.map(r => r.key_label)).toEqual(['work laptop', null, 'billing account']);
+    // The label is the operator's own name for the key, never the internal key
+    // id and never the credential.
+    const keyIds = routes.map(r => String(r.keyId));
+    for (const r of rows) {
+      if (r.key_label === null) continue;
+      expect(keyIds).not.toContain(r.key_label);
+      expect(r.key_label).not.toBe(routes[0].apiKey);
     }
   });
 

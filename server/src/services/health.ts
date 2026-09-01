@@ -8,6 +8,7 @@ import { inferQuotaPoolKey } from './provider-quota.js';
 import { updateDegradationState } from './degradation.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
+import { providerLog } from '../lib/server-logs.js';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const CONSECUTIVE_FAILURES_TO_DISABLE = 3;
@@ -60,13 +61,22 @@ function positiveIntEnv(raw: string | undefined, fallback: number): number {
 // Track consecutive failures per key
 const failureCount = new Map<number, number>();
 
-function recordInvalidFailure(keyId: number): void {
+function recordInvalidFailure(keyId: number, platform?: string): void {
   const count = (failureCount.get(keyId) ?? 0) + 1;
   failureCount.set(keyId, count);
 
   if (count >= CONSECUTIVE_FAILURES_TO_DISABLE) {
     getDb().prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(keyId);
-    console.log(`[Health] Auto-disabled key ${keyId} after ${count} consecutive failures`);
+    // providerLog, not console.log: losing a key is the event an operator is
+    // most likely to be looking for after the fact, so it goes to the dashboard
+    // log viewer (where warn/error survive a restart) as well as to stdout —
+    // which providerLog still writes, so nothing here is only visible behind a
+    // login. Raised to warn for the same reason.
+    providerLog(
+      'warn',
+      `[Health] Auto-disabled key ${keyId} after ${count} consecutive failures`,
+      { provider: platform, event: 'key_auto_disabled' },
+    );
   }
 }
 
@@ -108,10 +118,12 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
     if (isValid) {
       failureCount.delete(keyId);
     } else {
-      console.warn(
+      providerLog(
+        'warn',
         `[Health] Key ${keyId} (${row.platform}, base=${row.base_url ?? 'default'}) invalid: ${lastError}`,
+        { provider: row.platform, event: 'key_invalid' },
       );
-      recordInvalidFailure(keyId);
+      recordInvalidFailure(keyId, row.platform);
     }
 
     return status;

@@ -435,6 +435,146 @@ function crush(ctx: GenerateContext): Generation {
   };
 }
 
+// DeepSeek Harness (dsh) reads one YAML settings document, $DSH_HOME/settings.yaml
+// (default ~/.dsh). Every provider is a route under `llm-pi-ai.providers`;
+// a route pi-ai's installed catalog does not ship must spell out `api`,
+// `baseURL`, and a non-empty `models` list, which is exactly what a gateway
+// with a per-user live catalog is. The key travels through `apiKeyEnv`:
+// DSH loads $DSH_HOME/.env as its user environment layer, so writing the key
+// there (0600) makes the route work on the next request without an export.
+// No `compat` switches: the gateway already maps `developer` → `system` and
+// honours `max_completion_tokens`, the two things pi-ai sends to an endpoint
+// it cannot recognize.
+function dsh(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  // DSH_HOME relocates the whole harness home; nothing else about the
+  // layout changes, so honour it the way dsh itself does.
+  const home = process.env.DSH_HOME?.trim() || path.join(ctx.homeDir, '.dsh');
+  // A route id is permanent in DSH (sessions, defaults, and credential refs
+  // name it) and must be lowercase; a named profile becomes a second route
+  // beside the default one rather than replacing it.
+  const route = ctx.profile === 'default'
+    ? 'freellmapi'
+    : `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const roster = catalogModels(ctx.models);
+  const entries = [model, ...roster.filter(entry => entry.id !== model.id)]
+    .map(entry => ({
+      id: entry.id,
+      name: entry.name ?? entry.id,
+      contextWindow: contextWindow(entry),
+      maxTokens: outputLimit(entry),
+    }));
+  return {
+    files: [
+      {
+        path: path.join(home, 'settings.yaml'),
+        format: 'yaml',
+        value: {
+          'llm-pi-ai': {
+            providers: {
+              [route]: {
+                displayName: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+                apiKeyEnv: 'FREELLMAPI_API_KEY',
+                api: 'openai-completions',
+                baseURL: v1Url(ctx.url),
+                models: entries,
+              },
+            },
+          },
+          // The default model is only claimed for the default profile; a
+          // named route is an extra option in the picker, not a takeover.
+          // A previous default's `reasoningEffort` must go with it: DSH
+          // refuses a request naming a level the selected model cannot
+          // take, and a hand-declared model declares none.
+          ...(ctx.profile === 'default'
+            ? {
+              'agent-default-model': {
+                provider: route,
+                model: model.id,
+                reasoningEffort: undefined,
+              },
+            }
+            : {}),
+        },
+      },
+      {
+        path: path.join(home, '.env'),
+        format: 'env',
+        sensitive: true,
+        content: `FREELLMAPI_API_KEY=${ctx.apiKey}\n`,
+      },
+    ],
+    notes: [
+      `Start DeepSeek Harness with: npx @deepseek-ai/dsh web — ${route}/${model.id} is ${ctx.profile === 'default' ? 'the default model' : 'in the model picker'}.`,
+      'Settings are hot-reloaded, so a running dsh picks this up on its next request.',
+      `Models are declared text-only; give a vision model \`input: [text, image]\` under ${route}.models in settings.yaml to send it images.`,
+    ],
+  };
+}
+
+// MiMo Code is an OpenCode derivative, so the config is the same shape as the
+// OpenCode one above: a custom `provider` entry backed by the AI SDK's
+// openai-compatible package, with credentials as `options.apiKey` /
+// `options.baseURL` (mimo.xiaomi.com/mimocode/models-provider). Two things
+// differ from OpenCode and both matter:
+//   * the file lives in MiMo's own global config directory. That is
+//     `$XDG_CONFIG_HOME/mimocode` (`~/.config/mimocode` on macOS and Linux),
+//     relocated wholesale to `$MIMOCODE_HOME/config` when that is set. The
+//     directory accepts `config.json`, `mimocode.json` and `mimocode.jsonc`
+//     and merges them in that order, so writing `config.json` — the first and
+//     weakest layer — leaves a hand-written `mimocode.json` in charge.
+//   * `provider.<id>.models.<id>.limit` requires BOTH `context` and `output`
+//     in MiMo's schema, unlike OpenCode which takes `context` alone.
+// There is no MIMOCODE_API_KEY or MIMOCODE_BASE_URL: MiMo's environment
+// variables locate resources and toggle features, they are not a fallback for
+// config fields. The key travels through the config file's own `{env:VAR}`
+// substitution instead, which keeps it off disk.
+function mimo(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const configDir = process.env.MIMOCODE_HOME?.trim()
+    ? path.join(process.env.MIMOCODE_HOME.trim(), 'config')
+    : path.join(
+      process.env.XDG_CONFIG_HOME?.trim() || path.join(ctx.homeDir, '.config'),
+      'mimocode',
+    );
+  // The default model is named as `freellmapi/<id>`, so it has to exist in the
+  // provider's own `models` map — `auto`, the usual default, is filtered out
+  // of the plain catalog roster, so put the chosen model back at the front.
+  const roster = catalogModels(ctx.models);
+  const modelEntries = Object.fromEntries(
+    [model, ...roster.filter(entry => entry.id !== model.id)].map(entry => [entry.id, {
+      name: entry.name ?? entry.id,
+      limit: { context: contextWindow(entry), output: outputLimit(entry) },
+    }]),
+  );
+  return {
+    files: [{
+      path: path.join(configDir, 'config.json'),
+      format: 'json',
+      value: {
+        $schema: 'https://mimo.xiaomi.com/mimocode/config.json',
+        provider: {
+          freellmapi: {
+            npm: '@ai-sdk/openai-compatible',
+            name: 'FreeLLMAPI',
+            options: {
+              baseURL: v1Url(ctx.url),
+              apiKey: '{env:FREELLMAPI_API_KEY}',
+            },
+            models: modelEntries,
+          },
+        },
+        model: `freellmapi/${model.id}`,
+      },
+    }],
+    notes: [
+      'Install MiMo Code with: curl -fsSL https://mimo.xiaomi.com/install | bash',
+      'Export FREELLMAPI_API_KEY before starting MiMo Code.',
+      `Start it with \`mimo\` — freellmapi/${model.id} is the default model.`,
+    ],
+  };
+}
+
 function cursor(ctx: GenerateContext): Generation {
   return {
     files: [],
@@ -473,6 +613,8 @@ const metadata = [
   ['roo', 'Roo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-roo', 'https://docs.roocode.com', roo],
   ['kilo', 'Kilo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-kilo', 'https://kilocode.ai/docs', kilo],
   ['crush', 'Crush', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-crush', 'https://github.com/charmbracelet/crush', crush],
+  ['dsh', 'DeepSeek Harness', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-dsh', 'https://github.com/deepseek-ai/deepseek-harness', dsh],
+  ['mimo', 'MiMo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-mimo', 'https://mimo.xiaomi.com/mimocode', mimo],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;

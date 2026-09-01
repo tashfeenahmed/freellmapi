@@ -1,4 +1,4 @@
-// Generative-media routing (image generation + audio/TTS).
+// Generative-media routing (image, video, and audio/TTS).
 //
 // Self-contained, exactly like embeddings: media models live in their OWN
 // `media_models` table so they can NEVER enter the chat router's candidate pool
@@ -11,11 +11,17 @@ import { getDb } from '../db/index.js';
 import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
 export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google']);
+
+/** Video uses a dedicated optional catalog registry so binaries that predate
+ *  this modality ignore the rows instead of accidentally ingesting them as
+ *  chat models. Keep its adapter allowlist separate for the same reason. */
+export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
 const KEYLESS_CAPABLE = new Set(['pollinations']);
@@ -30,7 +36,7 @@ export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare']);
 // catalog-sync), never via migrations. Their per-model adapter metadata
 // (native subtitle formats, upload ceiling, request flavor) rides in the
 // meta_json column — see TranscriptionMeta below.
-export type MediaModality = 'image' | 'audio' | 'transcription';
+export type MediaModality = 'image' | 'video' | 'audio' | 'transcription';
 
 export interface MediaModelRow {
   id: number;
@@ -67,8 +73,22 @@ export interface SpeechResult {
   audio: Buffer;
   contentType: string;
 }
+export interface VideoResult {
+  platform: string;
+  modelId: string;
+  video: Buffer;
+  contentType: string;
+}
 export interface ImageParams { prompt: string; n?: number; size?: string }
 export interface SpeechParams { input: string; voice?: string; format?: string }
+export interface VideoParams {
+  prompt: string;
+  duration?: number;
+  aspectRatio?: '16:9' | '9:16';
+  image?: string;
+  seed?: number;
+  audio?: boolean;
+}
 
 // OpenAI clients commonly send one of these voice names even when the user did
 // not choose a voice explicitly. Native TTS providers use unrelated voice
@@ -162,6 +182,17 @@ function geminiVoice(requested?: string): string {
 
 // Media generations are slower than chat — a cold FLUX/SDXL run can take 30-60s.
 const FETCH_TIMEOUT_MS = 60_000;
+// Video providers submit long-running jobs and can legitimately need several
+// minutes before the MP4 is ready. This is still bounded end-to-end.
+const VIDEO_FETCH_TIMEOUT_MS = 5 * 60_000;
+
+/** Bail out of a long-running media job whose API caller has hung up. Video is
+ *  the only surface here that can poll for minutes, so without this a client
+ *  that disconnects after two seconds still costs a full generation — and a
+ *  second one, when the chain fails over to the next provider. */
+function throwIfClientGone(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new MediaError('client closed the request', 499);
+}
 
 export function listMediaModels(modality: MediaModality): MediaModelRow[] {
   return getDb()
@@ -220,13 +251,20 @@ async function mediaFetch(
   platform: string,
   modality: MediaModality,
   init: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+  /** The caller's own cancellation (a disconnected API client), folded in on
+   *  top of the per-request timeout so a departed client drops the upstream
+   *  request instead of leaving it to run out the clock. */
+  clientSignal?: AbortSignal,
 ): Promise<Response> {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = clientSignal ? AbortSignal.any([timeoutSignal, clientSignal]) : timeoutSignal;
   const r = await proxyFetch(
     url,
-    { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    { ...init, signal },
     platform,
     modality,
-    FETCH_TIMEOUT_MS,
+    timeoutMs,
   );
   if (!r.ok) {
     const body = await r.text().catch(() => '');
@@ -261,6 +299,22 @@ function mediaRequestStyle(row: MediaModelRow): string | null {
     return typeof parsed?.requestStyle === 'string' ? parsed.requestStyle : null;
   } catch {
     return null;
+  }
+}
+
+interface VideoMeta {
+  /** Provider-native deployment id. Hugging Face model ids are mapped to fal
+   *  queue ids in the catalog so runtime calls need no mutable discovery step. */
+  providerModelId?: string;
+}
+
+function videoMeta(row: MediaModelRow): VideoMeta {
+  if (!row.meta_json) return {};
+  try {
+    const parsed = JSON.parse(row.meta_json) as VideoMeta;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
   }
 }
 
@@ -417,6 +471,138 @@ async function callImageProvider(
   }
 }
 
+async function callHuggingFaceVideo(
+  row: MediaModelRow,
+  key: string | null,
+  p: VideoParams,
+  clientSignal?: AbortSignal,
+): Promise<{ video: Buffer; contentType: string }> {
+  if (!key) throw new MediaError('huggingface key required', 401);
+  const providerModelId = videoMeta(row).providerModelId;
+  if (!providerModelId) {
+    throw new MediaError(`huggingface video model '${row.model_id}' is missing providerModelId metadata`, 500);
+  }
+
+  const deadline = Date.now() + VIDEO_FETCH_TIMEOUT_MS;
+  const remaining = () => Math.max(1, deadline - Date.now());
+  const query = '?_subdomain=queue';
+  const queueUrl = `https://router.huggingface.co/fal-ai/${providerModelId}${query}`;
+  const submitted = await mediaFetch(queueUrl, 'huggingface', 'video', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      prompt: p.prompt,
+      ...(p.seed !== undefined ? { seed: p.seed } : {}),
+    }),
+  }, remaining(), clientSignal);
+  const queue = (await submitted.json()) as {
+    request_id?: string;
+    status?: string;
+    response_url?: string;
+  };
+  if (!queue.request_id || !queue.response_url) {
+    throw new MediaError('huggingface returned no video job id', 502);
+  }
+
+  // Hugging Face's fal router returns a fal queue response URL. Only reuse its
+  // path; all polling stays on router.huggingface.co so the HF token is never
+  // sent to an arbitrary host supplied in an upstream JSON body.
+  let responsePath: string;
+  try {
+    responsePath = new URL(queue.response_url, 'https://queue.fal.run').pathname;
+  } catch {
+    throw new MediaError('huggingface returned an invalid video job URL', 502);
+  }
+  const routedJobUrl = `https://router.huggingface.co/fal-ai${responsePath}`;
+  let status = queue.status ?? 'IN_QUEUE';
+  while (status !== 'COMPLETED') {
+    if (status === 'FAILED' || status === 'CANCELLED') {
+      throw new MediaError(`huggingface video job ${status.toLowerCase()}`, 502);
+    }
+    if (remaining() <= 1) throw new MediaError('huggingface video generation timed out', 504);
+    throwIfClientGone(clientSignal);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const polled = await mediaFetch(`${routedJobUrl}/status${query}`, 'huggingface', 'video', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${key}` },
+    }, remaining(), clientSignal);
+    const state = (await polled.json()) as { status?: string; error?: string };
+    if (!state.status) throw new MediaError('huggingface returned an invalid video job status', 502);
+    status = state.status;
+  }
+
+  const completed = await mediaFetch(`${routedJobUrl}${query}`, 'huggingface', 'video', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
+  }, remaining(), clientSignal);
+  const result = (await completed.json()) as { video?: { url?: string; content_type?: string } };
+  const videoUrl = result.video?.url;
+  if (!videoUrl) throw new MediaError('huggingface returned no video URL', 502);
+  // Every other URL this adapter contacts is built from constants; this one
+  // comes out of an upstream JSON body, which is exactly the shape #440's
+  // guard exists for. Refuse anything that is not plain http(s) on a routable
+  // address before spending a request on it — a result URL pointing at cloud
+  // metadata or a link-local address would otherwise be fetched and streamed
+  // straight back to the caller.
+  const verdict = await assessProviderUrl(videoUrl);
+  if (!verdict.allowed) {
+    throw new MediaError(`huggingface returned an unusable video URL: ${verdict.reason}`, 502);
+  }
+  const downloaded = await mediaFetch(videoUrl, 'huggingface', 'video', { method: 'GET' }, remaining(), clientSignal);
+  const video = Buffer.from(await downloaded.arrayBuffer());
+  return {
+    video,
+    contentType: downloaded.headers.get('content-type') ?? result.video?.content_type ?? 'video/mp4',
+  };
+}
+
+async function callVideoProvider(
+  row: MediaModelRow,
+  credential: ProviderCredential,
+  p: VideoParams,
+  clientSignal?: AbortSignal,
+): Promise<{ video: Buffer; contentType: string }> {
+  const key = credential.key;
+  switch (row.platform) {
+    case 'pollinations': {
+      if (!key) throw new MediaError('pollinations key required', 401);
+      // Every Pollinations video model advertises its own allowed durations
+      // (nova-reel 6-120 in steps of 6, veo 4/6/8, minimax-h3 exactly 5,
+      // wan 5/10/15, seedance-2.5 exactly 4...). There is no length that is
+      // valid everywhere, so an omitted `duration` is left off the query and
+      // the provider applies the model's own default instead of a guess that
+      // would 400 on most of the roster.
+      const duration = p.duration;
+      if (duration !== undefined && row.model_id === 'nova-reel'
+          && (duration < 6 || duration > 120 || duration % 6 !== 0)) {
+        throw new MediaError('nova-reel duration must be a multiple of 6 between 6 and 120 seconds', 400);
+      }
+      const params = new URLSearchParams({ model: row.model_id });
+      if (duration !== undefined) params.set('duration', String(duration));
+      if (p.aspectRatio) params.set('aspectRatio', p.aspectRatio);
+      if (p.image) params.set('image', p.image);
+      if (p.seed !== undefined) params.set('seed', String(p.seed));
+      if (p.audio !== undefined) params.set('audio', String(p.audio));
+      const r = await mediaFetch(
+        `https://gen.pollinations.ai/video/${encodeURIComponent(p.prompt)}?${params}`,
+        'pollinations',
+        'video',
+        { method: 'GET', headers: { Authorization: `Bearer ${key}` } },
+        VIDEO_FETCH_TIMEOUT_MS,
+        clientSignal,
+      );
+      return {
+        video: Buffer.from(await r.arrayBuffer()),
+        contentType: r.headers.get('content-type') ?? 'video/mp4',
+      };
+    }
+    case 'huggingface':
+      return callHuggingFaceVideo(row, key, p, clientSignal);
+    default:
+      throw new MediaError(`no video adapter for platform '${row.platform}'`, 500);
+  }
+}
+
 async function callSpeechProvider(
   row: MediaModelRow,
   credential: ProviderCredential,
@@ -549,9 +735,19 @@ function logMedia(row: Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>
 }
 
 function chainError(modality: MediaModality, lastError: MediaError | null): MediaError {
+  // Only statuses the CALLER can act on are passed through. 400 (bad prompt,
+  // duration the model does not accept) and 413 (upload too large) describe
+  // the caller's own request, and 429 is the long-standing rate-limit signal.
+  // An upstream 401 is deliberately NOT among them: it means the operator's
+  // provider key was rejected, and forwarding it would tell an OpenAI client
+  // its own gateway key is bad — which sends SDKs into a credential error
+  // instead of the retryable upstream failure this actually is.
+  const status = lastError && [400, 413, 429].includes(lastError.status)
+    ? lastError.status
+    : 502;
   return new MediaError(
     `All ${modality} providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
-    lastError && lastError.status === 429 ? 429 : 502,
+    status,
   );
 }
 
@@ -581,12 +777,48 @@ export async function runImageGeneration(model: string | undefined, params: Imag
   throw chainError('image', lastError);
 }
 
+/** Generate a video, failing over across catalogued text-to-video providers.
+ *  `clientSignal` is the API caller's connection: when it aborts, the in-flight
+ *  upstream request is dropped and no further provider is tried. */
+export async function runVideoGeneration(
+  model: string | undefined,
+  params: VideoParams,
+  clientSignal?: AbortSignal,
+): Promise<VideoResult> {
+  const chain = resolveMediaChain(model, 'video');
+  let lastError: MediaError | null = null;
+  for (const row of chain) {
+    throwIfClientGone(clientSignal);
+    const credential = getProviderCredential(row);
+    if (!credential) continue;
+    if (credential.id != null && isOnCooldown(row.platform, row.model_id, credential.id)) continue;
+    const started = Date.now();
+    try {
+      const out = await callVideoProvider(row, credential, params, clientSignal);
+      if (!out.video.length) throw new MediaError('upstream returned no video', 502);
+      logMedia(row, credential.id, 'success', Date.now() - started, null);
+      return { platform: row.platform, modelId: row.model_id, ...out };
+    } catch (err: any) {
+      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+      if (e.status === 429 && credential.id != null) setCooldown(row.platform, row.model_id, credential.id);
+      lastError = e;
+      // A caller that hung up gets no second generation charged to its account.
+      throwIfClientGone(clientSignal);
+    }
+  }
+  throw chainError('video', lastError);
+}
+
 // ---------------------------------------------------------------------------
 // Speech-to-text (/v1/audio/transcriptions)
 //
 // STT models live in media_models with modality='transcription', maintained
 // by the published catalog's `transcriptionModels` array (see catalog-sync)
-// — never hardcoded here, never seeded by migrations. The per-platform
+// — never hardcoded here, never seeded by migrations. A user can also
+// register their own OpenAI-compatible STT endpoint (platform 'custom') from
+// the Keys page; those rows are keyed to an api_keys row and are never touched
+// by catalog-sync. The per-platform
 // adapters below are pure transport; everything model-specific (native
 // subtitle support, upload ceiling, request flavor) rides on the catalog
 // entry and lands in the row's meta_json. On an install that has never
@@ -617,6 +849,11 @@ export const MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024;
 interface SttCandidate {
   platform: string;
   modelId: string;
+  /** The api_keys row this model is bound to, or null to pick any healthy key
+   *  for the platform. Custom endpoints ALWAYS carry one: getProviderCredential
+   *  refuses to guess a key for platform 'custom', so dropping this here would
+   *  silently skip every custom STT row. */
+  keyId: number | null;
   nativeSubtitles: Set<string>;
   maxBytes: number;
   requestStyle: string | null;
@@ -641,6 +878,7 @@ function toSttCandidate(row: MediaModelRow): SttCandidate {
   return {
     platform: row.platform,
     modelId: row.model_id,
+    keyId: row.key_id,
     nativeSubtitles: new Set(Array.isArray(meta.subtitleFormats) ? meta.subtitleFormats : []),
     maxBytes,
     requestStyle: typeof meta.requestStyle === 'string' ? meta.requestStyle : null,
@@ -680,7 +918,8 @@ function resolveTranscriptionChain(model: string | undefined, responseFormat: st
     // for / trigger a sync rather than pretending the model id is wrong.
     throw new MediaError(
       'No transcription models are configured yet. The registry arrives via catalog sync; ' +
-      'wait for the next sync (or trigger one from the dashboard) and retry.',
+      'wait for the next sync (or trigger one from the dashboard) and retry, ' +
+      'or register your own OpenAI-compatible endpoint from the Keys page.',
       503,
       'no_transcription_models',
     );
@@ -714,6 +953,31 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'custom': {
+      // Any OpenAI-compatible STT server (faster-whisper-server, LocalAI,
+      // whisper.cpp's server, vLLM…). Same multipart shape as groq below;
+      // only the base URL and the optional key differ.
+      if (!credential.baseUrl) throw new MediaError('custom transcription provider is missing base_url', 500);
+      const form = new FormData();
+      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('model', m.modelId);
+      if (p.language) form.append('language', p.language);
+      if (p.prompt) form.append('prompt', p.prompt);
+      if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
+      // 'text' is derived locally from the json shape so failover output stays
+      // uniform; 'vtt' never reaches here (no native subtitle support is
+      // declared for custom rows, so resolveTranscriptionChain filters them).
+      form.append('response_format', p.responseFormat === 'verbose_json' ? 'verbose_json' : 'json');
+      // Never set Content-Type by hand — FormData supplies the boundary.
+      const r = await mediaFetch(`${credential.baseUrl}/audio/transcriptions`, 'custom', 'transcription', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key ?? 'no-key'}` },
+        body: form,
+      });
+      const j = (await r.json()) as { text?: string; language?: string; duration?: number; segments?: unknown[] };
+      if (typeof j.text !== 'string') throw new MediaError('custom endpoint returned no transcription text', 502);
+      return { text: j.text, language: j.language, duration: j.duration, segments: j.segments };
+    }
     case 'groq': {
       // Groq's OpenAI-compatible audio endpoint takes multipart form data.
       // Never set Content-Type by hand — FormData supplies the boundary.
@@ -791,7 +1055,7 @@ export async function runTranscription(model: string | undefined, p: Transcripti
   }
   let lastError: MediaError | null = null;
   for (const m of usable) {
-    const credential = getProviderCredential({ platform: m.platform, key_id: null });
+    const credential = getProviderCredential({ platform: m.platform, key_id: m.keyId });
     if (!credential) continue; // no usable key for this provider — try the next
     if (credential.id != null && isOnCooldown(m.platform, m.modelId, credential.id)) continue;
     const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };

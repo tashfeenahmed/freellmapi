@@ -29,7 +29,7 @@ function parseModelList(raw: string): string[] {
 export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio'>('chat')
+  const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio' | 'transcription'>('chat')
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -130,14 +130,18 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       ? 'text-embedding-3-small'
       : customType === 'image'
         ? 'gpt-image-1'
-        : 'gpt-4o-mini-tts'
+        : customType === 'transcription'
+          ? 'Systran/faster-whisper-large-v3'
+          : 'gpt-4o-mini-tts'
   const addLabel = customType === 'chat'
     ? (multiple ? t('keys.addModels', { count: models.length }) : t('keys.addModel'))
     : customType === 'embedding'
       ? t('keys.addEmbeddingModel')
       : customType === 'image'
         ? t('keys.addImageModel')
-        : t('keys.addAudioModel')
+        : customType === 'transcription'
+          ? t('keys.addTranscriptionModel')
+          : t('keys.addAudioModel')
 
   const form = (
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
@@ -155,6 +159,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
               <SelectItem value="embedding" label={t('keys.customTypeEmbedding')}>{t('keys.customTypeEmbedding')}</SelectItem>
               <SelectItem value="image" label={t('keys.customTypeImage')}>{t('keys.customTypeImage')}</SelectItem>
               <SelectItem value="audio" label={t('keys.customTypeAudio')}>{t('keys.customTypeAudio')}</SelectItem>
+              <SelectItem value="transcription" label={t('keys.customTypeTranscription')}>{t('keys.customTypeTranscription')}</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -4,6 +4,7 @@ import {
   recordRateLimitHit, recordSuccess,
 } from '../../services/router.js';
 import { getDb, initDb } from '../../db/index.js';
+import { addToActiveChain } from '../helpers/chain.js';
 
 vi.mock('../../services/ratelimit.js', async () => {
   const actual = await vi.importActual('../../services/ratelimit.js');
@@ -42,6 +43,7 @@ function addModel(opts: { platform: string; modelId: string; priority: number })
   const id = (db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(opts.platform, opts.modelId) as { id: number }).id;
   db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(id, opts.priority);
+  addToActiveChain(id, opts.priority);
   db.prepare(`
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
     VALUES (?, 'k', 'enc', 'iv', 'tag', 'healthy', 1)

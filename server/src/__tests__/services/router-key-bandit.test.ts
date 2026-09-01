@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { routeRequest, refreshStatsCache, setRoutingStrategy } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
+import { addToActiveChain } from '../helpers/chain.js';
 
 // Per-key scoring inside one model (#580): with the group merge, several keys
 // (and formerly several providers' identically-named models) share one routing
@@ -39,6 +40,7 @@ function addModel(opts: {
   const id = (db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(opts.platform, opts.modelId) as { id: number }).id;
   db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(id, opts.priority ?? 1);
+  addToActiveChain(id, opts.priority ?? 1);
   return id;
 }
 

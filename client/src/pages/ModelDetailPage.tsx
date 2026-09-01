@@ -15,7 +15,7 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { Tooltip } from '@/components/tooltip'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
-import { ModelTableHead, RowContent } from '@/components/model-table'
+import { ModelTableHead, RateLimitBadge, RowContent } from '@/components/model-table'
 import {
   groupQuotaBadge,
   isMemberSplit,
@@ -25,6 +25,7 @@ import {
   providerPinId,
   splitsWithoutMember,
   type FallbackEntry,
+  type RateLimitUsageData,
   type RoutingData,
   type Row,
 } from '@/lib/routing'
@@ -77,6 +78,17 @@ export default function ModelDetailPage() {
     queryKey: ['unify'],
     queryFn: () => apiFetch('/api/settings/unify'),
   })
+  // Time-window rate-limit usage (#876), the same shared query the Models table
+  // uses — one poll for the page, read per row from a map.
+  const { data: rateLimitUsage } = useQuery<RateLimitUsageData>({
+    queryKey: ['fallback', 'rate-limit-usage'],
+    queryFn: () => apiFetch('/api/fallback/rate-limit-usage'),
+    refetchInterval: 15_000,
+  })
+  const rateUsageByModel = useMemo(
+    () => new Map((rateLimitUsage?.rows ?? []).map(r => [r.modelDbId, r])),
+    [rateLimitUsage],
+  )
 
   // Toggling a provider persists immediately (no save bar on this page): send the
   // full entries list with this one flipped, then refresh.
@@ -247,6 +259,7 @@ export default function ModelDetailPage() {
               </span>
               <span className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground">{t('models.providerCount', { count: members.length })}</span>
               {quota && <span title={quota.title} className="text-[11px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground tabular-nums">{quota.text}</span>}
+              <RateLimitBadge size="md" rows={members.flatMap(m => rateUsageByModel.get(m.modelDbId) ?? [])} />
               {vision && <span title={t('models.visionTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-cyan-600/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-400">{t('models.vision')}</span>}
               {tools && <span title={t('models.toolsTitle')} className="text-[11px] rounded-full px-2 py-0.5 bg-violet-600/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-400">{t('models.tools')}</span>}
             </div>
@@ -258,7 +271,7 @@ export default function ModelDetailPage() {
                 <tbody>
                   {members.map((m, i) => (
                     <tr key={m.modelDbId} className={`border-b last:border-0 ${m.enabled ? '' : 'opacity-50'}`}>
-                      <RowContent row={m} rank={i + 1} draggable={false} onToggle={handleToggle} providerName={memberProviderLabel(m, siblings)} providerTitle={memberEndpointTitle(m, siblings)} />
+                      <RowContent row={m} rank={i + 1} draggable={false} onToggle={handleToggle} providerName={memberProviderLabel(m, siblings)} providerTitle={memberEndpointTitle(m, siblings)} rateUsage={rateUsageByModel.get(m.modelDbId)} />
                     </tr>
                   ))}
                 </tbody>

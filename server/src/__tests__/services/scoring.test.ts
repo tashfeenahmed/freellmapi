@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   BANDIT_PRESETS, combineScore, speedScore, intelligenceScore, intelligenceComposite,
-  headroomFactor, rateLimitFactor, sampleBeta, reliabilityPosterior,
+  headroomFactor, rateWindowHeadroomFactor, rateLimitFactor, sampleBeta, reliabilityPosterior,
   expectedReliability, SPEED_PRIOR, HEADROOM_FLOOR,
+  isPeakHours, peakAdjustedWeights, hourInTimezone, isValidPeakHour, isValidTimezone,
+  isPeakExemptStrategy, DEFAULT_PEAK_HOURS, PEAK_SPEED_TO_RELIABILITY,
+  type PeakHoursConfig,
 } from '../../services/scoring.js';
 
 describe('scoring: reliability posterior', () => {
@@ -124,8 +127,56 @@ describe('scoring: guardrails', () => {
     expect(headroomFactor(900_000, 1_000_000)).toBeLessThan(1); // 10% left → protecting
   });
 
+  it('honors tunable rampStart/floor thresholds (#899)', () => {
+    // Aggressive operator: start protecting at 50% remaining, floor at 0.3.
+    const opts = { rampStart: 0.5, floor: 0.3 };
+    expect(headroomFactor(400_000, 1_000_000, opts)).toBe(1); // 60% left ≥ rampStart → no opinion
+    expect(headroomFactor(500_000, 1_000_000, opts)).toBe(1); // exactly at rampStart → not yet demoting
+    // 40% left → demoting: floor + (1-floor)·(remaining/rampStart)
+    //            = 0.3 + 0.7·(0.4/0.5) = 0.86
+    expect(headroomFactor(600_000, 1_000_000, opts)).toBeCloseTo(0.86, 5);
+    expect(headroomFactor(1_000_000, 1_000_000, opts)).toBeCloseTo(0.3, 5); // fully used → floor
+  });
+
+  it('clamps out-of-range thresholds to defaults (#899)', () => {
+    expect(headroomFactor(500_000, 1_000_000, { rampStart: 2, floor: -1 }))
+      .toBe(headroomFactor(500_000, 1_000_000)); // same as default behavior
+    expect(headroomFactor(500_000, 1_000_000, { rampStart: NaN }))
+      .toBe(headroomFactor(500_000, 1_000_000));
+  });
+
   it('unknown budget yields no opinion (factor 1)', () => {
     expect(headroomFactor(123, 0)).toBe(1);
+  });
+
+  it('rate-window headroom rides the same ramp as the monthly one (#899)', () => {
+    expect(rateWindowHeadroomFactor(0)).toBe(1);      // idle
+    expect(rateWindowHeadroomFactor(0.5)).toBe(1);    // 50% left, ramp starts at 20%
+    // Exactly at the ramp start: 1 - 0.8 lands a float ulp under 0.2, so this
+    // is the very top of the ramp rather than the flat part. Same arithmetic
+    // the monthly guardrail has always done.
+    expect(rateWindowHeadroomFactor(0.8)).toBeCloseTo(1, 9);
+    // 5% of the window left → 0.1 + 0.9·(0.05/0.2)
+    expect(rateWindowHeadroomFactor(0.95)).toBeCloseTo(0.325, 5);
+    expect(rateWindowHeadroomFactor(1)).toBeCloseTo(HEADROOM_FLOOR, 5);
+    // Over-consumption (a provider counted more than we did) cannot go below
+    // the floor.
+    expect(rateWindowHeadroomFactor(1.4)).toBeCloseTo(HEADROOM_FLOOR, 5);
+    // The two guardrails agree wherever the remaining fraction agrees.
+    expect(rateWindowHeadroomFactor(0.95)).toBeCloseTo(headroomFactor(950, 1000), 10);
+  });
+
+  it('rate-window headroom takes the same tunable thresholds (#899)', () => {
+    const opts = { rampStart: 0.5, floor: 0.3 };
+    expect(rateWindowHeadroomFactor(0.4, opts)).toBe(1);            // 60% left
+    expect(rateWindowHeadroomFactor(0.6, opts)).toBeCloseTo(0.86, 5); // 0.3 + 0.7·(0.4/0.5)
+    expect(rateWindowHeadroomFactor(0.6, { rampStart: 5 }))
+      .toBe(rateWindowHeadroomFactor(0.6)); // out of range → defaults
+  });
+
+  it('no measurable window yields no opinion (factor 1)', () => {
+    expect(rateWindowHeadroomFactor(null)).toBe(1);
+    expect(rateWindowHeadroomFactor(NaN)).toBe(1);
   });
 
   it('rate-limit factor is 1 at no penalty and damped but non-zero at max', () => {
@@ -199,5 +250,121 @@ describe('scoring: Beta sampler (Thompson exploration)', () => {
       if (sampleBeta(12, 4) > sampleBeta(20, 2)) weakerWonAtLeastOnce = true;
     }
     expect(weakerWonAtLeastOnce).toBe(true);
+  });
+});
+
+describe('scoring: time-of-day dynamic ranking (#760)', () => {
+  // Every timestamp below is an absolute instant (Z), so the timezone under
+  // test — not the machine running the suite — decides which hour it is.
+  const cfg = (patch: Partial<PeakHoursConfig> = {}): PeakHoursConfig =>
+    ({ ...DEFAULT_PEAK_HOURS, enabled: true, ...patch });
+
+  it('is off by default', () => {
+    expect(DEFAULT_PEAK_HOURS.enabled).toBe(false);
+    expect(DEFAULT_PEAK_HOURS.startHour).toBe(18);
+    expect(DEFAULT_PEAK_HOURS.endHour).toBe(6);
+    expect(DEFAULT_PEAK_HOURS.timezone).toBe('UTC');
+    const base = BANDIT_PRESETS.balanced;
+    // 20:00 UTC is inside the default window, but the flag is off.
+    const out = peakAdjustedWeights(base, 'balanced', DEFAULT_PEAK_HOURS, new Date('2026-08-18T20:00:00Z'));
+    expect(out.weights).toEqual(base);
+    expect(out.adjusted).toBe(false);
+  });
+
+  it('reads the hour in the configured timezone, not the host clock', () => {
+    const noonUtc = new Date('2026-08-18T12:00:00Z');
+    expect(hourInTimezone(noonUtc, 'UTC')).toBe(12);
+    expect(hourInTimezone(noonUtc, 'Asia/Kolkata')).toBe(17);   // +5:30
+    expect(hourInTimezone(noonUtc, 'America/Los_Angeles')).toBe(5); // -7 (DST)
+    // Midnight must read as 0, never 24 (h23 vs h24 hour cycles).
+    expect(hourInTimezone(new Date('2026-08-18T00:00:00Z'), 'UTC')).toBe(0);
+    // An unknown zone degrades to UTC rather than throwing mid-route.
+    expect(hourInTimezone(noonUtc, 'Mars/Olympus_Mons')).toBe(12);
+  });
+
+  it('marks the window per timezone (spans midnight, end exclusive)', () => {
+    const utc = cfg();
+    expect(isPeakHours(utc, new Date('2026-08-18T18:00:00Z'))).toBe(true);
+    expect(isPeakHours(utc, new Date('2026-08-18T23:59:00Z'))).toBe(true);
+    expect(isPeakHours(utc, new Date('2026-08-18T00:00:00Z'))).toBe(true);
+    expect(isPeakHours(utc, new Date('2026-08-18T05:59:00Z'))).toBe(true);
+    expect(isPeakHours(utc, new Date('2026-08-18T06:00:00Z'))).toBe(false);
+    expect(isPeakHours(utc, new Date('2026-08-18T12:00:00Z'))).toBe(false);
+
+    // Same instant, two zones: 13:00 UTC is 18:30 in Kolkata (peak) and 13:00
+    // in London-summer... which is off-peak. The timezone is what decides.
+    const instant = new Date('2026-08-18T13:00:00Z');
+    expect(isPeakHours(cfg({ timezone: 'Asia/Kolkata' }), instant)).toBe(true);
+    expect(isPeakHours(cfg({ timezone: 'UTC' }), instant)).toBe(false);
+  });
+
+  it('supports a same-day window and treats start === end as empty', () => {
+    const lunch = cfg({ startHour: 9, endHour: 17 });
+    expect(isPeakHours(lunch, new Date('2026-08-18T09:00:00Z'))).toBe(true);
+    expect(isPeakHours(lunch, new Date('2026-08-18T16:59:00Z'))).toBe(true);
+    expect(isPeakHours(lunch, new Date('2026-08-18T17:00:00Z'))).toBe(false);
+    expect(isPeakHours(lunch, new Date('2026-08-18T03:00:00Z'))).toBe(false);
+
+    const empty = cfg({ startHour: 10, endHour: 10 });
+    for (const h of [0, 9, 10, 11, 23]) {
+      expect(isPeakHours(empty, new Date(`2026-08-18T${String(h).padStart(2, '0')}:30:00Z`))).toBe(false);
+    }
+  });
+
+  it('shifts speed→reliability inside the window, intelligence untouched', () => {
+    const base = BANDIT_PRESETS.balanced; // { reliability: 0.5, speed: 0.25, intelligence: 0.25 }
+    const { weights, adjusted } = peakAdjustedWeights(base, 'balanced', cfg(), new Date('2026-08-18T20:00:00Z'));
+    const shift = base.speed * PEAK_SPEED_TO_RELIABILITY;
+    expect(adjusted).toBe(true);
+    expect(weights.reliability).toBeCloseTo(base.reliability + shift, 5);
+    expect(weights.speed).toBeCloseTo(base.speed - shift, 5);
+    expect(weights.intelligence).toBe(base.intelligence);
+    expect(weights.reliability + weights.speed + weights.intelligence).toBeCloseTo(1, 5);
+  });
+
+  it('leaves weights alone outside the window', () => {
+    const base = BANDIT_PRESETS.smartest;
+    const out = peakAdjustedWeights(base, 'smartest', cfg(), new Date('2026-08-18T12:00:00Z'));
+    expect(out.weights).toEqual(base);
+    expect(out.adjusted).toBe(false);
+  });
+
+  it('exempts fastest and reliable so no preset turns into another', () => {
+    const inWindow = new Date('2026-08-18T20:00:00Z');
+    for (const strategy of ['fastest', 'reliable'] as const) {
+      expect(isPeakExemptStrategy(strategy)).toBe(true);
+      const out = peakAdjustedWeights(BANDIT_PRESETS[strategy], strategy, cfg(), inWindow);
+      expect(out.weights).toEqual(BANDIT_PRESETS[strategy]);
+      expect(out.adjusted).toBe(false);
+    }
+    for (const strategy of ['balanced', 'smartest'] as const) {
+      expect(isPeakExemptStrategy(strategy)).toBe(false);
+      expect(peakAdjustedWeights(BANDIT_PRESETS[strategy], strategy, cfg(), inWindow).adjusted).toBe(true);
+    }
+  });
+
+  it('never pushes an adjusted preset past the reliable preset', () => {
+    const inWindow = new Date('2026-08-18T20:00:00Z');
+    for (const strategy of ['balanced', 'smartest'] as const) {
+      const { weights } = peakAdjustedWeights(BANDIT_PRESETS[strategy], strategy, cfg(), inWindow);
+      expect(weights.speed).toBeGreaterThanOrEqual(0);
+      // The whole point of exempting the extremes: an adjusted mixed preset
+      // must not end up more reliability-heavy than `reliable` itself.
+      expect(weights.reliability).toBeLessThanOrEqual(BANDIT_PRESETS.reliable.reliability);
+      expect(weights.reliability + weights.speed + weights.intelligence).toBeCloseTo(1, 5);
+    }
+  });
+
+  it('rejects out-of-range hours and unknown timezones', () => {
+    for (const h of [0, 6, 18, 23]) expect(isValidPeakHour(h)).toBe(true);
+    for (const h of [-1, 24, 6.5, NaN, '6', null, undefined]) expect(isValidPeakHour(h)).toBe(false);
+    for (const tz of ['UTC', 'Asia/Kolkata', 'America/New_York']) expect(isValidTimezone(tz)).toBe(true);
+    for (const tz of ['', '  ', 'Not/AZone', 'GMT+5', 42, null]) expect(isValidTimezone(tz)).toBe(false);
+  });
+
+  it('ignores a stored config with a corrupt window', () => {
+    const base = BANDIT_PRESETS.balanced;
+    const bad = { enabled: true, startHour: 99, endHour: 6, timezone: 'UTC' } as PeakHoursConfig;
+    expect(peakAdjustedWeights(base, 'balanced', bad, new Date('2026-08-18T20:00:00Z')).weights).toEqual(base);
   });
 });

@@ -1,5 +1,9 @@
 // ---- Platform & Model Types ----
 
+/** How the global outbound proxy URL is interpreted. Per-key proxies always
+ * use the traditional forward-proxy transport. */
+export type ProxyMode = 'forward' | 'fetch-relay';
+
 /** A model declared beside a custom endpoint in an import file (#382). A
  *  capability flag is present only when the paste declared it via a trailing
  *  -TOOLS / -VISION suffix. */
@@ -132,6 +136,22 @@ export type Platform =
   // (never fall back to paid). Catalog rows live in the Oracle catalog
   // (premium now, free after the 30-day model-age gate).
   | 'orcarouter'
+  // UnoRouter (unorouter.com) — OpenAI-compatible aggregator. The web app is a
+  // Next.js site at unorouter.com; the API lives at api.unorouter.com/v1. Free
+  // key from unorouter.com (no card); free models carry a `:free` suffix and a
+  // per-minute rate limit (429 on cap, e.g. "1 request(s) every 1 min").
+  // Live-probed 2026-08-23: /v1/models is public without a key but 401s on a
+  // wrong key, and /v1/chat/completions 401s without a key, so default key
+  // validation works. Catalog rows live in the hosted catalog (premium now,
+  // free after the 30-day model-age gate).
+  | 'unorouter'
+  // xKiro (xkiro.com) — OpenAI-compatible gateway at api.xkiro.com/v1. Free key
+  // from xkiro.com (no card); free plan is 5M tokens/day on its free models,
+  // paid models 403 on a free key.
+  // /v1/models is public (200 with no key), so key validation must probe
+  // /v1/usage, which 401s on a missing/invalid ClientApiKey. Catalog rows live
+  // in the hosted catalog (premium now, free after the 30-day model-age gate).
+  | 'xkiro'
   // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
   // (api-inference.modelscope.cn/v1). Free tier is 2000 requests/day
   // account-wide, but calls only work after the ModelScope account is bound to
@@ -233,7 +253,7 @@ export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unkn
 
 export interface ApiKeyModel {
   id: number;
-  kind: 'chat' | 'embedding' | 'image' | 'audio';
+  kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription';
   modelId: string;
   displayName: string;
   family?: string | null;

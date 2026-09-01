@@ -92,12 +92,32 @@ export function transformUnprotectedText(text: string, transform: (part: string)
   );
 }
 
+/**
+ * Boolean-only fast path: true when any rule matches, WITHOUT collecting,
+ * sorting or merging the spans. Equivalent to `scanProtectedSpans(text).length > 0`
+ * (none of the rules can match the empty string — every pattern requires at
+ * least one character), but it exits on the first hit instead of building the
+ * full span list. The per-line callers (toolfilter's `mustKeep`,
+ * `protectedLines`, hard-budget, relevance) were paying the full
+ * collect + sort + merge cost just to answer a yes/no question; on a
+ * 20k-line adversarial payload that is the difference between the
+ * compression regression test sitting under and over its budget on slow
+ * hardware.
+ */
+export function hasProtectedSpan(text: string): boolean {
+  for (const rule of RULES) {
+    rule.regex.lastIndex = 0;
+    if (rule.regex.test(text)) return true;
+  }
+  return false;
+}
+
 export function hasProtectedContent(text: string): boolean {
-  return scanProtectedSpans(text).length > 0;
+  return hasProtectedSpan(text);
 }
 
 export function protectedLines(text: string): string[] {
-  return text.split('\n').filter(line => scanProtectedSpans(line).length > 0);
+  return text.split('\n').filter(line => hasProtectedSpan(line));
 }
 
 export function extractProtectedValues(text: string, kind?: ProtectedKind): string[] {

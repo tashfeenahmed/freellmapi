@@ -4,12 +4,13 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { maskKey } from '../lib/crypto.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
-import { resolveCustomEndpointKey, customEndpointKeyIds } from '../services/custom-endpoint.js';
+import { resolveCustomEndpointKey } from '../services/custom-endpoint.js';
+import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { listAllMediaModels } from '../services/media.js';
 
 export const mediaRouter = Router();
 
-// Generative-media models (image + audio/TTS) for the dashboard Image/Audio tabs.
+// Generative-media models for the dashboard Image/Video/Audio tabs.
 // Mirrors the embeddings tab: a flat list with an enable toggle per row. keyCount
 // surfaces whether the row's platform has a usable key configured.
 mediaRouter.get('/', (_req: Request, res: Response) => {
@@ -48,11 +49,14 @@ mediaRouter.get('/', (_req: Request, res: Response) => {
 // token counts are reported. As with embeddings there is no budget
 // denominator — `media_models` only carries a free-text `quota_label`
 // ("Shared 10k neurons/day", "MP3 output - multilingual", which is not even a
-// quota) — so the summary shows spend and the label verbatim.
+// quota) — so the summary shows spend and the label verbatim. Transcription
+// rows are logged the same way (request_type='transcription', see
+// logMedia), so the Audio tab's STT section can show the same per-model
+// counts instead of dead-ending on a 400.
 mediaRouter.get('/usage', (req: Request, res: Response) => {
-  const parsed = z.enum(['image', 'audio']).safeParse(req.query.modality);
+  const parsed = z.enum(['image', 'video', 'audio', 'transcription']).safeParse(req.query.modality);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: 'modality must be image or audio' } });
+    res.status(400).json({ error: { message: 'modality must be image, video, audio or transcription' } });
     return;
   }
   const modality = parsed.data;
@@ -99,7 +103,10 @@ const customMediaSchema = z.object({
   baseUrl: z.string().url('baseUrl must be a valid URL'),
   model: z.string().min(1),
   displayName: z.string().optional(),
-  modality: z.enum(['image', 'audio']),
+  // 'transcription' registers a custom OpenAI-compatible STT endpoint. The
+  // media_models table, GET /api/media/usage, the /v1/audio/transcriptions
+  // handler and the media service's 'custom' adapter all accept it.
+  modality: z.enum(['image', 'audio', 'transcription']),
   apiKey: z.string().optional(),
   label: z.string().optional(),
   quotaLabel: z.string().optional(),
@@ -129,46 +136,16 @@ mediaRouter.post('/custom', (req: Request, res: Response) => {
 
   const upsert = db.transaction(() => {
     // A new secret for a known endpoint is an ADDITIONAL credential, never a
-    // replacement for the stored one (#619).
+    // replacement for the stored one (#619). The upsert itself is shared with
+    // the classified branch of POST /api/keys/custom (#1051).
     const { keyId, storedKey: storedKeyForMask } = resolveCustomEndpointKey(db, baseUrl, providedKey, label);
-    const endpointKeyIds = customEndpointKeyIds(db, keyId);
-
-    const existingModel = db.prepare(`
-      SELECT id, modality, priority, key_id
-        FROM media_models
-       WHERE platform = 'custom' AND model_id = ?
-       LIMIT 1
-    `).get(modelId) as { id: number; modality: string; priority: number; key_id: number | null } | undefined;
-    // A model already on this endpoint keeps the key it has; only a move to a
-    // different endpoint re-binds it.
-    const bindKeyId = existingModel?.key_id != null && endpointKeyIds.has(existingModel.key_id)
-      ? existingModel.key_id
-      : keyId;
-    const priority = existingModel && existingModel.modality === parsed.data.modality
-      ? existingModel.priority
-      : (db.prepare('SELECT COALESCE(MAX(priority), 0) AS maxPriority FROM media_models WHERE modality = ?')
-        .get(parsed.data.modality) as { maxPriority: number }).maxPriority + 1;
-
-    if (existingModel) {
-      db.prepare(`
-        UPDATE media_models
-           SET display_name = COALESCE(?, display_name),
-               modality = ?,
-               priority = ?,
-               enabled = 1,
-               quota_label = ?,
-               key_id = ?
-         WHERE id = ?
-      `).run(submittedName, parsed.data.modality, priority, quotaLabel, bindKeyId, existingModel.id);
-      return { modelDbId: existingModel.id, keyId, storedKeyForMask };
-    }
-
-    const model = db.prepare(`
-      INSERT INTO media_models
-        (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
-      VALUES ('custom', ?, ?, ?, ?, 1, ?, ?)
-    `).run(modelId, submittedName ?? modelId, parsed.data.modality, priority, quotaLabel, bindKeyId);
-    return { modelDbId: Number(model.lastInsertRowid), keyId, storedKeyForMask };
+    const { modelDbId } = registerCustomMediaModel(db, keyId, {
+      modelId,
+      displayName: submittedName,
+      modality: parsed.data.modality,
+      quotaLabel,
+    });
+    return { modelDbId, keyId, storedKeyForMask };
   });
 
   const result = upsert();

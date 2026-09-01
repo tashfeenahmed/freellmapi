@@ -2,6 +2,7 @@ import type { Db } from '../db/types.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds } from './custom-endpoint.js';
 import { customModelSeed } from './custom-model-seed.js';
 import { ensureModelInProfiles } from './profile-models.js';
+import { clearCustomModelTombstone } from './custom-model-tombstone.js';
 import { endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 
 // ── Shared custom-model registration ─────────────────────────────────────────
@@ -92,6 +93,12 @@ export function registerCustomChatModels(
 
   const registered: RegisteredCustomModel[] = [];
   for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
+    // #926: this is an EXPLICIT registration (POST /custom, bulk importer or
+    // the dashboard's "Fetch models" submit), so it overrides a previous
+    // deletion. The scheduled sync never reaches this loop for a tombstoned
+    // model — it filters them out in custom-model-sync.ts — so the tombstone
+    // can only be lifted here by a human choosing to re-add the model.
+    clearCustomModelTombstone(db, endpointScope, modelId);
     const bound = db.prepare(
       "SELECT key_id FROM models WHERE platform = 'custom' AND model_id = ? AND endpoint_scope = ?",
     ).get(modelId, endpointScope) as { key_id: number | null } | undefined;

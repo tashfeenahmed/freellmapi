@@ -376,6 +376,46 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.orcarouter.ai/v1',
 }));
 
+// UnoRouter (unorouter.com) — OpenAI-compatible aggregator. The web app is a
+// Next.js site at unorouter.com (which redirects /v1/* to the marketing app,
+// NOT the API); the real API is api.unorouter.com/v1. Free key from
+// unorouter.com (no card); free models carry a `:free` suffix and a per-minute
+// rate limit (429 on cap — "1 request(s) every 1 min per account on <model>").
+// Live-probed 2026-08-23: GET /v1/models is public (200 with no key) but
+// answers 401 "Invalid token" to a wrong key, and chat/completions is 401
+// without a key — so the default /v1/models key validation (which sends the
+// key) is a real check; no validateUrl override needed. A burst of parallel
+// requests trips an account-wide 429 on every :free model for several
+// minutes, which is why provider-quota pools the platform as one allowance.
+// Catalog rows live in the hosted catalog (premium now, free after the 30-day
+// model-age gate).
+register(new OpenAICompatProvider({
+  platform: 'unorouter',
+  name: 'UnoRouter',
+  baseUrl: 'https://api.unorouter.com/v1',
+}));
+
+// xKiro (xkiro.com) — OpenAI-compatible gateway at api.xkiro.com/v1 (the
+// apex serves the same API today, but the docs name api.). Free key from
+// xkiro.com (no card). Live-probed 2026-08-23 with a free-plan key: /v1/usage
+// reports free_tokens limit_per_day=5,000,000; paid models answer an instant
+// 403 "premium model"/"requires a paid account", free ones (Mistral, MiniMax,
+// DeepSeek families) answer normally, Qwen was 503 upstream.
+// GET /v1/models answers 200 with NO key (public
+// catalog), so the default /v1/models key validation would be a false
+// positive — validateUrl points at /v1/usage instead, which 401s on a missing
+// or invalid ClientApiKey ("Invalid or disabled ClientApiKey"). Accepts
+// Authorization: Bearer or x-api-key. Catalog rows live in the hosted catalog
+// (premium now, free after the 30-day model-age gate); the ids in #947 are
+// unverified against a live account and are candidates for catalog authoring,
+// where a bad id is caught by the health check instead of shipped as a default.
+register(new OpenAICompatProvider({
+  platform: 'xkiro',
+  name: 'xKiro',
+  baseUrl: 'https://api.xkiro.com/v1',
+  validateUrl: 'https://api.xkiro.com/v1/usage',
+}));
+
 // ModelScope (魔搭社区, Alibaba) — OpenAI-compatible inference API
 // (api-inference.modelscope.cn/v1, Bearer auth). Free tier: 2000 requests/day
 // account-wide. Token from modelscope.cn/my/myaccesstoken, BUT calls only work

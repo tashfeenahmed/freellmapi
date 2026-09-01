@@ -18,6 +18,7 @@ import { modelRetirementSignal } from '../lib/error-classify.js';
 import { summarizeAttemptError } from '../lib/error-redaction.js';
 import { isCatalogManagedModel, retireCatalogModelUpstream } from './model-state.js';
 import { modelStatsKey } from '../lib/endpoint-scope.js';
+import { providerLog } from '../lib/server-logs.js';
 
 /** How many DISTINCT requests must report a 'probable' signal before acting. */
 export const RETIREMENT_CONFIRMATIONS_REQUIRED = 2;
@@ -86,8 +87,13 @@ export function noteModelRetirementSignal(
     if (!row || !isCatalogManagedModel(row)) return false;
     if (!retireCatalogModelUpstream(db, row.id, row.platform, row.model_id, reason)) return false;
     observations.delete(key);
-    console.log(
+    // Retiring a model changes routing permanently, so it is a warn (which the
+    // dashboard viewer persists across restarts) carrying the platform/model it
+    // acted on. Still printed to stdout by providerLog.
+    providerLog(
+      'warn',
       `[ModelRetirement] ${row.platform}/${row.model_id} disabled — upstream reports it retired: ${reason}`,
+      { provider: row.platform, model: row.model_id, event: 'model_retired' },
     );
     return true;
   } catch (dbErr: any) {

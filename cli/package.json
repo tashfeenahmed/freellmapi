@@ -1,6 +1,6 @@
 {
   "name": "freellmapi",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Set up coding agents to use a FreeLLMAPI gateway",
   "license": "MIT",
   "repository": {
@@ -57,7 +57,8 @@
     "node": ">=20.18.0 <25.0.0"
   },
   "dependencies": {
-    "jsonc-parser": "^3.3.1"
+    "jsonc-parser": "^3.3.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

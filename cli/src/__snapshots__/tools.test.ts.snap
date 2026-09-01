@@ -240,6 +240,60 @@ exports[`tool generators > setup-cursor has stable golden output 1`] = `
 }
 `;
 
+exports[`tool generators > setup-dsh has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "format": "yaml",
+      "path": "/home/tester/.dsh/settings.yaml",
+      "value": {
+        "agent-default-model": {
+          "model": "fast-coder",
+          "provider": "freellmapi",
+          "reasoningEffort": undefined,
+        },
+        "llm-pi-ai": {
+          "providers": {
+            "freellmapi": {
+              "api": "openai-completions",
+              "apiKeyEnv": "FREELLMAPI_API_KEY",
+              "baseURL": "http://localhost:3000/v1",
+              "displayName": "FreeLLMAPI",
+              "models": [
+                {
+                  "contextWindow": 131072,
+                  "id": "fast-coder",
+                  "maxTokens": 8192,
+                  "name": "Fast Coder",
+                },
+                {
+                  "contextWindow": 262144,
+                  "id": "reasoning-model",
+                  "maxTokens": 8192,
+                  "name": "Reasoning Model",
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+    {
+      "content": "FREELLMAPI_API_KEY=freellmapi-test-key
+",
+      "format": "env",
+      "path": "/home/tester/.dsh/.env",
+      "sensitive": true,
+    },
+  ],
+  "notes": [
+    "Start DeepSeek Harness with: npx @deepseek-ai/dsh web — freellmapi/fast-coder is the default model.",
+    "Settings are hot-reloaded, so a running dsh picks this up on its next request.",
+    "Models are declared text-only; give a vision model \`input: [text, image]\` under freellmapi.models in settings.yaml to send it images.",
+  ],
+}
+`;
+
 exports[`tool generators > setup-generic has stable golden output 1`] = `
 {
   "files": [],
@@ -337,6 +391,52 @@ exports[`tool generators > setup-kilo has stable golden output 1`] = `
   ],
   "notes": [
     "Export FREELLMAPI_API_KEY before starting Kilo; global config is trusted for {env:…} expansion.",
+  ],
+}
+`;
+
+exports[`tool generators > setup-mimo has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "format": "json",
+      "path": "/home/tester/.config/mimocode/config.json",
+      "value": {
+        "$schema": "https://mimo.xiaomi.com/mimocode/config.json",
+        "model": "freellmapi/fast-coder",
+        "provider": {
+          "freellmapi": {
+            "models": {
+              "fast-coder": {
+                "limit": {
+                  "context": 131072,
+                  "output": 8192,
+                },
+                "name": "Fast Coder",
+              },
+              "reasoning-model": {
+                "limit": {
+                  "context": 262144,
+                  "output": 8192,
+                },
+                "name": "Reasoning Model",
+              },
+            },
+            "name": "FreeLLMAPI",
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+              "apiKey": "{env:FREELLMAPI_API_KEY}",
+              "baseURL": "http://localhost:3000/v1",
+            },
+          },
+        },
+      },
+    },
+  ],
+  "notes": [
+    "Install MiMo Code with: curl -fsSL https://mimo.xiaomi.com/install | bash",
+    "Export FREELLMAPI_API_KEY before starting MiMo Code.",
+    "Start it with \`mimo\` — freellmapi/fast-coder is the default model.",
   ],
 }
 `;

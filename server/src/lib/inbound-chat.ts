@@ -201,7 +201,11 @@ export async function runInboundChat(
   const attemptLog: AttemptRecord[] = [];
   const wantsTools = (input.tools?.length ?? 0) > 0;
   const imageRequest = hasImages(input.messages);
-  const estimatedTotal = estimatedInputTokens + routingReserveTokens(maxTokens);
+  // Capped reserve (#470); threaded to the router separately because it is an
+  // exact count and must not be inflated by the context-window safety margin
+  // (#956 review).
+  const outputReserve = routingReserveTokens(maxTokens);
+  const estimatedTotal = estimatedInputTokens + outputReserve;
   const schemas = toolSchemaMap(input.tools);
   let clientGone = false;
   const clientAbort = new AbortController();
@@ -240,6 +244,7 @@ export async function runInboundChat(
       pin.strictChain,
       input.responseFormat !== undefined,
       state.skipPlatforms.size ? state.skipPlatforms : undefined,
+      outputReserve,
     ),
     dispatch: async (route, attempt) => {
       if (!input.stream) {

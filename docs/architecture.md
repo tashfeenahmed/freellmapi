@@ -33,7 +33,7 @@ How the router decides, what to expect from stacked free tiers, and where the bo
                                           │
    ┌──────────────┬────────────┬──────────┴─────────┬─────────────┬──────────┐
    ▼              ▼            ▼                    ▼             ▼          ▼
- Google         Groq        Cerebras           OpenRouter        HF       …22 more
+ Google         Groq        Cerebras           OpenRouter        HF       …29 more
 ```
 
 - **Router** (`server/src/services/router.ts`) — picks a model per request.
@@ -79,8 +79,8 @@ PRs that add any of these are very welcome. See [Contributing](../README.md#cont
 
 Stacking free tiers has real trade-offs. Be honest with yourself about them:
 
-- **No frontier models.** The free-tier catalog tops out around Llama 3.3 70B, GLM-4.5, Qwen 3 Coder, and Gemini 2.5 Pro. You will not get GPT-5 or Claude Opus class reasoning through this. For hard problems, pay for a real API.
-- **Intelligence degrades as the day progresses.** Your top-ranked models (usually Gemini 2.5 Pro, GPT-4o via GitHub Models) have the lowest daily caps. Once they hit their limits, the router falls down your priority chain to smaller/weaker models. Expect the effective intelligence of the endpoint to drop in the late hours of each day — then reset at UTC midnight.
+- **Quota and availability are the ceiling, not model class.** The catalog does carry frontier-class rows — GPT-5.x, Grok 4.x, Kimi K3, DeepSeek V4 Pro, and Gemini 3.x all show up on somebody's free tier. What you don't get is *sustained* access to them: those are exactly the rows with the smallest daily allowances, the longest queues, and the highest chance of being pulled or paywalled at short notice. Budget for capacity and uptime, not for a capability limit.
+- **Intelligence degrades as the day progresses.** Your top-ranked models (usually Gemini 3.6 Flash, DeepSeek V4, Kimi K2.6) have the lowest daily caps. Once they hit their limits, the router falls down your priority chain to smaller/weaker models. Expect the effective intelligence of the endpoint to drop in the late hours of each day — then reset at UTC midnight.
 - **Latency is highly variable.** Cerebras and Groq are extremely fast; others are not. You get whichever one is available.
 - **Free tiers can change without notice.** Providers regularly tighten, loosen, or remove free tiers. When that happens you'll see 429s or auth errors until the catalog update reaches you — live-feed installs get those fixes within days, free installs on the 30-day trail. Re-seed scripts live in `server/src/scripts/`.
 - **No SLA, by definition.** If you need reliability, use a paid provider with a contract.
@@ -109,4 +109,4 @@ A self-hosted, single-user, personal-use setup was re-reviewed against each prov
 
 Rules of thumb that keep most providers happy: **one account per provider**, **no reselling**, **no sharing your endpoint with other humans**, **don't hammer a free tier as a paid production backend**. This is informational, not legal advice — read each provider's ToS and make your own call.
 
-Removed since the April 2026 review: Hugging Face, Moonshot, and MiniMax direct integrations were dropped from the catalog (HF — tool-call format issues; Moonshot — moved to paid only; MiniMax — superseded by the OpenRouter `minimax/minimax-m2.5:free` route).
+Removed since the April 2026 review: Moonshot and MiniMax direct integrations were dropped from the catalog (Moonshot — moved to paid only; MiniMax — superseded by the OpenRouter `minimax/minimax-m2.5:free` route).

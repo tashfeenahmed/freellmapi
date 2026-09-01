@@ -159,6 +159,22 @@ function getEncryptionKey(): Buffer {
   return cachedKey;
 }
 
+/**
+ * A short, non-reversible identifier for the key currently in use.
+ *
+ * Database dumps record it in their header so a restore can tell, before it
+ * touches a row, whether the api_keys ciphertext in the file was written under
+ * this key. sha256 truncated to 64 bits: enough to catch a different key,
+ * nowhere near enough to help recover the key itself, and safe to show in an
+ * error message or write to a file an operator emails around.
+ *
+ * Returns null before initEncryptionKey() has run.
+ */
+export function encryptionKeyFingerprint(): string | null {
+  if (!cachedKey) return null;
+  return `sha256:${crypto.createHash('sha256').update(cachedKey).digest('hex').slice(0, 16)}`;
+}
+
 export function isEncryptionKeyInitialized(): boolean {
   return cachedKey !== null;
 }

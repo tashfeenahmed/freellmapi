@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 
@@ -27,6 +29,53 @@ vi.mock('../../../server/src/lib/proxy.js', () => ({
   restoreProxySettings: vi.fn(() => {
     calls.push('restoreProxySettings');
   }),
+  flushProxyCache: vi.fn(),
+}));
+
+vi.mock('../../../server/src/lib/log-redaction.js', () => ({
+  installLogRedaction: vi.fn(() => {
+    calls.push('installLogRedaction');
+    return () => undefined;
+  }),
+}));
+
+vi.mock('../../../server/src/lib/process-safety-net.js', () => ({
+  installProcessSafetyNet: vi.fn(() => {
+    calls.push('installProcessSafetyNet');
+  }),
+}));
+
+vi.mock('../../../server/src/services/ratelimit.js', () => ({
+  cleanupExpiredCooldowns: vi.fn(() => {
+    calls.push('cleanupExpiredCooldowns');
+    return 0;
+  }),
+}));
+
+vi.mock('../../../server/src/services/cooldown-probe.js', () => ({
+  startCooldownProbe: vi.fn(() => {
+    calls.push('startCooldownProbe');
+  }),
+}));
+
+vi.mock('../../../server/src/services/backups.js', () => ({
+  startBackupScheduler: vi.fn(() => {
+    calls.push('startBackupScheduler');
+    return () => undefined;
+  }),
+}));
+
+vi.mock('../../../server/src/services/custom-model-sync.js', () => ({
+  startCustomModelSync: vi.fn(() => {
+    calls.push('startCustomModelSync');
+    return null;
+  }),
+}));
+
+vi.mock('../../../server/src/lib/wake-detect.js', () => ({
+  startWakeDetect: vi.fn(() => {
+    calls.push('startWakeDetect');
+  }),
 }));
 
 vi.mock('../../../server/src/app.js', () => ({
@@ -47,6 +96,7 @@ vi.mock('../../../server/src/services/health.js', () => ({
   startHealthChecker: vi.fn(() => {
     calls.push('startHealthChecker');
   }),
+  checkAllKeys: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../../server/src/services/catalog-sync.js', () => ({
@@ -100,12 +150,51 @@ describe('desktop server boot sequence (#949)', () => {
   it('runs the whole startup in the order server/src/index.ts uses', async () => {
     await boot();
     expect(calls).toEqual([
+      'installLogRedaction',
+      'installProcessSafetyNet',
       'initDb',
+      'cleanupExpiredCooldowns',
       'restoreProxySettings',
       'createApp',
       'listen',
       'startHealthChecker',
       'startCatalogSync',
+      'startCooldownProbe',
+      'startBackupScheduler',
+      'startCustomModelSync',
+      'startWakeDetect',
     ]);
+  });
+
+  // The literal list above froze an incomplete sequence once already: it was
+  // written for #949 with six steps and then green-lit eight later omissions,
+  // including startBackupScheduler — the Backups page saved a schedule that
+  // never fired. So derive the required steps from the index.ts source instead
+  // of trusting anyone to update both places.
+  it('mirrors every startup step server/src/index.ts performs (minus the documented env-only skips)', async () => {
+    const indexSrc = fs.readFileSync(
+      fileURLToPath(new URL('../../../server/src/index.ts', import.meta.url)),
+      'utf8',
+    );
+    const withoutComments = indexSrc
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    const steps = new Set(
+      [...withoutComments.matchAll(/\b((?:install|start|cleanup|restore)[A-Z]\w*)\(/g)].map((m) => m[1]),
+    );
+    // Env-gated (FREEAPI_DB_BACKUP_*): a GUI-launched packaged app inherits no
+    // shell environment, so these can never activate on desktop.
+    const SKIPPED = new Set(['restoreDbBackupIfNeeded', 'startDbBackupPump']);
+    // Regex sanity floor — an index.ts restructure must not blank this test.
+    expect(steps.size).toBeGreaterThanOrEqual(10);
+
+    await boot();
+    for (const step of steps) {
+      if (SKIPPED.has(step)) continue;
+      expect(
+        calls,
+        `server/src/index.ts calls ${step}() but the desktop embedder never does — add it to startServer() in server-host.ts`,
+      ).toContain(step);
+    }
   });
 });

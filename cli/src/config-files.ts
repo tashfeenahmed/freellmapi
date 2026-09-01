@@ -6,6 +6,7 @@ import {
   parse,
   type ParseError,
 } from 'jsonc-parser';
+import { Document, isMap, parseDocument } from 'yaml';
 import type { GeneratedFile } from './types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,6 +52,47 @@ function mergeJson(existing: string, value: Record<string, unknown>): string {
     }
   };
   applyPatch(parsed, value);
+  return rendered.endsWith('\n') ? rendered : `${rendered}\n`;
+}
+
+// Structural YAML merge, the `mergeJson` rule applied to a YAML document:
+// nested objects recurse, everything else (scalars, arrays) is replaced at
+// that path, and an explicit `undefined` deletes the key (a generator's way
+// to retire a sibling the new value makes stale). Editing the parsed
+// Document rather than re-rendering from a plain object keeps the user's
+// comments, key order, and quoting for every node the patch does not touch —
+// a settings.yaml shared with other providers (DeepSeek Harness keeps every
+// route under one `llm-pi-ai` key) must not lose its siblings just because
+// ours changed.
+function mergeYamlDocument(existing: string, value: Record<string, unknown>): string {
+  if (!existing.trim()) {
+    const fresh = new Document(JSON.parse(JSON.stringify(value)));
+    return fresh.toString({ lineWidth: 0 });
+  }
+  const doc = parseDocument(existing);
+  if (doc.errors.length) {
+    throw new Error(`Existing YAML cannot be parsed safely: ${doc.errors[0].message}`);
+  }
+  if (doc.contents !== null && !isMap(doc.contents)) {
+    throw new Error('Existing YAML is not a mapping at the top level');
+  }
+  const applyPatch = (patch: Record<string, unknown>, parentPath: string[] = []) => {
+    for (const [key, next] of Object.entries(patch)) {
+      const propertyPath = [...parentPath, key];
+      if (next === undefined) {
+        doc.deleteIn(propertyPath);
+        continue;
+      }
+      const current = doc.getIn(propertyPath, true);
+      if (isRecord(next) && isMap(current)) {
+        applyPatch(next, propertyPath);
+        continue;
+      }
+      doc.setIn(propertyPath, next);
+    }
+  };
+  applyPatch(value);
+  const rendered = doc.toString({ lineWidth: 0 });
   return rendered.endsWith('\n') ? rendered : `${rendered}\n`;
 }
 
@@ -258,7 +300,11 @@ function mergeEnv(existing: string, generated: string): string {
 export function renderFile(file: GeneratedFile, existing = ''): string {
   if (file.format === 'json') return mergeJson(existing, file.value ?? {});
   if (file.format === 'env') return mergeEnv(existing, file.content ?? '');
-  if (file.format === 'yaml') return mergeYaml(existing, file.content ?? '');
+  if (file.format === 'yaml') {
+    return file.value
+      ? mergeYamlDocument(existing, file.value)
+      : mergeYaml(existing, file.content ?? '');
+  }
   return mergeToml(existing, file.content ?? '');
 }
 

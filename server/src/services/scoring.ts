@@ -33,6 +33,14 @@ export interface RoutingWeights {
 // router.ts). Each is just a weight vector — the engine is identical.
 export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom';
 
+// How the router picks BETWEEN several keys of one platform, once a model has
+// been chosen. Deliberately not a RoutingStrategy: model ranking and key
+// selection are independent choices, and folding this into the strategy enum
+// would mean switching key policy also switches (or disables) the model bandit.
+// 'auto' is the historical behaviour — per-key bandit score, else round-robin.
+// 'least-remaining' additionally ranks by observed remaining quota (#919).
+export type KeySelectionStrategy = 'auto' | 'least-remaining';
+
 export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority' | 'custom'>, RoutingWeights> = {
   // Reliability leads; speed and intelligence split the rest evenly.
   balanced: { reliability: 0.5, speed: 0.25, intelligence: 0.25 },
@@ -49,6 +57,141 @@ export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority' | 'custo
 // old hand-ordered chain can switch the strategy to 'priority' from the
 // dashboard or PUT /api/fallback/routing.
 export const DEFAULT_STRATEGY: RoutingStrategy = 'balanced';
+
+// ── Time-of-day dynamic ranking (#760) ─────────────────────────────────────
+// During an operator-declared peak window free relays are congested, so a
+// model's raw throughput is a weaker signal than its reliability: part of the
+// speed weight is moved onto reliability. This is OFF by default and every
+// parameter is operator-set — routing that silently changes with the wall
+// clock is impossible to reason about when someone reports "it picked a
+// different model this evening".
+//
+// The hour is read in an explicit IANA timezone, never the server's local
+// clock: the box a gateway runs on is frequently UTC (containers, VPS images)
+// while the traffic it serves is not, so `getHours()` would define "peak" as
+// whatever the host image happened to be built with.
+
+/** Persisted peak-hours settings. `enabled` false ⇒ presets are untouched. */
+export interface PeakHoursConfig {
+  enabled: boolean;
+  /** Window start hour, inclusive, 0–23. */
+  startHour: number;
+  /** Window end hour, exclusive, 0–23. May be < startHour (window spans midnight). */
+  endHour: number;
+  /** IANA timezone name the hours are interpreted in. */
+  timezone: string;
+}
+
+export const DEFAULT_PEAK_START_HOUR = 18;
+export const DEFAULT_PEAK_END_HOUR = 6; // default window spans midnight: [18, 24) ∪ [0, 6)
+export const DEFAULT_PEAK_TIMEZONE = 'UTC';
+
+/** Fraction of the speed weight moved onto reliability during peak hours. */
+export const PEAK_SPEED_TO_RELIABILITY = 0.6;
+
+export const DEFAULT_PEAK_HOURS: PeakHoursConfig = {
+  enabled: false,
+  startHour: DEFAULT_PEAK_START_HOUR,
+  endHour: DEFAULT_PEAK_END_HOUR,
+  timezone: DEFAULT_PEAK_TIMEZONE,
+};
+
+/**
+ * Presets exempt from the peak adjustment.
+ *
+ * `fastest` and `reliable` are the two ends of the speed↔reliability axis, and
+ * they are what an operator picks when they have already decided which end they
+ * want. Shifting 60% of `fastest`'s 0.55 speed weight would leave it at
+ * reliability 0.68 / speed 0.22 — i.e. `fastest` would quietly become a slightly
+ * noisy copy of `reliable`, which is a different preset the user could have
+ * selected. `reliable` is exempt for the mirror-image reason: it is already the
+ * reliability extreme, so there is nothing the adjustment can add, and moving
+ * its speed weight only pushes it past the range any preset offers. The
+ * adjustment therefore applies only to the mixed presets (`balanced`,
+ * `smartest`), where trading some speed weight for reliability stays inside the
+ * span the presets already describe. Clamping instead of exempting was the
+ * alternative; exempting is chosen because it keeps each preset's identity
+ * exactly, rather than making two of them silently converge on a third.
+ */
+export const PEAK_EXEMPT_STRATEGIES: readonly RoutingStrategy[] = ['fastest', 'reliable'];
+
+/** Whether this strategy opts out of the peak adjustment (see above). */
+export function isPeakExemptStrategy(strategy: RoutingStrategy): boolean {
+  return PEAK_EXEMPT_STRATEGIES.includes(strategy);
+}
+
+/** True when `hour` is a whole number in 0–23. */
+export function isValidPeakHour(hour: unknown): hour is number {
+  return typeof hour === 'number' && Number.isInteger(hour) && hour >= 0 && hour <= 23;
+}
+
+/** True when `timezone` is an IANA name this runtime's ICU data knows. */
+export function isValidTimezone(timezone: unknown): timezone is string {
+  if (typeof timezone !== 'string' || !timezone.trim()) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The hour (0–23) at `now` in `timezone`. Uses Intl rather than Date#getHours
+ * so the window means the same thing regardless of the host's TZ. An unknown
+ * timezone falls back to UTC instead of throwing — routing must never fail
+ * because a settings row went stale.
+ */
+export function hourInTimezone(now: Date, timezone: string): number {
+  const zone = isValidTimezone(timezone) ? timezone : DEFAULT_PEAK_TIMEZONE;
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', hourCycle: 'h23' })
+    .formatToParts(now);
+  const raw = parts.find(p => p.type === 'hour')?.value ?? '0';
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed % 24 : 0;
+}
+
+/**
+ * True when `now` falls inside the configured window. `startHour === endHour`
+ * is an EMPTY window, not a 24-hour one: an operator who drags both ends to the
+ * same value means "nothing", and the alternative (always peak) would be a
+ * permanent silent reweight from a config that looks like a no-op.
+ */
+export function isPeakHours(config: PeakHoursConfig, now = new Date()): boolean {
+  if (!config.enabled) return false;
+  if (!isValidPeakHour(config.startHour) || !isValidPeakHour(config.endHour)) return false;
+  if (config.startHour === config.endHour) return false;
+  const h = hourInTimezone(now, config.timezone);
+  return config.startHour < config.endHour
+    ? h >= config.startHour && h < config.endHour
+    : h >= config.startHour || h < config.endHour;
+}
+
+/**
+ * Peak-adjusted weights for a bandit preset, plus whether the adjustment
+ * actually fired (the dashboard labels the weight summary from that flag).
+ * Returns the base vector untouched when the feature is off, when the clock is
+ * outside the window, or when the strategy is exempt.
+ */
+export function peakAdjustedWeights(
+  base: RoutingWeights,
+  strategy: RoutingStrategy,
+  config: PeakHoursConfig,
+  now = new Date(),
+): { weights: RoutingWeights; adjusted: boolean } {
+  if (isPeakExemptStrategy(strategy)) return { weights: base, adjusted: false };
+  if (!isPeakHours(config, now)) return { weights: base, adjusted: false };
+  const shift = base.speed * PEAK_SPEED_TO_RELIABILITY;
+  if (shift <= 0) return { weights: base, adjusted: false };
+  return {
+    weights: {
+      reliability: base.reliability + shift,
+      speed: base.speed - shift,
+      intelligence: base.intelligence,
+    },
+    adjusted: true,
+  };
+}
 
 // ── Reliability ───────────────────────────────────────────────────────────
 // Beta(1,1) prior = uniform: an unseen model is genuinely uncertain, not assumed
@@ -206,15 +349,68 @@ export function intelligenceScore(composite: number, min: number, max: number): 
 // Multiplier that stays at 1 while a model has comfortable monthly headroom and
 // ramps down to a floor as it approaches its free-tier cap, so we stop steering
 // traffic at a model we're about to burn out. Unknown budget (0) → no opinion.
+// Thresholds are tunable per-instance (#899): callers may pass explicit
+// rampStart/floor, and the defaults below are the historical behavior (start
+// protecting at 20% remaining, floor at 10% of the score). Router wires these
+// to persisted settings so operators can tune without a code change.
 export const HEADROOM_FLOOR = 0.1;
 export const HEADROOM_RAMP_START = 0.2; // start protecting at 20% remaining
 
-export function headroomFactor(usedTokens: number, budgetTokens: number): number {
+export interface HeadroomThresholds {
+  /** Remaining-budget fraction at which demotion begins (0..1). */
+  rampStart?: number;
+  /** Score floor while a model is at 0 remaining budget (0..1). */
+  floor?: number;
+}
+
+export function headroomFactor(usedTokens: number, budgetTokens: number, opts?: HeadroomThresholds): number {
   if (!budgetTokens || budgetTokens <= 0) return 1; // unknown budget → no opinion
-  const remaining = Math.max(0, 1 - usedTokens / budgetTokens);
-  if (remaining >= HEADROOM_RAMP_START) return 1;
-  // Linear from (0 remaining → floor) to (RAMP_START remaining → 1).
-  return HEADROOM_FLOOR + (1 - HEADROOM_FLOOR) * (remaining / HEADROOM_RAMP_START);
+  return headroomRamp(1 - usedTokens / budgetTokens, opts);
+}
+
+/** The shared ramp both headroom guardrails ride: 1 while `remaining` (a 0..1
+ *  fraction of the quota still available) is comfortable, then linear down to
+ *  `floor` as it reaches zero. Factored out so the monthly-budget guardrail and
+ *  the rate-window one below cannot drift apart — and so a single pair of
+ *  operator-tuned thresholds governs both (#899). */
+function headroomRamp(remainingRaw: number, opts?: HeadroomThresholds): number {
+  const rampStart = clampUnit(opts?.rampStart, HEADROOM_RAMP_START);
+  const floor = clampUnit(opts?.floor, HEADROOM_FLOOR);
+  const remaining = Math.max(0, Math.min(1, remainingRaw));
+  if (remaining >= rampStart) return 1;
+  // Linear from (0 remaining → floor) to (rampStart remaining → 1).
+  return floor + (1 - floor) * (remaining / rampStart);
+}
+
+// ── Guardrail: rate-window headroom (#899) ──────────────────────────────────
+// The monthly-budget guardrail above only has an opinion about models that
+// declare a `monthly_token_budget`. The far more common free-tier shape is a
+// per-day request or token cap (rpd/tpd, plus the per-minute rpm/tpm), and
+// those were purely BINARY: canMakeRequest/canUseTokens reject at 100% and the
+// router happily keeps a model pinned at #1 until the very request that
+// exhausts it, then eats a 429 and falls through. That is exactly the
+// "deprioritize at 82% utilization, prefer the idle peer" behavior the issue
+// asks for.
+//
+// So: same ramp, same tunable thresholds, driven by live window utilization
+// instead of monthly tokens. `usedFraction` is the share of the binding window
+// limit already consumed (0 = idle, 1 = exhausted); null means the model
+// declares no window limits, or has no routable key to measure — in both cases
+// the guardrail has no opinion and returns 1.
+//
+// Recovery is automatic and needs no bookkeeping: the windows are sliding, so a
+// demoted model's utilization falls on its own as the minute or the day rolls
+// past, and the factor climbs straight back to 1.
+export function rateWindowHeadroomFactor(usedFraction: number | null, opts?: HeadroomThresholds): number {
+  if (usedFraction === null || !Number.isFinite(usedFraction)) return 1; // unknown → no opinion
+  return headroomRamp(1 - usedFraction, opts);
+}
+
+// Out-of-range / non-finite operator input falls back to the default rather
+// than silently clamping to a legal-but-unintended value (#899).
+function clampUnit(n: number | undefined, fallback: number): number {
+  if (n === undefined || !Number.isFinite(n) || n < 0 || n > 1) return fallback;
+  return n;
 }
 
 // ── Guardrail: live rate-limit penalty ──────────────────────────────────────

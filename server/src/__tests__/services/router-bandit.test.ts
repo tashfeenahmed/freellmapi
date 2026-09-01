@@ -3,10 +3,13 @@ import {
   routeRequest, refreshStatsCache, getRoutingStrategy, setRoutingStrategy, getRoutingScores,
   getCustomWeights, setCustomWeights, getExploreEnabled, setExploreEnabled,
   getCommunityPrior, setCommunityPriors, getCommunityPriorEnabled, setCommunityPriorEnabled,
+  getPeakHoursConfig, setPeakHoursConfig,
 } from '../../services/router.js';
+import { BANDIT_PRESETS, DEFAULT_PEAK_HOURS } from '../../services/scoring.js';
 import { resetModelWeightOverrides } from '../../services/model-weight-overrides.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
+import { addToActiveChain } from '../helpers/chain.js';
 
 vi.mock('../../services/ratelimit.js', async () => {
   const actual = await vi.importActual('../../services/ratelimit.js');
@@ -40,6 +43,7 @@ function addModel(opts: {
   const id = (db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(opts.platform, opts.modelId) as { id: number }).id;
   db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(id, opts.priority);
+  addToActiveChain(id, opts.priority);
   // every platform needs at least one healthy key to be routable
   db.prepare(`
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
@@ -211,18 +215,115 @@ describe('bandit router', () => {
   });
 
   it('getRoutingScores returns a per-axis breakdown ranked by score', () => {
-    addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
-    addHistory('google', 'm1', { successes: 30, failures: 0, outTokens: 500, latencyMs: 1000, ttfbMs: 200 });
-    setRoutingStrategy('balanced');
-    refreshStatsCache(getDb(), true);
-    const { strategy, weights, scores } = getRoutingScores();
-    expect(strategy).toBe('balanced');
-    expect(weights).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
-    expect(scores).toHaveLength(1);
-    expect(scores[0]).toMatchObject({ modelId: 'm1', enabled: true });
-    expect(scores[0].reliability).toBeGreaterThan(0.9);
-    expect(scores[0].score).toBeGreaterThan(0);
-    expect(scores[0].score).toBeLessThanOrEqual(1);
+    // The peak-hours adjustment (#760) is opt-in and off here, so the preset is
+    // returned verbatim — but the clock is still pinned to off-peak noon so this
+    // assertion can never depend on when CI happens to run.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-15T12:00:00'));
+    try {
+      addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+      addHistory('google', 'm1', { successes: 30, failures: 0, outTokens: 500, latencyMs: 1000, ttfbMs: 200 });
+      setRoutingStrategy('balanced');
+      refreshStatsCache(getDb(), true);
+      const { strategy, weights, scores } = getRoutingScores();
+      expect(strategy).toBe('balanced');
+      expect(weights).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+      expect(scores).toHaveLength(1);
+      expect(scores[0]).toMatchObject({ modelId: 'm1', enabled: true });
+      expect(scores[0].reliability).toBeGreaterThan(0.9);
+      expect(scores[0].score).toBeGreaterThan(0);
+      expect(scores[0].score).toBeLessThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('peak-hours settings persist and default to off with the stock window', () => {
+    expect(getPeakHoursConfig()).toEqual(DEFAULT_PEAK_HOURS);
+    setPeakHoursConfig({ enabled: true, startHour: 9, endHour: 17, timezone: 'Asia/Kolkata' });
+    expect(getPeakHoursConfig()).toEqual({ enabled: true, startHour: 9, endHour: 17, timezone: 'Asia/Kolkata' });
+    setPeakHoursConfig({ enabled: false });
+    expect(getPeakHoursConfig().enabled).toBe(false);
+  });
+
+  it('rejects an out-of-range hour or an unknown timezone', () => {
+    expect(() => setPeakHoursConfig({ startHour: 24 })).toThrow(/peakStartHour/);
+    expect(() => setPeakHoursConfig({ startHour: -1 })).toThrow(/peakStartHour/);
+    expect(() => setPeakHoursConfig({ endHour: 6.5 })).toThrow(/peakEndHour/);
+    expect(() => setPeakHoursConfig({ timezone: 'Not/AZone' })).toThrow(/peakTimezone/);
+    // Nothing was written by the rejected calls.
+    expect(getPeakHoursConfig()).toEqual(DEFAULT_PEAK_HOURS);
+  });
+
+  it('leaves preset weights alone while the peak adjustment is off (#760)', () => {
+    vi.useFakeTimers();
+    // 20:00 UTC — squarely inside the default 18:00–06:00 window.
+    vi.setSystemTime(new Date('2026-01-15T20:00:00Z'));
+    try {
+      addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+      refreshStatsCache(getDb(), true);
+      for (const strategy of ['balanced', 'smartest', 'fastest', 'reliable'] as const) {
+        setRoutingStrategy(strategy);
+        const { weights, peakAdjusted } = getRoutingScores();
+        expect(weights).toEqual(BANDIT_PRESETS[strategy]);
+        expect(peakAdjusted).toBe(false);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shifts speed onto reliability inside the window, in the configured timezone (#760)', () => {
+    vi.useFakeTimers();
+    // 13:00 UTC = 18:30 in Kolkata (inside 18:00–06:00) and 13:00 in UTC (outside).
+    vi.setSystemTime(new Date('2026-01-15T13:00:00Z'));
+    try {
+      addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+      refreshStatsCache(getDb(), true);
+      setRoutingStrategy('balanced');
+
+      setPeakHoursConfig({ enabled: true, timezone: 'Asia/Kolkata' });
+      const inside = getRoutingScores();
+      expect(inside.peakAdjusted).toBe(true);
+      expect(inside.weights).toEqual({ reliability: 0.65, speed: 0.1, intelligence: 0.25 });
+
+      // Same instant, same flag — only the timezone moves it out of the window.
+      setPeakHoursConfig({ timezone: 'UTC' });
+      const outside = getRoutingScores();
+      expect(outside.peakAdjusted).toBe(false);
+      expect(outside.weights).toEqual(BANDIT_PRESETS.balanced);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exempts fastest and reliable from the peak adjustment (#760)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-15T20:00:00Z')); // inside the default window
+    try {
+      addModel({ platform: 'google', modelId: 'm1', name: 'M1', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+      refreshStatsCache(getDb(), true);
+      setPeakHoursConfig({ enabled: true, timezone: 'UTC' });
+
+      for (const strategy of ['fastest', 'reliable'] as const) {
+        setRoutingStrategy(strategy);
+        const { weights, peakAdjusted } = getRoutingScores();
+        expect(weights).toEqual(BANDIT_PRESETS[strategy]);
+        expect(peakAdjusted).toBe(false);
+      }
+      for (const strategy of ['balanced', 'smartest'] as const) {
+        setRoutingStrategy(strategy);
+        expect(getRoutingScores().peakAdjusted).toBe(true);
+      }
+      // 'custom' is the operator's own vector and is never rewritten either.
+      setCustomWeights({ reliability: 0.1, speed: 0.9, intelligence: 0 });
+      setRoutingStrategy('custom');
+      const custom = getRoutingScores();
+      expect(custom.weights).toEqual({ reliability: 0.1, speed: 0.9, intelligence: 0 });
+      expect(custom.peakAdjusted).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('exploration toggle persists and defaults to off', () => {

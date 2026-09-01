@@ -4,7 +4,7 @@ import type { Db } from '../db/types.js';
 import { getDb } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
-import { setCustomWeights, setRoutingStrategy } from './router.js';
+import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
 import { ensureModelInProfiles } from './profile-models.js';
 import { customModelSeed } from './custom-model-seed.js';
 import { endpointRefMatches, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
@@ -89,6 +89,9 @@ const declarativeConfigSchema = z.object({
       speed: z.number().nonnegative(),
       intelligence: z.number().nonnegative(),
     }).optional(),
+    // Which key of a platform to reach for (#919); orthogonal to `strategy`,
+    // which ranks models. Omitted leaves the persisted value alone.
+    keySelectionStrategy: z.enum(['auto', 'least-remaining']).optional(),
   }).optional(),
 }).strict();
 
@@ -476,6 +479,9 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
     if (parsed.data.routing) {
       if (parsed.data.routing.weights) setCustomWeights(parsed.data.routing.weights);
       setRoutingStrategy(parsed.data.routing.strategy);
+      if (parsed.data.routing.keySelectionStrategy) {
+        setKeySelectionStrategy(parsed.data.routing.keySelectionStrategy);
+      }
       result.routing = true;
     }
   });

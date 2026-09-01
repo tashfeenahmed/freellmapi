@@ -1,8 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tools } from './tools.js';
 import type { GenerateContext } from './types.js';
+
+// CI runners export XDG_CONFIG_HOME (and could export MIMOCODE_HOME / DSH_HOME),
+// which the XDG-aware generators honour over ctx.homeDir. Pin them so golden
+// output is stable everywhere.
+beforeEach(() => {
+  vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('MIMOCODE_HOME', '');
+  vi.stubEnv('DSH_HOME', '');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const context: GenerateContext = {
   url: 'http://localhost:3000',
@@ -211,6 +223,96 @@ describe('tool generators', () => {
         supports_attachments: false,
       });
     }
+  });
+
+  it('declares a complete DeepSeek Harness route and claims the default model', () => {
+    const dsh = tools.find(tool => tool.id === 'dsh')!;
+    const generation = dsh.generate(context);
+    const [settings, env] = generation.files;
+    expect(settings.path).toBe('/home/tester/.dsh/settings.yaml');
+    expect(settings.format).toBe('yaml');
+    const value = settings.value as {
+      'llm-pi-ai': { providers: Record<string, { api: string; baseURL: string; apiKeyEnv: string; models: { id: string }[] }> };
+      'agent-default-model': { provider: string; model: string; reasoningEffort?: string };
+    };
+    const route = value['llm-pi-ai'].providers.freellmapi;
+    // A hand-declared route must carry api, baseURL, and a non-empty models
+    // list, or DSH refuses the whole section where it is written.
+    expect(route.api).toBe('openai-completions');
+    expect(route.baseURL).toBe('http://localhost:3000/v1');
+    expect(route.apiKeyEnv).toBe('FREELLMAPI_API_KEY');
+    expect(route.models.map(model => model.id)).toEqual(['fast-coder', 'reasoning-model']);
+    expect(value['agent-default-model']).toEqual({
+      provider: 'freellmapi',
+      model: 'fast-coder',
+      reasoningEffort: undefined,
+    });
+    expect('reasoningEffort' in value['agent-default-model']).toBe(true);
+    // DSH loads $DSH_HOME/.env as its user environment layer, which is how
+    // `apiKeyEnv` resolves without an export.
+    expect(env).toMatchObject({
+      path: '/home/tester/.dsh/.env',
+      format: 'env',
+      sensitive: true,
+      content: 'FREELLMAPI_API_KEY=freellmapi-test-key\n',
+    });
+  });
+
+  it('adds a named DeepSeek Harness profile as a second route without moving the default', () => {
+    const dsh = tools.find(tool => tool.id === 'dsh')!;
+    const value = dsh.generate({ ...context, profile: 'Work Laptop' }).files[0].value as Record<string, unknown>;
+    const providers = (value['llm-pi-ai'] as { providers: Record<string, unknown> }).providers;
+    expect(Object.keys(providers)).toEqual(['freellmapi-work-laptop']);
+    expect(value['agent-default-model']).toBeUndefined();
+  });
+
+  it('writes MiMo Code a custom provider its own schema accepts', () => {
+    const mimo = tools.find(tool => tool.id === 'mimo')!;
+    const [config] = mimo.generate(context).files;
+    // The global config directory is XDG-based, and `config.json` is the
+    // weakest of the three names it merges, so a hand-written
+    // `mimocode.json` still wins.
+    expect(config.path).toBe('/home/tester/.config/mimocode/config.json');
+    const value = config.value as {
+      model: string;
+      provider: {
+        freellmapi: {
+          npm: string;
+          options: Record<string, string>;
+          models: Record<string, { limit: Record<string, number> }>;
+        };
+      };
+    };
+    const provider = value.provider.freellmapi;
+    expect(provider.npm).toBe('@ai-sdk/openai-compatible');
+    expect(provider.options).toEqual({
+      baseURL: 'http://localhost:3000/v1',
+      apiKey: '{env:FREELLMAPI_API_KEY}',
+    });
+    // `provider.<id>.models.<id>.limit` requires context AND output.
+    expect(provider.models['fast-coder'].limit).toEqual({ context: 131072, output: 8192 });
+    // The default model has to name an entry that exists in that map.
+    expect(value.model).toBe('freellmapi/fast-coder');
+    expect(Object.keys(provider.models)).toContain(value.model.split('/')[1]);
+    // MIMOCODE_API_KEY and MIMOCODE_BASE_URL do not exist.
+    expect(JSON.stringify(mimo.generate(context))).not.toContain('MIMOCODE_');
+  });
+
+  it('keeps the MiMo Code default model in its own provider map when auto leads', () => {
+    const liveContext: GenerateContext = {
+      ...context,
+      models: [
+        { id: 'auto', name: 'Auto', available: true, context_window: 200_000 },
+        ...context.models,
+      ],
+    };
+    const value = tools.find(tool => tool.id === 'mimo')!
+      .generate(liveContext).files[0].value as {
+        model: string;
+        provider: { freellmapi: { models: Record<string, unknown> } };
+      };
+    expect(value.model).toBe('freellmapi/auto');
+    expect(Object.keys(value.provider.freellmapi.models)).toContain('auto');
   });
 
   it('uses /v1 for every OpenAI-compatible generated base URL', () => {

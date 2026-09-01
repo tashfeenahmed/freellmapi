@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**每月 40 亿词元。29 家免费 LLM 提供方。358 个免费模型端点。一个 OpenAI 兼容端点。**
+**每月 74 亿词元。34 家免费 LLM 提供方。635 个免费模型端点。一个 OpenAI 兼容端点。**
 
 把几十家提供方的免费额度，连同任意自建的 OpenAI 兼容聊天、嵌入、图像和音频端点，一起聚合到单个 `/v1` API 之后。密钥加密存储。路由器为每个请求挑选当前可用的最佳模型，某家提供方触发限流时自动转移到下一家，并按密钥跟踪用量，让你始终待在各家的免费额度之内。
 
@@ -13,9 +13,11 @@
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 浏览完整目录：251 个模型系列，358 个免费端点
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 浏览完整目录：474 个模型系列，635 个免费端点
 
 [English](../../../README.md) · **简体中文**
+
+本翻译可能滞后，最新内容以英文 README 为准。
 
 ![FreeLLMAPI 仪表盘 —— 带每月词元额度的模型页](../../../repo-assets/github-hero.png)
 
@@ -52,13 +54,13 @@
 
 ## 为什么会有这个项目
 
-如今每家正经的 AI 实验室都提供免费额度：每月几百万词元，每天几千次请求。单独看，每一份都只是个玩具。叠加起来，它们合计约 **每月 40 亿词元** 的可用推理能力，覆盖 **251 个模型系列 / 358 个提供方端点**，从小而快的到相当能打的都有。
+如今每家正经的 AI 实验室都提供免费额度：每月几百万词元，每天几千次请求。单独看，每一份都只是个玩具。叠加起来，它们合计约 **每月 74 亿词元** 的可用推理能力，覆盖 **474 个模型系列 / 635 个提供方端点**，从小而快的到相当能打的都有。
 
-问题在于手工叠加太痛苦：二十九套不同的 SDK，二十九种不同的限流规则，二十九个请求可能失败的地方。FreeLLMAPI 把这些收拢成一个 OpenAI 兼容端点。把任意 OpenAI 客户端库指向你的本地服务，它就会在你添加过密钥的提供方之间透明路由。
+问题在于手工叠加太痛苦：三十四套不同的 SDK，三十四种不同的限流规则，三十四个请求可能失败的地方。FreeLLMAPI 把这些收拢成一个 OpenAI 兼容端点。把任意 OpenAI 客户端库指向你的本地服务，它就会在你添加过密钥的提供方之间透明路由。
 
 而且免费额度的格局每周都在变：提供方会上线新模型、下线旧模型，并且不打招呼就调整额度。这些 FreeLLMAPI 都替你盯着。路由器会自行从 [freellmapi.co](https://freellmapi.co) 拉取经过签名的模型目录，所以你的部署不用 `git pull` 也能跟上。跟进速度见 [Premium 实时目录](#premium-实时目录)。
 
-![叠加后的免费额度 —— 28 家提供方合计每月约 40 亿词元的免费推理](../../../repo-assets/free-tier.png)
+![叠加后的免费额度 —— 34 家提供方合计每月约 74 亿词元的免费推理](../../../repo-assets/free-tier.png)
 
 ## 支持的提供方
 
@@ -86,7 +88,7 @@
 </tr>
 </table>
 
-<i>…… 以及另外 17 家免费提供方</i>
+<i>…… 以及另外 22 家免费提供方</i>
 
 </div>
 
@@ -230,7 +232,7 @@ FreeLLMAPI 在设计上是本地优先、单用户的。你的提供方密钥留
 
 路由器会自行保持模型目录的新鲜：它每天两次从 [freellmapi.co](https://freellmapi.co) 拉取经过签名的目录，把新模型、额度变更和提供方的怪癖修复应用到你的本地数据库。你自己的启用/停用选择和自定义提供方永远不会被动到，而且每次下载在应用之前都会用固定的 Ed25519 公钥验签。
 
-目录目前收录 **29 家提供方**、**251 个模型系列**、**358 个提供方/模型端点**，以及大约 **每月 40 亿词元** 的免费额度容量。完整内容可在 **[freellmapi.co/models](https://freellmapi.co/models.html)** 浏览。
+目录目前收录 **34 家提供方**、**474 个模型系列**、**635 个免费提供方/模型端点**（584 个聊天、41 个嵌入、7 个转录、3 个视频），以及大约 **每月 74 亿词元** 的免费额度容量。完整内容可在 **[freellmapi.co/models](https://freellmapi.co/models.html)** 浏览。
 
 Premium 让这份签名目录在你运行的每一个路由器上保持实时。当某家提供方上线了一个强力的免费模型、悄悄收紧了额度，或者改坏了协议格式，订阅了实时源的路由器会在我们发布的第一时间收到更新。
 

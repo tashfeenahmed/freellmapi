@@ -640,8 +640,11 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   const imageCount = messages.reduce((n, m) =>
     n + (Array.isArray(m.content) ? m.content.filter(b => (b as { type?: string })?.type === 'image_url' || (b as { type?: string })?.type === 'image').length : 0), 0);
   // Capped output reserve so a large max_output_tokens can't falsely exclude the
-  // model pool (#470); input counts in full.
-  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + routingReserveTokens(reqData.max_output_tokens);
+  // model pool (#470); input counts in full. Threaded to the router separately:
+  // it is exact and must not be inflated by the context-window safety margin
+  // (#956 review).
+  const outputReserve = routingReserveTokens(reqData.max_output_tokens);
+  const estimatedTotal = estimatedInputTokens + imageCount * IMAGE_TOKEN_ESTIMATE + outputReserve;
 
   // Guardrail: per-request token budget (request_max_tokens_budget, default
   // off). A request with no max_output_tokens gets its output capped to the
@@ -768,7 +771,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     attemptLog,
     clientGone: () => clientGone,
     abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
-    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined),
+    route: () => routeRequest(estimatedTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve),
     dispatch: async (route, attempt, ctx) => {
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',

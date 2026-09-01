@@ -129,7 +129,10 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     // silence it and toast a translated line that carries the reason instead.
     meta: { silenceToast: true },
     mutationFn: (keyId: number) =>
-      apiFetch<{ modelId: string; latencyMs: number }>(`/api/keys/custom/probe`, {
+      // reasoning/toolCalls are optional (#874): the server omits a capability
+      // whose probe errored or timed out, and "absent" means UNKNOWN — which is
+      // not the same claim as "the model cannot do it", so it renders as such.
+      apiFetch<{ modelId: string; latencyMs: number; reasoning?: boolean; toolCalls?: boolean }>(`/api/keys/custom/probe`, {
         method: 'POST',
         body: JSON.stringify({ keyId }),
       }),
@@ -138,7 +141,15 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] })
-      toast.success(t('keys.probeSuccess', { model: data.modelId, latency: data.latencyMs }))
+      const capability = (value: boolean | undefined) =>
+        value === undefined ? t('keys.probeCapUnknown') : value ? t('keys.probeCapYes') : t('keys.probeCapNo')
+      const capabilities = t('keys.probeCapabilities', {
+        reasoning: capability(data.reasoning),
+        tools: capability(data.toolCalls),
+      })
+      toast.success(
+        `${t('keys.probeSuccess', { model: data.modelId, latency: data.latencyMs })} — ${capabilities}`,
+      )
     },
     onError: (error) => {
       toast.error(t('keys.probeFailed', { reason: error instanceof Error ? error.message : String(error) }))
@@ -650,15 +661,18 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     </Button>
                                   </Tooltip>
                                   <Tooltip text={t('keys.probeNow')}>
-                                    <Button
+                                    <ConfirmButton
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => probeKey.mutate(k.id)}
+                                      armedSize="xs"
+                                      confirmLabel={t('keys.probeConfirm')}
+                                      onConfirm={() => probeKey.mutate(k.id)}
                                       disabled={probeKey.isPending}
+                                      title={t('keys.probeNow')}
                                       aria-label={t('keys.probeNow')}
                                     >
                                       <Zap className={`size-3 ${probeKey.isPending ? 'animate-pulse' : ''}`} />
-                                    </Button>
+                                    </ConfirmButton>
                                   </Tooltip>
                                 </>
                               )}

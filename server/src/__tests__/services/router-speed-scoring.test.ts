@@ -6,6 +6,7 @@ import {
 import { observedSpeedRank, TIMEOUT_LATENCY_CAP_MS } from '../../services/scoring.js';
 import { upsertModelOverrides } from '../../services/model-state.js';
 import { getDb, initDb } from '../../db/index.js';
+import { addToActiveChain } from '../helpers/chain.js';
 
 vi.mock('../../lib/crypto.js', async () => {
   const actual = await vi.importActual('../../lib/crypto.js');
@@ -27,6 +28,7 @@ function addModel(opts: {
     .get(opts.platform, opts.modelId) as { id: number }).id;
   db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)')
     .run(id, opts.priority ?? 1);
+  addToActiveChain(id, opts.priority ?? 1);
   db.prepare(`
     INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
     VALUES (?, 'k', 'enc', 'iv', 'tag', 'healthy', 1)

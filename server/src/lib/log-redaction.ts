@@ -11,7 +11,15 @@
  * string for API responses: that one also strips every URL and truncates to 240
  * chars, which would make server logs unreadable. This module removes
  * credentials and nothing else.
+ *
+ * This is also the capture point for the dashboard's server-log viewer
+ * (lib/server-logs.ts). The tap lives inside the one wrapper installed below
+ * rather than in a second one, so a line is redacted before anything else can
+ * see it and the two consumers cannot drift apart.
  */
+
+import { recordConsoleLine } from './server-logs.js';
+import type { ServerLogLevel } from './server-logs.js';
 
 const REDACTED = '[redacted-key]';
 
@@ -59,7 +67,16 @@ const PATTERNS: Array<[RegExp, string]> = [
   // Last resort: an unbroken 32+ char alphanumeric run. Long enough to exclude
   // request ids, git SHAs (40 hex would match, which is an acceptable trade) and
   // model names, and it catches bare keys with no recognisable prefix.
-  [/\b[A-Za-z0-9]{32,}\b/g, '[redacted-token]'],
+  //
+  // The (?!([A-Za-z0-9])\1{31}) guard excludes a run of ONE repeated character.
+  // A credential of 32 identical characters does not exist; padding, separator
+  // rules ('='*40), progress bars and truncation markers made of them do, and
+  // replacing those with [redacted-token] destroyed readable output while
+  // protecting nothing. The exemption is narrow: it only fires when the run's
+  // first 32 characters are all the same one, so anything with two distinct
+  // characters that early — every real key, the more so the higher its entropy —
+  // fails the lookahead and is redacted exactly as before.
+  [/\b(?!([A-Za-z0-9])\1{31})[A-Za-z0-9]{32,}\b/g, '[redacted-token]'],
 ];
 
 /** Strip credentials from a string. Safe to call on anything; non-strings are
@@ -110,6 +127,18 @@ function redactArg(arg: unknown): unknown {
 type ConsoleMethod = 'log' | 'info' | 'warn' | 'error' | 'debug' | 'trace';
 const METHODS: ConsoleMethod[] = ['log', 'info', 'warn', 'error', 'debug', 'trace'];
 
+// console.log is the codebase's ordinary informational writer, so it shares
+// 'info'; debug and trace keep their own level so the dashboard can filter them
+// out on their own.
+const LEVEL_FOR_METHOD: Record<ConsoleMethod, ServerLogLevel> = {
+  log: 'info',
+  info: 'info',
+  warn: 'warn',
+  error: 'error',
+  debug: 'debug',
+  trace: 'trace',
+};
+
 let installed = false;
 
 /**
@@ -126,9 +155,16 @@ export function installLogRedaction(): () => void {
     const original = console[method] as (...args: unknown[]) => void;
     if (typeof original !== 'function') continue;
     originals.set(method, original);
+    const level = LEVEL_FOR_METHOD[method];
     console[method] = (...args: unknown[]) => {
       try {
-        original(...args.map(redactArg));
+        const redacted = args.map(redactArg);
+        // The dashboard's log viewer taps in HERE, on the redacted args and
+        // before the write, so there is still exactly one console patch in the
+        // process and the buffer can never hold a credential the terminal did
+        // not. recordConsoleLine never throws.
+        recordConsoleLine(level, redacted);
+        original(...redacted);
       } catch {
         // Never let redaction swallow a log line.
         original(...args);

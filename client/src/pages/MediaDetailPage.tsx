@@ -12,10 +12,10 @@ import type { MediaModel } from '@/components/media-models'
 
 // One generative-media model's page: every provider that serves this logical
 // model (failover routes across them), plus a ready-to-run snippet. Mirrors the
-// chat ModelDetailPage for the image, audio (TTS), and transcription (STT)
+// chat ModelDetailPage for image, video, audio (TTS), and transcription (STT)
 // modalities. Transcription models list on the Audio tab, so their back link
 // points there.
-export default function MediaDetailPage({ modality }: { modality: 'image' | 'audio' | 'transcription' }) {
+export default function MediaDetailPage({ modality }: { modality: 'image' | 'video' | 'audio' | 'transcription' }) {
   const { t } = useI18n()
   const { id } = useParams<{ id: string }>()
   const label = id ? decodeURIComponent(id) : ''
@@ -52,7 +52,15 @@ export default function MediaDetailPage({ modality }: { modality: 'image' | 'aud
     "model": "${exampleModel}",
     "prompt": "a red cat"
   }'`
-    : modality === 'transcription'
+    : modality === 'video'
+      ? `curl ${base}/videos/generations \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${exampleModel}",
+    "prompt": "a sunrise over a quiet lake"
+  }' --output video.mp4`
+      : modality === 'transcription'
       ? `curl ${base}/audio/transcriptions \\
   -H "Authorization: Bearer ${key}" \\
   -F file=@audio.mp3 \\

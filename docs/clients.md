@@ -48,13 +48,69 @@ context windows.
 | **Roo Code** | `setup-roo` | `http://localhost:3001/v1` | OpenAI Chat |
 | **Kilo Code** | `setup-kilo` | `http://localhost:3001/v1` | OpenAI Chat |
 | **Crush** | `setup-crush` | `http://localhost:3001/v1` | OpenAI Chat |
+| **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
+| **MiMo Code** | `setup-mimo` | `http://localhost:3001/v1` | OpenAI Chat |
 | **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
 | **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
 
 The root-vs-`/v1` distinction matters: Claude Code expects the server root
 because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
-Roo, Kilo, and Crush—expect their configured base URL to include `/v1`.
+Roo, Kilo, Crush, MiMo Code, and DeepSeek Harness—expect their configured
+base URL to include `/v1`.
+
+### DeepSeek Harness (`dsh`)
+
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) keeps
+every provider as a route under `llm-pi-ai.providers` in
+`$DSH_HOME/settings.yaml` (`~/.dsh` by default). `setup-dsh` adds a
+`freellmapi` route there — `api: openai-completions`, the gateway's `/v1`
+base URL, and the live catalog as the route's `models` list, which DSH
+requires for a provider its installed catalog does not ship — and makes
+`freellmapi/auto` the default model. The key goes into `$DSH_HOME/.env`
+(mode 0600) as `FREELLMAPI_API_KEY`, the environment layer DSH reads on its
+own, so nothing needs exporting. Both writes are structural merges: other
+routes, comments, and settings in the file are left as they were.
+
+```bash
+npx freellmapi setup-dsh --url http://localhost:3001 --api-key <unified-key>
+npx @deepseek-ai/dsh web
+```
+
+Settings are hot-reloaded, so a running `dsh` uses the route on its next
+request. `--profile <name>` adds a second route (`freellmapi-<name>`) without
+changing the default model; `--model <id>` pins the default. Routes are
+declared text-only — add `input: [text, image]` to a model entry under
+`freellmapi.models` to send it images. `DSH_HOME` is honoured when set.
+
+### MiMo Code (`mimo`)
+
+[MiMo Code](https://mimo.xiaomi.com/mimocode) is an OpenCode derivative, so it
+takes any OpenAI-compatible endpoint as a custom entry under `provider` — an
+`npm` package to speak with (`@ai-sdk/openai-compatible`), the credentials in
+`options`, and a `models` map. `setup-mimo` writes that entry as `freellmapi`
+and names `freellmapi/<model>` as the default `model`.
+
+The file is `config.json` in MiMo's own global config directory:
+`$XDG_CONFIG_HOME/mimocode` (`~/.config/mimocode` on macOS and Linux), or
+`$MIMOCODE_HOME/config` when `MIMOCODE_HOME` is set. That directory merges
+`config.json`, `mimocode.json` and `mimocode.jsonc` in that order, so the
+generated file is the weakest layer and anything you hand-write in
+`mimocode.json` still wins. The write itself is a structural merge, so other
+providers and settings already in `config.json` are left as they were.
+
+```bash
+npx freellmapi setup-mimo --url http://localhost:3001
+export FREELLMAPI_API_KEY=<unified-key>
+mimo
+```
+
+The key is referenced as `{env:FREELLMAPI_API_KEY}`, MiMo's own substitution
+syntax, so it stays out of the config file. There is no `MIMOCODE_API_KEY` or
+`MIMOCODE_BASE_URL`: MiMo's environment variables locate resources and toggle
+features, they are not a general fallback for config fields. Each model is
+declared with the `limit.context` and `limit.output` pair MiMo's schema
+requires, both taken from the live catalog.
 
 ## Native Gemini clients
 

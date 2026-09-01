@@ -4,7 +4,7 @@
 
 [← Back to README](../README.md) · [Documentation index](README.md)
 
-Everything about getting FreeLLMAPI running: the one-liner, Docker Compose, local development, declarative config, production builds, the desktop app, and where your data lives.
+Everything about getting FreeLLMAPI running: the one-liner, Docker Compose, local development, declarative config, production builds, the desktop app, where your data lives, and how to reset a password, read the logs, or uninstall.
 
 - [Quick start (one-liner)](#quick-start-one-liner)
 - [Docker Compose](#docker-compose)
@@ -13,6 +13,7 @@ Everything about getting FreeLLMAPI running: the one-liner, Docker Compose, loca
 - [Docker image & operations](#docker-image--operations)
 - [Desktop app](#desktop-app)
 - [Credentials and where your data lives](#credentials-and-where-your-data-lives)
+- [FAQ: passwords, logs, uninstall](#faq-passwords-logs-uninstall)
 
 ## Quick start (one-liner)
 
@@ -266,8 +267,85 @@ another machine or into a container):
 | macOS | `~/Library/Application Support/FreeLLMAPI/` |
 | Linux | `~/.config/FreeLLMAPI/` |
 
-That folder holds `freeapi.db` (all keys, models, settings, encrypted at rest)
-and `config.json` (window/theme/port/LAN preferences). Copy both to move an
+That folder holds `freeapi.db` (all keys, models, settings, encrypted at rest),
+`config.json` (window/theme/port/LAN preferences) and `logs/freeapi.log` (what
+the app would print to a terminal if it had one). Copy the first two to move an
 install. For the server (non-desktop) deployment, the equivalent state is the
 `.env` file and the SQLite DB at `server/data/freeapi.db` (or wherever
 `FREEAPI_DB_PATH` points).
+
+## FAQ: passwords, logs, uninstall
+
+### I forgot my dashboard password
+
+**Desktop app — there is no password.** The dashboard signs itself in with a
+hidden local account, so there is nothing to remember and nothing to reset. If
+you cannot see the dashboard, open it from the tray icon → **Open Dashboard**.
+
+**Server installs** (Docker, one-liner, `npm run dev`) do have an email +
+password account, and there is no email delivery to send a reset link to. The
+flow is a one-time code printed to the server log:
+
+1. On the login page, click **Forgot password?**, then **Send reset code**.
+2. Read the code from the server log (see below). It looks like this:
+
+   ```
+     Password-reset code: HWNHPU5QGZ
+     Enter this code on the reset form to set a new password.
+   ```
+
+3. Type it into the reset form together with your new password.
+
+The code is valid for **15 minutes**, and requesting a new one invalidates the
+previous code. Requests are rate-limited, so ask for one code and wait for it
+rather than clicking repeatedly.
+
+### Where are the logs?
+
+| Install method | Where the log goes |
+|----------------|--------------------|
+| Docker Compose | `docker compose logs -f freellmapi` |
+| Plain Docker | `docker logs -f <container>` (`docker ps` lists the name) |
+| One-liner install | `cd ~/freellmapi && docker compose logs -f freellmapi` |
+| `npm run dev` / `node server/dist/index.js` | the terminal the server is running in |
+| Desktop app | `<data dir>/logs/freeapi.log` — tray icon → right-click → **Open Logs Folder** |
+
+The desktop app has no terminal attached, so it also tees everything it prints
+to a file: `freeapi.log` in the `logs` folder inside the data directory listed
+[above](#credentials-and-where-your-data-lives) — for example
+`~/Library/Application Support/FreeLLMAPI/logs/freeapi.log` on macOS. It keeps
+the current file plus one rotated `freeapi.log.1`, 1 MB each. Open it in any
+text editor; the reset code above appears there too.
+
+### How do I uninstall?
+
+Removing the app never removes your data directory — deleting that is a
+separate, deliberate step, which is also what makes it safe to reinstall over
+the top.
+
+**Desktop app**
+
+1. Quit from the tray menu (**Quit FreeLLMAPI**). If you turned on *Start at
+   login* in the popover, switch it off first so no stale login item is left.
+2. Remove the application:
+   - **macOS** — drag `FreeLLMAPI.app` from `/Applications` to the Trash.
+   - **Windows** — *Settings → Apps → Installed apps → FreeLLMAPI → Uninstall*.
+   - **Linux** — delete the AppImage, or `sudo apt remove freellmapi` for the `.deb`.
+3. Delete the data directory to remove your keys, settings and logs for good:
+   - **Windows** — `%APPDATA%\FreeLLMAPI\`
+   - **macOS** — `~/Library/Application Support/FreeLLMAPI/`
+   - **Linux** — `~/.config/FreeLLMAPI/`
+
+**Docker**
+
+```bash
+docker compose down -v            # -v also drops the freellmapi-data volume
+docker image rm ghcr.io/tashfeenahmed/freellmapi:latest
+rm -rf ~/freellmapi               # the one-liner's directory: .env + compose file
+```
+
+Leave off `-v` if you want to keep the database for a later reinstall.
+
+**From source** — delete the checkout. The state that matters is `.env` and
+`server/data/freeapi.db` (or wherever `FREEAPI_DB_PATH` points), so back those
+up first if you plan to come back.

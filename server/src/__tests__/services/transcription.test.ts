@@ -254,6 +254,92 @@ describe('transcription service', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // A user-registered OpenAI-compatible STT box (platform 'custom'). Its row
+  // is bound to one api_keys row that carries the base_url —
+  // getProviderCredential refuses to guess a key for 'custom', so the
+  // candidate MUST carry key_id or the row is silently skipped.
+  function addCustomStt(model = 'local-whisper', secret = 'stt-secret', baseUrl = 'http://127.0.0.1:9911/v1'): number {
+    const { encrypted, iv, authTag } = encrypt(secret);
+    const key = getDb().prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+      VALUES ('custom', 'Local STT', ?, ?, ?, 'unknown', 1, ?)
+    `).run(encrypted, iv, authTag, baseUrl);
+    const keyId = Number(key.lastInsertRowid);
+    getDb().prepare(`
+      INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
+      VALUES ('custom', ?, 'Local Whisper', 'transcription', 99, 1, 'custom endpoint', ?)
+    `).run(model, keyId);
+    return keyId;
+  }
+
+  it('custom: multipart POST to the endpoint\'s own /audio/transcriptions with its key', async () => {
+    addCustomStt();
+    const fetchMock = vi.fn(async () => jsonResponse({ text: 'local text', language: 'en', duration: 3 }));
+    globalThis.fetch = fetchMock as any;
+
+    const r = await runTranscription('local-whisper', params({ language: 'en', prompt: 'ctx', temperature: 0.3 }));
+    expect(r.platform).toBe('custom');
+    expect(r.text).toBe('local text');
+    expect(r.language).toBe('en');
+    expect(r.duration).toBe(3);
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://127.0.0.1:9911/v1/audio/transcriptions');
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer stt-secret');
+    // Content-Type must NOT be set by hand — FormData supplies the boundary.
+    expect(headers['Content-Type']).toBeUndefined();
+    const form = init.body as FormData;
+    expect(form.get('model')).toBe('local-whisper');
+    expect(form.get('language')).toBe('en');
+    expect(form.get('prompt')).toBe('ctx');
+    expect(form.get('temperature')).toBe('0.3');
+    expect(form.get('response_format')).toBe('json');
+    const file = form.get('file') as File;
+    expect(file.name).toBe('clip.wav');
+    expect(Buffer.from(await file.arrayBuffer()).equals(AUDIO)).toBe(true);
+  });
+
+  it('custom: the row is NOT skipped for want of a key (key_id must reach getProviderCredential)', async () => {
+    // No catalog rows at all: if the custom candidate dropped its key_id the
+    // chain would come up empty and this would throw instead of transcribing.
+    getDb().prepare("DELETE FROM media_models WHERE platform IN ('groq', 'cloudflare')").run();
+    addCustomStt();
+    const fetchMock = vi.fn(async () => jsonResponse({ text: 'reached' }));
+    globalThis.fetch = fetchMock as any;
+
+    const r = await runTranscription('auto', params());
+    expect(r.platform).toBe('custom');
+    expect(r.text).toBe('reached');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('custom: verbose_json is asked for upstream and segments pass through', async () => {
+    addCustomStt();
+    const segments = [{ id: 0, start: 0, end: 1, text: 'local text' }];
+    const fetchMock = vi.fn(async () => jsonResponse({ text: 'local text', segments }));
+    globalThis.fetch = fetchMock as any;
+
+    const r = await runTranscription('local-whisper', params({ responseFormat: 'verbose_json' }));
+    const form = (fetchMock.mock.calls[0][1] as RequestInit).body as FormData;
+    expect(form.get('response_format')).toBe('verbose_json');
+    expect(r.segments).toEqual(segments);
+  });
+
+  it('custom: an endpoint whose key row lost its base_url fails loudly, not silently', async () => {
+    const keyId = addCustomStt();
+    getDb().prepare('UPDATE api_keys SET base_url = NULL WHERE id = ?').run(keyId);
+    globalThis.fetch = vi.fn() as any;
+    await expect(runTranscription('local-whisper', params()))
+      .rejects.toMatchObject({ status: 502 }); // chainError wraps the 500 adapter error
+  });
+
+  it("custom: vtt is refused — no custom row declares native subtitles", async () => {
+    addCustomStt();
+    await expect(runTranscription('local-whisper', params({ responseFormat: 'vtt' })))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
   it('logs transcription requests with request_type=transcription', async () => {
     addKey('groq');
     globalThis.fetch = vi.fn(async () => jsonResponse({ text: 'logged' })) as any;

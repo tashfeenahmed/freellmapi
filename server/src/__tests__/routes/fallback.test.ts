@@ -236,6 +236,70 @@ describe('Fallback API', () => {
     expect(get2.body.exploreEnabled).toBe(false);
   });
 
+  // Peak-hours adjustment (#760): opt-in, so the stock payload must report it
+  // off with the documented window, and the router must still be on the raw
+  // preset weights no matter what hour the suite runs at.
+  it('GET /api/fallback/routing reports the peak-hours settings, off by default', async () => {
+    const { body } = await request(app, 'GET', '/api/fallback/routing');
+    expect(body.peakHoursAdjust).toBe(false);
+    expect(body.peakStartHour).toBe(18);
+    expect(body.peakEndHour).toBe(6);
+    expect(body.peakTimezone).toBe('UTC');
+    expect(body.peakAdjusted).toBe(false);
+    expect(body.weights).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+  });
+
+  it('PUT /api/fallback/routing persists the peak-hours window and echoes the active weights', async () => {
+    const put = await request(app, 'PUT', '/api/fallback/routing', {
+      strategy: 'balanced',
+      peakHoursAdjust: true,
+      peakStartHour: 0,
+      peakEndHour: 23,
+      peakTimezone: 'Asia/Kolkata',
+    });
+    expect(put.status).toBe(200);
+    expect(put.body.peakHoursAdjust).toBe(true);
+    expect(put.body.peakStartHour).toBe(0);
+    expect(put.body.peakEndHour).toBe(23);
+    expect(put.body.peakTimezone).toBe('Asia/Kolkata');
+    // 00:00–23:00 covers every hour but the last, so the echo is the adjusted
+    // vector except in that one hour — assert the two are consistent with each
+    // other rather than pinning the wall clock.
+    expect(put.body.weights).toEqual(put.body.peakAdjusted
+      ? { reliability: 0.65, speed: 0.1, intelligence: 0.25 }
+      : { reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+    // The raw preset table is still echoed untouched for older clients.
+    expect(put.body.presets.balanced).toEqual({ reliability: 0.5, speed: 0.25, intelligence: 0.25 });
+
+    const { body } = await request(app, 'GET', '/api/fallback/routing');
+    expect(body.peakHoursAdjust).toBe(true);
+    expect(body.peakTimezone).toBe('Asia/Kolkata');
+
+    await request(app, 'PUT', '/api/fallback/routing', {
+      strategy: 'balanced', peakHoursAdjust: false, peakStartHour: 18, peakEndHour: 6, peakTimezone: 'UTC',
+    });
+  });
+
+  it('PUT /api/fallback/routing rejects invalid peak hours and timezones', async () => {
+    for (const payload of [
+      { peakStartHour: 24 },
+      { peakStartHour: -1 },
+      { peakEndHour: 24 },
+      { peakEndHour: 6.5 },
+      { peakTimezone: 'Not/AZone' },
+      { peakTimezone: '' },
+    ]) {
+      const { status } = await request(app, 'PUT', '/api/fallback/routing', { strategy: 'balanced', ...payload });
+      expect(status, JSON.stringify(payload)).toBe(400);
+    }
+    // Nothing was persisted by any of the rejected requests.
+    const { body } = await request(app, 'GET', '/api/fallback/routing');
+    expect(body.peakHoursAdjust).toBe(false);
+    expect(body.peakStartHour).toBe(18);
+    expect(body.peakEndHour).toBe(6);
+    expect(body.peakTimezone).toBe('UTC');
+  });
+
   it('PUT /api/fallback/routing rejects all-zero custom weights', async () => {
     const { status } = await request(app, 'PUT', '/api/fallback/routing', {
       strategy: 'custom',

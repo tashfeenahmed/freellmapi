@@ -710,8 +710,9 @@ export class GoogleProvider extends BaseProvider {
 
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          const raw = trimmed.slice(6);
+          // `data:` with or without the space, same as BaseProvider (#1087).
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const raw = trimmed.slice(5).replace(/^ /, '');
           if (raw === '[DONE]') {
             if (!emittedFinish) {
               emittedFinish = true;

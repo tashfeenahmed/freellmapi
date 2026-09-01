@@ -172,6 +172,58 @@ describe('Router', () => {
     expect(routeRequest(9000).modelDbId).toBe(groq.id);
   });
 
+  it('prefers margin-fitting models but still serves raw-window fits (#956 review)', () => {
+    const db = getDb();
+    const groqKey = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'groq', groqKey.encrypted, groqKey.iv, groqKey.authTag, 'healthy', 1);
+
+    const groq = db.prepare(`
+      SELECT id FROM models
+       WHERE platform = 'groq' AND context_window = 131072
+       LIMIT 1
+    `).get() as { id: number };
+
+    db.prepare('UPDATE fallback_config SET priority = 1000, enabled = 1').run();
+    db.prepare('UPDATE fallback_config SET priority = 1 WHERE model_db_id = ?').run(groq.id);
+    db.prepare('UPDATE models SET tpm_limit = NULL, tpd_limit = NULL WHERE id = ?').run(groq.id);
+
+    // CONTEXT_WINDOW_SAFETY_FACTOR: the chars/4 estimate under-counts dense
+    // payloads (JSON, code), so the preferred ceiling is window / 1.25.
+    // 131072 / 1.25 = 104857.6. A margin-fitting runner-up on another platform
+    // must NOT outrank the priority-1 model while the estimate is inside the
+    // margin.
+    const googleKey = encrypt('test-google-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('google', 'google', googleKey.encrypted, googleKey.iv, googleKey.authTag, 'healthy', 1);
+    const google = db.prepare(`
+      SELECT id FROM models
+       WHERE platform = 'google' AND context_window >= 132500 AND enabled = 1
+       ORDER BY intelligence_rank ASC
+       LIMIT 1
+    `).get() as { id: number };
+    expect(google).toBeDefined();
+    db.prepare('UPDATE fallback_config SET priority = 2 WHERE model_db_id = ?').run(google.id);
+    db.prepare('UPDATE models SET tpm_limit = NULL, tpd_limit = NULL WHERE id = ?').run(google.id);
+
+    expect(routeRequest(104000).modelDbId).toBe(groq.id);
+
+    // Above the margin ceiling the priority-1 model is DEMOTED, not excluded:
+    // /v1/models advertises the raw window, so a client that packs past the
+    // margin gets the margin-fitting runner-up instead of "all models exhausted".
+    expect(routeRequest(106000).modelDbId).not.toBe(groq.id);
+    expect(routeRequest(106000).modelDbId).toBe(google.id);
+
+    // When nothing fits WITH the margin anywhere, the raw advertised window is
+    // still honored — one attempt rather than an empty pool.
+    db.prepare("DELETE FROM api_keys WHERE platform = 'google'").run();
+    expect(routeRequest(106000).modelDbId).toBe(groq.id);
+  });
+
   it('still routes a model with an unknown (null) context window (#167)', () => {
     const db = getDb();
     const groqKey = encrypt('test-groq-key');

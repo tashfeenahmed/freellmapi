@@ -76,6 +76,11 @@ export function classifyClaudeFamily(model?: string): ClaudeFamily | null {
 export interface ResolvedAnthropicModel {
   // The catalog model db id to pin, or undefined to auto-route.
   preferredModelDbId?: number;
+  // The catalog model_id that db id belongs to, when one was pinned. Callers
+  // widen this into the model's cross-provider group so a failure fails over to
+  // the SAME model on another provider (the strict chain /v1/chat/completions
+  // and /v1/responses already build) instead of to an unrelated model.
+  modelId?: string;
   // True when we resolved to a specific model (for analytics/pinned labels).
   pinned: boolean;
 }
@@ -85,24 +90,34 @@ export interface ResolvedAnthropicModel {
 // "auto-route" (the default for every family unless the operator pinned one).
 export function resolveAnthropicModel(model?: string): ResolvedAnthropicModel {
   const db = getDb();
-  const lookupEnabled = (modelId: string): number | undefined => {
-    const row = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(modelId) as { id: number } | undefined;
-    return row?.id;
-  };
+  // A model_id can exist on several platforms at once (the same open-weights
+  // model relayed by two providers). The row we pin is only the head hint —
+  // the caller routes over the whole group — but an arbitrary SQLite row order
+  // made the head flap between providers run to run, so pick deterministically:
+  // chain priority first (ascending, as everywhere else), then insertion order.
+  const lookupEnabled = (modelId: string): { id: number; model_id: string } | undefined =>
+    db.prepare(`
+      SELECT m.id as id, m.model_id as model_id
+      FROM models m
+      LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+      WHERE m.model_id = ? AND m.enabled = 1
+      ORDER BY COALESCE(fc.priority, 0) ASC, m.id ASC
+      LIMIT 1
+    `).get(modelId) as { id: number; model_id: string } | undefined;
 
   const family = classifyClaudeFamily(model);
   if (family) {
     const target = getClaudeModelMap()[family];
     if (!target || target === 'auto') return { pinned: false };
-    const id = lookupEnabled(target);
+    const row = lookupEnabled(target);
     // A pinned-but-now-disabled/removed target degrades gracefully to auto.
-    return id != null ? { preferredModelDbId: id, pinned: true } : { pinned: false };
+    return row ? { preferredModelDbId: row.id, modelId: row.model_id, pinned: true } : { pinned: false };
   }
 
   // Not a Claude alias: treat as a concrete catalog model id and pin it if it
   // exists and is enabled; otherwise auto-route (lenient, like the OpenAI route).
-  const id = lookupEnabled((model ?? '').trim());
-  return id != null ? { preferredModelDbId: id, pinned: true } : { pinned: false };
+  const row = lookupEnabled((model ?? '').trim());
+  return row ? { preferredModelDbId: row.id, modelId: row.model_id, pinned: true } : { pinned: false };
 }
 
 // The canonical Claude id this gateway answers to for each family, and the

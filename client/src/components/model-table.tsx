@@ -14,7 +14,9 @@ import {
   memberEndpointTitle,
   memberProviderLabel,
   providerLabel,
+  tightestRateLimit,
   type ModelGroupRow,
+  type RateLimitUsageRow,
   type Row,
 } from '@/lib/routing'
 
@@ -121,6 +123,28 @@ export function ModelTableHead() {
 }
 
 // ── One row of the unified table ────────────────────────────────────────────
+// Time-window rate-limit pressure for one logical model or one provider row
+// (#876). Shared by the Models table group header, the model detail page's
+// summary badges and its per-provider rows so all three read identically.
+// Renders nothing when there is no usage to report.
+export function RateLimitBadge({ rows, size = 'sm' }: { rows: RateLimitUsageRow[]; size?: 'sm' | 'md' }) {
+  const { t } = useI18n()
+  const tightest = tightestRateLimit(rows)
+  if (!tightest) return null
+  const ratio = tightest.limit > 0 ? tightest.used / tightest.limit : 0
+  const tone = tightest.used >= tightest.limit
+    ? 'bg-red-600/15 text-red-700 dark:text-red-400'
+    : ratio >= 0.7
+      ? 'bg-amber-600/15 text-amber-700 dark:text-amber-400'
+      : 'bg-muted text-muted-foreground'
+  const scale = size === 'md' ? 'text-[11px] px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5'
+  return (
+    <span title={t('models.rateLimitUsageTitle')} className={`rounded-full tabular-nums ${scale} ${tone}`}>
+      {t('models.rateLimitUsage', { kind: tightest.kind, used: tightest.used, limit: tightest.limit })}
+    </span>
+  )
+}
+
 export function RowContent({
   row,
   rank,
@@ -129,6 +153,7 @@ export function RowContent({
   onToggle,
   providerName,
   providerTitle,
+  rateUsage,
 }: {
   row: Row
   rank: number
@@ -142,6 +167,8 @@ export function RowContent({
   // disambiguate. Never derived from row.endpointScope here: every custom row
   // carries a scope, so doing so would leak the base URL of a lone endpoint.
   providerTitle?: string
+  // This provider's own time-window usage (#876), when the caller fetched it.
+  rateUsage?: RateLimitUsageRow
 }) {
   const { t } = useI18n()
   const guard = (row.headroom ?? 1) * (row.rateLimit ?? 1)
@@ -157,6 +184,7 @@ export function RowContent({
           <span className="text-xs text-muted-foreground" title={providerTitle}>
             {providerName ?? providerLabel(row)}
           </span>
+          <RateLimitBadge rows={rateUsage ? [rateUsage] : []} />
           {row.supportsVision && (
             <span
               title={t('models.visionTitle')}
@@ -242,7 +270,7 @@ export const dragDots = (
 // The collapsed header row for a logical-model group: name, provider count,
 // union vision/tools badges, the best member's axis bars + score, and a single
 // switch that enables/disables every provider in the group.
-export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRows }: {
+export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRows, rateUsage }: {
   group: ModelGroupRow
   rank: number
   dragHandle?: ReactNode
@@ -251,12 +279,22 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   // model id land in different display groups the moment one copy is renamed,
   // so the group's own members are not a complete sibling set (#651).
   allRows?: readonly Row[]
+  // Time-window rate-limit usage by model db id (#876). Fetched ONCE at the page
+  // level and passed down: a query hook here would open one observer and one
+  // 15s poll timer per row, i.e. hundreds of them on a real catalog.
+  rateUsage?: ReadonlyMap<number, RateLimitUsageRow>
 }) {
   const { t } = useI18n()
   const anyEnabled = group.members.some(m => m.enabled)
   const solo = group.members.length === 1
   const best = group.members.reduce((b, m) => ((m.score ?? -1) > (b.score ?? -1) ? m : b), group.members[0])
   const guard = (best.headroom ?? 1) * (best.rateLimit ?? 1)
+  // Remaining time-window quota for this group (#876): the member with the most
+  // headroom decides the badge, since the group stays routable while any one of
+  // its providers can serve. Lookup is O(members) against the shared map.
+  const rateRows = rateUsage
+    ? group.members.flatMap(m => rateUsage.get(m.modelDbId) ?? [])
+    : []
   // Honest group display (#580): reliability/speed ranges come only from
   // members that were actually measured; when none were, show "no data" rather
   // than the shared exploration priors. Intelligence is catalog metadata, so
@@ -295,6 +333,7 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
                 {quota.text}
               </span>
             )}
+            <RateLimitBadge rows={rateRows} />
             {maxCtx > 0 && (
               <span title={t('models.ctxTitle')} className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
                 {t('models.ctxBadge', { size: formatContext(maxCtx) })}
@@ -341,11 +380,12 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   )
 }
 
-export function SortableGroupRow({ group, rank, onToggleGroup, allRows }: {
+export function SortableGroupRow({ group, rank, onToggleGroup, allRows, rateUsage }: {
   group: ModelGroupRow
   rank: number
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
   allRows?: readonly Row[]
+  rateUsage?: ReadonlyMap<number, RateLimitUsageRow>
 }) {
   const { t } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
@@ -370,7 +410,7 @@ export function SortableGroupRow({ group, rank, onToggleGroup, allRows }: {
       onClick={() => navigate(`/models/chat/${detailId}`)}
       className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
     >
-      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} />
+      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} rateUsage={rateUsage} />
     </tr>
   )
 }

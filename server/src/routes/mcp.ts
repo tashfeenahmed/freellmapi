@@ -163,6 +163,9 @@ function routingInfo(): unknown {
   const scores = getRoutingScores();
   return {
     strategy: scores.strategy,
+    // Which key of a platform requests are steered to (#919) — a separate knob
+    // from the model strategy, so it has to be reported separately too.
+    key_selection: scores.keySelectionStrategy,
     top_models: scores.scores
       .filter(s => s.enabled)
       .slice(0, 10)

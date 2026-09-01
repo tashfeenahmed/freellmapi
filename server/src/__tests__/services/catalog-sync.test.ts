@@ -503,6 +503,107 @@ describe('applyCatalog: transcriptionModels', () => {
   });
 });
 
+// Video models use a dedicated optional top-level registry. That shape is the
+// backward-compatibility boundary: clients released before video support ignore
+// it, instead of misclassifying an unknown models[].modality as chat.
+describe('applyCatalog: videoModels', () => {
+  type CatalogVideo = NonNullable<AnyCatalog['videoModels']>[number];
+
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  function videoRoster(): CatalogVideo[] {
+    return [
+      {
+        platform: 'pollinations',
+        modelId: 'nova-reel',
+        displayName: 'Nova Reel',
+        priority: 0,
+        enabled: true,
+        quotaLabel: 'Recurring daily Pollen refill',
+      },
+      {
+        platform: 'huggingface',
+        modelId: 'Lightricks/LTX-Video-0.9.5',
+        displayName: 'LTX-Video 0.9.5',
+        priority: 1,
+        enabled: true,
+        quotaLabel: '$0.10 shared monthly credits',
+        providerModelId: 'fal-ai/ltx-video-v095',
+      },
+    ];
+  }
+
+  function videoCatalog(entries?: CatalogVideo[]): AnyCatalog {
+    const catalog = catalogOf(existingAsCatalogModels());
+    if (entries) catalog.videoModels = entries;
+    return catalog;
+  }
+
+  function videoRows(): Array<{ platform: string; model_id: string; enabled: number; priority: number; meta_json: string | null }> {
+    return getDb().prepare(`
+      SELECT platform, model_id, enabled, priority, meta_json
+        FROM media_models
+       WHERE modality = 'video'
+       ORDER BY priority, id
+    `).all() as any;
+  }
+
+  it('lands the video roster and provider-native metadata in media_models', () => {
+    const counts = applyCatalog(getDb(), videoCatalog(videoRoster()));
+    expect(counts.inserted).toBeGreaterThanOrEqual(2);
+    expect(videoRows().map(r => `${r.platform}:${r.model_id}`)).toEqual([
+      'pollinations:nova-reel',
+      'huggingface:Lightricks/LTX-Video-0.9.5',
+    ]);
+    expect(videoRows()[0].meta_json).toBeNull();
+    expect(JSON.parse(videoRows()[1].meta_json!)).toEqual({ providerModelId: 'fal-ai/ltx-video-v095' });
+  });
+
+  it('retains video rows when an older catalog omits the optional registry', () => {
+    applyCatalog(getDb(), videoCatalog(undefined));
+    expect(videoRows()).toHaveLength(2);
+  });
+
+  it('prunes only video rows when the registry drops a model', () => {
+    const counts = applyCatalog(
+      getDb(),
+      videoCatalog(videoRoster().filter(m => m.platform !== 'pollinations')),
+    );
+    expect(counts.removed).toBe(1);
+    expect(videoRows().map(r => r.model_id)).toEqual(['Lightricks/LTX-Video-0.9.5']);
+  });
+
+  it('skips a video entry without a runtime adapter', () => {
+    const roster = videoRoster();
+    roster.push({
+      platform: 'cloudflare',
+      modelId: 'future-video',
+      displayName: 'Future Video',
+      priority: 9,
+      enabled: true,
+    });
+    const counts = applyCatalog(getDb(), videoCatalog(roster));
+    expect(counts.skippedUnknownPlatform).toBeGreaterThanOrEqual(1);
+    expect(videoRows().map(r => r.model_id)).not.toContain('future-video');
+  });
+
+  it('keeps a user-deleted video model tombstoned', () => {
+    recordCatalogModelTombstone(getDb(), 'media', 'pollinations', 'nova-reel');
+    applyCatalog(getDb(), videoCatalog(videoRoster()));
+    expect(videoRows().map(r => r.model_id)).not.toContain('nova-reel');
+  });
+
+  it('rejects malformed video metadata before applying the cached catalog', () => {
+    const catalog = videoCatalog(videoRoster());
+    (catalog.videoModels![0] as any).providerModelId = 42;
+    setSetting('catalog_applied_json', JSON.stringify(catalog));
+    expect(reapplyCachedCatalog().reapplied).toBe(false);
+  });
+});
+
 // Generative media rows (image/audio) carry adapter metadata in meta_json the
 // same way transcription rows do — the flavour a platform's endpoint expects.
 // Cloudflare hosts both JSON-body image models and the FLUX.2 family, whose

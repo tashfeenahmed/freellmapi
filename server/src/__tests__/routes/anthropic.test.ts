@@ -2,6 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { addToActiveChain } from '../helpers/chain.js';
+import { encrypt } from '../../lib/crypto.js';
+import { setUnifyEnabled, setUnifyOverrides } from '../../services/model-groups.js';
+import { getRoutingStrategy, setRoutingStrategy, type RoutingStrategy } from '../../services/router.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 
 // Anthropic-compatible Messages API (`POST /v1/messages`). These tests drive
@@ -508,4 +512,151 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(status).toBe(200);
     expect(body.map).toEqual({ default: 'auto', opus: 'auto', sonnet: 'auto', haiku: 'auto' });
   });
+
+  // ── Same-model cross-provider failover (#932) ────────────────────────────
+  // Reported by stephenzwj: a pinned /v1/messages request preferred exactly ONE
+  // catalog row, so when that provider rate-limited, the fallback loop walked
+  // the rest of the chain and answered with a DIFFERENT model. Every other
+  // surface already routes a pinned id over its unified model group as a strict
+  // chain; these tests hold /v1/messages to the same contract.
+  describe('same-model cross-provider failover (#932)', () => {
+    const SHARED = 'shared-fallback-model';
+    const UNRELATED = 'unrelated-test-model';
+    let enabledBefore: number[] = [];
+    let addedIds: number[] = [];
+    let strategyBefore: RoutingStrategy;
+
+    // A catalog row + its fallback_config entry, returning the model db id.
+    function addModel(platform: string, modelId: string, displayName: string, priority: number): number {
+      const db = getDb();
+      const info = db.prepare(`
+        INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+                            rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, supports_vision)
+        VALUES (?, ?, ?, 5, 5, 'Large', 100, NULL, NULL, NULL, '~10M', 131072, 1, 0)
+      `).run(platform, modelId, displayName);
+      const id = Number(info.lastInsertRowid);
+      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(id, priority);
+      addToActiveChain(id, priority);
+      return id;
+    }
+
+    function addKey(platform: string): void {
+      const { encrypted, iv, authTag } = encrypt(`test-key-${platform}`);
+      getDb().prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+        VALUES (?, ?, ?, ?, ?, 'healthy', 1)
+      `).run(platform, `${platform}-key`, encrypted, iv, authTag);
+    }
+
+    beforeEach(() => {
+      const db = getDb();
+      strategyBefore = getRoutingStrategy();
+      setRoutingStrategy('priority');
+      setUnifyEnabled(true);
+      setUnifyOverrides({ merges: [], splits: [] });
+      // Isolate the catalog: only the three rows below can be routed to, so
+      // "served by an unrelated model" is unambiguous.
+      enabledBefore = (db.prepare('SELECT id FROM models WHERE enabled = 1').all() as { id: number }[]).map(r => r.id);
+      db.prepare('UPDATE models SET enabled = 0').run();
+      addedIds = [
+        // The SAME model_id served by two platforms. Groq is tried first
+        // (priority 10 < 20) and is the one that fails.
+        addModel('groq', SHARED, 'Shared Fallback Model', 10),
+        addModel('cerebras', SHARED, 'Shared Fallback Model', 20),
+        // A different model on the healthy platform, with the BEST priority in
+        // the catalog — before the fix this is what answered the request.
+        addModel('cerebras', UNRELATED, 'Unrelated Test Model', 1),
+      ];
+      addKey('cerebras'); // the groq key is created by the outer beforeEach
+    });
+
+    afterEach(() => {
+      const db = getDb();
+      for (const id of addedIds) {
+        db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+        db.prepare('DELETE FROM models WHERE id = ?').run(id);
+      }
+      if (enabledBefore.length) {
+        db.prepare(`UPDATE models SET enabled = 1 WHERE id IN (${enabledBefore.map(() => '?').join(',')})`).run(...enabledBefore);
+      }
+      setRoutingStrategy(strategyBefore);
+    });
+
+    // Records every upstream the router actually dispatched to, as
+    // "platform/model_id", and rate-limits Groq.
+    function mockTwoPlatforms(seen: string[]) {
+      const orig = global.fetch;
+      vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+        const u = String(url);
+        const sent = init?.body ? JSON.parse(String(init.body)) : {};
+        if (u.includes('api.groq.com')) {
+          seen.push(`groq/${sent.model}`);
+          return new Response(JSON.stringify({ error: { message: 'rate limited' } }), { status: 429 });
+        }
+        if (u.includes('api.cerebras.ai')) {
+          seen.push(`cerebras/${sent.model}`);
+          return new Response(JSON.stringify({
+            id: 'chatcmpl-c', object: 'chat.completion', created: 1, model: sent.model,
+            choices: [{ index: 0, message: { role: 'assistant', content: `answer from cerebras ${sent.model}` }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return orig(url, init);
+      });
+    }
+
+    it('falls over to the SAME model on the second provider, never to an unrelated one', async () => {
+      const seen: string[] = [];
+      mockTwoPlatforms(seen);
+
+      const { status, body, headers } = await request(app, '/v1/messages', {
+        model: SHARED, max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+      }, anthropicHeaders());
+
+      expect(status).toBe(200);
+      // Same model, second provider — not the better-priority unrelated model.
+      expect(headers.get('x-routed-via')).toBe(`cerebras/${SHARED}`);
+      expect(body.content[0].text).toBe(`answer from cerebras ${SHARED}`);
+      expect(seen).toEqual([`groq/${SHARED}`, `cerebras/${SHARED}`]);
+      expect(seen.some(s => s.includes(UNRELATED))).toBe(false);
+    });
+
+    it('never leaves the pinned model even when every provider for it fails', async () => {
+      const orig = global.fetch;
+      const seen: string[] = [];
+      vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+        const u = String(url);
+        const sent = init?.body ? JSON.parse(String(init.body)) : {};
+        if (u.includes('api.groq.com') || u.includes('api.cerebras.ai')) {
+          seen.push(`${u.includes('api.groq.com') ? 'groq' : 'cerebras'}/${sent.model}`);
+          return new Response(JSON.stringify({ error: { message: 'rate limited' } }), { status: 429 });
+        }
+        return orig(url, init);
+      });
+
+      const { status } = await request(app, '/v1/messages', {
+        model: SHARED, max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+      }, anthropicHeaders());
+
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(seen.every(s => s.endsWith(`/${SHARED}`))).toBe(true);
+      expect(seen.some(s => s.includes(UNRELATED))).toBe(false);
+    });
+
+    it('leaves an auto-routed Claude alias on the full chain', async () => {
+      // opus/sonnet/haiku/default all map to 'auto' by default, so nothing is
+      // pinned and the router is free to pick any model — including the
+      // unrelated one, which is exactly the pre-existing behaviour.
+      const seen: string[] = [];
+      mockTwoPlatforms(seen);
+
+      const { status, headers } = await request(app, '/v1/messages', {
+        model: 'claude-sonnet-4-5', max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+      }, anthropicHeaders());
+
+      expect(status).toBe(200);
+      expect(headers.get('x-routed-via')).toBe(`cerebras/${UNRELATED}`);
+    });
+  });
+
 });

@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb, getSetting, setSetting } from '../../db/index.js';
+import { initDb, getDb, getSetting, setSetting, getUnifiedApiKey } from '../../db/index.js';
+import { encrypt } from '../../lib/crypto.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 import { applyAllModelOverrides } from '../../services/model-state.js';
 
@@ -37,11 +38,17 @@ async function request(app: Express, method: string, path: string, body?: any) {
   const addr = server.address() as any;
   const url = `http://127.0.0.1:${addr.port}${path}`;
 
+  // /v1/* inference endpoints authenticate with the unified key (or a client
+  // profile key), NOT the dashboard token; /api/* admin endpoints take the
+  // dashboard token. isGatedApiPath covers the admin side, and /v1 paths are
+  // simply excluded from it — so add the unified key explicitly for those.
+  const isV1 = path.startsWith('/v1/');
   const res = await fetch(url, {
     method,
     headers: {
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(isGatedApiPath(path) ? { Authorization: `Bearer ${dashToken}` } : {}),
+      ...(isV1 ? { Authorization: `Bearer ${getUnifiedApiKey()}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -59,6 +66,10 @@ describe('Model management API', () => {
     initDb(':memory:');
     app = createApp();
     dashToken = mintDashboardToken();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('updates catalog model metadata and records durable overrides', async () => {
@@ -318,5 +329,145 @@ describe('Model management API', () => {
       SELECT 1 FROM catalog_model_tombstones
        WHERE kind = 'chat' AND platform = ? AND model_id = ?
     `).get(target.platform, target.model_id)).toBeDefined();
+  });
+
+  // The named-chain listing and routing tests below need a live groq key: a
+  // chain is only "available" when one of its members can serve a request now.
+  function seedGroqKey(): void {
+    const secret = encrypt('gsk_named_chain_test');
+    getDb().prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('groq', 'named-chain', ?, ?, ?, 'healthy', 1)
+    `).run(secret.encrypted, secret.iv, secret.authTag);
+  }
+
+  // A model that exists ONLY inside the custom profile, so "the served model is
+  // this one" proves the request went through the named chain rather than the
+  // active/default chain.
+  function seedChainOnlyModel(modelId: string, contextWindow: number): number {
+    const inserted = getDb().prepare(`
+      INSERT INTO models (
+        platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+        context_window, enabled, supports_tools
+      ) VALUES ('groq', ?, ?, 100, 100, 'Small', ?, 1, 1)
+    `).run(modelId, `Named chain ${modelId}`, contextWindow);
+    return Number(inserted.lastInsertRowid);
+  }
+
+  function newProfile(name: string, sortOrder: number): number {
+    const inserted = getDb().prepare(`
+      INSERT INTO profiles (name, emoji, color, type, sort_order) VALUES (?, '', '#6366f1', 'custom', ?)
+    `).run(name, sortOrder);
+    return Number(inserted.lastInsertRowid);
+  }
+
+  function addToProfile(profileId: number, modelDbId: number, enabled = 1): void {
+    getDb().prepare('INSERT INTO profile_models (profile_id, model_db_id, priority, enabled) VALUES (?, ?, 1, ?)')
+      .run(profileId, modelDbId, enabled);
+  }
+
+  it('exposes custom profiles as auto:<name> chains in /v1/models (#960/#895)', async () => {
+    seedGroqKey();
+
+    // A chain whose single member is enabled and backed by an enabled key.
+    const servableId = seedChainOnlyModel('named-chain-servable', 111000);
+    addToProfile(newProfile('my-group', 5), servableId);
+
+    // A chain whose single member is switched off in the chain: nothing in it
+    // can serve a request, so the entry must say so rather than claim ready.
+    const prunedId = seedChainOnlyModel('named-chain-pruned', 222000);
+    addToProfile(newProfile('off-group', 6), prunedId, 0);
+
+    const listed = await request(app, 'GET', '/v1/models');
+    expect(listed.status).toBe(200);
+
+    const chain = listed.body.data.find((m: any) => m.id === 'auto:my-group');
+    expect(chain).toBeDefined();
+    expect(chain.name).toContain('my-group');
+    expect(chain.object).toBe('model');
+    expect(chain.owned_by).toBe('freellmapi');
+    // The real point of the entry: is this chain usable right now, and how big
+    // a context can it take? Both are asserted, not merely present.
+    expect(chain.available).toBe(true);
+    expect(chain.unavailable_reason).toBeNull();
+    expect(chain.context_window).toBe(111000);
+    expect(chain.context_length).toBe(111000);
+
+    const off = listed.body.data.find((m: any) => m.id === 'auto:off-group');
+    expect(off).toBeDefined();
+    expect(off.available).toBe(false);
+    expect(off.unavailable_reason).toBe('no_models');
+
+    // The virtual auto: id must not collide with real catalog ids.
+    expect(listed.body.data.filter((m: any) => m.id === 'auto:my-group')).toHaveLength(1);
+  });
+
+  it('lists the Claude family ids on the plain OpenAI /v1/models too (#880)', async () => {
+    // routes/anthropic.ts only answers GET /v1/models when the caller sends an
+    // `anthropic-version` header. Claude Desktop's gateway picker does not, so
+    // the OpenAI-shaped listing has to carry the same Claude-shaped ids or the
+    // picker reports "found 0 models".
+    const listed = await request(app, 'GET', '/v1/models');
+    expect(listed.status).toBe(200);
+
+    for (const id of ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5']) {
+      const entry = listed.body.data.find((m: any) => m.id === id);
+      expect(entry, `${id} must be listed`).toBeDefined();
+      expect(entry.object).toBe('model');
+      expect(entry.owned_by).toBe('freellmapi');
+      expect(entry.available).toBe(true);
+      // The display name says where the request really goes — none of these is
+      // hosted Claude.
+      expect(entry.name).toMatch(/slot/);
+    }
+
+    // Still one row per id.
+    const ids = listed.body.data.map((m: any) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('routes a request to model auto:<name> through that named chain (#960/#895)', async () => {
+    const chainOnlyId = seedChainOnlyModel('named-chain-routed', 128000);
+    addToProfile(newProfile('route-group', 7), chainOnlyId);
+
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('api.groq.com')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: () => Promise.resolve({
+            id: 'chatcmpl-chain', object: 'chat.completion', created: 1, model: 'named-chain-routed',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'routed via route-group' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const routed = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto:route-group',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(routed.status).toBe(200);
+    expect(routed.body.choices[0].message.content).toBe('routed via route-group');
+
+    // The served model is the one that exists ONLY in this profile, so the
+    // request really went down the named chain and not the active one.
+    const served = getDb().prepare('SELECT model_id FROM requests ORDER BY id DESC LIMIT 1')
+      .get() as { model_id: string } | undefined;
+    expect(served?.model_id).toBe('named-chain-routed');
+
+    // An unknown chain name must fail loudly, not silently fall back to the
+    // active chain.
+    const missing = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto:no-such-group',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain('no-such-group');
   });
 });

@@ -145,6 +145,14 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   // OrcaRouter: one rate-limited free allowance across all `*-free` aliases
   // and the `orcarouter/free` auto route (limits unpublished; 429 on cap).
   if (platform === 'orcarouter') return 'orcarouter::free';
+  // UnoRouter: the docs say 1 req/min per free model, but live-probed
+  // 2026-08-23 a burst across many `:free` models put the whole account into
+  // 429 on every model for several minutes — so one pool, and a 429 on any
+  // model backs off the platform as a whole.
+  if (platform === 'unorouter') return 'unorouter::free';
+  // xkiro: one account-level allowance shared across its free models (the
+  // free tier is a per-account grant, not per-model), so one pool.
+  if (platform === 'xkiro') return 'xkiro::free';
   // AnyAPI: the free tier is one 100K-tokens/day budget for the whole account,
   // shared across every free/basic model — so one pool, not one per model.
   if (platform === 'anyapi') return 'anyapi::free';
@@ -154,7 +162,7 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
 }
 
 function isSharedPool(platform: Platform): boolean {
-  return ['openrouter', 'google', 'groq', 'cerebras', 'bai', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'bai', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
@@ -382,6 +390,10 @@ export function recordQuotaObservation(input: QuotaObservationInput): ProviderQu
     );
   })();
 
+  // The row just moved, so the memoised headroom for this platform is wrong —
+  // drop it rather than let a 5s window hide a fresh 429 from the router.
+  invalidateKeyQuotaHeadroom(platform);
+
   return {
     id,
     platform,
@@ -432,6 +444,84 @@ function normalizeExpiredQuotaState(db: ReturnType<typeof getDb>): void {
      WHERE reset_at IS NOT NULL
        AND julianday(reset_at) < julianday('now')
   `).run();
+}
+
+// ── Per-key headroom (routing signal) ───────────────────────────────────────
+// getQuotaStateForKeys is a panel query: it takes a write (the expiry fix-up)
+// and window-functions the whole observation log. The router needs a far
+// smaller answer — "how much of its budget does each key of ONE platform have
+// left" — on a path that runs per chain entry per request, so it gets its own
+// read-only, platform-filtered query behind a short TTL.
+
+/** Confidence floor for letting an observation steer routing. Keeps headers,
+ *  quota APIs and 429 bodies in; leaves local estimates and probes out. */
+const HEADROOM_MIN_CONFIDENCE = 0.7;
+/** Quota moves on the timescale of a rate-limit window, not a request, so a
+ *  few seconds of staleness is invisible while the query count drops to ~one
+ *  per platform per burst. Writes bust the entry outright (see below). */
+const HEADROOM_TTL_MS = 5_000;
+
+// The Db handle is part of the cache identity: reconnecting (tests, a restore)
+// hands back a different object, which invalidates every entry at once.
+const headroomCache = new Map<string, { db: unknown; at: number; map: Map<number, number> }>();
+
+/**
+ * Fraction of the observed budget still available for each key of `platform`,
+ * as keyId → 0..1, where 1 is untouched and 0 exhausted. Keys with no usable
+ * observation are simply absent — that is not the same as "empty", and callers
+ * must treat a miss as unknown rather than as zero headroom.
+ *
+ * A key metered on several metrics takes the WORST of them: the binding
+ * constraint is what 429s, so a key with 90% of its requests but 2% of its
+ * tokens left has 2% of headroom, not 90%.
+ */
+export function getKeyQuotaHeadroom(platform: Platform): Map<number, number> {
+  let db;
+  try {
+    db = getDb();
+  } catch {
+    return new Map();
+  }
+  const now = Date.now();
+  const cached = headroomCache.get(platform);
+  if (cached && cached.db === db && now - cached.at < HEADROOM_TTL_MS) return cached.map;
+
+  const rows = db.prepare(`
+    SELECT key_id AS keyId,
+           limit_value AS limitValue,
+           remaining_value AS remainingValue,
+           CASE WHEN reset_at IS NOT NULL AND julianday(reset_at) < julianday('now')
+                THEN 1 ELSE 0 END AS expired
+      FROM provider_quota_state
+     WHERE platform = ?
+       AND confidence >= ?
+       AND limit_value IS NOT NULL
+       AND limit_value > 0
+       AND remaining_value IS NOT NULL
+  `).all(platform, HEADROOM_MIN_CONFIDENCE) as {
+    keyId: number; limitValue: number; remainingValue: number; expired: number;
+  }[];
+
+  const map = new Map<number, number>();
+  for (const row of rows) {
+    // A window that already reset is a full budget again. Same rule as
+    // normalizeExpiredQuotaState, minus the write — this path must not take
+    // one just to answer a routing question.
+    const ratio = row.expired
+      ? 1
+      : Math.max(0, Math.min(1, row.remainingValue / row.limitValue));
+    const prev = map.get(row.keyId);
+    if (prev === undefined || ratio < prev) map.set(row.keyId, ratio);
+  }
+  headroomCache.set(platform, { db, at: now, map });
+  return map;
+}
+
+/** Drop the memoised headroom for one platform (or all of them). Called on
+ *  every write so a fresh observation is visible to the very next route. */
+export function invalidateKeyQuotaHeadroom(platform?: Platform): void {
+  if (platform) headroomCache.delete(platform);
+  else headroomCache.clear();
 }
 
 export function getQuotaStateForKeys(): QuotaObservationView[] {

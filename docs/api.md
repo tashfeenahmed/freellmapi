@@ -16,7 +16,7 @@ Any OpenAI-compatible client works (Anthropic / Claude clients too — see [Anth
 - [Revocable URL tokens](#revocable-url-tokens)
 - [Vision / image input](#vision--image-input)
 - [Document attachments](#document-attachments)
-- [Images & text-to-speech](#images--text-to-speech)
+- [Images, video & text-to-speech](#images-video--text-to-speech)
 - [Fusion (multi-model synthesis)](#fusion-multi-model-synthesis)
 - [Response headers](#response-headers)
 - [Embeddings](#embeddings)
@@ -239,9 +239,19 @@ Anthropic's `document` content blocks are accepted on `/v1/messages` when their 
 
 `url` sources are refused rather than fetched on your behalf; making the proxy retrieve arbitrary URLs would turn it into a request forwarder for whatever a client names.
 
-## Images & text-to-speech
+## Images, video & text-to-speech
 
-`POST /v1/images/generations` and `POST /v1/audio/speech` route across the providers that serve media models, including custom OpenAI-compatible media endpoints. Browse and toggle them on the dashboard's **Models → Image / Audio** tabs.
+`POST /v1/images/generations`, `POST /v1/videos/generations`, and `POST /v1/audio/speech` route across the providers that serve media models. Images and speech also accept custom OpenAI-compatible media endpoints; video does not. Browse and toggle them on the dashboard's **Models → Image / Video / Audio** tabs.
+
+Video generation accepts a JSON body with `prompt`, optional `model` (`auto` by default), and provider-dependent `duration`, `aspect_ratio`, `image`, `seed`, and `audio` options. It waits for queued providers to finish and returns the generated video as binary MP4 data:
+
+```bash
+curl http://localhost:3001/v1/videos/generations \
+  -H "Authorization: Bearer freellmapi-your-unified-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","prompt":"a sunrise over a quiet lake","duration":6}' \
+  --output video.mp4
+```
 
 ## Fusion (multi-model synthesis)
 

@@ -2,6 +2,7 @@ import type { Db } from '../db/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import { discoverEndpointModels } from './model-discovery.js';
 import { registerCustomModels, type CustomModelEntry } from './custom-model-register.js';
+import { isCustomModelTombstoned } from './custom-model-tombstone.js';
 import { listCustomEndpoints } from './custom-endpoint.js';
 import { endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 
@@ -59,6 +60,12 @@ export interface CustomModelSyncResult {
   skipped: number;
   /** Models skipped because they matched no free pattern (#746). */
   paidSkipped: number;
+  /** Models skipped because the operator deleted them and they must stay deleted (#926). */
+  tombstoned: number;
+  /** Models skipped because they are discernibly not chat models — embedding,
+   *  image, audio, transcription or video ids (#1051). Registering those as
+   *  chat models is how they used to 404 forever. */
+  nonChatSkipped: number;
   failures: Array<{ baseUrl: string; error: string }>;
 }
 
@@ -66,7 +73,7 @@ export interface CustomModelSyncResult {
  *  that wants a manual pass) can run it directly without waiting for the timer. */
 export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult> {
   const endpoints = listCustomEndpoints(db);
-  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, paidSkipped: 0, failures: [] };
+  const result: CustomModelSyncResult = { endpoints: endpoints.length, added: 0, skipped: 0, paidSkipped: 0, tombstoned: 0, nonChatSkipped: 0, failures: [] };
 
   for (const endpoint of endpoints) {
     try {
@@ -88,11 +95,26 @@ export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult>
           result.skipped += 1;
           continue;
         }
+        // #926: the operator deleted this model (or the key that owned it) and
+        // expects it to stay gone. The sync's "add only" contract must not turn
+        // a deliberate deletion into the next pass's "new model".
+        if (isCustomModelTombstoned(db, scope, model.id)) {
+          result.tombstoned += 1;
+          continue;
+        }
         // Free-only policy (#746): when FREE_PATTERNS is configured, a model
         // that matches none of the known-free patterns is presumably paid and
         // is skipped rather than silently registered.
         if (freePatterns.length > 0 && !freePatterns.some(p => patternMatches(p, model.id))) {
           result.paidSkipped += 1;
+          continue;
+        }
+        // #1051: a diffusion/whisper/video/embedding id is not a chat model,
+        // and registering it here is how it ends up 404ing in every chain.
+        // The sync only ADDS chat models; media and embedding models go
+        // through their own explicit registration paths.
+        if (model.kind !== undefined) {
+          result.nonChatSkipped += 1;
           continue;
         }
         // Bare id only, like the dashboard's bulk "Fetch models" submit: no name

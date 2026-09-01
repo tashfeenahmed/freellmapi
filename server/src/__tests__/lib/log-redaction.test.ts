@@ -109,6 +109,26 @@ describe('redactSecrets', () => {
     expect(out.match(/\[redacted/g)).toHaveLength(1);
   });
 
+  it('leaves a long run of one repeated character alone', () => {
+    // The 32+ char catch-all is an entropy heuristic, and a run of a single
+    // character has none: separator rules, padding and progress output are not
+    // credentials, and redacting them made real output unreadable while
+    // protecting nothing.
+    const line = `divider ${'a'.repeat(36)} end`;
+    expect(redactSecrets(line)).toBe(line);
+    expect(redactSecrets(`${'='.repeat(40)}`)).toBe('='.repeat(40));
+  });
+
+  it('still redacts a genuine high-entropy 32-char token', () => {
+    // The guard above must not have opened a hole: two distinct characters in
+    // the first 32 is all it takes to be caught, which every real key is.
+    const secret = filler(32);
+    const out = redactSecrets(`token ${secret} rejected`);
+    expect(out).not.toContain(secret);
+    expect(out).toContain('[redacted-token]');
+    expect(out).toContain('rejected');
+  });
+
   it('is idempotent — redacting twice changes nothing', () => {
     const once = redactSecrets('Authorization: Bearer abc123def456ghi789jkl012');
     expect(redactSecrets(once)).toBe(once);

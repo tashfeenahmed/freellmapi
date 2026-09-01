@@ -42,6 +42,15 @@ mac:
         - arm64
   extendInfo:
     LSUIElement: 1
+# The DMG is the file people actually download, so it is the file macOS
+# quarantines and assesses. electron-builder signs and notarizes the .app inside
+# but leaves the DMG itself unsigned, which leaves `spctl -t install` on the
+# download reporting "no usable signature" — #373's "damaged" report. Signing it
+# here is also what makes it *eligible* for notarization; the release workflow
+# submits and staples it afterwards. This runs before the blockmap and
+# latest-mac.yml are computed, so those describe the signed file.
+dmg:
+  sign: true
 win:
   target:
     - target: nsis
