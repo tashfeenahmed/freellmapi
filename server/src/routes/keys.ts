@@ -842,7 +842,10 @@ keysRouter.post('/custom/discover-models', async (req: Request, res: Response) =
     });
   } catch (err: any) {
     if (err instanceof ModelDiscoveryError) {
-      res.status(err.status).json({ error: { message: err.message } });
+      // `upstream_error`, never `authentication_error`: this status is relayed
+      // from the operator's own endpoint, and a client that reads a bare 401 as
+      // "session expired" would sign the operator out for testing a bad key.
+      res.status(err.status).json({ error: { message: err.message, type: 'upstream_error' } });
       return;
     }
     res.status(502).json({ error: { message: `Model discovery failed: ${err?.message ?? 'unknown error'}` } });
@@ -938,7 +941,10 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     if (err instanceof ModelDiscoveryError) {
-      res.status(err.status).json({ error: { message: err.message } });
+      // `upstream_error`, never `authentication_error`: this status is relayed
+      // from the operator's own endpoint, and a client that reads a bare 401 as
+      // "session expired" would sign the operator out for testing a bad key.
+      res.status(err.status).json({ error: { message: err.message, type: 'upstream_error' } });
       return;
     }
     res.status(502).json({ error: { message: `Probe failed: ${err?.message ?? 'unknown error'}` } });
