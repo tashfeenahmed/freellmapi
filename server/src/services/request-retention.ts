@@ -84,8 +84,9 @@ export function getQuotaObservationRetentionConfig(): QuotaObservationRetentionC
 // thousands of rows; deleting them in one statement held the loop for ~4.5s on
 // a 470k-row log. Work is chunked under a wall-clock budget instead, and a
 // sweep that runs out of budget is resumed on the next 60s tick rather than
-// tomorrow.
-const QUOTA_OBSERVATIONS_PRUNE_CHUNK = 20_000;
+// tomorrow. The chunk is the smallest unit of stall: 20k rows took ~870ms on a
+// 2-vCPU box under load, 5k keeps each tick near the budget.
+const QUOTA_OBSERVATIONS_PRUNE_CHUNK = 5_000;
 const QUOTA_OBSERVATIONS_PRUNE_BUDGET_MS = 250;
 
 /**

@@ -135,9 +135,9 @@ describe('provider-quota: record + read round-trip', () => {
     // A zero budget allows exactly one chunk before the check trips.
     const first = pruneQuotaObservations(db, now, 0);
     expect(first.done).toBe(false);
-    expect(first.deleted).toBe(20_000);
+    expect(first.deleted).toBe(5_000);
     const rest = pruneQuotaObservations(db, now, 60_000);
-    expect(rest).toEqual({ deleted: 25_000, done: true });
+    expect(rest).toEqual({ deleted: 40_000, done: true });
   });
 
   it('records an observation and surfaces it via getQuotaStateForKeys', () => {
