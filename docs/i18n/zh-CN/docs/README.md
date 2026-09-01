@@ -1,6 +1,6 @@
 [English](../../../README.md) · **简体中文**
 
-# FreeLLMAPI 文档
+# JiMesh 文档
 
 根目录的 [README](../README.md) 是产品总览，详细指南在这里。
 

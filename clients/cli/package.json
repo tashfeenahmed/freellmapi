@@ -1,0 +1,68 @@
+{
+  "name": "jimesh",
+  "version": "0.5.0",
+  "description": "Set up coding agents to use a JiMesh gateway",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tashfeenahmed/freellmapi.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/tashfeenahmed/freellmapi/tree/main/cli#readme",
+  "bugs": {
+    "url": "https://github.com/tashfeenahmed/freellmapi/issues"
+  },
+  "keywords": [
+    "freellmapi",
+    "llm",
+    "openai-compatible",
+    "claude-code",
+    "codex",
+    "aider",
+    "cline",
+    "coding-agent",
+    "cli"
+  ],
+  "type": "module",
+  "bin": {
+    "freellmapi": "dist/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tools": "./dist/tools.js"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/config-files.js",
+    "dist/config-files.d.ts",
+    "dist/doctor.js",
+    "dist/doctor.d.ts",
+    "dist/models.js",
+    "dist/models.d.ts",
+    "dist/tools.js",
+    "dist/tools.d.ts",
+    "dist/types.js",
+    "dist/types.d.ts",
+    "tools.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=20.18.0 <25.0.0"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "typescript": "~6.0.2",
+    "vitest": "^3.1.3"
+  }
+}

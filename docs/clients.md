@@ -13,7 +13,7 @@
 
 ## OpenAI-compatible clients
 
-Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
+Any client that can target an OpenAI-compatible base URL can use JiMesh:
 
 - **LangChain, LlamaIndex, official OpenAI SDKs**: set `base_url` to
   `http://localhost:3001/v1` and use the unified key from the dashboard.
@@ -26,8 +26,8 @@ Use the generator instead of hand-editing a client configuration:
 
 ```bash
 export FREELLMAPI_API_KEY=<unified-key>   # or pass --api-key on each command
-npx freellmapi setup-claude --url http://localhost:3001 --dry-run
-npx freellmapi setup-claude --url http://localhost:3001
+npx JiMesh setup-claude --url http://localhost:3001 --dry-run
+npx JiMesh setup-claude --url http://localhost:3001
 ```
 
 `--dry-run` prints a diff. Real writes merge with the existing configuration
@@ -64,32 +64,32 @@ base URL to include `/v1`.
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) keeps
 every provider as a route under `llm-pi-ai.providers` in
 `$DSH_HOME/settings.yaml` (`~/.dsh` by default). `setup-dsh` adds a
-`freellmapi` route there — `api: openai-completions`, the gateway's `/v1`
+`JiMesh` route there — `api: openai-completions`, the gateway's `/v1`
 base URL, and the live catalog as the route's `models` list, which DSH
 requires for a provider its installed catalog does not ship — and makes
-`freellmapi/auto` the default model. The key goes into `$DSH_HOME/.env`
+`JiMesh/auto` the default model. The key goes into `$DSH_HOME/.env`
 (mode 0600) as `FREELLMAPI_API_KEY`, the environment layer DSH reads on its
 own, so nothing needs exporting. Both writes are structural merges: other
 routes, comments, and settings in the file are left as they were.
 
 ```bash
-npx freellmapi setup-dsh --url http://localhost:3001 --api-key <unified-key>
+npx JiMesh setup-dsh --url http://localhost:3001 --api-key <unified-key>
 npx @deepseek-ai/dsh web
 ```
 
 Settings are hot-reloaded, so a running `dsh` uses the route on its next
-request. `--profile <name>` adds a second route (`freellmapi-<name>`) without
+request. `--profile <name>` adds a second route (`JiMesh-<name>`) without
 changing the default model; `--model <id>` pins the default. Routes are
 declared text-only — add `input: [text, image]` to a model entry under
-`freellmapi.models` to send it images. `DSH_HOME` is honoured when set.
+`JiMesh.models` to send it images. `DSH_HOME` is honoured when set.
 
 ### MiMo Code (`mimo`)
 
 [MiMo Code](https://mimo.xiaomi.com/mimocode) is an OpenCode derivative, so it
 takes any OpenAI-compatible endpoint as a custom entry under `provider` — an
 `npm` package to speak with (`@ai-sdk/openai-compatible`), the credentials in
-`options`, and a `models` map. `setup-mimo` writes that entry as `freellmapi`
-and names `freellmapi/<model>` as the default `model`.
+`options`, and a `models` map. `setup-mimo` writes that entry as `JiMesh`
+and names `JiMesh/<model>` as the default `model`.
 
 The file is `config.json` in MiMo's own global config directory:
 `$XDG_CONFIG_HOME/mimocode` (`~/.config/mimocode` on macOS and Linux), or
@@ -100,7 +100,7 @@ generated file is the weakest layer and anything you hand-write in
 providers and settings already in `config.json` are left as they were.
 
 ```bash
-npx freellmapi setup-mimo --url http://localhost:3001
+npx JiMesh setup-mimo --url http://localhost:3001
 export FREELLMAPI_API_KEY=<unified-key>
 mimo
 ```
@@ -118,7 +118,7 @@ Gemini CLI and Gemini-lineage clients can speak Google's wire format directly:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL=http://localhost:3001
-export GEMINI_API_KEY=freellmapi-your-unified-key
+export GEMINI_API_KEY=JiMesh-your-unified-key
 gemini
 ```
 
@@ -171,28 +171,28 @@ On top of inference, the router is an **MCP server**: agents can introspect it m
 routing strategy). For Claude Code:
 
 ```bash
-claude mcp add --transport http freellmapi http://localhost:3001/mcp \
-  --header "Authorization: Bearer freellmapi-your-unified-key"
+claude mcp add --transport http JiMesh http://localhost:3001/mcp \
+  --header "Authorization: Bearer JiMesh-your-unified-key"
 ```
 
 Any MCP client that speaks Streamable HTTP works the same way: point it at `/mcp` with the
 unified key as a Bearer token.
 
-FreeLLMAPI is local-first and single-user by design. Your provider keys stay in
+JiMesh is local-first and single-user by design. Your provider keys stay in
 your SQLite database, encrypted at rest, and requests go from your machine to the
 upstream providers you enabled.
 
 ## VS Code ghost-text autocomplete (Continue)
 
-FreeLLMAPI exposes `/v1/completions` for editor autocomplete clients that send legacy OpenAI prompt/suffix requests. Example Continue config:
+JiMesh exposes `/v1/completions` for editor autocomplete clients that send legacy OpenAI prompt/suffix requests. Example Continue config:
 
 ```yaml
 models:
-  - name: FreeLLMAPI Autocomplete
+  - name: JiMesh Autocomplete
     provider: openai
     model: auto
     apiBase: http://localhost:3001/v1
-    apiKey: freellmapi-your-unified-key
+    apiKey: JiMesh-your-unified-key
     useLegacyCompletionsEndpoint: true
     roles:
       - autocomplete
@@ -200,10 +200,10 @@ models:
 
 ## Context Handoff
 
-When FreeLLMAPI falls over to a different model mid-conversation (quota, rate limit, cooldown), the new model has no idea it is picking up someone else's task. **Context handoff** adds a single compact `system` message to the outbound request that tells the new model exactly that:
+When JiMesh falls over to a different model mid-conversation (quota, rate limit, cooldown), the new model has no idea it is picking up someone else's task. **Context handoff** adds a single compact `system` message to the outbound request that tells the new model exactly that:
 
 ```
-FreeLLMAPI context handoff:
+JiMesh context handoff:
 You are taking over an ongoing conversation from another model (groq:llama-3 → google:gemini-flash).
 Continue the user's task using the conversation context already provided in this request.
 Do not restart the task, re-ask already answered setup questions, or discard prior tool results.
@@ -228,4 +228,4 @@ FREELLMAPI_CONTEXT_HANDOFF=on_model_switch
 - Session key: `X-Session-Id` header if present, otherwise SHA-1 of the first user message (same as sticky sessions).
 - Storage is in-memory only. Nothing is written to disk or logged.
 
-> **Important:** Context Handoff improves continuity for conversations routed through FreeLLMAPI. It cannot recover provider-internal hidden state or messages that were never sent to the proxy.
+> **Important:** Context Handoff improves continuity for conversations routed through JiMesh. It cannot recover provider-internal hidden state or messages that were never sent to the proxy.

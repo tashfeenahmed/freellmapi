@@ -16,7 +16,7 @@ How the router decides, what to expect from stacked free tiers, and where the bo
 ![One request in, the best free model out — the fallback chain with live scores, cooldowns, and quota tracking](../repo-assets/router-flow.png)
 
 ```
-┌──────────────────┐   Bearer freellmapi-…   ┌─────────────────────────┐
+┌──────────────────┐   Bearer JiMesh-…   ┌─────────────────────────┐
 │  OpenAI SDK /    │ ──────────────────────▶ │  Express proxy (:3001)  │
 │  curl / any      │ ◀────────────────────── │  /v1/chat/completions   │
 │  OpenAI client   │      streamed tokens    └────────────┬────────────┘
@@ -57,7 +57,7 @@ How the router decides, what to expect from stacked free tiers, and where the bo
 ## Operational details
 
 - **Encrypted key storage** — API keys are encrypted with AES-256-GCM before hitting SQLite; decryption happens in-memory just before a request.
-- **Unified API key** — Clients authenticate to your proxy with a single `freellmapi-…` bearer token. You never expose upstream provider keys to your apps.
+- **Unified API key** — Clients authenticate to your proxy with a single `JiMesh-…` bearer token. You never expose upstream provider keys to your apps.
 - **Dashboard login** — The admin UI and all `/api/*` routes are gated behind an email + password account (scrypt-hashed, session-token auth), set on first run. The `/v1` proxy keeps its own unified-key auth for apps.
 - **Health checks** — Periodic probes mark keys as `healthy`, `rate_limited`, `invalid`, or `error` so the router skips dead ones automatically.
 - **Response cache (opt-in)** — an exact-match in-memory LRU for identical non-streaming requests: canonical SHA-256 keys over the full request, TTL and temperature gates, per-request `X-FreeLLM-Cache: on|off` override, and saved-token stats on the dashboard. Off by default; cache hits consume zero provider quota.
