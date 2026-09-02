@@ -28,7 +28,7 @@ Aggregate free tiers from dozens of providers, plus custom OpenAI-compatible cha
 
 
 Your router updates its own model catalog from a signed feed: new free models, quota changes, and compatibility fixes land without a `git pull`. Free installs get the monthly snapshot, so a model reaches them 30 days after it joins the live feed; premium routers get it the same day.
-**[Go live at freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_top#pricing)** ($19/yr, cancel anytime).
+**[Go live at freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_top#pricing)** ($29/yr, cancel anytime).
 
 </div>
 
@@ -274,7 +274,7 @@ live-feed routers receive the update the same day we ship it.
 
 **[Go live at freellmapi.co →](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_bottom#pricing)**
 
-- $19/year or $49 once, lifetime. Stripe checkout; cancel anytime, self-serve.
+- $29/year or $79 once, lifetime. Stripe checkout; cancel anytime, self-serve.
 - One `fla_` key covers every router you run: desktop, homelab, Raspberry Pi.
 - Activate in the dashboard under **Premium**; cancel or manage billing
   self-serve at [freellmapi.co/manage](https://freellmapi.co/manage).

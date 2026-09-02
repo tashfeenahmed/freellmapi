@@ -23,7 +23,7 @@
 
 
 你的路由器会从签名源自行更新模型目录：新的免费模型、额度变更和兼容性修复，都不需要 `git pull` 就能生效。
-**[前往 freellmapi.co 启用](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_top#pricing)**（每年 $19，随时可取消）。
+**[前往 freellmapi.co 启用](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_top#pricing)**（每年 $29，随时可取消）。
 
 </div>
 
@@ -238,7 +238,7 @@ Premium 让这份签名目录在你运行的每一个路由器上保持实时。
 
 **[前往 freellmapi.co 启用 →](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=premium&utm_content=readme_bottom#pricing)**
 
-- 每年 $19，或一次性 $49 永久有效。Stripe 支付，随时可自助取消。
+- 每年 $29，或一次性 $79 永久有效。Stripe 支付，随时可自助取消。
 - 一个 `fla_` 密钥覆盖你运行的所有路由器：桌面、家庭服务器、树莓派。
 - 在仪表盘的 **Premium** 页激活；取消或管理账单可自助前往 [freellmapi.co/manage](https://freellmapi.co/manage)。
 - 路由器本身永远保持 MIT 许可、完全免费。Premium 只是那条实时源，而正是它资助了每天的模型测试和目录维护，让这份目录始终可用。
