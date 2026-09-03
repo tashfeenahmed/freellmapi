@@ -15,13 +15,19 @@ import { getQuotaStateForKeys } from './provider-quota.js';
 
 export const LOW_BALANCE_THRESHOLD = 0.1; // <10% of the daily window left → warn
 export const LOW_BALANCE_ABSOLUTE = 20; // ...or fewer than 20 requests left
+// The absolute floor is a statement about big windows: "20 left" is alarming
+// out of 14400/day and unremarkable out of 30/day. Below this limit the
+// percentage rule alone decides, otherwise a small tier would warn from its
+// first request onwards and the flag would mean nothing.
+export const LOW_BALANCE_ABSOLUTE_MIN_LIMIT = 200;
 
 export interface QuotaForecastEntry {
   /** Platform the pool belongs to, e.g. 'groq'. */
   platform: string;
   /** Human-readable pool label (platform::scope), e.g. 'groq::account'. */
   pool: string;
-  /** Requests used in the current window. Null when the provider reported no limit. */
+  /** Requests used in the current window. Null when `remaining` is unknown,
+   *  since used is only ever derived from it. */
   used: number | null;
   /** Requests remaining in the current window. Null when unknown. */
   remaining: number | null;
@@ -31,7 +37,9 @@ export interface QuotaForecastEntry {
   remaining_pct: number | null;
   /** ISO timestamp of the window reset, or null when never observed. */
   reset_at: string | null;
-  /** True when fewer than LOW_BALANCE_THRESHOLD (or LOW_BALANCE_ABSOLUTE) remain. */
+  /** True when less than LOW_BALANCE_THRESHOLD of the window remains, or —
+   *  on a window of at least LOW_BALANCE_ABSOLUTE_MIN_LIMIT — fewer than
+   *  LOW_BALANCE_ABSOLUTE requests do. Always false when remaining is unknown. */
   low_balance: boolean;
   /** Seconds until reset_at, or null when reset_at is unknown/expired. */
   seconds_until_reset: number | null;
@@ -54,12 +62,16 @@ function entryFor(row: QuotaObservationView): QuotaForecastEntry | null {
   const limit = row.limit;
   const remaining = typeof row.remaining === 'number' ? row.remaining : null;
 
-  const used = Math.max(0, limit - (remaining ?? 0));
+  // An unknown `remaining` says nothing about consumption: reporting the whole
+  // limit as used would read as an exhausted pool when it may be untouched.
+  const used = remaining === null ? null : Math.max(0, limit - remaining);
   let remainingPct: number | null = null;
   let lowBalance = false;
   if (remaining !== null) {
     remainingPct = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
-    lowBalance = remaining <= LOW_BALANCE_ABSOLUTE || remaining / limit < LOW_BALANCE_THRESHOLD;
+    const absoluteApplies = limit >= LOW_BALANCE_ABSOLUTE_MIN_LIMIT;
+    lowBalance = (absoluteApplies && remaining <= LOW_BALANCE_ABSOLUTE)
+      || remaining / limit < LOW_BALANCE_THRESHOLD;
   }
 
   return {
@@ -83,7 +95,8 @@ export function getQuotaForecast(): QuotaForecastEntry[] {
   for (const row of getQuotaStateForKeys()) {
     const entry = entryFor(row);
     if (!entry) continue;
-    const key = `${entry.platform}::${entry.pool}`;
+    // `pool` already carries its platform ("groq::account"), so it is the key.
+    const key = entry.pool;
     const prev = byKey.get(key);
     if (!prev || (entry.remaining_pct ?? Infinity) < (prev.remaining_pct ?? Infinity)) {
       byKey.set(key, entry);

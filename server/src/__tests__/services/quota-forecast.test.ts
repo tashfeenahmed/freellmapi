@@ -69,7 +69,44 @@ describe('quota-forecast: daily balance aggregation (#1104)', () => {
     const forecast = getQuotaForecast();
     expect(forecast).toHaveLength(1);
     expect(forecast[0].remaining).toBe(20); // tightest wins
-    expect(forecast[0].low_balance).toBe(true);
+    // 20 of 100 is a fifth of the window, and 100 is below the absolute
+    // floor's minimum, so nothing here is low.
+    expect(forecast[0].low_balance).toBe(false);
+  });
+
+  it('does not apply the absolute floor to a small window', () => {
+    // A 30/day tier with 25 left has five sixths of its window: the absolute
+    // floor of 20 would call that low, which is the bug this guards.
+    insertState({ platform: 'cerebras', keyId: 1, pool: 'cerebras::account', metric: 'requests', limit: 30, remaining: 25, resetAt: future() });
+
+    const e = getQuotaForecast()[0];
+    expect(e.remaining_pct).toBe(83);
+    expect(e.low_balance).toBe(false);
+  });
+
+  it('still warns on a small window once the percentage rule bites', () => {
+    insertState({ platform: 'cerebras', keyId: 1, pool: 'cerebras::account', metric: 'requests', limit: 30, remaining: 2, resetAt: future() });
+
+    expect(getQuotaForecast()[0].low_balance).toBe(true);
+  });
+
+  it('leaves used null when the provider reported no remaining', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: null, resetAt: future() });
+
+    const e = getQuotaForecast()[0];
+    expect(e.used).toBeNull();
+    expect(e.remaining).toBeNull();
+    expect(e.remaining_pct).toBeNull();
+    expect(e.low_balance).toBe(false);
+  });
+
+  it('keys the dedupe on the pool alone, which already names its platform', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 1000, remaining: 900, resetAt: future() });
+    insertState({ platform: 'groq', keyId: 2, pool: 'groq::batch', metric: 'requests', limit: 1000, remaining: 800, resetAt: future() });
+
+    const pools = getQuotaForecast().map(e => e.pool);
+    expect(pools).toContain('groq::account');
+    expect(pools).toContain('groq::batch');
   });
 
   it('ignores non-request metrics and unknown limits', () => {
