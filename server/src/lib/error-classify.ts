@@ -505,7 +505,18 @@ export function isModelNotFoundError(err: any): boolean {
   if (err?.status === 404 || err?.status === 410) return true;
   const msg = (err?.message ?? '').toLowerCase();
   return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
-    || msg.includes('410') || msg.includes('gone');
+    || msg.includes('410') || msg.includes('gone')
+    // Some aggregators report a removed/stale model with a 400 (not a 404) whose
+    // body reads "No model found: <id>", "model not found", "unknown model" or
+    // "model does not exist" (#: Routeway 400 "No model found: llama-3.3-70b-instruct:free").
+    // Note "No model found" does NOT contain the substring "not found" (words are
+    // no/model/found), so it slipped past the checks above and fell through to
+    // isProviderBadRequestError — surfacing as a request-blaming 400 instead of a
+    // stale-catalog 404. These phrasings are MODEL-level (every sibling key fails
+    // identically), so they belong here for the whole-model skip.
+    || msg.includes('no model found') || msg.includes('model not found')
+    || msg.includes('unknown model') || msg.includes('model does not exist')
+    || msg.includes('no such model');
 }
 
 // A 403 Forbidden returned for a specific model behind an otherwise-valid key.
