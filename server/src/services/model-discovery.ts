@@ -27,6 +27,11 @@ export const MAX_DISCOVERED_MODELS = 500;
 /** Ids longer than this are certainly not model ids; skip rather than store. */
 const MAX_MODEL_ID_LENGTH = 256;
 
+/** What a discovered model IS, when it discernibly isn't a chat model (#1051).
+ *  Absent means "chat as far as anyone can tell" — the field is emitted only
+ *  when a non-chat kind is detected, so plain chat rows keep their shape. */
+export type DiscoveredModelKind = 'embedding' | 'image' | 'audio' | 'transcription' | 'video';
+
 export interface DiscoveredModel {
   id: string;
   ownedBy: string | null;
@@ -42,6 +47,8 @@ export interface DiscoveredModel {
   isFree?: boolean;
   /** True when the upstream advertises image input (modalities/vision). */
   vision?: boolean;
+  /** Present only when the model is discernibly NOT a chat model (#1051). */
+  kind?: DiscoveredModelKind;
 }
 
 /** Carries the HTTP status the route should answer with, so a relay's 401 stays
@@ -226,6 +233,82 @@ function visionFromId(id: string): true | undefined {
   return undefined;
 }
 
+// #1051, the non-vision half: an upstream that answers with bare ids gives us
+// no `object`/`type` to read (SiliconFlow ships none at all), so a diffusion,
+// whisper or video model registers as a chat model and then 404s forever. The
+// id is the only signal left. Same rules as VISION_ID_MARKERS: matched per
+// token (the id split on non-alphanumerics), never as a raw substring, so
+// `sdk`, `tootsie` or `pastta` can't smuggle a kind in. Chat is the default —
+// classifyModelId returns undefined unless a marker is unambiguous, because a
+// wrong "media" verdict makes a working chat model unreachable, which is worse
+// than the status quo.
+const KIND_ID_MARKERS: ReadonlyArray<readonly [DiscoveredModelKind, RegExp]> = [
+  // Embedding first: "embedding" ids sometimes also carry family tokens.
+  ['embedding', /^embed(ding)?s?$/],
+  ['embedding', /^bge$/],
+  // Speech-to-text families.
+  ['transcription', /^whisper$/],
+  ['transcription', /^(asr|stt)$/],
+  ['transcription', /^transcri(be|ption)$/],
+  ['transcription', /^sensevoice(small|large)?$/],
+  ['transcription', /^voxtral$/],
+  // Text-to-speech families.
+  ['audio', /^tts$/],
+  ['audio', /^cosyvoice\d*$/],
+  // Video generation: Wan2.2's own tokens (`wan2`, `t2v`, `i2v`) plus ids that
+  // simply say video (HunyuanVideo, LTX-Video, ...).
+  ['video', /^wan\d*$/],
+  ['video', /^[ti]2v$/],
+  ['video', /video/],
+  // Image generation: diffusion/SD/FLUX/DALL-E/Kolors families. `sd` only as a
+  // whole token with optional xl/digits (sd3, sdxl, sd35) so `sdk` stays out.
+  ['image', /^diffusion$/],
+  ['image', /^sd(xl)?\d*$/],
+  ['image', /^flux$/],
+  ['image', /^dall-?e?\d*$/],
+  ['image', /^dalle\d*$/],
+  ['image', /^kolors$/],
+  ['image', /^imagen\d*$/],
+  ['image', /^photomaker(v\d+)?$/],
+];
+
+// Upstream type metadata beats the id when it exists: a few relays ship a
+// `type`/`task`/`object` per entry ("embedding", "text-to-image", ...). OpenAI's
+// own `object: "model"` says nothing and maps to undefined here.
+const KIND_METADATA_KEYS = ['type', 'task', 'object', 'model_type', 'modelType'] as const;
+const KIND_METADATA_VALUES: ReadonlyArray<readonly [DiscoveredModelKind, RegExp]> = [
+  ['embedding', /embedding/],
+  ['transcription', /(speech-?to-?text|transcri|asr\b|\bstt\b)/],
+  ['audio', /(text-?to-?speech|\btts\b|speech-?synthesis)/],
+  ['video', /video/],
+  ['image', /(text-?to-?image|image-?generation|diffusion)/],
+];
+
+/** The model's kind read off its id, for upstreams that advertise no usable
+ *  type metadata (#1051). Returns a kind or undefined and never 'chat': absence
+ *  of a marker is not evidence of anything, and chat stays the default. */
+export function classifyModelId(id: string): DiscoveredModelKind | undefined {
+  for (const token of id.toLowerCase().split(/[^a-z0-9]+/)) {
+    for (const [kind, pattern] of KIND_ID_MARKERS) {
+      if (pattern.test(token)) return kind;
+    }
+  }
+  return undefined;
+}
+
+function kindFromMetadata(record: Record<string, unknown>): DiscoveredModelKind | undefined {
+  for (const key of KIND_METADATA_KEYS) {
+    const value = record[key];
+    if (typeof value !== 'string') continue;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || normalized === 'model') continue;
+    for (const [kind, pattern] of KIND_METADATA_VALUES) {
+      if (pattern.test(normalized)) return kind;
+    }
+  }
+  return undefined;
+}
+
 function toDiscovered(entry: unknown): DiscoveredModel | null {
   if (typeof entry === 'string') {
     const id = entry.trim();
@@ -233,6 +316,10 @@ function toDiscovered(entry: unknown): DiscoveredModel | null {
     const bare: DiscoveredModel = { id, ownedBy: null };
     const bareVision = visionFromId(id);
     if (bareVision !== undefined) bare.vision = bareVision;
+    if (bareVision !== true) {
+      const bareKind = classifyModelId(id);
+      if (bareKind !== undefined) bare.kind = bareKind;
+    }
     return bare;
   }
   const record = asRecord(entry);
@@ -253,6 +340,12 @@ function toDiscovered(entry: unknown): DiscoveredModel | null {
   // `??` not `||`: an upstream that explicitly says false keeps saying false.
   const vision = visionOf(record) ?? visionFromId(id);
   if (vision !== undefined) model.vision = vision;
+  // Metadata wins over the id; a vision verdict wins over both — a VL model is
+  // a chat model that sees, not a media model (#1051).
+  if (vision !== true) {
+    const kind = kindFromMetadata(record) ?? classifyModelId(id);
+    if (kind !== undefined) model.kind = kind;
+  }
   return model;
 }
 

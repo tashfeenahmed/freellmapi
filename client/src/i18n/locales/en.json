@@ -669,7 +669,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "analytics": {
@@ -745,7 +746,9 @@
     "keyBadge": "Key #{n}",
     "attemptTimingHint": "Start offset from request start · attempt duration",
     "requestedModel": "Requested model",
-    "ttft": "TTFT"
+    "ttft": "TTFT",
+    "sortBy": "Sort by {column}",
+    "sortHint": "Sorting applies to the {count} loaded rows"
   },
   "logs": {
     "title": "Logs",

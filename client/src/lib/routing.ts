@@ -376,6 +376,7 @@ export const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
+  sail:        '#0ea5e9',
   bai:         '#111827',
   nvidia:      '#76b900',
   mistral:     '#f59e0b',
@@ -440,4 +441,36 @@ export function buildGroups(rows: Row[], isManual: boolean): ModelGroupRow[] {
       : Math.max(...b.members.map(m => m.score ?? 0)) - Math.max(...a.members.map(m => m.score ?? 0)),
   )
   return groups
+}
+
+/**
+ * Whether a search query matches a logical-model group (#1056). The hay covers
+ * everything the table can DISPLAY for the group: its label, canonical id, and
+ * every member's platform, display name and model id — plus, for custom rows,
+ * the key label and endpoint host the row is actually rendered with. Those last
+ * two are the fix: a relay added as a custom endpoint (UnoRouter, say) carries
+ * platform 'custom', so searching the provider's name found nothing even
+ * though the table prints "api.unorouter.com" on the row.
+ */
+export function groupMatchesQuery(
+  g: {
+    label: string
+    members: Array<{
+      platform: string; modelId: string; displayName: string
+      canonicalId?: string; source?: 'catalog' | 'custom'
+      keyLabel?: string | null; endpointScope?: string | null
+    }>
+  },
+  query: string,
+): boolean {
+  const hay = [
+    g.label,
+    g.members[0].canonicalId ?? '',
+    ...g.members.map(m => m.platform),
+    ...g.members.map(m => m.displayName),
+    ...g.members.map(m => m.modelId),
+    ...g.members.map(m => m.keyLabel ?? ''),
+    ...g.members.map(m => m.endpointScope ? endpointShortLabel(m.endpointScope) : ''),
+  ].join(' ').toLowerCase()
+  return hay.includes(query)
 }

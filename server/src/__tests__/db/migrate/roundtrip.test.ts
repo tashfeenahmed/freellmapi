@@ -32,6 +32,9 @@ const SERVER_LOGS_FILENAME = '20260823_000001_server_logs.ts';
 const BACKUPS_TABLE_FILENAME = '20260823_000002_backups_table.ts';
 const ATTEMPT_KEY_LABEL_FILENAME = '20260823_000003_attempt_key_label.ts';
 const PROFILE_AUTO_INCLUDE_FILENAME = '20260823_000004_profile_auto_include.ts';
+const IDEMPOTENCY_CLAIMS_FILENAME = '20260901_000001_idempotency_claims.ts';
+const QUOTA_OBSERVATION_LOOKUP_FILENAME = '20260901_000002_quota_observation_lookup.ts';
+const ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME = '20260902_000001_analytics_latency_percentile_index.ts';
 
 interface SchemaRow {
   type: string;
@@ -110,6 +113,9 @@ describe('migration round trip', () => {
         BACKUPS_TABLE_FILENAME,
         ATTEMPT_KEY_LABEL_FILENAME,
         PROFILE_AUTO_INCLUDE_FILENAME,
+        IDEMPOTENCY_CLAIMS_FILENAME,
+        QUOTA_OBSERVATION_LOOKUP_FILENAME,
+        ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME,
       ]);
     } finally {
       db.close();

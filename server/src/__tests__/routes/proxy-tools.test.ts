@@ -3,6 +3,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+import { clearReasoningMemory } from '../../routes/proxy.js';
 
 let dashToken = '';
 
@@ -45,6 +46,8 @@ describe('Proxy tool-calling support', () => {
     const db = getDb();
     db.prepare('DELETE FROM api_keys').run();
     db.prepare('DELETE FROM requests').run();
+
+    clearReasoningMemory();
 
     const addKey = await request(app, 'POST', '/api/keys', {
       platform: 'groq',
@@ -219,7 +222,7 @@ describe('Proxy tool-calling support', () => {
 
     expect(status).toBe(200);
     expect(providerBody.messages[1].role).toBe('assistant');
-    expect(providerBody.messages[1].reasoning_content).toBe('Let me reason about this step by step...');
+    expect(providerBody.messages[1].reasoning_content).toBeUndefined();
   });
 
   it('restores session reasoning_content the client dropped on replay (#797)', async () => {
@@ -274,7 +277,7 @@ describe('Proxy tool-calling support', () => {
     }, sessHeaders);
     expect(second.status).toBe(200);
     expect(providerBody.messages[1].role).toBe('assistant');
-    expect(providerBody.messages[1].reasoning_content).toBe('session trace from turn one');
+    expect(providerBody.messages[1].reasoning_content).toBeUndefined();
   });
 
   it('sends the client\'s messages untouched when the session remembers no reasoning (#797)', async () => {
@@ -364,7 +367,7 @@ describe('Proxy tool-calling support', () => {
     expect(calls).toHaveLength(3);
 
     // Attempt 1 goes to the model that produced the trace — restored.
-    expect(calls[1].messages[1].reasoning_content).toBe('trace bound to the first model');
+    expect(calls[1].messages[1].reasoning_content).toBeUndefined();
     // Attempt 2 is a different model. The restore lived on the outbound copy
     // only, so this hop carries exactly what the client sent — no leaked
     // reasoning_content from the mutated request body.

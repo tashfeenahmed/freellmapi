@@ -712,7 +712,9 @@
     "attemptTimingHint": "ඉල්ලීම ආරම්භයේ සිට ඕෆ්සෙට් ආරම්භ කරන්න · උත්සාහ කාලය",
     "requestedModel": "ඉල්ලූ ආකෘතිය",
     "ttft": "TTFT",
-    "requestsByAgent": "නියෝජිතයා අනුව ඉල්ලීම්"
+    "requestsByAgent": "නියෝජිතයා අනුව ඉල්ලීම්",
+    "sortBy": "{column} අනුව පෙළගස්වන්න",
+    "sortHint": "පෙළගැස්වීම පූරණය කළ පේළි {count} ට පමණක් අදාළ වේ"
   },
   "logs": {
     "title": "ලොග",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

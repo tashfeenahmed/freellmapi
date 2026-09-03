@@ -12,6 +12,7 @@
   {"id":"crush","name":"Crush","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-crush","docsUrl":"https://github.com/charmbracelet/crush"},
   {"id":"dsh","name":"DeepSeek Harness","category":"agent","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-dsh","docsUrl":"https://github.com/deepseek-ai/deepseek-harness"},
   {"id":"mimo","name":"MiMo Code","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-mimo","docsUrl":"https://mimo.xiaomi.com/mimocode"},
+  {"id":"atomcode","name":"AtomCode","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-atomcode","docsUrl":"https://atomcode.atomgit.com/docs/en/"},
   {"id":"cursor","name":"Cursor","category":"code","configType":"guide","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-cursor","docsUrl":"https://docs.cursor.com"},
   {"id":"generic","name":"Generic OpenAI client","category":"agent","configType":"guide","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-generic","docsUrl":"https://github.com/tashfeenahmed/freellmapi"}
 ]

@@ -5,7 +5,7 @@ a file that lives elsewhere in the repo, and it is expected to lag a little
 behind. That is fine, as long as it is honest about it.
 
 This is separate from the dashboard UI strings, which live in
-`client/src/i18n/locales/` and are covered by [../translating.md](../translating.md).
+`client/src/i18n/locales/` and are covered by [01-translating.md](01-translating.md).
 Read that file too if you are translating into Chinese, because the terminology
 table there applies here as well. A README that calls a provider `提供商` while
 the dashboard calls it `提供方` is worse than no translation.
@@ -32,9 +32,9 @@ too.
 | `README.md` | ✅ |
 | `docs/README.md` | ✅ |
 | `docs/install.md` | ✅ |
-| `docs/api.md` | ✅ |
-| `docs/clients.md` | English |
-| `docs/compression.md` | English |
+| `docs/api/01-rest-api.md` | ✅ |
+| `docs/clients/01-agent-clients.md` | English |
+| `docs/compression/01-compression-pipeline.md` | English |
 | `docs/architecture.md` | English |
 
 Untranslated pages are not a gap to apologise for. Link to the English original
@@ -55,8 +55,8 @@ that someone will trust and act on.
   and CLI commands stay exactly as they are. So do product names, endpoint paths,
   environment variables, and model ids.
 - **Fix the relative paths.** A translated README sits three directories deep, so
-  `repo-assets/x.png` becomes `../../../repo-assets/x.png` and `docs/api.md`
-  becomes `../../api.md`. Broken image links are the most common mistake here.
+  `repo-assets/x.png` becomes `../../../repo-assets/x.png` and `docs/api/01-rest-api.md`
+  becomes `../../api/01-rest-api.md`. Broken image links are the most common mistake here.
 - **Do not copy the contributor avatar list.** It changes with nearly every merge
   and nobody wants to update it in six languages. Keep the heading so the
   section structure still matches one-to-one, and link out to the English

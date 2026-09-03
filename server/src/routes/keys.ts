@@ -14,7 +14,8 @@ import { ensureModelInProfiles } from '../services/profile-models.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential } from '../services/custom-endpoint.js';
 import { customModelSeed } from '../services/custom-model-seed.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
-import { discoverEndpointModels, probeEndpointModel, ModelDiscoveryError } from '../services/model-discovery.js';
+import { registerCustomMediaModel } from '../services/custom-media-register.js';
+import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
 import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
@@ -29,7 +30,7 @@ export const keysRouter = Router();
 // was dropped in V4 and re-added in V13 via the router.huggingface.co route.
 // SambaNova was dropped in V23 (free tier permanently retired).
 const PLATFORMS = [
-  'google', 'groq', 'cerebras', 'bai', 'nvidia', 'mistral',
+  'google', 'groq', 'cerebras', 'sail', 'bai', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
   'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
@@ -729,8 +730,18 @@ async function registerImportedModels(
   models: Array<{ id: string; supportsTools?: boolean; supportsVision?: boolean }>,
   errors: Array<{ key: string; error: string }>,
 ): Promise<number> {
-  const chat = models.filter(m => !/embedding/i.test(m.id));
-  const embeds = models.filter(m => /embedding/i.test(m.id));
+  // #1051: classify by id, not just /embedding/. A whisper, diffusion or video
+  // id registered as a chat model 404s in every chain; they go to their own
+  // tables (or, for video, are skipped — nothing can serve a custom video
+  // model yet).
+  const kindOf = (id: string) => /embedding/i.test(id) ? 'embedding' : classifyModelId(id);
+  const chat = models.filter(m => kindOf(m.id) === undefined);
+  const embeds = models.filter(m => kindOf(m.id) === 'embedding');
+  const media = models.filter(m => {
+    const kind = kindOf(m.id);
+    return kind === 'image' || kind === 'audio' || kind === 'transcription';
+  });
+  const video = models.filter(m => kindOf(m.id) === 'video');
   let registered = 0;
 
   if (chat.length > 0) {
@@ -741,6 +752,22 @@ async function registerImportedModels(
       supportsVision: m.supportsVision,
     }));
     registered += db.transaction(() => registerCustomChatModels(db, baseUrl, keyId, entries))().length;
+  }
+
+  for (const m of media) {
+    try {
+      registerCustomMediaModel(db, keyId, {
+        modelId: m.id,
+        displayName: null,
+        modality: kindOf(m.id) as 'image' | 'audio' | 'transcription',
+      });
+      registered++;
+    } catch (err: any) {
+      errors.push({ key: `${keyName}: ${m.id}`, error: err?.message ?? 'media registration failed' });
+    }
+  }
+  for (const m of video) {
+    errors.push({ key: `${keyName}: ${m.id}`, error: 'video generation models are not supported on custom endpoints yet; skipped' });
   }
 
   for (const m of embeds) {
@@ -842,7 +869,10 @@ keysRouter.post('/custom/discover-models', async (req: Request, res: Response) =
     });
   } catch (err: any) {
     if (err instanceof ModelDiscoveryError) {
-      res.status(err.status).json({ error: { message: err.message } });
+      // `upstream_error`, never `authentication_error`: this status is relayed
+      // from the operator's own endpoint, and a client that reads a bare 401 as
+      // "session expired" would sign the operator out for testing a bad key.
+      res.status(err.status).json({ error: { message: err.message, type: 'upstream_error' } });
       return;
     }
     res.status(502).json({ error: { message: `Model discovery failed: ${err?.message ?? 'unknown error'}` } });
@@ -938,7 +968,10 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     if (err instanceof ModelDiscoveryError) {
-      res.status(err.status).json({ error: { message: err.message } });
+      // `upstream_error`, never `authentication_error`: this status is relayed
+      // from the operator's own endpoint, and a client that reads a bare 401 as
+      // "session expired" would sign the operator out for testing a bad key.
+      res.status(err.status).json({ error: { message: err.message, type: 'upstream_error' } });
       return;
     }
     res.status(502).json({ error: { message: `Probe failed: ${err?.message ?? 'unknown error'}` } });
@@ -1039,27 +1072,91 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
     return;
   }
 
+  // #1051: a whisper, diffusion or video id submitted here used to register as
+  // a chat model and then 404 in every chain. Classify by id and route each
+  // entry to the table that can actually serve it. An explicit capability flag
+  // on the entry is an operator override: someone who says "this is a chat
+  // model with vision/tools" wins over the keyword guess.
+  const overridden = (e: typeof entries[number]) => e.supportsTools !== undefined || e.supportsVision !== undefined;
+  const kindOf = (e: typeof entries[number]) => overridden(e) ? undefined : classifyModelId(e.modelId);
+  const chatEntries = entries.filter(e => kindOf(e) === undefined || kindOf(e) === 'embedding');
+  const embedEntries = chatEntries.filter(e => kindOf(e) === 'embedding');
+  const pureChatEntries = chatEntries.filter(e => kindOf(e) !== 'embedding');
+  const mediaEntries = entries.filter(e => {
+    const kind = kindOf(e);
+    return kind === 'image' || kind === 'audio' || kind === 'transcription';
+  });
+  const videoEntries = entries.filter(e => kindOf(e) === 'video');
+
   const { keyId, storedKey, registered } = registerCustomModels(
-    db, baseUrl, providedKey, label, endpoint.keyId ?? undefined, entries,
+    db, baseUrl, providedKey, label, endpoint.keyId ?? undefined, pureChatEntries,
   );
+
+  const mediaRegistered: Array<{ modelDbId: number; model: string; modality: string; created: boolean }> = [];
+  const perModelErrors: Array<{ model: string; error: string }> = [];
+  for (const e of mediaEntries) {
+    try {
+      mediaRegistered.push(db.transaction(() => registerCustomMediaModel(db, keyId, {
+        modelId: e.modelId,
+        displayName: e.displayName,
+        modality: kindOf(e) as 'image' | 'audio' | 'transcription',
+      }))());
+    } catch (err: any) {
+      perModelErrors.push({ model: e.modelId, error: err?.message ?? 'media registration failed' });
+    }
+  }
+
+  const embeddingsRegistered: Array<{ model: string }> = [];
+  for (const e of embedEntries) {
+    try {
+      const existing = db.prepare(
+        "SELECT dimensions FROM embedding_models WHERE platform = 'custom' AND model_id = ?",
+      ).get(e.modelId) as { dimensions: number } | undefined;
+      const dimensions = existing?.dimensions ?? await probeEmbeddingDimensions(baseUrl, providedKey ?? storedKey, e.modelId);
+      registerCustomEmbeddingModel(db, {
+        keyId,
+        modelId: e.modelId,
+        displayName: e.displayName,
+        family: e.modelId,
+        dimensions,
+        maxInputTokens: null,
+        quotaLabel: 'custom endpoint',
+      });
+      embeddingsRegistered.push({ model: e.modelId });
+    } catch (err: any) {
+      perModelErrors.push({ model: e.modelId, error: err?.message ?? 'embedding registration failed' });
+    }
+  }
+
   // `model`/`displayName`/`modelDbId` echo the first model for older clients;
   // `models` carries the full set registered in this call.
-  const first = registered[0]!;
+  const first = registered[0];
   res.status(201).json({
     success: true,
     keyId,
-    modelDbId: first.modelDbId,
+    ...(first ? {
+      modelDbId: first.modelDbId,
+      model: first.model,
+      displayName: first.displayName,
+      supportsTools: first.supportsTools,
+      supportsVision: first.supportsVision,
+    } : {}),
     platform: 'custom',
     baseUrl,
-    model: first.model,
-    displayName: first.displayName,
-    supportsTools: first.supportsTools,
-    supportsVision: first.supportsVision,
     models: registered,
+    media: mediaRegistered,
+    embeddings: embeddingsRegistered,
+    // Video generation has no custom-endpoint serving path yet; saying so
+    // beats registering a chat model that can never answer.
+    videoSkipped: videoEntries.map(e => e.modelId),
+    modelErrors: perModelErrors,
     // Bulk registration (#488) needs to tell the user what actually changed:
     // picking a whole discovered list re-submits ids that are already there.
-    created: registered.filter(m => m.created).length,
-    alreadyRegistered: registered.filter(m => !m.created).length,
+    created: registered.filter(m => m.created).length
+      + mediaRegistered.filter(m => m.created).length
+      + embeddingsRegistered.length,
+    alreadyRegistered: registered.filter(m => !m.created).length
+      + mediaRegistered.filter(m => !m.created).length,
     maskedKey: maskKey(storedKey),
   });
 });

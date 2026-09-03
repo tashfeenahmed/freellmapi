@@ -1,6 +1,6 @@
 # Clients & coding agents
 
-[← Back to README](../README.md) · [Documentation index](README.md)
+[← Back to README](../README.md) · [Documentation index](../README.md)
 
 - [OpenAI-compatible clients](#openai-compatible-clients)
 - [Coding agents](#coding-agents)
@@ -28,6 +28,7 @@ Use the generator instead of hand-editing a client configuration:
 export FREELLMAPI_API_KEY=<unified-key>   # or pass --api-key on each command
 npx freellmapi setup-claude --url http://localhost:3001 --dry-run
 npx freellmapi setup-claude --url http://localhost:3001
+npx freellmapi setup-dsh --url http://localhost:3001 --api-key <unified-key>
 ```
 
 `--dry-run` prints a diff. Real writes merge with the existing configuration
@@ -50,13 +51,14 @@ context windows.
 | **Crush** | `setup-crush` | `http://localhost:3001/v1` | OpenAI Chat |
 | **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **MiMo Code** | `setup-mimo` | `http://localhost:3001/v1` | OpenAI Chat |
+| **AtomCode** | `setup-atomcode` | `http://localhost:3001/v1` | OpenAI Chat (`type = "openai"`) |
 | **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
 | **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
 
 The root-vs-`/v1` distinction matters: Claude Code expects the server root
 because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
-Roo, Kilo, Crush, MiMo Code, and DeepSeek Harness—expect their configured
+Roo, Kilo, Crush, MiMo Code, AtomCode, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
 
 ### DeepSeek Harness (`dsh`)
@@ -111,6 +113,29 @@ syntax, so it stays out of the config file. There is no `MIMOCODE_API_KEY` or
 features, they are not a general fallback for config fields. Each model is
 declared with the `limit.context` and `limit.output` pair MiMo's schema
 requires, both taken from the live catalog.
+
+### AtomCode (`atomcode`)
+
+[AtomCode](https://atomcode.atomgit.com/docs/en/) is AtomGit's terminal
+coding agent, written in Rust. It reads `~/.atomcode/config.toml`, where a
+root `default_provider` key names one `[providers.<id>]` table and
+`type = "openai"` makes that table speak the OpenAI-compatible wire.
+`setup-atomcode` writes a `[providers.freellmapi]` table — `base_url` on the
+gateway's `/v1`, the unified key as `api_key`, the chosen model and its
+`context_window` from the live catalog — and sets `default_provider` to it.
+The write is a structural merge: the root key is placed above any existing
+tables, only the `freellmapi` table is replaced, and other `[providers.*]`
+tables and settings in the file are left as they were.
+
+```bash
+npx freellmapi setup-atomcode --url http://localhost:3001 --api-key <unified-key>
+atomcode
+```
+
+AtomCode has no environment-variable fallback for the key, so it is written
+into the config file; the file is created with mode 0600 and a timestamped
+backup is taken before an existing one is changed. `--model <id>` pins the
+default model.
 
 ## Native Gemini clients
 

@@ -712,7 +712,9 @@
     "attemptTimingHint": "요청 시작부터 시작 오프셋 · 시도 기간",
     "requestedModel": "요청 모델",
     "ttft": "TTFT",
-    "requestsByAgent": "에이전트별 요청"
+    "requestsByAgent": "에이전트별 요청",
+    "sortBy": "{column} 기준 정렬",
+    "sortHint": "정렬은 불러온 {count}개 행에만 적용됩니다"
   },
   "logs": {
     "title": "로그",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek의 하네스. 공급자마다 전환 가능한 경로로 보관합니다.",
       "mimo": "샤오미의 터미널 에이전트. OpenCode 포크로 OpenAI 호환 공급자를 모두 받습니다.",
       "cursor": "AI 중심 편집기. Cursor 클라우드를 거치므로 공개 URL이 필요합니다.",
-      "generic": "OpenAI API를 쓰는 다른 모든 도구. 기본 URL과 키로 직접 설정합니다."
+      "generic": "OpenAI API를 쓰는 다른 모든 도구. 기본 URL과 키로 직접 설정합니다.",
+      "atomcode": "AtomGit의 터미널 에이전트. Rust로 작성되었으며 OpenAI 호환 엔드포인트를 모두 받습니다."
     }
   },
   "update": {

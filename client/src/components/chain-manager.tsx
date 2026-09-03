@@ -62,12 +62,16 @@ export function ChainManager() {
     queryFn: () => apiFetch('/api/profiles/active'),
   })
 
-  const invalidate = () => {
+  const invalidate = async () => {
+    // Resolve WHICH chain is active before refreshing anything keyed on it
+    // (#1047): invalidating ['fallback'] first refetched the chain table under
+    // the old profile id — a wasted full-catalog round trip, and the write that
+    // poisoned the old chain's cache entry with the new chain's rows.
+    await queryClient.refetchQueries({ queryKey: ['profiles', 'active'], exact: true })
     queryClient.invalidateQueries({ queryKey: ['profiles'] })
-    queryClient.invalidateQueries({ queryKey: ['profiles', 'active'] })
-    // The fallback table renders the active chain; refresh it too.
+    // The fallback table renders the active chain; refresh it too. The prefix
+    // covers the chain, routing, token-usage and rate-limit queries.
     queryClient.invalidateQueries({ queryKey: ['fallback'] })
-    queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] })
   }
 
   const createChain = useMutation({

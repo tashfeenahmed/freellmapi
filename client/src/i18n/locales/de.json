@@ -712,7 +712,9 @@
     "attemptTimingHint": "Startoffset vom Anforderungsstart · Versuchsdauer",
     "requestedModel": "Angefragtes Modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Anfragen nach Agent"
+    "requestsByAgent": "Anfragen nach Agent",
+    "sortBy": "Nach {column} sortieren",
+    "sortHint": "Die Sortierung gilt für die {count} geladenen Zeilen"
   },
   "logs": {
     "title": "Protokoll",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeeks Harness, das jeden Anbieter als umschaltbare Route führt.",
       "mimo": "Xiaomis Terminal-Agent, ein OpenCode-Fork für jeden OpenAI-kompatiblen Anbieter.",
       "cursor": "Der KI-zentrierte Editor; er läuft über Cursors Cloud und braucht daher eine öffentliche URL.",
-      "generic": "Alles andere, was die OpenAI-API spricht — von Hand mit Basis-URL und Schlüssel eingerichtet."
+      "generic": "Alles andere, was die OpenAI-API spricht — von Hand mit Basis-URL und Schlüssel eingerichtet.",
+      "atomcode": "AtomGits Terminal-Agent, in Rust geschrieben, für jeden OpenAI-kompatiblen Endpunkt."
     }
   },
   "update": {

@@ -2,9 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { clientContextMiddleware, getClientContext } from '../../lib/client-context.js';
 
-// Minimal fake req: the middleware only touches headers, socket, and app.
-function fakeReq(headers: Record<string, string | string[]>, remoteAddress?: string, trustProxy?: boolean): Request {
-  return { headers, socket: { remoteAddress }, app: { get: () => trustProxy ?? false } } as unknown as Request;
+// Minimal fake req: the middleware only touches headers, socket, and req.ip.
+// `ip` is what Express resolves from the socket peer address (or from the
+// X-Forwarded-For chain when `trust proxy` is enabled) — the middleware reads
+// req.ip rather than re-implementing the trust chain itself (#1024).
+function fakeReq(headers: Record<string, string | string[]>, remoteAddress?: string, ip?: string): Request {
+  return { headers, socket: { remoteAddress }, ip } as unknown as Request;
 }
 
 // Run the middleware and capture the context visible to downstream code
@@ -25,13 +28,24 @@ describe('clientContextMiddleware', () => {
     expect(ctx).toEqual({ ip: '192.168.0.42', userAgent: 'curl/8.6.0', agent: 'unknown' });
   });
 
-  it('prefers the first X-Forwarded-For hop when trust proxy is enabled', () => {
+  it('uses Express-resolved req.ip (trust-proxy chain) when available', () => {
+    // With TRUST_PROXY enabled, Express resolves req.ip to the first untrusted
+    // hop of the X-Forwarded-For chain; the middleware trusts that resolution.
     const ctx = contextFor(fakeReq(
       { 'x-forwarded-for': '10.1.2.3, 172.16.0.1', 'user-agent': 'ua' },
       '127.0.0.1',
-      true,
+      '10.1.2.3',
     ));
     expect(ctx.ip).toBe('10.1.2.3');
+  });
+
+  it('falls back to the socket peer address when req.ip is absent', () => {
+    const ctx = contextFor(fakeReq(
+      { 'x-forwarded-for': '10.1.2.3, 172.16.0.1', 'user-agent': 'ua' },
+      '127.0.0.1',
+    ));
+    // trust proxy disabled → spoofed header ignored, socket address used.
+    expect(ctx.ip).toBe('127.0.0.1');
   });
 
   it('normalizes IPv4-mapped IPv6 addresses', () => {

@@ -15,6 +15,28 @@ import { recordQuotaObservationsFromResponse, type QuotaObservationContext } fro
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
 import { isAbortLikeError } from '../lib/error-classify.js';
 
+/** Hosts that ARE Moonshot's OpenAI-compatible API (api.moonshot.ai,
+ * api.moonshot.cn, api.kimi.com and their subdomains). */
+const MOONSHOT_HOST_SUFFIXES = ['moonshot.ai', 'moonshot.cn', 'kimi.com'];
+
+/**
+ * Whether a base URL points at Moonshot's own API. Moonshot documents an
+ * assistant-message `partial: true` prefill flag that no other OpenAI-compatible
+ * upstream understands, and there is no built-in moonshot platform — Kimi
+ * models are otherwise served by Groq, Cloudflare, OpenRouter, Hugging Face,
+ * Ollama, ... — so the flag is gated on the endpoint host, never on the model
+ * id. Returns false for anything that does not parse as a URL. (#1038)
+ */
+export function isMoonshotEndpoint(baseUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return MOONSHOT_HOST_SUFFIXES.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
 /**
  * Generic provider for platforms that use an OpenAI-compatible API.
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
@@ -34,6 +56,9 @@ export class OpenAICompatProvider extends BaseProvider {
    * `400 This model only supports single tool-calls at once!`. When set, pin
    * parallel_tool_calls to false whenever tools are in play. See issue #255. */
   private readonly forceSingleToolCall: boolean;
+  /** True only for a custom endpoint whose host is Moonshot's own API; see
+   * isMoonshotEndpoint(). Gates the assistant `partial` prefill flag (#1038). */
+  private readonly forwardsPartial: boolean;
 
   constructor(opts: {
     platform: Platform;
@@ -55,6 +80,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.timeoutMs = providerTimeoutMs(opts.platform, opts.timeoutMs ?? 60_000);
     this.keyless = opts.keyless ?? false;
     this.forceSingleToolCall = opts.forceSingleToolCall ?? false;
+    this.forwardsPartial = opts.platform === 'custom' && isMoonshotEndpoint(opts.baseUrl);
   }
 
   /** Resolve the parallel_tool_calls flag to send upstream. For providers that
@@ -138,44 +164,69 @@ export class OpenAICompatProvider extends BaseProvider {
     return { temperature: options?.temperature, topP: options?.top_p };
   }
 
-  /** Mistral's OpenAI-compatible endpoint is strict about unknown nested fields
-   * and returns 422 for provider-private replay fields that other gateways
-   * ignore. Keep the OpenAI wire shape, but strip our internal reasoning /
-   * thought-signature extensions before sending to Mistral. */
+  /**
+   * OpenAI-compatible endpoints that are strict about unknown nested fields:
+   * Mistral returns 422 for provider-private replay fields, Groq rejects
+   * assistant `reasoning_content` with 400 (verified in production, #1070),
+   * and Cerebras rejects it too — `property 'messages.N.assistant.
+   * reasoning_content' is unsupported` (confirmed via vercel/ai#15042 and
+   * opencode#26762, and by Cerebras' own docs, which use a `reasoning` field
+   * instead). Other gateways ignore the fields, so keep the OpenAI wire
+   * shape but strip our internal reasoning / thought-signature extensions
+   * before sending to these platforms.
+   */
+  private static readonly STRICT_PLATFORMS = new Set(['mistral', 'groq', 'cerebras']);
   private messagesForPlatform(messages: ChatMessage[]): ChatMessage[] {
-    if (this.platform !== 'mistral') return messages;
+    if (OpenAICompatProvider.STRICT_PLATFORMS.has(this.platform)) {
+      // Rebuild every message from a whitelist of keys, so `partial` and the
+      // reasoning extensions never reach these platforms.
+      return messages.map((m) => {
+        if (m.role === 'assistant') {
+          return {
+            role: m.role,
+            content: m.content,
+            ...(m.name ? { name: m.name } : {}),
+            ...(m.tool_calls && m.tool_calls.length > 0 ? {
+              tool_calls: m.tool_calls.map((tc) => ({
+                id: tc.id,
+                type: tc.type,
+                function: {
+                  name: tc.function.name,
+                  arguments: tc.function.arguments,
+                },
+              })),
+            } : {}),
+          };
+        }
+        if (m.role === 'tool') {
+          return {
+            role: m.role,
+            content: m.content,
+            ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+            ...(m.name ? { name: m.name } : {}),
+          };
+        }
+        return {
+          role: m.role,
+          content: m.content,
+          ...(m.name ? { name: m.name } : {}),
+        };
+      });
+    }
 
+    // Moonshot's assistant `partial` prefill flag only survives to the wire
+    // when this provider IS Moonshot's own API (a custom endpoint on a
+    // Moonshot/Kimi host). Every other OpenAI-compatible gateway — including
+    // the ones that serve Kimi models, like Groq, Cloudflare or OpenRouter —
+    // gets it stripped, since strict upstreams 400/422 on unknown message keys
+    // and the rest would ignore it anyway. (#1038)
+    if (this.forwardsPartial) return messages;
     return messages.map((m) => {
-      if (m.role === 'assistant') {
-        return {
-          role: m.role,
-          content: m.content,
-          ...(m.name ? { name: m.name } : {}),
-          ...(m.tool_calls && m.tool_calls.length > 0 ? {
-            tool_calls: m.tool_calls.map((tc) => ({
-              id: tc.id,
-              type: tc.type,
-              function: {
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              },
-            })),
-          } : {}),
-        };
+      if (m.role === 'assistant' && m.partial !== undefined) {
+        const { partial: _partial, ...rest } = m;
+        return rest;
       }
-      if (m.role === 'tool') {
-        return {
-          role: m.role,
-          content: m.content,
-          ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
-          ...(m.name ? { name: m.name } : {}),
-        };
-      }
-      return {
-        role: m.role,
-        content: m.content,
-        ...(m.name ? { name: m.name } : {}),
-      };
+      return m;
     });
   }
 

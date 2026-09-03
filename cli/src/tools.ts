@@ -588,6 +588,37 @@ function cursor(ctx: GenerateContext): Generation {
   };
 }
 
+function atomcode(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const configDir = path.join(ctx.homeDir, '.atomcode');
+  // AtomCode picks its provider by name: a root `default_provider` key names
+  // one `[providers.<id>]` table, and `type = "openai"` is what makes that
+  // table speak the OpenAI-compatible wire. Root key first, table second, so
+  // mergeToml can slot the key above any tables already in the file.
+  return {
+    files: [{
+      path: path.join(configDir, 'config.toml'),
+      format: 'toml',
+      sensitive: true,
+      content: [
+        'default_provider = "freellmapi"',
+        '',
+        '[providers.freellmapi]',
+        'type = "openai"',
+        `base_url = ${JSON.stringify(v1Url(ctx.url))}`,
+        `api_key = ${JSON.stringify(ctx.apiKey)}`,
+        `model = ${JSON.stringify(model.id)}`,
+        `context_window = ${contextWindow(model)}`,
+      ].join('\n'),
+    }],
+    notes: [
+      'AtomCode reads ~/.atomcode/config.toml; other [providers.*] tables in it are kept.',
+      `default_provider now points at [providers.freellmapi] with ${model.id} as its model.`,
+      'Point base_url at the unified /v1 endpoint; api_key is the unified key shown on the Agents page.',
+    ],
+  };
+}
+
 function generic(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   return {
@@ -615,6 +646,7 @@ const metadata = [
   ['crush', 'Crush', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-crush', 'https://github.com/charmbracelet/crush', crush],
   ['dsh', 'DeepSeek Harness', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-dsh', 'https://github.com/deepseek-ai/deepseek-harness', dsh],
   ['mimo', 'MiMo Code', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-mimo', 'https://mimo.xiaomi.com/mimocode', mimo],
+  ['atomcode', 'AtomCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-atomcode', 'https://atomcode.atomgit.com/docs/en/', atomcode],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;

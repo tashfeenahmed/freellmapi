@@ -712,7 +712,9 @@
     "attemptTimingHint": "เริ่มต้นออฟเซ็ตจากคำขอเริ่มต้น · ระยะเวลาความพยายาม",
     "requestedModel": "รุ่นที่ขอ",
     "ttft": "TTFT",
-    "requestsByAgent": "คำขอตามเอเจนต์"
+    "requestsByAgent": "คำขอตามเอเจนต์",
+    "sortBy": "เรียงตาม{column}",
+    "sortHint": "การเรียงลำดับใช้กับ {count} แถวที่โหลดแล้วเท่านั้น"
   },
   "logs": {
     "title": "บันทึก",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

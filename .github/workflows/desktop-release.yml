@@ -59,6 +59,7 @@ jobs:
               desktop/dist-electron/*.AppImage
               desktop/dist-electron/*.tar.xz
               desktop/dist-electron/*.deb
+              desktop/dist-electron/*.rpm
               desktop/dist-electron/latest-linux.yml
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +89,7 @@ jobs:
           echo "desktop/package.json $VERSION matches tag $GITHUB_REF_NAME."
 
       - name: Install workspace dependencies
-        run: npm install
+        run: npm ci
 
       # `npm ci` rather than `install`: install rewrites desktop/package-lock.json
       # in place, which would quietly repair a stale lockfile version before the

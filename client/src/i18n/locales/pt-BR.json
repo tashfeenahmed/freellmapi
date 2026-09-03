@@ -712,7 +712,9 @@
     "attemptTimingHint": "Deslocamento desde o início da requisição · duração da tentativa",
     "requestedModel": "Modelo solicitado",
     "ttft": "TTFT",
-    "requestsByAgent": "Solicitações por agente"
+    "requestsByAgent": "Solicitações por agente",
+    "sortBy": "Ordenar por {column}",
+    "sortHint": "A ordenação se aplica às {count} linhas carregadas"
   },
   "logs": {
     "title": "Logs",
@@ -1026,7 +1028,8 @@
       "dsh": "O harness da DeepSeek, que guarda cada provedor como uma rota que você pode trocar.",
       "mimo": "O agente de terminal da Xiaomi, um fork do OpenCode que aceita qualquer provedor compatível com OpenAI.",
       "cursor": "O editor centrado em IA; ele passa pela nuvem da Cursor, então precisa de uma URL pública.",
-      "generic": "Qualquer outra ferramenta que fale a API da OpenAI, configurada à mão com URL base e chave."
+      "generic": "Qualquer outra ferramenta que fale a API da OpenAI, configurada à mão com URL base e chave.",
+      "atomcode": "O agente de terminal da AtomGit, escrito em Rust, que aceita qualquer endpoint compatível com OpenAI."
     }
   },
   "update": {

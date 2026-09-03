@@ -712,7 +712,9 @@
     "attemptTimingHint": "Bẹrẹ aiṣedeede lati ibere ibere · Iye akoko igbiyanju",
     "requestedModel": "Awoṣe ti a beere",
     "ttft": "TTFT",
-    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju"
+    "requestsByAgent": "Awọn ibeere nipasẹ aṣoju",
+    "sortBy": "Ṣètò nípa {column}",
+    "sortHint": "Ìṣètò kan àwọn ìlà {count} tí a ti gbé sókè nìkan"
   },
   "logs": {
     "title": "Àkọọlẹ",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

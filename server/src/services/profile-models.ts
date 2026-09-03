@@ -47,12 +47,18 @@ export function ensureAllModelsInProfiles(db: Db): void {
   const maxPriority = db.prepare('SELECT COALESCE(MAX(priority), 0) AS max_priority FROM profile_models WHERE profile_id = ?');
   const insert = db.prepare('INSERT INTO profile_models (profile_id, model_db_id, priority, enabled) VALUES (?, ?, ?, ?)');
 
-  for (const profile of profiles) {
-    const rows = missing.all(profile.id) as { id: number; enabled: number }[];
-    if (rows.length === 0) continue;
-    const max = maxPriority.get(profile.id) as { max_priority: number };
-    rows.forEach((row, index) => {
-      insert.run(profile.id, row.id, max.max_priority + index + 1, row.enabled);
-    });
-  }
+  // One transaction for the whole backfill (#1047): under WAL each bare
+  // insert.run() is its own commit + fsync, and profiles × missing models of
+  // those, run on the event loop, is how a catalog sync froze every request
+  // on the box for minutes on slow storage.
+  db.transaction(() => {
+    for (const profile of profiles) {
+      const rows = missing.all(profile.id) as { id: number; enabled: number }[];
+      if (rows.length === 0) continue;
+      const max = maxPriority.get(profile.id) as { max_priority: number };
+      rows.forEach((row, index) => {
+        insert.run(profile.id, row.id, max.max_priority + index + 1, row.enabled);
+      });
+    }
+  })();
 }

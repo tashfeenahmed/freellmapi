@@ -712,7 +712,9 @@
     "attemptTimingHint": "Почетак одступања од почетка захтева · трајање покушаја",
     "requestedModel": "Тражени модел",
     "ttft": "TTFT",
-    "requestsByAgent": "Захтеви по агенту"
+    "requestsByAgent": "Захтеви по агенту",
+    "sortBy": "Сортирај по: {column}",
+    "sortHint": "Сортирање важи за {count} учитаних редова"
   },
   "logs": {
     "title": "Логови",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

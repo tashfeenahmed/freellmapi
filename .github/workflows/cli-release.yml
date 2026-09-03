@@ -1,7 +1,7 @@
 name: CLI release
 
 # Publishes the `freellmapi` CLI to npm. Closes #671 — the README and
-# docs/clients.md have always documented `npx freellmapi setup-claude`, but the
+# docs/clients/01-agent-clients.md have always documented `npx freellmapi setup-claude`, but the
 # package was never pushed to the registry, so every one of those commands died
 # with npm E404.
 #
@@ -58,7 +58,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Resolve version
         id: version

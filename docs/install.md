@@ -330,7 +330,7 @@ the top.
 2. Remove the application:
    - **macOS** — drag `FreeLLMAPI.app` from `/Applications` to the Trash.
    - **Windows** — *Settings → Apps → Installed apps → FreeLLMAPI → Uninstall*.
-   - **Linux** — delete the AppImage, or `sudo apt remove freellmapi` for the `.deb`.
+   - **Linux** — delete the AppImage, `sudo apt remove freellmapi` for the `.deb`, or `sudo dnf remove freellmapi` for the `.rpm`.
 3. Delete the data directory to remove your keys, settings and logs for good:
    - **Windows** — `%APPDATA%\FreeLLMAPI\`
    - **macOS** — `~/Library/Application Support/FreeLLMAPI/`

@@ -1,8 +1,8 @@
-**English** · [简体中文](i18n/zh-CN/docs/api.md)
+**English** · [简体中文](../i18n/zh-CN/docs/api/01-rest-api.md)
 
 # API reference
 
-[← Back to README](../README.md) · [Documentation index](README.md)
+[← Back to README](../README.md) · [Documentation index](../README.md)
 
 Any OpenAI-compatible client works (Anthropic / Claude clients too — see [Anthropic / Claude clients](#anthropic--claude-clients)). Base URL `http://localhost:3001/v1`, unified key from the dashboard's Keys page. An interactive OpenAPI viewer covering every proxy endpoint is served at `GET /v1/docs`; the spec itself lives at `GET /v1/openapi.json`.
 
@@ -21,6 +21,8 @@ Any OpenAI-compatible client works (Anthropic / Claude clients too — see [Anth
 - [Response headers](#response-headers)
 - [Embeddings](#embeddings)
 - [Anthropic / Claude clients](#anthropic--claude-clients)
+- [Free-tier budget API](#free-tier-budget-api)
+- [Backups API](#backups-api)
 
 ## Chat completions
 
@@ -243,7 +245,9 @@ Anthropic's `document` content blocks are accepted on `/v1/messages` when their 
 
 `POST /v1/images/generations`, `POST /v1/videos/generations`, and `POST /v1/audio/speech` route across the providers that serve media models. Images and speech also accept custom OpenAI-compatible media endpoints; video does not. Browse and toggle them on the dashboard's **Models → Image / Video / Audio** tabs.
 
-Video generation accepts a JSON body with `prompt`, optional `model` (`auto` by default), and provider-dependent `duration`, `aspect_ratio`, `image`, `seed`, and `audio` options. It waits for queued providers to finish and returns the generated video as binary MP4 data:
+Video generation is served by two platforms — **`pollinations`** and **`huggingface`** (`VIDEO_PLATFORMS`). It accepts a JSON body with `prompt`, optional `model` (`auto` by default), and provider-dependent `duration`, `aspect_ratio`, `image`, `seed`, and `audio` options. A video job runs for minutes, so the whole surface is **bounded to a 5-minute timeout** (`VIDEO_FETCH_TIMEOUT_MS`); if the provider hasn't finished by then the request returns `504`. A client that hangs up mid-generation is detected via the socket `close` event, which aborts the work so the gateway does not keep polling (and fail over to a second provider) for a response nobody is waiting for.
+
+HuggingFace models route through the **fal queue** (`router.huggingface.co/fal-ai/…`): the request is submitted as a queued job, polled every 500 ms until `COMPLETED`, and the resulting video URL is fetched and streamed back. Pollinations models are requested directly. Both return the generated video as binary MP4 data with `X-Provider` and `X-Model` response headers:
 
 ```bash
 curl http://localhost:3001/v1/videos/generations \
@@ -282,7 +286,7 @@ HTTP headers only carry printable ASCII, so a model id with characters outside t
 
 The opt-in response cache can be toggled per request with `X-FreeLLM-Cache: on|off` — an exact-match in-memory LRU for identical non-streaming requests (canonical SHA-256 keys over the full request, TTL and temperature gates, saved-token stats on the dashboard). Off by default; cache hits consume zero provider quota.
 
-When [prompt compression](compression.md) is enabled, `X-FreeLLM-Compress: off|on|lossless|standard|aggressive` can disable or lower the configured mode for one request. It cannot raise the operator's configured mode. The response reports the effective mode and estimated savings, for example `X-FreeLLM-Compress: standard; saved~=1840`.
+When [prompt compression](../compression/01-compression-pipeline.md) is enabled, `X-FreeLLM-Compress: off|on|lossless|standard|aggressive` can disable or lower the configured mode for one request. It cannot raise the operator's configured mode. The response reports the effective mode and estimated savings, for example `X-FreeLLM-Compress: standard; saved~=1840`.
 
 ## Embeddings
 
@@ -355,3 +359,70 @@ claude
 ```
 
 > Use `ANTHROPIC_AUTH_TOKEN` (sent as a Bearer token), **not** `ANTHROPIC_API_KEY` — Claude Code treats a set `ANTHROPIC_API_KEY` as a conflicting first-party credential and refuses to start.
+
+## Free-tier budget API
+
+`GET /api/free-tier` returns the operator's free-tier budget as a **pool-deduped** monthly overview. Many models on one platform share the same free pool, so summing every model's label would double-count; the endpoint collapses models into quota pools (`inferQuotaPoolKey`) and reports **one documented budget per pool** (the largest `parseBudget` value seen in it), scaled by the number of usable (enabled + healthy/unknown) keys for the platform. Chain-disabled rows still contribute to a pool — they share the same provider allowance — and are only marked, never dropped, so the totals match the dashboard's stacked per-model bar.
+
+```json
+{
+  "generatedAt": "2026-08-25T12:00:00.000Z",
+  "summary": {
+    "poolCount": 18,
+    "documentedMonthlyTokens": 7400000000,
+    "creditsBasedPools": 2,
+    "unpublishedPools": 3
+  },
+  "pools": [
+    {
+      "poolKey": "google",
+      "platform": "google",
+      "memberModelIds": ["gemini-3.0-flash", "gemini-2.5-flash"],
+      "modelCount": 2,
+      "disabledModelCount": 0,
+      "keyCount": 1,
+      "documentedBudget": 120000000,
+      "bestLabel": "~120M",
+      "kind": "documented",
+      "quota": { "limit": 150000000, "remaining": 98000000, "resetAt": "2026-08-26T00:00:00.000Z", "metric": "tokens", "keyCount": 1 }
+    }
+  ]
+}
+```
+
+- `kind` ∈ `documented` (a parseable monthly budget), `credits` (credit-based), or `unpublished` (no public figure).
+- `quota` carries live observations (limit / remaining / reset / metric) when the provider reports them; `metric` prefers `tokens` → `credits` → `neurons` → `requests`.
+- Mounted behind the dashboard session (`requireAuth`); not the unified `/v1` key.
+
+## Backups API
+
+`GET /api/backups` lists the encrypted database snapshots the gateway has taken (scheduled or manual via `POST /api/backups`). Each backup is an SQL dump with a header carrying its **sha256 key fingerprint** — `restore` refuses a dump written under a different `ENCRYPTION_KEY` (reports `backup: <fingerprint>; server: <fingerprint>`). The on-disk layout is versioned with `DUMP_FORMAT = 1`; a dump of a different format is rejected with `409`.
+
+```json
+{
+  "items": [
+    {
+      "id": 14,
+      "filename": "freellmapi-20260825-040000-enc.sql",
+      "filesize": 2418688,
+      "isFull": true,
+      "source": "scheduled",
+      "createdAt": "2026-08-25T04:00:00.000Z",
+      "tables": ["api_keys", "models", "fallback_config", "settings", "..."]
+    }
+  ],
+  "total": 14
+}
+```
+
+Endpoints (all behind `requireAuth`):
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/backups` | Paginated listing (`?page=&pageSize=`, max 200) |
+| `POST` | `/api/backups` | Create now; optional `tables` whitelist (≤ 500 names) |
+| `GET` | `/api/backups/:id/download` | Download the encrypted dump |
+| `POST` | `/api/backups/:id/restore` | Restore into the live DB (refuses mismatched key / format) |
+| `DELETE` | `/api/backups/:id` | Delete one backup |
+| `GET` | `/api/backups/tables` | Tables a dump may contain |
+| `GET` / `PUT` | `/api/backups/schedule` | Read / write the backup schedule (HH:mm, interval days, path) |

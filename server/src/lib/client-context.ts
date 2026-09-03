@@ -13,19 +13,14 @@ export interface ClientContext {
 // proxy, responses, anthropic, fusion, embeddings and media paths all log).
 const storage = new AsyncLocalStorage<ClientContext>();
 
-// Resolve the client IP from the socket peer address. The X-Forwarded-For
-// header is only trusted when Express's "trust proxy" setting is enabled
-// (opt-in via app.set('trust proxy', ...) or the TRUST_PROXY env var in
-// run.ts). Without that, a spoofed header from a LAN client is ignored.
+// Resolve the client IP. With Express's `trust proxy` disabled (the default),
+// this is the socket peer address and a spoofed X-Forwarded-For from a LAN
+// client is ignored. When TRUST_PROXY (#1024) opts into trusting a reverse
+// proxy, `req.ip` walks the configured trusted-proxy chain and returns the
+// first untrusted address — instead of trusting the leftmost caller-supplied
+// X-Forwarded-For value, which would let any direct caller spoof it.
 function resolveClientIp(req: Request): string | null {
-  const trustProxy = req.app?.get('trust proxy') ?? false;
-  let raw: string | null;
-  if (trustProxy) {
-    const xff = req.headers['x-forwarded-for'];
-    raw = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim() || req.socket.remoteAddress || null;
-  } else {
-    raw = req.socket.remoteAddress || null;
-  }
+  const raw = req.ip ?? req.socket.remoteAddress ?? null;
   // Normalize IPv4-mapped IPv6 ("::ffff:192.168.0.5" -> "192.168.0.5").
   return raw?.replace(/^::ffff:/i, '') ?? null;
 }

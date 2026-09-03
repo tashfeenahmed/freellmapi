@@ -712,7 +712,9 @@
     "attemptTimingHint": "Mulai offset dari awal permintaan · durasi upaya",
     "requestedModel": "Model yang diminta",
     "ttft": "TTFT",
-    "requestsByAgent": "Permintaan per agen"
+    "requestsByAgent": "Permintaan per agen",
+    "sortBy": "Urutkan berdasarkan {column}",
+    "sortHint": "Pengurutan berlaku untuk {count} baris yang dimuat"
   },
   "logs": {
     "title": "Log",
@@ -1026,7 +1028,8 @@
       "dsh": "Kerangka DeepSeek, yang menyimpan tiap penyedia sebagai rute yang bisa Anda ganti.",
       "mimo": "Agen terminal dari Xiaomi, cabang OpenCode yang menerima penyedia apa pun yang kompatibel dengan OpenAI.",
       "cursor": "Penyunting yang mengutamakan AI; lewat awan Cursor, jadi perlu URL publik.",
-      "generic": "Perkakas lain mana pun yang berbicara API OpenAI, disiapkan manual dengan URL dasar dan kunci."
+      "generic": "Perkakas lain mana pun yang berbicara API OpenAI, disiapkan manual dengan URL dasar dan kunci.",
+      "atomcode": "Agen terminal dari AtomGit, ditulis dalam Rust, yang menerima endpoint apa pun yang kompatibel dengan OpenAI."
     }
   },
   "update": {

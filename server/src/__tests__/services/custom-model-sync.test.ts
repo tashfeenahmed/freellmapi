@@ -246,4 +246,20 @@ describe('custom model sync', () => {
     expect(result.skipped).toBe(1);
     expect(customModelIds()).toEqual(['model-a']);
   });
+
+  it('skips discovered media/embedding models instead of registering them as chat (#1051)', async () => {
+    addCustomEndpoint('http://localhost:9999');
+    (discoverEndpointModels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'glm-chat-mini', ownedBy: null },
+      { id: 'stable-diffusion-3-5-large', ownedBy: null, kind: 'image' },
+      { id: 'whisper-large-v3', ownedBy: null, kind: 'transcription' },
+      { id: 'Wan2.2-T2V-A14B', ownedBy: null, kind: 'video' },
+      { id: 'text-embedding-3-small', ownedBy: null, kind: 'embedding' },
+    ]);
+
+    const result = await runCustomModelSync(getDb());
+    expect(result.added).toBe(1);
+    expect(result.nonChatSkipped).toBe(4);
+    expect(customModelIds()).toEqual(['glm-chat-mini']);
+  });
 });

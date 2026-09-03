@@ -712,7 +712,9 @@
     "attemptTimingHint": "Bắt đầu bù đắp từ khi bắt đầu yêu cầu · thời gian thử",
     "requestedModel": "Mô hình được yêu cầu",
     "ttft": "TTFT",
-    "requestsByAgent": "Yêu cầu theo tác nhân"
+    "requestsByAgent": "Yêu cầu theo tác nhân",
+    "sortBy": "Sắp xếp theo {column}",
+    "sortHint": "Sắp xếp chỉ áp dụng cho {count} hàng đã tải"
   },
   "logs": {
     "title": "Nhật ký",
@@ -1026,7 +1028,8 @@
       "dsh": "Bộ khung của DeepSeek, giữ mỗi nhà cung cấp thành một tuyến có thể chuyển đổi.",
       "mimo": "Tác nhân dòng lệnh của Xiaomi, nhánh của OpenCode, nhận mọi nhà cung cấp tương thích OpenAI.",
       "cursor": "Trình soạn thảo lấy AI làm gốc; đi qua đám mây của Cursor nên cần URL công khai.",
-      "generic": "Mọi công cụ khác nói API OpenAI, thiết lập thủ công bằng URL cơ sở và khóa."
+      "generic": "Mọi công cụ khác nói API OpenAI, thiết lập thủ công bằng URL cơ sở và khóa.",
+      "atomcode": "Tác nhân dòng lệnh của AtomGit, viết bằng Rust, nhận mọi điểm cuối tương thích OpenAI."
     }
   },
   "update": {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import dns from 'node:dns';
 import { OpenAICompatProvider } from '../../providers/openai-compat.js';
 
 describe('OpenAICompatProvider', () => {
@@ -67,6 +68,91 @@ describe('OpenAICompatProvider', () => {
     expect(capturedHeaders['Authorization']).toBe('Bearer my-key');
     expect(capturedHeaders['X-Custom']).toBe('test');
     expect(capturedBody.messages[0].role).toBe('user');
+  });
+
+  describe('Moonshot assistant `partial` prefill flag (#1038)', () => {
+    beforeEach(() => {
+      // The custom-platform SSRF guard resolves public hosts before every
+      // request; answer with a public address so no real DNS is needed.
+      vi.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '203.0.113.10', family: 4 }] as any);
+    });
+    function captureBody(): { body: () => any } {
+      let captured: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+        captured = JSON.parse((init as any).body);
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'test-id',
+            object: 'chat.completion',
+            created: 123,
+            model: 'test-model',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        } as any;
+      });
+      return { body: () => captured };
+    }
+    const prefill: any = { role: 'assistant', content: 'continue this', partial: true };
+    const custom = (baseUrl: string) => new OpenAICompatProvider({ platform: 'custom', name: 'Custom', baseUrl });
+
+    it('forwards `partial` to a custom endpoint on a Moonshot host', async () => {
+      const captured = captureBody();
+      await custom('https://api.moonshot.ai/v1').chatCompletion('k', [prefill], 'kimi-k2-0905-preview');
+      expect(captured.body().messages[0].partial).toBe(true);
+
+      await custom('https://api.moonshot.cn/v1').chatCompletion('k', [prefill], 'moonshot-v1-8k');
+      expect(captured.body().messages[0].partial).toBe(true);
+
+      await custom('https://api.kimi.com/coding/v1').chatCompletion('k', [prefill], 'kimi-for-coding');
+      expect(captured.body().messages[0].partial).toBe(true);
+    });
+
+    it('strips `partial` for a custom endpoint on any other host, even for a Kimi model id', async () => {
+      const captured = captureBody();
+      await custom('http://127.0.0.1:11434/v1').chatCompletion('k', [prefill], 'kimi-k2:1t-cloud');
+      expect(captured.body().messages[0]).not.toHaveProperty('partial');
+      expect(captured.body().messages[0].content).toBe('continue this');
+
+      // A look-alike host is not Moonshot.
+      await custom('https://moonshot.ai.example.com/v1').chatCompletion('k', [prefill], 'kimi-latest');
+      expect(captured.body().messages[0]).not.toHaveProperty('partial');
+    });
+
+    it('strips `partial` on Groq even when the model id is a Kimi model', async () => {
+      const captured = captureBody();
+      const groq = new OpenAICompatProvider({ platform: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' });
+      await groq.chatCompletion('k', [prefill], 'moonshotai/kimi-k2-instruct-0905');
+      expect(captured.body().messages[0]).not.toHaveProperty('partial');
+      expect(captured.body().messages[0].content).toBe('continue this');
+    });
+
+    it('strips `partial` on a non-strict built-in gateway that serves Kimi models', async () => {
+      const captured = captureBody();
+      const openrouter = new OpenAICompatProvider({ platform: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' });
+      await openrouter.chatCompletion('k', [
+        { role: 'user', content: 'hi' },
+        { ...prefill, reasoning_content: 'kept: only partial is Moonshot-private' },
+      ], 'moonshotai/kimi-k2:free');
+      const msgs = captured.body().messages;
+      expect(msgs[1]).not.toHaveProperty('partial');
+      expect(msgs[1].reasoning_content).toBe('kept: only partial is Moonshot-private');
+      expect(msgs[0]).toEqual({ role: 'user', content: 'hi' });
+    });
+
+    it('also strips `partial` on the streaming path for non-Moonshot endpoints', async () => {
+      let captured: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+        captured = JSON.parse((init as any).body);
+        return sseResponse(['data: [DONE]\n\n']);
+      });
+      await collect(custom('http://127.0.0.1:1234/v1').streamChatCompletion('k', [prefill], 'kimi-latest'));
+      expect(captured.messages[0]).not.toHaveProperty('partial');
+
+      await collect(custom('https://api.moonshot.ai/v1').streamChatCompletion('k', [prefill], 'kimi-latest'));
+      expect(captured.messages[0].partial).toBe(true);
+    });
   });
 
   it('uses a 60s chat timeout by default for OpenAI-compatible providers (#530)', async () => {
@@ -411,6 +497,68 @@ describe('OpenAICompatProvider', () => {
       type: 'function',
       function: { name: 'lookup', arguments: '{}' },
     });
+  });
+
+  it('strips assistant reasoning_content before sending messages to Groq (#1070)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const groq = new OpenAICompatProvider({ platform: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1' });
+    await groq.chatCompletion(
+      'k',
+      [{
+        role: 'assistant',
+        content: 'replayed turn',
+        reasoning_content: 'private chain from a prior thinking turn',
+      }],
+      'llama-3.3-70b-versatile',
+    );
+
+    // Groq is strict about unknown fields: reasoning_content must NOT reach the wire.
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'replayed turn' });
+  });
+
+  it('strips assistant reasoning_content before sending messages to Cerebras (#1070)', async () => {
+    let body: any = null;
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      body = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'id', object: 'chat.completion', created: 1, model: 'm',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    const cerebras = new OpenAICompatProvider({ platform: 'cerebras', name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1' });
+    await cerebras.chatCompletion(
+      'k',
+      [{
+        role: 'assistant',
+        content: 'replayed turn',
+        reasoning_content: 'private chain from a prior thinking turn',
+      }],
+      'zai-glm-4.7',
+    );
+
+    // Cerebras is strict about unknown fields: reasoning_content must NOT reach
+    // the wire (verified: 400 wrong_api_format 'property ... reasoning_content
+    // is unsupported', see vercel/ai#15042 / opencode#26762).
+    expect(body.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'replayed turn' });
   });
 
   it('folds reasoning into content when content is empty (Ollama style — bare `reasoning` field)', async () => {

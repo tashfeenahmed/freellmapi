@@ -712,7 +712,9 @@
     "attemptTimingHint": "Startförskjutning från begäran start · Försökslängd",
     "requestedModel": "Efterfrågad modell",
     "ttft": "TTFT",
-    "requestsByAgent": "Begäranden per agent"
+    "requestsByAgent": "Begäranden per agent",
+    "sortBy": "Sortera efter {column}",
+    "sortHint": "Sorteringen gäller de {count} inlästa raderna"
   },
   "logs": {
     "title": "Loggar",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

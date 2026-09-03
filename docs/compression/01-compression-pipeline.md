@@ -1,6 +1,6 @@
 # Prompt compression
 
-[← Back to README](../README.md) · [Documentation index](README.md) · [API reference](api.md)
+[← Back to README](../README.md) · [Documentation index](../README.md) · [API reference](../api/01-rest-api.md)
 
 Long coding-agent sessions repeatedly send system prompts, file reads, command output, and tool schemas. FreeLLMAPI can shrink that request context before cache lookup, token budgeting, and routing, so the router sees the reduced estimate and more small-context models remain eligible. Provider responses are never rewritten.
 
@@ -48,6 +48,11 @@ When `autoTriggerEstTokens` is configured and an uncompressed request crosses th
 ## Fidelity and cache safety
 
 The pipeline is fail-open. Every engine runs independently, and its output is discarded if it grows the request, throws an exception, or fails a fidelity gate. The gate requires:
+
+> **Perf note (cf0c216):** The protected-span check now early-exits when a span is
+> already known to be preserved, avoiding redundant work in the per-line hot path.
+
+- all distinct numeric literals and diff hunks to survive;
 
 - all distinct numeric literals and diff hunks to survive;
 - every explicit constraint, security instruction, and error line to survive;

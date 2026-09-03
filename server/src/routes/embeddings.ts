@@ -147,7 +147,10 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
     result = upsert();
   } catch (err: any) {
     if (err instanceof EmbeddingsError) {
-      res.status(err.status).json({ error: { message: err.message } });
+      // `upstream_error`, never `authentication_error`: this status is relayed
+      // from the operator's own endpoint, and a client that reads a bare 401 as
+      // "session expired" would sign the operator out for testing a bad key.
+      res.status(err.status).json({ error: { message: err.message, type: 'upstream_error' } });
       return;
     }
     throw err;

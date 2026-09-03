@@ -48,6 +48,9 @@ import { cn } from '@/lib/utils'
 //             Harness      to reuse official artwork; tinted with DeepSeek's brand blue
 //   mimo      MiMo Code    lettermark only: no vector published, only the 32px favicon      Xiaomi TM, nominative use
 //                          at cdn.cnbj1.fds.api.mi-img.com/.../mimo.ico, which is flat black
+//   atomcode  AtomCode     lettermark only: no vector published; hue sampled from the        AtomGit TM, nominative use
+//                          app icon cdn-news.gitcode.com/news/atomcode-icon1.png (the
+//                          gradient's dominant blue, at two of its four corners)
 //
 //   id        light tile        ratio  dark tile         ratio  dark-mode treatment
 //   claude    #D37152            3.08  #D97757            5.52  brand #D97757 on dark; light tile is
@@ -77,6 +80,7 @@ import { cn } from '@/lib/utils'
 //   dsh       #4D6BFE            3.97  #4D6BFE            3.98  brand blue unchanged; clears on both tiles
 //   mimo      #000000           19.26  #FFFFFF           17.22  published pair (the favicon is black artwork on
 //                                                               transparent, so it inverts on the dark tile)
+//   atomcode  #3C82F6            3.37  #3C82F6            4.69  icon blue unchanged; clears on both tiles
 //   generic   currentColor         —   currentColor         —   not a brand mark
 //
 // Cursor also publishes a 2.5D cube in five warm greys (#43413c #55544f #72716d
@@ -223,6 +227,13 @@ const brands: Record<string, Brand> = {
   // pair treatment: black on the light tile, white on the dark one.
   mimo: {
     tint: '[--mk:#000000] dark:[--mk:#FFFFFF]',
+  },
+  // AtomGit publishes AtomCode's icon only as a raster (the app icon the site
+  // header uses: an atom orbit on a cyan-to-violet gradient), so the lettermark
+  // stands in. It is tinted with the gradient's dominant blue, sampled from
+  // that PNG, which clears 3:1 on both tiles as published.
+  atomcode: {
+    tint: '[--mk:#3C82F6] dark:[--mk:#3C82F6]',
   },
   // Any other OpenAI-compatible client: our own terminal glyph, not a brand
   // mark, so it keeps the page foreground colour on both tiles.

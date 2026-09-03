@@ -4,7 +4,7 @@ The dashboard ships 60 locales under `client/src/i18n/locales/`. `en.json` is th
 truth: every other file mirrors its key structure exactly.
 
 Translating the README and the docs pages is a separate job with its own layout and rules,
-covered in [i18n/README.md](i18n/README.md). The terminology table below applies to both.
+covered in [i18n/README.md](README.md). The terminology table below applies to both.
 
 ## Before you open a PR
 
