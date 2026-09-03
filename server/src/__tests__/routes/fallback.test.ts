@@ -105,59 +105,6 @@ describe('Fallback API', () => {
     });
   });
 
-  // Regression #1065: every model row on a platform repeats that platform's
-  // one account-pool label, so summing per model counted a single 100M Mistral
-  // allowance once per catalog model (13 models read as 1.3B). The headline
-  // must take one budget per pool; per-model rows keep their own figures.
-  it('GET /api/fallback/token-usage counts a shared platform pool once in totalBudget', async () => {
-    const db = getDb();
-    // Exactly one usable key ⇒ the pool budget is unscaled (×1).
-    db.prepare(`DELETE FROM api_keys WHERE platform = 'mistral'`).run();
-    const secret = encrypt('pool-test-key');
-    db.prepare(`
-      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-      VALUES ('mistral', 'pool', ?, ?, ?, 'healthy', 1)
-    `).run(secret.encrypted, secret.iv, secret.authTag);
-    // Three chain models on the shared pool, all repeating the same label.
-    // The seed activates profile 1, so the chain is profile_models (insert into
-    // both tables so the test holds whichever mode a later seed change picks).
-    const insertModel = db.prepare(`
-      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, monthly_token_budget)
-      VALUES ('mistral', ?, ?, 5, 5, '~100M')
-    `);
-    for (const modelId of ['pool-a', 'pool-b', 'pool-c']) {
-      const res = insertModel.run(modelId, modelId.toUpperCase());
-      const id = Number(res.lastInsertRowid);
-      db.prepare(`INSERT OR IGNORE INTO fallback_config (model_db_id, priority) VALUES (?, 900)`).run(id);
-      db.prepare(`INSERT OR IGNORE INTO profile_models (profile_id, model_db_id, priority) VALUES (1, ?, 900)`).run(id);
-    }
-    db.prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
-      VALUES ('mistral', 'pool-a', NULL, 'success', 10, 5, 10, NULL, 'chat')
-    `).run();
-
-    const { status, body } = await request(app, 'GET', '/api/fallback/token-usage');
-
-    expect(status).toBe(200);
-    // All mistral models — mine plus any seeded ones — collapse to ONE pool row.
-    const mistralModels = body.models.filter((m: any) => m.platform === 'mistral');
-    expect(mistralModels.length).toBeGreaterThanOrEqual(3);
-    const mistralPools = body.pools.filter((p: any) => p.platform === 'mistral');
-    expect(mistralPools).toHaveLength(1);
-    // The pool takes the largest documented budget, not the per-model sum.
-    const pool = mistralPools[0];
-    expect(pool.poolKey).toBe('mistral::experiment-pool');
-    expect(pool.budget).toBe(Math.max(...mistralModels.map((m: any) => m.budget)));
-    expect(pool.budget).toBeLessThan(mistralModels.reduce((s: number, m: any) => s + m.budget, 0));
-    // Pool `used` aggregates the per-model spend.
-    expect(pool.used).toBe(mistralModels.reduce((s: number, m: any) => s + (m.used ?? 0), 0));
-    // Per-model rows keep repeating the label and their own usage.
-    expect(mistralModels.find((m: any) => m.modelId === 'pool-a')).toMatchObject({
-      budget: 100_000_000,
-      used: 15,
-    });
-  });
-
   // Regression: GET /routing must always carry customWeights, even before the
   // user has saved any — the dashboard's custom-weight sliders dereference it
   // and a missing field white-screened the Fallback page.

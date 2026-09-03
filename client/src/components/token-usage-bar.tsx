@@ -26,9 +26,7 @@ const METRIC_KEYS: Record<string, string> = {
 // extracted from FallbackPage.
 export function TokenUsageBar({ data }: { data: TokenUsageData }) {
   const { t } = useI18n()
-  // `pools` is new in this payload (#1065); an older server, or a cached
-  // response from one, simply has no segments to draw.
-  const { totalBudget, totalUsed, pools = [], models } = data
+  const { totalBudget, totalUsed, models } = data
   const remaining = Math.max(0, totalBudget - totalUsed)
   const remainingPct = totalBudget > 0 ? formatPercent(remaining / totalBudget) : '0%'
 
@@ -43,24 +41,6 @@ export function TokenUsageBar({ data }: { data: TokenUsageData }) {
     }
   })
   const usedPct = totalBudget > 0 ? Math.min(100, (totalUsed / totalBudget) * 100) : 0
-
-  // One segment per pool (#1065): the total counts each shared platform
-  // allowance once, so per-model segments would overflow the bar — every
-  // model on a platform draws on the same segment.
-  const poolSegments = pools.map(p => {
-    const remainingTokens = Math.max(0, p.budget - p.used)
-    const scope = poolScopeWords(p.poolKey)
-    return {
-      ...p,
-      remainingTokens,
-      // The raw key ("mistral::experiment-pool") is server vocabulary; the
-      // legend headers already say it in words, so the segment does too.
-      label: scope
-        ? t('freeTier.poolLabel', { platform: p.platform, scope })
-        : t('freeTier.poolLabelBare', { platform: p.platform }),
-      widthPct: totalBudget > 0 ? (remainingTokens / totalBudget) * 100 : 0,
-    }
-  })
 
   // Provider pools (#905): many models on one platform share a single free
   // allowance, so the legend groups its rows under the pool they draw from
@@ -114,13 +94,13 @@ export function TokenUsageBar({ data }: { data: TokenUsageData }) {
       </div>
 
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
-        {poolSegments.map(p => (
+        {modelsWithWidth.map((m, i) => (
           <div
-            key={p.poolKey}
-            title={`${p.label}: ${formatTokens(p.remainingTokens)} ${t('models.remaining')}, ${formatTokens(p.used)} ${t('models.used')}`}
+            key={i}
+            title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} ${t('models.remaining')}, ${formatTokens(m.usedTokens)} ${t('models.used')}`}
             style={{
-              width: `${p.widthPct}%`,
-              backgroundColor: platformColors[p.platform] ?? '#94a3b8',
+              width: `${m.widthPct}%`,
+              backgroundColor: platformColors[m.platform] ?? '#94a3b8',
             }}
           />
         ))}

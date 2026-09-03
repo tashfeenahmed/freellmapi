@@ -138,19 +138,10 @@ export function mockApiPlugin(): Plugin {
         }
 
         if (url === '/api/fallback/token-usage') {
-          // Pool-deduped like the server (#1065): one budget per shared
-          // allowance. The mock approximates inferQuotaPoolKey by grouping
-          // per platform.
-          const modelBudgets = models.map(m => ({ displayName: m.displayName, platform: m.platform, modelId: m.modelId, budget: budgetTokens(m.monthlyTokenBudget) }))
-          const pools = new Map<string, { poolKey: string; platform: string; budget: number; used: number }>()
-          for (const m of modelBudgets) {
-            let p = pools.get(m.platform)
-            if (!p) { p = { poolKey: `${m.platform}::account`, platform: m.platform, budget: 0, used: 0 }; pools.set(m.platform, p) }
-            if (m.budget > p.budget) p.budget = m.budget
-          }
-          const poolList = [...pools.values()]
-          const totalBudget = poolList.reduce((s, p) => s + p.budget, 0)
-          return send({ totalBudget, totalUsed: Math.round(totalBudget * 0.18), pools: poolList, models: modelBudgets })
+          const withKeys = models
+          const modelBudgets = withKeys.map(m => ({ displayName: m.displayName, platform: m.platform, budget: budgetTokens(m.monthlyTokenBudget) }))
+          const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0)
+          return send({ totalBudget, totalUsed: Math.round(totalBudget * 0.18), models: modelBudgets })
         }
 
         // Anything else under /api → empty 200 so pages don't hard-crash.
