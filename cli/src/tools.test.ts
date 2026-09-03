@@ -315,6 +315,26 @@ describe('tool generators', () => {
     expect(Object.keys(value.provider.freellmapi.models)).toContain('auto');
   });
 
+  it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {
+    // AtomCode ignores a bare `[provider]` table: it looks up the table named
+    // by the root `default_provider` key, and only a `type = "openai"` table
+    // speaks the OpenAI-compatible wire. `context_window` is its own key.
+    const [config] = tools.find(tool => tool.id === 'atomcode')!.generate(context).files;
+    expect(config.path).toBe('/home/tester/.atomcode/config.toml');
+    expect(config.format).toBe('toml');
+    expect(config.sensitive).toBe(true);
+    const lines = (config.content ?? '').split('\n');
+    expect(lines[0]).toBe('default_provider = "freellmapi"');
+    expect(lines).toContain('[providers.freellmapi]');
+    expect(lines.indexOf('[providers.freellmapi]')).toBeGreaterThan(0);
+    expect(lines).toContain('type = "openai"');
+    expect(lines).toContain('base_url = "http://localhost:3000/v1"');
+    expect(lines).toContain('api_key = "freellmapi-test-key"');
+    expect(lines).toContain('model = "fast-coder"');
+    expect(lines).toContain('context_window = 131072');
+    expect(config.content).not.toContain('[provider]');
+  });
+
   it('uses /v1 for every OpenAI-compatible generated base URL', () => {
     for (const tool of tools.filter(entry => entry.protocol.startsWith('OpenAI'))) {
       expect(tool.baseUrlSupport, tool.id).toBe('/v1');

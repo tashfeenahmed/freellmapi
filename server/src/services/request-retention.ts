@@ -14,6 +14,13 @@ const HOURLY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // rows carry no aggregate that would silently change if they were pruned.
 const DEFAULT_SERVER_LOGS_RETENTION_DAYS = 7;
 const DEFAULT_SERVER_LOGS_MAX_ROWS = 50_000;
+// provider_quota_observations is the append-only audit trail behind
+// provider_quota_state (which always holds the current reading). Nothing reads
+// further back than the newest row per pool, so the history is diagnostics
+// only — yet a busy install wrote ~15k rows a day and reached 470k rows in a
+// month. Pruned on the daily gate: the delete is a range over created_at.
+const DEFAULT_QUOTA_OBSERVATIONS_RETENTION_DAYS = 30;
+const DEFAULT_QUOTA_OBSERVATIONS_MAX_ROWS = 200_000;
 
 type RetentionDb = ReturnType<typeof getDb>;
 
@@ -24,6 +31,7 @@ export interface RequestAnalyticsRetentionConfig {
 
 let nextPruneAtMs = 0;
 let nextHourlyPruneAtMs = 0;
+let nextQuotaObservationsPruneAtMs = 0;
 
 function readNonNegativeInt(name: string, defaultValue: number): number {
   const raw = process.env[name];
@@ -57,6 +65,96 @@ export function getServerLogRetentionConfig(): ServerLogRetentionConfig {
     retentionDays: readNonNegativeInt('SERVER_LOGS_RETENTION_DAYS', DEFAULT_SERVER_LOGS_RETENTION_DAYS),
     maxRows: readNonNegativeInt('SERVER_LOGS_MAX_ROWS', DEFAULT_SERVER_LOGS_MAX_ROWS),
   };
+}
+
+export interface QuotaObservationRetentionConfig {
+  retentionDays: number;
+  maxRows: number;
+}
+
+/** Same env convention as the pairs above; 0 on either knob disables that half. */
+export function getQuotaObservationRetentionConfig(): QuotaObservationRetentionConfig {
+  return {
+    retentionDays: readNonNegativeInt('QUOTA_OBSERVATIONS_RETENTION_DAYS', DEFAULT_QUOTA_OBSERVATIONS_RETENTION_DAYS),
+    maxRows: readNonNegativeInt('QUOTA_OBSERVATIONS_MAX_ROWS', DEFAULT_QUOTA_OBSERVATIONS_MAX_ROWS),
+  };
+}
+
+// The first sweep on an install that predates the prune may face hundreds of
+// thousands of rows; deleting them in one statement held the loop for ~4.5s on
+// a 470k-row log. Work is chunked under a wall-clock budget instead, and a
+// sweep that runs out of budget is resumed on the next 60s tick rather than
+// tomorrow. The chunk is the smallest unit of stall: 20k rows took ~870ms on a
+// 2-vCPU box under load, 5k keeps each tick near the budget.
+const QUOTA_OBSERVATIONS_PRUNE_CHUNK = 5_000;
+const QUOTA_OBSERVATIONS_PRUNE_BUDGET_MS = 250;
+
+/**
+ * Age- and count-bound the provider quota observation log.
+ *
+ * provider_quota_state is the source of truth for "how much is left"; this
+ * table only explains how it got there. Keeping the newest row per pool is
+ * guaranteed by the count bound being far above the number of live pools.
+ * created_at is SQLite datetime text, indexed since the 20260901_000002
+ * migration, so both deletes are range/ordered walks, not scans. Guarded
+ * against the table being absent for the same reason as the hourly prune.
+ *
+ * Returns how many rows went and whether the sweep finished; `done: false`
+ * means the budget ran out and the caller should come back soon.
+ */
+export function pruneQuotaObservations(
+  db: RetentionDb,
+  nowMs: number,
+  budgetMs = QUOTA_OBSERVATIONS_PRUNE_BUDGET_MS,
+): { deleted: number; done: boolean } {
+  const hasTable = !!db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_quota_observations'")
+    .get();
+  if (!hasTable) return { deleted: 0, done: true };
+
+  const { retentionDays, maxRows } = getQuotaObservationRetentionConfig();
+  const started = Date.now();
+  const inBudget = () => Date.now() - started < budgetMs;
+  let deleted = 0;
+
+  if (retentionDays > 0) {
+    const cutoff = toSqliteTimestamp(new Date(nowMs - retentionDays * DAY_MS));
+    const byAge = db.prepare(`
+      DELETE FROM provider_quota_observations
+      WHERE rowid IN (
+        SELECT rowid FROM provider_quota_observations
+        WHERE created_at < ?
+        ORDER BY created_at ASC
+        LIMIT ?
+      )
+    `);
+    for (;;) {
+      const changes = byAge.run(cutoff, QUOTA_OBSERVATIONS_PRUNE_CHUNK).changes;
+      deleted += changes;
+      if (changes < QUOTA_OBSERVATIONS_PRUNE_CHUNK) break;
+      if (!inBudget()) return { deleted, done: false };
+    }
+  }
+
+  if (maxRows > 0) {
+    const byCount = db.prepare(`
+      DELETE FROM provider_quota_observations
+      WHERE rowid IN (
+        SELECT rowid
+        FROM provider_quota_observations
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ? OFFSET ?
+      )
+    `);
+    for (;;) {
+      const changes = byCount.run(QUOTA_OBSERVATIONS_PRUNE_CHUNK, maxRows).changes;
+      deleted += changes;
+      if (changes < QUOTA_OBSERVATIONS_PRUNE_CHUNK) break;
+      if (!inBudget()) return { deleted, done: false };
+    }
+  }
+
+  return { deleted, done: true };
 }
 
 /**
@@ -144,6 +242,14 @@ export function pruneRequestAnalytics(options: {
   // than the UI range, or the 30d count will silently drop again.
   // Guarded against the table being absent (tests that init a DB before the
   // migration runs would otherwise crash the prune loop).
+  // Quota observation log, once a day — or again next tick while a large
+  // backlog is still being worked off in budgeted chunks.
+  if (nowMs >= nextQuotaObservationsPruneAtMs) {
+    const sweep = pruneQuotaObservations(db, nowMs);
+    deleted += sweep.deleted;
+    nextQuotaObservationsPruneAtMs = nowMs + (sweep.done ? HOURLY_PRUNE_INTERVAL_MS : PRUNE_INTERVAL_MS);
+  }
+
   if (nowMs >= nextHourlyPruneAtMs) {
     nextHourlyPruneAtMs = nowMs + HOURLY_PRUNE_INTERVAL_MS;
     const hasHourly = !!db

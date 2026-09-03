@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  groupMatchesQuery,
   isMemberSplit,
   memberEndpointTitle,
   memberOverrideKey,
@@ -258,5 +259,43 @@ describe('tightestRateLimit', () => {
       usageRow(2, { tpm: { used: 500, limit: 100_000 } }),
     ]
     expect(tightestRateLimit(rows)).toEqual({ kind: 'TPM', used: 500, limit: 100_000 })
+  })
+})
+
+// #1056: a relay added as a custom endpoint carries platform 'custom', so
+// searching the provider's name ("unorouter") found nothing even though the
+// table prints the endpoint host on the row.
+describe('groupMatchesQuery (#1056)', () => {
+  const member = (over: Record<string, unknown> = {}) => ({
+    platform: 'custom', modelId: 'glm-5.1', displayName: 'GLM 5.1',
+    source: 'custom' as const, keyLabel: null,
+    endpointScope: 'https://api.unorouter.com/v1', ...over,
+  })
+  const group = (members: ReturnType<typeof member>[]) => ({ label: 'GLM 5.1', members })
+
+  it('matches a custom endpoint host the table displays', () => {
+    expect(groupMatchesQuery(group([member()]), 'unorouter')).toBe(true)
+    expect(groupMatchesQuery(group([member()]), 'api.unorouter.com')).toBe(true)
+  })
+
+  it('matches the operator-given key label', () => {
+    const g = group([member({ endpointScope: null, keyLabel: 'My UnoRouter key' })])
+    expect(groupMatchesQuery(g, 'unorouter')).toBe(true)
+  })
+
+  it('matches when only ONE member of a multi-provider group is on that endpoint', () => {
+    const g = group([
+      member({ platform: 'zhipu', source: 'catalog' as const, endpointScope: null }),
+      member(),
+    ])
+    expect(groupMatchesQuery(g, 'unorouter')).toBe(true)
+    expect(groupMatchesQuery(g, 'zhipu')).toBe(true)
+  })
+
+  it('still matches names, ids and catalog platforms', () => {
+    const g = group([member({ platform: 'groq', source: 'catalog' as const, endpointScope: null })])
+    expect(groupMatchesQuery(g, 'glm')).toBe(true)
+    expect(groupMatchesQuery(g, 'groq')).toBe(true)
+    expect(groupMatchesQuery(g, 'mistral')).toBe(false)
   })
 })

@@ -115,6 +115,7 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   if (platform === 'google') return 'google::project';
   if (platform === 'groq') return 'groq::account';
   if (platform === 'cerebras') return 'cerebras::shared';
+  if (platform === 'sail') return 'sail::monthly-credit';
   if (platform === 'bai') return 'bai::promo';
   if (platform === 'sambanova') return 'sambanova::shared';
   if (platform === 'nvidia') return 'nvidia::credit-pool';
@@ -162,7 +163,7 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
 }
 
 function isSharedPool(platform: Platform): boolean {
-  return ['openrouter', 'google', 'groq', 'cerebras', 'bai', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
@@ -532,16 +533,13 @@ export function getQuotaStateForKeys(): QuotaObservationView[] {
     return [];
   }
   normalizeExpiredQuotaState(db);
+  // One seek per state row for its newest observation. The log is append-only
+  // and grows into the hundreds of thousands of rows, so this must never scan
+  // it: the correlated subquery walks idx_provider_quota_observations_latest
+  // (platform, key_id, quota_pool_key, metric, observed_at DESC, created_at
+  // DESC) and stops at the first entry. The window-function form it replaces
+  // ranked the entire table, raw_json included, on every dashboard poll.
   return db.prepare(`
-    WITH latest AS (
-      SELECT
-        oq.*,
-        ROW_NUMBER() OVER (
-          PARTITION BY oq.platform, oq.key_id, oq.quota_pool_key, oq.metric
-          ORDER BY oq.observed_at DESC, oq.created_at DESC
-        ) AS rn
-      FROM provider_quota_observations oq
-    )
     SELECT
       pqs.platform,
       pqs.key_id AS keyId,
@@ -568,12 +566,17 @@ export function getQuotaStateForKeys(): QuotaObservationView[] {
       latest.created_at AS createdAt
     FROM provider_quota_state pqs
     LEFT JOIN api_keys k ON k.id = pqs.key_id
-    LEFT JOIN latest
-      ON latest.platform = pqs.platform
-     AND latest.key_id = pqs.key_id
-     AND latest.quota_pool_key = pqs.quota_pool_key
-     AND latest.metric = pqs.metric
-     AND latest.rn = 1
+    LEFT JOIN provider_quota_observations latest
+      ON latest.id = (
+        SELECT o.id
+          FROM provider_quota_observations o
+         WHERE o.platform = pqs.platform
+           AND o.key_id = pqs.key_id
+           AND o.quota_pool_key = pqs.quota_pool_key
+           AND o.metric = pqs.metric
+         ORDER BY o.observed_at DESC, o.created_at DESC
+         LIMIT 1
+      )
     ORDER BY pqs.platform ASC, pqs.key_id ASC, pqs.quota_pool_key ASC, pqs.metric ASC
   `).all() as QuotaObservationView[];
 }

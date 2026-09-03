@@ -238,6 +238,13 @@ export const GITHUB_MAX_OUTPUT_TOKENS = 400;
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  // Sail's stable Responses API accepts temperature/top_p, JSON Schema output,
+  // tools and reasoning effort. The remaining Chat Completions knobs are not
+  // supported and are intentionally omitted by the dedicated adapter.
+  sail: {
+    drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
+    jsonObjectToSchema: true,
+  },
   // Mistral's API is strict (422 on unknown body keys) and names its seed
   // `random_seed`. It has no top_k/min_p/logit_bias/logprobs equivalents, and
   // no reasoning_effort (Magistral's reasoning has no request-side knob).

@@ -8,6 +8,7 @@ import { AIHordeProvider } from './aihorde.js';
 import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
+import { SailProvider } from './sail.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -33,6 +34,14 @@ register(new OpenAICompatProvider({
   name: 'Cerebras',
   baseUrl: 'https://api.cerebras.ai/v1',
 }));
+
+// Sail Research — its stable API is /v1/responses and all calls are submitted
+// as background jobs, then polled. The dedicated adapter translates terminal
+// Responses objects back to Chat Completions and handles flex-only models.
+// Sail grants $5 in free credits every month when a payment method is attached;
+// usage beyond that grant is pay-as-you-go. Live-tested 2026-09-01. Model rows
+// stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
+register(new SailProvider());
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;

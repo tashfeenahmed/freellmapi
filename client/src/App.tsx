@@ -47,6 +47,15 @@ import AgentsPage from '@/pages/AgentsPage'
 // silently. A page that already shows the failure inline can opt out with
 // `meta: { silenceToast: true }` on the mutation.
 const queryClient = new QueryClient({
+  // staleTime dedupes the mount storm (#1047) and keeps page-to-page
+  // navigation off the network: the Models page alone mounts ~13 queries,
+  // several of them the same endpoint from different components, and
+  // staleTime 0 refetched every one of them on every navigation and window
+  // focus. Cached data renders immediately either way; this only decides
+  // whether a background refetch follows. Thirty seconds is shorter than any
+  // poller here (refetchInterval still fires on its own clock), and mutations
+  // invalidate explicitly, so nothing user-visible goes stale.
+  defaultOptions: { queries: { staleTime: 30_000 } },
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
       if (mutation.meta?.silenceToast) return
@@ -399,6 +408,21 @@ function PageContainer({ children }: { children: ReactNode }) {
   )
 }
 
+// The shell column. Padded routes keep `min-h-screen` and scroll as a document;
+// a full-bleed route pins the shell to the dynamic viewport instead, because
+// min-height alone is a floor, not a ceiling: with an indefinite shell height
+// every flex-1 container below grows with its content and the document scrolls
+// rather than the one pane (the Playground transcript) that means to.
+function AppShell({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  const fullBleed = FULL_BLEED_ROUTES.has(location.pathname)
+  return (
+    <div className={`flex flex-col ${fullBleed ? 'h-dvh overflow-hidden' : 'min-h-screen'} ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
+      {children}
+    </div>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -410,7 +434,7 @@ function App() {
                   leaves without anyone having to know how tall the navbar is.
                   Fixed-position children (toaster, palette, reminder) are out of
                   flow, and a padded route stretches to nothing it can show. */}
-              <div className={`flex min-h-screen flex-col ${isDesktopApp ? 'desktop-backdrop' : 'bg-background'}`}>
+              <AppShell>
                 <Navbar />
                 <PageContainer>
                   <PageBoundary>
@@ -445,7 +469,7 @@ function App() {
                 <Toaster />
                 <CommandPalette />
                 <UpdateReminder />
-              </div>
+              </AppShell>
             </AuthGate>
           </BrowserRouter>
         </I18nProvider>

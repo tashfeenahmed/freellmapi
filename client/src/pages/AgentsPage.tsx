@@ -42,6 +42,7 @@ const analyticsIds: Record<string, string> = {
   crush: 'crush',
   dsh: 'deepseek-harness',
   mimo: 'mimo-code',
+  atomcode: 'atomcode',
   cursor: 'cursor',
 }
 

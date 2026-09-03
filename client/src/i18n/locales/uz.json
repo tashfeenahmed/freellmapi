@@ -712,7 +712,9 @@
     "attemptTimingHint": "So'rov boshlanishidan boshlab ofsetni boshlash · urinish davomiyligi",
     "requestedModel": "So'ralgan model",
     "ttft": "TTFT",
-    "requestsByAgent": "Agent bo'yicha so'rovlar"
+    "requestsByAgent": "Agent bo'yicha so'rovlar",
+    "sortBy": "{column} bo‘yicha saralash",
+    "sortHint": "Saralash faqat yuklangan {count} ta qatorga qo‘llanadi"
   },
   "logs": {
     "title": "Jurnal",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

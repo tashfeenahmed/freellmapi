@@ -712,7 +712,9 @@
     "attemptTimingHint": "Offset dall'inizio della richiesta · durata del tentativo",
     "requestedModel": "Modello richiesto",
     "ttft": "TTFT",
-    "requestsByAgent": "Richieste per agente"
+    "requestsByAgent": "Richieste per agente",
+    "sortBy": "Ordina per {column}",
+    "sortHint": "L'ordinamento si applica alle {count} righe caricate"
   },
   "logs": {
     "title": "Log",
@@ -1026,7 +1028,8 @@
       "dsh": "L'imbracatura di DeepSeek, che tiene ogni fornitore come una rotta commutabile.",
       "mimo": "L'agente da terminale di Xiaomi, un fork di OpenCode che accetta qualsiasi fornitore compatibile OpenAI.",
       "cursor": "L'editor pensato per l'IA; passa dal cloud di Cursor, quindi serve un URL pubblico.",
-      "generic": "Qualsiasi altro strumento che parli l'API di OpenAI, configurato a mano con URL base e chiave."
+      "generic": "Qualsiasi altro strumento che parli l'API di OpenAI, configurato a mano con URL base e chiave.",
+      "atomcode": "L'agente da terminale di AtomGit, scritto in Rust, che accetta qualsiasi endpoint compatibile OpenAI."
     }
   },
   "update": {

@@ -712,7 +712,9 @@
     "attemptTimingHint": "అభ్యర్థన ప్రారంభం నుండి ఆఫ్‌సెట్ ప్రారంభించండి · ప్రయత్న వ్యవధి",
     "requestedModel": "అభ్యర్థించిన మోడల్",
     "ttft": "TTFT",
-    "requestsByAgent": "ఏజెంట్ వారీగా అభ్యర్థనలు"
+    "requestsByAgent": "ఏజెంట్ వారీగా అభ్యర్థనలు",
+    "sortBy": "{column} ప్రకారం క్రమబద్ధీకరించు",
+    "sortHint": "క్రమబద్ధీకరణ లోడ్ అయిన {count} వరుసలకు మాత్రమే వర్తిస్తుంది"
   },
   "logs": {
     "title": "లాగ్‌లు",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

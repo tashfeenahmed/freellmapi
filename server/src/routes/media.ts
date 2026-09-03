@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { maskKey } from '../lib/crypto.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
-import { resolveCustomEndpointKey, customEndpointKeyIds } from '../services/custom-endpoint.js';
+import { resolveCustomEndpointKey } from '../services/custom-endpoint.js';
+import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { listAllMediaModels } from '../services/media.js';
 
 export const mediaRouter = Router();
@@ -135,46 +136,16 @@ mediaRouter.post('/custom', (req: Request, res: Response) => {
 
   const upsert = db.transaction(() => {
     // A new secret for a known endpoint is an ADDITIONAL credential, never a
-    // replacement for the stored one (#619).
+    // replacement for the stored one (#619). The upsert itself is shared with
+    // the classified branch of POST /api/keys/custom (#1051).
     const { keyId, storedKey: storedKeyForMask } = resolveCustomEndpointKey(db, baseUrl, providedKey, label);
-    const endpointKeyIds = customEndpointKeyIds(db, keyId);
-
-    const existingModel = db.prepare(`
-      SELECT id, modality, priority, key_id
-        FROM media_models
-       WHERE platform = 'custom' AND model_id = ?
-       LIMIT 1
-    `).get(modelId) as { id: number; modality: string; priority: number; key_id: number | null } | undefined;
-    // A model already on this endpoint keeps the key it has; only a move to a
-    // different endpoint re-binds it.
-    const bindKeyId = existingModel?.key_id != null && endpointKeyIds.has(existingModel.key_id)
-      ? existingModel.key_id
-      : keyId;
-    const priority = existingModel && existingModel.modality === parsed.data.modality
-      ? existingModel.priority
-      : (db.prepare('SELECT COALESCE(MAX(priority), 0) AS maxPriority FROM media_models WHERE modality = ?')
-        .get(parsed.data.modality) as { maxPriority: number }).maxPriority + 1;
-
-    if (existingModel) {
-      db.prepare(`
-        UPDATE media_models
-           SET display_name = COALESCE(?, display_name),
-               modality = ?,
-               priority = ?,
-               enabled = 1,
-               quota_label = ?,
-               key_id = ?
-         WHERE id = ?
-      `).run(submittedName, parsed.data.modality, priority, quotaLabel, bindKeyId, existingModel.id);
-      return { modelDbId: existingModel.id, keyId, storedKeyForMask };
-    }
-
-    const model = db.prepare(`
-      INSERT INTO media_models
-        (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
-      VALUES ('custom', ?, ?, ?, ?, 1, ?, ?)
-    `).run(modelId, submittedName ?? modelId, parsed.data.modality, priority, quotaLabel, bindKeyId);
-    return { modelDbId: Number(model.lastInsertRowid), keyId, storedKeyForMask };
+    const { modelDbId } = registerCustomMediaModel(db, keyId, {
+      modelId,
+      displayName: submittedName,
+      modality: parsed.data.modality,
+      quotaLabel,
+    });
+    return { modelDbId, keyId, storedKeyForMask };
   });
 
   const result = upsert();

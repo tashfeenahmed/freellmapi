@@ -2081,7 +2081,28 @@ export function getRoutingScores(): { strategy: RoutingStrategy; keySelectionStr
   const strategy = getRoutingStrategy();
   refreshStatsCache(db);
 
-  const chain = getActiveChain(db);
+  // Score the whole enabled catalog, not just the active chain (#1047). Since
+  // #1023 the dashboard table lists every catalog row through the chain, and
+  // merging it against chain-only scores left every not-yet-opted-in row with
+  // blank reliability/speed — which read as "each new chain starts from
+  // scratch" even though the underlying per-model stats are global. Rows the
+  // chain names keep its enabled flag; the rest score as disabled. Display
+  // only: routeRequest still walks getActiveChain.
+  const profileId = getActiveProfileId(db);
+  const chain = db.prepare(`
+    SELECT m.id AS model_db_id, COALESCE(c.priority, 0) AS priority, COALESCE(c.enabled, 0) AS enabled,
+           m.platform, m.model_id, m.display_name, m.intelligence_rank,
+           m.size_label, m.monthly_token_budget,
+           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+    FROM models m
+    LEFT JOIN ${profileId != null
+      ? '(SELECT model_db_id, priority, enabled FROM profile_models WHERE profile_id = ?) c'
+      : '(SELECT model_db_id, priority, enabled FROM fallback_config) c'}
+      ON c.model_db_id = m.id
+    WHERE m.enabled = 1
+    ORDER BY c.priority ASC
+  `).all(...(profileId != null ? [profileId] : [])) as ChainRow[];
 
   // For display we score under 'balanced' weights when in priority mode, so the
   // table still shows a meaningful ranking even with the bandit turned off.

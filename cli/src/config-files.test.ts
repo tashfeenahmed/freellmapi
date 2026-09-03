@@ -393,6 +393,48 @@ describe('safe config writes', () => {
     expect(fs.readFileSync(bad, 'utf8')).toBe('{ this is not json');
   });
 
+  it('merges an AtomCode config: root key above existing tables, other providers kept', () => {
+    // A user with a DeepSeek provider already configured runs setup-atomcode:
+    // `default_provider` must land in the root region (a key appended after
+    // `[providers.deepseek]` would become that table's key), the deepseek
+    // table must survive, and a stale `[providers.freellmapi]` is replaced.
+    const existing = [
+      'default_provider = "deepseek"',
+      'auto_update = true',
+      '',
+      '[providers.deepseek]',
+      'type = "openai"',
+      'api_key = "sk-keep"',
+      'model = "deepseek-chat"',
+      '',
+      '[providers.freellmapi]',
+      'type = "openai"',
+      'model = "stale-model"',
+      '',
+    ].join('\n');
+    const generated = [
+      'default_provider = "freellmapi"',
+      '',
+      '[providers.freellmapi]',
+      'type = "openai"',
+      'base_url = "http://localhost:3000/v1"',
+      'api_key = "freellmapi-test-key"',
+      'model = "fast-coder"',
+      'context_window = 131072',
+    ].join('\n');
+    const merged = renderFile({ path: '/unused', format: 'toml', content: generated }, existing);
+    const lines = merged.split('\n');
+    const firstTable = lines.findIndex(line => line.startsWith('['));
+    expect(lines.slice(0, firstTable)).toContain('default_provider = "freellmapi"');
+    expect(lines.slice(0, firstTable)).toContain('auto_update = true');
+    expect(merged.match(/^default_provider =/gm)).toHaveLength(1);
+    expect(merged).toContain('[providers.deepseek]\ntype = "openai"\napi_key = "sk-keep"');
+    expect(merged.match(/^\[providers\.freellmapi\]$/gm)).toHaveLength(1);
+    expect(merged).not.toContain('stale-model');
+    expect(merged).toContain('context_window = 131072');
+    expect(renderFile({ path: '/unused', format: 'toml', content: generated }, merged)).toBe(merged);
+  });
+
   it('creates a timestamped backup before replacing a real file', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'freellmapi-cli-'));
     temporary.push(directory);

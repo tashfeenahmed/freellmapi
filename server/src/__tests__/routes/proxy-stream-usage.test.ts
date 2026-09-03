@@ -195,7 +195,7 @@ describe('Streaming usage-frame fallback injection', () => {
     expect(frames[0].usage.estimated).toBe(true);
   });
 
-  it('does NOT inject a usage frame when include_usage is not requested', async () => {
+  it('injects an estimated usage frame when the upstream never echoes one, even without include_usage', async () => {
     const origFetch = global.fetch;
     vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
@@ -211,7 +211,53 @@ describe('Streaming usage-frame fallback injection', () => {
     }, authHeaders());
 
     expect(status).toBe(200);
-    expect(usageFrames(raw)).toHaveLength(0);
+    // #1084: agents read `usage` for context-window display even when they
+    // never requested include_usage; a missing frame used to show 0. The
+    // estimate is injected regardless of the client's stream_options.
+    const frames = usageFrames(raw);
+    expect(frames).toHaveLength(1);
+    expect(frames[0].choices).toEqual([]);
+    expect(frames[0].usage.prompt_tokens).toBeGreaterThan(0);
+    expect(frames[0].usage.completion_tokens).toBeGreaterThan(0);
+    expect(frames[0].usage.estimated).toBe(true);
+  });
+
+  it('injects estimated usage into a NON-streaming response when the upstream omits usage', async () => {
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('api.groq.com/openai/v1/chat/completions')) {
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-nousage',
+            object: 'chat.completion',
+            created: 123,
+            model: 'openai/gpt-oss-120b',
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'hi there' },
+              finish_reason: 'stop',
+            }],
+            // No `usage` block — the #1084 scenario.
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hi' }],
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.usage).toBeDefined();
+    expect(body.usage.prompt_tokens).toBeGreaterThan(0);
+    expect(body.usage.completion_tokens).toBeGreaterThan(0);
+    expect(body.usage.total_tokens).toBe(
+      body.usage.prompt_tokens + body.usage.completion_tokens,
+    );
+    expect(body.usage.estimated).toBe(true);
   });
 
   it('passes through the upstream usage frame unchanged when one is present', async () => {

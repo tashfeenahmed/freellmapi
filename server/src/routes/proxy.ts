@@ -22,6 +22,7 @@ import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModel
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
+import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
@@ -193,6 +194,11 @@ function rememberReasoning(sessionKey: string | undefined, modelKey: string, rea
 // The remembered trace for this session, or undefined when there is none, it
 // expired, or it came from a different model than the one about to be called.
 // An expired entry is dropped on read rather than left for the size sweep.
+export function clearReasoningMemory() {
+  reasoningMemory.clear();
+  stickySessionMap.clear();
+}
+
 function rememberedReasoningFor(sessionKey: string, modelKey: string): string | undefined {
   if (!sessionKey) return undefined;
   const entry = reasoningMemory.get(sessionKey);
@@ -499,6 +505,10 @@ const assistantMessageSchema = z.object({
   // unless the prior turn's reasoning_content is replayed, so keep it through
   // validation instead of stripping it. See issue #255.
   reasoning_content: z.string().nullable().optional(),
+  // Moonshot's "partial" prefill flag. A plain z.object (no .passthrough())
+  // would silently strip it; keep it through validation so it can be forwarded
+  // to Moonshot/Kimi models, which document it. See issue #1038.
+  partial: z.boolean().optional(),
 });
 
 // Tool results may arrive with null/missing content (a tool that returned
@@ -1468,6 +1478,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         ...(typeof m.reasoning_content === 'string' && m.reasoning_content.length > 0
           ? { reasoning_content: m.reasoning_content }
           : {}),
+        // Moonshot's "partial" prefill flag: keep it through the message build
+        // (the schema already preserves it); the provider layer decides whether
+        // the routed model understands it and strips it otherwise. (#1038)
+        ...(m.partial === true ? { partial: true } : {}),
         // hasToolCalls (not a bare truthiness check) so null AND empty-array
         // tool_calls are dropped rather than forwarded — strict upstreams
         // reject both shapes. (#200)
@@ -1779,6 +1793,50 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     }
   }
 
+  // ── Idempotency-Key (services/idempotency.ts) ──
+  // Optional caller-scoped dedup for NON-streaming requests: a client that
+  // times out and retries with the same Idempotency-Key gets the ORIGINAL
+  // response replayed (zero provider cost) instead of burning a second
+  // free-tier slot. Only a SHA-256 hash of the key is stored. Reusing a key
+  // with different request content is a 409 conflict. Streaming always
+  // bypasses (like the response cache) — a stream cannot be replayed as a
+  // unit, and the open connection is itself the retry signal.
+  const idemKeyRaw = req.headers['idempotency-key'] ?? req.headers['Idempotency-Key'];
+  const idemKey = !stream ? normalizeIdempotencyKey(idemKeyRaw) : null;
+  const idemFingerprint = idemKey
+    ? computeIdempotencyFingerprint({
+        model: requestedModel,
+        messages,
+        temperature,
+        top_p,
+        max_tokens,
+        tools,
+        tool_choice,
+      })
+    : null;
+  if (idemKey && idemFingerprint) {
+    const keyHash = hashIdempotencyKey(idemKey);
+    const claim = lookupIdempotencyReplay(keyHash, idemFingerprint);
+    if (claim.kind === 'replay') {
+      // Replay consumes NO provider quota — same zero-cost rationale as a
+      // cache hit, so request/usage bookkeeping is skipped here too.
+      res.setHeader('X-Routed-Via', 'idempotency');
+      res.status(claim.status).json(claim.body);
+      return;
+    }
+    if (claim.kind === 'conflict') {
+      res.status(409).json({
+        error: {
+          message: 'idempotency_key_conflict',
+          type: 'invalid_request_error',
+        },
+      });
+      return;
+    }
+    // kind === 'miss': no prior claim (or it expired) — proceed normally
+    // and persist the result on success below.
+  }
+
   // Optional client-managed session affinity (see getSessionKey). Express
   // lower-cases header names; a repeated header arrives as an array — take
   // the first value.
@@ -2017,9 +2075,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let ttfbMs: number | null = null;
 
         // Hold-window state: 'undecided' until the first text either matches
-        // a dialect marker (→ 'dialect': buffer everything, rescue at end) or
-        // provably cannot (→ 'passthrough': flush and stream normally).
-        let mode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+        // a dialect marker (→ 'dialect': buffer everything, rescue at end),
+        // carries a structured-output request (→ 'json': buffer everything,
+        // enforce JSON at end) or provably cannot (→ 'passthrough': flush and
+        // stream normally).
+        let mode: 'undecided' | 'passthrough' | 'dialect' | 'json' = 'undecided';
         let heldText = '';
         const preamble: unknown[] = []; // role-only chunks held until flush
         const toolCallAcc = new Map<number, { id?: string; name: string; args: string }>();
@@ -2181,11 +2241,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
 
             heldText += text;
-            if (mode === 'dialect') continue;
+            if (mode === 'dialect' || mode === 'json') continue;
 
             const probe = heldText.trimStart();
             if (wantsTools && startsWithDialectMarker(probe)) {
               mode = 'dialect';
+            } else if (samplingParams.response_format) {
+              // Structured-output request (#933): hold ALL text until the
+              // stream ends, then enforce JSON (mirrors the non-stream check
+              // below). Streaming bytes are already committed once headers
+              // flush, so a model that answers in prose despite the forwarded
+              // response_format must be caught here, before any byte leaves —
+              // the client asked for machine-readable output, not an essay.
+              mode = 'json';
             } else if (!wantsTools || !couldBecomeDialectMarker(probe) || probe.length > 256) {
               mode = 'passthrough';
               flushHeaders();
@@ -2279,6 +2347,28 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             );
           }
 
+          // Structured-output enforcement for streams (#933): the non-stream
+          // path checks JSON before returning; the stream path must too, or a
+          // model that answers in prose despite the forwarded response_format
+          // ships the essay as a "success" — the worst case for a
+          // machine-readable request. json mode held every byte (headers never
+          // flushed), so failing over here is free: skipBench (provider
+          // healthy, the MODEL misbehaved) + skipModelForRequest (a sibling
+          // key would misbehave identically). Mirrors proxy.ts non-stream.
+          if (mode === 'json' && samplingParams.response_format && completedCalls.length === 0) {
+            const enforced = enforceJsonContent(heldText);
+            if (!enforced.ok) {
+              const truncated = upstreamFinish === 'length';
+              throw Object.assign(
+                new Error(truncated
+                  ? `truncated JSON from ${route.displayName} (finish_reason=length — raise max_tokens for this ${samplingParams.response_format.type} request)`
+                  : `${route.displayName} ignored response_format (returned non-JSON despite ${samplingParams.response_format.type})`),
+                { skipBench: true, skipModelForRequest: true },
+              );
+            }
+            if (enforced.healed) heldText = enforced.content;
+          }
+
           flushHeaders();
           if (heldText.length > 0) {
             writeChunk(mkChunk({ content: heldText }, null));
@@ -2302,19 +2392,20 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           const estimatedPromptTokens = estimatedInputTokens + injectedHandoffTokens + imageCount * IMAGE_TOKEN_ESTIMATE;
           if (usageChunk) {
             writeChunk(usageChunk);
-          } else if (parsed.data.stream_options?.include_usage) {
-            // Some OpenAI-compatible upstreams (e.g. OpenCode Zen) never echo
-            // a final usage frame even when stream_options.include_usage is
-            // requested. Strict clients (Hermes, Cline, Continue) treat a
+          } else {
+            // Some OpenAI-compatible upstreams never echo a final usage
+            // frame — neither when stream_options.include_usage is requested
+            // nor otherwise. Strict clients (Hermes, Cline, Continue) treat a
             // missing usage block as "no accounting happened" and skip
-            // per-call token/cost/billing_provider writes entirely.
+            // per-call token/cost/billing_provider writes entirely; agents
+            // that read usage for context-window display (e.g. #1084) show 0.
             //
-            // Injected ONLY when the client asked for usage via
-            // stream_options.include_usage AND the upstream never sent one;
-            // the numbers are this gateway's own chars/4 estimate (the same
-            // total the accounting below records), never the upstream's
-            // accounting, so the block is flagged `estimated: true` rather
-            // than passed off as real counts.
+            // So inject the estimate whenever the upstream never sent one —
+            // regardless of whether the client asked for include_usage. The
+            // numbers are this gateway's own chars/4 estimate (the same total
+            // the accounting below records), never the upstream's accounting,
+            // so the block is flagged `estimated: true` rather than passed
+            // off as real counts.
             const completionTokens = totalOutputTokens;
             writeChunk({
               id: lastMeta.id ?? `chatcmpl-${Date.now()}`,
@@ -2546,6 +2637,39 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Normalize array-shaped message.content to a string on the way out (#166).
         const outboundBody = sanitizeResponse(normalizeOutboundContent(result));
         res.setHeader('X-FreeLLM-Cache', cacheKey ? 'MISS' : 'OFF');
+
+        // #1084: agents show zero context usage when the upstream omits
+        // `usage` (many free-tier providers do). Fall back to the same
+        // chars/4 estimate used for accounting above, flagged `estimated:
+        // true` so a cost-accounting client can tell it apart from the
+        // upstream's real counts.
+        if (!outboundBody.usage) {
+          outboundBody.usage = {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: totalTokens,
+            estimated: true,
+          };
+        }
+
+        // Persist the completed response for Idempotency-Key replays. Only
+        // non-streaming requests with a valid key reach here; a truncated turn
+        // (finish_reason 'length') is NOT stored — replaying a cut-off answer
+        // would be worse than regenerating, matching the cache policy below.
+        if (
+          idemKey
+          && idemFingerprint
+          && result.choices?.[0]?.finish_reason !== 'length'
+        ) {
+          storeIdempotencyResult(
+            hashIdempotencyKey(idemKey),
+            idemFingerprint,
+            200,
+            outboundBody,
+            requestGroupId,
+          );
+        }
+
         res.json(outboundBody);
 
         // Cache the freshly-generated answer so an identical later request is

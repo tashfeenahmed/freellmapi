@@ -712,7 +712,9 @@
     "attemptTimingHint": "İstek başlangıcından itibaren başlangıç dengelemesi · deneme süresi",
     "requestedModel": "İstenilen model",
     "ttft": "TTFT",
-    "requestsByAgent": "Ajan başına istekler"
+    "requestsByAgent": "Ajan başına istekler",
+    "sortBy": "{column} ölçütüne göre sırala",
+    "sortHint": "Sıralama yalnızca yüklenen {count} satıra uygulanır"
   },
   "logs": {
     "title": "Günlükler",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek'in koşum takımı; her sağlayıcıyı geçiş yapılabilir bir rota olarak tutar.",
       "mimo": "Xiaomi'nin terminal ajanı; OpenAI uyumlu her sağlayıcıyı kabul eden bir OpenCode çatallaması.",
       "cursor": "Yapay zekâ odaklı düzenleyici; Cursor bulutundan geçtiği için herkese açık bir URL ister.",
-      "generic": "OpenAI API'sini konuşan diğer her araç; temel URL ve anahtarla elle kurulur."
+      "generic": "OpenAI API'sini konuşan diğer her araç; temel URL ve anahtarla elle kurulur.",
+      "atomcode": "AtomGit'in terminal ajanı; Rust ile yazılmış, OpenAI uyumlu her uç noktayı kabul eder."
     }
   },
   "update": {

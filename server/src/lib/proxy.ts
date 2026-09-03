@@ -1,5 +1,6 @@
 import http from 'http';
 import https from 'https';
+import { execFileSync } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getSetting } from '../db/index.js';
 import { decrypt, encrypt } from './crypto.js';
@@ -131,7 +132,88 @@ function resolveProxySource(dbValue: string): { url: string; source: string } {
     const value = readEnv(name);
     if (value) return { url: value, source: name };
   }
+
+  // #353: last resort — read the system-wide proxy settings (macOS System
+  // Settings / Windows Internet Options / GNOME desktop) so the app works
+  // without duplicating the OS config. Best-effort: every failure here just
+  // falls through to the direct (no-proxy) path.
+  const system = detectSystemProxy();
+  if (system.url) return system;
   return { url: '', source: 'none' };
+}
+
+/**
+ * Read the OS-wide proxy configuration. Synchronous and best-effort: never
+ * throws, returns '' when the platform is unsupported or the command fails.
+ *
+ * - macOS: `scutil --proxy` (System Settings → Network → Proxies)
+ * - Windows: Internet Options registry (ProxyEnable + ProxyServer)
+ * - Linux: GNOME gsettings (the most common desktop), manual mode only
+ */
+export function detectSystemProxy(): { url: string; source: string } {
+  try {
+    if (process.platform === 'darwin') {
+      const out = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 2000 });
+      return parseScutilProxy(out);
+    }
+    if (process.platform === 'win32') {
+      const enable = execFileSync(
+        'reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyEnable'],
+        { encoding: 'utf8', timeout: 2000 },
+      );
+      const server = execFileSync(
+        'reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyServer'],
+        { encoding: 'utf8', timeout: 2000 },
+      );
+      return parseRegProxy(enable, server);
+    }
+    if (process.platform === 'linux') {
+      return parseGsettingsProxy();
+    }
+  } catch {
+    // fall through to no-proxy
+  }
+  return { url: '', source: 'none' };
+}
+
+/** Parse `scutil --proxy` output: HTTPEnable/HTTPProxy/HTTPPort first, then SOCKS. */
+export function parseScutilProxy(out: string): { url: string; source: string } {
+  const kv = (key: string) => out.match(new RegExp(`^\\s*${key}\\s*:\\s*(.+)$`, 'm'))?.[1]?.trim();
+  const httpEnabled = kv('HTTPEnable') === '1';
+  const httpHost = kv('HTTPProxy');
+  const httpPort = kv('HTTPPort') || '80';
+  if (httpEnabled && httpHost) {
+    return { url: `${httpHost}:${httpPort}`, source: 'system(macOS)' };
+  }
+  const socksEnabled = kv('SOCKSEnable') === '1';
+  const socksHost = kv('SOCKSProxy');
+  const socksPort = kv('SOCKSPort') || '1080';
+  if (socksEnabled && socksHost) {
+    return { url: `socks5://${socksHost}:${socksPort}`, source: 'system(macOS)' };
+  }
+  return { url: '', source: 'none' };
+}
+
+/** Parse Windows registry output; ProxyServer may be "host:port" or "http=…;https=…". */
+export function parseRegProxy(enableOut: string, serverOut: string): { url: string; source: string } {
+  // reg query prints: `    ProxyEnable    REG_DWORD    0x1`
+  if (!/ProxyEnable\s+REG_DWORD\s+0x1/.test(enableOut)) return { url: '', source: 'none' };
+  const m = serverOut.match(/ProxyServer\s+REG_SZ\s+(.+)$/m);
+  if (!m) return { url: '', source: 'none' };
+  const raw = m[1].trim();
+  const http = raw.split(';').find(p => p.startsWith('http='))?.slice('http='.length) ?? raw;
+  if (!http) return { url: '', source: 'none' };
+  return { url: http, source: 'system(Windows)' };
+}
+
+/** GNOME desktop proxy in manual mode (gsettings). */
+function parseGsettingsProxy(): { url: string; source: string } {
+  const mode = execFileSync('gsettings', ['get', 'org.gnome.system.proxy', 'mode'], { encoding: 'utf8', timeout: 2000 }).trim();
+  if (mode !== "'manual'") return { url: '', source: 'none' };
+  const host = execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'host'], { encoding: 'utf8', timeout: 2000 }).trim().replace(/^'|'$/g, '');
+  const port = execFileSync('gsettings', ['get', 'org.gnome.system.proxy.http', 'port'], { encoding: 'utf8', timeout: 2000 }).trim();
+  if (!host || !port) return { url: '', source: 'none' };
+  return { url: `${host}:${port}`, source: 'system(GNOME)' };
 }
 
 /**

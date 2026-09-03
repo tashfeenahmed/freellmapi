@@ -62,7 +62,7 @@ Node.js >= 20.18. A running FreeLLMAPI gateway
 
 ## Links
 
-- [Clients & coding agents guide](https://github.com/tashfeenahmed/freellmapi/blob/main/docs/clients.md)
+- [Clients & coding agents guide](https://github.com/tashfeenahmed/freellmapi/blob/main/docs/clients/01-agent-clients.md)
 - [Issue tracker](https://github.com/tashfeenahmed/freellmapi/issues)
 
 MIT © Tashfeen Ahmed

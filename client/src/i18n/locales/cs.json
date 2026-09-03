@@ -712,7 +712,9 @@
     "attemptTimingHint": "Začít offset od začátku požadavku · Doba trvání pokusu",
     "requestedModel": "Požadovaný model",
     "ttft": "TTFT",
-    "requestsByAgent": "Požadavky podle agenta"
+    "requestsByAgent": "Požadavky podle agenta",
+    "sortBy": "Seřadit podle: {column}",
+    "sortHint": "Řazení se vztahuje na {count} načtených řádků"
   },
   "logs": {
     "title": "Logy",
@@ -1026,7 +1028,8 @@
       "dsh": "DeepSeek's harness, which keeps every provider as a route you can switch between.",
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
-      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key."
+      "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
     }
   },
   "update": {

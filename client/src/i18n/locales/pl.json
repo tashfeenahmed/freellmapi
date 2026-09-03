@@ -712,7 +712,9 @@
     "attemptTimingHint": "Przesunięcie początku od początku żądania · czas trwania próby",
     "requestedModel": "Żądany model",
     "ttft": "TTFT",
-    "requestsByAgent": "Żądania według agenta"
+    "requestsByAgent": "Żądania według agenta",
+    "sortBy": "Sortuj według: {column}",
+    "sortHint": "Sortowanie dotyczy {count} załadowanych wierszy"
   },
   "logs": {
     "title": "Logi",
@@ -1026,7 +1028,8 @@
       "dsh": "Uprząż DeepSeeka, w której każdy dostawca to przełączalna trasa.",
       "mimo": "Agent terminalowy Xiaomi, fork OpenCode przyjmujący dowolnego dostawcę zgodnego z OpenAI.",
       "cursor": "Edytor pisany pod AI; działa przez chmurę Cursora, więc potrzebuje publicznego adresu URL.",
-      "generic": "Każde inne narzędzie mówiące API OpenAI, ustawiane ręcznie adresem bazowym i kluczem."
+      "generic": "Każde inne narzędzie mówiące API OpenAI, ustawiane ręcznie adresem bazowym i kluczem.",
+      "atomcode": "Agent terminalowy AtomGit, napisany w Rust, przyjmujący dowolny endpoint zgodny z OpenAI."
     }
   },
   "update": {

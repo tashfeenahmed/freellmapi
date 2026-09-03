@@ -96,6 +96,12 @@ function isTrustworthyOrigin(req: express.Request): boolean {
 export function createApp(config?: Config) {
   const cfg = config ?? loadConfig();
   const app = express();
+  // TRUST_PROXY (#1024): opt-in trust of X-Forwarded-* from a reverse proxy.
+  // false (default) ignores forwarded headers so direct callers cannot spoof
+  // the client IP; true trusts every hop; a comma-separated list of addresses
+  // /CIDRs trusts only those proxies. Must be set before client-context and
+  // the rate-limit middleware, which both resolve the client IP.
+  app.set('trust proxy', cfg.trustProxy);
   const allowedCorsOrigins = new Set([
     ...DEFAULT_DASHBOARD_ORIGINS,
     ...cfg.dashboardOrigins,
