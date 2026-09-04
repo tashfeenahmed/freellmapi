@@ -177,6 +177,60 @@ jobs:
           # electron-builder reads APPLE_API_KEY as the path to hand notarytool.
           echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
 
+      # electron-builder makes its own temp keychain when handed CSC_LINK, and on
+      # the macos-26 runner image that broke: its `security set-key-partition-list`
+      # now fails with "SecKeychainUnlock: The user name or passphrase you entered
+      # is not correct" and the build dies before signing anything. v0.9.5 built
+      # fine on image 20260728.0273.1 and v0.9.6 failed on 20260831.0337.3, same
+      # workflow and same secrets. Importing the certificate ourselves keeps every
+      # keychain command under our control; electron-builder then only needs
+      # CSC_KEYCHAIN (which it uses precisely when CSC_LINK is absent) and finds
+      # the identity through the search list.
+      - name: Import the Developer ID certificate
+        if: steps.maccreds.outputs.signed == 'true'
+        shell: bash
+        env:
+          MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          cert="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$MACOS_CSC_LINK" | base64 --decode > "$cert"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          # Unlocked for the whole build; the runner is ephemeral and wiped after.
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          # -A lets any tool use the key, so codesign still works even when the
+          # partition list below is refused — which is the failure being worked
+          # around here, so it is a warning rather than a hard stop.
+          security import "$cert" -k "$keychain" -P "$MACOS_CSC_KEY_PASSWORD" -A \
+            -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$cert"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$keychain_password" "$keychain" >/dev/null 2>&1 \
+            || echo "::warning::set-key-partition-list was refused; relying on the -A import"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$keychain"
+
+          # Fail here, with the keychain in front of us, rather than ten minutes
+          # later inside electron-builder. Naming the identity explicitly also
+          # spares it an autodiscovery pass over the search list.
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          if [ -z "$identity" ]; then
+            echo "No 'Developer ID Application' identity in the imported certificate."
+            security find-identity -v -p codesigning "$keychain" || true
+            exit 1
+          fi
+          echo "Signing identity: $identity"
+          {
+            echo "CSC_KEYCHAIN=$keychain"
+            echo "CSC_NAME=$identity"
+          } >> "$GITHUB_ENV"
+
       - name: Package installer
         shell: bash
         env:
@@ -191,8 +245,10 @@ jobs:
           # silently shadow the API key — the two cannot coexist. The API key
           # also does not expire the way an app-specific password does.
           CSC_IDENTITY_AUTODISCOVERY: ${{ matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/') && steps.maccreds.outputs.signed == 'true' && 'true' || 'false' }}
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          # No CSC_LINK / CSC_KEY_PASSWORD: the step above imported the
+          # certificate into a keychain of our own and exported CSC_KEYCHAIN +
+          # CSC_NAME through $GITHUB_ENV. Setting CSC_LINK here would send
+          # electron-builder back down its own temp-keychain path.
           # APPLE_API_KEY is deliberately absent here: the step above exports the
           # on-disk key path through $GITHUB_ENV, and a step-level `env:` entry
           # would override it with the raw PEM text.
@@ -208,7 +264,7 @@ jobs:
           # with "<dir> not a file" on any non-PR build (PR builds never hit it
           # because electron-builder skips signing for pull requests). Drop empty
           # signing vars so unsigned builds actually build unsigned.
-          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID APPLE_KEYCHAIN APPLE_KEYCHAIN_PROFILE; do
+          for v in CSC_KEYCHAIN CSC_NAME APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID APPLE_KEYCHAIN APPLE_KEYCHAIN_PROFILE; do
             if [ -z "${!v:-}" ]; then unset "$v"; fi
           done
           # Run electron-builder with desktop/ as its own project root. Invoked
