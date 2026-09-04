@@ -226,9 +226,13 @@ jobs:
             exit 1
           fi
           echo "Signing identity: $identity"
+          # electron-builder rejects a CSC_NAME carrying the certificate-type
+          # prefix ("Please remove prefix \"Developer ID Application:\" from the
+          # specified name"); it wants the common name alone and re-attaches the
+          # prefix itself when matching identities.
           {
             echo "CSC_KEYCHAIN=$keychain"
-            echo "CSC_NAME=$identity"
+            echo "CSC_NAME=${identity#Developer ID Application: }"
           } >> "$GITHUB_ENV"
 
       - name: Package installer
