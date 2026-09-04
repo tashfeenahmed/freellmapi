@@ -41,6 +41,7 @@ const PATTERNS: Array<[RegExp, string]> = [
   [/\bghp_[A-Za-z0-9]{20,}/g, REDACTED],               // GitHub classic
   [/\bhf_[A-Za-z0-9]{16,}/g, REDACTED],                // HuggingFace
   [/\bcfut_[A-Za-z0-9]{16,}/g, REDACTED],              // Cloudflare
+  [/\brc-[0-9a-f]{48}\b/gi, REDACTED],                 // AMD Radeon Cloud
   [/\bvck_[A-Za-z0-9]{16,}/g, REDACTED],               // Vercel
   [/\bcpk_[A-Za-z0-9.]{16,}/g, REDACTED],              // Chutes
   [/\balv2_[A-Za-z0-9]{16,}/g, REDACTED],              // Aion Labs

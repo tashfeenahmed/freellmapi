@@ -23,6 +23,8 @@ describe('reasoning-model chat timeouts', () => {
     ['agnes', 60_000],
     ['opencode', 60_000],
     ['ollama', 120_000], // pre-existing bump; keep it from regressing too
+    // Radeon Cloud documents a ten-minute non-streaming and stream-gap limit.
+    ['radeon', 600_000],
     // NVIDIA NIM prefills 100k-token prompts for minutes before the first SSE
     // byte; this value doubles as the streaming first-byte grace budget (#584).
     ['nvidia', 180_000],

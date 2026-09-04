@@ -117,6 +117,7 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   if (platform === 'cerebras') return 'cerebras::shared';
   if (platform === 'sail') return 'sail::monthly-credit';
   if (platform === 'bai') return 'bai::promo';
+  if (platform === 'radeon') return 'radeon::daily-free';
   if (platform === 'sambanova') return 'sambanova::shared';
   if (platform === 'nvidia') return 'nvidia::credit-pool';
   if (platform === 'mistral') return 'mistral::experiment-pool';
@@ -163,7 +164,7 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
 }
 
 function isSharedPool(platform: Platform): boolean {
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
@@ -180,6 +181,10 @@ const HEADER_SPECS: Partial<Record<Platform, HeaderSpec[]>> = {
   openrouter: [
     { metric: 'requests', limit: 'x-ratelimit-limit-requests', remaining: 'x-ratelimit-remaining-requests', reset: 'x-ratelimit-reset-requests', strategy: 'provider_reported' },
     { metric: 'tokens', limit: 'x-ratelimit-limit-tokens', remaining: 'x-ratelimit-remaining-tokens', reset: 'x-ratelimit-reset-tokens', strategy: 'provider_reported' },
+  ],
+  radeon: [
+    { metric: 'requests', limit: 'x-ratelimit-limit-user-rpm', remaining: 'x-ratelimit-remaining-user-rpm', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
+    { metric: 'credits', limit: 'x-ratelimit-limit-user-daily-usd', remaining: 'x-ratelimit-remaining-user-daily-usd', reset: 'x-ratelimit-reset-user-daily-usd', strategy: 'provider_reported' },
   ],
   // ModelScope reportedly returns `modelscope-ratelimit-*`-style headers on
   // authenticated responses. UNCONFIRMED: no real token exists for this

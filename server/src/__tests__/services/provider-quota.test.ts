@@ -46,6 +46,8 @@ describe('provider-quota: pool inference', () => {
     // the platform shares a single pool.
     expect(inferQuotaPoolKey('anyapi')).toBe('anyapi::free');
     expect(inferQuotaPoolKey('anyapi', 'qwen/qwen3-coder:free')).toBe('anyapi::free');
+    expect(inferQuotaPoolKey('radeon', 'DeepSeek-V4-Flash')).toBe('radeon::daily-free');
+    expect(inferQuotaPoolKey('radeon', 'Qwen3.8-Flash-Next')).toBe('radeon::daily-free');
     // Unknown platform falls back to platform::model or platform::account.
     expect(inferQuotaPoolKey('acme' as any, 'x')).toBe('acme::x');
     expect(inferQuotaPoolKey('acme' as any)).toBe('acme::account');
@@ -217,6 +219,28 @@ describe('provider-quota: parse from response headers (shared parseRetryAfterMs)
     expect(obs.some(o => o.retryAfterMs === 30_000)).toBe(true);
     // A 429 always marks the pool as remaining 0.
     expect(obs.some(o => o.remaining === 0)).toBe(true);
+  });
+
+  it('parses Radeon Cloud RPM and recurring daily allowance headers', () => {
+    const resp = new Response(null, {
+      status: 200,
+      headers: {
+        'x-ratelimit-limit-user-rpm': '30',
+        'x-ratelimit-remaining-user-rpm': '29',
+        'x-ratelimit-reset': '60',
+        'x-ratelimit-limit-user-daily-usd': '10',
+        'x-ratelimit-used-user-daily-usd': '2.5',
+        'x-ratelimit-remaining-user-daily-usd': '7.5',
+        'x-ratelimit-reset-user-daily-usd': '86400',
+      },
+    });
+    const obs = parseQuotaObservationsFromResponse(resp, { platform: 'radeon', keyId: 9 });
+    expect(obs.find(o => o.metric === 'requests')).toMatchObject({
+      quotaPoolKey: 'radeon::daily-free', limit: 30, remaining: 29,
+    });
+    expect(obs.find(o => o.metric === 'credits')).toMatchObject({
+      quotaPoolKey: 'radeon::daily-free', limit: 10, remaining: 7.5,
+    });
   });
 });
 

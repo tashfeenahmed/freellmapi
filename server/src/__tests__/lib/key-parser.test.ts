@@ -65,6 +65,9 @@ describe('key parser', () => {
     expect(detectPlatform('ANY_API_')).toBe('anyapi');
     expect(detectPlatform('BAI_')).toBe('bai');
     expect(detectPlatform('B_AI_')).toBe('bai');
+    expect(detectPlatform('RADEON_')).toBe('radeon');
+    expect(detectPlatform('AMD_RADEON_')).toBe('radeon');
+    expect(detectPlatform('AMD_TOKENFACTORY_')).toBe('radeon');
     expect(detectPlatform('SAIL_')).toBe('sail');
     expect(detectPlatform('SAIL_RESEARCH_')).toBe('sail');
     expect(detectPlatform('SAMBANOVA_')).toBeNull();
@@ -82,6 +85,8 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['model-scope']).toBe('modelscope');
     expect(AUTH_JSON_PROVIDER_MAP['any-api']).toBe('anyapi');
     expect(AUTH_JSON_PROVIDER_MAP['b-ai']).toBe('bai');
+    expect(AUTH_JSON_PROVIDER_MAP['radeon-cloud']).toBe('radeon');
+    expect(AUTH_JSON_PROVIDER_MAP['amd-tokenfactory']).toBe('radeon');
     expect(AUTH_JSON_PROVIDER_MAP['sail-research']).toBe('sail');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {

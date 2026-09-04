@@ -14,6 +14,7 @@ import { invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
 import { isAbortLikeError } from '../lib/error-classify.js';
+import { contentToString } from '../lib/content.js';
 
 /** Hosts that ARE Moonshot's OpenAI-compatible API (api.moonshot.ai,
  * api.moonshot.cn, api.kimi.com and their subdomains). */
@@ -176,7 +177,7 @@ export class OpenAICompatProvider extends BaseProvider {
    * before sending to these platforms.
    */
   private static readonly STRICT_PLATFORMS = new Set(['mistral', 'groq', 'cerebras']);
-  private messagesForPlatform(messages: ChatMessage[]): ChatMessage[] {
+  private messagesForPlatform(messages: ChatMessage[], modelId: string): ChatMessage[] {
     if (OpenAICompatProvider.STRICT_PLATFORMS.has(this.platform)) {
       // Rebuild every message from a whitelist of keys, so `partial` and the
       // reasoning extensions never reach these platforms.
@@ -220,14 +221,27 @@ export class OpenAICompatProvider extends BaseProvider {
     // the ones that serve Kimi models, like Groq, Cloudflare or OpenRouter —
     // gets it stripped, since strict upstreams 400/422 on unknown message keys
     // and the rest would ignore it anyway. (#1038)
-    if (this.forwardsPartial) return messages;
-    return messages.map((m) => {
+    const sanitized = this.forwardsPartial ? messages : messages.map((m) => {
       if (m.role === 'assistant' && m.partial !== undefined) {
         const { partial: _partial, ...rest } = m;
         return rest;
       }
       return m;
     });
+
+    // Qwen3.8-Flash-Next accepts exactly one system message, and only at index
+    // zero. Profiles can prepend a gateway system prompt to a client's own
+    // system message, so coalesce every system instruction before dispatch
+    // instead of letting an otherwise valid request fail upstream.
+    if (this.platform === 'radeon' && modelId === 'Qwen3.8-Flash-Next') {
+      const systems = sanitized.filter(m => m.role === 'system');
+      if (systems.length === 1 && sanitized[0]?.role === 'system') return sanitized;
+      const systemText = systems.map(m => contentToString(m.content)).filter(Boolean).join('\n\n');
+      const rest = sanitized.filter(m => m.role !== 'system');
+      return systemText ? [{ role: 'system', content: systemText }, ...rest] : rest;
+    }
+
+    return sanitized;
   }
 
   async chatCompletion(
@@ -247,7 +261,7 @@ export class OpenAICompatProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: modelId,
-        messages: this.messagesForPlatform(messages),
+        messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
         max_tokens: resolveMaxTokens(this.platform, options?.max_tokens),
         top_p: sampling.topP,
@@ -366,7 +380,7 @@ export class OpenAICompatProvider extends BaseProvider {
       },
       body: JSON.stringify({
         model: modelId,
-        messages: this.messagesForPlatform(messages),
+        messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
         max_tokens: resolveMaxTokens(this.platform, options?.max_tokens),
         top_p: sampling.topP,

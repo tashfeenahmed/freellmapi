@@ -378,6 +378,7 @@ export const platformColors: Record<string, string> = {
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
   bai:         '#111827',
+  radeon:      '#ed1c24',
   nvidia:      '#76b900',
   mistral:     '#f59e0b',
   openrouter:  '#ec4899',

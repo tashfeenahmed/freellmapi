@@ -648,6 +648,7 @@ describe('OpenAICompatProvider - platform instances', () => {
     { platform: 'cerebras',   name: 'Cerebras',      baseUrl: 'https://api.cerebras.ai/v1' },
     { platform: 'bai',        name: 'B.AI',          baseUrl: 'https://api.b.ai/v1' },
     { platform: 'anyapi',     name: 'AnyAPI',        baseUrl: 'https://api.anyapi.ai/v1' },
+    { platform: 'radeon',     name: 'AMD Radeon Cloud', baseUrl: 'https://developer.amd.com.cn/radeon/api/v1' },
     { platform: 'nvidia',     name: 'NVIDIA NIM',    baseUrl: 'https://integrate.api.nvidia.com/v1' },
     { platform: 'mistral',    name: 'Mistral',       baseUrl: 'https://api.mistral.ai/v1' },
     { platform: 'openrouter', name: 'OpenRouter',    baseUrl: 'https://openrouter.ai/api/v1' },

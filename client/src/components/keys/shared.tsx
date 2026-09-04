@@ -31,6 +31,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
   { value: 'sail', label: 'Sail Research ($5 monthly with payment method)', url: 'https://app.sailresearch.com' },
   { value: 'bai', label: 'B.AI (promotional free model)', url: 'https://b.ai' },
+  { value: 'radeon', label: 'AMD Radeon Cloud (free shared models)', url: 'https://developer.amd.com.cn/radeon/tokenfactory' },
   { value: 'nvidia', label: 'NVIDIA NIM', url: 'https://build.nvidia.com/settings/api-keys' },
   { value: 'mistral', label: 'Mistral', url: 'https://console.mistral.ai/api-keys/' },
   { value: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/keys' },

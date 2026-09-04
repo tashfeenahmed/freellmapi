@@ -32,6 +32,7 @@ const SPECS: Array<[string, string, number, string]> = [
   ['HuggingFace', 'hf_', 34, ALNUM],
   ['OpenRouter', 'sk-or-v1-', 64, HEX],
   ['Cloudflare', 'cfut_', 44, ALNUM],
+  ['AMD Radeon Cloud', 'rc-', 48, HEX],
   ['Vercel', 'vck_', 56, ALNUM],
   ['Aion', 'alv2_', 43, ALNUM],
   ['Pollinations', 'sk_', 32, ALNUM],

@@ -71,6 +71,23 @@ describe('extendedBodyParams (per-platform policy)', () => {
     expect(body.response_format).toEqual({ type: 'json_object' });
   });
 
+  it('radeon: keeps only documented knobs and clamps reasoning to the shared roster', () => {
+    const body = extendedBodyParams('radeon', { ...allSet, reasoning_effort: 'high' });
+    for (const k of ['top_k', 'min_p', 'seed', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs']) {
+      expect(body).not.toHaveProperty(k);
+    }
+    expect(body.presence_penalty).toBe(1);
+    expect(body.frequency_penalty).toBe(-1);
+    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.reasoning_effort).toBe('medium');
+  });
+
+  it('radeon: downgrades unsupported JSON Schema output to JSON-object mode', () => {
+    const schema = { type: 'json_schema' as const, json_schema: { name: 'answer', schema: { type: 'object' } } };
+    expect(extendedBodyParams('radeon', { response_format: schema }).response_format)
+      .toEqual({ type: 'json_object' });
+  });
+
   it('aihorde: drops the entire extended set', () => {
     expect(extendedBodyParams('aihorde', allSet)).toEqual({});
   });

@@ -76,6 +76,10 @@ export type Platform =
   // published. Catalog rows live in the hosted catalog (premium now, free after
   // 30 days).
   | 'anyapi'
+  // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
+  // rotating public-model roster is free without consuming instance credits,
+  // with recurring account-level allowance and request/concurrency controls.
+  | 'radeon'
   | 'nvidia'
   | 'mistral'
   | 'sambanova'

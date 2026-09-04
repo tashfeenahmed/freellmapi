@@ -204,6 +204,10 @@ export interface PlatformParamPolicy {
   // are 'text' and 'json_schema'."). Upgrade json_object to a permissive
   // json_schema on the wire instead of dropping structured output entirely.
   jsonObjectToSchema?: boolean;
+  // The reverse compatibility shim for providers that support JSON mode but
+  // not schema enforcement. Preserve structured output by requesting a JSON
+  // object instead of sending an unsupported json_schema payload.
+  jsonSchemaToObject?: boolean;
   // The effort values this platform's API accepts, when it accepts fewer than
   // the full scale. A request outside the set is clamped to the nearest
   // supported value instead of being forwarded into a 400 (#619). Omitted =
@@ -287,6 +291,14 @@ export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPoli
     drop: ['min_p', 'logit_bias', 'logprobs', 'top_logprobs', 'reasoning_effort'],
     defaultMaxTokens: 8192,
   },
+  // Radeon Cloud silently drops these fields. Keep reasoning_effort within the
+  // common subset of its current shared roster (Qwen: low/medium; DeepSeek is
+  // broader) so either model receives a supported value.
+  radeon: {
+    drop: ['top_k', 'min_p', 'seed', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
+    reasoningEfforts: ['low', 'medium'],
+    jsonSchemaToObject: true,
+  },
   // AI Horde builds its own payload format; none of the extended set maps.
   aihorde: { drop: [...EXTENDED_SAMPLING_KEYS] },
   // Kilo's anonymous gateway 400s ("Provider returned error") whenever
@@ -325,6 +337,10 @@ export function extendedBodyParams(platform: string, options: ExtendedSamplingOp
     if (key === 'response_format' && policy?.jsonObjectToSchema
         && (value as { type?: string }).type === 'json_object') {
       value = ANY_OBJECT_SCHEMA;
+    }
+    if (key === 'response_format' && policy?.jsonSchemaToObject
+        && (value as { type?: string }).type === 'json_schema') {
+      value = { type: 'json_object' };
     }
     if (key === 'reasoning_effort' && policy?.reasoningEfforts) {
       value = clampEffortTo(value as ReasoningEffort, policy.reasoningEfforts);

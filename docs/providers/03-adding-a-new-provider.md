@@ -1,6 +1,6 @@
 # Adding a new provider
 
-A contributor walkthrough that mirrors how the existing 40 built-in platforms are wired. Read [`server/src/providers/index.ts`](../../server/src/providers/index.ts) alongside this guide — it is both the registry and the best documentation of per-platform judgment calls.
+A contributor walkthrough that mirrors how the existing 41 built-in platforms are wired. Read [`server/src/providers/index.ts`](../../server/src/providers/index.ts) alongside this guide — it is both the registry and the best documentation of per-platform judgment calls.
 
 ## 1. Declare the platform
 

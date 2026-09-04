@@ -72,6 +72,19 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.anyapi.ai/v1',
 }));
 
+// AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible
+// and its current public roster is free without consuming GPU-instance
+// credits. Public models are experimental and may rotate, so their ids remain
+// in the hosted catalog rather than migrations. Both current models reject
+// parallel tool calls; long reasoning requests may run for up to ten minutes.
+register(new OpenAICompatProvider({
+  platform: 'radeon',
+  name: 'AMD Radeon Cloud',
+  baseUrl: 'https://developer.amd.com.cn/radeon/api/v1',
+  forceSingleToolCall: true,
+  timeoutMs: 600_000,
+}));
+
 // SambaNova was dropped in V23 (June 2026): the free tier is permanently gone.
 // The always-free tier was retired in early 2025 for a one-time $5 trial
 // credit (expires in 3 months); once it lapses, every chat call 402s
