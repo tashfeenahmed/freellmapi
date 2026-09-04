@@ -11,6 +11,10 @@ export interface DesktopConfig {
   // on the LAN / Tailscale can reach it (#442, #418). Off by default: exposes
   // the API, guarded only by the unified key. Applied at next server start.
   lanAccess?: boolean;
+  // App version the "macOS is hiding your menu-bar icon" notice was last shown
+  // for (#807). Explaining the fix once per version is enough; the tray can stay
+  // hidden for as long as the user wants it hidden.
+  trayHiddenNoticeVersion?: string;
 }
 
 function configPath(): string {

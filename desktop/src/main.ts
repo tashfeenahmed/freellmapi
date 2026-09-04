@@ -1,10 +1,11 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, dialog, ipcMain, clipboard, nativeTheme, shell } from 'electron';
+import { app, dialog, ipcMain, clipboard, nativeTheme, screen, shell, type Tray } from 'electron';
 import { startServer, ensureSessionToken, getUnifiedApiKey } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale } from './tray.js';
+import { trayIsInMenuBar } from './tray-visibility.js';
 import { openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
@@ -58,6 +59,15 @@ if (!app.requestSingleInstanceLock()) {
   );
 
   app.on('second-instance', () => {
+    if (sessionToken) openDashboard(resolvedPort, sessionToken);
+  });
+
+  // Reopening a *running* app on macOS — double-clicking it in Finder, clicking
+  // its Dock icon — is delivered as 'activate'. LaunchServices activates the
+  // live process instead of starting a second one, so 'second-instance' above
+  // never fires for it. Without this handler a user whose tray icon is hidden
+  // or clipped by the menu bar has no way back into the UI at all (#807).
+  app.on('activate', () => {
     if (sessionToken) openDashboard(resolvedPort, sessionToken);
   });
 
@@ -171,6 +181,45 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   }
 
+  // macOS lays the status item out asynchronously; reading its bounds straight
+  // after `new Tray()` can catch it before it has been placed.
+  const TRAY_PROBE_DELAY_MS = 1500;
+
+  // The app is menu-bar-only, so a tray macOS declines to show leaves it running
+  // with no UI whatsoever — the silent failure behind #807. Say so in the log,
+  // and once per version offer the ways in that do not need the icon.
+  function reportHiddenTray(tray: Tray, port: number): void {
+    let visible: boolean;
+    try {
+      visible = trayIsInMenuBar(tray.getBounds(), screen.getAllDisplays());
+    } catch {
+      return; // a diagnostic must never be the thing that breaks startup
+    }
+    if (visible) return;
+    console.log('[desktop] the menu bar is not showing our tray icon — see #807');
+
+    const cfg = loadConfig();
+    if (cfg.trayHiddenNoticeVersion === app.getVersion()) return;
+    saveConfig({ ...cfg, trayHiddenNoticeVersion: app.getVersion() });
+
+    const choice = dialog.showMessageBoxSync({
+      type: 'info',
+      title: 'FreeLLMAPI has no menu-bar icon',
+      message: 'macOS is not showing the FreeLLMAPI menu-bar icon.',
+      detail:
+        'The app and its API are running normally, but the icon everything else ' +
+        'hangs off is not being drawn, so there is nothing to click.\n\n' +
+        'To bring it back: System Settings > Menu Bar, find FreeLLMAPI and set it ' +
+        'to Allow. On a Mac with a notch, quitting a few other menu-bar apps can ' +
+        'also free up the room it needs.\n\n' +
+        'Until then, relaunching FreeLLMAPI from Finder opens the dashboard.',
+      buttons: ['Open Dashboard', 'Continue in Background'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (choice === 0) openDashboard(port, sessionToken);
+  }
+
   app.whenReady().then(async () => {
     if (process.platform === 'darwin') app.dock?.hide();
 
@@ -208,6 +257,9 @@ if (!app.requestSingleInstanceLock()) {
       sessionToken = ensureSessionToken();
       const tray = buildTray(port, sessionToken, () => locale, () => loadConfig().lanAccess ?? false, toggleLanAccess);
       console.log(`[desktop] FreeLLMAPI running on http://${host}:${port}${cfg.lanAccess ? ' (LAN access enabled)' : ''}`);
+      // A tray that macOS refuses to draw still constructs cleanly, so the only
+      // way to notice is to look at where the item landed (#807).
+      if (process.platform === 'darwin') setTimeout(() => reportHiddenTray(tray, port), TRAY_PROBE_DELAY_MS);
 
       // Dev-only UI verification: FREEAPI_SHOT=1 opens the popover and the
       // dashboard, captures both to /tmp, and quits. FREEAPI_SHOT=hold opens
