@@ -23,9 +23,23 @@ const failedPasswordAttempts = new Map<number, number>();
 // /status, /setup and /login are reachable without a session (bootstrap);
 // /logout and /me validate the token themselves.
 
-const credentialsSchema = z.object({
+// Signing up is the one place the address has to look like an address.
+const signupSchema = z.object({
   email: z.string().email('A valid email is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+// Logging in is a lookup, not a registration, so the address is matched rather
+// than validated. The desktop app seeds its hidden account as
+// `desktop@localhost` (server-host.ts), which has no TLD and so could never
+// satisfy z.email() — every login attempt on a desktop install failed with
+// "A valid email is required" before the password was even checked, including
+// the reset-then-sign-in-from-a-browser route suggested in #807. Length rules
+// belong to signup too: an account created under an older policy must still be
+// able to get in.
+const loginSchema = z.object({
+  email: z.string().min(1, 'Email is required'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 // ── Brute-force throttle ──────────────────────────────────────────────────
@@ -104,7 +118,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
     return;
   }
 
-  const parsed = credentialsSchema.safeParse(req.body);
+  const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
     return;
@@ -116,7 +130,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
 });
 
 authRouter.post('/login', (req: Request, res: Response) => {
-  const parsed = credentialsSchema.safeParse(req.body);
+  const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
     return;
