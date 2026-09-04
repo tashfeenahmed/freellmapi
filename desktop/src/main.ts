@@ -220,8 +220,23 @@ if (!app.requestSingleInstanceLock()) {
     if (choice === 0) openDashboard(port, sessionToken);
   }
 
+  // The bundle ships LSUIElement, so the app starts as an accessory with no
+  // Dock presence at all; app.dock.show() promotes it at runtime and hide()
+  // puts it back, no relaunch either way.
+  function applyDockVisibility(show: boolean): void {
+    if (process.platform !== 'darwin') return;
+    if (show) void app.dock?.show();
+    else app.dock?.hide();
+  }
+
+  function toggleShowInDock(): void {
+    const next = !(loadConfig().showInDock ?? true);
+    saveConfig({ ...loadConfig(), showInDock: next });
+    applyDockVisibility(next);
+  }
+
   app.whenReady().then(async () => {
-    if (process.platform === 'darwin') app.dock?.hide();
+    applyDockVisibility(loadConfig().showInDock ?? true);
 
     const cfg = loadConfig();
     const dbPath = path.join(app.getPath('userData'), 'freeapi.db');
@@ -255,7 +270,15 @@ if (!app.requestSingleInstanceLock()) {
       resolvedPort = port;
       saveConfig({ ...cfg, port });
       sessionToken = ensureSessionToken();
-      const tray = buildTray(port, sessionToken, () => locale, () => loadConfig().lanAccess ?? false, toggleLanAccess);
+      const tray = buildTray(
+        port,
+        sessionToken,
+        () => locale,
+        () => loadConfig().lanAccess ?? false,
+        toggleLanAccess,
+        () => loadConfig().showInDock ?? true,
+        toggleShowInDock,
+      );
       console.log(`[desktop] FreeLLMAPI running on http://${host}:${port}${cfg.lanAccess ? ' (LAN access enabled)' : ''}`);
       // A tray that macOS refuses to draw still constructs cleanly, so the only
       // way to notice is to look at where the item landed (#807).

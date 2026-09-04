@@ -21,6 +21,8 @@ export function buildTray(
   getLocale: () => NativeLocale,
   getLanAccess: () => boolean,
   onToggleLanAccess: () => void,
+  getShowInDock: () => boolean,
+  onToggleShowInDock: () => void,
 ): Tray {
   const iconPath = path.join(__dirname, '../assets/trayTemplate.png');
   const icon = nativeImage.createFromPath(iconPath);
@@ -39,6 +41,10 @@ export function buildTray(
       { type: 'separator' },
       // Toggling relaunches the app (the bind host is fixed at server start).
       { label: dt(locale, 'lanAccess'), type: 'checkbox', checked: lanOn, click: () => onToggleLanAccess() },
+      // The Dock icon is the "yes, it is running" signal the tray cannot always
+      // give: macOS 26 lets the user hide menu-bar icons, and a notched display
+      // clips them (#807). Applied live, no relaunch.
+      { label: dt(locale, 'showInDock'), type: 'checkbox', checked: getShowInDock(), click: () => onToggleShowInDock() },
       // #824: the password-reset code is printed to the log and nowhere else,
       // so the folder holding it needs to be reachable without a terminal.
       { label: dt(locale, 'openLogs'), click: () => openLogsFolder() },
