@@ -4,10 +4,16 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-// Load .env (ENCRYPTION_KEY, PORT) without a dep.
-for (const line of readFileSync(new URL('./.env', import.meta.url), 'utf8').split('\n')) {
-  const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+// Load .env (ENCRYPTION_KEY, PORT) if present. It is gitignored, so a fresh
+// clone won't have one — that's fine: the server auto-generates an at-rest
+// encryption key (written next to the SQLite DB) when ENCRYPTION_KEY is unset.
+try {
+  for (const line of readFileSync(new URL('./.env', import.meta.url), 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+} catch {
+  console.log('[launcher] no .env found — server will auto-generate an encryption key');
 }
 
 // Map Infisical secret names -> FreeLLMAPI platform slugs.

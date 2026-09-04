@@ -16,6 +16,7 @@
     "build": "npm run build -w server && npm run build -w cli && npm run build -w client",
     "lint": "npm run lint -w server && npm run lint -w cli",
     "build:server": "npm run build -w server",
+    "start:infisical": "infisical run --projectId ${INFISICAL_PROJECT_ID:-e55d0f7f-f095-4146-b022-db74aa0c5ca6} --env ${INFISICAL_ENV:-dev} -- node start-with-infisical.mjs",
     "test:migrations": "npm run test:migrations -w server",
     "desktop:dev": "npm run build -w client && npm --prefix desktop run dev",
     "desktop:dist": "npm run build -w client && npm --prefix desktop run dist",
