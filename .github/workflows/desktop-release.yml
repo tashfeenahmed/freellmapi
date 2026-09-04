@@ -337,8 +337,39 @@ jobs:
           path: ${{ matrix.glob }}
           if-no-files-found: error
 
+      # Upload the assets and nothing else. softprops/action-gh-release always
+      # PATCHes the release (name, body, draft state, target commitish) before it
+      # uploads, and that PATCH started coming back
+      # "403 Resource not accessible by integration" on the v0.9.6 rebuilds —
+      # every platform, while `GITHUB_TOKEN Permissions` in the same logs read
+      # `Contents: write` and the release was not immutable. Asset upload itself
+      # has never been refused: it is what attached the v0.9.6 Windows and Linux
+      # installers. So upload directly and leave the release metadata, which this
+      # job has no business rewriting, exactly as the release author left it.
       - name: Attach installer to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          files: ${{ matrix.glob }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GLOB: ${{ matrix.glob }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=()
+          while IFS= read -r pattern; do
+            [ -n "$pattern" ] || continue
+            files+=($pattern)
+          done <<< "$GLOB"
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no installers matched the patterns for this platform"
+            exit 1
+          fi
+          printf 'attaching %s\n' "${files[@]}"
+          # The release is created before the tag is pushed (see the release
+          # recipe), so it exists by now; create it rather than dropping the
+          # installers on the floor if someone pushed a tag on its own.
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::warning::no release for $GITHUB_REF_NAME yet — creating one"
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
