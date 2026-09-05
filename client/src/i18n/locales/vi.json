@@ -574,7 +574,8 @@
       "subsetNote": "Khóa này sẽ chỉ giới hạn ở các mô hình đã chọn. Bạn có thể thay đổi sau tại hàng của khóa.",
       "skip": "Để sau",
       "scopedOne": "Khóa giới hạn ở 1 mô hình",
-      "scopedOther": "Khóa giới hạn ở {count} mô hình"
+      "scopedOther": "Khóa giới hạn ở {count} mô hình",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Hồ sơ client",
     "cpDesc": "Khóa API riêng cho từng client, mỗi khóa có một system prompt mà máy chủ luôn áp dụng.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Chỉnh sửa khóa",
+    "editPlatformLocked": "Không thể thay đổi nhà cung cấp hoặc endpoint sau khi tạo.",
+    "editCredentialHint": "Để trống để giữ khóa hiện tại.",
+    "editCredentialPartsRequired": "Nhập cả ID tài khoản và mã API.",
+    "editModels": "Chỉnh sửa mô hình",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

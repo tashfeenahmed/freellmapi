@@ -574,7 +574,8 @@
       "subsetNote": "এই কী শুধুমাত্র নির্বাচিত মডেলগুলিতে সীমাবদ্ধ থাকবে। আপনি পরে কী-এর সারি থেকে এটি পরিবর্তন করতে পারবেন।",
       "skip": "এখন নয়",
       "scopedOne": "কী 1টি মডেলে সীমাবদ্ধ",
-      "scopedOther": "কী {count}টি মডেলে সীমাবদ্ধ"
+      "scopedOther": "কী {count}টি মডেলে সীমাবদ্ধ",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ক্লায়েন্ট প্রোফাইল",
     "cpDesc": "প্রতিটি ক্লায়েন্টের জন্য আলাদা API কী, যার সিস্টেম প্রম্পট সার্ভার সবসময় প্রয়োগ করে।",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "কী সম্পাদনা করুন",
+    "editPlatformLocked": "তৈরির পরে প্রোভাইডার বা এন্ডপয়েন্ট পরিবর্তন করা যাবে না।",
+    "editCredentialHint": "বর্তমান কী রাখতে ফাঁকা রাখুন।",
+    "editCredentialPartsRequired": "অ্যাকাউন্ট আইডি ও API টোকেন—দুটিই দিন।",
+    "editModels": "মডেল সম্পাদনা",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

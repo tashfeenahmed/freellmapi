@@ -574,7 +574,8 @@
       "subsetNote": "ይህ ቁልፍ በተመረጡት ሞዴሎች ብቻ ይገደባል። ይህን በኋላ ከቁልፉ ረድፍ መቀየር ይችላሉ።",
       "skip": "አሁን አይደለም",
       "scopedOne": "ቁልፍ በ1 ሞዴል ተገድቧል",
-      "scopedOther": "ቁልፍ በ{count} ሞዴሎች ተገድቧል"
+      "scopedOther": "ቁልፍ በ{count} ሞዴሎች ተገድቧል",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "የደንበኛ መገለጫዎች",
     "cpDesc": "ለእያንዳንዱ ደንበኛ የተለየ የ API ቁልፍ፣ እያንዳንዱም አገልጋዩ ሁልጊዜ የሚተገብረው የስርዓት መመሪያ አለው።",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "የቁልፍ አርትዖት",
+    "editPlatformLocked": "የአቅራቢውና የመጨረሻ ነጥብ ከፍጠራ በኋላ ሊለወጡ አይችሉም።",
+    "editCredentialHint": "የአሁኑን ቁልፍ ለመቀጠል ባዶ ይተው።",
+    "editCredentialPartsRequired": "የመለያ ቁጥሩንና የAPI ቶከኑን ሁለቱንም ያስገቡ።",
+    "editModels": "የሞዴሎች አርትዖት",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

@@ -574,7 +574,8 @@
       "subsetNote": "คีย์นี้จะถูกจำกัดไว้เฉพาะโมเดลที่เลือก คุณเปลี่ยนได้ภายหลังจากแถวของคีย์",
       "skip": "ยังไม่ใช่ตอนนี้",
       "scopedOne": "คีย์จำกัดไว้ที่ 1 โมเดล",
-      "scopedOther": "คีย์จำกัดไว้ที่ {count} โมเดล"
+      "scopedOther": "คีย์จำกัดไว้ที่ {count} โมเดล",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "โปรไฟล์ไคลเอนต์",
     "cpDesc": "คีย์ API แยกตามไคลเอนต์ แต่ละคีย์มี system prompt ที่เซิร์ฟเวอร์ใช้เสมอ",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "แก้ไขคีย์",
+    "editPlatformLocked": "ไม่สามารถเปลี่ยนผู้ให้บริการและ endpoint หลังจากสร้างแล้ว",
+    "editCredentialHint": "เว้นว่างเพื่อใช้คีย์ปัจจุบันต่อ",
+    "editCredentialPartsRequired": "กรอกทั้ง ID บัญชีและโทเคน API",
+    "editModels": "แก้ไขโมเดล",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

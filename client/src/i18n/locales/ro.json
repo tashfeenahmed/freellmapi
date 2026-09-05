@@ -574,7 +574,8 @@
       "subsetNote": "Această cheie va fi limitată la modelele selectate. Poți schimba asta mai târziu din rândul cheii.",
       "skip": "Nu acum",
       "scopedOne": "Cheie limitată la 1 model",
-      "scopedOther": "Cheie limitată la {count} modele"
+      "scopedOther": "Cheie limitată la {count} modele",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Profiluri de client",
     "cpDesc": "Chei API per client, fiecare cu un prompt de sistem pe care serverul îl aplică întotdeauna.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Editează cheia",
+    "editPlatformLocked": "Furnizorul și endpointul nu pot fi schimbate după creare.",
+    "editCredentialHint": "Lasă gol pentru a păstra cheia actuală.",
+    "editCredentialPartsRequired": "Introdu at ID-ul contului, cât și tokenul API.",
+    "editModels": "Editează modelele",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

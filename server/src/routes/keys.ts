@@ -18,6 +18,7 @@ import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../servi
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
 import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
 import type { Db } from '../db/types.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 
@@ -74,8 +75,12 @@ const updateKeySchema = z.object({
   modelScope: z.array(z.string().trim().min(1).max(200)).max(100).nullable().optional(),
   // #590: '' clears the per-key proxy; absent leaves it unchanged.
   proxyUrl: proxyUrlSchema.optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined, {
-  message: 'At least one of enabled, label, modelScope or proxyUrl must be provided',
+  // Re-entry of a credential without deleting and recreating the row. Like
+  // POST, the value is trimmed and never echoed back; an absent field leaves
+  // the encrypted key untouched.
+  key: z.string().trim().min(1).optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined, {
+  message: 'At least one of enabled, label, modelScope, proxyUrl or key must be provided',
 });
 
 const importKeySchema = z.object({
@@ -1508,13 +1513,40 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, key } = parsed.data;
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
+  let changedKey: string | undefined;
+
+  if (key !== undefined) {
+    const db = getDb();
+    const stored = db.prepare('SELECT platform, encrypted_key, iv, auth_tag FROM api_keys WHERE id = ?')
+      .get(id) as { platform: string; encrypted_key: string; iv: string; auth_tag: string } | undefined;
+    if (!stored) {
+      res.status(404).json({ error: { message: 'Key not found' } });
+      return;
+    }
+    if (resolveProvider(stored.platform as Platform)?.keyless === true) {
+      res.status(400).json({ error: { message: 'Keyless providers cannot store a credential' } });
+      return;
+    }
+
+    try {
+      if (decrypt(stored.encrypted_key, stored.iv, stored.auth_tag) !== key) changedKey = key;
+    } catch {
+      // An undecryptable old credential is still replaceable.
+      changedKey = key;
+    }
+  }
 
   if (enabled !== undefined) {
     updates.push('enabled = ?');
     values.push(enabled ? 1 : 0);
+  }
+  if (changedKey !== undefined) {
+    const { encrypted, iv, authTag } = encrypt(changedKey);
+    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL');
+    values.push(encrypted, iv, authTag);
   }
   if (label !== undefined) {
     updates.push('label = ?');
@@ -1537,17 +1569,26 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   values.push(id);
 
   const db = getDb();
-  const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  // Re-submitting the same key satisfies "something changed" but is a no-op;
+  // it must not turn into an invalid UPDATE with an empty SET list.
+  const result = updates.length === 0
+    ? { changes: 1 }
+    : db.transaction(() =>
+      db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values),
+    )();
 
   if (result.changes === 0) {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
 
+  if (changedKey !== undefined) clearCooldownsForKey(id);
+
   const response: Record<string, unknown> = { success: true };
   if (enabled !== undefined) response.enabled = enabled;
   if (label !== undefined) response.label = label;
   if (proxyUrl !== undefined) response.maskedProxyUrl = maskProxyUrl(proxyUrl);
+  if (key !== undefined) response.maskedKey = maskKey(key);
   if (modelScope !== undefined) response.modelScope = scopeIds.length > 0 ? scopeIds : null;
   res.json(response);
 });

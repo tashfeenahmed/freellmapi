@@ -574,7 +574,8 @@
       "subsetNote": "Bu kalit faqat tanlangan modellar bilan cheklanadi. Buni keyinroq kalit qatoridan o‘zgartirishingiz mumkin.",
       "skip": "Hozir emas",
       "scopedOne": "Kalit 1 ta model bilan cheklandi",
-      "scopedOther": "Kalit {count} ta model bilan cheklandi"
+      "scopedOther": "Kalit {count} ta model bilan cheklandi",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Mijoz profillari",
     "cpDesc": "Har bir mijoz uchun alohida API kaliti; uning tizim promptini server doim qo'llaydi.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Kalitni tahrirlash",
+    "editPlatformLocked": "Yaratilgandan keyin provayder va endpointni o‘zgartirib bo‘lmaydi.",
+    "editCredentialHint": "Joriy kalitni saqlash uchun bo‘sh qoldiring.",
+    "editCredentialPartsRequired": "Ham hisob ID sini, ham API tokenini kiriting.",
+    "editModels": "Modellarni tahrirlash",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

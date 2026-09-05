@@ -574,7 +574,8 @@
       "subsetNote": "මෙම යතුර තෝරාගත් මොඩල වලට පමණක් සීමා වේ. ඔබට මෙය පසුව යතුරේ පේළියෙන් වෙනස් කළ හැක.",
       "skip": "දැන් නොවේ",
       "scopedOne": "යතුර මොඩල 1කට සීමිතයි",
-      "scopedOther": "යතුර මොඩල {count}කට සීමිතයි"
+      "scopedOther": "යතුර මොඩල {count}කට සීමිතයි",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "සේවාලාභී පැතිකඩ",
     "cpDesc": "එක් එක් සේවාලාභියාට වෙනම API යතුරක්; එහි පද්ධති විධානය සේවාදායකය සැමවිටම යොදයි.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "යතුර සංස්කරණය",
+    "editPlatformLocked": "සෑදීමෙන් පසු සපයන්නා හෝ endpoint වෙනස් කළ නොහැක.",
+    "editCredentialHint": "වත්මන් යතුර තබා ගැනීමට හිස්ව තබන්න.",
+    "editCredentialPartsRequired": "ගිණුම් ID සහ API ටෝකනය දෙකම ඇතුළත් කරන්න.",
+    "editModels": "ආකෘති සංස්කරණය",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

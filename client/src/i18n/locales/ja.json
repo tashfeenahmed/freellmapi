@@ -574,7 +574,8 @@
       "subsetNote": "このキーは選択したモデルに限定されます。この設定は後からキーの行で変更できます。",
       "skip": "今はしない",
       "scopedOne": "キーを 1 モデルに限定しました",
-      "scopedOther": "キーを {count} モデルに限定しました"
+      "scopedOther": "キーを {count} モデルに限定しました",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "クライアントプロファイル",
     "cpDesc": "クライアントごとの API キー。それぞれのシステムプロンプトをサーバーが常に適用します。",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "キーを編集",
+    "editPlatformLocked": "作成後にプロバイダーとエンドポイントは変更できません。",
+    "editCredentialHint": "現在のキーを保持するには空欄のままにしてください。",
+    "editCredentialPartsRequired": "アカウント ID と API トークンの両方を入力してください。",
+    "editModels": "モデルを編集",
+    "editModelsHint": "このキーが利用できるカタログモデルを選択します。すべて選択すると制限が解除されます。",
+    "editModelsCustomHint": "このキーが利用できる登録済みエンドポイントモデルを選択します。すべて選択すると制限が解除されます。",
+    "editModelsSync": "カタログの更新を確認",
+    "editModelsSyncing": "確認中…",
+    "editModelsSynced": "モデルカタログを確認しました"
   },
   "backups": {
     "title": "Backups",

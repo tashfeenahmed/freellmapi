@@ -574,7 +574,8 @@
       "subsetNote": "Šis raktas bus apribotas pasirinktais modeliais. Tai galėsite pakeisti vėliau rakto eilutėje.",
       "skip": "Ne dabar",
       "scopedOne": "Raktas apribotas 1 modeliu",
-      "scopedOther": "Raktas apribotas iki {count} modelių"
+      "scopedOther": "Raktas apribotas iki {count} modelių",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Klientų profiliai",
     "cpDesc": "Atskiri API raktai kiekvienam klientui, kiekvienas su sisteminiu promptu, kurį serveris visada taiko.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Redaguoti raktą",
+    "editPlatformLocked": "Po kūrimo tiekėjo ir galinio taško keisti negalima.",
+    "editCredentialHint": "Palikite tuščią, jei norite naudoti dabartinį raktą.",
+    "editCredentialPartsRequired": "Įveskite ir paskyros ID, ir API prieigos raktą.",
+    "editModels": "Redaguoti modelius",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

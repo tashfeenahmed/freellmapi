@@ -574,7 +574,8 @@
       "subsetNote": "Malilimitahan ang key na ito sa mga napiling modelo. Mababago mo ito mamaya mula sa row ng key.",
       "skip": "Hindi ngayon",
       "scopedOne": "Limitado ang key sa 1 modelo",
-      "scopedOther": "Limitado ang key sa {count} na modelo"
+      "scopedOther": "Limitado ang key sa {count} na modelo",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Mga profile ng client",
     "cpDesc": "Hiwalay na API key para sa bawat client, bawat isa may system prompt na palaging inilalapat ng server.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "I-edit ang key",
+    "editPlatformLocked": "Hindi mababago ang provider at endpoint pagkatapos gawin.",
+    "editCredentialHint": "Iwanang blangko para panatilihin ang kasalukuyang key.",
+    "editCredentialPartsRequired": "Ilagay pareho ang account ID at API token.",
+    "editModels": "I-edit ang mga model",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

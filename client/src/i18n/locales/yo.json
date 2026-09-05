@@ -574,7 +574,8 @@
       "subsetNote": "Bọtìnì yìí yóò ní ààlà sí àwọn awoṣe tí a yàn. O lè yí èyí padà lẹ́yìn náà láti orí ìlà bọtìnì náà.",
       "skip": "Kì í ṣe báyìí",
       "scopedOne": "Bọtìnì ní ààlà sí awoṣe 1",
-      "scopedOther": "Bọtìnì ní ààlà sí awoṣe {count}"
+      "scopedOther": "Bọtìnì ní ààlà sí awoṣe {count}",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Àwọn pírófáìlì oníbàárà",
     "cpDesc": "Àwọn kọ́kọ́rọ́ API fún oníbàárà kọ̀ọ̀kan, ọ̀kọ̀ọ̀kan pẹ̀lú ìtọ́ni ètò tí sáfà máa ń lò nígbà gbogbo.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Ṣàtúnṣe bọtìnì",
+    "editPlatformLocked": "Àgbékalẹ̀ àti endpoint kì í yí padà lẹ́yìn ìdámẹ̀.",
+    "editCredentialHint": "Fi aṣàjá sílẹ̀ láti fi bọtìnì tí ó wà nílẹ̀.",
+    "editCredentialPartsRequired": "Tẹ́ ORukọ àkántí àti API token sílẹ̀.",
+    "editModels": "Ṣàtúnṣe àwọn aṣàpẹẹrẹ",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

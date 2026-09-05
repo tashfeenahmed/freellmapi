@@ -574,7 +574,8 @@
       "subsetNote": "ఈ కీ ఎంచుకున్న మోడళ్లకు మాత్రమే పరిమితం అవుతుంది. దీన్ని తర్వాత కీ వరుస నుండి మార్చుకోవచ్చు.",
       "skip": "ఇప్పుడు కాదు",
       "scopedOne": "కీ 1 మోడల్‌కు పరిమితం",
-      "scopedOther": "కీ {count} మోడళ్లకు పరిమితం"
+      "scopedOther": "కీ {count} మోడళ్లకు పరిమితం",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "క్లయింట్ ప్రొఫైల్స్",
     "cpDesc": "ప్రతి క్లయింట్‌కు వేరు API కీ, దాని సిస్టమ్ ప్రాంప్ట్‌ను సర్వర్ ఎల్లప్పుడూ వర్తింపజేస్తుంది.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "కీ సవరించు",
+    "editPlatformLocked": "సృష్టించిన తర్వాత ప్రొవైడర్ లేదా ఎండ్‌పాయింట్ మార్చలేరు.",
+    "editCredentialHint": "ప్రస్తుత కీని ఉంచడానికి ఖాళీగా వదిలేయండి.",
+    "editCredentialPartsRequired": "ఖాతా ID మరియు API టోకెన్ రెండూ నమోదు చేయండి.",
+    "editModels": "మోడల్‌లను సవరించండి",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

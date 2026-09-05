@@ -574,7 +574,8 @@
       "subsetNote": "ეს გასაღები შეიზღუდება მონიშნული მოდელებით. ამის შეცვლა მოგვიანებით გასაღების სტრიქონიდან შეგიძლიათ.",
       "skip": "ახლა არა",
       "scopedOne": "გასაღები შეზღუდულია 1 მოდელით",
-      "scopedOther": "გასაღები შეზღუდულია {count} მოდელით"
+      "scopedOther": "გასაღები შეზღუდულია {count} მოდელით",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "კლიენტის პროფილები",
     "cpDesc": "ცალკე API გასაღები თითოეული კლიენტისთვის, თითოეულს აქვს სისტემური პრომპტი, რომელსაც სერვერი ყოველთვის იყენებს.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "გასაღების რედაქტირება",
+    "editPlatformLocked": "შექმნის შემდეგ მომწოდებლისა და საბოლოო წერტილის შეცვლა შეუძლებელია.",
+    "editCredentialHint": "მიმდინარე გასაღების შესანარჩუნებლად დატოვეთ ცარიელი.",
+    "editCredentialPartsRequired": "შეიყვანეთ ანგარიშის ID და API ტოკენი.",
+    "editModels": "მოდელების რედაქტირება",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

@@ -574,7 +574,8 @@
       "subsetNote": "ഈ കീ തിരഞ്ഞെടുത്ത മോഡലുകളിലേക്ക് മാത്രം പരിമിതപ്പെടും. ഇത് പിന്നീട് കീയുടെ വരിയിൽ നിന്ന് മാറ്റാം.",
       "skip": "ഇപ്പോൾ വേണ്ട",
       "scopedOne": "കീ 1 മോഡലിലേക്ക് പരിമിതം",
-      "scopedOther": "കീ {count} മോഡലുകളിലേക്ക് പരിമിതം"
+      "scopedOther": "കീ {count} മോഡലുകളിലേക്ക് പരിമിതം",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ക്ലയന്റ് പ്രൊഫൈലുകൾ",
     "cpDesc": "ഓരോ ക്ലയന്റിനും പ്രത്യേക API കീ; അതിന്റെ സിസ്റ്റം പ്രോംപ്റ്റ് സെർവർ എപ്പോഴും പ്രയോഗിക്കുന്നു.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "കീ എഡിറ്റ് ചെയ്യുക",
+    "editPlatformLocked": "സൃഷ്ടിച്ചതിന് ശേഷം പ്രൊവൈഡറും എൻഡ്‌പോയിന്റും മാറ്റാൻ കഴിയില്ല.",
+    "editCredentialHint": "നിലവിലെ കീ നിലനിർത്താൻ ശൂന്യമായി വയ്ക്കുക.",
+    "editCredentialPartsRequired": "അക്കൗണ്ട് ID-യും API ടോക്കനും രണ്ടും നൽകുക.",
+    "editModels": "മോഡലുകൾ എഡിറ്റ് ചെയ്യുക",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

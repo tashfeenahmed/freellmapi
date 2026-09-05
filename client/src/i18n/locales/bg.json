@@ -574,7 +574,8 @@
       "subsetNote": "Този ключ ще бъде ограничен до избраните модели. Можете да промените това по-късно от реда на ключа.",
       "skip": "Не сега",
       "scopedOne": "Ключът е ограничен до 1 модел",
-      "scopedOther": "Ключът е ограничен до {count} модела"
+      "scopedOther": "Ключът е ограничен до {count} модела",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Клиентски профили",
     "cpDesc": "Отделни API ключове за всеки клиент, всеки със системен промпт, който сървърът винаги прилага.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Редактиране на ключ",
+    "editPlatformLocked": "Доставчикът и крайната точка не могат да се променят след създаване.",
+    "editCredentialHint": "Оставете празно, за да запазите текущия ключ.",
+    "editCredentialPartsRequired": "Въведете и ID на акаунта, и API токен.",
+    "editModels": "Редактиране на моделите",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

@@ -574,7 +574,8 @@
       "subsetNote": "Esta clave se limitará a los modelos seleccionados. Puedes cambiarlo más adelante desde la fila de la clave.",
       "skip": "Ahora no",
       "scopedOne": "Clave limitada a 1 modelo",
-      "scopedOther": "Clave limitada a {count} modelos"
+      "scopedOther": "Clave limitada a {count} modelos",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Perfiles de cliente",
     "cpDesc": "Claves API por cliente, cada una con un prompt de sistema que el servidor aplica siempre.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Editar clave",
+    "editPlatformLocked": "El proveedor y el endpoint no pueden cambiarse después de crearlos.",
+    "editCredentialHint": "Déjalo vacío para conservar la clave actual.",
+    "editCredentialPartsRequired": "Introduce tanto el ID de cuenta como el token de API.",
+    "editModels": "Editar modelos",
+    "editModelsHint": "Elige qué modelos del catálogo puede servir esta clave. Selecciona todo para quitar la restricción.",
+    "editModelsCustomHint": "Elige qué modelos registrados del endpoint puede servir esta clave. Selecciona todo para quitar la restricción.",
+    "editModelsSync": "Comprobar actualizaciones del catálogo",
+    "editModelsSyncing": "Comprobando…",
+    "editModelsSynced": "Catálogo de modelos comprobado"
   },
   "backups": {
     "title": "Backups",

@@ -574,7 +574,8 @@
       "subsetNote": "ಈ ಕೀ ಆಯ್ಕೆ ಮಾಡಿದ ಮಾಡೆಲ್‌ಗಳಿಗೆ ಮಾತ್ರ ಸೀಮಿತವಾಗಿರುತ್ತದೆ. ಇದನ್ನು ನೀವು ನಂತರ ಕೀಯ ಸಾಲಿನಿಂದ ಬದಲಾಯಿಸಬಹುದು.",
       "skip": "ಈಗ ಬೇಡ",
       "scopedOne": "ಕೀ 1 ಮಾಡೆಲ್‌ಗೆ ಸೀಮಿತ",
-      "scopedOther": "ಕೀ {count} ಮಾಡೆಲ್‌ಗಳಿಗೆ ಸೀಮಿತ"
+      "scopedOther": "ಕೀ {count} ಮಾಡೆಲ್‌ಗಳಿಗೆ ಸೀಮಿತ",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ಕ್ಲೈಂಟ್ ಪ್ರೊಫೈಲ್‌ಗಳು",
     "cpDesc": "ಪ್ರತಿ ಕ್ಲೈಂಟ್‌ಗೆ ಪ್ರತ್ಯೇಕ API ಕೀ; ಅದರ ಸಿಸ್ಟಂ ಪ್ರಾಂಪ್ಟ್ ಅನ್ನು ಸರ್ವರ್ ಯಾವಾಗಲೂ ಅನ್ವಯಿಸುತ್ತದೆ.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "ಕೀ ಸಂಪಾದಿಸಿ",
+    "editPlatformLocked": "ರಚಿಸಿದ ನಂತರ ಪೂರೈಕೆದಾರ ಅಥವಾ ಎಂಡ್‌ಪಾಯಿಂಟ್ ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
+    "editCredentialHint": "ಪ್ರಸ್ತುತ ಕೀ ಉಳಿಸಲು ಖಾಲಿ ಬಿಡಿ.",
+    "editCredentialPartsRequired": "ಖಾತೆ ID ಮತ್ತು API ಟೋಕನ್ ಎರಡನ್ನೂ ನಮೂದಿಸಿ.",
+    "editModels": "ಮಾದರಿಗಳನ್ನು ಸಂಪಾದಿಸಿ",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",
