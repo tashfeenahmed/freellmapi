@@ -4,7 +4,7 @@
 
 FreeLLMAPI 如何把发往提供方的流量经由代理转发、多个变量同时设置时谁说了算，以及随之而来的 Docker 网络坑点。
 
-来源：[`.env.example`](../../../.env.example)（代理配置块）、[`docker-compose.yml`](../../../docker-compose.yml)，以及 [`docs/install.md`](../install/01-install.md) 中的容器网络说明。
+来源：[`.env.example`](../../../.env.example)（代理配置块）、[`docker-compose.yml`](../../../docker-compose.yml)，以及 [docs/zh-cn/install/01-install.md](../install/01-install.md) 中的容器网络说明。
 
 - [代理链优先级](#代理链优先级)
 - [协议支持](#协议支持)

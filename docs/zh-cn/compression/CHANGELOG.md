@@ -6,4 +6,4 @@
 
 ## 2026-08-23 —— 领域创建
 
-- **6a1c1a9** `docs(compression): fold pipeline guide into compression domain` — `docs/compression.md` → `docs/compression/01-compression-pipeline.md`，补 `OVERVIEW.md` + `CHANGELOG.md`。
+- **36850e8** `docs(compression): fold pipeline guide into compression domain` — `docs/compression.md` → `docs/en/compression/01-compression-pipeline.md`，补 `OVERVIEW.md` + `CHANGELOG.md`。（经 #979 合入）

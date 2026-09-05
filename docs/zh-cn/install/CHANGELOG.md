@@ -1,6 +1,6 @@
 [English](../../en/install/CHANGELOG.md) · **简体中文**
 
-# Changelog — install (zh-cn)
+# 变更记录 —— install
 
 | Commit | Date | Summary |
 | --- | --- | --- |

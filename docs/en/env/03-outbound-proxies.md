@@ -4,7 +4,7 @@
 
 How FreeLLMAPI routes its provider-bound traffic through proxies, which variables win when several are set, and the Docker networking gotchas that come with that.
 
-Sources: [`.env.example`](../../../.env.example) (proxy block), [`docker-compose.yml`](../../../docker-compose.yml), the container-networking notes in [`docs/install.md`](../install/01-install.md), the proxy transports in [`../proxy/01-fetch-relay.md`](../proxy/01-fetch-relay.md) / [`../proxy/OVERVIEW.md`](../proxy/OVERVIEW.md) (`server/src/lib/proxy.ts:52-414`, `server/src/lib/config.ts:95-110` for `TRUST_PROXY`).
+Sources: [`.env.example`](../../../.env.example) (proxy block), [`docker-compose.yml`](../../../docker-compose.yml), the container-networking notes in [docs/en/install/01-install.md](../install/01-install.md), the proxy transports in [`../proxy/01-fetch-relay.md`](../proxy/01-fetch-relay.md) / [`../proxy/OVERVIEW.md`](../proxy/OVERVIEW.md) (`server/src/lib/proxy.ts:52-414`, `server/src/lib/config.ts:95-110` for `TRUST_PROXY`).
 
 - [Proxy chain precedence](#proxy-chain-precedence)
 - [Fetch Relay transport](#fetch-relay-transport-summary)

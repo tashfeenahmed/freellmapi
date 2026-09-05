@@ -4,7 +4,7 @@
 
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `8bd3acd` | 2026-09-02 | Idempotency `409` — fingerprint/ TTL documented |
+| `eab992f` | 2026-09-02 | Idempotency `409` — fingerprint/ TTL documented (landed via #1164) |
 | `e852ff1` | 2026-08-23 | Empty chain authoritative `400` — `activeChainOrThrow` |
 | `86368ac` | 2026-09-01 | System proxy auto-detect `scutil`/`registry`/`gsettings` |
 | `56eb257` | 2026-08-31 | Fetch Relay `PROXY_MODE`/`FETCH_RELAY_TOKEN` loopback guard |

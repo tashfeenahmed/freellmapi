@@ -71,15 +71,15 @@ npx @deepseek-ai/dsh web
 ### QwenPaw
 
 [QwenPaw](https://github.com/agentscope-ai/QwenPaw) 支持使用 OpenAI
-`chat.completions` API 的自定义提供商。先启动 FreeLLMAPI，并从其仪表盘创建或复制统一密钥，
+`chat.completions` API 的自定义提供方。先启动 FreeLLMAPI，并从其仪表盘创建或复制统一密钥，
 然后在 QwenPaw Console 中打开 **设置 → 模型**：
 
-1. 在 **提供商** 下选择 **添加提供商**。
-2. 填写 **提供商 ID**（例如 `freellmapi`）和 **提供商名称**（例如 `FreeLLMAPI`），
+1. 在 **提供方** 下选择 **添加提供方**。
+2. 填写 **提供方 ID**（例如 `freellmapi`）和 **提供方名称**（例如 `FreeLLMAPI`），
    并将 API 兼容模式设为 OpenAI `chat.completions`。
-3. 进入该提供商的设置页，将 **Base URL** 设为 `http://localhost:3001/v1`，
+3. 进入该提供方的设置页，将 **Base URL** 设为 `http://localhost:3001/v1`，
    将 **API 密钥** 设为 FreeLLMAPI 统一密钥。
-4. 在该提供商的模型页面添加模型。**模型 ID** 可填 `auto` 让 FreeLLMAPI 自动路由，
+4. 在该提供方的模型页面添加模型。**模型 ID** 可填 `auto` 让 FreeLLMAPI 自动路由，
    或从 `GET http://localhost:3001/v1/models` 复制当前可用的模型 id。
 5. 保存后把该模型设为默认（或在单次对话中选用），并发一条消息验证。
 
