@@ -1,0 +1,12 @@
+# Proxy Domain — Changelog
+
+Revision history for `docs/proxy/`, derived from git commits touching the outbound proxy and Fetch Relay surface. Most recent first.
+
+| Commit | Date | Summary |
+| --- | --- | --- |
+| `46ea0de` | 2026-09-02 | feat(proxy): honor `TRUST_PROXY` for reverse-proxied client IPs (#1041) — adds `TRUST_PROXY` (`false\|true\|<hops>\|addr/CIDR`, `.env.example:306-315`, `server/src/lib/config.ts:95-112` `parseTrustProxy`) forwarded to Express `trust proxy` so Analytics + `PROXY_RATE_LIMIT_RPM`/`ADMIN_RATE_LIMIT_RPM` see real client IP behind Caddy/nginx/Traefik; default `false` (no spoof). |
+| `86368ac` | 2026-09-01 | feat(proxy): auto-detect system-wide proxy settings as a last-resort fallback (#838) — adds `detectSystemProxy()` (`server/src/lib/proxy.ts:52-414` — `scutil --proxy` on macOS, Windows registry `ProxyEnable`+`ProxyServer`, GNOME `gsettings` `manual` + `http host/port` on Linux) at end of `PROXY_URL → dashboard → ALL_PROXY → HTTPS_PROXY → HTTP_PROXY → detectSystemProxy() → direct` chain (`resolveProxySource`), closes #353/#1069, best-effort 2s timeout, never throws. |
+| `56eb257` | 2026-08-31 | Add an opt-in Fetch Relay outbound transport (#975) — adds `PROXY_MODE` (`forward` default, `fetch-relay` opt-in, `.env.example:74-78`, `server/src/lib/proxy.ts:52` `PROXY_MODES`) and `FETCH_RELAY_TOKEN` (bearer, encrypted at rest, empty=unauthenticated but not recommended, env precedence over dashboard, `.env.example:78`, `server/src/lib/proxy.ts:389-417`, `isLoopbackRelayHostname`/`fetchRelayUrlError` loopback-https guard, `Fetch-Relay-Target`/`Fetch-Relay-Authorization` headers, `fetchRelayFetch` streaming + manual redirect, `examples/fetch-relay-worker/` Cloudflare Worker reference); initial `docs/fetch-relay.md` (now `docs/proxy/01-fetch-relay.md`) with protocol, security contract, and Worker details. |
+| `ac0a9ce` | 2026-08-22 | docs(env): add runtime configuration reference domain — initial outbound proxy documentation in `docs/env/03-outbound-proxies.md` (precedence `PROXY_URL → dashboard → ALL_PROXY → HTTPS_PROXY → HTTP_PROXY`, scheme support `http`/`https`/`socks4`/`socks4a`/`socks5`/`socks5h`, `NO_PROXY` bypasses, Docker `host.docker.internal` gotcha, inbound rate-limit knobs), scaffolded `docs/env/` domain with `OVERVIEW.md` + `CHANGELOG.md`. |
+
+Regenerate with `git log --oneline -- docs/proxy/ docs/fetch-relay.md docs/env/03-outbound-proxies.md` and `git log --oneline --grep=proxy --grep=relay --grep=TRUST_PROXY`.

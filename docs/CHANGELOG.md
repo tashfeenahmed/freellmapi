@@ -1,6 +1,31 @@
 # Changelog
 
+## 2026-09-02 — Per-language structure
+
+| Commit | Date | Summary |
+| --- | --- | --- |
+| `c108132` | 2026-09-02 | scaffold per-language en/ and zh-cn/ top-level |
+| `7378adc` | 2026-09-02 | move English domains under en/ (17 domains, git mv) |
+| `cbb2620` | 2026-09-02 | fix link depths after move (0 broken in en/) |
+| `91c1776` | 2026-09-02 | migrate Chinese translations to zh-cn/ (10 domains) |
+| `ab0d0f9` | 2026-09-02 | obliterate i18n wrapper — simple /docs/{en,zh-cn} |
+| `9c679bd` | 2026-09-02 | fix zh-cn link depths |
+| `4761a0b` | 2026-09-02 | fix remaining link depths |
+| `5f887aa` | 2026-09-02 | translate cli and desktop domains to zh-cn |
+| `13ca740` | 2026-09-02 | translate proxy, fallback, glossary to zh-cn |
+| `a0a4df7` | 2026-09-02 | translate troubleshooting to zh-cn |
+
+
+
 Revision history for `docs/`, derived from git commits touching this directory. Most recent first.
+
+## 2026-09-02
+
+| Commit | Date | Summary |
+| --- | --- | --- |
+| `c2114c0` | 2026-09-02 | docs(proxy): create proxy domain and move Fetch Relay into it — `01-fetch-relay.md` moved from flat `fetch-relay.md`, `detectSystemProxy()` OS auto-detect, `TRUST_PROXY` |
+| `26f71dd` | 2026-09-02 | docs(env): cover `PROXY_MODE`, `FETCH_RELAY_TOKEN`, `TRUST_PROXY`, `QUOTA_OBSERVATIONS_*`, `IDEMPOTENCY_TTL_MS` — full precedence chain, callout boxes |
+| `8bd3acd` | 2026-09-02 | docs(api): document Idempotency-Key safe retries (`02-idempotency.md`) — replay/409/miss, fingerprint, curl example |
 
 ## 2026-08-25
 

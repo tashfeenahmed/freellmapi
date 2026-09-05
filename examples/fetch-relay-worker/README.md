@@ -1,7 +1,7 @@
 # Universal Fetch Relay Worker
 
 This provider-agnostic, single-file Cloudflare Worker implements the protocol
-documented in [`docs/fetch-relay.md`](../../docs/fetch-relay.md). It stores no
+documented in [`docs/en/proxy/01-fetch-relay.md`](../../docs/en/proxy/01-fetch-relay.md). It stores no
 target-site or LLM-provider configuration. Each request supplies its complete
 public HTTP(S) target through `Fetch-Relay-Target`.
 
