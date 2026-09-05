@@ -48,12 +48,50 @@ const SYNTHESIS_QUORUM = 2;
 const MAX_SLOT_ATTEMPTS = 4;
 // Judge dispatch walks the normal auto chain; give it room to fail over.
 const MAX_JUDGE_ATTEMPTS = 6;
+// Tool calls are actions, not independent prose. Running a whole Fusion panel
+// for them is both unsafe (several models can propose the same side effect)
+// and needlessly slow (one stalled provider holds Promise.allSettled open).
+// Keep each sequential candidate bounded well below the provider's generous
+// cold-start timeout; a slower candidate can still be reached through the
+// normal ordered fallback list after this one is abandoned.
+const DEFAULT_TOOL_CALL_TIMEOUT_MS = 12_000;
+const MAX_TOOL_CALL_TIMEOUT_MS = 120_000;
 
 function intSetting(key: string, fallback: number): number {
   const raw = getSetting(key);
   if (!raw) return fallback;
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function toolCallTimeoutMs(): number {
+  return Math.min(
+    intSetting('fusion_tool_timeout_ms', DEFAULT_TOOL_CALL_TIMEOUT_MS),
+    MAX_TOOL_CALL_TIMEOUT_MS,
+  );
+}
+
+/**
+ * Give one tool-bearing panel candidate its own deadline while preserving the
+ * caller's disconnect signal. The timer is cancelled as soon as the candidate
+ * settles; aborting a request is deliberately scoped to this candidate so a
+ * later fallback can still run.
+ */
+function withToolCallDeadline(options: CompletionOptions): { options: CompletionOptions; cancel: () => void } {
+  const controller = new AbortController();
+  const timeoutMs = toolCallTimeoutMs();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`fusion tool call timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+  timer.unref?.();
+
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, controller.signal])
+    : controller.signal;
+  return {
+    options: { ...options, signal },
+    cancel: () => clearTimeout(timer),
+  };
 }
 
 function panelDefaultK(): number {
@@ -564,6 +602,15 @@ export async function runFusion(params: {
   const strategy = config.strategy ?? 'synthesize';
 
   const requireTools = (options.tools?.length ?? 0) > 0;
+  const requiresToolCall = options.tool_choice === 'required'
+    || (typeof options.tool_choice === 'object' && options.tool_choice !== null);
+  const requiredToolName = typeof options.tool_choice === 'object'
+    ? options.tool_choice.function.name
+    : undefined;
+  // `tool_choice=auto` (or an omitted choice) still allows a model to emit a
+  // structured call. Continue past a prose-only candidate so a later capable
+  // model gets a chance; `none` is the explicit opt-out and may stop at prose.
+  const acceptsToolCall = options.tool_choice !== 'none';
   const { panel, overflow, dropped } = selectPanel(config, { requireTools, requireVision: vision, estimatedTokens });
   if (panel.length === 0) {
     const hint = vision
@@ -579,12 +626,17 @@ export async function runFusion(params: {
   // model's keys (so a key 429 doesn't collapse the slot onto a duplicate
   // backend — issue #326). Returns its answer and fires onPanel the moment it
   // settles so a streaming client sees answers arrive one by one.
-  const runSlot = (cand: FusionCandidate): Promise<PanelAnswer> =>
+  const runSlot = (cand: FusionCandidate, slotOptions: CompletionOptions = options): Promise<PanelAnswer> =>
     runModelCall(
       (skipKeys) => routePinnedModel(cand.modelDbId, estimatedTokens, skipKeys),
-      messages, options, estimatedTokens, MAX_SLOT_ATTEMPTS,
+      messages, slotOptions, estimatedTokens, MAX_SLOT_ATTEMPTS,
     ).then((outcome): PanelAnswer => {
-      const answer: PanelAnswer = outcome.ok
+      const returnedToolCalls = outcome.toolCalls;
+      const forbiddenToolCall = options.tool_choice === 'none' && !!returnedToolCalls?.length;
+      const wrongNamedTool = !!requiredToolName
+        && !!returnedToolCalls?.length
+        && returnedToolCalls.some(tc => tc.function?.name !== requiredToolName);
+      const answer: PanelAnswer = outcome.ok && !wrongNamedTool && !forbiddenToolCall
         ? {
             modelDbId: cand.modelDbId,
             platform: cand.platform,
@@ -596,7 +648,18 @@ export async function runFusion(params: {
             rawChoice: outcome.rawChoice,
             usage: outcome.usage,
           }
-        : { modelDbId: cand.modelDbId, platform: cand.platform, modelId: cand.modelId, displayName: cand.displayName, status: 'failed', error: outcome.error };
+        : {
+            modelDbId: cand.modelDbId,
+            platform: cand.platform,
+            modelId: cand.modelId,
+            displayName: cand.displayName,
+            status: 'failed',
+            error: wrongNamedTool
+              ? `provider returned a tool call other than required function '${requiredToolName}'`
+              : forbiddenToolCall
+              ? 'provider returned a tool call despite tool_choice=none'
+              : outcome.error,
+          };
       hooks?.onPanel?.({ platform: answer.platform, model: answer.modelId, status: answer.status, content: answer.content, tool_calls: answer.toolCalls, error: answer.error });
       return answer;
     });
@@ -613,17 +676,45 @@ export async function runFusion(params: {
   const answers: PanelAnswer[] = [];
   let okCount = 0;
   let cursor = 0;
-  while (okCount < target && cursor < candidates.length) {
-    const wave = candidates.slice(cursor, cursor + (target - okCount));
-    cursor += wave.length;
-    const settled = await Promise.allSettled(wave.map(runSlot));
-    settled.forEach((s, i) => {
-      const a: PanelAnswer = s.status === 'fulfilled'
-        ? s.value
-        : { modelDbId: wave[i].modelDbId, platform: wave[i].platform, modelId: wave[i].modelId, displayName: wave[i].displayName, status: 'failed', error: sanitizeProviderErrorMessage((s as PromiseRejectedResult).reason?.message) };
-      answers.push(a);
-      if (a.status === 'ok' && (a.content || (a.toolCalls?.length ?? 0) > 0)) okCount++;
-    });
+  if (requireTools) {
+    // Tool calls are not safely mergeable: the client may execute the returned
+    // action, so asking several models in parallel can produce duplicate or
+    // contradictory side effects. Walk the ordered candidates one at a time,
+    // stopping at the first structured call (or the target number of prose
+    // survivors when the model declines to call). Each candidate gets a bounded signal so a slow
+    // provider cannot hold the Responses stream open for its full 180s
+    // cold-start budget. This also makes fallback deterministic and releases
+    // the provider lease before the next candidate starts.
+    while (cursor < candidates.length) {
+      const cand = candidates[cursor++];
+      const deadline = withToolCallDeadline(options);
+      let answer: PanelAnswer;
+      try {
+        answer = await runSlot(cand, deadline.options);
+      } finally {
+        deadline.cancel();
+      }
+      answers.push(answer);
+      const usable = answer.status === 'ok' && (answer.content || (answer.toolCalls?.length ?? 0) > 0);
+      if (usable) {
+        okCount++;
+        if (answer.toolCalls?.length && acceptsToolCall) break;
+        if (!acceptsToolCall || okCount >= target) break;
+      }
+    }
+  } else {
+    while (okCount < target && cursor < candidates.length) {
+      const wave = candidates.slice(cursor, cursor + (target - okCount));
+      cursor += wave.length;
+      const settled = await Promise.allSettled(wave.map(cand => runSlot(cand)));
+      settled.forEach((s, i) => {
+        const a: PanelAnswer = s.status === 'fulfilled'
+          ? s.value
+          : { modelDbId: wave[i].modelDbId, platform: wave[i].platform, modelId: wave[i].modelId, displayName: wave[i].displayName, status: 'failed', error: sanitizeProviderErrorMessage((s as PromiseRejectedResult).reason?.message) };
+        answers.push(a);
+        if (a.status === 'ok' && (a.content || (a.toolCalls?.length ?? 0) > 0)) okCount++;
+      });
+    }
   }
 
   const survivors = answers.filter(a => a.status === 'ok' && (a.content || (a.toolCalls?.length ?? 0) > 0));
@@ -686,6 +777,16 @@ export async function runFusion(params: {
       response,
       routedVia: `fusion(${survivors.map(a => a.modelId).join('+')} -> tool_call:${toolCallWinner.modelId})`,
     };
+  }
+
+  if (requiresToolCall) {
+    // `tool_choice=required` (or a named function choice) is a contract with
+    // the caller. Returning prose after every candidate ignored that contract
+    // would leave an agent waiting for a tool result that can never arrive.
+    throw new FusionError(
+      'fusion: no panel model returned the required tool call. Try again or pick a tool-capable `fusion.models` entry.',
+      502,
+    );
   }
 
   const textSurvivors = survivors.filter(a => a.content);

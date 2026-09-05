@@ -1881,18 +1881,23 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
  */
 export function resolveFusionCandidate(modelId: string): FusionCandidate | null {
   const db = getDb();
-  const row = db.prepare(`
+  const rows = db.prepare(`
     SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name,
            m.size_label, m.supports_vision, m.supports_tools
     FROM models m
     WHERE m.model_id = ? AND m.enabled = 1
     ORDER BY m.intelligence_rank ASC, m.id ASC
-    LIMIT 1
-  `).get(modelId) as {
+  `).all(modelId) as {
     model_db_id: number; platform: string; model_id: string; display_name: string;
     size_label: string; supports_vision: number; supports_tools: number;
-  } | undefined;
-  if (row) {
+  }[];
+  if (rows.length > 0) {
+    // A logical model can have several enabled provider rows. Prefer one with
+    // an enabled, healthy/unknown key before falling back to the deterministic
+    // ranking. Without this check a duplicate alias can pin fusion to a
+    // keyless provider (for example a free relay) while a configured provider
+    // for the same model is available.
+    const row = rows.find(candidate => routableKeyIdsForModel(candidate.model_db_id).length > 0) ?? rows[0];
     return {
       modelDbId: row.model_db_id,
       platform: row.platform,
@@ -1911,7 +1916,11 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   if (isUnifyEnabled()) {
     const resolved = resolveRequestedIdForDispatch(modelId, getModelGroups());
     if (resolved && resolved.memberDbIds.length > 0) {
-      const top = resolveModelGroupCandidates(resolved.memberDbIds, resolved.demotedDbIds)[0];
+      const candidates = resolveModelGroupCandidates(resolved.memberDbIds, resolved.demotedDbIds);
+      // Bare unified aliases may resolve to a provider row that is enabled in
+      // the catalog but has no usable key. Select the first routable member so
+      // an explicit fusion panel does not waste a slot on that dead end.
+      const top = candidates.find(candidate => routableKeyIdsForModel(candidate.model_db_id).length > 0) ?? candidates[0];
       if (top) {
         return {
           modelDbId: top.model_db_id,

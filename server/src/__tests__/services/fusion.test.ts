@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { setRoutingStrategy } from '../../services/router.js';
+import { resolveFusionCandidate, setRoutingStrategy } from '../../services/router.js';
 
 // A fusion unit-test fixture: seed the standard catalog, then add one healthy
 // key per platform so the auto-panel chain has servable members (the seed ships
@@ -48,6 +48,28 @@ describe('selectPanel vision filtering', () => {
     const { panel } = selectPanel(config, { requireVision: true, estimatedTokens: 100 });
     expect(panel.length).toBeGreaterThan(0);
     expect(panel.every((c) => c.supportsVision === 1)).toBe(true);
+  });
+
+  it('explicit unified aliases prefer a keyed provider over a keyless duplicate', () => {
+    const db = getDb();
+    const insert = db.prepare(`
+      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, enabled)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `);
+    // Make the keyless row win the normal deterministic ordering. The fusion
+    // resolver must still choose the configured provider for the same logical
+    // alias rather than spending a panel slot on a dead relay.
+    insert.run('kilo', 'edge-case-model', 'Edge Case Model (Kilo)', 1, 1);
+    insert.run('nvidia', 'edge-case-model', 'Edge Case Model (NVIDIA)', 2, 2);
+    addKey('nvidia');
+
+    try {
+      const candidate = resolveFusionCandidate('edge-case-model');
+      expect(candidate?.platform).toBe('nvidia');
+      expect(candidate?.modelId).toBe('edge-case-model');
+    } finally {
+      db.prepare("DELETE FROM models WHERE model_id = 'edge-case-model'").run();
+    }
   });
 });
 

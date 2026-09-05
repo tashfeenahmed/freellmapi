@@ -293,6 +293,171 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     expect(groqCall?.body.tool_choice).toBe('required');
     expect(groqCall?.body.parallel_tool_calls).toBe(true);
     expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+    // Tool actions are not mergeable: once the first capable model returns a
+    // structured call, Fusion must not fan out to a second model that could
+    // propose a duplicate side effect.
+    expect(upstream.calls.some(c => c.url.includes('api.cerebras.ai'))).toBe(false);
+  });
+
+  it('keeps looking for a structured call when tool_choice is auto', async () => {
+    const toolCalls = [{
+      id: 'call_auto_exec',
+      type: 'function',
+      function: { name: 'exec_command', arguments: '{"cmd":"pwd"}' },
+    }];
+    const upstream = mockUpstreams({
+      'api.groq.com': 'prose-only first candidate',
+      'api.cerebras.ai': { content: null, tool_calls: toolCalls, finish_reason: 'tool_calls' },
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      messages: [{ role: 'user', content: 'run the command' }],
+      tools: [{
+        type: 'function',
+        function: { name: 'exec_command', parameters: { type: 'object', properties: { cmd: { type: 'string' } } } },
+      }],
+      // Omitted/auto tool choice is the shape Codex commonly sends.
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel },
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].finish_reason).toBe('tool_calls');
+    expect(body.choices[0].message.tool_calls).toEqual(toolCalls);
+    expect(upstream.calls.some(c => c.url.includes('api.groq.com'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('api.cerebras.ai'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('does not forward a tool call that violates a named tool_choice', async () => {
+    const wrongCall = [{
+      id: 'call_wrong',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+    }];
+    const rightCall = [{
+      id: 'call_right',
+      type: 'function',
+      function: { name: 'exec_command', arguments: '{"cmd":"pwd"}' },
+    }];
+    const upstream = mockUpstreams({
+      'api.groq.com': { content: null, tool_calls: wrongCall, finish_reason: 'tool_calls' },
+      'api.cerebras.ai': { content: null, tool_calls: rightCall, finish_reason: 'tool_calls' },
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      messages: [{ role: 'user', content: 'run the command' }],
+      tools: [{
+        type: 'function',
+        function: { name: 'exec_command', parameters: { type: 'object', properties: { cmd: { type: 'string' } } } },
+      }],
+      tool_choice: { type: 'function', function: { name: 'exec_command' } },
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel },
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].finish_reason).toBe('tool_calls');
+    expect(body.choices[0].message.tool_calls).toEqual(rightCall);
+    expect(upstream.calls.some(c => c.url.includes('api.groq.com'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('api.cerebras.ai'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('suppresses a provider tool call when tool_choice is none', async () => {
+    const ignoredCall = [{
+      id: 'call_ignored',
+      type: 'function',
+      function: { name: 'exec_command', arguments: '{"cmd":"rm -rf /"}' },
+    }];
+    const upstream = mockUpstreams({
+      'api.groq.com': { content: null, tool_calls: ignoredCall, finish_reason: 'tool_calls' },
+      'api.cerebras.ai': 'safe prose fallback',
+      'openrouter.ai': 'JUDGE SHOULD NOT RUN',
+    });
+
+    const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'fusion',
+      messages: [{ role: 'user', content: 'answer without tools' }],
+      tools: [{
+        type: 'function',
+        function: { name: 'exec_command', parameters: { type: 'object', properties: { cmd: { type: 'string' } } } },
+      }],
+      tool_choice: 'none',
+      fusion: { models: [toolGroqModel, toolCerebrasModel], judge: openrouterModel },
+    }, authHeaders());
+
+    expect(status).toBe(200);
+    expect(body.choices[0].finish_reason).toBe('stop');
+    expect(body.choices[0].message.content).toBe('safe prose fallback');
+    expect(body.choices[0].message.tool_calls).toBeUndefined();
+    expect(upstream.calls.some(c => c.url.includes('api.groq.com'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('api.cerebras.ai'))).toBe(true);
+    expect(upstream.calls.some(c => c.url.includes('openrouter.ai'))).toBe(false);
+  });
+
+  it('times out a stalled tool candidate before falling back sequentially', async () => {
+    // Keep the unit test fast while exercising the same AbortSignal path used
+    // by the hosted 12s tool deadline. The first provider never answers; the
+    // second returns a valid structured call and must be reached without a
+    // parallel in-flight request.
+    getDb().prepare("INSERT INTO settings (key, value) VALUES ('fusion_tool_timeout_ms', '20') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+    const toolCalls = [{
+      id: 'call_exec',
+      type: 'function',
+      function: { name: 'exec_command', arguments: '{"cmd":"true"}' },
+    }];
+    const calls: string[] = [];
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      calls.push(u);
+      if (u.includes('api.groq.com')) {
+        return await new Promise((_resolve, reject) => {
+          const signal = (init as any)?.signal as AbortSignal | undefined;
+          const abort = () => reject(signal?.reason ?? new Error('aborted'));
+          if (signal?.aborted) abort();
+          else signal?.addEventListener('abort', abort, { once: true });
+        }) as any;
+      }
+      if (u.includes('api.cerebras.ai')) {
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            id: 'chatcmpl-timeout-fallback', object: 'chat.completion', created: 1, model: 'm',
+            choices: [{ index: 0, message: { role: 'assistant', content: null, tool_calls: toolCalls }, finish_reason: 'tool_calls' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        } as any;
+      }
+      return origFetch(url as any, init as any);
+    });
+
+    try {
+      const started = Date.now();
+      const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
+        model: 'fusion',
+        messages: [{ role: 'user', content: 'run the command' }],
+        tools: [{
+          type: 'function',
+          function: { name: 'exec_command', parameters: { type: 'object', properties: { cmd: { type: 'string' } } } },
+        }],
+        tool_choice: 'required',
+        fusion: { models: [toolGroqModel, toolCerebrasModel] },
+      }, authHeaders());
+
+      expect(status).toBe(200);
+      expect(body.choices[0].finish_reason).toBe('tool_calls');
+      expect(body.choices[0].message.tool_calls).toEqual(toolCalls);
+      expect(calls.filter(u => u.includes('api.groq.com'))).toHaveLength(1);
+      expect(calls.filter(u => u.includes('api.cerebras.ai'))).toHaveLength(1);
+      expect(Date.now() - started).toBeLessThan(2000);
+    } finally {
+      getDb().prepare("DELETE FROM settings WHERE key = 'fusion_tool_timeout_ms'").run();
+    }
   });
 
   it('keeps tool-bearing fusion panels on tool-capable models even with tool_choice none', async () => {
