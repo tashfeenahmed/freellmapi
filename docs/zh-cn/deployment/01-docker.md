@@ -46,7 +46,7 @@ printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 docker compose up -d
 ```
 
-Windows PowerShell 版本和 curl 一行命令引导见 [`docs/install.md`](../install/01-install.md#docker-compose)。然后跟踪日志：
+Windows PowerShell 版本和 curl 一行命令引导见 [docs/zh-cn/install/01-install.md#docker-compose](../install/01-install.md#docker-compose)。然后跟踪日志：
 
 ```bash
 docker compose logs -f freellmapi

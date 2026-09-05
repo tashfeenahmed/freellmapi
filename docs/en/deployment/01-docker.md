@@ -46,7 +46,7 @@ printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 docker compose up -d
 ```
 
-Windows PowerShell variant and a curl one-liner bootstrap live in [`docs/install.md`](../install/01-install.md#docker-compose). Then follow the logs:
+Windows PowerShell variant and a curl one-liner bootstrap live in [docs/en/install/01-install.md#docker-compose](../install/01-install.md#docker-compose). Then follow the logs:
 
 ```bash
 docker compose logs -f freellmapi

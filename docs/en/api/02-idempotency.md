@@ -2,7 +2,7 @@
 
 # Idempotency-Key — Safe Retries for Non-Streaming Chat Completions
 
-> **Sources:** `server/src/services/idempotency.ts`, `server/src/routes/proxy.ts:1793-1835` (entry) + `2640-2656` (persist), `server/src/db/migrations/20260901_000001_idempotency_claims.ts`, commit `36b877d` (feature), `95bc46f` (in-flight clarification), env `IDEMPOTENCY_TTL_MS` documented in `docs/env/01-variables.md#idempotency`.
+> **Sources:** `server/src/services/idempotency.ts`, `server/src/routes/proxy.ts:1793-1835` (entry) + `2640-2656` (persist), `server/src/db/migrations/20260901_000001_idempotency_claims.ts`, commit `36b877d` (feature), `95bc46f` (in-flight clarification), env `IDEMPOTENCY_TTL_MS` documented in [`docs/en/env/01-variables.md#idempotency`](../env/01-variables.md#idempotency).
 
 Non-streaming `POST /v1/chat/completions` supports an opt-in `Idempotency-Key` header so a client that times out and retries does not burn a second free-tier slot for an answer it already received. When the same key + same request content is seen again inside the replay window the gateway replays the stored response at **zero provider cost**; the same key with different content is a `409` rather than a silent wrong answer.
 
@@ -91,7 +91,7 @@ Guarding the in-flight window would require a `pending`-claim state with its own
 
 - Read **per call** via `idempotencyTtlMs()` → `envNum('IDEMPOTENCY_TTL_MS', 24*60*60*1000)` so tests can flip it live; non-finite / negative → fallback.
 - `expires_at_ms = now + ttl`; stale rows are lazily swept **per `key_hash`** at the next `storeIdempotencyResult` (`DELETE ... WHERE key_hash = ? AND expires_at_ms <= ?`) and via the `idx_idempotency_claims_expires` index for range scans.
-- Source of truth: `server/src/services/idempotency.ts:40-42`, `docs/env/01-variables.md#idempotency`.
+- Source of truth: `server/src/services/idempotency.ts:40-42`, [`docs/en/env/01-variables.md#idempotency`](../env/01-variables.md#idempotency).
 
 ---
 
@@ -181,13 +181,13 @@ Tips:
 ## 10. Relationship to response cache & degraded mode
 
 - **Response cache** (`services/cache.ts`, `X-FreeLLM-Cache`) is orthogonal: global, temperature-gated, in-memory LRU; idempotency is durable (SQLite), per-caller, and fingerprint-bound. Both short-circuit provider calls.
-- **Degraded mode** (`docs/architecture/04-degraded-mode-and-failover.md`) disables bandit exploration but does not affect idempotency — replays still bypass routing entirely.
+- **Degraded mode** ([`docs/en/architecture/04-degraded-mode-and-failover.md`](../architecture/04-degraded-mode-and-failover.md)) disables bandit exploration but does not affect idempotency — replays still bypass routing entirely.
 - **Failover**: only the final successful body is stored. If a request exhausts the fallback loop, nothing is stored for that key.
 
 ---
 
 ## Related
 
-- `docs/env/01-variables.md#idempotency` — `IDEMPOTENCY_TTL_MS` defaults and bounds.
-- `docs/architecture/04-degraded-mode-and-failover.md` — retry budget, hedging, and fallback headers that apply when a `miss` enters the loop.
+- [`docs/en/env/01-variables.md#idempotency`](../env/01-variables.md#idempotency) — `IDEMPOTENCY_TTL_MS` defaults and bounds.
+- [`docs/en/architecture/04-degraded-mode-and-failover.md`](../architecture/04-degraded-mode-and-failover.md) — retry budget, hedging, and fallback headers that apply when a `miss` enters the loop.
 - `01-rest-api.md` — OpenAI-compatible surface (`/v1/chat/completions`) and response headers (`X-Routed-Via`, `X-Fallback-Detail`).

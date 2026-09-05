@@ -6,7 +6,7 @@ Doc revision history for `docs/architecture/`, seeded from commits touching arch
 
 ## 2026-09-02
 
-- **docs(architecture): cross-ref Idempotency-Key replay in degraded-mode doc** — `04-degraded-mode-and-failover.md:10` now maps the pre-routing idempotency lookup (`server/src/services/idempotency.ts`, `proxy.ts:1793-1838`) and post-success persist (`proxy.ts:2640-2656`) to the fallback loop, notes `X-Routed-Via: idempotency` zero-cost replay, `stream:true` + `finish_reason:length` exclusion, in-flight NOT deduplicated (`95bc46f`), `IDEMPOTENCY_TTL_MS` 24 h lazy sweep, and that `409` + replay bypass `isDegraded()` / retry budget / hedging. Client contract lives in `docs/api/02-idempotency.md` (`36b877d`).
+- **docs(architecture): cross-ref Idempotency-Key replay in degraded-mode doc** — `04-degraded-mode-and-failover.md:10` now maps the pre-routing idempotency lookup (`server/src/services/idempotency.ts`, `proxy.ts:1793-1838`) and post-success persist (`proxy.ts:2640-2656`) to the fallback loop, notes `X-Routed-Via: idempotency` zero-cost replay, `stream:true` + `finish_reason:length` exclusion, in-flight NOT deduplicated (`95bc46f`), `IDEMPOTENCY_TTL_MS` 24 h lazy sweep, and that `409` + replay bypass `isDegraded()` / retry budget / hedging. Client contract lives in `docs/en/api/02-idempotency.md` (`36b877d`).
 
 ## 2026-08-25
 

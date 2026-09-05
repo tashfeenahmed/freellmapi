@@ -4,7 +4,7 @@
 
 ## Scope
 
-This domain holds the implementation deep-dives for FreeLLMAPI's server-side architecture. Each file expands one subsystem with source pointers, scoring formulas, state machines and commit-tagged history. For the high-level summary — what the system is, how a request flows, honest limitations and the provider ToS review — see the high-level index [`architecture.md`](00-high-level-index.md).
+This domain holds the implementation deep-dives for FreeLLMAPI's server-side architecture. Each file expands one subsystem with source pointers, scoring formulas, state machines and commit-tagged history. For the high-level summary — what the system is, how a request flows, honest limitations and the provider ToS review — see the high-level index [00-high-level-index.md](00-high-level-index.md).
 
 ## File Index
 
@@ -20,7 +20,7 @@ This domain holds the implementation deep-dives for FreeLLMAPI's server-side arc
 
 ## How deep-dives fit
 
-The root [`architecture.md`](00-high-level-index.md) stays the high-level index (two-paragraph system summary, request-flow diagram, limitations and ToS). The files above are the deep-dives: start with `01` (bandit scoring & routing) and `02` (quota & cooldown) for the router core, then `03`/`04` for streaming and degraded-mode failover, `05` for catalog sync and `06` for observability internals. The operator-facing logs viewer and polling API are documented separately in [`logs/`](../logs/01-server-logs-viewer.md) and cross-linked from `06`.
+The root [00-high-level-index.md](00-high-level-index.md) stays the high-level index (two-paragraph system summary, request-flow diagram, limitations and ToS). The files above are the deep-dives: start with `01` (bandit scoring & routing) and `02` (quota & cooldown) for the router core, then `03`/`04` for streaming and degraded-mode failover, `05` for catalog sync and `06` for observability internals. The operator-facing logs viewer and polling API are documented separately in [`logs/`](../logs/01-server-logs-viewer.md) and cross-linked from `06`.
 
 ## Navigation
 

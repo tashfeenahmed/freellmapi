@@ -4,7 +4,7 @@
 
 ## Scope
 
-Operating FreeLLMAPI in Docker: the published image, Compose quickstart, persistence, healthchecks, the container-networking gotchas, and the ongoing maintenance work — upgrading, backups, and declarative configuration. Content is derived from [`Dockerfile`](../../../Dockerfile), [`docker-compose.yml`](../../../docker-compose.yml), [`.dockerignore`](../../../.dockerignore), and [`docs/install.md`](../install/01-install.md).
+Operating FreeLLMAPI in Docker: the published image, Compose quickstart, persistence, healthchecks, the container-networking gotchas, and the ongoing maintenance work — upgrading, backups, and declarative configuration. Content is derived from [`Dockerfile`](../../../Dockerfile), [`docker-compose.yml`](../../../docker-compose.yml), [`.dockerignore`](../../../.dockerignore), and [docs/en/install/01-install.md](../install/01-install.md).
 
 For installation paths beyond Docker (one-liner script, local development, desktop app), see [Install & deploy](../install/01-install.md).
 

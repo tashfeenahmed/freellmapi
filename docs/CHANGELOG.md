@@ -1,63 +1,46 @@
 # Changelog
 
-## 2026-09-02 — Per-language structure
+Revision history for `docs/`, derived from git commits touching this directory. Most recent first. Rows marked "landed via #N" describe work done on a contributor branch and squash-merged; the commit shown is the squash on `main`.
+
+## 2026-09-05 — Per-language structure
 
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `c108132` | 2026-09-02 | scaffold per-language en/ and zh-cn/ top-level |
-| `7378adc` | 2026-09-02 | move English domains under en/ (17 domains, git mv) |
-| `cbb2620` | 2026-09-02 | fix link depths after move (0 broken in en/) |
-| `91c1776` | 2026-09-02 | migrate Chinese translations to zh-cn/ (10 domains) |
-| `ab0d0f9` | 2026-09-02 | obliterate i18n wrapper — simple /docs/{en,zh-cn} |
-| `9c679bd` | 2026-09-02 | fix zh-cn link depths |
-| `4761a0b` | 2026-09-02 | fix remaining link depths |
-| `5f887aa` | 2026-09-02 | translate cli and desktop domains to zh-cn |
-| `13ca740` | 2026-09-02 | translate proxy, fallback, glossary to zh-cn |
-| `a0a4df7` | 2026-09-02 | translate troubleshooting to zh-cn |
-
-
-
-Revision history for `docs/`, derived from git commits touching this directory. Most recent first.
+| `ef1b9ce` | 2026-09-05 | docs(zh-cn): translate the four stub pages, fix the Chinese index, anchors and language switchers (#1167) |
+| `eab992f` | 2026-09-05 | docs: per-language layout `docs/{en,zh-cn}`, Chinese README, redirect stubs at the old paths (#1164). Squash of the contributor branch: scaffold `en/` and `zh-cn/`, move the 17 English domains under `en/`, migrate the Chinese translations out of `docs/i18n/zh-CN/docs/` into `zh-cn/`, translate the cli, desktop, proxy, fallback, glossary and troubleshooting domains, fix link depths. |
+| `36850e8` | 2026-09-01 | docs: per-domain folders with OVERVIEW/CHANGELOG metadata (#979). Squash of the contributor branch whose rows are dated 2026-08-22 to 2026-08-25 below. |
 
 ## 2026-09-02
 
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `c2114c0` | 2026-09-02 | docs(proxy): create proxy domain and move Fetch Relay into it — `01-fetch-relay.md` moved from flat `fetch-relay.md`, `detectSystemProxy()` OS auto-detect, `TRUST_PROXY` |
-| `26f71dd` | 2026-09-02 | docs(env): cover `PROXY_MODE`, `FETCH_RELAY_TOKEN`, `TRUST_PROXY`, `QUOTA_OBSERVATIONS_*`, `IDEMPOTENCY_TTL_MS` — full precedence chain, callout boxes |
-| `8bd3acd` | 2026-09-02 | docs(api): document Idempotency-Key safe retries (`02-idempotency.md`) — replay/409/miss, fingerprint, curl example |
+| `eab992f` | 2026-09-02 | docs(proxy): create proxy domain and move Fetch Relay into it — `01-fetch-relay.md` moved from flat `fetch-relay.md`, `detectSystemProxy()` OS auto-detect, `TRUST_PROXY` (landed via #1164) |
+| `eab992f` | 2026-09-02 | docs(env): cover `PROXY_MODE`, `FETCH_RELAY_TOKEN`, `TRUST_PROXY`, `QUOTA_OBSERVATIONS_*`, `IDEMPOTENCY_TTL_MS` — full precedence chain, callout boxes (landed via #1164) |
+| `eab992f` | 2026-09-02 | docs(api): document Idempotency-Key safe retries (`02-idempotency.md`) — replay/409/miss, fingerprint, curl example (landed via #1164) |
 
 ## 2026-08-25
 
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `60d03d6` | 2026-08-25 | docs(api): document video platforms (pollinations/huggingface, 5-min bound, fal queue), free-tier budget API (`GET /api/free-tier`, pool-deduped), and backups API (`GET /api/backups`, DUMP_FORMAT=1, sha256 fingerprint) |
-| `b7482d4` | 2026-08-25 | docs(fallback): add named-chains domain — chain lifecycle, empty-chain authoritative 400 (`activeChainOrThrow`, e852ff1), `auto:<name>` in `GET /v1/models` (cc1e985), `profiles.auto_include_new_models` (b3bf20f), named-chain manager UI (8bb2004) |
-| `5a77e44` | 2026-08-25 | docs(observability): dedupe 06-observability.md against logs viewer, cross-link both ways, add desktop `freeapi.log` file-logger note (90aaa5b) |
-| `f4135a3` | 2026-08-25 | docs(providers): refresh free-tier numbers to 34 providers / 474 families / 635 endpoints (~7.4B tokens/month) in providers/OVERVIEW.md and providers/01-supported-platforms.md |
+| `36850e8` | 2026-08-25 | docs(api): document video platforms (pollinations/huggingface, 5-min bound, fal queue), free-tier budget API (`GET /api/free-tier`, pool-deduped), and backups API (`GET /api/backups`, DUMP_FORMAT=1, sha256 fingerprint) (landed via #979) |
+| `36850e8` | 2026-08-25 | docs(fallback): add named-chains domain — chain lifecycle, empty-chain authoritative 400 (`activeChainOrThrow`, e852ff1), `auto:<name>` in `GET /v1/models` (cc1e985), `profiles.auto_include_new_models` (b3bf20f), named-chain manager UI (8bb2004) (landed via #979) |
+| `36850e8` | 2026-08-25 | docs(observability): dedupe 06-observability.md against logs viewer, cross-link both ways, add desktop `freeapi.log` file-logger note (90aaa5b) (landed via #979) |
+| `36850e8` | 2026-08-25 | docs(providers): refresh free-tier numbers to 34 providers / 474 families / 635 endpoints (~7.4B tokens/month) in providers/OVERVIEW.md and providers/01-supported-platforms.md (landed via #979) |
 
 ## 2026-08-23
 
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `0e515ac` | 2026-08-23 | docs(meta): fix broken links from 2026-08-23 doc updates — 24 links fixed across 16 files (api/compression/clients/i18nzh) |
+| `36850e8` | 2026-08-23 | docs(meta): fix broken links from 2026-08-23 doc updates — 24 links fixed across 16 files (api/compression/clients/i18nzh) (landed via #979) |
 | `1a0ce48` | 2026-08-23 | feat(cli): setup-dsh — configure DeepSeek Harness in one command (#995) |
 | `cf0c216` | 2026-08-23 | perf(compression): early-exit protected-span check in the per-line hot path (#990) |
 | `74df985` | 2026-08-23 | Server log viewer in the dashboard, under an Analytics nav menu (#993) |
-| `96b6f75` | 2026-08-22 | docs(meta): index providers/testing domains and log today's additions |
-| `676ae20` | 2026-08-22 | docs(testing): add test matrix and compatibility-suite documentation |
-| `b21ec10` | 2026-08-22 | docs(providers): add platform catalog and integration guides |
-| `abe6b00` | 2026-08-22 | docs(deployment): add Docker operations and maintenance domain |
-| `ac0a9ce` | 2026-08-22 | docs(env): add runtime configuration reference domain |
+| `36850e8` | 2026-08-22 | docs(meta): index providers/testing domains and log today's additions (landed via #979) |
+| `36850e8` | 2026-08-22 | docs(testing): add test matrix and compatibility-suite documentation (landed via #979) |
+| `36850e8` | 2026-08-22 | docs(providers): add platform catalog and integration guides (landed via #979) |
+| `36850e8` | 2026-08-22 | docs(deployment): add Docker operations and maintenance domain (landed via #979) |
+| `36850e8` | 2026-08-22 | docs(env): add runtime configuration reference domain (landed via #979) |
 
-## 2026-08-22
-
-| Commit | Date | Summary |
-| --- | --- | --- |
-| `676ae20` | 2026-08-22 | docs(testing): add test matrix and compatibility-suite documentation |
-| `b21ec10` | 2026-08-22 | docs(providers): add platform catalog and integration guides |
-| `abe6b00` | 2026-08-22 | docs(deployment): add Docker operations and maintenance domain |
-| `ac0a9ce` | 2026-08-22 | docs(env): add runtime configuration reference domain |
 
 ## 2026-08-10 and earlier
 
