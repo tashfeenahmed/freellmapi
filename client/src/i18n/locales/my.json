@@ -574,7 +574,8 @@
       "subsetNote": "ဤကီးကို ရွေးထားသော မော်ဒယ်များအတွက်သာ ကန့်သတ်ပါမည်။ ၎င်းကို နောက်မှ ကီး၏ အတန်းမှ ပြောင်းလဲနိုင်ပါသည်။",
       "skip": "ယခုမလုပ်ပါ",
       "scopedOne": "ကီးကို မော်ဒယ် 1 ခုသာ ကန့်သတ်ထား",
-      "scopedOther": "ကီးကို မော်ဒယ် {count} ခုသာ ကန့်သတ်ထား"
+      "scopedOther": "ကီးကို မော်ဒယ် {count} ခုသာ ကန့်သတ်ထား",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ကလိုင်းယင့် ပရိုဖိုင်များ",
     "cpDesc": "ကလိုင်းယင့်တစ်ခုချင်းစီအတွက် သီးခြား API ကီးများ၊ တစ်ခုစီတွင် ဆာဗာက အမြဲအသုံးပြုသည့် စနစ် prompt ပါရှိသည်။",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "ကီး တည်းဖြတ်ရန်",
+    "editPlatformLocked": "ဖန်တီးပြီးလျှင် ပေးသွင်းသူနှင့် endpoint ကို ပြောင်းလဲ၍မရပါ။",
+    "editCredentialHint": "လက်ရှိကီးကို ဆက်လက်အသုံးပြုရန် ကွက်လပ်ထားပါ။",
+    "editCredentialPartsRequired": "အကောင့် ID နှင့် API token နှစ်ခုစလုံး ထည့်ပါ။",
+    "editModels": "မော်ဒယ်များ တည်းဖြတ်ရန်",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

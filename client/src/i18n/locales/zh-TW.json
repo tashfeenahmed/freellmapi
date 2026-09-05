@@ -578,7 +578,8 @@
       "subsetNote": "此金鑰將僅限於所選模型。日後可在該金鑰所在列變更。",
       "skip": "暫不設定",
       "scopedOne": "金鑰已限定為 1 個模型",
-      "scopedOther": "金鑰已限定為 {count} 個模型"
+      "scopedOther": "金鑰已限定為 {count} 個模型",
+      "allSaved": "金鑰可服務全部目錄模型"
     },
     "cpTitle": "用戶端設定檔",
     "cpDesc": "為每個用戶端各自發放 API 金鑰，伺服器會一律套用其系統提示詞。",
@@ -598,7 +599,17 @@
     "bulkDelete": "批次刪除",
     "bulkDeleteConfirm": "刪除 {count} 個？",
     "bulkResult": "已更新 {done} 個；失敗 {failed} 個。",
-    "bulkDeleteResult": "已刪除 {done} 個；失敗 {failed} 個。"
+    "bulkDeleteResult": "已刪除 {done} 個；失敗 {failed} 個。",
+    "editKey": "編輯金鑰",
+    "editPlatformLocked": "建立後無法變更提供方和端點。",
+    "editCredentialHint": "留空則保留目前的金鑰。",
+    "editCredentialPartsRequired": "請同時輸入帳號 ID 和 API 權杖。",
+    "editModels": "編輯模型",
+    "editModelsHint": "選擇此金鑰可服務的目錄模型。全選將清除限制。",
+    "editModelsCustomHint": "選擇此金鑰可服務的已註冊端點模型。全選將清除限制。",
+    "editModelsSync": "檢查目錄更新",
+    "editModelsSyncing": "檢查中…",
+    "editModelsSynced": "模型目錄已檢查"
   },
   "backups": {
     "title": "Backups",

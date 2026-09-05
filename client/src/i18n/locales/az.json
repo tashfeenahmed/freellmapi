@@ -574,7 +574,8 @@
       "subsetNote": "Bu açar yalnız seçilmiş modellərlə məhdudlaşacaq. Bunu sonra açarın sətrindən dəyişə bilərsiniz.",
       "skip": "İndi yox",
       "scopedOne": "Açar 1 modellə məhdudlaşdırıldı",
-      "scopedOther": "Açar {count} modellə məhdudlaşdırıldı"
+      "scopedOther": "Açar {count} modellə məhdudlaşdırıldı",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Müştəri profilləri",
     "cpDesc": "Hər müştəri üçün ayrıca API açarı; onun sistem promptunu server həmişə tətbiq edir.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Açarı redaktə et",
+    "editPlatformLocked": "Yaratmadan sonra provayderi və son nöqtəni dəyişmək olmaz.",
+    "editCredentialHint": "Cari açarı saxlamaq üçün boş buraxın.",
+    "editCredentialPartsRequired": "Həm hesab ID-sini, həm API tokenini daxil edin.",
+    "editModels": "Modelləri redaktə et",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

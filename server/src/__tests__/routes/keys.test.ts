@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
+import { decrypt } from '../../lib/crypto.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -215,6 +216,71 @@ describe('Keys API', () => {
     const { body: keys } = await request(app, 'GET', '/api/keys');
     expect(keys[0].enabled).toBe(false);
     expect(keys[0].label).toBe('Disabled key');
+  });
+
+  it('PATCH /api/keys/:id replaces the credential without changing its stable identity', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_old_key_123456',
+      label: 'Before',
+    });
+    getDb().prepare(`
+      INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms)
+      VALUES ('groq', 'llama-3.3-70b', ?, ?)
+    `).run(created.id, Date.now() + 60_000);
+
+    const { status, body } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'gsk_new_key_654321',
+    });
+
+    expect(status).toBe(200);
+    expect(body.maskedKey).toContain('gsk_new_key_654321'.slice(-4));
+    const row = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('gsk_new_key_654321');
+    expect(row.platform).toBe('groq');
+    expect(row.label).toBe('Before');
+    expect(row.enabled).toBe(1);
+    expect(row.status).toBe('unknown');
+    expect(row.last_checked_at).toBeNull();
+    expect(row.last_health_error).toBeNull();
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM rate_limit_cooldowns WHERE key_id = ?')
+      .get(created.id)).toEqual({ n: 0 });
+  });
+
+  it('PATCH /api/keys/:id leaves health state alone when the submitted key is unchanged', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_same_key_123456',
+    });
+    getDb().prepare(`
+      UPDATE api_keys
+         SET status = 'healthy', last_checked_at = datetime('now'), last_health_error = NULL
+       WHERE id = ?
+    `).run(created.id);
+
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'gsk_same_key_123456',
+    });
+
+    expect(status).toBe(200);
+    const row = getDb().prepare('SELECT status, last_checked_at FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(row.status).toBe('healthy');
+    expect(row.last_checked_at).toBeTruthy();
+  });
+
+  it('PATCH /api/keys/:id rejects a credential for a keyless provider', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'kilo',
+      key: '',
+    });
+
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'unexpected-secret',
+    });
+
+    expect(status).toBe(400);
+    const row = getDb().prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('no-key');
   });
 
   it('PATCH /api/keys/:id clears label', async () => {

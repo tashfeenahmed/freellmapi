@@ -574,7 +574,8 @@
       "subsetNote": "המפתח הזה יוגבל למודלים שנבחרו. אפשר לשנות זאת בהמשך משורת המפתח.",
       "skip": "לא עכשיו",
       "scopedOne": "המפתח מוגבל למודל אחד",
-      "scopedOther": "המפתח מוגבל ל-{count} מודלים"
+      "scopedOther": "המפתח מוגבל ל-{count} מודלים",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "פרופילי לקוח",
     "cpDesc": "מפתחות API לכל לקוח, לכל אחד הנחיית מערכת שהשרת מחיל תמיד.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "עריכת מפתח",
+    "editPlatformLocked": "לא ניתן לשנות את הספק ונקודת הקצה לאחר היצירה.",
+    "editCredentialHint": "השאר ריק כדי לשמור על המפתח הנוכחי.",
+    "editCredentialPartsRequired": "יש להזין גם מזהה חשבון וגם אסימון API.",
+    "editModels": "עריכת מודלים",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

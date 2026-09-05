@@ -574,7 +574,8 @@
       "subsetNote": "Avain rajataan valittuihin malleihin. Voit muuttaa tätä myöhemmin avaimen riviltä.",
       "skip": "Ei nyt",
       "scopedOne": "Avain rajattu 1 malliin",
-      "scopedOther": "Avain rajattu {count} malliin"
+      "scopedOther": "Avain rajattu {count} malliin",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Asiakasprofiilit",
     "cpDesc": "API-avaimet asiakaskohtaisesti, kullakin järjestelmäkehote, jonka palvelin lisää aina.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Muokkaa avainta",
+    "editPlatformLocked": "Palveluntarjoajaa ja endpointiä ei voi muuttaa luomisen jälkeen.",
+    "editCredentialHint": "Säilytä nykyinen avain jättämällä kenttä tyhjäksi.",
+    "editCredentialPartsRequired": "Syötä sekä tilin tunnus että API-tunnus.",
+    "editModels": "Muokkaa malleja",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

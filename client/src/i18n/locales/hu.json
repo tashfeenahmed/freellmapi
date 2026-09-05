@@ -574,7 +574,8 @@
       "subsetNote": "Ez a kulcs a kijelölt modellekre lesz korlátozva. Ezt később a kulcs sorában módosíthatja.",
       "skip": "Most nem",
       "scopedOne": "A kulcs 1 modellre korlátozva",
-      "scopedOther": "A kulcs {count} modellre korlátozva"
+      "scopedOther": "A kulcs {count} modellre korlátozva",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Kliensprofilok",
     "cpDesc": "Kliensenkénti API-kulcsok, mindegyikhez saját rendszerprompt, amelyet a szerver mindig alkalmaz.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Kulcs szerkesztése",
+    "editPlatformLocked": "A szolgáltató és a végpont a létrehozás után nem módosítható.",
+    "editCredentialHint": "A jelenlegi kulcs megtartásához hagyja üresen.",
+    "editCredentialPartsRequired": "Adja meg a fiókazonosítót és az API-jogkivonatot is.",
+    "editModels": "Modellek szerkesztése",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

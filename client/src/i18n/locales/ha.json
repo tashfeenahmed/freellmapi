@@ -574,7 +574,8 @@
       "subsetNote": "Wannan maɓalli zai iyakantu ga samfuran da aka zaɓa. Za ka iya canja wannan daga baya a jerin maɓallin.",
       "skip": "Ba yanzu ba",
       "scopedOne": "An iyakance maɓalli ga samfuri 1",
-      "scopedOther": "An iyakance maɓalli ga samfura {count}"
+      "scopedOther": "An iyakance maɓalli ga samfura {count}",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Bayanan martabar abokan ciniki",
     "cpDesc": "Maɓallan API na kowane abokin ciniki, kowanne da umarnin tsarin da sabar ke amfani da shi koyaushe.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Gyara maɓallin",
+    "editPlatformLocked": "Ba a iya canza mai bayarwa ko endpoint bayan ƙirƙira ba.",
+    "editCredentialHint": "Bar sarari don rike maɓallin na yanzu.",
+    "editCredentialPartsRequired": "Shigar da ID na asusu da API token tare.",
+    "editModels": "Gyara samfura",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

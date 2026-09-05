@@ -574,7 +574,8 @@
       "subsetNote": "Ufunguo huu utawekewa kikomo cha modeli zilizochaguliwa. Unaweza kubadilisha hili baadaye kutoka safu ya ufunguo.",
       "skip": "Si sasa",
       "scopedOne": "Ufunguo umezuiliwa kwa modeli 1",
-      "scopedOther": "Ufunguo umezuiliwa kwa modeli {count}"
+      "scopedOther": "Ufunguo umezuiliwa kwa modeli {count}",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Wasifu wa wateja",
     "cpDesc": "Funguo za API kwa kila mteja, kila mmoja na maelekezo ya mfumo ambayo seva hutumia kila wakati.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Hariri ufunguo",
+    "editPlatformLocked": "Muuzaji na endpoint haziwezi kubadilishwa baada ya kuumbwa.",
+    "editCredentialHint": "Iache wazi ili kupeteza ufunguo wa sasa.",
+    "editCredentialPartsRequired": "Weka ID ya akaunti na tokeni ya API.",
+    "editModels": "Hariri mifano",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

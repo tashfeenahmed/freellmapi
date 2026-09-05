@@ -574,7 +574,8 @@
       "subsetNote": "இந்த விசை தேர்ந்தெடுக்கப்பட்ட மாடல்களுக்கு மட்டுமே வரம்பிடப்படும். இதை பின்னர் விசையின் வரிசையிலிருந்து மாற்றலாம்.",
       "skip": "இப்போது வேண்டாம்",
       "scopedOne": "விசை 1 மாடலுக்கு வரம்பிடப்பட்டது",
-      "scopedOther": "விசை {count} மாடல்களுக்கு வரம்பிடப்பட்டது"
+      "scopedOther": "விசை {count} மாடல்களுக்கு வரம்பிடப்பட்டது",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "கிளையண்ட் சுயவிவரங்கள்",
     "cpDesc": "ஒவ்வொரு கிளையண்டுக்கும் தனி API சாவி; அதன் சிஸ்டம் ப்ராம்ப்டை சேவையகம் எப்போதும் பயன்படுத்தும்.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "முகவரை திருத்து",
+    "editPlatformLocked": "உருவாக்கிய பின் வழங்குநரையோ என்புள்ளியையோ மாற்ற முடியாது.",
+    "editCredentialHint": "தற்போதைய முகவரை வைத்திருக்க காலியாக விடுங்கள்.",
+    "editCredentialPartsRequired": "கணக்கு ID மற்றும் API டோக்கன் இரண்டையும் உள்ளிடுங்கள்.",
+    "editModels": "மாதிரிகளைத் திருத்து",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

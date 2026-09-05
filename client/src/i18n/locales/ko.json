@@ -574,7 +574,8 @@
       "subsetNote": "이 키는 선택한 모델로 제한됩니다. 나중에 키 행에서 변경할 수 있습니다.",
       "skip": "나중에",
       "scopedOne": "키가 모델 1개로 제한됨",
-      "scopedOther": "키가 모델 {count}개로 제한됨"
+      "scopedOther": "키가 모델 {count}개로 제한됨",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "클라이언트 프로필",
     "cpDesc": "클라이언트별 API 키로, 각 키의 시스템 프롬프트를 서버가 항상 적용합니다.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "키 편집",
+    "editPlatformLocked": "생성 후에는 공급자와 엔드포인트를 변경할 수 없습니다.",
+    "editCredentialHint": "현재 키를 유지하려면 비워 두세요.",
+    "editCredentialPartsRequired": "계정 ID와 API 토큰을 모두 입력하세요.",
+    "editModels": "모델 편집",
+    "editModelsHint": "이 키가 제공할 수 있는 카탈로그 모델을 선택하세요. 모두 선택하면 범위가 지워집니다.",
+    "editModelsCustomHint": "이 키가 제공할 수 있는 등록된 엔드포인트 모델을 선택하세요. 모두 선택하면 범위가 지워집니다.",
+    "editModelsSync": "카탈로그 업데이트 확인",
+    "editModelsSyncing": "확인 중…",
+    "editModelsSynced": "모델 카탈로그를 확인했습니다"
   },
   "backups": {
     "title": "Backups",

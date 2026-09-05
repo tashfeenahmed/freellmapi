@@ -574,7 +574,8 @@
       "subsetNote": "Deze sleutel wordt beperkt tot de geselecteerde modellen. Je kunt dit later wijzigen via de rij van de sleutel.",
       "skip": "Niet nu",
       "scopedOne": "Sleutel beperkt tot 1 model",
-      "scopedOther": "Sleutel beperkt tot {count} modellen"
+      "scopedOther": "Sleutel beperkt tot {count} modellen",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Clientprofielen",
     "cpDesc": "API-sleutels per client, elk met een systeemprompt die de server altijd toepast.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Sleutel bewerken",
+    "editPlatformLocked": "Provider en endpoint kunnen na aanmaak niet worden gewijzigd.",
+    "editCredentialHint": "Laat leeg om de huidige sleutel te houden.",
+    "editCredentialPartsRequired": "Voer zowel de account-ID als het API-token in.",
+    "editModels": "Modellen bewerken",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

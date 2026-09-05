@@ -574,7 +574,8 @@
       "subsetNote": "កូនសោនេះនឹងត្រូវកំណត់ត្រឹមម៉ូដែលដែលបានជ្រើសរើស។ អ្នកអាចផ្លាស់ប្តូរវានៅពេលក្រោយពីជួរដេករបស់កូនសោ។",
       "skip": "មិនមែនឥឡូវទេ",
       "scopedOne": "កូនសោកំណត់ត្រឹមម៉ូដែល 1",
-      "scopedOther": "កូនសោកំណត់ត្រឹមម៉ូដែល {count}"
+      "scopedOther": "កូនសោកំណត់ត្រឹមម៉ូដែល {count}",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ប្រវត្តិរូបអតិថិជន",
     "cpDesc": "សោ API សម្រាប់អតិថិជននីមួយៗ ដែលមាន system prompt ដែលម៉ាស៊ីនមេអនុវត្តជានិច្ច។",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "កែសម្រួលកូនសោ",
+    "editPlatformLocked": "មិនអាចផ្លាស់ប្ដូរក្រុមហ៊ុនផ្ដល់សេវា ឬចំណុចបញ្ចប់បានទេ បន្ទាប់ពីបង្កើត។",
+    "editCredentialHint": "ទុកចំហរ ដើម្បីរក្សាកូនសោបច្ចុប្បន្ន។",
+    "editCredentialPartsRequired": "សូមបញ្ចូលទាំង ID គណនី និង token API។",
+    "editModels": "កែសម្រួលម៉ូដេល",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

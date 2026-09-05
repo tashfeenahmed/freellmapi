@@ -574,7 +574,8 @@
       "subsetNote": "یہ کلید صرف منتخب ماڈلز تک محدود رہے گی۔ آپ بعد میں کلید کی سطر سے یہ تبدیل کر سکتے ہیں۔",
       "skip": "ابھی نہیں",
       "scopedOne": "کلید 1 ماڈل تک محدود",
-      "scopedOther": "کلید {count} ماڈلز تک محدود"
+      "scopedOther": "کلید {count} ماڈلز تک محدود",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "کلائنٹ پروفائلز",
     "cpDesc": "ہر کلائنٹ کے لیے الگ API کلید، جس کا سسٹم پرامپٹ سرور ہمیشہ لاگو کرتا ہے۔",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "کلید ترمیم کریں",
+    "editPlatformLocked": "بنانے کے بعد فراہم کنندہ اور اینڈ پوائنٹ تبدیل نہیں ہو سکتے۔",
+    "editCredentialHint": "موجودہ کلید رکھنے کے لیے خالی چھوڑیں۔",
+    "editCredentialPartsRequired": "اکاؤنٹ ID اور API ٹوکن دونوں درج کریں۔",
+    "editModels": "ماڈل ترمیم کریں",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

@@ -574,7 +574,8 @@
       "subsetNote": "ही की फक्त निवडलेल्या मॉडेल्सपुरती मर्यादित राहील. तुम्ही हे नंतर कीच्या ओळीतून बदलू शकता.",
       "skip": "आत्ता नको",
       "scopedOne": "की 1 मॉडेलपुरती मर्यादित",
-      "scopedOther": "की {count} मॉडेल्सपुरती मर्यादित"
+      "scopedOther": "की {count} मॉडेल्सपुरती मर्यादित",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "क्लायंट प्रोफाइल",
     "cpDesc": "प्रत्येक क्लायंटसाठी वेगळी API की, जिचा सिस्टम प्रॉम्प्ट सर्व्हर नेहमी लागू करतो.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "की संपादा",
+    "editPlatformLocked": "तयार केल्यानंतर पुरवठादार आणि एंडपॉइंट बदलता येत नाही.",
+    "editCredentialHint": "सध्याची की ठेवण्यासाठी रिकामे ठेवा.",
+    "editCredentialPartsRequired": "खाते ID आणि API टोकन दोन्ही टाका.",
+    "editModels": "मॉडेल्स संपादा",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

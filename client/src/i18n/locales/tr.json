@@ -574,7 +574,8 @@
       "subsetNote": "Bu anahtar seçili modellerle sınırlı olacak. Bunu daha sonra anahtarın satırından değiştirebilirsiniz.",
       "skip": "Şimdi değil",
       "scopedOne": "Anahtar 1 modelle sınırlandırıldı",
-      "scopedOther": "Anahtar {count} modelle sınırlandırıldı"
+      "scopedOther": "Anahtar {count} modelle sınırlandırıldı",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "İstemci profilleri",
     "cpDesc": "İstemci başına API anahtarları; her birinin sistem istemini sunucu her zaman uygular.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Anahtarı düzenle",
+    "editPlatformLocked": "Oluşturmadan sonra sağlayıcı ve uç nokta değiştirilemez.",
+    "editCredentialHint": "Geçerli anahtarı korumak için boş bırakın.",
+    "editCredentialPartsRequired": "Hem hesap kimliğini hem de API belirtecini girin.",
+    "editModels": "Modelleri düzenle",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

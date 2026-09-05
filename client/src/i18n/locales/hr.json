@@ -574,7 +574,8 @@
       "subsetNote": "Ovaj će ključ biti ograničen na odabrane modele. To možete promijeniti kasnije u retku ključa.",
       "skip": "Ne sada",
       "scopedOne": "Ključ je ograničen na 1 model",
-      "scopedOther": "Ključ je ograničen na {count} modela"
+      "scopedOther": "Ključ je ograničen na {count} modela",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Profili klijenata",
     "cpDesc": "API ključevi po klijentu, svaki sa sistemskim promptom koji poslužitelj uvijek primjenjuje.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Uredi ključ",
+    "editPlatformLocked": "Davatelj usluga i krajnja točka ne mogu se promijeniti nakon stvaranja.",
+    "editCredentialHint": "Ostavite prazno da biste zadržali trenutačni ključ.",
+    "editCredentialPartsRequired": "Unesite i ID računa i API token.",
+    "editModels": "Uredi modele",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

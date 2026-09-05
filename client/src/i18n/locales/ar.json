@@ -574,7 +574,8 @@
       "subsetNote": "سيقتصر هذا المفتاح على النماذج المحددة. يمكنك تغيير ذلك لاحقًا من صف المفتاح.",
       "skip": "ليس الآن",
       "scopedOne": "المفتاح مقيّد بنموذج واحد",
-      "scopedOther": "المفتاح مقيّد بـ {count} نماذج"
+      "scopedOther": "المفتاح مقيّد بـ {count} نماذج",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ملفات تعريف العملاء",
     "cpDesc": "مفاتيح API لكل عميل، لكل منها موجّه نظام يطبّقه الخادم دائمًا.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "تحرير المفتاح",
+    "editPlatformLocked": "لا يمكن تغيير المزوّد أو نقطة النهاية بعد الإنشاء.",
+    "editCredentialHint": "اتركه فارغاً للاحتفاظ بالمفتاح الحالي.",
+    "editCredentialPartsRequired": "أدخل معرّف الحساب ورمز API معاً.",
+    "editModels": "تحرير النماذج",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

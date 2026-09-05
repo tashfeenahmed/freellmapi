@@ -574,7 +574,8 @@
       "subsetNote": "Цей ключ буде обмежено вибраними моделями. Змінити це можна пізніше в рядку ключа.",
       "skip": "Не зараз",
       "scopedOne": "Ключ обмежено 1 моделлю",
-      "scopedOther": "Ключ обмежено {count} моделями"
+      "scopedOther": "Ключ обмежено {count} моделями",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Профілі клієнтів",
     "cpDesc": "Окремі API-ключі для кожного клієнта, кожен зі своїм системним промптом, який сервер застосовує завжди.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Редагувати ключ",
+    "editPlatformLocked": "Постачальника та кінцеву точку не можна змінити після створення.",
+    "editCredentialHint": "Залиште порожнім, щоб зберегти поточний ключ.",
+    "editCredentialPartsRequired": "Введіть і ID облікового запису, і API-токен.",
+    "editModels": "Редагувати моделі",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

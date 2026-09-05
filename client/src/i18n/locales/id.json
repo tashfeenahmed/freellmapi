@@ -574,7 +574,8 @@
       "subsetNote": "Kunci ini akan dibatasi pada model yang dipilih. Anda dapat mengubahnya nanti dari baris kunci tersebut.",
       "skip": "Nanti saja",
       "scopedOne": "Kunci dibatasi ke 1 model",
-      "scopedOther": "Kunci dibatasi ke {count} model"
+      "scopedOther": "Kunci dibatasi ke {count} model",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Profil klien",
     "cpDesc": "Kunci API per klien, masing-masing dengan prompt sistem yang selalu diterapkan server.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Edit kunci",
+    "editPlatformLocked": "Penyedia dan endpoint tidak dapat diubah setelah dibuat.",
+    "editCredentialHint": "Biarkan kosong untuk mempertahankan kunci saat ini.",
+    "editCredentialPartsRequired": "Masukkan ID akun dan token API.",
+    "editModels": "Edit model",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

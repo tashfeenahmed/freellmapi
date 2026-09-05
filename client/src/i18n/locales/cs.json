@@ -574,7 +574,8 @@
       "subsetNote": "Tento klíč bude omezen na vybrané modely. Změnit to můžete později v řádku klíče.",
       "skip": "Teď ne",
       "scopedOne": "Klíč omezen na 1 model",
-      "scopedOther": "Klíč omezen na {count} modelů"
+      "scopedOther": "Klíč omezen na {count} modelů",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Profily klientů",
     "cpDesc": "Samostatné API klíče pro každého klienta, každý se systémovým promptem, který server vždy použije.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Upravit klíč",
+    "editPlatformLocked": "Poskytovatel a koncový bod se po vytvoření nedají změnit.",
+    "editCredentialHint": "Chcete-li zachovat aktuální klíč, ponechte pole prázdné.",
+    "editCredentialPartsRequired": "Zadejte ID účtu i token API.",
+    "editModels": "Upravit modely",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

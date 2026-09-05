@@ -574,7 +574,8 @@
       "subsetNote": "Αυτό το κλειδί θα περιοριστεί στα επιλεγμένα μοντέλα. Μπορείτε να το αλλάξετε αργότερα από τη γραμμή του κλειδιού.",
       "skip": "Όχι τώρα",
       "scopedOne": "Το κλειδί περιορίζεται σε 1 μοντέλο",
-      "scopedOther": "Το κλειδί περιορίζεται σε {count} μοντέλα"
+      "scopedOther": "Το κλειδί περιορίζεται σε {count} μοντέλα",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Προφίλ πελατών",
     "cpDesc": "Κλειδιά API ανά πελάτη, καθένα με ένα system prompt που ο διακομιστής εφαρμόζει πάντα.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Επεξεργασία κλειδιού",
+    "editPlatformLocked": "Ο πάροχος και το endpoint δεν αλλάζουν μετά τη δημιουργία.",
+    "editCredentialHint": "Αφήστε το κενό για να διατηρηθεί το τρέχον κλειδί.",
+    "editCredentialPartsRequired": "Εισάγετε το ID λογαριασμού και το API token.",
+    "editModels": "Επεξεργασία μοντέλων",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

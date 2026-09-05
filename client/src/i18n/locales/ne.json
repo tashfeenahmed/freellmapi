@@ -574,7 +574,8 @@
       "subsetNote": "यो कुञ्जी छानिएका मोडेलहरूमा मात्र सीमित हुनेछ। तपाईं यसलाई पछि कुञ्जीको पङ्क्तिबाट परिवर्तन गर्न सक्नुहुन्छ।",
       "skip": "अहिले होइन",
       "scopedOne": "कुञ्जी 1 मोडेलमा सीमित",
-      "scopedOther": "कुञ्जी {count} मोडेलमा सीमित"
+      "scopedOther": "कुञ्जी {count} मोडेलमा सीमित",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "क्लाइन्ट प्रोफाइलहरू",
     "cpDesc": "प्रत्येक क्लाइन्टका लागि छुट्टै API कुञ्जी, जसको सिस्टम प्रम्प्ट सर्भरले सधैँ लागू गर्छ।",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "कुञ्जी सम्पादन",
+    "editPlatformLocked": "सिर्जना पछि प्रदायक र एन्डपोइन्ट परिवर्तन गर्न मिल्दैन।",
+    "editCredentialHint": "हालको कुञ्जी राख्न खाली छोड्नुहोस्।",
+    "editCredentialPartsRequired": "खाता ID र API टोकन दुवै प्रविष्ट गर्नुहोस्।",
+    "editModels": "मोडेल सम्पादन",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

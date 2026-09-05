@@ -574,7 +574,8 @@
       "subsetNote": "Dieser Schlüssel wird auf die ausgewählten Modelle beschränkt. Sie können dies später in der Zeile des Schlüssels ändern.",
       "skip": "Jetzt nicht",
       "scopedOne": "Schlüssel auf 1 Modell begrenzt",
-      "scopedOther": "Schlüssel auf {count} Modelle begrenzt"
+      "scopedOther": "Schlüssel auf {count} Modelle begrenzt",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Client-Profile",
     "cpDesc": "API-Schlüssel pro Client, jeweils mit einem System-Prompt, den der Server immer anwendet.",
@@ -598,7 +599,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Schlüssel bearbeiten",
+    "editPlatformLocked": "Anbieter und Endpoint können nach dem Erstellen nicht geändert werden.",
+    "editCredentialHint": "Leer lassen, um den aktuellen Schlüssel zu behalten.",
+    "editCredentialPartsRequired": "Gib sowohl die Konto-ID als auch das API-Token ein.",
+    "editModels": "Modelle bearbeiten",
+    "editModelsHint": "Wähle, welche Katalogmodelle dieser Schlüssel bedienen darf. Alles auswählen entfernt die Einschränkung.",
+    "editModelsCustomHint": "Wähle, welche registrierten Endpoint-Modelle dieser Schlüssel bedienen darf. Alles auswählen entfernt die Einschränkung.",
+    "editModelsSync": "Katalogaktualisierungen prüfen",
+    "editModelsSyncing": "Prüfen…",
+    "editModelsSynced": "Modellkatalog geprüft"
   },
   "backups": {
     "title": "Backups",
