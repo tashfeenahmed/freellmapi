@@ -339,6 +339,18 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
   return result.sort((a, b) => b.penalty - a.penalty);
 }
 
+/**
+ * Operator clear (#952): forget every model's penalty at once and report how
+ * many models were carrying one. Pairs with clearAllCooldowns — a pool stuck
+ * behind day-long benches also has its models sunk by penalties, and lifting
+ * one without the other leaves the router still avoiding them.
+ */
+export function clearAllPenalties(): number {
+  const count = getAllPenalties().length;
+  rateLimitPenalties.clear();
+  return count;
+}
+
 // ── Routing strategy (persisted) ────────────────────────────────────────────
 const STRATEGY_KEY = 'routing_strategy';
 const CUSTOM_WEIGHTS_KEY = 'routing_custom_weights';

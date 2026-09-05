@@ -103,6 +103,9 @@ export interface RoutingData {
   /** Key-selection policy (#919). Required for the same reason as
    *  exploreEnabled: the picker renders straight from GET /routing. */
   keySelectionStrategy: KeySelectionStrategy
+  /** Ceiling on the router's own cooldown guesses in ms (#952); null = no cap
+   *  (ladder tops out at 24h, 402/403 bench a day). */
+  cooldownCeilingMs: number | null
   scores: (RoutingScore & { platform: string; modelId: string; displayName: string; enabled: boolean })[]
 }
 

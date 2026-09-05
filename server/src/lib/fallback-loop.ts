@@ -25,8 +25,8 @@ import {
   getActiveCooldownsForKeys,
   getCooldownDecisionForLimit,
   getSoonestCooldownExpiry,
-  PAYMENT_REQUIRED_COOLDOWN_MS,
-  MODEL_FORBIDDEN_COOLDOWN_MS,
+  getPaymentRequiredCooldownMs,
+  getModelForbiddenCooldownMs,
   learnLimitFromError,
   type CooldownDecision,
 } from '../services/ratelimit.js';
@@ -175,7 +175,9 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
  * The one true cooldown-duration selection after a retryable upstream failure:
  *   - 402 out-of-credits  → a full day (PAYMENT_REQUIRED_COOLDOWN_MS)
  *   - 403 model-not-on-tier → a full day (MODEL_FORBIDDEN_COOLDOWN_MS), because a
- *     tier/subscription gate won't clear on the next minute window (issue #256)
+ *     tier/subscription gate won't clear on the next minute window (issue #256).
+ *     Both honour the operator's cooldown ceiling (#952): relay endpoints emit
+ *     these for transient reasons, and a day is then far too long.
  *   - a 429 that says the DAILY free allocation is spent (Cloudflare "used up
  *     your daily free allocation of 10,000 neurons") → benched until the next
  *     UTC midnight, like the 402 path. The old transient 90s cooldown made the
@@ -201,8 +203,8 @@ export function cooldownForError(route: RouteResult, err: any): number {
  * Retry-After actually determined the expiry.
  */
 export function cooldownDecisionForError(route: RouteResult, err: any): CooldownDecision {
-  if (isPaymentRequiredError(err)) return { durationMs: PAYMENT_REQUIRED_COOLDOWN_MS, source: 'credit' };
-  if (isModelAccessForbiddenError(err)) return { durationMs: MODEL_FORBIDDEN_COOLDOWN_MS, source: 'tier' };
+  if (isPaymentRequiredError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
+  if (isModelAccessForbiddenError(err)) return { durationMs: getModelForbiddenCooldownMs(), source: 'tier' };
   if (isDailyQuotaExhaustedError(err)) {
     return { durationMs: err?.retryAfterMs ?? msUntilNextUtcMidnight(), source: 'authoritative' };
   }
@@ -241,6 +243,15 @@ export function resetEmptyCompletionStreaks(): void {
  *  reach it. */
 export function resetModelFailureWindows(): void {
   modelFailureTimestamps.clear();
+}
+
+/** Operator clear (#952): drop every model's failure window and report how many
+ *  models were mid-streak. The benches those streaks produced are ordinary
+ *  cooldown rows and go with clearAllCooldowns. */
+export function clearModelFailureWindows(): number {
+  const count = modelFailureTimestamps.size;
+  modelFailureTimestamps.clear();
+  return count;
 }
 
 // Advance (or break) the streak for this failure and report whether the

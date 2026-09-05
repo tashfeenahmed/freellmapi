@@ -1,6 +1,6 @@
 // Sliding window rate limit tracker with SQLite persistence.
 
-import { getDb } from '../db/index.js';
+import { getDb, getSetting, setSetting } from '../db/index.js';
 import { isLoopbackOrPrivateUrl } from '../lib/url-guard.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 
@@ -874,6 +874,50 @@ const COOLDOWN_DURATIONS = [
   DAY,          // 4th and beyond
 ];
 
+// ── Operator ceiling on automatic cooldowns (#952, #1049) ────────────────────
+// The ladder above and the day-long 402/403 benches below assume a provider
+// whose failures mean what they say. Relay endpoints often don't: a "busy" or
+// "insufficient balance" blip clears in minutes, yet a handful of them per key
+// walked every key+model pair of a pool onto a 24h bench with no way back but
+// the per-key reset button. `routing_cooldown_ceiling_ms` caps how long OUR
+// guesses may bench a route. It never shortens a provider-stated retry time
+// (Retry-After, daily-quota reset): those are facts, and re-hammering a
+// provider that told us when to come back would only burn quota. Unset =
+// unchanged behaviour (the ladder tops out at a day).
+export const COOLDOWN_CEILING_KEY = 'routing_cooldown_ceiling_ms';
+export const MIN_COOLDOWN_CEILING_MS = MINUTE;
+export const MAX_COOLDOWN_CEILING_MS = DAY;
+
+/** The configured ceiling in ms, or null when unset/invalid (no cap). Read
+ *  through a try/catch like every other DB touch in this module so a failure
+ *  before the DB is ready degrades to "no cap" instead of throwing mid-route. */
+export function getCooldownCeilingMs(): number | null {
+  let raw: string | undefined;
+  try { raw = getSetting(COOLDOWN_CEILING_KEY); } catch { return null; }
+  if (raw === undefined || raw.trim() === '') return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < MIN_COOLDOWN_CEILING_MS || n > MAX_COOLDOWN_CEILING_MS) return null;
+  return n;
+}
+
+/** null clears the ceiling (back to the uncapped ladder). */
+export function setCooldownCeilingMs(value: number | null): void {
+  if (value === null) {
+    getDb().prepare('DELETE FROM settings WHERE key = ?').run(COOLDOWN_CEILING_KEY);
+    return;
+  }
+  if (!Number.isInteger(value) || value < MIN_COOLDOWN_CEILING_MS || value > MAX_COOLDOWN_CEILING_MS) {
+    throw new Error(`cooldown ceiling must be an integer between ${MIN_COOLDOWN_CEILING_MS} and ${MAX_COOLDOWN_CEILING_MS} ms`);
+  }
+  setSetting(COOLDOWN_CEILING_KEY, String(value));
+}
+
+/** Apply the operator ceiling to one of OUR heuristic bench durations. */
+export function capCooldownMs(durationMs: number): number {
+  const ceiling = getCooldownCeilingMs();
+  return ceiling === null ? durationMs : Math.min(durationMs, ceiling);
+}
+
 export function getNextCooldownDuration(platform: string, modelId: string, keyId: number): number {
   const key = `${platform}:${modelId}:${keyId}`;
   const now = Date.now();
@@ -881,7 +925,7 @@ export function getNextCooldownDuration(platform: string, modelId: string, keyId
   hits.push(now);
   cooldownHits.set(key, hits);
   const idx = Math.min(hits.length - 1, COOLDOWN_DURATIONS.length - 1);
-  return COOLDOWN_DURATIONS[idx]!;
+  return capCooldownMs(COOLDOWN_DURATIONS[idx]!);
 }
 
 function clearCooldownHits(platform: string, modelId: string, keyId: number): void {
@@ -909,6 +953,11 @@ const UNKNOWN_LIMIT_MAX_COOLDOWN_MS = 10 * MINUTE;
 // on the next 402 after expiry if still unpaid; a restart re-benches on first hit.
 export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
 
+/** The 402 bench with the operator ceiling applied (#952). */
+export function getPaymentRequiredCooldownMs(): number {
+  return capCooldownMs(PAYMENT_REQUIRED_COOLDOWN_MS);
+}
+
 // Long cooldown for a 403 Forbidden on a key that already passed validateKey
 // (so it is not a dead key — the health checker disables those). A request-time
 // 403 means this key's tier can't reach this specific model (e.g. gpt-4o on
@@ -916,6 +965,11 @@ export const PAYMENT_REQUIRED_COOLDOWN_MS = DAY;
 // change within a minute window, so bench this model+key for a full day and let
 // the router fail over to a model the key can actually serve. See issue #256.
 export const MODEL_FORBIDDEN_COOLDOWN_MS = DAY;
+
+/** The 403 tier bench with the operator ceiling applied (#952). */
+export function getModelForbiddenCooldownMs(): number {
+  return capCooldownMs(MODEL_FORBIDDEN_COOLDOWN_MS);
+}
 
 // When RPD/TPD limits are NULL (provider's published daily quota is unknown or
 // not yet seeded — common for ollama, cloudflare, nvidia, huggingface, mistral,
@@ -1286,6 +1340,28 @@ export function clearCooldownsForKey(keyId: number): number {
     }
   }
 
+  return Math.max(cleared, memoryCleared);
+}
+
+/**
+ * Drop EVERY cooldown (all keys, all models), the escalation-ladder counters
+ * and the null-limits hit windows — the "my whole pool is stuck" escape hatch
+ * (#952). Returns how many active benches were lifted. Penalties and the
+ * model-failure windows live elsewhere; services/penalty-inspector.ts
+ * composes all three into one clear.
+ */
+export function clearAllCooldowns(now = Date.now()): number {
+  const cleared = withDb(db => {
+    const result = db.prepare('DELETE FROM rate_limit_cooldowns WHERE expires_at_ms > ?').run(now);
+    // Expired rows are dead weight either way; sweep them in the same pass.
+    db.prepare('DELETE FROM rate_limit_cooldowns WHERE expires_at_ms <= ?').run(now);
+    return Number(result.changes ?? 0);
+  }) ?? 0;
+  let memoryCleared = 0;
+  for (const expiry of cooldowns.values()) if (expiry > now) memoryCleared++;
+  cooldowns.clear();
+  cooldownHits.clear();
+  nullLimitHits.clear();
   return Math.max(cleared, memoryCleared);
 }
 

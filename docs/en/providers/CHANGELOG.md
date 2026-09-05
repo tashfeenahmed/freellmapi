@@ -4,6 +4,7 @@ Revision history for `docs/providers/`, listing the upstream commits that shaped
 
 | Commit | Date | Summary |
 | --- | --- | --- |
+| Unreleased | 2026-09-05 | Cooldown ceiling (`routing_cooldown_ceiling_ms`) and Router pressure "Clear all" (#952). |
 | Unreleased | 2026-09-04 | Add AMD Radeon Cloud TokenFactory shared-model adapter and catalog-ready platform wiring. |
 | Unreleased | 2026-09-01 | Add the native Sail Research background Responses adapter and catalog-ready platform wiring. |
 | `ef4519a` | 2026-08-23 | feat(providers): add xkiro.com as OpenAI-compatible provider (#967) |

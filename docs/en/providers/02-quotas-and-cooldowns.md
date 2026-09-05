@@ -34,6 +34,8 @@ A 429 blocks that model+key pair for a period:
 | Payment required (402) | 1 day | Out-of-credits. |
 | Model forbidden (403 tier gate) | 1 day | Key valid, model gated to a higher tier. |
 | Local endpoint errors | 5s | Never enters the ladder. |
+
+**Operator ceiling (#952).** Relay endpoints often return "busy" or "insufficient balance" for transient reasons, and a few of those per key can walk a whole pool onto day-long benches. Fallback page → routing options → *Longest automatic cooldown* (`routing_cooldown_ceiling_ms`, `PUT /api/fallback/routing {"cooldownCeilingMs"}`) caps the escalation ladder and the 402/403 benches at 10 min, 1 h or 6 h. Provider-stated retry times (Retry-After, daily-quota resets) are never shortened. The *Router pressure* panel's **Clear all** (`DELETE /api/fallback/penalty-inspector`) lifts every cooldown, score penalty, ladder counter and cross-key failure streak at once; the per-key reset (`DELETE /api/keys/:id/cooldowns`) remains for the surgical case.
 | Auth failure (401) | benched until the next health cycle | ~5 minutes. |
 
 ### Provenance and probe-based early recovery

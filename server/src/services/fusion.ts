@@ -7,7 +7,7 @@ import {
 import {
   recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit,
   getCooldownDecisionForLimit,
-  PAYMENT_REQUIRED_COOLDOWN_MS, MODEL_FORBIDDEN_COOLDOWN_MS,
+  getPaymentRequiredCooldownMs, getModelForbiddenCooldownMs,
 } from './ratelimit.js';
 import { logRequest } from '../lib/request-log.js';
 import {
@@ -279,9 +279,9 @@ async function runModelCall(
         // credit/tier benches are never probe-recovered, Retry-After-backed
         // ones only when our heuristic outlasted the provider's own retry time.
         const decision = isPaymentRequiredError(err)
-          ? { durationMs: PAYMENT_REQUIRED_COOLDOWN_MS, source: 'credit' as const }
+          ? { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' as const }
           : isModelAccessForbiddenError(err)
-          ? { durationMs: MODEL_FORBIDDEN_COOLDOWN_MS, source: 'tier' as const }
+          ? { durationMs: getModelForbiddenCooldownMs(), source: 'tier' as const }
           : getCooldownDecisionForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }, err.retryAfterMs, { quotaSignal: isRateLimitSignal(err) });
         setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
         recordRateLimitHit(route.modelDbId);
@@ -369,9 +369,9 @@ async function runJudgeStreaming(
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
         // Same provenance mapping as the non-stream path above.
         const decision = isPaymentRequiredError(err)
-          ? { durationMs: PAYMENT_REQUIRED_COOLDOWN_MS, source: 'credit' as const }
+          ? { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' as const }
           : isModelAccessForbiddenError(err)
-          ? { durationMs: MODEL_FORBIDDEN_COOLDOWN_MS, source: 'tier' as const }
+          ? { durationMs: getModelForbiddenCooldownMs(), source: 'tier' as const }
           : getCooldownDecisionForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }, err.retryAfterMs, { quotaSignal: isRateLimitSignal(err) });
         setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
         recordRateLimitHit(route.modelDbId);

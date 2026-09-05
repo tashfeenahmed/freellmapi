@@ -11,7 +11,8 @@ import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrate
 import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
-import { getPenaltyInspector } from '../services/penalty-inspector.js';
+import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
+import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
@@ -30,11 +31,19 @@ fallbackRouter.get('/routing', (_req: Request, res: Response) => {
     peakStartHour: peakHours.startHour,
     peakEndHour: peakHours.endHour,
     peakTimezone: peakHours.timezone,
+    cooldownCeilingMs: getCooldownCeilingMs(),
   });
 });
 
 fallbackRouter.get('/penalty-inspector', (_req: Request, res: Response) => {
   res.json(getPenaltyInspector());
+});
+
+// DELETE /penalty-inspector → lift every cooldown, penalty and failure streak
+// at once (#952). The per-key DELETE /api/keys/:id/cooldowns stays for the
+// surgical case; this is the escape hatch for a pool that cannot route at all.
+fallbackRouter.delete('/penalty-inspector', (_req: Request, res: Response) => {
+  res.json(clearRouterPressure());
 });
 
 const routingSchema = z.object({
@@ -59,6 +68,12 @@ const routingSchema = z.object({
   // `strategy`, which ranks MODELS — the two are set from the same form, so
   // they round-trip through the same request.
   keySelectionStrategy: z.enum(['auto', 'least-remaining']).optional(),
+  // Ceiling on automatic cooldowns (#952): 1 min .. 24 h in ms, null = no cap
+  // (the escalation ladder keeps its 24h top step and 402/403 bench a day).
+  cooldownCeilingMs: z.number().int()
+    .min(MIN_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at least ${MIN_COOLDOWN_CEILING_MS} (1 minute)` })
+    .max(MAX_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at most ${MAX_COOLDOWN_CEILING_MS} (24 hours)` })
+    .nullable().optional(),
 });
 
 // PUT /routing → switch strategy. Presets are just weight vectors over the three
@@ -86,6 +101,9 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
   }
   if (parsed.data.keySelectionStrategy !== undefined) {
     setKeySelectionStrategy(parsed.data.keySelectionStrategy);
+  }
+  if (parsed.data.cooldownCeilingMs !== undefined) {
+    setCooldownCeilingMs(parsed.data.cooldownCeilingMs);
   }
   try {
     setPeakHoursConfig({
@@ -115,6 +133,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
     peakStartHour: peak.startHour,
     peakEndHour: peak.endHour,
     peakTimezone: peak.timezone,
+    cooldownCeilingMs: getCooldownCeilingMs(),
   });
 });
 
