@@ -51,6 +51,38 @@ describe('summarizeExhaustion', () => {
     expect(msg).toContain('1 rate-limited or on cooldown');
   });
 
+  // Keyless models are dropped before the routing walk, so they must be
+  // reported OUTSIDE the "routes checked" total: counting them inflated the
+  // pool the caller thinks it has (37 reported for a 22-candidate clean tier).
+  describe('keyless-skipped count', () => {
+    // Separator selectKeyForModel really emits, built by code point so the
+    // fixture stays byte-identical to production output.
+    const SEP = String.fromCharCode(0x2014);
+    const diag = [`groq/llama: 1 key(s) ${SEP} cooldown:1`];
+
+    it('reports skipped models separately from the route total', () => {
+      const msg = summarizeExhaustion(diag, null, now, 14);
+      expect(msg).toContain('1 route checked');
+      expect(msg).not.toContain('15 routes checked');
+      expect(msg).toContain('14 models skipped: no key configured for their platform.');
+    });
+
+    it('singularizes one skipped model', () => {
+      expect(summarizeExhaustion(diag, null, now, 1)).toContain('1 model skipped:');
+    });
+
+    it('says nothing when none were skipped', () => {
+      expect(summarizeExhaustion(diag, null, now, 0)).not.toContain('skipped');
+      expect(summarizeExhaustion(diag, null, now)).not.toContain('skipped');
+    });
+
+    it('still reports skips when every candidate was dropped (empty diag)', () => {
+      const msg = summarizeExhaustion([], null, now, 14);
+      expect(msg).toMatch(/^All models exhausted\./);
+      expect(msg).toContain('14 models skipped: no key configured for their platform.');
+    });
+  });
+
   it('classifies prompt-too-large lines, not as rate limits', () => {
     const diag = [
       'groq/gpt-oss-120b: tpm_limit 8000 < estimated 33476',

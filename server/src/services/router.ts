@@ -81,11 +81,18 @@ export function summarizeExhaustion(
   diag: string[] | undefined,
   soonestResetMs?: number | null,
   now = Date.now(),
+  keylessSkipped = 0,
 ): string {
   const eta = formatResetEta(soonestResetMs, now);
   const etaSuffix = eta ? ` Soonest reset ${eta}.` : '';
+  // Models dropped before the walk (#423 follow-up) are reported separately and
+  // never counted as "routes checked": they were never candidates, and folding
+  // them into the total inflates the pool the caller thinks it has.
+  const keylessSuffix = keylessSkipped > 0
+    ? ` ${keylessSkipped} model${keylessSkipped === 1 ? '' : 's'} skipped: no key configured for their platform.`
+    : '';
   if (!diag || diag.length === 0) {
-    return `All models exhausted. ${EXHAUSTION_ADVICE}${etaSuffix}`;
+    return `All models exhausted. ${EXHAUSTION_ADVICE}${etaSuffix}${keylessSuffix}`;
   }
 
   const counts: Record<string, number> = {};
@@ -116,7 +123,7 @@ export function summarizeExhaustion(
   ];
   const parts = order.filter(b => counts[b]).map(b => `${counts[b]} ${b}`);
   const total = diag.length;
-  return `All models exhausted: ${total} route${total === 1 ? '' : 's'} checked (${parts.join(', ')}). ${EXHAUSTION_ADVICE}${etaSuffix}`;
+  return `All models exhausted: ${total} route${total === 1 ? '' : 's'} checked (${parts.join(', ')}). ${EXHAUSTION_ADVICE}${etaSuffix}${keylessSuffix}`;
 }
 
 interface KeyRow {
@@ -2012,6 +2019,31 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     }
   }
 
+  // Drop models whose platform has NO enabled+healthy key before the walk. Such
+  // a row can never produce a route (selectKeyForModel's first query returns
+  // empty for it), so walking it is pure overhead on every request, and its diag
+  // line pads the exhaustion summary with a constant that has nothing to do with
+  // why THIS request failed. On the clean tier that was 14 of 36 rows, reported
+  // as "37 routes checked" when only 22 were ever candidates.
+  //
+  // An explicit pin is exempt: the client named that model, so it still gets
+  // walked and still reports "no enabled+healthy key for platform" against its
+  // own label rather than vanishing into an aggregate.
+  const keyCounts = usableKeyCountsByPlatform(db);
+  const isRoutable = (e: ChainRow) =>
+    e.model_db_id === preferredModelDbId || (keyCounts.get(e.platform) ?? 0) > 0;
+  const routableChain = sortedChain.filter(isRoutable);
+  const keylessSkipped = sortedChain.length - routableChain.length;
+  // One aggregate line, not one per model: the platforms stay visible to anyone
+  // reading RouteError.diagnostics (and keep routingExhaustionBody classifying a
+  // fully-unconfigured pool as 503 config, not a 429 rate limit), without N
+  // near-identical rows drowning the request's real reasons.
+  const keylessLine = keylessSkipped > 0
+    ? `${keylessSkipped} model(s) skipped: no enabled+healthy key for platform (${
+        [...new Set(sortedChain.filter(e => !isRoutable(e)).map(e => e.platform))].sort().join(', ')
+      })`
+    : null;
+
   // Per-model disposition, attached to the exhaustion error when the loop falls
   // through with no route — the only record of WHY the pool was empty on the
   // synchronous "all exhausted" path (nothing downstream logs it). See issue _1.
@@ -2026,7 +2058,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   // hop instead of no route at all.
   const servingChain: ChainRow[] = [];
   const marginDeferred: ChainRow[] = [];
-  for (const e of sortedChain) {
+  for (const e of routableChain) {
     (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve) ? servingChain : marginDeferred).push(e);
   }
   servingChain.push(...marginDeferred);
@@ -2103,7 +2135,13 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     if (route) return route;
   }
 
-  throw new RouteError(summarizeExhaustion(diag, getSoonestCooldownExpiry()), 429, diag);
+  // The aggregate keyless line rides in diagnostics but NOT in the summary's
+  // route count: those models were never candidates for this request.
+  throw new RouteError(
+    summarizeExhaustion(diag, getSoonestCooldownExpiry(), Date.now(), keylessSkipped),
+    429,
+    keylessLine ? [...diag, keylessLine] : diag,
+  );
 }
 
 /**
