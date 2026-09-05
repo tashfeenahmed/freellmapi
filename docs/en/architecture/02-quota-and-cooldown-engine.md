@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/02-quota-and-cooldown-engine.md)
+
 # Quota & Cooldown Engine — Deep Dive
 
 > **Source:** `server/src/services/ratelimit.ts`, `server/src/services/cooldown-probe.ts`, `server/src/services/provider-quota.ts`

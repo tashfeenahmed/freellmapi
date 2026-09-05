@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/00-high-level-index.md)
+
 # Architecture & internals
 
 [← Back to README](../../../README.md) · [Documentation index](../README.md) · [Deep-dive domain](OVERVIEW.md)
@@ -57,7 +59,7 @@ The scope is deliberately narrow. If a feature isn't in the README's feature lis
 - **`n > 1`** (multiple completions per request)
 - **Per-user billing / multi-tenant auth** — single-user by design
 
-PRs that add any of these are very welcome. See [Contributing](../README.md#contributing).
+PRs that add any of these are very welcome. See [Contributing](../../../README.md#contributing).
 
 ## Limitations
 

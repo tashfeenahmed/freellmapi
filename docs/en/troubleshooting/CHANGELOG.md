@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/troubleshooting/CHANGELOG.md)
+
 # Changelog — troubleshooting
 
 | Commit | Date | Summary |

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/testing/01-running-tests.md)
+
 # Running tests
 
 ## Root chain

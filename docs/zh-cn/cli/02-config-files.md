@@ -31,7 +31,7 @@
 1. 在 `cli/tools.json` 中新增条目（`id`、`name`、`category`、`configType`、`protocol`、`baseUrlSupport`、`command`、`docsUrl`）。
 2. 在 `cli/src/tools.ts` 中新增 `function myTool(ctx: GenerateContext): Generation` —— 返回正确的 `path`/`format`/`value` 的 `files` 以及供 CLI 输出的 `notes`。使用辅助函数 `rootUrl()`/`v1Url()`/`primaryModel()`/`contextWindow()`。
 3. 在 `cli/src/tools.test.ts` 中新增快照用例。
-4. 在 [01-generators.md](01-generators.md) 表格与 `docs/clients/01-agent-clients.md` 章节中补充文档。
+4. 在 [01-generators.md](01-generators.md) 表格与 `docs/en/clients/01-agent-clients.md` 章节中补充文档。
 5. 若仪表盘会列出它，需同步 `client/src/data/agent-tools.json`。
 
 ## 相关

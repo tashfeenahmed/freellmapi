@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/06-observability.md)
+
 # Observability — Deep Dive
 
 > **Source:** `server/src/lib/server-logs.ts`, `server/src/routes/logs.ts`, `server/src/lib/request-log.ts`, `server/src/lib/log-redaction.ts`, `server/src/lib/attempt-trace.ts`

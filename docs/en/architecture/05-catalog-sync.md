@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/05-catalog-sync.md)
+
 # Catalog Sync — Deep Dive
 
 > **Source:** `server/src/services/catalog-sync.ts`, `server/src/services/model-state.ts`, `server/src/db/migrations/`

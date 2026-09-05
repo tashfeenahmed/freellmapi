@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/fallback/CHANGELOG.md)
+
 # Fallback Domain — Changelog
 
 Doc revision history for `docs/fallback/`, seeded from fallback-relevant commits.

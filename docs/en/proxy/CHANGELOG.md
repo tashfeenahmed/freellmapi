@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/proxy/CHANGELOG.md)
+
 # Proxy Domain — Changelog
 
 Revision history for `docs/proxy/`, derived from git commits touching the outbound proxy and Fetch Relay surface. Most recent first.

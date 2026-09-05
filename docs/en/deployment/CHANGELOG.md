@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/deployment/CHANGELOG.md)
+
 # Changelog
 
 Revision history for `docs/deployment/`, listing the commits that shaped the Docker operations and maintenance behavior documented here. Most recent first.

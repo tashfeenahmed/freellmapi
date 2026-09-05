@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/providers/01-supported-platforms.md)
+
 # Supported platforms
 
 The `Platform` union in [`shared/types.ts` (line 59)](../../../shared/types.ts) is the single source of truth for platform identity; the runtime registry in [`server/src/providers/index.ts`](../../../server/src/providers/index.ts) must match it. The union currently declares **43 members**:

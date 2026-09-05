@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/logs/01-server-logs-viewer.md)
+
 # Server Logs Viewer
 
 The dashboard includes a live **Server Logs** viewer (accessible from the

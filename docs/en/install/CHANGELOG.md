@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/install/CHANGELOG.md)
+
 # Changelog
 
 Revision history for `docs/install/`, derived from git commits touching this directory. Most recent first.

@@ -46,7 +46,7 @@ printf "ENCRYPTION_KEY=%s\nPORT=3001\n" "$ENCRYPTION_KEY" > .env
 docker compose up -d
 ```
 
-Windows PowerShell 版本和 curl 一行命令引导见 [`docs/install.md`](../../en/install/01-install.md#docker-compose)。然后跟踪日志：
+Windows PowerShell 版本和 curl 一行命令引导见 [`docs/install.md`](../install/01-install.md#docker-compose)。然后跟踪日志：
 
 ```bash
 docker compose logs -f freellmapi
@@ -97,7 +97,7 @@ runtime 阶段在 `EXPOSE 3001` 之前切换到 `USER node`。服务器数据目
 
 宿主机一切正常，容器里的提供方却不可达？容器有自己独立的网络栈，有两件在你机器上顺理成章的事不会自动延续过去：
 
-- **`127.0.0.1` 上的代理不是你的机器。** 在容器内部，环回地址指容器自己。如果你经由宿主机上的代理客户端（Clash、v2rayN、sing-box 或公司代理）访问提供方，就让 FreeLLMAPI 指向宿主机：`PROXY_URL=socks5h://host.docker.internal:7890`。随附的 `docker-compose.yml` 通过 `extra_hosts` 把 `host.docker.internal` 映射到宿主机网关，所以在原生 Linux Docker 上和 Docker Desktop 里都可用。代理还得接受来自环回之外的连接（在 Clash 里是 `allow-lan: true`）。更多细节见 [../env/03-outbound-proxies.md](../env/03-outbound-proxies.md#docker-127001-指的是容器)。
+- **`127.0.0.1` 上的代理不是你的机器。** 在容器内部，环回地址指容器自己。如果你经由宿主机上的代理客户端（Clash、v2rayN、sing-box 或公司代理）访问提供方，就让 FreeLLMAPI 指向宿主机：`PROXY_URL=socks5h://host.docker.internal:7890`。随附的 `docker-compose.yml` 通过 `extra_hosts` 把 `host.docker.internal` 映射到宿主机网关，所以在原生 Linux Docker 上和 Docker Desktop 里都可用。代理还得接受来自环回之外的连接（在 Clash 里是 `allow-lan: true`）。更多细节见 [../env/03-outbound-proxies.md](../env/03-outbound-proxies.md#docker127001-指的是容器)。
 - **纯 IPv6 的宿主机需要在 Docker 里启用 IPv6。** 默认桥接网络只有 IPv4，所以在没有 IPv4 路由的主机上容器什么都够不着，DNS 也一样。在 `/etc/docker/daemon.json` 中以 `"ipv6": true`、`"ip6tables": true` 和一段 `"fixed-cidr-v6"` 网段启用，然后重启 Docker。
 
 想分辨自己撞上的是哪种情况，直接问容器本身：

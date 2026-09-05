@@ -1,9 +1,12 @@
+[English](../en/CHANGELOG.md) · **简体中文**
+
 # Changelog
 
-Doc revision history for `docs/i18n/zh-CN/`. Most recent first.
+`docs/zh-cn/` 的文档修订历史（2026-09-05 之前位于 `docs/i18n/zh-CN/`）。最近的在前。
 
 | Date | Commit | Change |
 | --- | --- | --- |
+| 2026-09-05 | [`eab992f`](https://github.com/tashfeenahmed/freellmapi/commit/eab992f) | docs: 按语言重排为 `docs/zh-cn/`（#1164）；补齐幂等、架构索引、Termux、安装总览四页中文；修正索引与锚点 |
 | 2026-08-23 | `e82f85f` | docs(i18n): translate logs/ and architecture/ domains to zh-CN |
 | 2026-08-23 | [`2331045`](https://github.com/tashfeenahmed/freellmapi/commit/2331045) | docs(providers): add unorouter and xkiro to platform catalog |
 | 2026-08-23 | [`453de80`](https://github.com/tashfeenahmed/freellmapi/commit/453de80) | docs(providers): document xkiro 5M tokens/day and unorouter per-min RPM in quotas |

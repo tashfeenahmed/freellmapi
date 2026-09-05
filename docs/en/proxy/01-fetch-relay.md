@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/proxy/01-fetch-relay.md)
+
 # Fetch Relay transport
 
 FreeLLMAPI can route provider HTTP requests through an application-layer

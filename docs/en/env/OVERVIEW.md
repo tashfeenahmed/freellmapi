@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/env/OVERVIEW.md)
+
 # Environment configuration overview
 
 ## Scope

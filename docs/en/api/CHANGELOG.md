@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/api/CHANGELOG.md)
+
 # API Domain — Changelog
 
 Doc revision history for `docs/api/`, seeded from API-relevant commits.

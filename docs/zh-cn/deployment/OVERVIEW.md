@@ -4,9 +4,9 @@
 
 ## 范围
 
-在 Docker 中运营 FreeLLMAPI：已发布的镜像、Compose 快速开始、持久化、健康检查、容器网络坑点，以及日常维护工作——升级、备份和声明式配置。内容取材自 [`Dockerfile`](../../../Dockerfile)、[`docker-compose.yml`](../../../docker-compose.yml)、[`.dockerignore`](../../../.dockerignore) 与 [`docs/install.md`](../../en/install/01-install.md)。
+在 Docker 中运营 FreeLLMAPI：已发布的镜像、Compose 快速开始、持久化、健康检查、容器网络坑点，以及日常维护工作——升级、备份和声明式配置。内容取材自 [`Dockerfile`](../../../Dockerfile)、[`docker-compose.yml`](../../../docker-compose.yml)、[`.dockerignore`](../../../.dockerignore) 与 [`docs/install.md`](../install/01-install.md)。
 
-Docker 之外的安装路径（一行命令脚本、本地开发、桌面应用）见「[安装与部署](../../en/install/01-install.md)」。
+Docker 之外的安装路径（一行命令脚本、本地开发、桌面应用）见「[安装与部署](../install/01-install.md)」。
 
 ## 文件索引
 

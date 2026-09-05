@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/env/02-security-and-keys.md)
+
 # Security and key handling
 
 How FreeLLMAPI protects the provider API keys you store in it, and how the `ENCRYPTION_KEY` that makes that protection real is generated, stored, and migrated.

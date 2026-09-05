@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/env/CHANGELOG.md)
+
 # Changelog
 
 Revision history for `docs/env/`, listing the commits that shaped the runtime configuration surface documented here. Most recent first.

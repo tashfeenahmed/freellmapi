@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/fallback/OVERVIEW.md)
+
 # Fallback Domain — Overview & File Index
 
 This domain documents FreeLLMAPI's named fallback-chain system: how chains are stored, how the router resolves the active chain (and refuses when it is empty), how named chains surface to clients as `auto:<name>`, and how catalog sync interacts with curated chains. The root [`README.md`](../README.md) and [`OVERVIEW.md`](../OVERVIEW.md) index this as the operator's primary mechanism for controlling which models the router may use.

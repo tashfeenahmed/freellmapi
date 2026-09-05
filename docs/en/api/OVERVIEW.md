@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/api/OVERVIEW.md)
+
 # API Domain — Overview & File Index
 
 This domain documents FreeLLMAPI's OpenAI-compatible HTTP surface and its Anthropic/Gemini-compatible shims. The root [`README.md`](../README.md) and [`OVERVIEW.md`](../OVERVIEW.md) index this as the gateway's external contract.

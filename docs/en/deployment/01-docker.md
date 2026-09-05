@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/deployment/01-docker.md)
+
 # Docker
 
 The production image, the Compose quickstart, and everything about running FreeLLMAPI in a container: persistence, ports, health, and the networking gotchas.

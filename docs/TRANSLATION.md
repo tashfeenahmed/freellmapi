@@ -3,8 +3,10 @@
 The dashboard ships 60 locales under `client/src/i18n/locales/`. `en.json` is the source of
 truth: every other file mirrors its key structure exactly.
 
-Translating the README and the docs pages is a separate job with its own layout and rules,
-covered in [TRANSLATION.md](TRANSLATION.md) itself. The terminology table below applies to both.
+Translating the README and the docs pages is a separate job: the tree is `docs/<lang>/<domain>/…`,
+one file per English page with the same name, and each language keeps its own index at
+`docs/<lang>/OVERVIEW.md` (see [zh-cn/OVERVIEW.md](zh-cn/OVERVIEW.md)). The terminology table
+below applies to both.
 
 ## Before you open a PR
 

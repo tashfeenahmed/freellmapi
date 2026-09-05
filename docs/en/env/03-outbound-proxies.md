@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/env/03-outbound-proxies.md)
+
 # Outbound proxies
 
 How FreeLLMAPI routes its provider-bound traffic through proxies, which variables win when several are set, and the Docker networking gotchas that come with that.
@@ -5,7 +7,7 @@ How FreeLLMAPI routes its provider-bound traffic through proxies, which variable
 Sources: [`.env.example`](../../../.env.example) (proxy block), [`docker-compose.yml`](../../../docker-compose.yml), the container-networking notes in [`docs/install.md`](../install/01-install.md), the proxy transports in [`../proxy/01-fetch-relay.md`](../proxy/01-fetch-relay.md) / [`../proxy/OVERVIEW.md`](../proxy/OVERVIEW.md) (`server/src/lib/proxy.ts:52-414`, `server/src/lib/config.ts:95-110` for `TRUST_PROXY`).
 
 - [Proxy chain precedence](#proxy-chain-precedence)
-- [Fetch Relay transport](#fetch-relay-transport)
+- [Fetch Relay transport](#fetch-relay-transport-summary)
 - [Scheme support](#scheme-support)
 - [NO_PROXY bypasses](#no_proxy-bypasses)
 - [Docker: 127.0.0.1 is the container](#docker-127001-is-the-container)

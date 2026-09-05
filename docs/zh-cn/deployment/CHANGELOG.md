@@ -1,3 +1,5 @@
+[English](../../en/deployment/CHANGELOG.md) · **简体中文**
+
 # 变更记录
 
 `docs/deployment/` 的修订历史，列出塑造了本文档所述 Docker 运维与维护行为的提交。最新在前。

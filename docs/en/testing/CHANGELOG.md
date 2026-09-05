@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/testing/CHANGELOG.md)
+
 # Changelog
 
 Revision history for `docs/testing/`, listing the upstream commits that shaped the test infrastructure documented here. Most recent first.

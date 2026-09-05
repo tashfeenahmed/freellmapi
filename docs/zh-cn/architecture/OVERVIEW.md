@@ -2,7 +2,7 @@
 
 # 架构域 —— 概览与文件索引
 
-本目录包含 FreeLLMAPI 服务端架构的深度文档。根目录的 [`architecture.md`](../../en/architecture/00-high-level-index.md) 仍是高层索引；这些文件把各子系统展开并给出实现细节。
+本目录包含 FreeLLMAPI 服务端架构的深度文档。根目录的 [`architecture.md`](00-high-level-index.md) 仍是高层索引；这些文件把各子系统展开并给出实现细节。
 
 ## 文件索引
 
@@ -19,4 +19,4 @@
 ## 导航
 
 - ← [文档根目录](../README.md)
-- ↑ [高层架构索引](../../en/architecture/00-high-level-index.md)
+- ↑ [高层架构索引](00-high-level-index.md)

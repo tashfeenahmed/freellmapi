@@ -1,4 +1,4 @@
-**English** · [简体中文](../../zh-cn/install/OVERVIEW.md)
+**English** · [简体中文](../../zh-cn/install/01-install.md)
 
 # Install & deploy
 

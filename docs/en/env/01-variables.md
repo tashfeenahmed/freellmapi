@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/env/01-variables.md)
+
 # Environment variable reference
 
 Every variable FreeLLMAPI reads from `.env`, grouped by concern. Defaults and descriptions are derived only from the comments and values in [`.env.example`](../../../.env.example). Variables shown commented out in `.env.example` are optional; their documented default is listed here.

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/logs/OVERVIEW.md)
+
 # Logs Domain
 
 ## Scope

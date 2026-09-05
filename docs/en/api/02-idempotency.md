@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/api/02-idempotency.md)
+
 # Idempotency-Key — Safe Retries for Non-Streaming Chat Completions
 
 > **Sources:** `server/src/services/idempotency.ts`, `server/src/routes/proxy.ts:1793-1835` (entry) + `2640-2656` (persist), `server/src/db/migrations/20260901_000001_idempotency_claims.ts`, commit `36b877d` (feature), `95bc46f` (in-flight clarification), env `IDEMPOTENCY_TTL_MS` documented in `docs/env/01-variables.md#idempotency`.

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/deployment/02-updates-and-backup.md)
+
 # Updates and backup
 
 Keeping a Docker deployment current, protecting the SQLite data volume, and making installs reproducible with declarative configuration.

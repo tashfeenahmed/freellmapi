@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/compression/CHANGELOG.md)
+
 # Changelog
 
 Doc revision history for `docs/compression/`. Most recent first.

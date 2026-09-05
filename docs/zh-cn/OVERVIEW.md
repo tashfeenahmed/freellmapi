@@ -1,50 +1,39 @@
-# zh-CN Translations
+[English](../en/OVERVIEW.md) · **简体中文**
 
-## Scope
+# 文档 —— 简体中文
 
-Simplified Chinese translations of the core documentation: the pages that cover
-what FreeLLMAPI is, how to install it, and how to call its API. Each file below
-mirrors an English original at the same position in the tree, with
-`docs/i18n/zh-CN/` removed from the path.
+简体中文文档的语言级索引。每个文件都与 `docs/en/` 中同一位置的英文原文一一对应；术语遵循 [../TRANSLATION.md](../TRANSLATION.md) 中约定的中文术语表（提供方、词元、令牌……），与仪表盘界面保持一致。
 
-Terminology follows the settled zh-CN table in
-[../TRANSLATION.md](../TRANSLATION.md) so these docs and the dashboard UI
-use the same words (提供方, 词元, 令牌, ...).
+## 域
 
-## File index
-
-| File | Mirrors | Description |
+| 域 | 对应英文 | 说明 |
 | --- | --- | --- |
-| [README.md](README.md) | [../../README.md](../../README.md) | Project overview: what the gateway does, supported providers, quick start, and configuration - the full root README in Simplified Chinese. |
-| [../en/README.md](../en/README.md) | [../en/README.md](../en/README.md) | Documentation index page listing every guide in the docs tree. |
-| [docs/install.md](../en/install/01-install.md) | [../../../docs/install.md](../en/install/01-install.md) | Installation guide covering Docker Compose, local setup, and desktop app installs. |
-| [../en/api/01-rest-api.md](../en/api/01-rest-api.md) | [../en/api/01-rest-api.md](../en/api/01-rest-api.md) | API reference for the OpenAI-compatible `/v1` endpoints, authentication, and request formats. |
+| [api/](api/OVERVIEW.md) | [en/api/](api/OVERVIEW.md) | API 参考：聊天补全、流式、工具调用、视觉、嵌入、响应头、Anthropic Messages 接口、幂等键。 |
+| [architecture/](architecture/OVERVIEW.md) | [en/architecture/](architecture/OVERVIEW.md) | 架构深入解析：老虎机路由与评分、额度与冷却引擎、流式管线、降级模式与故障转移、目录同步、可观测性。另见 [00-high-level-index.md](architecture/00-high-level-index.md)。 |
+| [cli/](cli/OVERVIEW.md) | [en/cli/](cli/OVERVIEW.md) | 安装 CLI：`setup-*` 生成器、配置文件合并层。 |
+| [clients/](clients/OVERVIEW.md) | [en/clients/](clients/OVERVIEW.md) | 客户端与编程智能体：兼容 OpenAI 的客户端、配置配方、MCP、编辑器补全。 |
+| [compression/](compression/OVERVIEW.md) | [en/compression/](compression/OVERVIEW.md) | 提示词压缩：模式、安全保护、按请求控制、过滤器、统计。 |
+| [deployment/](deployment/OVERVIEW.md) | [en/deployment/](deployment/OVERVIEW.md) | Docker 运维：镜像、Compose、网络、升级、备份。 |
+| [desktop/](desktop/OVERVIEW.md) | [en/desktop/](desktop/OVERVIEW.md) | 桌面应用：Electron 结构、文件日志、更新分发。 |
+| [env/](env/OVERVIEW.md) | [en/env/](env/OVERVIEW.md) | 运行时配置：`.env` 变量、加密密钥、出站代理。 |
+| [fallback/](fallback/OVERVIEW.md) | [en/fallback/](fallback/OVERVIEW.md) | 命名回退链：生命周期、`auto:<name>`、目录同步回填。 |
+| [glossary/](glossary/OVERVIEW.md) | [en/glossary/](glossary/OVERVIEW.md) | 术语表：余量、RPD/TPD、池键、`auto:<name>`、模型年龄闸。 |
+| [install/](install/OVERVIEW.md) | [en/install/](install/OVERVIEW.md) | 安装：快速开始、Docker Compose、本地开发、桌面应用、Termux。 |
+| [logs/](logs/OVERVIEW.md) | [en/logs/](logs/OVERVIEW.md) | 服务器日志查看器：实时面板、两级存储、轮询 API。 |
+| [providers/](providers/OVERVIEW.md) | [en/providers/](providers/OVERVIEW.md) | 提供方集成：支持的平台目录、额度核算、添加新提供方。 |
+| [proxy/](proxy/OVERVIEW.md) | [en/proxy/](proxy/OVERVIEW.md) | 出站代理传输：正向代理与 Fetch Relay、系统自动检测。 |
+| [testing/](testing/OVERVIEW.md) | [en/testing/](testing/OVERVIEW.md) | 测试：本地矩阵、服务端套件、端到端兼容性套件。 |
+| [troubleshooting/](troubleshooting/OVERVIEW.md) | [en/troubleshooting/](troubleshooting/OVERVIEW.md) | 常见问题：Docker、空链、Fetch Relay、幂等、额度、TRUST_PROXY。 |
+| [i18n](../TRANSLATION.md) | — | 翻译流程与术语表 —— 跨语言指南，位于语言目录之外。 |
 
-### Translated domain subtrees
+## 翻译状态
 
-Each folder below mirrors a `docs/` subdomain (OVERVIEW, numbered topic
-docs, CHANGELOG):
+文件集合与英文完全一致：每个英文页面在这里都有同名的中文页面，且所有页面都已有中文内容。少数较长的页面（如 API 参考、安装、出站代理和几篇架构深入解析）在英文原文新增章节后尚未同步，以英文版为准；每个页面页首的语言切换都能直接跳到对应原文。想补齐其中一篇，欢迎提 PR：直接编辑 `docs/zh-cn/` 下的同名文件即可，不要改动文件名或目录结构。
 
-| Folder | Mirrors | Contents |
-| --- | --- | --- |
-| [../en/env/](../en/env/OVERVIEW.md) | [../../../../en/env/](../en/env/) | Runtime configuration surface: the full `.env` variable reference, encryption-key handling, and outbound proxy configuration. |
-| [../en/deployment/](../en/deployment/OVERVIEW.md) | [../../../../en/deployment/](../en/deployment/) | Docker operations: image, Compose quickstart, persistence, healthchecks, upgrades, and backups. |
-| [../en/providers/](../en/providers/OVERVIEW.md) | [../../../../en/providers/](../en/providers/) | Provider layer: supported platforms catalog, quotas/cooldowns/key health, and how to add a new provider. |
-| [../en/testing/](../en/testing/OVERVIEW.md) | [../../../../en/testing/](../en/testing/) | Test matrix across workspaces, server suite conventions, and the coding-agent compatibility suite. |
-| [../en/logs/](../en/logs/OVERVIEW.md) | [../../../../en/logs/](../en/logs/) | Live server log viewer in the dashboard: two-tier store, polling API, level counts, clear endpoint, env vars, redaction integration. |
-| [../en/architecture/](../en/architecture/OVERVIEW.md) | [../../../../en/architecture/](../en/architecture/) | Deep-dive server architecture: bandit router, quota/cooldown engine, streaming pipeline, degraded mode, catalog sync, observability. |
-| [../en/cli/](../en/cli/OVERVIEW.md) | [../../../../en/cli/](../en/cli/) | Setup CLI: `setup-*` generators, config-file merge layer, zero-persistence launchers and `doctor`. |
-| [../en/desktop/](../en/desktop/OVERVIEW.md) | [../../../../en/desktop/](../en/desktop/) | Desktop app: Electron shape, file logging and update delivery. |
-| [../en/fallback/](../en/fallback/OVERVIEW.md) | [../../../../en/fallback/](../en/fallback/) | Named fallback chains: lifecycle, `auto:<name>`, catalog-sync backfill. |
-| [../en/glossary/](../en/glossary/OVERVIEW.md) | [../../../../en/glossary/](../en/glossary/) | Glossary of recurring terms: headroom, RPD/TPD, pool key, `auto:<name>`, model-age gate. |
-| [../en/proxy/](../en/proxy/OVERVIEW.md) | [../../../../en/proxy/](../en/proxy/) | Outbound proxy transports: forward vs fetch-relay, system auto-detect. |
-| [../en/troubleshooting/](../en/troubleshooting/OVERVIEW.md) | [../../../../en/troubleshooting/](../en/troubleshooting/) | 常见问题：Docker 容器网络、空链 `400`、fetch-relay 环回防护、幂等 `409`、额度面板、更新检查、密码重置、反向代理 `TRUST_PROXY`。 |
+## 其他入口
 
-Pages not listed here have no translation yet; they link to their English
-originals by design.
+- [README.md](README.md) —— 中文文档入口页。
+- [../../README.zh-cn.md](../../README.zh-cn.md) —— 项目总览（中文 README）。
+- [../OVERVIEW.md](../OVERVIEW.md) —— `docs/` 目录总索引。
 
-## Navigation
-
-- Up one level: [../OVERVIEW.md](../OVERVIEW.md)
-- Language toggle: every README above links back to
-  **[English](../../README.md)** via the centered language bar at the top.
+另见：[English](../en/OVERVIEW.md) · [翻译指南](../TRANSLATION.md)

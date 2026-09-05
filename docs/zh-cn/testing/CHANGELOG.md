@@ -1,3 +1,5 @@
+[English](../../en/testing/CHANGELOG.md) · **简体中文**
+
 # 变更记录
 
 `docs/testing/` 的修订历史，列出塑造了本文档所述测试基础设施的上游提交。最新在前。

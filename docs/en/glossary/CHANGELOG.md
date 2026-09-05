@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/glossary/CHANGELOG.md)
+
 # Changelog — glossary
 
 | Commit | Date | Summary |

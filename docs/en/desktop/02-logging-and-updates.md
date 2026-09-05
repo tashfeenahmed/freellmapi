@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/desktop/02-logging-and-updates.md)
+
 # Logging and updates — desktop
 
 ## Why `freeapi.log` exists (#824)

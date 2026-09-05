@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/compression/01-compression-pipeline.md)
+
 # Prompt compression
 
 [← Back to README](../README.md) · [Documentation index](../README.md) · [API reference](../api/01-rest-api.md)

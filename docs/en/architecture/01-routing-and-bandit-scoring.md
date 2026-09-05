@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/01-routing-and-bandit-scoring.md)
+
 # Routing & Bandit Scoring — Deep Dive
 
 > **Source:** `server/src/services/router.ts`, `server/src/services/scoring.ts`

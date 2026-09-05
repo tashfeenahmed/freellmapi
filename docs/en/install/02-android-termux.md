@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/install/02-android-termux.md)
+
 # Android (Termux) installation
 
 > Experimental and community-supported. FreeLLMAPI runs locally on the Android device.

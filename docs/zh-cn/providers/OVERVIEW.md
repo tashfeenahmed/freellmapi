@@ -6,7 +6,7 @@
 
 本域文档描述 FreeLLMAPI 的提供方层：网关聚合了哪些平台、每个平台如何鉴权和适配，以及按密钥的额度记账、冷却和健康检查如何让各家免费额度在同一个 OpenAI 兼容 API 之下保持可用。
 
-权威来源是 [`shared/types.ts`](../../../shared/types.ts)（`Platform` 联合类型）、[`server/src/providers/index.ts`](../../../server/src/providers/index.ts)（运行时注册表）和 [`server/src/providers/base.ts`](../../../server/src/providers/base.ts)（适配器契约）。公开目录的招牌数字——约 29 家免费提供方、251 个模型系列、358 个免费端点（约合每月 40 亿词元的在册容量）——来自 [README 的提供方表格](../../en/README.md)；目录实际跟踪的平台比类型联合声明的要少，因为联合中的部分成员已退役，或者由用户自定义而非由目录管理。
+权威来源是 [`shared/types.ts`](../../../shared/types.ts)（`Platform` 联合类型）、[`server/src/providers/index.ts`](../../../server/src/providers/index.ts)（运行时注册表）和 [`server/src/providers/base.ts`](../../../server/src/providers/base.ts)（适配器契约）。公开目录的招牌数字——约 29 家免费提供方、251 个模型系列、358 个免费端点（约合每月 40 亿词元的在册容量）——来自 [README 的提供方表格](../README.md)；目录实际跟踪的平台比类型联合声明的要少，因为联合中的部分成员已退役，或者由用户自定义而非由目录管理。
 
 ## 文件索引
 

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/testing/02-server-suite.md)
+
 # Server suite
 
 ## Layout

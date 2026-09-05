@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/fallback/01-named-chains.md)
+
 # Named Fallback Chains
 
 > **Source:** `server/src/services/router.ts` (`activeChainOrThrow`, `resolveRoutingChain`), `server/src/services/profile-models.ts` (`getActiveProfileId`, `autoIncludeNewModelsForProfiles`), `server/src/routes/fallback.ts`, `server/src/routes/profiles.ts`

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/providers/02-quotas-and-cooldowns.md)
+
 # Quotas, cooldowns, and key health
 
 Free tiers fail in specific, metered ways: per-minute and per-day request caps, token budgets, concurrency limits, and outright quota exhaustion. The gateway models all of them so the router stops spending fallback attempts on keys it already knows are spent. The machinery lives in [`server/src/services/ratelimit.ts`](../../../server/src/services/ratelimit.ts), [`server/src/services/provider-quota.ts`](../../../server/src/services/provider-quota.ts), [`server/src/services/cooldown-probe.ts`](../../../server/src/services/cooldown-probe.ts), [`server/src/services/health.ts`](../../../server/src/services/health.ts), and the shared back-off parsers in [`server/src/providers/base.ts`](../../../server/src/providers/base.ts).

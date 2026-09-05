@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/logs/CHANGELOG.md)
+
 # Changelog
 
 Doc revision history for `docs/logs/`. Most recent first.

@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/cli/02-config-files.md)
+
 # Config files
 
 ## Registry — `cli/tools.json`
@@ -29,7 +31,7 @@ Before first write, `config-files.ts` copies the existing file to `<path>.bak.<I
 1. Add entry to `cli/tools.json` (`id`, `name`, `category`, `configType`, `protocol`, `baseUrlSupport`, `command`, `docsUrl`).
 2. Add `function myTool(ctx: GenerateContext): Generation` in `cli/src/tools.ts` — return `files` with correct `path`/`format`/`value` and `notes` for the CLI output. Use helpers `rootUrl()`/`v1Url()`/`primaryModel()`/`contextWindow()`.
 3. Add snapshot case in `cli/src/tools.test.ts`.
-4. Document in [01-generators.md](01-generators.md) table + `docs/clients/01-agent-clients.md` section.
+4. Document in [01-generators.md](01-generators.md) table + `docs/en/clients/01-agent-clients.md` section.
 5. Sync `client/src/data/agent-tools.json` if the dashboard lists it.
 
 ## Related

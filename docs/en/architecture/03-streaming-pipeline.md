@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/03-streaming-pipeline.md)
+
 # Streaming Pipeline — Deep Dive
 
 > **Source:** `server/src/routes/proxy.ts`, `server/src/routes/responses.ts`, `server/src/routes/anthropic.ts`, `server/src/lib/fallback-loop.ts`

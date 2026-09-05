@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/desktop/01-desktop-app.md)
+
 # Desktop app
 
 ## Package manifest

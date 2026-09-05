@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/desktop/CHANGELOG.md)
+
 # Changelog — desktop
 
 | Commit | Date | Summary |

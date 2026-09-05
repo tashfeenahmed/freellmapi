@@ -1,4 +1,4 @@
-**English** · [简体中文](../../zh-cn/api/OVERVIEW.md)
+**English** · [简体中文](../../zh-cn/api/01-rest-api.md)
 
 # API reference
 
@@ -91,7 +91,7 @@ curl http://localhost:3001/v1/chat/completions \
   }'
 ```
 
-An unknown profile name returns a clear `400` rather than silently falling back. Profiles are named fallback chains (see [Features](../README.md#features)) — create and switch them from the dashboard; whichever is active is what plain `auto` uses.
+An unknown profile name returns a clear `400` rather than silently falling back. Profiles are named fallback chains (see [Features](../../../README.md#features)) — create and switch them from the dashboard; whichever is active is what plain `auto` uses.
 
 ## Model listing
 

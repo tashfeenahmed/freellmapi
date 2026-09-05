@@ -1,3 +1,5 @@
+**English** · [简体中文](../../zh-cn/architecture/CHANGELOG.md)
+
 # Architecture Domain — Changelog
 
 Doc revision history for `docs/architecture/`, seeded from commits touching architecture-relevant code.
