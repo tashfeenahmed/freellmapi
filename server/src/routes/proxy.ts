@@ -1264,7 +1264,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             inputTokens: estimatedInputTokens,
             outputTokens: totalOutputTokens,
           });
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId);
+          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId, null, 'http');
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
@@ -1287,7 +1287,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
               latencyMs: Date.now() - start,
               error: sanitizeProviderErrorMessage(streamErr.message),
             });
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http');
             return 'committed';
           }
           throw streamErr;
@@ -1357,7 +1357,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         inputTokens: promptTokens,
         outputTokens: completionTokens,
       });
-      logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId);
+      logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId, null, 'http');
       return 'done';
     },
     logFailure: (route, err, attempt) => {
@@ -1372,7 +1372,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         latencyMs: latency,
         error: safeError,
       });
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId, null, 'http');
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);
@@ -1396,12 +1396,12 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       }
       setFallbackHeaders(res, info.attempts.length, info.attempts);
       setExhaustionHeaders(res, exhaustion);
-      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion) });
+      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion), execution_id: requestGroupId });
     },
     onExhausted: (exhaustion, info) => {
       setFallbackHeaders(res, info.attempts.length, info.attempts);
       setExhaustionHeaders(res, exhaustion);
-      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion) });
+      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion), execution_id: requestGroupId });
     },
   });
 });
@@ -1434,6 +1434,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         message: `Invalid request: ${detail}`,
         type: 'invalid_request_error',
       },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -2180,7 +2181,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
                 latencyMs: Date.now() - start,
                 error: sanitizeProviderErrorMessage(String(msg)),
               });
-              logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, ttfbMs, pinnedModelId);
+              logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, ttfbMs, pinnedModelId, null, 'http');
               return 'committed';
             }
 
@@ -2467,7 +2468,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             outputTokens,
           });
           logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens, Date.now() - start, null, ttfbMs, pinnedModelId,
-            observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }));
+            observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }), 'http');
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
@@ -2492,7 +2493,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               latencyMs: Date.now() - start,
               error: sanitizeProviderErrorMessage(streamErr.message),
             });
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId);
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http');
             return 'committed';
           }
           // Headers never sent — bubble to the shared loop, which cooldowns this
@@ -2692,7 +2693,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           );
         }
 
-        res.json(outboundBody);
+        // #1102: expose the execution id in the body so clients (incl. AI
+        // agents that ignore headers) can trace this response to its analytics
+        // attempt trail. Additive — OpenAI clients ignore unknown fields.
+        res.json({ execution_id: requestGroupId, ...outboundBody });
 
         // Cache the freshly-generated answer so an identical later request is
         // served from memory without spending another free-tier slot. A
@@ -2720,7 +2724,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           outputTokens: completionTokens,
         });
         logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId,
-          observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }));
+          observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }), 'http');
         return 'done';
       }
     },
@@ -2736,7 +2740,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         latencyMs: latency,
         error: safeError,
       });
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, pinnedModelId, null, 'http');
     },
     onFatal: (route, err, attempt) => {
       // Non-retryable error (bare 4xx, etc.): don't retry.
@@ -2764,12 +2768,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
       setFallbackHeaders(res, info.attempts.length, info.attempts);
       setExhaustionHeaders(res, exhaustion);
-      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion) });
+      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion), execution_id: requestGroupId });
     },
     onExhausted: (exhaustion, info) => {
       setFallbackHeaders(res, info.attempts.length, info.attempts);
       setExhaustionHeaders(res, exhaustion);
-      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion) });
+      res.status(exhaustion.status).json({ error: exhaustionErrorPayload(exhaustion), execution_id: requestGroupId });
     },
   });
 });

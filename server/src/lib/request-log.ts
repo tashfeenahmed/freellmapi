@@ -67,6 +67,10 @@ export function logRequest(
   // lib/served-model.ts). NULL when it matches or the provider reported
   // nothing usable, so the column stays empty in the healthy case.
   servedModel: string | null = null,
+  // Which gateway pathway produced this request: 'http' (OpenAI-compatible
+  // endpoints), 'mcp' (/mcp JSON-RPC), or 'web' (dashboard API). Lets
+  // analytics tell paths apart when debugging. NULL for legacy callers.
+  caller: string | null = null,
 ) {
   try {
     const db = getDb();
@@ -75,9 +79,9 @@ export function logRequest(
     const client = getClientContext();
     const tx = db.transaction(() => {
       const insert = db.prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent);
+        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller);
 
       // Report the row id back to the fallback loop's attempt trace (if one is
       // active): the LAST id noted during a loop run is the terminal row the
