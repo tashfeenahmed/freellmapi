@@ -1,0 +1,15 @@
+{
+  "name": "freellmapi-model-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent sidecar that auto-syncs newly-free OpenRouter models into a local FreeLLMAPI deployment via its HTTP API.",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js",
+    "once": "RUN_ONCE=true node sync.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
