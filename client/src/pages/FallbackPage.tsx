@@ -57,6 +57,7 @@ const STRATEGIES: { key: RoutingStrategy; tKey: string }[] = [
   { key: 'fastest', tKey: 'fastest' },
   { key: 'reliable', tKey: 'reliable' },
   { key: 'custom', tKey: 'custom' },
+  { key: 'manual-smart', tKey: 'manualSmart' },
 ]
 
 // Minimum-context filter buckets for the Models page toolbar. `key` is the token
@@ -151,7 +152,7 @@ export default function FallbackPage() {
   })
 
   // Time-window rate-limit usage (#876). One observer and one poll timer for the
-  // whole table — the row component reads it from a map instead of subscribing
+  // whole table 鈥?the row component reads it from a map instead of subscribing
   // per row, which on a large catalog was hundreds of observers and timers.
   const { data: rateLimitUsage } = useQuery<RateLimitUsageData>({
     queryKey: ['fallback', 'rate-limit-usage'],
@@ -184,7 +185,7 @@ export default function FallbackPage() {
 
   const strategy: RoutingStrategy = routing?.strategy ?? 'balanced'
   const keySelection: KeySelectionStrategy = routing?.keySelectionStrategy ?? 'auto'
-  const isManual = strategy === 'priority'
+  const isManual = strategy === 'priority' || strategy === 'manual-smart'
 
   // Merge fallback metadata with live scores, keyed by model. Memoized (#1047):
   // recomputing these over the whole catalog on every render — and the page
@@ -327,7 +328,7 @@ export default function FallbackPage() {
         {/* First-run checklist: hides itself once the install has keys + a request */}
         <GettingStarted />
 
-        {/* Monthly token budget — moved to the top */}
+        {/* Monthly token budget 鈥?moved to the top */}
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
         {/* Strategy selector */}
@@ -401,7 +402,7 @@ export default function FallbackPage() {
             <div className="mt-3 flex flex-col items-start gap-2 border-t pt-3">
               {/* Key selection (#919). A separate knob from the strategy above:
                   that one ranks MODELS, this one picks between several keys of
-                  the same provider. Shown in every mode — manual chain order
+                  the same provider. Shown in every mode 鈥?manual chain order
                   still leaves the choice of key open. */}
               <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{t('strategies.keySelection')}</span>
@@ -441,8 +442,7 @@ export default function FallbackPage() {
 
               {/* Peak-hours adjustment (#760): an opt-in tweak to the preset
                   weights, and off it does nothing at all. Its "(peak hours)"
-                  marker on the weight summary above stays visible either way —
-                  that one explains live behaviour. */}
+                  marker on the weight summary above stays visible either way 鈥?                  that one explains live behaviour. */}
               {!isManual && routing && (
                 <PeakHoursControls
                   routing={routing}
@@ -606,7 +606,7 @@ export default function FallbackPage() {
                 renders. Present only while rows remain, so IO never fires idle. */}
             {hasMoreRows && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
 
-            {/* Floating action bar — fixed to the viewport so it's always visible,
+            {/* Floating action bar 鈥?fixed to the viewport so it's always visible,
                 sliding up when there are unsaved changes and back down on save/discard. */}
             <FloatingBar show={hasChanges}>
               <span className="text-xs text-muted-foreground">{t('common.unsavedChanges')}</span>

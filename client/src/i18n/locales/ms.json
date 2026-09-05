@@ -331,7 +331,9 @@
     "weightSpeed": "Kelajuan",
     "weightIntelligence": "Perisikan",
     "weightRequired": "Sekurang-kurangnya satu berat mesti melebihi sifar.",
-    "scoreColumn": "Skor"
+    "scoreColumn": "Skor",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Tekanan penghala",

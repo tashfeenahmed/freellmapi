@@ -331,7 +331,9 @@
     "weightSpeed": "Tốc độ",
     "weightIntelligence": "Tình báo",
     "weightRequired": "Ít nhất một trọng lượng phải trên 0.",
-    "scoreColumn": "Điểm"
+    "scoreColumn": "Điểm",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Áp lực bộ định tuyến",

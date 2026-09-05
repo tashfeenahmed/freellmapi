@@ -331,7 +331,9 @@
     "weightSpeed": "Tezlik",
     "weightIntelligence": "Intellekt",
     "weightRequired": "Kamida bitta vazn noldan yuqori bo'lishi kerak.",
-    "scoreColumn": "Gol"
+    "scoreColumn": "Gol",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Router bosimi",

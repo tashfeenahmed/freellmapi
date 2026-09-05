@@ -16,7 +16,8 @@
 // the fire-and-forget key revalidation kicked off on an upstream 401 (below).
 
 import type { RouteResult } from '../services/router.js';
-import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta } from '../services/router.js';
+import { getDb } from '../db/index.js';
+import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, recordHealthFailure, recordHealthSuccess, getRoutingStrategy } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
 import {
   recordRequest,
@@ -291,34 +292,46 @@ function consumeSkipBenchExemption(route: RouteResult, err: any): boolean {
  * Callers add the just-failed key to skipKeys via this function (do not pre-add).
  */
 export function recordRetryableFailure(route: RouteResult, err: any, state: FallbackState, now: number = Date.now()): boolean {
-  // `skipModelForRequest: true` = the failure is MODEL behavior, not key
-  // state (ignored response_format, JSON truncated at max_tokens): a sibling
-  // key would reproduce it exactly, so rule out the whole model for this
-  // request instead of burning one failover hop per key.
-  // Context-too-large is MODEL-level too: a sibling key serves the same model
-  // with the same context window (and, for Groq-style per-key TPM 413s, the
-  // same tier ceiling), so it would reject the same request identically.
-  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || err?.skipModelForRequest === true) {
-    state.skipModels.add(route.modelDbId);
-  }
-  // A model-level 404/410 that says the model is GONE (not merely missing right
-  // now) outlives this request: persist it once the evidence is strong enough,
-  // or the retired model burns a fallback slot on every request forever (#634).
-  // The trace object identifies the request, so one request's failover across
-  // sibling keys counts as the single observation it is.
-  noteModelRetirementSignal(route, err, getRequestTrace());
-  state.skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
-  // #788: provider-level failures (5xx / timeout / transport / degraded) mean
-  // the PROVIDER is sick, not this key — every key AND every model of that
-  // platform would fail identically. Rule out the whole platform for this
-  // request so the loop moves to the NEXT provider instead of burning one
-  // failover hop per key. Key-scoped failures (auth/quota) stay on the
-  // single-key path, and the per-key cooldown below is still the only thing
-  // that outlives the request.
-  if (isProviderLevelError(err)) {
-    state.skipPlatforms.add(route.platform);
-  }
-  if (consumeSkipBenchExemption(route, err)) return true;
+    // `skipModelForRequest: true` = the failure is MODEL behavior, not key
+    // state (ignored response_format, JSON truncated at max_tokens): a sibling
+    // key would reproduce it exactly, so rule out the whole model for this
+    // request instead of burning one failover hop per key.
+    // Context-too-large is MODEL-level too: a sibling key serves the same model
+    // with the same context window (and, for Groq-style per-key TPM 413s, the
+    // same tier ceiling), so it would reject the same request identically.
+    if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || err?.skipModelForRequest === true) {
+      state.skipModels.add(route.modelDbId);
+    }
+    // A model-level 404/410 that says the model is GONE (not merely missing right
+    // now) outlives this request: persist it once the evidence is strong enough,
+    // or the retired model burns a fallback slot on every request forever (#634).
+    // The trace object identifies the request, so one request's failover across
+    // sibling keys counts as the single observation it is.
+    noteModelRetirementSignal(route, err, getRequestTrace());
+    state.skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+    // #788: provider-level failures (5xx / timeout / transport / degraded) mean
+    // the PROVIDER is sick, not this key — every key AND every model of that
+    // platform would fail identically. Rule out the whole platform for this
+    // request so the loop moves to the NEXT provider instead of burning one
+    // failover hop per key. Key-scoped failures (auth/quota) stay on the
+    // single-key path, and the per-key cooldown below is still the only thing
+    // that outlives the request.
+    if (isProviderLevelError(err)) {
+      state.skipPlatforms.add(route.platform);
+    }
+    // Manual-smart health recording: record failure for manual-smart strategy
+    if (getRoutingStrategy() === 'manual-smart') {
+      let failureType: 'rate-limit' | 'transient' | 'client-error' | 'provider-error' = 'transient';
+      if (isRateLimitSignal(err)) {
+        failureType = 'rate-limit';
+      } else if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err)) {
+        failureType = 'client-error';
+      } else if (isProviderLevelError(err)) {
+        failureType = 'provider-error';
+      }
+      recordHealthFailure(route.modelDbId, failureType, route.platform);
+    }
+    if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
   // Model-level failure benching: a model failing across keys (or repeatedly on
@@ -387,6 +400,10 @@ export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: numbe
   recordRequest(route.platform, route.modelId, route.keyId);
   recordTokens(route.platform, route.modelId, route.keyId, rateLimitTokens);
   recordSuccess(route.modelDbId);
+  // Manual-smart health recovery: record success for manual-smart strategy
+  if (getRoutingStrategy() === 'manual-smart') {
+    recordHealthSuccess(route.modelDbId);
+  }
   // A served request proves the model+key can complete: the empty-completion
   // streak (#751) starts over.
   emptyCompletionStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);

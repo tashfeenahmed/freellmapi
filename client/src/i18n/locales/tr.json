@@ -331,7 +331,9 @@
     "weightSpeed": "Hız",
     "weightIntelligence": "İstihbarat",
     "weightRequired": "En az bir ağırlık sıfırın üzerinde olmalıdır.",
-    "scoreColumn": "Puan"
+    "scoreColumn": "Puan",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Yönlendirici basıncı",

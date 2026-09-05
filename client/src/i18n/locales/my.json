@@ -331,7 +331,9 @@
     "weightSpeed": "အမြန်နှုန်း",
     "weightIntelligence": "ဉာဏ်ရည်",
     "weightRequired": "အနည်းဆုံး အလေးချိန်တစ်ခုသည် သုညထက် မြင့်ရမည်။",
-    "scoreColumn": "အမှတ်"
+    "scoreColumn": "အမှတ်",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "ရောတာဖိအား",

@@ -331,7 +331,9 @@
     "weightSpeed": "ઝડપ",
     "weightIntelligence": "બુદ્ધિ",
     "weightRequired": "ઓછામાં ઓછું એક વજન શૂન્યથી ઉપર હોવું જોઈએ.",
-    "scoreColumn": "સ્કોર"
+    "scoreColumn": "સ્કોર",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "રાઉટર દબાણ",

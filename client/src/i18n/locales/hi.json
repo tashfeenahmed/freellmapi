@@ -331,7 +331,9 @@
     "weightSpeed": "गति",
     "weightIntelligence": "बुद्धि",
     "weightRequired": "कम से कम एक वज़न शून्य से ऊपर होना चाहिए.",
-    "scoreColumn": "स्कोर"
+    "scoreColumn": "स्कोर",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "राउटर का दबाव",

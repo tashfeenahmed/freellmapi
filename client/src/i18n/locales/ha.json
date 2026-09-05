@@ -331,7 +331,9 @@
     "weightSpeed": "Gudu",
     "weightIntelligence": "Hankali",
     "weightRequired": "Aƙalla nauyi ɗaya dole ne ya kasance sama da sifili.",
-    "scoreColumn": "Maki"
+    "scoreColumn": "Maki",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Matsin na'ura mai ba da hanya tsakanin hanyoyin sadarwa",

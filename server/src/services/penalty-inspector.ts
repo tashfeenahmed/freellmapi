@@ -1,5 +1,5 @@
-import { getDb } from '../db/index.js';
-import { getAllPenalties } from './router.js';
+﻿import { getDb } from '../db/index.js';
+import { getAllManualSmartHealth, getAllPenalties, getRoutingStrategy } from './router.js';
 import { rateLimitFactor } from './scoring.js';
 
 const INSPECTOR_LOOKBACK_MINUTES = 30;
@@ -38,7 +38,6 @@ export interface InspectorRow {
   recentErrorCount: number;
   reasons: InspectorReason[];
 }
-
 export interface PenaltyInspectorSnapshot {
   generatedAtMs: number;
   lookbackMinutes: number;
@@ -96,7 +95,11 @@ export function getPenaltyInspector(): PenaltyInspectorSnapshot {
   const now = Date.now();
   const rows = new Map<string, InspectorRow>();
 
-  const penalties = getAllPenalties();
+  const manualSmart = getRoutingStrategy() === 'manual-smart';
+  const manualHealth = manualSmart ? getAllManualSmartHealth() : [];
+  const penalties = manualSmart
+    ? manualHealth.map(h => ({ modelDbId: h.modelDbId, count: h.rateLimitHits, penalty: h.penalty }))
+    : getAllPenalties();
   if (penalties.length > 0) {
     const placeholders = penalties.map(() => '?').join(',');
     const models = db.prepare(`
@@ -127,7 +130,11 @@ export function getPenaltyInspector(): PenaltyInspectorSnapshot {
         fallbackEnabled: model.fallback_enabled,
         priority: model.priority,
       });
-      row.penalty = { hits: p.count, value: p.penalty, rateLimitFactor: rateLimitFactor(p.penalty) };
+      row.penalty = {
+        hits: p.count,
+        value: manualSmart ? Math.round(p.penalty * 100) : p.penalty,
+        rateLimitFactor: manualSmart ? 1 - p.penalty : rateLimitFactor(p.penalty),
+      };
       addReason(row, 'penalty');
     }
   }

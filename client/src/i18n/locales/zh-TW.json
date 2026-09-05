@@ -331,7 +331,9 @@
     "weightSpeed": "速度",
     "weightIntelligence": "智慧",
     "weightRequired": "至少一個權重必須大於零。",
-    "scoreColumn": "分數"
+    "scoreColumn": "分數",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "路由壓力",

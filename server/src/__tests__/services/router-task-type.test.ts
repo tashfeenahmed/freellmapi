@@ -85,8 +85,8 @@ const TASK_RUNS = 400;
 // it is always 1 vs 0, and the speed axis must out-weigh that for the chat
 // bias to flip the pick.
 function seedSmartVsFast() {
-  addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 1, speedRank: 9, sizeLabel: 'Large', budget: '~50M', priority: 1 });
-  addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 2, speedRank: 1, sizeLabel: 'Large', budget: '~50M', priority: 2 });
+  addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 200, speedRank: 9, sizeLabel: 'Large', budget: '~50M', priority: 1 });
+  addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 1, speedRank: 1, sizeLabel: 'Large', budget: '~50M', priority: 2 });
   addHistory('google', 'smart', { successes: 100, failures: 0, outTokens: 1, latencyMs: 60000, ttfbMs: 4999 });
   addHistory('groq', 'fast', { successes: 100, failures: 0, outTokens: 10000, latencyMs: 100, ttfbMs: 10 });
 }
@@ -141,8 +141,8 @@ describe('task-type-aware routing', () => {
   // axis to sit, so a per-request header does not get to rewrite them (#1127).
   // The other two exempt strategies are covered exactly in scoring.test.ts.
   function seedSmartVsFlakyFast() {
-    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 1, speedRank: 9, sizeLabel: 'Large', budget: '~50M', priority: 1 });
-    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 2, speedRank: 1, sizeLabel: 'Large', budget: '~50M', priority: 2 });
+    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 200, speedRank: 9, sizeLabel: 'Large', budget: '~50M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 1, speedRank: 1, sizeLabel: 'Large', budget: '~50M', priority: 2 });
     addHistory('google', 'smart', { successes: 100, failures: 0, outTokens: 1, latencyMs: 60000, ttfbMs: 4999 });
     addHistory('groq', 'fast', { successes: 50, failures: 50, outTokens: 10000, latencyMs: 100, ttfbMs: 10 });
   }

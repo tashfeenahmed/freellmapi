@@ -331,7 +331,9 @@
     "weightSpeed": "വേഗത",
     "weightIntelligence": "ഇൻ്റലിജൻസ്",
     "weightRequired": "കുറഞ്ഞത് ഒരു ഭാരമെങ്കിലും പൂജ്യത്തിന് മുകളിലായിരിക്കണം.",
-    "scoreColumn": "സ്കോർ"
+    "scoreColumn": "സ്കോർ",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "റൂട്ടർ മർദ്ദം",

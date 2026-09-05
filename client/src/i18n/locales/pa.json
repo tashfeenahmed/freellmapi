@@ -331,7 +331,9 @@
     "weightSpeed": "ਗਤੀ",
     "weightIntelligence": "ਬੁੱਧੀ",
     "weightRequired": "ਘੱਟੋ-ਘੱਟ ਇੱਕ ਭਾਰ ਜ਼ੀਰੋ ਤੋਂ ਉੱਪਰ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।",
-    "scoreColumn": "ਸਕੋਰ"
+    "scoreColumn": "ਸਕੋਰ",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "ਰਾਊਟਰ ਦਾ ਦਬਾਅ",

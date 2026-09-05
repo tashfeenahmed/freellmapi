@@ -84,11 +84,11 @@ export function isCatalogManagedModel(row: { platform: string; key_id?: number |
 //   'user'        — deleted in the dashboard. Stays deleted across syncs, and
 //                   the row is removed from `models` on the next catalog apply.
 //   'upstream_eol' — the provider reported it permanently gone (410 / end of
-//                   life, issue #634). The row SURVIVES and is only disabled,
-//                   so the dashboard can show "retired upstream" instead of
-//                   silently losing the model, and so a later catalog that
-//                   still lists it can lift the retirement.
-export type CatalogTombstoneSource = 'user' | 'upstream_eol';
+//                   life, issue #634). The row survives and can be reinstated
+//                   by a later catalog.
+//   'upstream_permanent' — the provider explicitly ended free access or made
+//                   the model paywalled. The row is removed and not resurrected.
+export type CatalogTombstoneSource = 'user' | 'upstream_eol' | 'upstream_permanent';
 
 export interface CatalogModelTombstone {
   source: CatalogTombstoneSource;
@@ -107,17 +107,18 @@ export function getCatalogModelTombstone(
     .get(kind, platform, modelId) as { source: string; reason: string | null; created_at: string } | undefined;
   if (!row) return undefined;
   return {
-    source: row.source === 'upstream_eol' ? 'upstream_eol' : 'user',
+    source: row.source === 'upstream_eol'
+      ? 'upstream_eol'
+      : row.source === 'upstream_permanent' ? 'upstream_permanent' : 'user',
     reason: row.reason ?? null,
     createdAt: row.created_at,
   };
 }
 
 /**
- * True only for models the USER deleted — the "keep it deleted" contract every
- * caller here means. An upstream-retirement tombstone deliberately does NOT
- * count: those models stay in the catalog's write path so a refreshed catalog
- * can reinstate them (see reinstateUpstreamRetiredCatalogModel).
+ * True for user-deleted models and upstream models explicitly marked permanent.
+ * A normal upstream-retirement tombstone does NOT count: those models stay in
+ * the catalog's write path so a refreshed catalog can reinstate them.
  */
 export function isCatalogModelTombstoned(
   db: Db,
@@ -125,7 +126,8 @@ export function isCatalogModelTombstoned(
   platform: string,
   modelId: string,
 ): boolean {
-  return getCatalogModelTombstone(db, kind, platform, modelId)?.source === 'user';
+  const source = getCatalogModelTombstone(db, kind, platform, modelId)?.source;
+  return source === 'user' || source === 'upstream_permanent';
 }
 
 export function recordCatalogModelTombstone(
@@ -167,12 +169,18 @@ export function retireCatalogModelUpstream(
   platform: string,
   modelId: string,
   reason: string,
+  source: Extract<CatalogTombstoneSource, 'upstream_eol' | 'upstream_permanent'> = 'upstream_eol',
 ): boolean {
   const existing = getCatalogModelTombstone(db, 'chat', platform, modelId);
   if (existing) return false;
-  recordCatalogModelTombstone(db, 'chat', platform, modelId, { source: 'upstream_eol', reason });
-  db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
-  db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
+  recordCatalogModelTombstone(db, 'chat', platform, modelId, { source, reason });
+  if (source === 'upstream_permanent') {
+    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(modelDbId);
+    db.prepare('DELETE FROM models WHERE id = ?').run(modelDbId);
+  } else {
+    db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
+    db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
+  }
   return true;
 }
 
@@ -293,9 +301,8 @@ export function applyAllModelOverrides(db: Db): number {
   return applied;
 }
 
-// Only USER tombstones delete rows. An upstream-retirement tombstone disables
-// its model and keeps it (see retireCatalogModelUpstream), so deleting here
-// would throw away both the row and the reason the dashboard shows for it.
+// User and upstream-permanent tombstones delete rows. Normal upstream-retirement
+// tombstones keep their row so a later catalog can reinstate them.
 export function deleteTombstonedCatalogModels(db: Db): number {
   const chatRows = db.prepare(`
     SELECT m.id, m.platform, m.model_id

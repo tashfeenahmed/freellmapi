@@ -331,7 +331,9 @@
     "weightSpeed": "رفتار",
     "weightIntelligence": "ذہانت",
     "weightRequired": "کم از کم ایک وزن صفر سے اوپر ہونا چاہیے۔",
-    "scoreColumn": "سکور"
+    "scoreColumn": "سکور",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "راؤٹر کا دباؤ",

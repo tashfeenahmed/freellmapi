@@ -331,7 +331,9 @@
     "weightSpeed": "מהירות",
     "weightIntelligence": "מודיעין",
     "weightRequired": "לפחות משקל אחד חייב להיות מעל אפס.",
-    "scoreColumn": "פסקול"
+    "scoreColumn": "פסקול",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "לחץ הנתב",

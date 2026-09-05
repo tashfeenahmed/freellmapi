@@ -331,7 +331,9 @@
     "weightSpeed": "ፍጥነት",
     "weightIntelligence": "አእምሮ",
     "weightRequired": "ቢያንስ አንድ ክብደት ከዜሮ በላይ መሆን አለበት.",
-    "scoreColumn": "ውጤት"
+    "scoreColumn": "ውጤት",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "የራውተር ግፊት",

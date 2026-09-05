@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
-import { modelRetirementSignal } from '../../lib/error-classify.js';
+import { isPermanentModelUnavailableError, modelRetirementSignal } from '../../lib/error-classify.js';
 import {
   noteModelRetirementSignal,
   resetModelRetirementObservations,
@@ -58,6 +58,11 @@ const NVIDIA_EOL = Object.assign(
     + 'on 2026-07-27T00:00:00Z and is no longer available.',
   ),
   { status: 410 },
+);
+
+const FREE_PLAN_ENDED = Object.assign(
+  new Error('Provider API error 403: this model is not available on the free plan'),
+  { status: 403 },
 );
 
 // The transient shape from the same issue thread: a load balancer that cannot
@@ -122,6 +127,23 @@ describe('modelRetirementSignal (conservative end-of-life detection — #634)', 
     ))).toBe('probable');
   });
 
+  it('recognizes an explicit permanent free-plan gate but not resettable quota', () => {
+    const permanent = Object.assign(
+      new Error('Provider API error 403: this model is not available on the free plan'),
+      { status: 403 },
+    );
+    const resettable = Object.assign(
+      new Error('Provider API error 402: free tier quota resets monthly; upgrade is optional'),
+      { status: 402 },
+    );
+
+    expect(isPermanentModelUnavailableError(permanent)).toBe(true);
+    expect(modelRetirementSignal(permanent)).toBe('definitive');
+    expect(isPermanentModelUnavailableError(resettable)).toBe(false);
+    expect(modelRetirementSignal(resettable)).toBeNull();
+    expect(isPermanentModelUnavailableError(Object.assign(new Error('insufficient balance'), { status: 402 }))).toBe(false);
+  });
+
   it('never fires on transient 404s, empty not-found bodies, or unrelated failures', () => {
     expect(modelRetirementSignal(TRANSIENT_404)).toBeNull();
     expect(modelRetirementSignal(new Error('OpenRouter API error 404: Provider returned error'))).toBeNull();
@@ -141,14 +163,26 @@ describe('noteModelRetirementSignal (auto-disable with a reason — #634)', () =
     getDb().prepare("DELETE FROM catalog_model_tombstones WHERE model_id LIKE 'eol-test-%'").run();
   });
 
-  it('auto-disables the model on a single explicit 410 end-of-life response', () => {
+  it('deletes the model on a single explicit 410 end-of-life response', () => {
     const id = seedModel();
     expect(noteModelRetirementSignal(routeFor(id), NVIDIA_EOL, {})).toBe(true);
     expect(isRoutable(id)).toBe(false);
+    expect(getDb().prepare('SELECT id FROM models WHERE id = ?').get(id)).toBeUndefined();
 
     const tombstone = getCatalogModelTombstone(getDb(), 'chat', PLATFORM, MODEL_ID);
-    expect(tombstone?.source).toBe('upstream_eol');
+    expect(tombstone?.source).toBe('upstream_permanent');
     expect(tombstone?.reason).toContain('end of life');
+  });
+
+  it('deletes a model when the provider permanently ends free-plan access', () => {
+    const id = seedModel('eol-test-paywalled');
+    expect(noteModelRetirementSignal(routeFor(id, 'eol-test-paywalled'), FREE_PLAN_ENDED, {})).toBe(true);
+    expect(getDb().prepare('SELECT id FROM models WHERE id = ?').get(id)).toBeUndefined();
+
+    const tombstone = getCatalogModelTombstone(getDb(), 'chat', PLATFORM, 'eol-test-paywalled');
+    expect(tombstone?.source).toBe('upstream_permanent');
+    expect(tombstone?.reason).toContain('not available on the free plan');
+
   });
 
   it('leaves a transient 404 alone no matter how often it repeats', () => {
@@ -229,10 +263,12 @@ describe('catalog sync vs. upstream retirement (#634)', () => {
     } as unknown as Parameters<typeof applyCatalog>[1];
   }
 
-  it('re-enables an auto-retired model when a later catalog still lists it', () => {
+  it('re-enables a corroborated probable 404 when a later catalog still lists it', () => {
     resetModelRetirementObservations();
     const id = seedModel('eol-test-relisted');
-    noteModelRetirementSignal(routeFor(id, 'eol-test-relisted'), NVIDIA_EOL, {});
+    const err = Object.assign(new Error('API error 404: this model is no longer available'), { status: 404 });
+    noteModelRetirementSignal(routeFor(id, 'eol-test-relisted'), err, {});
+    noteModelRetirementSignal(routeFor(id, 'eol-test-relisted'), err, {});
     expect(isRoutable(id)).toBe(false);
 
     applyCatalog(getDb(), catalogWith('eol-test-relisted', true));
@@ -241,6 +277,18 @@ describe('catalog sync vs. upstream retirement (#634)', () => {
     expect(getCatalogModelTombstone(getDb(), 'chat', PLATFORM, 'eol-test-relisted')).toBeUndefined();
     expect(getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
       .get(PLATFORM, 'eol-test-relisted')).toBeDefined();
+  });
+
+  it('does not resurrect a permanently paywalled model from the catalog', () => {
+    resetModelRetirementObservations();
+    const id = seedModel('eol-test-paywalled-relisted');
+    noteModelRetirementSignal(routeFor(id, 'eol-test-paywalled-relisted'), FREE_PLAN_ENDED, {});
+    expect(getDb().prepare('SELECT id FROM models WHERE id = ?').get(id)).toBeUndefined();
+
+    applyCatalog(getDb(), catalogWith('eol-test-paywalled-relisted', true));
+
+    expect(getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
+      .get(PLATFORM, 'eol-test-paywalled-relisted')).toBeUndefined();
   });
 
   it('still deletes models the USER tombstoned (unchanged behavior)', () => {

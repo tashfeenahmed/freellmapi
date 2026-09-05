@@ -331,7 +331,9 @@
     "weightSpeed": "Ταχύτητα",
     "weightIntelligence": "Ευφυΐα",
     "weightRequired": "Τουλάχιστον ένα βάρος πρέπει να είναι πάνω από το μηδέν.",
-    "scoreColumn": "Σκορ"
+    "scoreColumn": "Σκορ",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Πίεση δρομολογητή",

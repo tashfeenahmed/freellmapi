@@ -331,7 +331,9 @@
     "weightSpeed": "Velocidade",
     "weightIntelligence": "Inteligência",
     "weightRequired": "Pelo menos um peso deve estar acima de zero.",
-    "scoreColumn": "Banda sonora"
+    "scoreColumn": "Banda sonora",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Pressão do router",

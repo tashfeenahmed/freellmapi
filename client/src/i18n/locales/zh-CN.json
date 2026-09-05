@@ -331,7 +331,9 @@
     "weightSpeed": "速度",
     "weightIntelligence": "智能",
     "weightRequired": "至少一个权重必须大于零。",
-    "scoreColumn": "评分"
+    "scoreColumn": "评分",
+    "manualSmart": "手动智能",
+    "manualSmartBlurb": "按自定义 intelligence_rank 路由。模型按排名排序，失败时惩罚，成功时恢复。"
   },
   "penaltyInspector": {
     "title": "路由压力",

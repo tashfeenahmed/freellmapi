@@ -287,12 +287,11 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       // Which fields the local override actually replaces, so the model page
       // can mark the individual inputs it edits (#551).
       overrideFields: overriddenFieldNames(r.overrides_json),
-      // Why the switch is off: a model auto-disabled because the provider
-      // retired it upstream (410 / end of life, #634) is a different state from
-      // one the user turned off, and the dashboard says so. The reason is the
-      // provider's own (redacted) wording.
-      retiredUpstream: r.tombstone_source === 'upstream_eol',
-      retiredReason: r.tombstone_source === 'upstream_eol' ? (r.tombstone_reason ?? null) : null,
+      // Why the switch is off: a model removed because the provider retired it
+      // or permanently ended free access is distinct from a user disable.
+      retiredUpstream: r.tombstone_source === 'upstream_eol' || r.tombstone_source === 'upstream_permanent',
+      retiredReason: r.tombstone_source === 'upstream_eol' || r.tombstone_source === 'upstream_permanent'
+        ? (r.tombstone_reason ?? null) : null,
       keyCount: keyCountMap.get(r.platform) ?? 0,
     };
   }));

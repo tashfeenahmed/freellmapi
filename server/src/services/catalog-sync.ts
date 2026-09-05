@@ -266,9 +266,10 @@ function routableContextWindow(platform: string, modelId: string, contextWindow:
  *    declarative config, admin adds) are never updated, never deleted, and
  *    never adopted — on a platform:model_id collision the user row wins and
  *    the catalog entry is skipped outright;
- *  - catalog models the user deleted stay deleted via tombstones, while models
- *    auto-retired from an upstream 410/end-of-life response (#634) are only
- *    disabled — a catalog that still lists them lifts the retirement;
+ *  - catalog models the user deleted stay deleted via tombstones; models
+ *    auto-retired from an upstream 410/end-of-life response (#634) are
+ *    disabled and may be reinstated by newer catalog evidence, while models
+ *    proven permanently unavailable are removed and suppressed from resync;
  *  - models that vanished from the catalog are deleted, exactly like the
  *    dead-model migrations do (fallback_config row first, FK order).
  */
@@ -394,9 +395,10 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         continue;
       }
       if (isCatalogModelTombstoned(db, 'chat', m.platform, m.modelId)) continue;
-      // A model auto-retired from a 410/end-of-life response (#634) is disabled,
-      // not deleted. A catalog that STILL lists it — and lists it enabled — is
-      // newer evidence than that one provider response, so lift the retirement.
+      // Recoverable upstream retirements are disabled, not deleted. A catalog
+      // that STILL lists one — and lists it enabled — is newer evidence than
+      // that provider response, so lift the retirement. Permanent tombstones
+      // were filtered above and never reach this path.
       if (m.enabled) reinstateUpstreamRetiredCatalogModel(db, m.platform, m.modelId);
       inCatalog.add(`${m.platform}:${m.modelId}`);
 

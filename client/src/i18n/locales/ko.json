@@ -331,7 +331,9 @@
     "weightSpeed": "속도",
     "weightIntelligence": "지능",
     "weightRequired": "하나 이상의 가중치가 0보다 커야 합니다.",
-    "scoreColumn": "점수"
+    "scoreColumn": "점수",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "라우터 압력",

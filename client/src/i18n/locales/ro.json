@@ -331,7 +331,9 @@
     "weightSpeed": "Viteză",
     "weightIntelligence": "Inteligență",
     "weightRequired": "Cel puțin o greutate trebuie să fie peste zero.",
-    "scoreColumn": "Scorul"
+    "scoreColumn": "Scorul",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Presiunea routerului",

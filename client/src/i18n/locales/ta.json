@@ -331,7 +331,9 @@
     "weightSpeed": "வேகம்",
     "weightIntelligence": "உளவுத்துறை",
     "weightRequired": "குறைந்தபட்சம் ஒரு எடை பூஜ்ஜியத்திற்கு மேல் இருக்க வேண்டும்.",
-    "scoreColumn": "மதிப்பெண்"
+    "scoreColumn": "மதிப்பெண்",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "திசைவி அழுத்தம்",

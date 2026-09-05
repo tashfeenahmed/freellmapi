@@ -331,7 +331,9 @@
     "weightSpeed": "Vitesse",
     "weightIntelligence": "Intelligence",
     "weightRequired": "Au moins une pondération doit être supérieure à zéro.",
-    "scoreColumn": "Score"
+    "scoreColumn": "Score",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Pression sur le routeur",

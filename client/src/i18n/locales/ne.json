@@ -331,7 +331,9 @@
     "weightSpeed": "गति",
     "weightIntelligence": "इन्टेलिजेन्स",
     "weightRequired": "कम्तीमा एउटा तौल शून्यभन्दा माथि हुनुपर्छ ।",
-    "scoreColumn": "प्राप्ताङ्क"
+    "scoreColumn": "प्राप्ताङ्क",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "राउटरको चाप",

@@ -331,7 +331,9 @@
     "weightSpeed": "ល្បឿន",
     "weightIntelligence": "បញ្ញា",
     "weightRequired": "យ៉ាងហោចណាស់ទម្ងន់មួយត្រូវតែខ្ពស់ជាងសូន្យ។",
-    "scoreColumn": "ពិន្ទុ"
+    "scoreColumn": "ពិន្ទុ",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "សំពាធរ៉ោទ័រ",

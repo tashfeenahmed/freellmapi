@@ -331,7 +331,9 @@
     "weightSpeed": "ବେଗ",
     "weightIntelligence": "ବୁଦ୍ଧିମତା",
     "weightRequired": "ଅତିକମରେ ଗୋଟିଏ ଓଜନ ଶୂନ୍ୟରୁ ଅଧିକ ହେବା ଆବଶ୍ୟକ।",
-    "scoreColumn": "ସ୍କୋର"
+    "scoreColumn": "ସ୍କୋର",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "ରାଉଟର ଚାପ",

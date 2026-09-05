@@ -70,53 +70,43 @@ describe('scoring: speed axis', () => {
 });
 
 describe('scoring: intelligence axis', () => {
-  it('maps min→0, max→1', () => {
-    expect(intelligenceScore(1000, 1000, 4000)).toBeCloseTo(0, 5);
-    expect(intelligenceScore(4000, 1000, 4000)).toBeCloseTo(1, 5);
-    expect(intelligenceScore(2500, 1000, 4000)).toBeCloseTo(0.5, 5);
+  it('maps the static 1–200 Intelligence Rank directly to the axis', () => {
+    expect(intelligenceScore(1, 1, 200)).toBeCloseTo(0.005, 5);
+    expect(intelligenceScore(200, 1, 200)).toBeCloseTo(1, 5);
+    expect(intelligenceScore(100, 1, 200)).toBeCloseTo(0.5, 5);
   });
 
-  it('returns neutral-high when all models are equal', () => {
-    expect(intelligenceScore(5, 5, 5)).toBe(1);
+  it('keeps the configured rank even when the chain has one model', () => {
+    expect(intelligenceScore(200, 200, 200)).toBe(1);
   });
 });
 
 describe('scoring: intelligence_rank is visible on the axis (#673)', () => {
-  // A realistic three-tier chain. The Frontier model pins the top of the
-  // min-max normalization and the Medium model pins the bottom; the Large
-  // model in between is the one the user re-ranks, so the span is unchanged by
-  // the edit and the whole move comes from the rank term.
-  const top = intelligenceComposite('Frontier', 1);
-  const bottom = intelligenceComposite('Medium', 50);
-  const axis = (rank: number) => intelligenceScore(intelligenceComposite('Large', rank), bottom, top);
+  const axis = (rank: number) => intelligenceScore(intelligenceComposite('Large', rank), 1, 200);
   // The dashboard renders Math.round(value * 100) (client AxisBar).
   const shown = (rank: number) => Math.round(axis(rank) * 100);
 
-  it('a rank 6 → 1 edit moves the displayed axis by at least 2 points', () => {
-    // Under the old linear `tier*1000 - rank` term this move was ~0.25 points,
-    // i.e. the same rendered integer — the edit looked like it did nothing.
-    expect(shown(1) - shown(6)).toBeGreaterThanOrEqual(2);
+  it('a rank 6 → 200 edit moves the displayed axis visibly', () => {
+    expect(shown(200) - shown(6)).toBeGreaterThanOrEqual(2);
   });
 
-  it('even a small rank improvement is worth more than a rounding artifact', () => {
-    // 10 → 3 is a typical "promote this model" edit.
-    expect(shown(3) - shown(10)).toBeGreaterThanOrEqual(2);
+  it('a higher rank always improves the displayed axis', () => {
+    expect(shown(30) - shown(10)).toBeGreaterThanOrEqual(2);
   });
 
-  it('stays monotonic: a better rank never scores lower', () => {
+  it('stays monotonic: a higher rank never scores lower', () => {
     for (let rank = 2; rank <= 200; rank++) {
-      expect(intelligenceComposite('Large', rank)).toBeLessThan(intelligenceComposite('Large', rank - 1));
+      expect(intelligenceComposite('Large', rank)).toBeGreaterThan(intelligenceComposite('Large', rank - 1));
     }
   });
 
-  it('keeps tier dominance: the worst rank in a tier still beats the best rank below it', () => {
-    for (const [better, worse] of [['Frontier', 'Large'], ['Large', 'Medium'], ['Medium', 'Small']] as const) {
-      expect(intelligenceComposite(better, 1000)).toBeGreaterThan(intelligenceComposite(worse, 1));
-    }
+  it('uses Intelligence Rank as the sole static intelligence baseline across tiers', () => {
+    expect(intelligenceComposite('Frontier', 42)).toBe(42);
+    expect(intelligenceComposite('Small', 42)).toBe(42);
   });
 
-  it('an unrecognized size label still scores below every real tier', () => {
-    expect(intelligenceComposite('', 1)).toBeLessThan(intelligenceComposite('Small', 1000));
+  it('does not change the static baseline for an unrecognized size label', () => {
+    expect(intelligenceComposite('', 120)).toBe(120);
   });
 });
 
