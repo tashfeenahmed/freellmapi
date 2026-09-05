@@ -53,7 +53,6 @@ See [OVERVIEW.md](architecture/OVERVIEW.md) for deep-dives.
 
 The scope is deliberately narrow. If a feature isn't in the README's feature list and isn't below, assume it isn't there yet.
 
-- **Moderation** (`/v1/moderations`)
 - **`n > 1`** (multiple completions per request)
 - **Per-user billing / multi-tenant auth** — single-user by design
 
