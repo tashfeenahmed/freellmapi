@@ -820,7 +820,7 @@ function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   // which would otherwise misread as a transient window.
   if (l.includes('< estimated')) return 'too_large';
   if (/no provider registered|no enabled\+healthy key|no usable key|decrypt-error|no-resolved-provider|custom-key-mismatch/.test(l)) return 'config';
-  if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency/.test(l)) return 'time_bound';
+  if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/.test(l)) return 'time_bound';
   return 'other';
 }
 

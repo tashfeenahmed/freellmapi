@@ -27,6 +27,7 @@ import {
   type HeadroomThresholds,
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS } from '../lib/error-classify.js';
+import { checkMonthlyBudget } from './key-budget.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
 import { modelsWithOverriddenField } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
@@ -1480,6 +1481,11 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
     if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
     if (!canUseProviderTokens(entry.platform, key.id, entry.model_id, estimatedTokens)) { note('provider-daily-token-cap'); continue; }
+    // Monthly budget (#1158): a key whose request/token caps are spent for the
+    // current UTC month is not a candidate — same skip semantics as the daily
+    // gates above. The Retry-After (next-month boundary) surfaces through the
+    // fallback exhaustion path rather than blocking here.
+    if (!checkMonthlyBudget(key.id, estimatedTokens).allowed) { note('monthly-budget-cap'); continue; }
 
     let decryptedKey: string;
     try {
