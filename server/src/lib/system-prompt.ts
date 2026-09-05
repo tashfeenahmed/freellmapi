@@ -9,6 +9,7 @@ import { getDb, getUnifiedApiKey } from '../db/index.js';
 // keeps today's behavior exactly: full inference access, no injected prompt.
 
 export const CLIENT_PROFILE_KEY_PREFIX = 'sk-cp-';
+export const TENANT_KEY_PREFIX = 'freetenant-';
 
 // Constant-time string comparison for inference credentials. Plain `===` leaks
 // length and per-character timing, which a network attacker could in principle
@@ -38,7 +39,8 @@ export function hashClientProfileKey(key: string): string {
 
 export type ResolvedAuth =
   | { kind: 'unified'; systemPrompt: null }
-  | { kind: 'profile'; profileId: number; name: string; systemPrompt: string | null };
+  | { kind: 'profile'; profileId: number; name: string; systemPrompt: string | null }
+  | { kind: 'tenant'; tenantId: number; name: string; systemPrompt: string | null; allowedModels: string | null };
 
 interface ProfileRow {
   id: number;
@@ -58,15 +60,35 @@ export function resolveAuth(token: string | undefined): ResolvedAuth | null {
   if (timingSafeStringEqual(token, getUnifiedApiKey())) {
     return { kind: 'unified', systemPrompt: null };
   }
-  if (!token.startsWith(CLIENT_PROFILE_KEY_PREFIX)) return null;
-  const row = getDb().prepare(
-    'SELECT id, name, system_prompt, enabled FROM client_profiles WHERE token_hash = ?',
-  ).get(hashClientProfileKey(token)) as ProfileRow | undefined;
-  if (!row || !row.enabled) return null;
-  const prompt = row.system_prompt != null && row.system_prompt.trim().length > 0
-    ? row.system_prompt
-    : null;
-  return { kind: 'profile', profileId: row.id, name: row.name, systemPrompt: prompt };
+  if (!token.startsWith(CLIENT_PROFILE_KEY_PREFIX) && !token.startsWith(TENANT_KEY_PREFIX)) return null;
+
+  const hash = hashClientProfileKey(token);
+
+  // Check client profiles first (existing behavior)
+  if (token.startsWith(CLIENT_PROFILE_KEY_PREFIX)) {
+    const row = getDb().prepare(
+      'SELECT id, name, system_prompt, enabled FROM client_profiles WHERE token_hash = ?',
+    ).get(hash) as ProfileRow | undefined;
+    if (!row || !row.enabled) return null;
+    const prompt = row.system_prompt != null && row.system_prompt.trim().length > 0
+      ? row.system_prompt
+      : null;
+    return { kind: 'profile', profileId: row.id, name: row.name, systemPrompt: prompt };
+  }
+
+  // Check tenants (multi-tenant auth #267)
+  if (token.startsWith(TENANT_KEY_PREFIX)) {
+    const row = getDb().prepare(
+      'SELECT id, name, system_prompt, allowed_models, enabled FROM tenants WHERE token_hash = ?',
+    ).get(hash) as { id: number; name: string; system_prompt: string | null; allowed_models: string | null; enabled: number } | undefined;
+    if (!row || !row.enabled) return null;
+    const prompt = row.system_prompt != null && row.system_prompt.trim().length > 0
+      ? row.system_prompt
+      : null;
+    return { kind: 'tenant', tenantId: row.id, name: row.name, systemPrompt: prompt, allowedModels: row.allowed_models };
+  }
+
+  return null;
 }
 
 /**

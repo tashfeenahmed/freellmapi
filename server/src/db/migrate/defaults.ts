@@ -30,6 +30,7 @@ import * as profileAutoInclude from '../migrations/20260823_000004_profile_auto_
 import * as idempotencyClaims from '../migrations/20260901_000001_idempotency_claims.js';
 import * as quotaObservationLookup from '../migrations/20260901_000002_quota_observation_lookup.js';
 import * as analyticsLatencyPercentileIndex from '../migrations/20260902_000001_analytics_latency_percentile_index.js';
+import * as tenants from '../migrations/20260902_000001_tenants.js';
 import * as mcpEnabledDefault from '../migrations/20260903_000001_mcp_enabled_default.js';
 import * as responseCache from '../migrations/20260903_000002_response_cache.js';
 
@@ -74,6 +75,7 @@ export const PROFILE_AUTO_INCLUDE_FILENAME = '20260823_000004_profile_auto_inclu
 export const IDEMPOTENCY_CLAIMS_FILENAME = '20260901_000001_idempotency_claims.ts';
 export const QUOTA_OBSERVATION_LOOKUP_FILENAME = '20260901_000002_quota_observation_lookup.ts';
 export const ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME = '20260902_000001_analytics_latency_percentile_index.ts';
+export const TENANTS_FILENAME = '20260902_000001_tenants.ts';
 export const MCP_ENABLED_DEFAULT_FILENAME = '20260903_000001_mcp_enabled_default.ts';
 export const RESPONSE_CACHE_FILENAME = '20260903_000002_response_cache.ts';
 
@@ -109,6 +111,7 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: IDEMPOTENCY_CLAIMS_FILENAME, module: idempotencyClaims },
   { filename: QUOTA_OBSERVATION_LOOKUP_FILENAME, module: quotaObservationLookup },
   { filename: ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME, module: analyticsLatencyPercentileIndex },
+  { filename: TENANTS_FILENAME, module: tenants },
   { filename: MCP_ENABLED_DEFAULT_FILENAME, module: mcpEnabledDefault },
   { filename: RESPONSE_CACHE_FILENAME, module: responseCache },
 ];
