@@ -331,7 +331,9 @@
     "weightSpeed": "ವೇಗ",
     "weightIntelligence": "ಗುಪ್ತಚರ",
     "weightRequired": "ಕನಿಷ್ಠ ಒಂದು ತೂಕವು ಶೂನ್ಯಕ್ಕಿಂತ ಹೆಚ್ಚಿರಬೇಕು.",
-    "scoreColumn": "ಸ್ಕೋರ್"
+    "scoreColumn": "ಸ್ಕೋರ್",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "ರೂಟರ್ ಒತ್ತಡ",

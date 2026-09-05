@@ -331,7 +331,9 @@
     "weightSpeed": "السرعة",
     "weightIntelligence": "الذكاء",
     "weightRequired": "يجب أن يكون وزن واحد على الأقل أعلى من الصفر.",
-    "scoreColumn": "النتيجة"
+    "scoreColumn": "النتيجة",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "ضغط جهاز التوجيه",

@@ -331,7 +331,9 @@
     "weightSpeed": "Sürət",
     "weightIntelligence": "Kəşfiyyat",
     "weightRequired": "Ən azı bir ağırlıq sıfırdan yuxarı olmalıdır.",
-    "scoreColumn": "Musiqi"
+    "scoreColumn": "Musiqi",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Router təzyiqi",

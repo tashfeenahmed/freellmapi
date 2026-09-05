@@ -331,7 +331,9 @@
     "weightSpeed": "Sebesség",
     "weightIntelligence": "Intelligencia",
     "weightRequired": "Legalább egy súlynak nulla felett kell lennie.",
-    "scoreColumn": "Zene"
+    "scoreColumn": "Zene",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Router nyomás",

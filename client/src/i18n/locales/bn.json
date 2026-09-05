@@ -331,7 +331,9 @@
     "weightSpeed": "গতি",
     "weightIntelligence": "বুদ্ধিমত্তা",
     "weightRequired": "কমপক্ষে একটি ওজন শূন্যের উপরে হতে হবে।",
-    "scoreColumn": "স্কোর"
+    "scoreColumn": "স্কোর",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "রাউটারের চাপ",

@@ -331,7 +331,9 @@
     "weightSpeed": "Iyara",
     "weightIntelligence": "Imọye",
     "weightRequired": "O kere ju iwuwo kan gbọdọ jẹ loke odo.",
-    "scoreColumn": "Dimegilio"
+    "scoreColumn": "Dimegilio",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Ipa olulana",

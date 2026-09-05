@@ -200,6 +200,7 @@ describe('applyCatalog', () => {
       displayName: 'Local Name',
       contextWindow: 12345,
       supportsTools: true,
+      intelligenceRank: 198,
     });
 
     const refreshed = existingAsCatalogModels().filter((m) => m.modelId !== 'override-model');
@@ -212,11 +213,11 @@ describe('applyCatalog', () => {
     applyCatalog(getDb(), catalogOf(refreshed));
 
     const row = getDb().prepare(`
-      SELECT display_name, context_window, supports_tools
+      SELECT display_name, context_window, supports_tools, intelligence_rank
         FROM models
        WHERE platform = 'groq' AND model_id = 'override-model'
-    `).get() as { display_name: string; context_window: number; supports_tools: number };
-    expect(row).toEqual({ display_name: 'Local Name', context_window: 12345, supports_tools: 1 });
+    `).get() as { display_name: string; context_window: number; supports_tools: number; intelligence_rank: number };
+    expect(row).toEqual({ display_name: 'Local Name', context_window: 12345, supports_tools: 1, intelligence_rank: 198 });
   });
 
   it('keeps user-deleted catalog models deleted across catalog refreshes', () => {

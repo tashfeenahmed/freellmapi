@@ -6,12 +6,11 @@
 // so the next request tried it again, and the next, forever, each one paying a
 // round trip and a fallback slot for a model that is never coming back.
 //
-// The fix persists the verdict: a definitive end-of-life response disables the
-// model right away, and a merely-probable one waits for corroboration from a
-// second distinct request first, so a single flaky 404 from a load balancer can
-// never kill a healthy model. The disable is reversible in both directions —
-// the user can switch the model back on, and a catalog refresh that still lists
-// it lifts the retirement (services/catalog-sync.ts).
+// The fix persists the verdict: a definitive end-of-life or permanent free-plan
+// response removes the model right away, and a merely-probable one waits for
+// corroboration from a second distinct request first, so a single flaky 404
+// from a load balancer can never remove a healthy model. Probable retirements
+// remain reversible when a later catalog still lists the model.
 
 import { getDb } from '../db/index.js';
 import { modelRetirementSignal } from '../lib/error-classify.js';
@@ -59,7 +58,7 @@ export interface RetirementRoute {
 
 /**
  * Record one upstream failure against the retirement heuristic and, when the
- * evidence is strong enough, auto-disable the model. Returns true iff this call
+ * evidence is strong enough, remove or disable the model. Returns true iff this call
  * retired it. Never throws: it runs on the proxy's failure path, where a DB
  * hiccup must not turn a failover into a crash.
  */
@@ -85,14 +84,15 @@ export function noteModelRetirementSignal(
     // Only catalog-managed rows: a model the user added by hand is their state,
     // not the catalog's, and the tombstone table has no meaning for it.
     if (!row || !isCatalogManagedModel(row)) return false;
-    if (!retireCatalogModelUpstream(db, row.id, row.platform, row.model_id, reason)) return false;
+    const source = confidence === 'definitive' ? 'upstream_permanent' : 'upstream_eol';
+    if (!retireCatalogModelUpstream(db, row.id, row.platform, row.model_id, reason, source)) return false;
     observations.delete(key);
     // Retiring a model changes routing permanently, so it is a warn (which the
     // dashboard viewer persists across restarts) carrying the platform/model it
     // acted on. Still printed to stdout by providerLog.
     providerLog(
       'warn',
-      `[ModelRetirement] ${row.platform}/${row.model_id} disabled — upstream reports it retired: ${reason}`,
+      `[ModelRetirement] ${row.platform}/${row.model_id} ${source === 'upstream_permanent' ? 'removed' : 'disabled'} — upstream reports it retired: ${reason}`,
       { provider: row.platform, model: row.model_id, event: 'model_retired' },
     );
     return true;

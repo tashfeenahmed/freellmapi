@@ -331,7 +331,9 @@
     "weightSpeed": "Bilis",
     "weightIntelligence": "Intelihensiya",
     "weightRequired": "Dapat may isang timbang na higit sa zero.",
-    "scoreColumn": "Iskor"
+    "scoreColumn": "Iskor",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Presyon ng router",

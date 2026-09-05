@@ -331,7 +331,9 @@
     "weightSpeed": "ความเร็ว",
     "weightIntelligence": "ความฉลาด",
     "weightRequired": "อย่างน้อยหนึ่งน้ำหนักต้องมากกว่าศูนย์",
-    "scoreColumn": "คะแนน"
+    "scoreColumn": "คะแนน",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "แรงดันเราเตอร์",

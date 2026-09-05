@@ -331,7 +331,9 @@
     "weightSpeed": "Greitis",
     "weightIntelligence": "Intelektas",
     "weightRequired": "Bent vienas svoris turi būti virš nulio.",
-    "scoreColumn": "Muzika"
+    "scoreColumn": "Muzika",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Maršrutizatoriaus slėgis",

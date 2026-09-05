@@ -331,7 +331,9 @@
     "weightSpeed": "వేగం",
     "weightIntelligence": "ఇంటెలిజెన్స్",
     "weightRequired": "కనీసం ఒక బరువు తప్పనిసరిగా సున్నా కంటే ఎక్కువగా ఉండాలి.",
-    "scoreColumn": "స్కోర్"
+    "scoreColumn": "స్కోర్",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "రూటర్ ఒత్తిడి",

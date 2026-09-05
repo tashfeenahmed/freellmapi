@@ -331,7 +331,9 @@
     "weightSpeed": "Hastighet",
     "weightIntelligence": "Underrättelse",
     "weightRequired": "Minst en vikt måste vara över noll.",
-    "scoreColumn": "Poäng"
+    "scoreColumn": "Poäng",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Frästryck",

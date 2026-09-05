@@ -331,7 +331,9 @@
     "weightSpeed": "Hastighet",
     "weightIntelligence": "Etterretning",
     "weightRequired": "Minst én vekt må være over null.",
-    "scoreColumn": "Poengsum"
+    "scoreColumn": "Poengsum",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Frestrykk",

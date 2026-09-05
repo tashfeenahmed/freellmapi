@@ -331,7 +331,9 @@
     "weightSpeed": "Брзина",
     "weightIntelligence": "Интелигенција",
     "weightRequired": "Најмање једна тежина мора бити изнад нуле.",
-    "scoreColumn": "Резултат"
+    "scoreColumn": "Резултат",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Притисак рутера",

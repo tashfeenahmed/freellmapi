@@ -331,7 +331,9 @@
     "weightSpeed": "Rychlost",
     "weightIntelligence": "Zpravodajství",
     "weightRequired": "Alespoň jedno závaží musí být nad nulou.",
-    "scoreColumn": "Hudba"
+    "scoreColumn": "Hudba",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Tlak frézky",

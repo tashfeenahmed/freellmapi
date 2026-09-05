@@ -164,8 +164,8 @@ describe('bandit router', () => {
 
   it('smartest vs fastest flips which model wins, at equal reliability', () => {
     // Smart: frontier tier, slow. Fast: small tier, high throughput. Equal success.
-    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
-    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 9, sizeLabel: 'Small', budget: '~50M', priority: 2 });
+    addModel({ platform: 'google', modelId: 'smart', name: 'Smart', intelligenceRank: 200, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'fast', name: 'Fast', intelligenceRank: 1, sizeLabel: 'Small', budget: '~50M', priority: 2 });
     addHistory('google', 'smart', { successes: 40, failures: 1, outTokens: 100, latencyMs: 3000, ttfbMs: 2500 });
     addHistory('groq', 'fast', { successes: 40, failures: 1, outTokens: 1000, latencyMs: 1000, ttfbMs: 150 });
 
@@ -461,12 +461,10 @@ describe('bandit router', () => {
   it('a saved intelligence_rank override visibly moves the axis (#673)', () => {
     // Regression for #673. A realistic chain: a Frontier flagship on top, a
     // Medium model at the bottom, and the Large model in between — the one the
-    // user re-ranks from 6 to 1 ("this is actually the best model I have").
+    // user re-ranks from 6 to 200 ("this is actually the best model I have").
     //
-    // Under the old LINEAR rank term that edit shifted the Large model's
-    // normalized axis by ~0.25 points out of 100, i.e. the dashboard rendered
-    // the SAME integer before and after and the edit looked like a no-op. The
-    // sqrt-compressed term moves it ~2 points, which is visible.
+    // Intelligence Rank is the authoritative static intelligence axis: higher
+    // rank means more capable, and the normalized score must visibly move.
     addModel({ platform: 'google', modelId: 'flagship', name: 'Flagship', intelligenceRank: 1, sizeLabel: 'Frontier', budget: '~50M', priority: 1 });
     addModel({ platform: 'groq', modelId: 'workhorse', name: 'Workhorse', intelligenceRank: 6, sizeLabel: 'Large', budget: '~50M', priority: 2 });
     addModel({ platform: 'meta', modelId: 'compact', name: 'Compact', intelligenceRank: 50, sizeLabel: 'Medium', budget: '~50M', priority: 3 });
@@ -475,12 +473,12 @@ describe('bandit router', () => {
 
     const before = getRoutingScores().scores.find(s => s.modelId === 'workhorse')!;
 
-    // PATCH /api/models/:id { intelligenceRank: 1 } bottoms out in exactly this
+    // PATCH /api/models/:id { intelligenceRank: 200 } writes exactly this
     // UPDATE (routes/models.ts maps intelligenceRank → the intelligence_rank
     // column); this suite drives the router directly and has no HTTP harness,
     // so write the column and refresh the cache the same way the route does.
     const row = getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get('groq', 'workhorse') as { id: number };
-    getDb().prepare('UPDATE models SET intelligence_rank = 1 WHERE id = ?').run(row.id);
+    getDb().prepare('UPDATE models SET intelligence_rank = 200 WHERE id = ?').run(row.id);
     refreshStatsCache(getDb(), true);
 
     const after = getRoutingScores().scores.find(s => s.modelId === 'workhorse')!;

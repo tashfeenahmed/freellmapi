@@ -331,7 +331,9 @@
     "weightSpeed": "Скорость",
     "weightIntelligence": "Интеллект",
     "weightRequired": "Хотя бы один вес должен быть больше нуля.",
-    "scoreColumn": "Оценка"
+    "scoreColumn": "Оценка",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Давление маршрутизатора",

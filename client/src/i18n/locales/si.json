@@ -331,7 +331,9 @@
     "weightSpeed": "වේගය",
     "weightIntelligence": "බුද්ධිය",
     "weightRequired": "අවම වශයෙන් එක් බරක් බිංදුවට වඩා වැඩි විය යුතුය.",
-    "scoreColumn": "ලකුණු"
+    "scoreColumn": "ලකුණු",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "රවුටරයේ පීඩනය",

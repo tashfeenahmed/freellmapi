@@ -331,7 +331,9 @@
     "weightSpeed": "Скорост",
     "weightIntelligence": "Разузнаване",
     "weightRequired": "Поне едно тегло трябва да е над нула.",
-    "scoreColumn": "Партитура"
+    "scoreColumn": "Партитура",
+    "manualSmart": "Manual Smart",
+    "manualSmartBlurb": "Route by your custom intelligence_rank. Models are ordered by rank, penalized on failures, and recovered on success."
   },
   "penaltyInspector": {
     "title": "Налягане в рутера",
