@@ -21,7 +21,7 @@ import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
-import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse } from '../services/cache.js';
+import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
@@ -1773,7 +1773,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // per-request `X-FreeLLM-Cache` header can force or bypass. Off unless enabled
   // via the RESPONSE_CACHE env var or the response_cache_enabled setting.
   const cacheDirective = parseCacheDirective(req.headers['x-freellm-cache'], req.headers['cache-control']);
-  const cacheKey = (!stream && cacheActive(cacheDirective) && isCacheableTemperature(temperature))
+  // Streaming requests participate in the cache too: same canonical key (the
+  // request content is identical), but hits are looked up in the streaming
+  // store and replayed as SSE rather than JSON (see below).
+  const cacheKey = (cacheActive(cacheDirective) && isCacheableTemperature(temperature))
     ? computeCacheKey({
         model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
         // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
@@ -1799,15 +1802,33 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       })
     : null;
   if (cacheKey) {
-    const hit = getCachedResponse(cacheKey);
-    if (hit) {
-      // A hit consumes NO provider quota, so recordRequest/recordTokens are
-      // deliberately skipped and the reply is not re-logged as provider usage.
-      // The savings are reported separately by GET /api/cache/stats.
-      res.setHeader('X-Routed-Via', 'cache');
-      res.setHeader('X-FreeLLM-Cache', 'HIT');
-      res.json(hit.body);
-      return;
+    if (stream) {
+      // Streaming hit: replay the captured SSE frame sequence verbatim —
+      // same zero-quota rationale as a JSON hit, with first-byte semantics
+      // preserved (the frames include the leading content chunks, so the
+      // first token arrives immediately).
+      const streamHit = getCachedStreamResponse(cacheKey);
+      if (streamHit) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Routed-Via', 'cache');
+        res.setHeader('X-FreeLLM-Cache', 'HIT');
+        for (const frame of streamHit.frames) res.write(frame);
+        res.end();
+        return;
+      }
+    } else {
+      const hit = getCachedResponse(cacheKey);
+      if (hit) {
+        // A hit consumes NO provider quota, so recordRequest/recordTokens are
+        // deliberately skipped and the reply is not re-logged as provider usage.
+        // The savings are reported separately by GET /api/cache/stats.
+        res.setHeader('X-Routed-Via', 'cache');
+        res.setHeader('X-FreeLLM-Cache', 'HIT');
+        res.json(hit.body);
+        return;
+      }
     }
   }
 
@@ -2113,6 +2134,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // Only evidence when a provider serves a different model than routed
         // (#534); compared/persisted on success via observeServedModel.
         let upstreamModel: string | null = null;
+        // Every `data: ...` frame the client sees, captured for a possible
+        // streaming cache store on success (exact SSE replay on a later hit).
+        const streamFrames: string[] = [];
 
         const flushHeaders = () => {
           if (headerSent) return;
@@ -2123,12 +2147,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
+          res.setHeader('X-FreeLLM-Cache', cacheKey ? 'MISS' : 'OFF');
           setFallbackHeaders(res, attempt, attemptLog);
           headerSent = true;
           // Committed: the answer is on its way, so the retry budget must no
           // longer cancel this attempt (it could not fail over now anyway).
           ctx.disarmHedge();
-          for (const p of preamble) res.write(`data: ${JSON.stringify(p)}\n\n`);
+          for (const p of preamble) {
+            const frame = `data: ${JSON.stringify(p)}\n\n`;
+            streamFrames.push(frame);
+            res.write(frame);
+          }
           preamble.length = 0;
         };
         const mkChunk = (delta: Record<string, unknown>, finish: string | null) => ({
@@ -2138,7 +2167,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           model: lastMeta.model ?? route.modelId,
           choices: [{ index: 0, delta, finish_reason: finish }],
         });
-        const writeChunk = (c: unknown) => res.write(`data: ${JSON.stringify(c)}\n\n`);
+        const writeChunk = (c: unknown) => {
+          const frame = `data: ${JSON.stringify(c)}\n\n`;
+          streamFrames.push(frame);
+          res.write(frame);
+        };
 
         try {
           const gen = route.provider.streamChatCompletion(
@@ -2443,7 +2476,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               },
             });
           }
-          res.write('data: [DONE]\n\n');
+          const doneFrame = 'data: [DONE]\n\n';
+          streamFrames.push(doneFrame);
+          res.write(doneFrame);
           res.end();
 
           const upstreamUsage = (usageChunk as { usage?: TokenUsage } | null)?.usage;
@@ -2451,6 +2486,23 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const totalTokens = upstreamUsage?.total_tokens ?? (inputTokens + outputTokens);
           recordUpstreamSuccess(route, totalTokens);
+
+          // Cache the freshly-generated SSE sequence so an identical later
+          // stream request is replayed without spending another free-tier
+          // slot. A truncated turn (finish 'length') is NOT cached, matching
+          // the JSON cache policy — replaying a cut-off answer would be worse
+          // than regenerating.
+          if (cacheKey && finish !== 'length') {
+            storeCachedStreamResponse(cacheKey, {
+              frames: streamFrames,
+              platform: route.platform,
+              modelId: route.modelId,
+              keyId: route.keyId,
+              promptTokens: inputTokens,
+              completionTokens: outputTokens,
+            });
+          }
+
           setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
           // #797: remember this turn's thinking trace so the next request from

@@ -280,6 +280,31 @@ interface CacheEntry {
 // at the end (delete + set), so eviction from the front drops the coldest entry.
 const store = new Map<string, CacheEntry>();
 
+// Streaming entries live in their own LRU: a stream's replayable artifact is
+// the exact SSE frame sequence, which is structurally different from a JSON
+// completion body, so the two kinds never share a key across stores.
+interface StreamCacheEntry {
+  frames: string[]; // verbatim `data: {...}\n\n` (and final `[DONE]`) frames
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+  hitCount: number;
+  createdAtMs: number;
+  lastHitAtMs: number | null;
+}
+const streamStore = new Map<string, StreamCacheEntry>();
+
+function evictToCap<K, V>(map: Map<K, V>): void {
+  const cap = cacheMaxEntries();
+  while (map.size > cap) {
+    const oldest = map.keys().next().value as K | undefined;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+}
+
 // Lifetime-of-process lookup tallies, the denominator behind the dashboard's
 // hit rate. Entries alone cannot provide it: a cache that is 99% empty is 0%
 // useful, and a flushed store would otherwise read as a 100% hit rate.
@@ -343,11 +368,13 @@ export function __flushPersistenceForTests(): void {
  * Test-only: drop the in-memory LRU while leaving the SQLite table intact, the
  * way a process restart does. (clearCache() is the user-facing flush and wipes
  * both, so it cannot stand in for a restart.) Pending write-through is drained
- * first, since a real restart's writes had already landed.
+ * first, since a real restart's writes had already landed. Streaming entries
+ * are memory-only (never written through), so a restart drops them too.
  */
 export function __resetMemoryForTests(): void {
   drainPendingWrites();
   store.clear();
+  streamStore.clear();
   lookupHits = 0;
   lookupMisses = 0;
 }
@@ -543,6 +570,79 @@ export function loadCacheFromDb(now = Date.now()): void {
   }
 }
 
+// ── Streaming entries ──
+
+export interface CachedStreamResponse {
+  frames: string[];
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface StoreStreamInput {
+  frames: string[];
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
+ * Look up a cached stream. Returns null on a miss or when the entry has aged
+ * past the TTL. A hit bumps hit_count and moves the entry to MRU.
+ */
+export function getCachedStreamResponse(cacheKey: string, now = Date.now()): CachedStreamResponse | null {
+  const entry = streamStore.get(cacheKey);
+  if (!entry) return null;
+
+  if (now - entry.createdAtMs > cacheTtlMs()) {
+    streamStore.delete(cacheKey);
+    return null;
+  }
+
+  entry.hitCount += 1;
+  entry.lastHitAtMs = now;
+  streamStore.delete(cacheKey);
+  streamStore.set(cacheKey, entry);
+
+  return {
+    frames: entry.frames,
+    platform: entry.platform,
+    modelId: entry.modelId,
+    keyId: entry.keyId,
+    promptTokens: entry.promptTokens,
+    completionTokens: entry.completionTokens,
+  };
+}
+
+/**
+ * Store a completed SSE frame sequence for replay. The frames are the verbatim
+ * `data: {...}\n\n` lines (including the final `[DONE]`) the client received,
+ * so a hit can reproduce the stream byte-for-byte. Best-effort like the JSON
+ * store.
+ */
+export function storeCachedStreamResponse(cacheKey: string, input: StoreStreamInput, now = Date.now()): void {
+  if (!Array.isArray(input.frames) || input.frames.length === 0) return;
+
+  streamStore.delete(cacheKey);
+  streamStore.set(cacheKey, {
+    frames: input.frames,
+    platform: input.platform,
+    modelId: input.modelId,
+    keyId: input.keyId,
+    promptTokens: input.promptTokens,
+    completionTokens: input.completionTokens,
+    hitCount: 0,
+    createdAtMs: now,
+    lastHitAtMs: null,
+  });
+
+  evictToCap(streamStore);
+}
+
 // ── Stats / admin ──
 
 export interface CacheStats {
@@ -580,9 +680,14 @@ export function getCacheStats(): CacheStats {
     savedPromptTokens += entry.hitCount * entry.promptTokens;
     savedCompletionTokens += entry.hitCount * entry.completionTokens;
   }
+  for (const entry of streamStore.values()) {
+    totalHits += entry.hitCount;
+    savedPromptTokens += entry.hitCount * entry.promptTokens;
+    savedCompletionTokens += entry.hitCount * entry.completionTokens;
+  }
   const lookups = lookupHits + lookupMisses;
   return {
-    entries: store.size,
+    entries: store.size + streamStore.size,
     totalHits,
     estimatedRequestsSaved: totalHits,
     savedPromptTokens,
@@ -602,8 +707,9 @@ export function getCacheStats(): CacheStats {
  * rather than deferred: this is an admin route, not the proxy hot path.
  */
 export function clearCache(): number {
-  const removed = store.size;
+  const removed = store.size + streamStore.size;
   store.clear();
+  streamStore.clear();
   pendingWrites.length = 0;
   // The lookup tallies describe the cache that just went away; keeping them
   // would show a 90% hit rate next to zero entries right after a flush.

@@ -4,6 +4,8 @@ import {
   computeCacheKey,
   getCachedResponse,
   storeCachedResponse,
+  getCachedStreamResponse,
+  storeCachedStreamResponse,
   getCacheStats,
   clearCache,
   loadCacheFromDb,
@@ -355,6 +357,70 @@ describe('response cache', () => {
       process.env.RESPONSE_CACHE = 'on';
       expect(cacheActive('default')).toBe(true);
       expect(cacheActive('off')).toBe(false);
+    });
+  });
+
+  describe('streaming cache', () => {
+    const frames = (text: string) => [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+
+    it('returns null on a streaming miss', () => {
+      expect(getCachedStreamResponse('does-not-exist')).toBeNull();
+    });
+
+    it('replays the exact SSE frames on a streaming hit', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'stream me')] });
+      storeCachedStreamResponse(key, {
+        frames: frames('streamed answer'),
+        platform: 'groq',
+        modelId: 'llama-3.3-70b',
+        keyId: 7,
+        promptTokens: 10,
+        completionTokens: 5,
+      });
+      const hit = getCachedStreamResponse(key);
+      expect(hit).not.toBeNull();
+      expect(hit!.frames).toEqual(frames('streamed answer'));
+      expect(hit!.platform).toBe('groq');
+      expect(hit!.modelId).toBe('llama-3.3-70b');
+    });
+
+    it('keeps JSON and streaming entries separate for the same key', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'both')] });
+      store(key, 'json answer');
+      storeCachedStreamResponse(key, {
+        frames: frames('stream answer'),
+        platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      });
+      // The JSON store still serves its entry; the stream store its own.
+      expect((getCachedResponse(key)!.body as any).choices[0].message.content).toBe('json answer');
+      expect(getCachedStreamResponse(key)!.frames).toEqual(frames('stream answer'));
+    });
+
+    it('rejects an empty frame list (nothing to replay)', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'empty')] });
+      storeCachedStreamResponse(key, {
+        frames: [],
+        platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      });
+      expect(getCachedStreamResponse(key)).toBeNull();
+    });
+
+    it('counts streaming hits in the aggregated stats and clearCache clears both', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'stats')] });
+      storeCachedStreamResponse(key, {
+        frames: frames('a'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 10, completionTokens: 5,
+      });
+      getCachedStreamResponse(key);
+      getCachedStreamResponse(key);
+      const stats = getCacheStats();
+      expect(stats.entries).toBe(1);
+      expect(stats.totalHits).toBe(2);
+      expect(stats.savedPromptTokens).toBe(20); // 2 hits × 10
+      expect(clearCache()).toBe(1);
+      expect(getCacheStats().entries).toBe(0);
     });
   });
 
