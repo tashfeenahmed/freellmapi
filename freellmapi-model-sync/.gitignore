@@ -1,0 +1,3 @@
+# Local credentials and runtime state
+.env
+state/
