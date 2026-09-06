@@ -380,6 +380,8 @@ export const platformColors: Record<string, string> = {
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
+  electronhub: '#6366f1',
+  experiential: '#14b8a6',
   bai:         '#111827',
   radeon:      '#ed1c24',
   nvidia:      '#76b900',

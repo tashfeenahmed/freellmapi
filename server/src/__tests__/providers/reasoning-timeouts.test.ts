@@ -22,6 +22,8 @@ describe('reasoning-model chat timeouts', () => {
     ['zhipu', 60_000],
     ['agnes', 60_000],
     ['opencode', 60_000],
+    ['experiential', 60_000],
+    ['electronhub', 90_000],
     ['ollama', 120_000], // pre-existing bump; keep it from regressing too
     // Radeon Cloud documents a ten-minute non-streaming and stream-gap limit.
     ['radeon', 600_000],

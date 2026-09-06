@@ -9,6 +9,7 @@ import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
 import { SailProvider } from './sail.js';
+import { ElectronHubProvider } from './electronhub.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -42,6 +43,15 @@ register(new OpenAICompatProvider({
 // usage beyond that grant is pay-as-you-go. Live-tested 2026-09-01. Model rows
 // stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
 register(new SailProvider());
+
+// Free-plan grants are shared wallets, not free credits per model. Eligibility
+// and tested model rows belong in Oracle, never in bundled DB migrations.
+register(new ElectronHubProvider());
+register(new OpenAICompatProvider({
+  platform: 'experiential',
+  name: 'Experiential Labs',
+  baseUrl: 'https://api.experientiallabs.ai/v1',
+}));
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;

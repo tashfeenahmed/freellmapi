@@ -40,6 +40,11 @@ describe('provider-quota: pool inference', () => {
 
   it('buckets shared-pool providers per account and openrouter free vs account', () => {
     expect(inferQuotaPoolKey('groq')).toBe('groq::account');
+    expect(inferQuotaPoolKey('electronhub', 'qwen3.8-flash')).toBe('electronhub::weekly-credit');
+    expect(inferQuotaPoolKey('electronhub', 'gpt-oss-120b')).toBe('electronhub::weekly-credit');
+    expect(inferQuotaPoolKey('electronhub', 'some-model:free')).toBe('electronhub::daily-free');
+    expect(inferQuotaPoolKey('experiential', 'glm-5.3')).toBe('experiential::monthly-credit');
+    expect(inferQuotaPoolKey('experiential', 'gpt-5.6-sol')).toBe('experiential::monthly-credit');
     expect(inferQuotaPoolKey('openrouter', 'meta-llama/llama-3.1-8b-instruct:free')).toBe('openrouter::free');
     expect(inferQuotaPoolKey('openrouter', 'openai/gpt-4o')).toBe('openrouter::account');
     // AnyAPI's 100K tokens/day is one account-wide budget, so every model on
@@ -241,6 +246,20 @@ describe('provider-quota: parse from response headers (shared parseRetryAfterMs)
     expect(obs.find(o => o.metric === 'credits')).toMatchObject({
       quotaPoolKey: 'radeon::daily-free', limit: 10, remaining: 7.5,
     });
+  });
+
+  it('uses ElectronHub account headers without inventing per-model credit limits', () => {
+    const response = new Response(null, { headers: {
+      'x-ratelimit-limit': '5', 'x-ratelimit-remaining': '4', 'x-ratelimit-reset': '1788690000',
+    } });
+    const observations = parseQuotaObservationsFromResponse(response, {
+      platform: 'electronhub', keyId: 9, modelId: 'qwen3.8-flash',
+    });
+    expect(observations.find(o => o.metric === 'requests')).toMatchObject({
+      quotaPoolKey: 'electronhub::weekly-credit', limit: 5, remaining: 4,
+      resetAt: new Date(1788690000000).toISOString(),
+    });
+    expect(observations.some(o => o.metric === 'credits')).toBe(false);
   });
 });
 

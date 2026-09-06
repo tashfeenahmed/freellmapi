@@ -153,6 +153,16 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
+  it.each(['electronhub', 'experiential'])('accepts a %s key without seeding gated model rows', async platform => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform, key: 'not-a-real-test-key-12345', label: 'Gateway test',
+    });
+    expect(status).toBe(201);
+    expect(body.platform).toBe(platform);
+    expect(body.modelsAvailable).toBe(0);
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM models WHERE platform = ?').get(platform)).toEqual({ n: 0 });
+  });
+
   it('POST /api/keys rejects missing key', async () => {
     const { status } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',
