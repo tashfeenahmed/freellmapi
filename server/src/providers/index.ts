@@ -10,6 +10,7 @@ import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
 import { SailProvider } from './sail.js';
 import { ElectronHubProvider } from './electronhub.js';
+import { ExperientialProvider } from './experiential.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -47,11 +48,7 @@ register(new SailProvider());
 // Free-plan grants are shared wallets, not free credits per model. Eligibility
 // and tested model rows belong in Oracle, never in bundled DB migrations.
 register(new ElectronHubProvider());
-register(new OpenAICompatProvider({
-  platform: 'experiential',
-  name: 'Experiential Labs',
-  baseUrl: 'https://api.experientiallabs.ai/v1',
-}));
+register(new ExperientialProvider());
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;

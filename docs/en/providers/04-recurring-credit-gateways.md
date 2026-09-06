@@ -22,6 +22,11 @@ endpoint. Its dedicated compatibility subclass rejects the observed proxy-error
 banner embedded in HTTP-200 responses, including split SSE chunks. The other
 seven tested ElectronHub candidates were excluded from catalog additions.
 
+Experiential's compatibility subclass omits fixed-temperature and unsupported
+top-p knobs on the specific Claude routes that reject them. This was caught
+by a live adapter test using normal dashboard sampling settings, not merely a
+minimal direct API request. Other models retain their supported settings.
+
 Key imports accept `ELECTRONHUB_API_KEY`, `ELECTRON_HUB_API_KEY`,
 `EXPERIENTIAL_API_KEY`, `EXPERIENTIALLABS_API_KEY`,
 `EXPERIENTIAL_LABS_API_KEY`, and `EXPLABS_API_KEY`.

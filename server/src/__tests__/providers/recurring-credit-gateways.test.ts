@@ -89,6 +89,35 @@ describe('recurring-credit gateway adapters', () => {
     expect(error.message).not.toContain('Private upstream');
   });
 
+  it.each(['claude-fable-5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.7', 'claude-opus-4.8'])(
+    'Experiential omits unsupported temperature and top_p for %s', async model => {
+      const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(completion())));
+      await getProvider('experiential')!.chatCompletion('test-key', [], model, { temperature: 0.7, top_p: 0.95, max_tokens: 256 });
+      const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+      expect(body).not.toHaveProperty('temperature');
+      expect(body).not.toHaveProperty('top_p');
+      expect(body.max_tokens).toBe(256);
+    },
+  );
+
+  it('Experiential uses the same model-specific sampling policy while streaming', async () => {
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(stream(['OK']));
+    for await (const _chunk of getProvider('experiential')!.streamChatCompletion('test-key', [], 'claude-opus-5', { temperature: 0.7, top_p: 0.95 })) { /* drain */ }
+    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('top_p');
+  });
+
+  it.each(['claude-opus-4.6', 'claude-sonnet-4.6'])(
+    'Experiential preserves supported top_p for %s while omitting fixed temperature', async model => {
+      const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(completion())));
+      await getProvider('experiential')!.chatCompletion('test-key', [], model, { temperature: 0.7, top_p: 0.95 });
+      const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+      expect(body).not.toHaveProperty('temperature');
+      expect(body.top_p).toBe(0.95);
+    },
+  );
+
   it('ElectronHub catches a proxy-error banner split across SSE chunks before yielding content', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(stream(['### **Pro', 'xy error (HTTP ', '404 Not Found)**']));
     const output: ChatCompletionChunk[] = [];
