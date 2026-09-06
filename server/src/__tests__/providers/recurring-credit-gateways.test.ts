@@ -109,14 +109,25 @@ describe('recurring-credit gateway adapters', () => {
   });
 
   it.each(['claude-opus-4.6', 'claude-sonnet-4.6'])(
-    'Experiential preserves supported top_p for %s while omitting fixed temperature', async model => {
+    'Experiential omits the restricted reasoning top_p for %s', async model => {
       const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(completion())));
       await getProvider('experiential')!.chatCompletion('test-key', [], model, { temperature: 0.7, top_p: 0.95 });
       const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
       expect(body).not.toHaveProperty('temperature');
-      expect(body.top_p).toBe(0.95);
+      expect(body).not.toHaveProperty('top_p');
     },
   );
+
+  it.each([
+    [{ temperature: 0.7, top_p: 0.95 }, { temperature: 0.7 }],
+    [{ top_p: 0.95 }, { top_p: 0.95 }],
+  ])('Experiential never sends competing sampling knobs to legacy Claude routes', async (options, expected) => {
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify(completion())));
+    await getProvider('experiential')!.chatCompletion('test-key', [], 'claude-haiku-4.5', options);
+    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    expect(body).toMatchObject(expected);
+    expect(body.temperature !== undefined && body.top_p !== undefined).toBe(false);
+  });
 
   it('ElectronHub catches a proxy-error banner split across SSE chunks before yielding content', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(stream(['### **Pro', 'xy error (HTTP ', '404 Not Found)**']));

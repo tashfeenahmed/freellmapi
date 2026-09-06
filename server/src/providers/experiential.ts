@@ -9,9 +9,6 @@ const FIXED_TEMPERATURE_MODELS = new Set([
   'claude-fable-5', 'claude-opus-5', 'claude-sonnet-5',
   'claude-opus-4.6', 'claude-opus-4.7', 'claude-opus-4.8', 'claude-sonnet-4.6',
 ]);
-const NO_TOP_P_MODELS = new Set([
-  'claude-fable-5', 'claude-opus-5', 'claude-sonnet-5', 'claude-opus-4.7', 'claude-opus-4.8',
-]);
 
 export class ExperientialProvider extends OpenAICompatProvider {
   constructor() {
@@ -24,9 +21,16 @@ export class ExperientialProvider extends OpenAICompatProvider {
 
   protected override samplingForModel(modelId: string, options?: CompletionOptions) {
     const sampling = super.samplingForModel(modelId, options);
+    // 4.6 reasoning routes additionally constrain top_p to [0.99, 1]; the
+    // newer routes reject it entirely. Omit both on the fixed-temperature
+    // routes. Other Claude routes accept either knob, but reject both together
+    // (live-reproduced on Haiku 4.5); prefer the requested temperature there.
+    const fixed = FIXED_TEMPERATURE_MODELS.has(modelId);
+    const competingClaudeSampling = modelId.startsWith('claude-') &&
+      sampling.temperature !== undefined && sampling.topP !== undefined;
     return {
-      temperature: FIXED_TEMPERATURE_MODELS.has(modelId) ? undefined : sampling.temperature,
-      topP: NO_TOP_P_MODELS.has(modelId) ? undefined : sampling.topP,
+      temperature: fixed ? undefined : sampling.temperature,
+      topP: fixed || competingClaudeSampling ? undefined : sampling.topP,
     };
   }
 }
