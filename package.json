@@ -17,6 +17,6 @@
     "desktop:dist:win": "npm run build -w client && npm --prefix desktop run dist:win"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^10.0.5"
   }
 }

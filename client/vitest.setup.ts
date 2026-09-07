@@ -1,5 +1,7 @@
 import '@testing-library/jest-dom/vitest'
-import { afterEach, vi } from 'vitest'
+import * as matchers from '@testing-library/jest-dom/matchers'
+import { expect, afterEach, vi } from 'vitest'
+expect.extend(matchers)
 import { cleanup } from '@testing-library/react'
 
 // jsdom (esp. v26) doesn't always expose a functional window.localStorage.

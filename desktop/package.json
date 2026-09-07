@@ -17,15 +17,15 @@
     "dist:win": "npm run build:all && npm run stage:client && electron-builder --win --x64"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0"
+    "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.0.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8",
-    "esbuild": "^0.24.0",
-    "typescript": "^5.8.0"
+    "@electron/rebuild": "^4.2.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.1",
+    "electron": "^33.4.11",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
   }
 }

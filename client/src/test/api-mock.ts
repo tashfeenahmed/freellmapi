@@ -1,14 +1,13 @@
 import type { ApiKey } from '../../../shared/types'
+import type { FusionConfigResponse, FallbackEntry } from '@/pages/FusionPage'
 import * as api from '@/lib/api'
-
-// Centralised apiFetch mock so render smoke tests don't need a live backend.
-// Components call `apiFetch<T>(path, opts)`; we route by path to canned data.
-// Install with `vi.spyOn(api, 'apiFetch').mockImplementation(...)` via the
-// returned helper, or call installApiFetchMock() directly from a test.
 
 export interface MockApiState {
   authStatus: { needsSetup: boolean; authenticated: boolean; email: string | null }
   keys: ApiKey[]
+  fusionConfig?: FusionConfigResponse
+  fallbackEntries?: FallbackEntry[]
+  unifyEnabled?: boolean
 }
 
 export const defaultMockState: MockApiState = {
@@ -33,19 +32,28 @@ export const defaultMockState: MockApiState = {
       createdAt: '2026-06-02T10:00:00.000Z',
     } as ApiKey,
   ],
+  fusionConfig: {
+    config: {
+      mode: 'auto',
+      models: [],
+      judge: null,
+      k: 4,
+      strategy: 'synthesize',
+      expose_panel: false,
+    },
+    maxK: 8,
+  },
+  fallbackEntries: [],
+  unifyEnabled: true,
 }
 
-/**
- * Install a path-routed apiFetch mock. Returns the vi spy so tests can inspect
- * or override it. Call from within a test (after the api module is loaded).
- */
 export function installApiFetchMock(state: MockApiState = defaultMockState) {
   return vi.spyOn(api, 'apiFetch').mockImplementation(async (path: string) => {
     if (path === '/api/auth/status') return state.authStatus as never
     if (path === '/api/keys') return state.keys as never
-    if (path.startsWith('/api/settings') || path === '/api/fallback') {
-      return {} as never
-    }
+    if (path === '/api/settings/fusion') return state.fusionConfig ?? defaultMockState.fusionConfig as never
+    if (path === '/api/fallback') return state.fallbackEntries ?? defaultMockState.fallbackEntries as never
+    if (path === '/api/settings/unify') return ({ enabled: state.unifyEnabled ?? defaultMockState.unifyEnabled } as never)
     return null as never
   })
 }

@@ -4,6 +4,7 @@ import { encrypt } from '../../lib/crypto.js';
 import {
   getAllPenalties,
   recordRateLimitHit,
+  recordSuccess,
   routeRequest,
   setRoutingStrategy,
 } from '../../services/router.js';
@@ -185,3 +186,19 @@ describe('Router', () => {
     });
   });
 });
+
+describe('Router: penalty / success / decay (low-coverage area)', () => {
+  it('recordSuccess reduces then removes a penalty', () => {
+    const id = 999888777;
+    recordRateLimitHit(id);
+    expect(getAllPenalties().some(p => p.modelDbId === id)).toBe(true);
+    recordSuccess(id); recordSuccess(id); recordSuccess(id);
+    expect(getAllPenalties().some(p => p.modelDbId === id)).toBe(false);
+  })
+  it('getAllPenalties is sorted by penalty desc', () => {
+    const a = 111; recordRateLimitHit(a);
+    const b = 222; recordRateLimitHit(b); recordRateLimitHit(b);
+    const sorted = getAllPenalties();
+    expect(sorted[0].penalty).toBeGreaterThanOrEqual(sorted[sorted.length-1].penalty);
+  })
+})

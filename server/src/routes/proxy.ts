@@ -505,8 +505,19 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
     const result = await runSpeech(parsed.data.model, {
       input: parsed.data.input, voice: parsed.data.voice, format: parsed.data.response_format,
     });
-    res.setHeader('Content-Type', result.contentType);
+    // Only emit content types we control — never echo an arbitrary provider
+    // content-type straight onto the response (semgrep:
+    // javascript.express.security.audit.direct-response-write).
+    const allowedAudioTypes = new Set([
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm',
+      'audio/flac', 'audio/aac', 'audio/mp4', 'audio/x-m4a',
+    ]);
+    const contentType = allowedAudioTypes.has(result.contentType)
+      ? result.contentType
+      : 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
     res.setHeader('X-Provider', result.platform);
+    res.setHeader('Content-Disposition', 'inline');
     res.send(result.audio);
   } catch (err: any) {
     const status = err instanceof MediaError ? err.status : 502;
