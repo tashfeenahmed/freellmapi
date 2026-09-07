@@ -47,8 +47,8 @@
     "newEmail": "Nový e-mail",
     "resetCode": "Kód pro reset",
     "resetCodePlaceholder": "kód ze serverových logů",
-    "resetCodeHint": "Kód pro reset hesla najdete v logách serveru.",
-    "forgotPasswordDescription": "Kliknutím níže vygenerujete kód pro reset. Kód se objeví v logách serveru — zadejte jej zde a nastavte nové heslo.",
+    "resetCodeHint": "Kód je v logu serveru. E-mailem se nikdy neposílá.",
+    "forgotPasswordDescription": "Kliknutím na tlačítko níže vygenerujete kód pro reset. Kód se zapíše do logu serveru, e-mailem se nikdy neposílá. Zadejte jej zde a nastavte nové heslo.",
     "requestResetCode": "Odeslat kód",
     "requestingResetCode": "Odesílání…",
     "resetPassword": "Resetovat heslo",
@@ -58,7 +58,9 @@
     "backToLogin": "Zpět k přihlášení",
     "passwordChanged": "Heslo bylo změněno.",
     "emailChanged": "E-mail byl změněn.",
-    "passwordReset": "Heslo bylo resetováno. Přihlaste se."
+    "passwordReset": "Heslo bylo resetováno. Přihlaste se.",
+    "resetCodeDockerHint": "Používáte Docker? Kód je v logu kontejneru: docker logs <container>.",
+    "desktopSessionFailed": "Řídicí panel se nedokázal přihlásit k místnímu serveru. Ukončete FreeLLMAPI a spusťte jej znovu."
   },
   "common": {
     "save": "Uložit",

@@ -47,8 +47,8 @@
     "newEmail": "Nowy e-mail",
     "resetCode": "Kod resetowania",
     "resetCodePlaceholder": "kod z logów serwera",
-    "resetCodeHint": "Kod resetowania hasła znajdziesz w logach serwera.",
-    "forgotPasswordDescription": "Kliknij poniżej, aby wygenerować kod resetowania. Kod pojawi się w logach serwera — wpisz go tutaj, aby ustawić nowe hasło.",
+    "resetCodeHint": "Kod znajduje się w logu serwera. Nigdy nie jest wysyłany e-mailem.",
+    "forgotPasswordDescription": "Kliknij przycisk poniżej, aby wygenerować kod resetowania. Kod jest zapisywany w logu serwera i nigdy nie jest wysyłany e-mailem. Wpisz go tutaj, aby ustawić nowe hasło.",
     "requestResetCode": "Wyślij kod",
     "requestingResetCode": "Wysyłanie…",
     "resetPassword": "Zresetuj hasło",
@@ -58,7 +58,9 @@
     "backToLogin": "Powrót do logowania",
     "passwordChanged": "Hasło zostało zmienione.",
     "emailChanged": "E-mail został zmieniony.",
-    "passwordReset": "Hasło zresetowane. Zaloguj się ponownie."
+    "passwordReset": "Hasło zresetowane. Zaloguj się ponownie.",
+    "resetCodeDockerHint": "Serwer działa w kontenerze Docker? Kod znajduje się w logu kontenera: docker logs <container>.",
+    "desktopSessionFailed": "Panel nie mógł zalogować się do lokalnego serwera. Zamknij FreeLLMAPI i otwórz go ponownie."
   },
   "common": {
     "save": "Zapisz",

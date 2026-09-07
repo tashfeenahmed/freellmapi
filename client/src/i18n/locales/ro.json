@@ -47,8 +47,8 @@
     "newEmail": "E-mail nou",
     "resetCode": "Cod de resetare",
     "resetCodePlaceholder": "cod din jurnalele serverului",
-    "resetCodeHint": "Găsești codul de resetare în jurnalele serverului.",
-    "forgotPasswordDescription": "Apasă mai jos pentru a genera un cod de resetare. Codul va apărea în jurnalele serverului — introdu-l aici pentru a seta o parolă nouă.",
+    "resetCodeHint": "Codul se află în jurnalul serverului. Nu este trimis niciodată prin e-mail.",
+    "forgotPasswordDescription": "Apasă butonul de mai jos pentru a genera un cod de resetare. Codul este scris în jurnalul serverului, niciodată trimis prin e-mail. Introdu-l aici pentru a seta o parolă nouă.",
     "requestResetCode": "Trimite codul",
     "requestingResetCode": "Se trimite…",
     "resetPassword": "Resetează parola",
@@ -58,7 +58,9 @@
     "backToLogin": "Înapoi la autentificare",
     "passwordChanged": "Parola a fost schimbată.",
     "emailChanged": "E-mailul a fost schimbat.",
-    "passwordReset": "Parola a fost resetată. Autentifică-te."
+    "passwordReset": "Parola a fost resetată. Autentifică-te.",
+    "resetCodeDockerHint": "Rulezi în Docker? Codul se află în jurnalul containerului: docker logs <container>.",
+    "desktopSessionFailed": "Panoul de control nu s-a putut autentifica la serverul local. Închide FreeLLMAPI și deschide-l din nou."
   },
   "common": {
     "save": "Salvează",

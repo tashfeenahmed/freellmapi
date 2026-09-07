@@ -47,8 +47,8 @@
     "newEmail": "Novo e-mail",
     "resetCode": "Código de reposição",
     "resetCodePlaceholder": "código dos registos do servidor",
-    "resetCodeHint": "Consulte os registos do servidor para obter o código.",
-    "forgotPasswordDescription": "Clique abaixo para gerar um código de reposição. O código aparecerá nos registos do servidor — introduza-o aqui para definir uma nova palavra-passe.",
+    "resetCodeHint": "O código está no registo do servidor. Nunca é enviado por e-mail.",
+    "forgotPasswordDescription": "Clique no botão abaixo para gerar um código de reposição. O código é escrito no registo do servidor, nunca enviado por e-mail. Introduza-o aqui para definir uma nova palavra-passe.",
     "requestResetCode": "Enviar código",
     "requestingResetCode": "A enviar…",
     "resetPassword": "Repor palavra-passe",
@@ -58,7 +58,9 @@
     "backToLogin": "Voltar ao início de sessão",
     "passwordChanged": "Palavra-passe alterada com sucesso.",
     "emailChanged": "E-mail alterado com sucesso.",
-    "passwordReset": "Palavra-passe reposta. Inicie sessão."
+    "passwordReset": "Palavra-passe reposta. Inicie sessão.",
+    "resetCodeDockerHint": "Está a usar Docker? O código está no registo do contentor: docker logs <container>.",
+    "desktopSessionFailed": "O painel não conseguiu iniciar sessão no servidor local. Feche o FreeLLMAPI e volte a abri-lo."
   },
   "common": {
     "save": "Guardar",

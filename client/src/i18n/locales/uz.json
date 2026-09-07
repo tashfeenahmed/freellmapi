@@ -47,8 +47,8 @@
     "newEmail": "Yangi e-pochta",
     "resetCode": "Tiklash kodi",
     "resetCodePlaceholder": "server jurnallaridagi kod",
-    "resetCodeHint": "Parolni tiklash kodini server jurnallarida ko'ring.",
-    "forgotPasswordDescription": "Tiklash kodini yaratish uchun quyiga bosing. Kod server jurnallarida ko'rinadi — yangi parol o'rnatish uchun shu yerga kiriting.",
+    "resetCodeHint": "Kod server jurnalida. U hech qachon elektron pochta orqali yuborilmaydi.",
+    "forgotPasswordDescription": "Tiklash kodini yaratish uchun quyidagi tugmani bosing. Kod server jurnaliga yoziladi, hech qachon elektron pochta orqali yuborilmaydi. Yangi parol o'rnatish uchun shu yerga kiriting.",
     "requestResetCode": "Kodni yuborish",
     "requestingResetCode": "Yuborilmoqda…",
     "resetPassword": "Parolni tiklash",
@@ -58,7 +58,9 @@
     "backToLogin": "Kirishga qaytish",
     "passwordChanged": "Parol muvaffaqiyatli o'zgartirildi.",
     "emailChanged": "E-pochta muvaffaqiyatli o'zgartirildi.",
-    "passwordReset": "Parol tiklandi. Iltimos, kiring."
+    "passwordReset": "Parol tiklandi. Iltimos, kiring.",
+    "resetCodeDockerHint": "Docker ichida ishlayaptimi? Kod konteyner jurnalida: docker logs <container>.",
+    "desktopSessionFailed": "Boshqaruv paneli lokal serverga kira olmadi. FreeLLMAPI dasturini yopib, qayta oching."
   },
   "common": {
     "save": "Saqlash",

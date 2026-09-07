@@ -47,8 +47,8 @@
     "newEmail": "Ny e-post",
     "resetCode": "Återställningskod",
     "resetCodePlaceholder": "kod från serverloggarna",
-    "resetCodeHint": "Återställningskoden finns i serverloggarna.",
-    "forgotPasswordDescription": "Klicka nedan för att skapa en återställningskod. Koden visas i serverloggarna — ange den här för att sätta ett nytt lösenord.",
+    "resetCodeHint": "Koden finns i serverloggen. Den skickas aldrig via e-post.",
+    "forgotPasswordDescription": "Klicka på knappen nedan för att skapa en återställningskod. Koden skrivs till serverloggen och skickas aldrig via e-post. Ange den här för att sätta ett nytt lösenord.",
     "requestResetCode": "Skicka kod",
     "requestingResetCode": "Skickar…",
     "resetPassword": "Återställ lösenord",
@@ -58,7 +58,9 @@
     "backToLogin": "Tillbaka till inloggning",
     "passwordChanged": "Lösenordet har bytts.",
     "emailChanged": "E-postadressen har bytts.",
-    "passwordReset": "Lösenordet återställt. Logga in."
+    "passwordReset": "Lösenordet återställt. Logga in.",
+    "resetCodeDockerHint": "Kör du i Docker? Koden finns i containerloggen: docker logs <container>.",
+    "desktopSessionFailed": "Instrumentpanelen kunde inte logga in på den lokala servern. Avsluta FreeLLMAPI och öppna det igen."
   },
   "common": {
     "save": "Spara",

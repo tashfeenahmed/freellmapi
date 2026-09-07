@@ -47,8 +47,8 @@
     "newEmail": "Uusi sähköposti",
     "resetCode": "Palautuskoodi",
     "resetCodePlaceholder": "koodi palvelimen lokeista",
-    "resetCodeHint": "Palautuskoodi löytyy palvelimen lokeista.",
-    "forgotPasswordDescription": "Napsauta alta luodaksesi palautuskoodin. Koodi näkyy palvelimen lokeissa — syötä se tähän asettaaksesi uuden salasanan.",
+    "resetCodeHint": "Koodi on palvelimen lokissa. Sitä ei koskaan lähetetä sähköpostitse.",
+    "forgotPasswordDescription": "Napsauta alla olevaa painiketta luodaksesi palautuskoodin. Koodi kirjoitetaan palvelimen lokiin, eikä sitä koskaan lähetetä sähköpostitse. Syötä se tähän asettaaksesi uuden salasanan.",
     "requestResetCode": "Lähetä koodi",
     "requestingResetCode": "Lähetetään…",
     "resetPassword": "Palauta salasana",
@@ -58,7 +58,9 @@
     "backToLogin": "Takaisin kirjautumiseen",
     "passwordChanged": "Salasana vaihdettu.",
     "emailChanged": "Sähköposti vaihdettu.",
-    "passwordReset": "Salasana palautettu. Kirjaudu sisään."
+    "passwordReset": "Salasana palautettu. Kirjaudu sisään.",
+    "resetCodeDockerHint": "Onko käytössä Docker? Koodi on kontin lokissa: docker logs <container>.",
+    "desktopSessionFailed": "Hallintapaneeli ei voinut kirjautua paikalliselle palvelimelle. Sulje FreeLLMAPI ja avaa se uudelleen."
   },
   "common": {
     "save": "Tallenna",

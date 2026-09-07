@@ -19,6 +19,16 @@ if (arg) {
 // no Sign out) when running inside the desktop shell.
 contextBridge.exposeInMainWorld('__FREEAPI_DESKTOP__', true);
 
+// The dashboard window signs in as the hidden machine account, whose password
+// is random and never shown, so it must never land on the login form. When the
+// seeded session is gone (expired after 30 days of uptime, or cleared by a 401)
+// AuthGate asks the main process for a fresh one instead. Exposed as a bare
+// function rather than a broader bridge: the renderer loads http://127.0.0.1,
+// and every extra capability handed to that world is one an XSS could use —
+// this one only ever hands back a session for the account the window already
+// runs as.
+contextBridge.exposeInMainWorld('__FREEAPI_SESSION__', () => ipcRenderer.invoke('freeapi:session-token'));
+
 // The running build's version, so the dashboard can show which one it is and
 // offer a check against the published releases (#703). Arrives the same way the
 // token does; absent in a browser, where the dashboard simply omits the row

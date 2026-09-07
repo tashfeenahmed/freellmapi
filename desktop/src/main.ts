@@ -152,6 +152,14 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('freeapi:copy-api-key', () => clipboard.writeText(getUnifiedApiKey()));
   ipcMain.handle('freeapi:set-login-item', (_e, open: boolean) => app.setLoginItemSettings({ openAtLogin: open }));
   ipcMain.handle('freeapi:quit', () => app.quit());
+  // Dashboard → a fresh session for the hidden machine account (preload
+  // __FREEAPI_SESSION__). The window never shows a login form: its account has
+  // a random password nobody knows, so when the boot-time session is gone the
+  // only sane answer is a new one. Later windows reuse it too.
+  ipcMain.handle('freeapi:session-token', () => {
+    sessionToken = ensureSessionToken();
+    return sessionToken;
+  });
 
   // Flip the LAN-access flag and relaunch so the server rebinds (127.0.0.1 ↔
   // 0.0.0.0). Enabling shows a one-time warning: the API becomes reachable by

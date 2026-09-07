@@ -47,8 +47,8 @@
     "newEmail": "E-mail baru",
     "resetCode": "Kode reset",
     "resetCodePlaceholder": "kode dari log server",
-    "resetCodeHint": "Lihat kode reset kata sandi di log server.",
-    "forgotPasswordDescription": "Klik di bawah untuk membuat kode reset. Kode akan muncul di log server — masukkan di sini untuk menyetel kata sandi baru.",
+    "resetCodeHint": "Kode ada di log server. Kode tidak pernah dikirim lewat email.",
+    "forgotPasswordDescription": "Klik tombol di bawah untuk membuat kode reset. Kode ditulis ke log server, tidak pernah dikirim lewat email. Masukkan di sini untuk menyetel kata sandi baru.",
     "requestResetCode": "Kirim kode reset",
     "requestingResetCode": "Mengirim…",
     "resetPassword": "Reset kata sandi",
@@ -58,7 +58,9 @@
     "backToLogin": "Kembali ke masuk",
     "passwordChanged": "Kata sandi berhasil diubah.",
     "emailChanged": "E-mail berhasil diubah.",
-    "passwordReset": "Kata sandi telah direset. Silakan masuk."
+    "passwordReset": "Kata sandi telah direset. Silakan masuk.",
+    "resetCodeDockerHint": "Menjalankan di Docker? Kode ada di log container: docker logs <container>.",
+    "desktopSessionFailed": "Dasbor tidak dapat masuk ke server lokal. Tutup FreeLLMAPI lalu buka lagi."
   },
   "common": {
     "save": "Simpan",

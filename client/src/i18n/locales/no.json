@@ -47,8 +47,8 @@
     "newEmail": "Ny e-post",
     "resetCode": "Tilbakestillingskode",
     "resetCodePlaceholder": "kode fra serverloggene",
-    "resetCodeHint": "Tilbakestillingskoden finnes i serverloggene.",
-    "forgotPasswordDescription": "Klikk nedenfor for å lage en tilbakestillingskode. Koden vises i serverloggene — skriv den inn her for å sette nytt passord.",
+    "resetCodeHint": "Koden står i serverloggen. Den sendes aldri på e-post.",
+    "forgotPasswordDescription": "Klikk på knappen nedenfor for å lage en tilbakestillingskode. Koden skrives til serverloggen og sendes aldri på e-post. Skriv den inn her for å sette nytt passord.",
     "requestResetCode": "Send kode",
     "requestingResetCode": "Sender…",
     "resetPassword": "Tilbakestill passord",
@@ -58,7 +58,9 @@
     "backToLogin": "Tilbake til innlogging",
     "passwordChanged": "Passordet er endret.",
     "emailChanged": "E-posten er endret.",
-    "passwordReset": "Passordet er tilbakestilt. Logg inn."
+    "passwordReset": "Passordet er tilbakestilt. Logg inn.",
+    "resetCodeDockerHint": "Kjører du i Docker? Koden står i containerloggen: docker logs <container>.",
+    "desktopSessionFailed": "Dashbordet kunne ikke logge inn på den lokale serveren. Avslutt FreeLLMAPI og åpne det på nytt."
   },
   "common": {
     "save": "Lagre",

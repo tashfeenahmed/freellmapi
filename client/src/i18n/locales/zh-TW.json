@@ -47,8 +47,8 @@
     "newEmail": "新的電子郵件",
     "resetCode": "重設碼",
     "resetCodePlaceholder": "伺服器日誌中的代碼",
-    "resetCodeHint": "請在伺服器日誌中查看密碼重設碼。",
-    "forgotPasswordDescription": "點選下方以產生重設碼。代碼會出現在伺服器日誌中——在此輸入即可設定新密碼。",
+    "resetCodeHint": "重設碼在伺服器日誌中，絕不會透過電子郵件寄送。",
+    "forgotPasswordDescription": "點選下方按鈕以產生重設碼。重設碼會寫入伺服器日誌，絕不會透過電子郵件寄送。在此輸入即可設定新密碼。",
     "requestResetCode": "傳送重設碼",
     "requestingResetCode": "傳送中…",
     "resetPassword": "重設密碼",
@@ -58,7 +58,9 @@
     "backToLogin": "返回登入",
     "passwordChanged": "密碼已成功變更。",
     "emailChanged": "電子郵件已成功變更。",
-    "passwordReset": "密碼已重設，請重新登入。"
+    "passwordReset": "密碼已重設，請重新登入。",
+    "resetCodeDockerHint": "在 Docker 中執行？重設碼在容器日誌中：docker logs <container>",
+    "desktopSessionFailed": "儀表板無法登入本機伺服器。請結束 FreeLLMAPI 並重新開啟。"
   },
   "common": {
     "save": "儲存",

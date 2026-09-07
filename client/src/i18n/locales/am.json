@@ -47,8 +47,8 @@
     "newEmail": "አዲስ ኢሜይል",
     "resetCode": "ዳግም ማስጀመሪያ ኮድ",
     "resetCodePlaceholder": "ከአገልጋይ መዝገብ የተገኘ ኮድ",
-    "resetCodeHint": "የይለፍ ቃል ዳግም ማስጀመሪያ ኮዱን በአገልጋይ መዝገብ ውስጥ ይመልከቱ።",
-    "forgotPasswordDescription": "ኮድ ለመፍጠር ከታች ይጫኑ። ኮዱ በአገልጋይ መዝገብ ውስጥ ይታያል — አዲስ የይለፍ ቃል ለማዘጋጀት እዚህ ያስገቡት።",
+    "resetCodeHint": "ኮዱ በአገልጋይ መዝገብ ውስጥ ነው። በኢሜይል በፍጹም አይላክም።",
+    "forgotPasswordDescription": "ዳግም ማስጀመሪያ ኮድ ለመፍጠር ከታች ያለውን አዝራር ይጫኑ። ኮዱ በአገልጋይ መዝገብ ውስጥ ይጻፋል፣ በኢሜይል በፍጹም አይላክም። አዲስ የይለፍ ቃል ለማዘጋጀት እዚህ ያስገቡት።",
     "requestResetCode": "ኮድ ላክ",
     "requestingResetCode": "በመላክ ላይ…",
     "resetPassword": "የይለፍ ቃል ዳግም አስጀምር",
@@ -58,7 +58,9 @@
     "backToLogin": "ወደ መግቢያ ተመለስ",
     "passwordChanged": "የይለፍ ቃል በተሳካ ሁኔታ ተቀይሯል።",
     "emailChanged": "ኢሜይል በተሳካ ሁኔታ ተቀይሯል።",
-    "passwordReset": "የይለፍ ቃል ዳግም ተጀምሯል። እባክዎ ይግቡ።"
+    "passwordReset": "የይለፍ ቃል ዳግም ተጀምሯል። እባክዎ ይግቡ።",
+    "resetCodeDockerHint": "በ Docker ውስጥ እየሮጠ ነው? ኮዱ በኮንቴይነሩ መዝገብ ውስጥ ነው፦ docker logs <container>።",
+    "desktopSessionFailed": "ዳሽቦርዱ ወደ አካባቢያዊ አገልጋዩ መግባት አልቻለም። FreeLLMAPI ን ዘግተው እንደገና ይክፈቱት።"
   },
   "common": {
     "save": "አስቀምጥ",

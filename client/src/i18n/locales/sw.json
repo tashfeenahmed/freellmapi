@@ -47,8 +47,8 @@
     "newEmail": "Barua pepe mpya",
     "resetCode": "Msimbo wa kuweka upya",
     "resetCodePlaceholder": "msimbo kutoka kwenye kumbukumbu za seva",
-    "resetCodeHint": "Angalia msimbo wa kuweka upya nenosiri kwenye kumbukumbu za seva.",
-    "forgotPasswordDescription": "Bofya hapa chini kutengeneza msimbo. Msimbo utaonekana kwenye kumbukumbu za seva — uweke hapa ili kuweka nenosiri jipya.",
+    "resetCodeHint": "Msimbo uko kwenye kumbukumbu ya seva. Hautumwi kamwe kwa barua pepe.",
+    "forgotPasswordDescription": "Bofya kitufe hapa chini kutengeneza msimbo wa kuweka upya. Msimbo huandikwa kwenye kumbukumbu ya seva, hautumwi kamwe kwa barua pepe. Uweke hapa ili kuweka nenosiri jipya.",
     "requestResetCode": "Tuma msimbo",
     "requestingResetCode": "Inatuma…",
     "resetPassword": "Weka upya nenosiri",
@@ -58,7 +58,9 @@
     "backToLogin": "Rudi kuingia",
     "passwordChanged": "Nenosiri limebadilishwa.",
     "emailChanged": "Barua pepe imebadilishwa.",
-    "passwordReset": "Nenosiri limewekwa upya. Tafadhali ingia."
+    "passwordReset": "Nenosiri limewekwa upya. Tafadhali ingia.",
+    "resetCodeDockerHint": "Unatumia Docker? Msimbo uko kwenye kumbukumbu ya kontena: docker logs <container>.",
+    "desktopSessionFailed": "Dashibodi haikuweza kuingia kwenye seva ya ndani. Funga FreeLLMAPI kisha uifungue tena."
   },
   "common": {
     "save": "Hifadhi",

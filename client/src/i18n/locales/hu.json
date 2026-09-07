@@ -47,8 +47,8 @@
     "newEmail": "Új e-mail",
     "resetCode": "Visszaállítási kód",
     "resetCodePlaceholder": "kód a szerver naplójából",
-    "resetCodeHint": "A jelszó-visszaállítási kódot a szerver naplójában találja.",
-    "forgotPasswordDescription": "Kattintson alább a visszaállítási kód létrehozásához. A kód megjelenik a szerver naplójában — írja be ide az új jelszó beállításához.",
+    "resetCodeHint": "A kód a szerver naplójában található. E-mailben soha nem küldjük el.",
+    "forgotPasswordDescription": "Kattintson az alábbi gombra a visszaállítási kód létrehozásához. A kód a szerver naplójába kerül, e-mailben soha nem küldjük el. Írja be ide az új jelszó beállításához.",
     "requestResetCode": "Kód küldése",
     "requestingResetCode": "Küldés…",
     "resetPassword": "Jelszó visszaállítása",
@@ -58,7 +58,9 @@
     "backToLogin": "Vissza a bejelentkezéshez",
     "passwordChanged": "A jelszó módosult.",
     "emailChanged": "Az e-mail-cím módosult.",
-    "passwordReset": "A jelszó visszaállt. Jelentkezzen be."
+    "passwordReset": "A jelszó visszaállt. Jelentkezzen be.",
+    "resetCodeDockerHint": "Docker alatt fut? A kód a konténer naplójában található: docker logs <container>.",
+    "desktopSessionFailed": "Az irányítópult nem tudott bejelentkezni a helyi szerverre. Lépjen ki a FreeLLMAPI alkalmazásból, és nyissa meg újra."
   },
   "common": {
     "save": "Mentés",

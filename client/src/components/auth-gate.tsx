@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,23 @@ import { toast } from '@/lib/toast'
 
 // Matches the server rule (routes/auth.ts zod schema).
 const PASSWORD_MIN = 8
+
+// Inside the desktop shell the dashboard runs as a hidden machine account with
+// a random password nobody knows (desktop/src/server-host.ts). There are no
+// credentials to type, so the gate never shows a login form there: when the
+// seeded session is gone (expired after a month of uptime, or cleared by a
+// 401) it asks the shell for a fresh one through the preload bridge.
+type DesktopWindow = Window & {
+  __FREEAPI_DESKTOP__?: boolean
+  __FREEAPI_SESSION__?: () => Promise<string>
+}
+function desktopSessionBridge(): (() => Promise<string>) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as DesktopWindow
+  return w.__FREEAPI_DESKTOP__ === true && typeof w.__FREEAPI_SESSION__ === 'function'
+    ? w.__FREEAPI_SESSION__
+    : null
+}
 
 interface AuthStatus {
   needsSetup: boolean
@@ -239,6 +256,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
         {step === 'reset' && (
           <form onSubmit={submitReset} className="space-y-3 mt-4" noValidate>
             <p className="text-xs text-muted-foreground">{t('auth.resetCodeHint')}</p>
+            <p className="text-xs text-muted-foreground">{t('auth.resetCodeDockerHint')}</p>
             <div className="space-y-1.5">
               <Label className="text-xs" htmlFor="reset-code">{t('auth.resetCode')}</Label>
               <Input
@@ -414,6 +432,33 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler)
   }, [refetch])
 
+  // Desktop self-repair: one attempt at a time, and none after the shell has
+  // handed back a session the server still rejects — a broken install shows a
+  // message instead of looping.
+  const desktopSession = desktopSessionBridge()
+  const desktopNeedsSession = !!desktopSession && !!data && (data.needsSetup || !data.authenticated)
+  const repairing = useRef(false)
+  const [repairFailed, setRepairFailed] = useState(false)
+  useEffect(() => {
+    if (!desktopNeedsSession || !desktopSession || repairing.current || repairFailed) return
+    repairing.current = true
+    ;(async () => {
+      try {
+        const token = await desktopSession()
+        if (!token) throw new Error('empty session token')
+        setToken(token)
+        queryClient.invalidateQueries()
+        const next = await refetch()
+        if (!next.data?.authenticated) setRepairFailed(true)
+      } catch (err) {
+        console.error('[auth-gate] desktop session repair failed', err)
+        setRepairFailed(true)
+      } finally {
+        repairing.current = false
+      }
+    })()
+  }, [desktopNeedsSession, desktopSession, repairFailed, queryClient, refetch])
+
   function onAuthed() {
     // New session: drop any cached (unauthenticated) data and re-check status.
     queryClient.invalidateQueries()
@@ -431,6 +476,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
     )
   }
 
+  if (desktopNeedsSession) {
+    if (repairFailed) {
+      return (
+        <Centered>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+            {t('auth.desktopSessionFailed')}
+          </div>
+        </Centered>
+      )
+    }
+    return <Centered><p className="text-sm text-muted-foreground text-center">{t('auth.loading')}</p></Centered>
+  }
   if (data.needsSetup) return <AuthForm mode="setup" onAuthed={onAuthed} />
   if (!data.authenticated) return <AuthForm mode="login" onAuthed={onAuthed} />
 

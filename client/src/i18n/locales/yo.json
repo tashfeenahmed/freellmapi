@@ -47,8 +47,8 @@
     "newEmail": "Ìmẹ́lì tuntun",
     "resetCode": "Kóòdù àtúnṣe",
     "resetCodePlaceholder": "kóòdù láti inú ìwé ìṣẹ̀lẹ̀ olùpèsè",
-    "resetCodeHint": "Wo kóòdù àtúnṣe nínú ìwé ìṣẹ̀lẹ̀ olùpèsè.",
-    "forgotPasswordDescription": "Tẹ ìsàlẹ̀ láti ṣẹ̀dá kóòdù àtúnṣe. Kóòdù náà yóò hàn nínú ìwé ìṣẹ̀lẹ̀ — tẹ̀ ẹ́ síbí láti ṣàgbékalẹ̀ ọ̀rọ̀ aṣínà tuntun.",
+    "resetCodeHint": "Kóòdù náà wà nínú ìwé ìṣẹ̀lẹ̀ olùpèsè. A kì í fi ímeèlì rán an láé.",
+    "forgotPasswordDescription": "Tẹ bọ́tìnì ìsàlẹ̀ láti ṣẹ̀dá kóòdù àtúnṣe. A kọ kóòdù náà sínú ìwé ìṣẹ̀lẹ̀ olùpèsè, a kì í fi ímeèlì rán an láé. Tẹ̀ ẹ́ síbí láti ṣàgbékalẹ̀ ọ̀rọ̀ aṣínà tuntun.",
     "requestResetCode": "Fi kóòdù ránṣẹ́",
     "requestingResetCode": "Ń fi ránṣẹ́…",
     "resetPassword": "Tún ọ̀rọ̀ aṣínà ṣe",
@@ -58,7 +58,9 @@
     "backToLogin": "Padà sí ìwọlé",
     "passwordChanged": "A yí ọ̀rọ̀ aṣínà padà.",
     "emailChanged": "A yí ìmẹ́lì padà.",
-    "passwordReset": "A tún ọ̀rọ̀ aṣínà ṣe. Jọ̀wọ́ wọlé."
+    "passwordReset": "A tún ọ̀rọ̀ aṣínà ṣe. Jọ̀wọ́ wọlé.",
+    "resetCodeDockerHint": "Ṣé o ń lo Docker? Kóòdù náà wà nínú ìwé ìṣẹ̀lẹ̀ kọ́ntéènà: docker logs <container>.",
+    "desktopSessionFailed": "Dáṣíbọ́ọ̀dù kò lè wọlé sí olùpèsè agbègbè. Pa FreeLLMAPI, kí o sì tún ṣí i."
   },
   "common": {
     "save": "Fipamọ",

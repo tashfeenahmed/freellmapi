@@ -47,8 +47,8 @@
     "newEmail": "Yeni e-poçt",
     "resetCode": "Sıfırlama kodu",
     "resetCodePlaceholder": "server jurnallarındakı kod",
-    "resetCodeHint": "Parol sıfırlama kodunu server jurnallarında görün.",
-    "forgotPasswordDescription": "Sıfırlama kodu yaratmaq üçün aşağıya klikləyin. Kod server jurnallarında görünəcək — yeni parol təyin etmək üçün buraya daxil edin.",
+    "resetCodeHint": "Kod server jurnalındadır. E-poçtla heç vaxt göndərilmir.",
+    "forgotPasswordDescription": "Sıfırlama kodu yaratmaq üçün aşağıdakı düyməyə klikləyin. Kod server jurnalına yazılır, e-poçtla heç vaxt göndərilmir. Yeni parol təyin etmək üçün onu buraya daxil edin.",
     "requestResetCode": "Kodu göndər",
     "requestingResetCode": "Göndərilir…",
     "resetPassword": "Parolu sıfırla",
@@ -58,7 +58,9 @@
     "backToLogin": "Girişə qayıt",
     "passwordChanged": "Parol uğurla dəyişdirildi.",
     "emailChanged": "E-poçt uğurla dəyişdirildi.",
-    "passwordReset": "Parol sıfırlandı. Zəhmət olmasa daxil olun."
+    "passwordReset": "Parol sıfırlandı. Zəhmət olmasa daxil olun.",
+    "resetCodeDockerHint": "Docker-də işləyirsiniz? Kod konteyner jurnalındadır: docker logs <container>.",
+    "desktopSessionFailed": "İdarə paneli lokal serverə daxil ola bilmədi. FreeLLMAPI-dən çıxın və yenidən açın."
   },
   "common": {
     "save": "Xilas et",

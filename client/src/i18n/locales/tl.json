@@ -47,8 +47,8 @@
     "newEmail": "Bagong e-mail",
     "resetCode": "Reset code",
     "resetCodePlaceholder": "code mula sa server logs",
-    "resetCodeHint": "Tingnan ang reset code sa server logs.",
-    "forgotPasswordDescription": "I-click sa ibaba para bumuo ng reset code. Lalabas ang code sa server logs — ilagay ito rito para magtakda ng bagong password.",
+    "resetCodeHint": "Nasa server log ang code. Hindi ito kailanman ipinapadala sa email.",
+    "forgotPasswordDescription": "I-click ang button sa ibaba para bumuo ng reset code. Isinusulat ang code sa server log, hindi kailanman ipinapadala sa email. Ilagay ito rito para magtakda ng bagong password.",
     "requestResetCode": "Ipadala ang code",
     "requestingResetCode": "Ipinapadala…",
     "resetPassword": "I-reset ang password",
@@ -58,7 +58,9 @@
     "backToLogin": "Bumalik sa pag-sign in",
     "passwordChanged": "Matagumpay na napalitan ang password.",
     "emailChanged": "Matagumpay na napalitan ang e-mail.",
-    "passwordReset": "Na-reset ang password. Mag-sign in po."
+    "passwordReset": "Na-reset ang password. Mag-sign in po.",
+    "resetCodeDockerHint": "Tumatakbo sa Docker? Nasa container log ang code: docker logs <container>.",
+    "desktopSessionFailed": "Hindi nakapag-sign in ang dashboard sa lokal na server. Isara ang FreeLLMAPI at buksan itong muli."
   },
   "common": {
     "save": "I-save",

@@ -47,8 +47,8 @@
     "newEmail": "Ozi-e ọhụrụ",
     "resetCode": "Koodu ntọghari",
     "resetCodePlaceholder": "koodu si na ndekọ sava",
-    "resetCodeHint": "Lelee koodu ntọghari na ndekọ sava.",
-    "forgotPasswordDescription": "Pịa n'okpuru iji mepụta koodu. Koodu ga-apụta na ndekọ sava — tinye ya ebe a iji hazie okwuntughe ọhụrụ.",
+    "resetCodeHint": "Koodu ahụ dị na ndekọ sava. A naghị eziga ya site na email ma ọlị.",
+    "forgotPasswordDescription": "Pịa bọtịnụ dị n'okpuru iji mepụta koodu ntọghari. A na-ede koodu ahụ na ndekọ sava, a naghị eziga ya site na email ma ọlị. Tinye ya ebe a iji hazie okwuntughe ọhụrụ.",
     "requestResetCode": "Zipu koodu",
     "requestingResetCode": "Na-eziga…",
     "resetPassword": "Tọghata okwuntughe",
@@ -58,7 +58,9 @@
     "backToLogin": "Laghachi na nbanye",
     "passwordChanged": "Agbanwela okwuntughe.",
     "emailChanged": "Agbanwela ozi-e.",
-    "passwordReset": "Atọghatala okwuntughe. Biko banye."
+    "passwordReset": "Atọghatala okwuntughe. Biko banye.",
+    "resetCodeDockerHint": "Ị na-agba na Docker? Koodu ahụ dị na ndekọ kọntetina: docker logs <container>.",
+    "desktopSessionFailed": "Dashboard enweghị ike ịbanye na sava mpaghara. Mechie FreeLLMAPI ma mepee ya ọzọ."
   },
   "common": {
     "save": "Chekwa",

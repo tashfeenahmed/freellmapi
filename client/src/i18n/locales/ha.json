@@ -47,8 +47,8 @@
     "newEmail": "Sabon imel",
     "resetCode": "Lambar sake saiti",
     "resetCodePlaceholder": "lamba daga tarihin uwar garke",
-    "resetCodeHint": "Duba lambar sake saiti a tarihin uwar garke.",
-    "forgotPasswordDescription": "Danna ƙasa don ƙirƙirar lamba. Lambar za ta bayyana a tarihin uwar garke — shigar da ita nan don sabuwar kalmar sirri.",
+    "resetCodeHint": "Lambar tana cikin tarihin uwar garke. Ba a taɓa aika ta ta imel ba.",
+    "forgotPasswordDescription": "Danna maɓallin da ke ƙasa don ƙirƙirar lambar sake saiti. Ana rubuta lambar a cikin tarihin uwar garke, ba a taɓa aika ta ta imel ba. Shigar da ita nan don saita sabuwar kalmar sirri.",
     "requestResetCode": "Aika lamba",
     "requestingResetCode": "Ana aikawa…",
     "resetPassword": "Sake saita kalmar sirri",
@@ -58,7 +58,9 @@
     "backToLogin": "Koma shiga",
     "passwordChanged": "An canza kalmar sirri.",
     "emailChanged": "An canza imel.",
-    "passwordReset": "An sake saita kalmar sirri. Da fatan shiga."
+    "passwordReset": "An sake saita kalmar sirri. Da fatan shiga.",
+    "resetCodeDockerHint": "Kana amfani da Docker? Lambar tana cikin tarihin kwantena: docker logs <container>.",
+    "desktopSessionFailed": "Dashboard ɗin bai iya shiga uwar garken gida ba. Rufe FreeLLMAPI ka sake buɗe shi."
   },
   "common": {
     "save": "Ajiye",

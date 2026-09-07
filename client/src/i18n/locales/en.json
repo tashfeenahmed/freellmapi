@@ -47,8 +47,8 @@
     "newEmail": "New email",
     "resetCode": "Reset code",
     "resetCodePlaceholder": "code from the server logs",
-    "resetCodeHint": "Check the server logs for the password-reset code.",
-    "forgotPasswordDescription": "Click the button below to generate a reset code. The code will appear in the server logs — enter it here to set a new password.",
+    "resetCodeHint": "The code is in the server log. It is never sent by email.",
+    "forgotPasswordDescription": "Click the button below to generate a reset code. The code is written to the server log, never emailed. Enter it here to set a new password.",
     "requestResetCode": "Send reset code",
     "requestingResetCode": "Sending…",
     "resetPassword": "Reset password",
@@ -58,7 +58,9 @@
     "backToLogin": "Back to sign in",
     "passwordChanged": "Password changed successfully.",
     "emailChanged": "Email changed successfully.",
-    "passwordReset": "Password reset successfully. Please sign in."
+    "passwordReset": "Password reset successfully. Please sign in.",
+    "resetCodeDockerHint": "Running in Docker? The code is in the container log: docker logs <container>.",
+    "desktopSessionFailed": "The dashboard could not sign in to the local server. Quit FreeLLMAPI and open it again."
   },
   "common": {
     "save": "Save",

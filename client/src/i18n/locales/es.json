@@ -47,8 +47,8 @@
     "newEmail": "Nuevo correo electrónico",
     "resetCode": "Código de restablecimiento",
     "resetCodePlaceholder": "código de los registros del servidor",
-    "resetCodeHint": "Revisa los registros del servidor para obtener el código de restablecimiento de contraseña.",
-    "forgotPasswordDescription": "Haz clic en el botón de abajo para generar un código de restablecimiento. El código aparecerá en los registros del servidor — ingrésalo aquí para establecer una nueva contraseña.",
+    "resetCodeHint": "El código está en el registro del servidor. Nunca se envía por correo electrónico.",
+    "forgotPasswordDescription": "Haz clic en el botón de abajo para generar un código de restablecimiento. El código se escribe en el registro del servidor, nunca se envía por correo. Ingrésalo aquí para establecer una nueva contraseña.",
     "requestResetCode": "Enviar código de restablecimiento",
     "requestingResetCode": "Enviando…",
     "resetPassword": "Restablecer contraseña",
@@ -58,7 +58,9 @@
     "backToLogin": "Volver al inicio de sesión",
     "passwordChanged": "Contraseña cambiada correctamente.",
     "emailChanged": "Correo electrónico cambiado correctamente.",
-    "passwordReset": "Contraseña restablecida correctamente. Por favor, inicia sesión."
+    "passwordReset": "Contraseña restablecida correctamente. Por favor, inicia sesión.",
+    "resetCodeDockerHint": "¿Usas Docker? El código está en el registro del contenedor: docker logs <container>.",
+    "desktopSessionFailed": "El panel no pudo iniciar sesión en el servidor local. Cierra FreeLLMAPI y vuelve a abrirlo."
   },
   "common": {
     "save": "Guardar",

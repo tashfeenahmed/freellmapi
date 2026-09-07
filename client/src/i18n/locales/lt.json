@@ -47,8 +47,8 @@
     "newEmail": "Naujas el. paštas",
     "resetCode": "Atstatymo kodas",
     "resetCodePlaceholder": "kodas iš serverio žurnalų",
-    "resetCodeHint": "Atstatymo kodą rasite serverio žurnaluose.",
-    "forgotPasswordDescription": "Spustelėkite žemiau, kad sugeneruotumėte atstatymo kodą. Kodas atsiras serverio žurnaluose — įveskite jį čia, kad nustatytumėte naują slaptažodį.",
+    "resetCodeHint": "Kodas yra serverio žurnale. El. paštu jis niekada nesiunčiamas.",
+    "forgotPasswordDescription": "Spustelėkite mygtuką žemiau, kad sugeneruotumėte atstatymo kodą. Kodas įrašomas į serverio žurnalą ir niekada nesiunčiamas el. paštu. Įveskite jį čia, kad nustatytumėte naują slaptažodį.",
     "requestResetCode": "Siųsti kodą",
     "requestingResetCode": "Siunčiama…",
     "resetPassword": "Atstatyti slaptažodį",
@@ -58,7 +58,9 @@
     "backToLogin": "Atgal į prisijungimą",
     "passwordChanged": "Slaptažodis pakeistas.",
     "emailChanged": "El. paštas pakeistas.",
-    "passwordReset": "Slaptažodis atstatytas. Prisijunkite."
+    "passwordReset": "Slaptažodis atstatytas. Prisijunkite.",
+    "resetCodeDockerHint": "Naudojate Docker? Kodas yra konteinerio žurnale: docker logs <container>.",
+    "desktopSessionFailed": "Valdymo skydeliui nepavyko prisijungti prie vietinio serverio. Uždarykite FreeLLMAPI ir atidarykite iš naujo."
   },
   "common": {
     "save": "Išsaugoti",

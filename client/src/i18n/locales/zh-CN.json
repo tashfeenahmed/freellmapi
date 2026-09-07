@@ -47,8 +47,8 @@
     "newEmail": "新邮箱",
     "resetCode": "重置码",
     "resetCodePlaceholder": "服务器日志中的代码",
-    "resetCodeHint": "请查看服务器日志获取密码重置码。",
-    "forgotPasswordDescription": "点击下方按钮生成重置码。重置码将出现在服务器日志中——在此输入以设置新密码。",
+    "resetCodeHint": "重置码在服务器日志中，绝不会通过邮件发送。",
+    "forgotPasswordDescription": "点击下方按钮生成重置码。重置码会写入服务器日志，绝不会通过邮件发送。在此输入以设置新密码。",
     "requestResetCode": "发送重置码",
     "requestingResetCode": "发送中…",
     "resetPassword": "重置密码",
@@ -58,7 +58,9 @@
     "backToLogin": "返回登录",
     "passwordChanged": "密码修改成功。",
     "emailChanged": "邮箱修改成功。",
-    "passwordReset": "密码重置成功，请重新登录。"
+    "passwordReset": "密码重置成功，请重新登录。",
+    "resetCodeDockerHint": "在 Docker 中运行？重置码在容器日志中：docker logs <container>",
+    "desktopSessionFailed": "控制台无法登录本地服务器。请退出 FreeLLMAPI 并重新打开。"
   },
   "common": {
     "save": "保存",

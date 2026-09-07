@@ -47,8 +47,8 @@
     "newEmail": "新しいメールアドレス",
     "resetCode": "リセットコード",
     "resetCodePlaceholder": "サーバーログのコード",
-    "resetCodeHint": "パスワードリセットコードはサーバーログに出力されます。",
-    "forgotPasswordDescription": "下のボタンでリセットコードを生成します。コードはサーバーログに表示されるので、ここに入力して新しいパスワードを設定してください。",
+    "resetCodeHint": "コードはサーバーログに出力されます。メールで送信されることはありません。",
+    "forgotPasswordDescription": "下のボタンでリセットコードを生成します。コードはサーバーログに書き込まれ、メールで送信されることはありません。ここに入力して新しいパスワードを設定してください。",
     "requestResetCode": "リセットコードを送信",
     "requestingResetCode": "送信中…",
     "resetPassword": "パスワードをリセット",
@@ -58,7 +58,9 @@
     "backToLogin": "ログインに戻る",
     "passwordChanged": "パスワードを変更しました。",
     "emailChanged": "メールアドレスを変更しました。",
-    "passwordReset": "パスワードをリセットしました。ログインしてください。"
+    "passwordReset": "パスワードをリセットしました。ログインしてください。",
+    "resetCodeDockerHint": "Docker で実行中ですか？コードはコンテナのログにあります: docker logs <container>",
+    "desktopSessionFailed": "ダッシュボードがローカルサーバーにサインインできませんでした。FreeLLMAPI を終了して開き直してください。"
   },
   "common": {
     "save": "保存",

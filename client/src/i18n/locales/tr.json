@@ -47,8 +47,8 @@
     "newEmail": "Yeni e-posta",
     "resetCode": "Sıfırlama kodu",
     "resetCodePlaceholder": "sunucu günlüklerindeki kod",
-    "resetCodeHint": "Şifre sıfırlama kodunu sunucu günlüklerinde bulabilirsiniz.",
-    "forgotPasswordDescription": "Sıfırlama kodu oluşturmak için aşağıya tıklayın. Kod sunucu günlüklerinde görünecek — yeni şifre belirlemek için buraya girin.",
+    "resetCodeHint": "Kod sunucu günlüğündedir. Asla e-postayla gönderilmez.",
+    "forgotPasswordDescription": "Sıfırlama kodu oluşturmak için aşağıdaki düğmeye tıklayın. Kod sunucu günlüğüne yazılır, asla e-postayla gönderilmez. Yeni şifre belirlemek için buraya girin.",
     "requestResetCode": "Kod gönder",
     "requestingResetCode": "Gönderiliyor…",
     "resetPassword": "Şifreyi sıfırla",
@@ -58,7 +58,9 @@
     "backToLogin": "Girişe dön",
     "passwordChanged": "Şifre değiştirildi.",
     "emailChanged": "E-posta değiştirildi.",
-    "passwordReset": "Şifre sıfırlandı. Lütfen giriş yapın."
+    "passwordReset": "Şifre sıfırlandı. Lütfen giriş yapın.",
+    "resetCodeDockerHint": "Docker içinde mi çalışıyor? Kod konteyner günlüğündedir: docker logs <container>.",
+    "desktopSessionFailed": "Kontrol paneli yerel sunucuya giriş yapamadı. FreeLLMAPI uygulamasını kapatıp yeniden açın."
   },
   "common": {
     "save": "Kaydet",

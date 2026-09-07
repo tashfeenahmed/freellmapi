@@ -47,8 +47,8 @@
     "newEmail": "Nieuw e-mailadres",
     "resetCode": "Resetcode",
     "resetCodePlaceholder": "code uit de serverlogs",
-    "resetCodeHint": "Kijk in de serverlogs voor de resetcode.",
-    "forgotPasswordDescription": "Klik hieronder om een resetcode te genereren. De code verschijnt in de serverlogs — voer hem hier in om een nieuw wachtwoord in te stellen.",
+    "resetCodeHint": "De code staat in de serverlog. Hij wordt nooit per e-mail verstuurd.",
+    "forgotPasswordDescription": "Klik op de knop hieronder om een resetcode te genereren. De code wordt naar de serverlog geschreven en nooit per e-mail verstuurd. Voer hem hier in om een nieuw wachtwoord in te stellen.",
     "requestResetCode": "Resetcode versturen",
     "requestingResetCode": "Versturen…",
     "resetPassword": "Wachtwoord resetten",
@@ -58,7 +58,9 @@
     "backToLogin": "Terug naar inloggen",
     "passwordChanged": "Wachtwoord gewijzigd.",
     "emailChanged": "E-mailadres gewijzigd.",
-    "passwordReset": "Wachtwoord gereset. Log opnieuw in."
+    "passwordReset": "Wachtwoord gereset. Log opnieuw in.",
+    "resetCodeDockerHint": "Draait het in Docker? De code staat in de containerlog: docker logs <container>.",
+    "desktopSessionFailed": "Het dashboard kon niet inloggen op de lokale server. Sluit FreeLLMAPI af en open het opnieuw."
   },
   "common": {
     "save": "Sla op",

@@ -47,8 +47,8 @@
     "newEmail": "Nouvel e-mail",
     "resetCode": "Code de réinitialisation",
     "resetCodePlaceholder": "code affiché dans les journaux du serveur",
-    "resetCodeHint": "Consultez les journaux du serveur pour obtenir le code de réinitialisation du mot de passe.",
-    "forgotPasswordDescription": "Cliquez sur le bouton ci-dessous pour générer un code de réinitialisation. Le code apparaîtra dans les journaux du serveur — saisissez-le ici pour définir un nouveau mot de passe.",
+    "resetCodeHint": "Le code se trouve dans le journal du serveur. Il n'est jamais envoyé par e-mail.",
+    "forgotPasswordDescription": "Cliquez sur le bouton ci-dessous pour générer un code de réinitialisation. Le code est écrit dans le journal du serveur, jamais envoyé par e-mail. Saisissez-le ici pour définir un nouveau mot de passe.",
     "requestResetCode": "Envoyer le code de réinitialisation",
     "requestingResetCode": "Envoi…",
     "resetPassword": "Réinitialiser le mot de passe",
@@ -58,7 +58,9 @@
     "backToLogin": "Retour à la connexion",
     "passwordChanged": "Mot de passe modifié avec succès.",
     "emailChanged": "Adresse e-mail modifiée avec succès.",
-    "passwordReset": "Mot de passe réinitialisé avec succès. Veuillez vous connecter."
+    "passwordReset": "Mot de passe réinitialisé avec succès. Veuillez vous connecter.",
+    "resetCodeDockerHint": "Vous utilisez Docker ? Le code se trouve dans le journal du conteneur : docker logs <container>.",
+    "desktopSessionFailed": "Le tableau de bord n'a pas pu se connecter au serveur local. Quittez FreeLLMAPI et rouvrez-le."
   },
   "common": {
     "save": "Enregistrer",

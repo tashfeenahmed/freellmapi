@@ -47,8 +47,8 @@
     "newEmail": "Novo e-mail",
     "resetCode": "Código de redefinição",
     "resetCodePlaceholder": "código dos logs do servidor",
-    "resetCodeHint": "Verifique os logs do servidor para obter o código de redefinição de senha.",
-    "forgotPasswordDescription": "Clique no botão abaixo para gerar um código de redefinição. O código aparecerá nos logs do servidor — insira-o aqui para definir uma nova senha.",
+    "resetCodeHint": "O código está no log do servidor. Ele nunca é enviado por e-mail.",
+    "forgotPasswordDescription": "Clique no botão abaixo para gerar um código de redefinição. O código é gravado no log do servidor, nunca enviado por e-mail. Insira-o aqui para definir uma nova senha.",
     "requestResetCode": "Enviar código de redefinição",
     "requestingResetCode": "Enviando…",
     "resetPassword": "Redefinir senha",
@@ -58,7 +58,9 @@
     "backToLogin": "Voltar ao login",
     "passwordChanged": "Senha alterada com sucesso.",
     "emailChanged": "E-mail alterado com sucesso.",
-    "passwordReset": "Senha redefinida com sucesso. Por favor, entre novamente."
+    "passwordReset": "Senha redefinida com sucesso. Por favor, entre novamente.",
+    "resetCodeDockerHint": "Está usando Docker? O código está no log do contêiner: docker logs <container>.",
+    "desktopSessionFailed": "O painel não conseguiu entrar no servidor local. Feche o FreeLLMAPI e abra-o novamente."
   },
   "common": {
     "save": "Salvar",

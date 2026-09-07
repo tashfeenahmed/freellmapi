@@ -47,8 +47,8 @@
     "newEmail": "דוא\"ל חדש",
     "resetCode": "קוד איפוס",
     "resetCodePlaceholder": "קוד מיומני השרת",
-    "resetCodeHint": "קוד איפוס הסיסמה מופיע ביומני השרת.",
-    "forgotPasswordDescription": "לחץ למטה כדי ליצור קוד איפוס. הקוד יופיע ביומני השרת — הזן אותו כאן כדי להגדיר סיסמה חדשה.",
+    "resetCodeHint": "הקוד מופיע ביומן השרת. הוא לעולם לא נשלח באימייל.",
+    "forgotPasswordDescription": "לחץ על הכפתור למטה כדי ליצור קוד איפוס. הקוד נכתב ליומן השרת ולעולם לא נשלח באימייל. הזן אותו כאן כדי להגדיר סיסמה חדשה.",
     "requestResetCode": "שליחת קוד",
     "requestingResetCode": "שולח…",
     "resetPassword": "איפוס סיסמה",
@@ -58,7 +58,9 @@
     "backToLogin": "חזרה להתחברות",
     "passwordChanged": "הסיסמה שונתה בהצלחה.",
     "emailChanged": "הדוא\"ל שונה בהצלחה.",
-    "passwordReset": "הסיסמה אופסה. יש להתחבר."
+    "passwordReset": "הסיסמה אופסה. יש להתחבר.",
+    "resetCodeDockerHint": "מריצים ב-Docker? הקוד מופיע ביומן הקונטיינר: docker logs <container>.",
+    "desktopSessionFailed": "לוח הבקרה לא הצליח להתחבר לשרת המקומי. סגור את FreeLLMAPI ופתח אותו מחדש."
   },
   "common": {
     "save": "שמור",

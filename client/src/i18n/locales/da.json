@@ -47,8 +47,8 @@
     "newEmail": "Ny e-mail",
     "resetCode": "Nulstillingskode",
     "resetCodePlaceholder": "kode fra serverloggene",
-    "resetCodeHint": "Nulstillingskoden findes i serverloggene.",
-    "forgotPasswordDescription": "Klik nedenfor for at generere en nulstillingskode. Koden vises i serverloggene — indtast den her for at vælge en ny adgangskode.",
+    "resetCodeHint": "Koden står i serverloggen. Den sendes aldrig på e-mail.",
+    "forgotPasswordDescription": "Klik på knappen nedenfor for at generere en nulstillingskode. Koden skrives til serverloggen og sendes aldrig på e-mail. Indtast den her for at vælge en ny adgangskode.",
     "requestResetCode": "Send kode",
     "requestingResetCode": "Sender…",
     "resetPassword": "Nulstil adgangskode",
@@ -58,7 +58,9 @@
     "backToLogin": "Tilbage til login",
     "passwordChanged": "Adgangskoden er skiftet.",
     "emailChanged": "E-mailen er skiftet.",
-    "passwordReset": "Adgangskoden er nulstillet. Log ind."
+    "passwordReset": "Adgangskoden er nulstillet. Log ind.",
+    "resetCodeDockerHint": "Kører du i Docker? Koden står i containerloggen: docker logs <container>.",
+    "desktopSessionFailed": "Dashboardet kunne ikke logge ind på den lokale server. Afslut FreeLLMAPI, og åbn det igen."
   },
   "common": {
     "save": "Gem",

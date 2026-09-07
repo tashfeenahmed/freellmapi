@@ -47,8 +47,8 @@
     "newEmail": "નવો ઈમેલ",
     "resetCode": "રીસેટ કોડ",
     "resetCodePlaceholder": "સર્વર લોગમાંનો કોડ",
-    "resetCodeHint": "પાસવર્ડ રીસેટ કોડ સર્વર લોગમાં જુઓ.",
-    "forgotPasswordDescription": "રીસેટ કોડ બનાવવા નીચે ક્લિક કરો. કોડ સર્વર લોગમાં દેખાશે — નવો પાસવર્ડ સેટ કરવા અહીં દાખલ કરો.",
+    "resetCodeHint": "કોડ સર્વર લોગમાં છે. તે ક્યારેય ઈમેલથી મોકલાતો નથી.",
+    "forgotPasswordDescription": "રીસેટ કોડ બનાવવા નીચેના બટન પર ક્લિક કરો. કોડ સર્વર લોગમાં લખાય છે, ક્યારેય ઈમેલથી મોકલાતો નથી. નવો પાસવર્ડ સેટ કરવા અહીં દાખલ કરો.",
     "requestResetCode": "રીસેટ કોડ મોકલો",
     "requestingResetCode": "મોકલી રહ્યા છીએ…",
     "resetPassword": "પાસવર્ડ રીસેટ કરો",
@@ -58,7 +58,9 @@
     "backToLogin": "સાઇન ઇન પર પાછા",
     "passwordChanged": "પાસવર્ડ સફળતાપૂર્વક બદલાયો.",
     "emailChanged": "ઈમેલ સફળતાપૂર્વક બદલાયો.",
-    "passwordReset": "પાસવર્ડ રીસેટ થયો. કૃપા કરી સાઇન ઇન કરો."
+    "passwordReset": "પાસવર્ડ રીસેટ થયો. કૃપા કરી સાઇન ઇન કરો.",
+    "resetCodeDockerHint": "Docker માં ચલાવો છો? કોડ કન્ટેનર લોગમાં છે: docker logs <container>.",
+    "desktopSessionFailed": "ડેશબોર્ડ લોકલ સર્વરમાં સાઇન ઇન કરી શક્યું નથી. FreeLLMAPI બંધ કરીને ફરીથી ખોલો."
   },
   "common": {
     "save": "સાચવો",

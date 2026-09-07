@@ -47,8 +47,8 @@
     "newEmail": "Nova e-pošta",
     "resetCode": "Kod za poništavanje",
     "resetCodePlaceholder": "kod iz zapisa poslužitelja",
-    "resetCodeHint": "Kod za poništavanje lozinke potražite u zapisima poslužitelja.",
-    "forgotPasswordDescription": "Kliknite u nastavku za generiranje koda. Kod će se pojaviti u zapisima poslužitelja — unesite ga ovdje da postavite novu lozinku.",
+    "resetCodeHint": "Kod se nalazi u zapisu poslužitelja. Nikada se ne šalje e-poštom.",
+    "forgotPasswordDescription": "Kliknite gumb u nastavku za generiranje koda za poništavanje. Kod se zapisuje u zapis poslužitelja i nikada se ne šalje e-poštom. Unesite ga ovdje da postavite novu lozinku.",
     "requestResetCode": "Pošalji kod",
     "requestingResetCode": "Slanje…",
     "resetPassword": "Poništi lozinku",
@@ -58,7 +58,9 @@
     "backToLogin": "Natrag na prijavu",
     "passwordChanged": "Lozinka je promijenjena.",
     "emailChanged": "E-pošta je promijenjena.",
-    "passwordReset": "Lozinka je poništena. Prijavite se."
+    "passwordReset": "Lozinka je poništena. Prijavite se.",
+    "resetCodeDockerHint": "Koristite Docker? Kod se nalazi u zapisu kontejnera: docker logs <container>.",
+    "desktopSessionFailed": "Nadzorna ploča nije se uspjela prijaviti na lokalni poslužitelj. Zatvorite FreeLLMAPI i ponovno ga otvorite."
   },
   "common": {
     "save": "Spasi",

@@ -47,8 +47,8 @@
     "newEmail": "새 이메일",
     "resetCode": "재설정 코드",
     "resetCodePlaceholder": "서버 로그의 코드",
-    "resetCodeHint": "비밀번호 재설정 코드는 서버 로그에서 확인하세요.",
-    "forgotPasswordDescription": "아래를 클릭해 재설정 코드를 생성하세요. 코드는 서버 로그에 표시되며, 여기에 입력하면 새 비밀번호를 설정할 수 있습니다.",
+    "resetCodeHint": "코드는 서버 로그에 있습니다. 이메일로는 절대 전송되지 않습니다.",
+    "forgotPasswordDescription": "아래 버튼을 클릭해 재설정 코드를 생성하세요. 코드는 서버 로그에 기록되며 이메일로는 전송되지 않습니다. 여기에 입력하면 새 비밀번호를 설정할 수 있습니다.",
     "requestResetCode": "재설정 코드 보내기",
     "requestingResetCode": "보내는 중…",
     "resetPassword": "비밀번호 재설정",
@@ -58,7 +58,9 @@
     "backToLogin": "로그인으로 돌아가기",
     "passwordChanged": "비밀번호가 변경되었습니다.",
     "emailChanged": "이메일이 변경되었습니다.",
-    "passwordReset": "비밀번호가 재설정되었습니다. 로그인해 주세요."
+    "passwordReset": "비밀번호가 재설정되었습니다. 로그인해 주세요.",
+    "resetCodeDockerHint": "Docker에서 실행 중인가요? 코드는 컨테이너 로그에 있습니다: docker logs <container>",
+    "desktopSessionFailed": "대시보드가 로컬 서버에 로그인하지 못했습니다. FreeLLMAPI를 종료한 뒤 다시 여세요."
   },
   "common": {
     "save": "저장",

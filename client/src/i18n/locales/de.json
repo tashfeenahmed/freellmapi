@@ -47,8 +47,8 @@
     "newEmail": "Neue E-Mail",
     "resetCode": "Reset-Code",
     "resetCodePlaceholder": "Code aus den Server-Logs",
-    "resetCodeHint": "Den Passwort-Reset-Code finden Sie in den Server-Logs.",
-    "forgotPasswordDescription": "Klicken Sie unten, um einen Reset-Code zu erzeugen. Der Code erscheint in den Server-Logs — geben Sie ihn hier ein, um ein neues Passwort zu setzen.",
+    "resetCodeHint": "Der Code steht im Server-Log. Er wird nie per E-Mail verschickt.",
+    "forgotPasswordDescription": "Klicken Sie unten, um einen Reset-Code zu erzeugen. Der Code wird ins Server-Log geschrieben und nie per E-Mail verschickt. Geben Sie ihn hier ein, um ein neues Passwort zu setzen.",
     "requestResetCode": "Reset-Code senden",
     "requestingResetCode": "Wird gesendet…",
     "resetPassword": "Passwort zurücksetzen",
@@ -58,7 +58,9 @@
     "backToLogin": "Zurück zur Anmeldung",
     "passwordChanged": "Passwort erfolgreich geändert.",
     "emailChanged": "E-Mail erfolgreich geändert.",
-    "passwordReset": "Passwort zurückgesetzt. Bitte melden Sie sich an."
+    "passwordReset": "Passwort zurückgesetzt. Bitte melden Sie sich an.",
+    "resetCodeDockerHint": "Läuft der Server in Docker? Der Code steht im Container-Log: docker logs <container>.",
+    "desktopSessionFailed": "Das Dashboard konnte sich nicht am lokalen Server anmelden. Beenden Sie FreeLLMAPI und öffnen Sie es erneut."
   },
   "common": {
     "save": "Speichern",

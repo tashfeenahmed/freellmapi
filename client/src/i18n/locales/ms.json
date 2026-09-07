@@ -47,8 +47,8 @@
     "newEmail": "E-mel baharu",
     "resetCode": "Kod set semula",
     "resetCodePlaceholder": "kod daripada log pelayan",
-    "resetCodeHint": "Lihat kod set semula kata laluan dalam log pelayan.",
-    "forgotPasswordDescription": "Klik di bawah untuk menjana kod set semula. Kod akan muncul dalam log pelayan — masukkan di sini untuk menetapkan kata laluan baharu.",
+    "resetCodeHint": "Kod berada dalam log pelayan. Ia tidak pernah dihantar melalui e-mel.",
+    "forgotPasswordDescription": "Klik butang di bawah untuk menjana kod set semula. Kod ditulis ke log pelayan, tidak pernah dihantar melalui e-mel. Masukkan di sini untuk menetapkan kata laluan baharu.",
     "requestResetCode": "Hantar kod",
     "requestingResetCode": "Menghantar…",
     "resetPassword": "Set semula kata laluan",
@@ -58,7 +58,9 @@
     "backToLogin": "Kembali ke log masuk",
     "passwordChanged": "Kata laluan berjaya ditukar.",
     "emailChanged": "E-mel berjaya ditukar.",
-    "passwordReset": "Kata laluan telah ditetapkan semula. Sila log masuk."
+    "passwordReset": "Kata laluan telah ditetapkan semula. Sila log masuk.",
+    "resetCodeDockerHint": "Berjalan dalam Docker? Kod berada dalam log kontena: docker logs <container>.",
+    "desktopSessionFailed": "Papan pemuka tidak dapat log masuk ke pelayan tempatan. Tutup FreeLLMAPI dan buka semula."
   },
   "common": {
     "save": "Simpan",

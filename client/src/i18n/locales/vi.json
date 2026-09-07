@@ -47,8 +47,8 @@
     "newEmail": "E-mail mới",
     "resetCode": "Mã đặt lại",
     "resetCodePlaceholder": "mã từ nhật ký máy chủ",
-    "resetCodeHint": "Xem mã đặt lại mật khẩu trong nhật ký máy chủ.",
-    "forgotPasswordDescription": "Nhấn bên dưới để tạo mã đặt lại. Mã sẽ xuất hiện trong nhật ký máy chủ — nhập vào đây để đặt mật khẩu mới.",
+    "resetCodeHint": "Mã nằm trong nhật ký máy chủ. Mã không bao giờ được gửi qua email.",
+    "forgotPasswordDescription": "Nhấn nút bên dưới để tạo mã đặt lại. Mã được ghi vào nhật ký máy chủ, không bao giờ gửi qua email. Nhập vào đây để đặt mật khẩu mới.",
     "requestResetCode": "Gửi mã đặt lại",
     "requestingResetCode": "Đang gửi…",
     "resetPassword": "Đặt lại mật khẩu",
@@ -58,7 +58,9 @@
     "backToLogin": "Quay lại đăng nhập",
     "passwordChanged": "Đã đổi mật khẩu thành công.",
     "emailChanged": "Đã đổi e-mail thành công.",
-    "passwordReset": "Đã đặt lại mật khẩu. Vui lòng đăng nhập."
+    "passwordReset": "Đã đặt lại mật khẩu. Vui lòng đăng nhập.",
+    "resetCodeDockerHint": "Đang chạy trong Docker? Mã nằm trong nhật ký của container: docker logs <container>.",
+    "desktopSessionFailed": "Bảng điều khiển không thể đăng nhập vào máy chủ cục bộ. Hãy thoát FreeLLMAPI và mở lại."
   },
   "common": {
     "save": "Lưu",
