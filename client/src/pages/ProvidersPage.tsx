@@ -170,8 +170,8 @@ export default function ProvidersPage() {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       queryClient.invalidateQueries({ queryKey: ['health'] })
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -186,8 +186,8 @@ export default function ProvidersPage() {
       setEditingKeyId(null)
       toast.success(t('providers.keyUpdated'))
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -198,8 +198,8 @@ export default function ProvidersPage() {
       queryClient.invalidateQueries({ queryKey: ['health'] })
       toast.success(t('providers.keyDeleted'))
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -210,8 +210,8 @@ export default function ProvidersPage() {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       toast.success(t('providers.healthChecked'))
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -225,8 +225,8 @@ export default function ProvidersPage() {
       queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -237,8 +237,8 @@ export default function ProvidersPage() {
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       toast.success(t('providers.modelDeleted'))
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.actionFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('providers.actionFailed'))
     },
   })
 
@@ -279,7 +279,8 @@ export default function ProvidersPage() {
       } else {
         toast.error(res.error || t('providers.testFailed'))
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = (err instanceof Error ? err.message : null) || t('providers.testFailed')
       setModelTests(prev => ({
         ...prev,
         [model.id]: {
@@ -288,11 +289,11 @@ export default function ProvidersPage() {
           result: {
             success: false,
             latencyMs: 0,
-            error: err?.message || t('providers.testFailed'),
+            error: errorMessage,
           },
         },
       }))
-      toast.error(err?.message || t('providers.testFailed'))
+      toast.error(errorMessage)
     }
   }
 

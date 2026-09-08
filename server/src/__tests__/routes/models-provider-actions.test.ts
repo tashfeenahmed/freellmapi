@@ -4,9 +4,8 @@ import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
-import { getProvider, resolveProvider } from '../../providers/index.js';
+import { getProvider } from '../../providers/index.js';
 import { getCatalogModelTombstone } from '../../services/model-state.js';
-import { isCustomModelTombstoned } from '../../services/custom-model-tombstone.js';
 
 let dashToken = '';
 
@@ -243,11 +242,10 @@ describe('Model Provider Actions API', () => {
 
       // Ensure an enabled key for groq
       const enc = encrypt('test-key-groq-secret');
-      const keyInfo = db.prepare(`
+      db.prepare(`
         INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, enabled, status)
         VALUES ('groq', 'Test Groq Key', ?, ?, ?, 1, 'healthy')
       `).run(enc.encrypted, enc.iv, enc.authTag);
-      const keyId = Number(keyInfo.lastInsertRowid);
 
       const groqProvider = getProvider('groq');
       expect(groqProvider).toBeDefined();
