@@ -5,9 +5,9 @@ import { useI18n } from '@/i18n'
 
 // The dashboard's one destructive-action idiom: first click arms the button
 // (label flips to "Confirm" in destructive color), second click within the
-// timeout fires onConfirm, and doing nothing disarms it again. Extracted from
-// the hand-rolled copies on Keys and ModelDetail so Embeddings/Media deletes
-// (which used to fire immediately, with no confirmation) behave the same way.
+// timeout fires onConfirm, and doing nothing or pressing Escape disarms it again.
+// Extracted from the hand-rolled copies on Keys and ModelDetail so Embeddings/Media
+// deletes (which used to fire immediately, with no confirmation) behave the same way.
 type ButtonSize = 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg'
 type ButtonVariant = 'default' | 'outline' | 'secondary' | 'ghost' | 'destructive' | 'link'
 
@@ -59,6 +59,13 @@ export function ConfirmButton({
       disabled={disabled}
       title={title}
       aria-label={armed ? undefined : ariaLabel}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && armed) {
+          e.preventDefault()
+          e.stopPropagation()
+          setArmed(false)
+        }
+      }}
       onClick={() => {
         if (armed) {
           setArmed(false)

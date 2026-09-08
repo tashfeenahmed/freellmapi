@@ -231,6 +231,9 @@ export interface Model {
   enabled: boolean;
   supportsVision: boolean;
   supportsTools: boolean;
+  source?: 'catalog' | 'custom';
+  keyId?: number | null;
+  endpointScope?: string | null;
 }
 
 // ---- Quirks ----
@@ -566,3 +569,53 @@ export interface ProviderQuotaObservation extends ProviderQuotaState {
   rawJson: string | null;
   createdAt: string;
 }
+
+// ---- Provider Dashboard Types ----
+
+export type ProviderHealthStatus = 'healthy' | 'issues' | 'rate_limited' | 'unknown' | 'unconfigured';
+
+export interface ProviderSummary {
+  platform: Platform;
+  name: string;
+  totalKeys: number;
+  enabledKeys: number;
+  healthyKeys: number;
+  totalModels: number;
+  activeModels: number;
+  status: ProviderHealthStatus;
+  isConfigured: boolean;
+}
+
+export interface GroupedProvider {
+  id: string;
+  platform: Platform;
+  name: string;
+  url?: string;
+  baseUrl?: string | null;
+  endpointScope?: string | null;
+  keyless?: boolean;
+  keys: ApiKey[];
+  models: Model[];
+  summary: ProviderSummary;
+}
+
+export interface CustomModelCreate {
+  platform: Platform;
+  modelId: string;
+  displayName?: string;
+  contextWindow?: number | null;
+  rpmLimit?: number | null;
+  rpdLimit?: number | null;
+  tpmLimit?: number | null;
+  tpdLimit?: number | null;
+  supportsVision?: boolean;
+  supportsTools?: boolean;
+}
+
+export interface ModelTestResult {
+  success: boolean;
+  modelId: string;
+  latencyMs: number;
+  error?: string;
+}
+
