@@ -30,7 +30,7 @@ import {
   logRequest,
 } from './proxy.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
-import { routedViaValue } from '../lib/header-value.js';
+import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
@@ -38,6 +38,14 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
+import {
+  FUSION_MODEL_ID,
+  FusionError,
+  fusionConfigSchema,
+  isFusionModel,
+  runFusion,
+  type FusionResult,
+} from '../services/fusion.js';
 
 export const responsesRouter = Router();
 
@@ -144,6 +152,19 @@ const localShellCallItemSchema = z.object({
   id: z.string().optional(),
 }).passthrough();
 
+// Codex sends its client-side tool inventory as an `additional_tools` input
+// item on every Responses turn.  It is metadata for the harness, not a chat
+// message, so the translator deliberately drops it below.  Keep the schema
+// permissive because Codex may add fields (or tool shapes) as the inventory
+// evolves; rejecting the whole request here turns an otherwise valid launch
+// into a misleading `input: Invalid input` 400.
+const additionalToolsItemSchema = z.object({
+  type: z.literal('additional_tools'),
+  id: z.string().optional(),
+  role: z.string().optional(),
+  tools: z.array(z.record(z.string(), z.unknown())).optional(),
+}).passthrough();
+
 // The rest of the official ResponseInputItemParam union: built-in tool calls
 // (web_search, file_search, code interpreter, image generation), MCP items,
 // and item references. None has a chat-completions equivalent — validated
@@ -165,6 +186,7 @@ const inputItemSchema = z.union([
   computerCallOutputItemSchema,
   reasoningItemSchema,
   localShellCallItemSchema,
+  additionalToolsItemSchema,
   otherKnownItemSchema,
   messageItemSchema,
 ]);
@@ -191,6 +213,10 @@ const responsesRequestSchema = z.object({
   top_p: z.number().min(0).max(1).nullable().optional(),
   max_output_tokens: z.number().int().positive().nullable().optional(),
   tools: z.array(responsesToolSchema).optional(),
+  // The virtual Fusion model fans the translated conversation out to a
+  // diverse panel, then optionally synthesizes the survivors. Keep the
+  // Responses surface in parity with /v1/chat/completions.
+  fusion: fusionConfigSchema.optional(),
   tool_choice: z.union([
     z.enum(['none', 'auto', 'required']),
     z.object({ type: z.literal('function'), name: z.string() }).passthrough(),
@@ -459,6 +485,7 @@ export function buildResponseObject(opts: {
   promptTokens: number;
   completionTokens: number;
   reasoningTokens?: number;
+  metadata?: Record<string, string>;
 }) {
   const output: any[] = [];
   if (opts.text.length > 0) {
@@ -496,7 +523,90 @@ export function buildResponseObject(opts: {
       output_tokens_details: { reasoning_tokens: opts.reasoningTokens ?? 0 },
       total_tokens: opts.promptTokens + opts.completionTokens,
     },
+    ...(opts.metadata ? { metadata: opts.metadata } : {}),
   };
+}
+
+/**
+ * Translate the chat-shaped result returned by the Fusion service into the
+ * Responses object clients expect. Chat Fusion uses additive `_fusion` and
+ * `x_fusion` fields, but those are not part of the Responses schema and strict
+ * SDKs (including Codex) reject them while decoding `response.completed`.
+ * Preserve the portable routing summary in the standard string-valued
+ * `metadata` map instead; the chat surface keeps its richer fields unchanged.
+ */
+function buildFusionResponseObject(id: string, result: FusionResult): Record<string, unknown> {
+  const fusionResponse = result.response as FusionResult['response'] & {
+    _fusion?: unknown;
+    x_fusion?: unknown;
+  };
+  const message = fusionResponse.choices?.[0]?.message;
+  const usage = fusionResponse.usage;
+  const response = buildResponseObject({
+    id,
+    model: FUSION_MODEL_ID,
+    text: contentToString(message?.content ?? ''),
+    toolCalls: message?.tool_calls ?? [],
+    promptTokens: usage?.prompt_tokens ?? 0,
+    completionTokens: usage?.completion_tokens ?? 0,
+    reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
+    metadata: fusionResponseMetadata(fusionResponse),
+  }) as Record<string, unknown>;
+
+  return response;
+}
+
+function fusionResponseMetadata(result: FusionResult['response'] & { _fusion?: unknown; x_fusion?: unknown }): Record<string, string> {
+  const metadata: Record<string, string> = { fusion: 'true' };
+  const summary = result._fusion && typeof result._fusion === 'object' && !Array.isArray(result._fusion)
+    ? result._fusion as Record<string, unknown>
+    : undefined;
+  const details = result.x_fusion && typeof result.x_fusion === 'object' && !Array.isArray(result.x_fusion)
+    ? result.x_fusion as Record<string, unknown>
+    : undefined;
+
+  if (Array.isArray(summary?.panel)) {
+    const panel = summary.panel
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const item = entry as Record<string, unknown>;
+        return typeof item.platform === 'string' && typeof item.model === 'string'
+          ? `${item.platform}/${item.model}`
+          : null;
+      })
+      .filter((entry): entry is string => entry !== null);
+    if (panel.length > 0) metadata.fusion_panel = panel.join(',');
+  }
+
+  if (summary && 'judge' in summary) {
+    const judge = summary.judge;
+    if (judge && typeof judge === 'object') {
+      const item = judge as Record<string, unknown>;
+      if (typeof item.platform === 'string' && typeof item.model === 'string') {
+        metadata.fusion_judge = `${item.platform}/${item.model}`;
+      }
+    } else {
+      metadata.fusion_judge = 'none';
+    }
+  }
+
+  if (typeof summary?.synthesized === 'boolean') metadata.fusion_synthesized = String(summary.synthesized);
+  if (typeof details?.strategy === 'string') metadata.fusion_strategy = details.strategy;
+  return metadata;
+}
+
+/** Apply the same structured-output contract to Fusion as the chat route. */
+function enforceFusionResponseFormat(result: FusionResult, responseFormat: ResponseFormat | undefined): void {
+  if (!responseFormat) return;
+  const message = result.response.choices?.[0]?.message as any;
+  if (!message || message.tool_calls?.length) return;
+  const text = contentToString(message.content ?? '');
+  if (!text) return;
+  const enforced = enforceJsonContent(text);
+  if (!enforced.ok) {
+    throw new Error(`fusion produced non-JSON output despite response_format=${responseFormat.type} — retry, or pin a structured-output-capable model instead of "fusion"`);
+  }
+  if (enforced.healed) message.content = enforced.content;
 }
 
 function quotaContextForRoute(route: RouteResult, endpoint: string): QuotaObservationContext {
@@ -674,6 +784,9 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
 
   if (isAutoModel(requestedModelLabel)) {
     preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader));
+  } else if (isFusionModel(requestedModelLabel)) {
+    // Fusion is a virtual model, not a row in the catalog. Its panel and
+    // judge each resolve through the normal router inside runFusion below.
   } else {
     const db = getDb();
     const resolved = isUnifyEnabled() ? resolveRequestedIdForDispatch(requestedModelLabel, getModelGroups()) : null;
@@ -753,6 +866,229 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     }
   });
   const dispatchOpts = { ...completionOpts, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
+
+  // ── Fusion: Responses-API virtual model ────────────────────────────────
+  // `fusion` is intentionally not a catalog row. The chat route handles this
+  // virtual id before normal model dispatch; do the same here after the common
+  // Responses translation/guardrails so Codex and other Responses clients can
+  // opt into the exact same panel + judge behavior.
+  if (isFusionModel(requestedModelLabel)) {
+    const fusionConfig = reqData.fusion ?? {};
+    const fusionOptions = { ...dispatchOpts };
+
+    if (!stream) {
+      try {
+        const result = await runFusion({
+          messages,
+          config: fusionConfig,
+          options: fusionOptions,
+          estimatedTokens: estimatedTotal,
+          vision: hasImage,
+        });
+        enforceFusionResponseFormat(result, samplingParams.response_format);
+        res.setHeader('X-Routed-Via', safeHeaderValue(result.routedVia));
+        res.json(buildFusionResponseObject(responseId, result));
+      } catch (err: any) {
+        if (err instanceof FusionError) {
+          res.status(err.status).json({
+            error: {
+              message: err.message,
+              type: err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error',
+            },
+          });
+        } else {
+          res.status(502).json({
+            error: {
+              message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`,
+              type: 'server_error',
+            },
+          });
+        }
+      }
+      return;
+    }
+
+    // A streamed Fusion judge can emit deltas through runFusion's hook. Panel
+    // and best-of/single-survivor paths remain valid Responses streams too:
+    // they simply emit the completed answer once the fan-out settles.
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    // The detailed panel is only known after runFusion settles, but the
+    // standard header can still identify this stream as Fusion before the
+    // response is committed. The final metadata carries panel/judge details.
+    res.setHeader('X-Routed-Via', FUSION_MODEL_ID);
+    let fusionSequence = 0;
+    const fusionSse = (event: string, payload: Record<string, unknown>) => {
+      if (res.writableEnded) return;
+      try {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify({ type: event, sequence_number: fusionSequence++, ...payload })}\n\n`);
+      } catch {
+        // The close listener aborts the provider signal; a late write can still
+        // race the socket teardown and is intentionally ignored.
+      }
+    };
+    const skeleton = {
+      id: responseId,
+      object: 'response',
+      created_at: nowUnix(),
+      status: 'in_progress',
+      model: FUSION_MODEL_ID,
+      output: [],
+      output_text: '',
+      metadata: { fusion: 'true' },
+    };
+    fusionSse('response.created', { response: skeleton });
+    fusionSse('response.in_progress', { response: skeleton });
+
+    // Fusion fans out to several upstream models before the judge can emit a
+    // token. That gap can exceed the ~15s idle timeout used by Codex's
+    // Responses client even though the HTTP connection is healthy. A standard
+    // in-progress event keeps the client-side event watchdog alive; comments
+    // are ignored by Codex's watchdog even though they refresh curl's stream.
+    const fusionHeartbeat = setInterval(() => {
+      if (res.writableEnded || res.destroyed) return;
+      try {
+        fusionSse('response.in_progress', { response: skeleton });
+      } catch {
+        // The close listener aborts the in-flight fan-out; a late heartbeat
+        // racing socket teardown is harmless.
+      }
+    }, 5000);
+    fusionHeartbeat.unref?.();
+
+    let textItemId: string | null = null;
+    const textOutputIndex = 0;
+    let streamedText = '';
+    const openTextItem = (id: string = newId('msg')) => {
+      if (textItemId !== null) return;
+      textItemId = id;
+      fusionSse('response.output_item.added', {
+        output_index: textOutputIndex,
+        item: { id, type: 'message', status: 'in_progress', role: 'assistant', content: [] },
+      });
+      fusionSse('response.content_part.added', {
+        item_id: id,
+        output_index: textOutputIndex,
+        content_index: 0,
+        part: { type: 'output_text', text: '', annotations: [] },
+      });
+    };
+
+    try {
+      const result = await runFusion({
+        messages,
+        config: fusionConfig,
+        options: fusionOptions,
+        estimatedTokens: estimatedTotal,
+        vision: hasImage,
+        hooks: {
+          onJudgeDelta: (delta) => {
+            if (!delta) return;
+            openTextItem();
+            fusionSse('response.output_text.delta', {
+              item_id: textItemId,
+              output_index: textOutputIndex,
+              content_index: 0,
+              delta,
+            });
+            streamedText += delta;
+          },
+        },
+      });
+      // Like the chat route's streamed Fusion branch, do not run a structured
+      // output verdict after judge deltas have already reached the client: a
+      // failed verdict could not retract the partial answer. Non-streaming
+      // Fusion is checked above before the response is committed.
+      const responseObject = buildFusionResponseObject(responseId, result) as any;
+      const outputs = Array.isArray(responseObject.output) ? responseObject.output : [];
+      const messageOutput = outputs.find((item: any) => item?.type === 'message');
+      const finalText = typeof responseObject.output_text === 'string' ? responseObject.output_text : '';
+
+      if (messageOutput) {
+        // Keep the final Response object's message id aligned with any judge
+        // deltas already emitted on the wire.
+        if (textItemId === null) openTextItem(messageOutput.id);
+        else messageOutput.id = textItemId;
+        if (finalText && !streamedText) {
+          fusionSse('response.output_text.delta', {
+            item_id: textItemId,
+            output_index: textOutputIndex,
+            content_index: 0,
+            delta: finalText,
+          });
+          streamedText = finalText;
+        } else if (finalText.length > streamedText.length && finalText.startsWith(streamedText)) {
+          fusionSse('response.output_text.delta', {
+            item_id: textItemId,
+            output_index: textOutputIndex,
+            content_index: 0,
+            delta: finalText.slice(streamedText.length),
+          });
+          streamedText = finalText;
+        }
+        fusionSse('response.output_text.done', {
+          item_id: textItemId,
+          output_index: textOutputIndex,
+          content_index: 0,
+          text: finalText,
+        });
+        fusionSse('response.content_part.done', {
+          item_id: textItemId,
+          output_index: textOutputIndex,
+          content_index: 0,
+          part: { type: 'output_text', text: finalText, annotations: [] },
+        });
+        fusionSse('response.output_item.done', {
+          output_index: textOutputIndex,
+          item: messageOutput,
+        });
+      }
+
+      let outputIndex = messageOutput ? 1 : 0;
+      for (const output of outputs) {
+        if (output?.type !== 'function_call') continue;
+        const item = { ...output, status: 'in_progress', arguments: '' };
+        fusionSse('response.output_item.added', { output_index: outputIndex, item });
+        if (output.arguments) {
+          fusionSse('response.function_call_arguments.delta', {
+            item_id: output.id,
+            output_index: outputIndex,
+            delta: output.arguments,
+          });
+        }
+        fusionSse('response.function_call_arguments.done', {
+          item_id: output.id,
+          output_index: outputIndex,
+          arguments: output.arguments ?? '',
+        });
+        fusionSse('response.output_item.done', { output_index: outputIndex, item: output });
+        outputIndex++;
+      }
+
+      fusionSse('response.completed', { response: responseObject });
+      res.end();
+    } catch (err: any) {
+      const message = err instanceof FusionError
+        ? err.message
+        : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
+      const type = err instanceof FusionError
+        ? (err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error')
+        : 'server_error';
+      fusionSse('response.failed', {
+        response: {
+          ...skeleton,
+          status: 'failed',
+          error: { message, type },
+        },
+      });
+      res.end();
+    } finally {
+      clearInterval(fusionHeartbeat);
+    }
+    return;
+  }
 
   // Stream bookkeeping (used only when stream === true). `streamStarted` is the
   // commit flag: true once the response.created/in_progress skeleton has left,
