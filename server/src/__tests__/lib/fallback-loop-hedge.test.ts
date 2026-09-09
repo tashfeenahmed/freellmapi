@@ -10,9 +10,10 @@ import type { RouteResult } from '../../services/router.js';
  * the loop calls abortInFlight() so a stalled attempt is abandoned instead of
  * only refusing to start the next retry behind it. The surface aborts its
  * composed fetch signal with newHedgeAbortError(); the loop must render
- * timedOut exhaustion WITHOUT any provider-health bookkeeping — no cooldown,
- * no skip entry, no logFailure row — because the budget is spent, not the
- * provider broken.
+ * timedOut exhaustion, and the provider-health bookkeeping — cooldown, skip
+ * entry, logFailure row — depends on WHOSE silence spent the budget: an attempt
+ * handed only the scraps a ladder left is not benched, one that stayed silent
+ * for most of the whole budget is.
  */
 
 let keySeq = 900;
@@ -158,6 +159,48 @@ describe('fallback loop time-budget hedging', () => {
     // And the request rendered as timedOut exhaustion, not a third failure.
     expect(h.onExhausted).toHaveBeenCalledTimes(1);
     expect(h.onExhausted.mock.calls[0][1].timedOut).toBe(true);
+  });
+
+  it('benches the route when one attempt stayed silent for the whole budget', async () => {
+    // The production shape behind this branch. Same ladder position as the two
+    // tests above — hedging only arms from the third attempt on (#751) — but
+    // here the two failures ahead of it are INSTANT, so the stalled attempt
+    // inherits essentially the whole budget and then sends no first byte for
+    // all of it. That is a stalled upstream, not a scheduling accident:
+    // unbenched it stays at the head of the route order and re-stalls every
+    // subsequent request, burning the full budget each time while the healthy
+    // routes queued behind it never run.
+    const state = newFallbackState();
+    const hedgeAbort = new AbortController();
+    const fast429 = async () => {
+      throw Object.assign(new Error('fake API error 429: rate limit'), { status: 429 });
+    };
+    const dispatch = vi.fn()
+      .mockImplementationOnce(fast429)
+      .mockImplementationOnce(fast429)
+      .mockImplementation(stalledDispatch(hedgeAbort));
+
+    const h = hooks(state, {
+      maxRetries: 5,
+      timeBudgetMs: 100,
+      abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    // Still a timedOut exhaustion — the render is unchanged.
+    expect(h.onExhausted).toHaveBeenCalledTimes(1);
+    expect(h.onExhausted.mock.calls[0][1].timedOut).toBe(true);
+    // But the stalled route now carries a cooldown and a skip entry of its own,
+    // on top of the two fast 429s', so the next request routes past it. This is
+    // the exact assertion that inverts for the shared-budget case above, where
+    // the same three attempts produce only two of each.
+    const cooldowns = getDb().prepare('SELECT COUNT(*) AS n FROM rate_limit_cooldowns').get() as { n: number };
+    expect(cooldowns.n).toBe(3);
+    expect(state.skipKeys.size).toBe(3);
+    expect(h.logFailure).toHaveBeenCalledTimes(3);
   });
 
   it('never cancels an attempt that already committed, however long it then runs', async () => {

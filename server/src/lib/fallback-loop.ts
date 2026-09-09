@@ -127,6 +127,14 @@ function clearModelFailure(route: RouteResult): void {
 // TODO(fallback-v2): AbortController hedging so a stalled attempt can be
 // abandoned mid-flight instead of only refusing to start the next one.
 export const DEFAULT_FALLBACK_TIME_BUDGET_MS = 45_000;
+// Share of the wall-clock budget an aborted attempt must have been silent for
+// before the hedge abort counts as provider health rather than bad luck. An
+// attempt late in a ladder inherits only the scraps of the budget its
+// predecessors left, and killing it proves nothing about that route; one that
+// owned most of the window and still sent no first byte is stalled. Kept a
+// fraction rather than a constant because the budget IS the declared patience
+// — raising FALLBACK_TIME_BUDGET_MS should raise the evidence bar with it.
+export const HEDGE_BENCH_MIN_SILENT_FRACTION = 0.75;
 export const FALLBACK_TIME_BUDGET_SETTING = 'fallback_time_budget_ms';
 
 export function getFallbackTimeBudgetMs(): number {
@@ -937,8 +945,8 @@ export interface FallbackHooks {
   // (remaining wall-clock budget) and calls this to ABORT the in-flight
   // upstream instead of just refusing to start the next retry behind a
   // stalled attempt. The surface aborts its composed fetch signal with
-  // newHedgeAbortError() — a non-provider-health signal, so the loop renders
-  // timedOut exhaustion without benching the model+key (see the
+  // newHedgeAbortError(); the loop renders timedOut exhaustion, and benches the
+  // model+key only when that attempt ate the whole budget by itself (see the
   // isHedgeAbortError branch below). Absent = pre-v2 behavior.
   abortInFlight?: () => void;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
@@ -1179,12 +1187,33 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       }
       // Time-budget hedge abort: the wall-clock retry budget expired while this
       // attempt was still in flight, and the surface aborted the composed fetch
-      // signal (see newHedgeAbortError). Not a provider-health signal — no
-      // cooldown, no penalty, no failure stats — and the budget is spent, so
+      // signal (see newHedgeAbortError). The budget is spent either way, so we
       // render timedOut exhaustion exactly like the loop-top budget check does.
+      //
+      // Whether it also counts as a provider-health signal depends on how much
+      // of the silence belongs to THIS attempt. Sharing a budget that earlier
+      // attempts already mostly spent says nothing about this route — it was
+      // simply last in line, and cancelling it is a scheduling accident. But an
+      // attempt that stayed silent for most of the operator's whole declared
+      // patience on its own produced no first byte over that entire window,
+      // and that is a stalled upstream. Left unbenched it stays at the head of the route
+      // order and re-stalls every subsequent request, burning the full budget
+      // each time and starving the healthy routes queued behind it — observed
+      // in production as one dead free-tier route 45s-ing every request for
+      // hours. Benching costs a short transient cooldown (a timeout is not a
+      // rate-limit signal, so cooldownDecisionForError keeps it light) plus the
+      // gradual model-level sink, both of which decay on their own if the route
+      // recovers.
       if (isHedgeAbortError(err)) {
         const elapsedMs = Date.now() - startedAt;
-        console.log(`[FallbackLoop] retry time budget expired mid-attempt on ${route.platform}/${route.modelId} after ${(elapsedMs / 1000).toFixed(1)}s — rendering timedOut exhaustion without benching`);
+        const attemptElapsedMs = Date.now() - attemptStartedAt;
+        const ownedWholeBudget = budgetMs > 0
+          && attemptElapsedMs >= budgetMs * HEDGE_BENCH_MIN_SILENT_FRACTION;
+        if (ownedWholeBudget) {
+          hooks.logFailure(route, err, attempt);
+          recordRetryableFailure(route, err, hooks.state);
+        }
+        console.log(`[FallbackLoop] retry time budget expired mid-attempt on ${route.platform}/${route.modelId} after ${(elapsedMs / 1000).toFixed(1)}s — rendering timedOut exhaustion ${ownedWholeBudget ? `and benching the route (silent for the whole ${budgetMs}ms budget)` : 'without benching'}`);
         hooks.onExhausted(
           exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
           { attempts, timedOut: true },
