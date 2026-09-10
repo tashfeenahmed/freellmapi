@@ -106,6 +106,20 @@ function shortRequestId(requestId: string): string {
   return requestId.replace(/-/g, '').slice(0, 6);
 }
 
+/**
+ * Stamp the execution id onto a body that was stored by an EARLIER request
+ * (response cache hit, idempotency replay). The id goes on the outbound copy
+ * only — never on the stored entry — so a replay reports the id of THIS
+ * request instead of the one that first filled the store, which is what makes
+ * the field safe to trust on every response. Stored bodies are typed
+ * `unknown`; a non-object entry (corrupt) is passed through untouched rather
+ * than spread into indexed characters.
+ */
+function withExecutionId(body: unknown, executionId: string): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  return { ...(body as Record<string, unknown>), execution_id: executionId };
+}
+
 type TraceEvent = 'start' | 'next' | 'ok' | 'fail';
 
 export function traceRouteEvent(
@@ -1019,6 +1033,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       .join(', ');
     res.status(400).json({
       error: { message: `Invalid request: ${detail}`, type: 'invalid_request_error' },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -1045,6 +1060,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   if (budgetCheck.rejection) {
     res.status(413).json({
       error: { message: tokenBudgetMessage(budgetCheck.rejection), type: 'invalid_request_error', code: 'request_token_budget' },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -1076,6 +1092,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
               type: 'service_unavailable',
               code: 'no_providers_configured',
             },
+            execution_id: requestGroupId,
           });
         } else {
           res.status(404).json({
@@ -1084,6 +1101,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
               type: 'invalid_request_error',
               code: 'model_not_found',
             },
+            execution_id: requestGroupId,
           });
         }
         return;
@@ -1101,6 +1119,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             type: 'invalid_request_error',
             code: 'model_not_found',
           },
+          execution_id: requestGroupId,
         });
         return;
       }
@@ -1345,6 +1364,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           finish_reason: result.choices?.[0]?.finish_reason ?? 'stop',
         }],
         usage: result.usage,
+        execution_id: requestGroupId,
       });
 
       traceRouteEvent('Proxy', {
@@ -1381,6 +1401,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
           type: 'provider_error',
         },
+        execution_id: requestGroupId,
       });
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
@@ -1604,6 +1625,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         type: 'invalid_request_error',
         code: 'no_vision_model',
       },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -1630,6 +1652,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         type: 'invalid_request_error',
         code: 'no_tools_model',
       },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -1643,6 +1666,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   if (budgetCheck.rejection) {
     res.status(413).json({
       error: { message: tokenBudgetMessage(budgetCheck.rejection), type: 'invalid_request_error', code: 'request_token_budget' },
+      execution_id: requestGroupId,
     });
     return;
   }
@@ -1747,19 +1771,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         if (fusionText) {
           const enforced = enforceJsonContent(fusionText);
           if (!enforced.ok) {
-            res.status(502).json({ error: { message: `fusion produced non-JSON output despite response_format=${samplingParams.response_format.type} — retry, or pin a structured-output-capable model instead of "fusion"`, type: 'server_error' } });
+            res.status(502).json({ error: { message: `fusion produced non-JSON output despite response_format=${samplingParams.response_format.type} — retry, or pin a structured-output-capable model instead of "fusion"`, type: 'server_error' }, execution_id: requestGroupId });
             return;
           }
           if (enforced.healed) fusionMsg.content = enforced.content;
         }
       }
       res.setHeader('X-Routed-Via', safeHeaderValue(routedVia));
-      res.json(response);
+      res.json({ ...response, execution_id: requestGroupId });
     } catch (err: any) {
       if (err instanceof FusionError) {
-        res.status(err.status).json({ error: { message: err.message, type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error' } });
+        res.status(err.status).json({ error: { message: err.message, type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error' }, execution_id: requestGroupId });
       } else {
-        res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' } });
+        res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' }, execution_id: requestGroupId });
       }
     }
     return;
@@ -1827,7 +1851,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // The savings are reported separately by GET /api/cache/stats.
         res.setHeader('X-Routed-Via', 'cache');
         res.setHeader('X-FreeLLM-Cache', 'HIT');
-        res.json(hit.body);
+        res.json(withExecutionId(hit.body, requestGroupId));
         return;
       }
     }
@@ -1861,7 +1885,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // Replay consumes NO provider quota — same zero-cost rationale as a
       // cache hit, so request/usage bookkeeping is skipped here too.
       res.setHeader('X-Routed-Via', 'idempotency');
-      res.status(claim.status).json(claim.body);
+      res.status(claim.status).json(withExecutionId(claim.body, requestGroupId));
       return;
     }
     if (claim.kind === 'conflict') {
@@ -1870,6 +1894,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           message: 'idempotency_key_conflict',
           type: 'invalid_request_error',
         },
+        execution_id: requestGroupId,
       });
       return;
     }
@@ -1959,6 +1984,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               type: 'service_unavailable',
               code: 'no_providers_configured',
             },
+            execution_id: requestGroupId,
           });
         } else {
           res.status(404).json({
@@ -1967,6 +1993,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               type: 'invalid_request_error',
               code: 'model_not_found',
             },
+            execution_id: requestGroupId,
           });
         }
         return;
@@ -1991,6 +2018,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             type: 'invalid_request_error',
             code: 'model_not_found',
           },
+          execution_id: requestGroupId,
         });
         return;
       }
@@ -2802,6 +2830,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
           type: 'provider_error',
         },
+        execution_id: requestGroupId,
       });
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {

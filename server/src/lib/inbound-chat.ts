@@ -338,6 +338,8 @@ export async function runInboundChat(
           null,
           null,
           pin.pinnedLabel,
+          null,
+          'http',
         );
         wire.sendNonStream(res, normalized);
         return 'done';
@@ -512,6 +514,8 @@ export async function runInboundChat(
           null,
           null,
           pin.pinnedLabel,
+          null,
+          'http',
         );
         return 'done';
       } catch (error: any) {
@@ -529,6 +533,8 @@ export async function runInboundChat(
           sanitizeProviderErrorMessage(error.message),
           null,
           pin.pinnedLabel,
+          null,
+          'http',
         );
         return 'committed';
       }
@@ -545,6 +551,8 @@ export async function runInboundChat(
         sanitizeProviderErrorMessage(error.message),
         null,
         pin.pinnedLabel,
+        null,
+        'http',
       );
     },
     onFatal: (route, error, attempt) => {

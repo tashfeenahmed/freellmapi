@@ -67,9 +67,16 @@ export function logRequest(
   // lib/served-model.ts). NULL when it matches or the provider reported
   // nothing usable, so the column stays empty in the healthy case.
   servedModel: string | null = null,
-  // Which gateway pathway produced this request: 'http' (OpenAI-compatible
-  // endpoints), 'mcp' (/mcp JSON-RPC), or 'web' (dashboard API). Lets
-  // analytics tell paths apart when debugging. NULL for legacy callers.
+  // Which gateway pathway produced this request. Today every inference
+  // surface writes 'http': the OpenAI-compatible proxy (/v1/chat/completions,
+  // /v1/completions), /v1/responses, /v1/messages, the Ollama + Gemini wires
+  // (lib/inbound-chat.ts), and fusion's panel/judge sub-calls. The /mcp
+  // JSON-RPC surface is introspection-only (list models, health, usage) and
+  // runs no inference, so it logs nothing; the dashboard playground calls the
+  // same HTTP endpoints as any other client and is indistinguishable from
+  // them here. The column is free-form so a future surface can add a value
+  // without a migration. NULL for call sites that pass no caller — notably
+  // the shared fallback loop's 'canceled' row, which is surface-agnostic.
   caller: string | null = null,
 ) {
   try {

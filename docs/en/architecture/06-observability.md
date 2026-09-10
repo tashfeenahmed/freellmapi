@@ -74,6 +74,22 @@ The desktop app has no terminal attached, so it tees every console line to a **f
 | `client_info` | User agent, IP hash |
 | `served_model` | Upstream-reported model (observability) |
 | `attempt_error_summary` | Aggregated failure classes for this request |
+| `caller` | Which gateway pathway produced the request |
+
+### `execution_id` and the `caller` dimension
+
+Every JSON body the chat completion routes send — success, cache/idempotency
+replay, and error alike — carries a top-level `execution_id` holding the same
+value as the `X-Request-ID` header, so a client that only kept the response body
+can still find the row and its attempt trail. It is stamped on the outbound copy,
+so a replayed cache hit reports the id of *that* request, not the one that filled
+the cache. Streamed frames omit it (the header carries it there).
+
+`requests.caller` records the surface: today every inference path writes `http`
+(the OpenAI-compatible proxy, `/v1/responses`, `/v1/messages`, the Ollama and
+Gemini wires, and fusion sub-calls). `/mcp` is introspection-only and runs no
+inference, and the dashboard playground calls the same HTTP endpoints as any
+other client. The column is free-form, so a new surface needs no migration.
 
 ### Attempt Trail (`request_attempts` table)
 
