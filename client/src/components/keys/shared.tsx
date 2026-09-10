@@ -32,6 +32,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'sail', label: 'Sail Research ($5 monthly with payment method)', url: 'https://app.sailresearch.com' },
   { value: 'electronhub', label: 'ElectronHub (shared weekly credits)', url: 'https://app.electronhub.ai' },
   { value: 'experiential', label: 'Experiential Labs (shared monthly credits)', url: 'https://platform.experientiallabs.ai' },
+  { value: 'router9', label: 'Router9 (shared monthly credits)', url: 'https://www.router9.com' },
+  { value: 'septor', label: 'Septor Labs (daily free-model quota)', url: 'https://septorlabs.com/dashboard' },
   { value: 'bai', label: 'B.AI (promotional free model)', url: 'https://b.ai' },
   { value: 'radeon', label: 'AMD Radeon Cloud (free shared models)', url: 'https://developer.amd.com.cn/radeon/tokenfactory' },
   { value: 'nvidia', label: 'NVIDIA NIM', url: 'https://build.nvidia.com/settings/api-keys' },

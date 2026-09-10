@@ -382,6 +382,8 @@ export const platformColors: Record<string, string> = {
   sail:        '#0ea5e9',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
+  router9:      '#8b5cf6',
+  septor:       '#0891b2',
   bai:         '#111827',
   radeon:      '#ed1c24',
   nvidia:      '#76b900',

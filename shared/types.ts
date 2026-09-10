@@ -72,6 +72,9 @@ export type Platform =
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'
   | 'experiential'
+  // Catalog-managed gateways: monthly shared credits vs daily free-model quota.
+  | 'router9'
+  | 'septor'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'

@@ -153,7 +153,7 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
-  it.each(['electronhub', 'experiential'])('accepts a %s key without seeding gated model rows', async platform => {
+  it.each(['electronhub', 'experiential', 'router9', 'septor'])('accepts a %s key without seeding gated model rows', async platform => {
     const { status, body } = await request(app, 'POST', '/api/keys', {
       platform, key: 'not-a-real-test-key-12345', label: 'Gateway test',
     });

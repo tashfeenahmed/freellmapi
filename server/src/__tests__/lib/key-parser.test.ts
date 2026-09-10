@@ -76,6 +76,11 @@ describe('key parser', () => {
     expect(detectPlatform('EXPERIENTIALLABS_')).toBe('experiential');
     expect(detectPlatform('EXPERIENTIAL_LABS_')).toBe('experiential');
     expect(detectPlatform('EXPLABS_')).toBe('experiential');
+    expect(detectPlatform('ROUTER9_')).toBe('router9');
+    expect(detectPlatform('ROUTER_9_')).toBe('router9');
+    expect(detectPlatform('SEPTOR_')).toBe('septor');
+    expect(detectPlatform('SEPTORLABS_')).toBe('septor');
+    expect(detectPlatform('SEPTOR_LABS_')).toBe('septor');
     expect(detectPlatform('SAMBANOVA_')).toBeNull();
   });
 
@@ -97,6 +102,11 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['electron-hub']).toBe('electronhub');
     expect(AUTH_JSON_PROVIDER_MAP['experiential-labs']).toBe('experiential');
     expect(AUTH_JSON_PROVIDER_MAP['explabs']).toBe('experiential');
+    expect(AUTH_JSON_PROVIDER_MAP['router9']).toBe('router9');
+    expect(AUTH_JSON_PROVIDER_MAP['router-9']).toBe('router9');
+    expect(AUTH_JSON_PROVIDER_MAP['septor']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['septor-labs']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['septorlabs']).toBe('septor');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],
