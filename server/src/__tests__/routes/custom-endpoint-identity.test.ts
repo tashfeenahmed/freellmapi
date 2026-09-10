@@ -7,6 +7,7 @@ import { setCooldown, isOnCooldown, clearCooldownsForKey } from '../../services/
 import { getModelGroups, resolveRequestedIdToMembers, setUnifyOverrides } from '../../services/model-groups.js';
 import { noteModelRetirementSignal, resetModelRetirementObservations } from '../../services/model-retirement.js';
 import { endpointHandle, qualifiedModelMemberId } from '../../lib/endpoint-scope.js';
+import { logRequest } from '../../lib/request-log.js';
 import { buildModelListing } from '../../services/model-listing.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
@@ -233,6 +234,20 @@ describe('per-endpoint identity for custom relay models (#651)', () => {
       );
 
       expect(rowsFor(SHARED_MODEL).map(r => r.enabled)).toEqual([1, 1]);
+    });
+
+    it('records the concrete model row selected for each relay', async () => {
+      await registerBothRelays(app);
+      const b = rowOn(RELAY_B);
+
+      logRequest('custom', SHARED_MODEL, b.key_id!, 'success', 10, 20, 30, null);
+
+      const logged = getDb().prepare(`
+        SELECT model_db_id FROM requests
+         WHERE platform = 'custom' AND model_id = ?
+         ORDER BY id DESC LIMIT 1
+      `).get(SHARED_MODEL) as { model_db_id: number };
+      expect(logged.model_db_id).toBe(b.id);
     });
   });
 
