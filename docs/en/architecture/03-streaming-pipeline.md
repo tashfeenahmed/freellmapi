@@ -253,7 +253,8 @@ Thin adapter over shared fallback loop:
 
 ## 13. Response Cache (Opt-In)
 
-- **Scope**: non-streaming only, cacheable temperature (`temperature ≤ 1` or unset), `X-FreeLLM-Cache: on` or `RESPONSE_CACHE=1`.
+- **Scope**: streaming and non-streaming, cacheable temperature (`temperature ≤ 1` or unset), `X-FreeLLM-Cache: on` or `RESPONSE_CACHE=1`.
 - **Key**: SHA-256 over canonical request (model, messages, all sampling params, tools, stop, response_format, n, seed, penalties, logit_bias, logprobs, top_logprobs, reasoning_effort, compression).
-- **Store**: in-memory LRU, TTL + temperature gates.
-- **Hit**: returns cached body, `X-Routed-Via: cache`, `X-FreeLLM-Cache: HIT`, **zero provider quota consumed**.
+- **Store**: in-memory LRU, TTL + temperature gates. Two stores — JSON bodies (persisted to SQLite) and streaming SSE (memory-only) — sharing one `RESPONSE_CACHE_MAX_ENTRIES` budget; `entries` in the stats counts both.
+- **Hit**: returns cached body, `X-Routed-Via: cache`, `X-FreeLLM-Cache: HIT`, **zero provider quota consumed**. A streaming hit replays the stored SSE byte for byte.
+- **Streaming store**: frames are buffered only when the request is cacheable (nothing is retained with the cache off) and dropped past a 2 MB replay ceiling. A truncated (`finish_reason: length`), errored, or aborted stream is never stored.

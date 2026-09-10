@@ -24,7 +24,7 @@ Idempotency-Key: <opaque client token>
 
 只存储键的 `SHA-256` 十六进制摘要（`hashIdempotencyKey`）—— 原始键永远不会进入 SQLite，与管理令牌、运行时令牌的处理方式相同。
 
-流式请求（`stream: true`）**始终绕过**幂等（`proxy.ts:1805` 中的 `const idemKey = !stream ? normalize... : null`）。一个流无法作为整体重放，而打开的连接本身就是重试信号 —— 与响应缓存的策略相同。
+流式请求（`stream: true`）**始终绕过**幂等（`proxy.ts:1805` 中的 `const idemKey = !stream ? normalize... : null`）。一个流无法作为整体用于*重试*重放，而打开的连接本身就是重试信号。（响应缓存已不再沿用这一策略：它会重放流，只是以请求内容而非调用方提供的键为准。）
 
 ---
 
@@ -180,7 +180,7 @@ curl -i http://localhost:3001/v1/chat/completions \
 
 ## 10. 与响应缓存及降级模式的关系
 
-- **响应缓存**（`services/cache.ts`，`X-FreeLLM-Cache`）是正交的：全局、受温度门控、内存 LRU；幂等则是持久化的（SQLite）、按调用方、与指纹绑定。两者都会绕过提供方调用。
+- **响应缓存**（`services/cache.ts`，`X-FreeLLM-Cache`）是正交的：全局、受温度门控、内存 LRU，流式与非流式一并覆盖；幂等则是持久化的（SQLite）、按调用方、与指纹绑定，且仅限非流式。两者都会绕过提供方调用。
 - **降级模式**（`../architecture/04-degraded-mode-and-failover.md`）会关闭老虎机探索，但不影响幂等 —— 重放仍然完全绕过路由。
 - **故障转移**：只存储最终成功的正文。若一个请求耗尽了回退循环，该键不会存储任何内容。
 

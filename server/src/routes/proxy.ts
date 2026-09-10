@@ -21,7 +21,7 @@ import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
-import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse } from '../services/cache.js';
+import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
 import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
@@ -1839,7 +1839,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Routed-Via', 'cache');
         res.setHeader('X-FreeLLM-Cache', 'HIT');
-        for (const frame of streamHit.frames) res.write(frame);
+        res.write(streamHit.sse);
         res.end();
         return;
       }
@@ -2165,7 +2165,24 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let upstreamModel: string | null = null;
         // Every `data: ...` frame the client sees, captured for a possible
         // streaming cache store on success (exact SSE replay on a later hit).
-        const streamFrames: string[] = [];
+        // Collected ONLY when this request is actually cacheable: with the
+        // cache off — the default — a stream must retain nothing, so the
+        // buffer stays null and every frame is written straight through.
+        const streamFrames: string[] | null = cacheKey ? [] : null;
+        let streamFrameBytes = 0;
+        // Flipped off once the answer outgrows what is worth holding; the
+        // buffer is dropped and this response is not stored.
+        let streamCacheable = cacheKey !== null;
+        const collectFrame = (frame: string) => {
+          if (!streamCacheable || !streamFrames) return;
+          streamFrameBytes += Buffer.byteLength(frame);
+          if (streamFrameBytes > STREAM_CACHE_MAX_BYTES) {
+            streamCacheable = false;
+            streamFrames.length = 0;
+            return;
+          }
+          streamFrames.push(frame);
+        };
 
         const flushHeaders = () => {
           if (headerSent) return;
@@ -2184,7 +2201,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           ctx.disarmHedge();
           for (const p of preamble) {
             const frame = `data: ${JSON.stringify(p)}\n\n`;
-            streamFrames.push(frame);
+            collectFrame(frame);
             res.write(frame);
           }
           preamble.length = 0;
@@ -2198,7 +2215,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         });
         const writeChunk = (c: unknown) => {
           const frame = `data: ${JSON.stringify(c)}\n\n`;
-          streamFrames.push(frame);
+          collectFrame(frame);
           res.write(frame);
         };
 
@@ -2506,7 +2523,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             });
           }
           const doneFrame = 'data: [DONE]\n\n';
-          streamFrames.push(doneFrame);
+          collectFrame(doneFrame);
           res.write(doneFrame);
           res.end();
 
@@ -2520,8 +2537,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // stream request is replayed without spending another free-tier
           // slot. A truncated turn (finish 'length') is NOT cached, matching
           // the JSON cache policy — replaying a cut-off answer would be worse
-          // than regenerating.
-          if (cacheKey && finish !== 'length') {
+          // than regenerating — and neither is one that outgrew the buffer
+          // ceiling. A stream that errored or was aborted mid-flight never
+          // reaches here at all (the catch below owns that path).
+          if (cacheKey && streamFrames && streamCacheable && finish !== 'length') {
             storeCachedStreamResponse(cacheKey, {
               frames: streamFrames,
               platform: route.platform,

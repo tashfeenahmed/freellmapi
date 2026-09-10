@@ -281,10 +281,13 @@ interface CacheEntry {
 const store = new Map<string, CacheEntry>();
 
 // Streaming entries live in their own LRU: a stream's replayable artifact is
-// the exact SSE frame sequence, which is structurally different from a JSON
-// completion body, so the two kinds never share a key across stores.
+// the exact SSE byte sequence, which is structurally different from a JSON
+// completion body, so the two kinds never share a key across stores. The
+// frames are concatenated into one string on store — a hit replays the whole
+// sequence in a single write, and one string costs far less than an array of
+// hundreds of small ones.
 interface StreamCacheEntry {
-  frames: string[]; // verbatim `data: {...}\n\n` (and final `[DONE]`) frames
+  sse: string; // verbatim `data: {...}\n\n` frames, `[DONE]` included
   platform: string;
   modelId: string;
   keyId: number | null;
@@ -296,12 +299,35 @@ interface StreamCacheEntry {
 }
 const streamStore = new Map<string, StreamCacheEntry>();
 
-function evictToCap<K, V>(map: Map<K, V>): void {
+/** Last use of an entry, for cross-store recency comparison. */
+function lastUsedAtMs(entry: { createdAtMs: number; lastHitAtMs: number | null }): number {
+  return entry.lastHitAtMs ?? entry.createdAtMs;
+}
+
+/**
+ * Evict least-recently-used entries until the JSON and streaming stores hold
+ * RESPONSE_CACHE_MAX_ENTRIES *between them*. One shared budget, so enabling
+ * streaming replay cannot silently double the documented memory ceiling.
+ * Each map is itself in LRU order, so only their two front entries can be the
+ * coldest; the older of the two goes first.
+ */
+function enforceCombinedCap(): void {
   const cap = cacheMaxEntries();
-  while (map.size > cap) {
-    const oldest = map.keys().next().value as K | undefined;
-    if (oldest === undefined) break;
-    map.delete(oldest);
+  while (store.size + streamStore.size > cap) {
+    const jsonKey = store.keys().next().value as string | undefined;
+    const streamKey = streamStore.keys().next().value as string | undefined;
+    const jsonAge = jsonKey === undefined ? Infinity : lastUsedAtMs(store.get(jsonKey)!);
+    const streamAge = streamKey === undefined ? Infinity : lastUsedAtMs(streamStore.get(streamKey)!);
+    if (streamKey !== undefined && streamAge <= jsonAge) {
+      streamStore.delete(streamKey);
+    } else if (jsonKey !== undefined) {
+      store.delete(jsonKey);
+      // Evicting in memory but not on disk would let the table grow without
+      // bound and let a restart resurrect entries the LRU already gave up on.
+      scheduleRowDelete(jsonKey);
+    } else {
+      break; // both stores empty; cap is 0
+    }
   }
 }
 
@@ -461,17 +487,10 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
     lastHitAtMs: null,
   });
 
-  // Evict least-recently-used beyond the cap. The count only drifts by one per
-  // insert, so at most one entry is removed per call in steady state.
-  const cap = cacheMaxEntries();
-  while (store.size > cap) {
-    const oldest = store.keys().next().value as string | undefined;
-    if (oldest === undefined) break;
-    store.delete(oldest);
-    // Evicting in memory but not on disk would let the table grow without
-    // bound and let a restart resurrect entries the LRU already gave up on.
-    scheduleRowDelete(oldest);
-  }
+  // Evict least-recently-used beyond the cap, which is shared with the
+  // streaming store. The count only drifts by one per insert, so at most one
+  // entry is removed per call in steady state.
+  enforceCombinedCap();
 
   // Write-through to SQLite. hit_count is stored at its current in-memory value
   // (0 for a fresh store, since an overwrite resets the rolling stat with the
@@ -572,8 +591,18 @@ export function loadCacheFromDb(now = Date.now()): void {
 
 // ── Streaming entries ──
 
+/**
+ * Ceiling on one cached stream's replay payload. A single long answer must not
+ * be able to pin megabytes of SSE text in memory, and a stream past this size
+ * is cheap to regenerate relative to what it costs to hold. The caller stops
+ * buffering at this point too (proxy.ts), so an oversize stream never fully
+ * materializes; this is the store-side backstop.
+ */
+export const STREAM_CACHE_MAX_BYTES = 2 * 1024 * 1024;
+
 export interface CachedStreamResponse {
-  frames: string[];
+  /** The whole SSE sequence, ready to write in one go. */
+  sse: string;
   platform: string;
   modelId: string;
   keyId: number | null;
@@ -592,24 +621,31 @@ export interface StoreStreamInput {
 
 /**
  * Look up a cached stream. Returns null on a miss or when the entry has aged
- * past the TTL. A hit bumps hit_count and moves the entry to MRU.
+ * past the TTL. A hit bumps hit_count and moves the entry to MRU, and — like
+ * the JSON lookup — counts into the process-wide hit/miss tallies behind the
+ * dashboard's hit rate, so streaming traffic is not invisible there.
  */
 export function getCachedStreamResponse(cacheKey: string, now = Date.now()): CachedStreamResponse | null {
   const entry = streamStore.get(cacheKey);
-  if (!entry) return null;
-
-  if (now - entry.createdAtMs > cacheTtlMs()) {
-    streamStore.delete(cacheKey);
+  if (!entry) {
+    lookupMisses += 1;
     return null;
   }
 
+  if (now - entry.createdAtMs > cacheTtlMs()) {
+    streamStore.delete(cacheKey);
+    lookupMisses += 1;
+    return null;
+  }
+
+  lookupHits += 1;
   entry.hitCount += 1;
   entry.lastHitAtMs = now;
   streamStore.delete(cacheKey);
   streamStore.set(cacheKey, entry);
 
   return {
-    frames: entry.frames,
+    sse: entry.sse,
     platform: entry.platform,
     modelId: entry.modelId,
     keyId: entry.keyId,
@@ -621,15 +657,18 @@ export function getCachedStreamResponse(cacheKey: string, now = Date.now()): Cac
 /**
  * Store a completed SSE frame sequence for replay. The frames are the verbatim
  * `data: {...}\n\n` lines (including the final `[DONE]`) the client received,
- * so a hit can reproduce the stream byte-for-byte. Best-effort like the JSON
- * store.
+ * concatenated, so a hit reproduces the stream byte-for-byte. Best-effort like
+ * the JSON store: an empty or oversize sequence is silently skipped, and the
+ * entry shares the JSON store's entry cap.
  */
 export function storeCachedStreamResponse(cacheKey: string, input: StoreStreamInput, now = Date.now()): void {
   if (!Array.isArray(input.frames) || input.frames.length === 0) return;
+  const sse = input.frames.join('');
+  if (sse.length === 0 || Buffer.byteLength(sse) > STREAM_CACHE_MAX_BYTES) return;
 
   streamStore.delete(cacheKey);
   streamStore.set(cacheKey, {
-    frames: input.frames,
+    sse,
     platform: input.platform,
     modelId: input.modelId,
     keyId: input.keyId,
@@ -640,12 +679,18 @@ export function storeCachedStreamResponse(cacheKey: string, input: StoreStreamIn
     lastHitAtMs: null,
   });
 
-  evictToCap(streamStore);
+  enforceCombinedCap();
 }
 
 // ── Stats / admin ──
 
 export interface CacheStats {
+  /**
+   * Entries held across BOTH stores (JSON completions + streaming replays),
+   * which is also what the shared RESPONSE_CACHE_MAX_ENTRIES cap bounds. One
+   * prompt asked both streaming and non-streaming therefore counts twice —
+   * they are two independent replayable artifacts, and two slots of the cap.
+   */
   entries: number;
   /** Hits accumulated by the entries currently held, restored from SQLite. */
   totalHits: number;
