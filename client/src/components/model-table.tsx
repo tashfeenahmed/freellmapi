@@ -11,6 +11,7 @@ import {
   formatContext,
   groupMaxContext,
   groupQuotaBadge,
+  isGroupDepleted,
   memberEndpointTitle,
   memberProviderLabel,
   providerLabel,
@@ -390,6 +391,9 @@ export function SortableGroupRow({ group, rank, onToggleGroup, allRows, rateUsag
   const { t } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `grp:${group.key}` })
   const anyEnabled = group.members.some(m => m.enabled)
+  // A fully exhausted group grays out (#1015) — but an all-members-disabled
+  // row keeps its stronger dim, so the two states never fight over opacity.
+  const depleted = anyEnabled && rateUsage !== undefined && isGroupDepleted(group.members, rateUsage)
   const navigate = useNavigate()
   const detailId = encodeURIComponent(group.members[0].canonicalId ?? group.members[0].modelId)
   const handle = (
@@ -408,7 +412,7 @@ export function SortableGroupRow({ group, rank, onToggleGroup, allRows, rateUsag
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={() => navigate(`/models/chat/${detailId}`)}
-      className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? '' : 'opacity-50'}`}
+      className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? (depleted ? 'opacity-60' : '') : 'opacity-50'}`}
     >
       <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} rateUsage={rateUsage} />
     </tr>
