@@ -506,13 +506,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (repairFailed) {
       return (
         <Centered>
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+          <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
             {t('auth.desktopSessionFailed')}
           </div>
         </Centered>
       )
     }
-    return <Centered><p className="text-sm text-muted-foreground text-center">{t('auth.loading')}</p></Centered>
+    return <Centered><p className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-3.5 animate-spin" aria-hidden />{t('auth.loading')}</p></Centered>
   }
   if (data.needsSetup) return <AuthForm mode="setup" onAuthed={onAuthed} />
   if (!data.authenticated) return <AuthForm mode="login" onAuthed={onAuthed} />

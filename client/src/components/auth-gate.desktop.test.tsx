@@ -116,6 +116,21 @@ describe('AuthGate inside the desktop shell', () => {
     expect(container.querySelector('[data-testid="app"]')).toBeNull()
     expect(container.textContent).toContain('Quit FreeLLMAPI and open it again')
   })
+
+  // The recovery message is the whole screen: a screen reader that has already
+  // announced "loading" must be told the wait ended in a failure.
+  it('announces the recovery message as an alert', async () => {
+    const w = window as DesktopWindow
+    w.__FREEAPI_DESKTOP__ = true
+    w.__FREEAPI_SESSION__ = vi.fn(async () => 'still-rejected')
+
+    mount()
+    await flush()
+
+    const alert = container.querySelector('[role="alert"]')
+    expect(alert).not.toBeNull()
+    expect(alert?.textContent?.trim()).not.toBe('')
+  })
 })
 
 describe('AuthGate in a browser', () => {
@@ -125,5 +140,43 @@ describe('AuthGate in a browser', () => {
 
     expect(passwordField()).not.toBeNull()
     expect(container.querySelector('[data-testid="app"]')).toBeNull()
+  })
+
+  // Assertions are on the wiring, not the wording: the copy comes from t() and
+  // is free to change, but a validation error nobody's input points at is
+  // silent to a screen reader.
+  it('ties each validation error to the field it describes', async () => {
+    mount()
+    await flush()
+
+    const form = container.querySelector('form')!
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+
+    for (const id of ['auth-email', 'auth-password']) {
+      const input = container.querySelector<HTMLInputElement>(`#${id}`)!
+      const describedBy = input.getAttribute('aria-describedby')
+      expect(describedBy).not.toBeNull()
+      expect(input.getAttribute('aria-invalid')).toBe('true')
+      const error = container.querySelector(`#${describedBy}`)!
+      expect(error).not.toBeNull()
+      expect(error.getAttribute('role')).toBe('alert')
+      expect(error.textContent?.trim()).not.toBe('')
+    }
+  })
+
+  it('gives every field a label pointing at it', async () => {
+    mount()
+    await flush()
+
+    const inputs = [...container.querySelectorAll('input')]
+    expect(inputs.length).toBeGreaterThan(0)
+    for (const input of inputs) {
+      expect(input.id).not.toBe('')
+      const label = container.querySelector(`label[for="${input.id}"]`)
+      expect(label, `no label for #${input.id}`).not.toBeNull()
+      expect(label?.textContent?.trim()).not.toBe('')
+    }
   })
 })
