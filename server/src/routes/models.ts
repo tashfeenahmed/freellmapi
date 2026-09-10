@@ -131,6 +131,14 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     const disablesModel = modelPatch.enabled === false;
 
     if (modelKeys.length > 0) {
+      // The row as it stands BEFORE the update below. For a catalog model this
+      // is the catalog-applied value (stored overrides re-apply to rows only
+      // after each sync), i.e. the baseline an override that returns to the
+      // catalog default is recognised against (#1178).
+      const preUpdateRow = isCatalogManagedModel(row)
+        ? db.prepare('SELECT * FROM models WHERE id = ?').get(id) as Record<string, unknown> | undefined
+        : undefined;
+
       const assignments: string[] = [];
       const values: unknown[] = [];
       for (const key of modelKeys) {
@@ -151,7 +159,7 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
             overridePatch[key] = modelPatch[key] as never;
           }
         }
-        upsertModelOverrides(db, row.platform, row.model_id, overridePatch);
+        upsertModelOverrides(db, row.platform, row.model_id, overridePatch, { baselineRow: preUpdateRow });
       }
 
       if (disablesModel) {
