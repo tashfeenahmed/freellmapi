@@ -258,7 +258,15 @@ export async function runInboundChat(
         let text = contentToString(message?.content ?? '');
         const reasoning = message?.reasoning_content ?? '';
         let toolCalls = message?.tool_calls ?? [];
-        if (!text && !reasoning && toolCalls.length === 0) {
+        // Reasoning does NOT count as usable output (#1184): to the agent
+        // clients that consume this surface a thinking trace with no text and
+        // no tool calls is an empty assistant message. Same failover class as
+        // a fully empty completion — the shared loop treats the two
+        // identically (retryable, streak-bounded skipBench exemption,
+        // recordUpstreamSuccess never fires), and the OpenAI surface already
+        // ignores `reasoning` in this check (#191); this closes the same gap
+        // on the Ollama/Gemini surfaces.
+        if (!text && toolCalls.length === 0) {
           throw Object.assign(
             new Error(`empty completion from ${route.displayName}`),
             result.choices?.[0]?.finish_reason === 'length' ? { skipBench: true } : {},
