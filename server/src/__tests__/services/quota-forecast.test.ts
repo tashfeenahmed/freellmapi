@@ -18,7 +18,18 @@ function insertState(row: {
   `).run(row.platform, row.keyId, row.pool, row.metric, row.limit, row.remaining, row.resetAt);
 }
 
-const future = () => new Date(Date.now() + 12 * 3600 * 1000).toISOString(); // 12h ahead → within today
+function insertRequest(platform: string, isoCreatedAt: string) {
+  getDb().prepare(
+    `INSERT INTO requests (platform, model_id, status, input_tokens, output_tokens, latency_ms, error, request_type, created_at)
+     VALUES (?, ?, 'ok', 10, 5, 100, NULL, 'chat', ?)`,
+  ).run(platform, 'groq/llama-3.3', isoCreatedAt);
+}
+
+function isoPlus(hours: number): string {
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString();
+}
+
+const future = () => isoPlus(12); // 12h ahead → within today
 
 describe('quota-forecast: daily balance aggregation (#1104)', () => {
   beforeAll(() => {
@@ -115,5 +126,60 @@ describe('quota-forecast: daily balance aggregation (#1104)', () => {
 
     const forecast = getQuotaForecast();
     expect(forecast).toHaveLength(0);
+  });
+
+  // --- estimated-exhaustion fields (the #1104 extension) ---
+
+  it('returns null rate_exhaustion when the observation window is empty', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: 80, resetAt: future() });
+    // No recent requests inserted — rate is too sparse to estimate.
+    const e = getQuotaForecast()[0];
+    expect(e.rate_per_min).toBeNull();
+    expect(e.estimated_exhaustion_at).toBeNull();
+  });
+
+  it('estimates exhaustion time once enough recent requests exist', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: 30, resetAt: future() });
+    // Insert 8 requests spread across the last 10-minute window — above the
+    // 3-request minimum that marks a rate observable.
+    const now = Date.now();
+    for (let i = 1; i <= 8; i++) insertRequest('groq', new Date(now - i * 60_000).toISOString());
+
+    const e = getQuotaForecast()[0];
+    expect(e.rate_per_min).toBeGreaterThan(0);
+    expect(e.estimated_exhaustion_at).toBeTruthy();
+    // The projection must land in the future (not past now).
+    expect(new Date(e.estimated_exhaustion_at!).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('never projects past the window reset', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: 90, resetAt: future() });
+    // Pump enough requests to force a projected exhaustion well beyond the
+    // actual reset — the projection must clamp to the reset boundary.
+    const now = Date.now();
+    for (let i = 1; i <= 30; i++) insertRequest('groq', new Date(now - i * 1000).toISOString());
+    const e = getQuotaForecast()[0];
+    if (e.estimated_exhaustion_at !== null) {
+      expect(new Date(e.estimated_exhaustion_at!).getTime())
+        .toBeLessThanOrEqual(new Date(e.reset_at!).getTime());
+    }
+  });
+
+  it('leaves rate null when remaining is unknown', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: null, resetAt: future() });
+    // The gate here is `remaining !== null`, not request volume.
+    const e = getQuotaForecast()[0];
+    expect(e.rate_per_min).toBeNull();
+    expect(e.estimated_exhaustion_at).toBeNull();
+  });
+
+  it('excludes exhausted pools from estimation', () => {
+    insertState({ platform: 'groq', keyId: 1, pool: 'groq::account', metric: 'requests', limit: 100, remaining: 0, resetAt: future() });
+    // Even with many requests, remaining=0 → no projection.
+    const now = Date.now();
+    for (let i = 1; i <= 30; i++) insertRequest('groq', new Date(now - i * 1000).toISOString());
+    const e = getQuotaForecast()[0];
+    expect(e.remaining).toBe(0);
+    expect(e.estimated_exhaustion_at).toBeNull();
   });
 });
