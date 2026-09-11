@@ -758,3 +758,86 @@ describe('runFallbackLoop: client disconnect + attempt log', () => {
     expect(attemptLog[0].errorClass).toBe('rate_limited');
   });
 });
+
+// The diagnostics line used to live in each surface's onRoutingExhausted hook,
+// and only routes/proxy.ts ever implemented it — so an opaque routing_error on
+// /v1/messages, /v1/responses or an inbound wire recorded nothing about WHY the
+// pool was empty. It belongs to the loop: these tests pin it there, for every
+// surface, including one that supplies no identity at all.
+describe('runFallbackLoop: routing-exhaustion diagnostics belong to the loop', () => {
+  const routeError = (diagnostics: string[]) =>
+    Object.assign(new Error('all candidates exhausted'), { status: 429, diagnostics });
+
+  const warnedLine = (warn: ReturnType<typeof vi.spyOn>): string | undefined =>
+    warn.mock.calls.map(c => String(c[0])).find(l => l.includes('routing exhausted'));
+
+  it('logs the router per-candidate disposition when no upstream was tried', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'anthropic messages', requestId: 'abcdef12-3456-7890', requestedModel: 'claude-x' },
+        route: () => { throw routeError(['glm-4.7 @zai: cooldown 42s', 'llama @groq: rpd 0 left']); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('anthropic messages');
+      expect(line).toContain('req=abcdef');           // hyphens stripped, 6 chars
+      expect(line).toContain('requested=claude-x');
+      expect(line).toContain('candidates=2');
+      expect(line).toContain('glm-4.7 @zai: cooldown 42s');
+      expect(line).toContain('llama @groq: rpd 0 left');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('still fires for a surface that supplies no logIdentity', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        route: () => { throw routeError(['solo @fake: no usable key']); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('unidentified surface');
+      expect(line).toContain('candidates=1');
+      expect(line).toContain('solo @fake: no usable key');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('handles a RouteError carrying no diagnostics at all', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'inbound chat' },
+        route: () => { throw Object.assign(new Error('nothing routable'), { status: 429 }); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('inbound chat');
+      expect(line).toContain('candidates=0');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('stays silent when attempts already ran — the attempt trail explains those', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      let call = 0;
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'chat completions' },
+        route: () => {
+          if (call++ === 0) return fakeRoute();
+          throw routeError(['everything @fake: cooldown']);
+        },
+        dispatch: async () => { throw Object.assign(new Error('Too Many Requests'), { status: 429 }); },
+      }));
+      expect(warnedLine(warn)).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

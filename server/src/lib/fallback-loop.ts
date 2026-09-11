@@ -887,6 +887,26 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
   };
 }
 
+/** Log the router's per-candidate disposition for a zero-attempt exhaustion.
+ *  Lives in the loop, not the surfaces: routing gave up before any upstream was
+ *  tried, so nothing else records WHY the pool was empty, and an opaque
+ *  routing_error is indistinguishable from a genuinely dry pool (issue _1).
+ *  Every surface used to be responsible for logging this itself and only
+ *  routes/proxy.ts ever did, so /v1/messages, /v1/responses and the inbound
+ *  wires logged nothing. The loop owns the format; surfaces only name
+ *  themselves via FallbackHooks.logIdentity. */
+function logRoutingExhaustion(routeErr: any, identity?: FallbackHooks['logIdentity']): void {
+  const disposition: string[] = Array.isArray(routeErr?.diagnostics) ? routeErr.diagnostics : [];
+  const surface = identity?.surface ?? 'unidentified surface';
+  const req = identity?.requestId ? ` req=${identity.requestId.replace(/-/g, '').slice(0, 6)}` : '';
+  const requested = identity?.requestedModel ? ` requested=${identity.requestedModel}` : '';
+  console.warn(
+    `[FallbackLoop] ${surface} routing exhausted (no upstream tried)${req}${requested} ` +
+    `candidates=${disposition.length}` +
+    (disposition.length ? `:\n  ${disposition.join('\n  ')}` : ''),
+  );
+}
+
 // What a surface's dispatch() returns to signal the response is finished and the
 // loop must stop:
 //   'done'      — the attempt succeeded and the full response was sent.
@@ -925,6 +945,11 @@ export interface FallbackHooks {
   // is the same array used for exhaustion bodies), so the surface can stamp
   // X-Fallback-Trail on successful responses too.
   attemptLog?: AttemptRecord[];
+  // Names this surface in the shared routing-exhaustion diagnostics line the
+  // loop logs when route() gave up before any upstream was tried (see
+  // logRoutingExhaustion). Absent = the line still fires, without identifying
+  // the surface or the request.
+  logIdentity?: { surface: string; requestId?: string; requestedModel?: string };
   // Returns true once the client has hung up. Checked before STARTING each
   // retry: a chain nobody is waiting for must not keep burning provider
   // quota. Surfaces additionally thread a client-disconnect AbortSignal into
@@ -1090,6 +1115,10 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       const exhaustion = lastError
         ? exhaustedRetryError(lastError, undefined, { attempts })
         : routingExhaustionBody(routeErr);
+      // Zero attempts ran: log the router's per-candidate disposition, the only
+      // record of why the pool was empty. With prior attempts the trail in the
+      // exhaustion body already explains the failure.
+      if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }
