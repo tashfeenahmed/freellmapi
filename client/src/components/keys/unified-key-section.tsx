@@ -86,6 +86,27 @@ export function UnifiedKeySection() {
         <span className="text-muted-foreground">{t('keys.endpointEmbeddings')}</span>
         <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">({t('keys.endpointEmbeddingsHint')})</span></code>
       </div>
+
+      <details className="group mt-4 rounded-xl border bg-muted/40 p-3">
+        <summary className="cursor-pointer select-none text-xs font-medium">{t('keys.quickStart')}</summary>
+        <p className="mt-2 text-xs text-muted-foreground">{t('keys.quickStartDesc')}</p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">{t('keys.exampleAuto')}</div>
+            <pre className="overflow-x-auto rounded-lg bg-background p-3 font-mono text-[11px] leading-relaxed"><code>{`curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer $YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</code></pre>
+          </div>
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">{t('keys.examplePinned')}</div>
+            <pre className="overflow-x-auto rounded-lg bg-background p-3 font-mono text-[11px] leading-relaxed"><code>{`curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer $YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"auto:gemini-flash","messages":[{"role":"user","content":"Hello"}]}'`}</code></pre>
+          </div>
+        </div>
+      </details>
     </section>
   )
 }
