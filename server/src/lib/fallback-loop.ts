@@ -29,6 +29,7 @@ import {
   getModelForbiddenCooldownMs,
   learnLimitFromError,
   type CooldownDecision,
+  type CooldownSource,
 } from '../services/ratelimit.js';
 import {
   isRetryableError,
@@ -40,6 +41,7 @@ import {
   isPaymentRequiredError,
   isModelNotFoundError,
   isModelAccessForbiddenError,
+  isAccountSuspendedError,
   isProviderBadRequestError,
   isProviderDegradedError,
   isProviderLevelError,
@@ -49,7 +51,7 @@ import {
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { checkKeyHealth, markKeyHealthyFromRequest } from '../services/health.js';
 import { noteModelRetirementSignal } from '../services/model-retirement.js';
-import { getSetting } from '../db/index.js';
+import { getDb, getSetting } from '../db/index.js';
 import { newBreaker, recordBreakerFailure } from './guardrails.js';
 import { getRequestTrace, newRequestTrace, runWithRequestTrace, type AttemptOutcome, type AttemptTraceRecord, type RequestTrace } from './attempt-trace.js';
 import { logRequest, persistRequestAttempts } from './request-log.js';
@@ -110,6 +112,30 @@ function noteModelFailure(route: RouteResult, now: number): void {
  *  window so a recovered model is not benched for a stale streak. */
 function clearModelFailure(route: RouteResult): void {
   modelFailureTimestamps.delete(route.modelDbId);
+}
+
+/** Bench one key on every enabled model of its platform it can route to (the
+ *  route's own model is benched by the caller). For KEY-level verdicts only —
+ *  an account suspension — never for a model-level one. Never throws: an
+ *  unreadable catalog leaves the narrower per-route bench in place.
+ */
+function benchKeyAcrossPlatform(route: RouteResult, durationMs: number, source: CooldownSource): void {
+  let modelIds: string[] = [];
+  try {
+    modelIds = (getDb().prepare(
+      'SELECT model_id FROM models WHERE platform = ? AND enabled = 1 AND (key_id IS NULL OR key_id = ?)',
+    ).all(route.platform, route.keyId) as { model_id: string }[]).map(r => r.model_id);
+  } catch (dbErr: any) {
+    console.warn(`[FallbackLoop] could not list ${route.platform} models to bench key ${route.keyId}: ${dbErr?.message ?? dbErr}`);
+    return;
+  }
+  let benched = 0;
+  for (const modelId of modelIds) {
+    if (modelId === route.modelId) continue;
+    setCooldown(route.platform, modelId, route.keyId, durationMs, source);
+    benched++;
+  }
+  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} reports the account suspended; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
 }
 
 // ── Wall-clock retry budget ──────────────────────────────────────────────────
@@ -204,6 +230,10 @@ export function cooldownForError(route: RouteResult, err: any): number {
  */
 export function cooldownDecisionForError(route: RouteResult, err: any): CooldownDecision {
   if (isPaymentRequiredError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
+  // Before the model-forbidden check: a suspended account is a 403 too, but
+  // it is the KEY that is out, for as long as an empty balance would be — and
+  // under the same operator ceiling (#952).
+  if (isAccountSuspendedError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
   if (isModelAccessForbiddenError(err)) return { durationMs: getModelForbiddenCooldownMs(), source: 'tier' };
   if (isDailyQuotaExhaustedError(err)) {
     return { durationMs: err?.retryAfterMs ?? msUntilNextUtcMidnight(), source: 'authoritative' };
@@ -332,6 +362,19 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
+  // A suspended ACCOUNT fails every model behind the key identically. The
+  // per-route cooldown above benches only the model that happened to be
+  // tried, so the next request picks the platform's next model and pays the
+  // same round trip again — on a platform with a large catalog that is the
+  // whole failover budget, every request, until each model has tripped
+  // separately. Bench the key across the platform's catalog in one go, and
+  // rule the platform out for the rest of this request: a sibling key would
+  // be a different account, but with the budget already spent on this one
+  // the next PROVIDER is the better hop.
+  if (isAccountSuspendedError(err)) {
+    state.skipPlatforms.add(route.platform);
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source);
+  }
   // Model-level failure benching: a model failing across keys (or repeatedly on
   // one key) must sink out of routing instead of being re-picked every request.
   noteModelFailure(route, now);

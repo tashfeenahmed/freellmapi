@@ -508,6 +508,24 @@ export function isModelNotFoundError(err: any): boolean {
     || msg.includes('410') || msg.includes('gone');
 }
 
+// A 403 that suspends the ACCOUNT, not one model: NavyAI answers every model
+// behind a benched free key with "The Free plan is temporarily disabled due to
+// abuse. You can purchase a plan ...". Every model of the platform fails the
+// same way, so classifying it as model-forbidden benched ONE model per attempt:
+// with 93 catalog rows on that platform, each request burned its whole failover
+// budget re-discovering the same dead account. Not key-auth either: the
+// credential itself is valid, the plan behind it is not, and validateKey's
+// /models probe still passes, so the health checker never demotes the key.
+// Status-gated to 403 (or a status-less message that names one) so provider
+// wording alone can never condemn a healthy key.
+export function isAccountSuspendedError(err: any): boolean {
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  const msg = (err?.message ?? '').toLowerCase();
+  if (status !== 403 && !(status === 0 && msg.includes('403'))) return false;
+  return /\b(plan|account|subscription) (is|has been|was) (temporarily )?(disabled|suspended|banned|deactivated)\b/.test(msg)
+    || msg.includes('due to abuse');
+}
+
 // A 403 Forbidden returned for a specific model behind an otherwise-valid key.
 // Drives the same whole-model skip as a 404: every key on this platform's tier
 // would be forbidden the same model, so rule it out for the rest of the request
