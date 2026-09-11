@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, CircleAlert, Copy, ExternalLink, KeyRound, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, Zap } from 'lucide-react'
+import { ChevronDown, CircleAlert, Copy, ExternalLink, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, Zap } from 'lucide-react'
 import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -35,6 +35,8 @@ import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
 import { CopyKeyDialog } from './copy-key-dialog'
+import { EditKeyDialog } from './edit-key-dialog'
+import { EditModelsDialog } from './edit-models-dialog'
 import { ModelScopeDialog } from './model-scope-dialog'
 
 type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
@@ -50,7 +52,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const queryClient = useQueryClient()
 
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
-  const [editingLabel, setEditingLabel] = useState('')
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
   // Explicit user open/closed overrides per provider group; absent = default.
   const [groupOverrides, setGroupOverrides] = useState<Map<string, boolean>>(new Map())
@@ -68,10 +69,10 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const [copyKey, setCopyKey] = useState<{ id: number; maskedKey: string } | null>(null)
   // Key whose model scope is being edited (#657).
   const [scopeKeyId, setScopeKeyId] = useState<number | null>(null)
+  // Re-open the post-add model picker against the current catalog (#657).
+  const [modelEditorKeyId, setModelEditorKeyId] = useState<number | null>(null)
   // #787: keys selected for bulk enable/disable/delete within a group.
   const [selectedKeyIds, setSelectedKeyIds] = useState<Set<number>>(new Set())
-  const editInputRef = useRef<HTMLInputElement>(null)
-
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
     queryFn: () => apiFetch('/api/keys'),
@@ -219,19 +220,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     },
   })
 
-  const updateKey = useMutation({
-    mutationFn: ({ id, label }: { id: number; label: string }) =>
-      apiFetch(`/api/keys/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ label }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['keys'] })
-      setEditingKeyId(null)
-      setEditingLabel('')
-    },
-  })
-
   const toggleBypass = useMutation({
     mutationFn: (platform: string) => {
       const next = bypassPlatforms.includes(platform)
@@ -244,18 +232,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
 
   function startEditing(key: ApiKey) {
     setEditingKeyId(key.id)
-    setEditingLabel(key.label)
-  }
-
-  function cancelEditing() {
-    setEditingKeyId(null)
-    setEditingLabel('')
-  }
-
-  function saveEditing(id: number) {
-    if (editingLabel !== undefined) {
-      updateKey.mutate({ id, label: editingLabel })
-    }
   }
 
   function toggleExpandedKey(id: number) {
@@ -266,12 +242,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       return next
     })
   }
-
-  useEffect(() => {
-    if (editingKeyId !== null && editInputRef.current) {
-      editInputRef.current.focus()
-    }
-  }, [editingKeyId])
 
   const healthKeyMap = new Map<number, { status: string; lastCheckedAt: string | null; lastHealthError: string | null }>()
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
@@ -506,7 +476,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                       const health = healthKeyMap.get(k.id)
                       const lastChecked = health?.lastCheckedAt ?? k.lastCheckedAt
                       const lastHealthError = health?.lastHealthError ?? k.lastHealthError
-                      const isEditing = editingKeyId === k.id
                       const customModels = k.models ?? []
                       const hasCustomModels = customModels.length > 0
                       const isExpanded = expandedKeyIds.has(k.id)
@@ -563,39 +532,20 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               </Button>
                             )}
                             <code className={`text-xs font-mono flex-shrink-0 ${k.enabled ? '' : 'opacity-50'}`}>{k.maskedKey}</code>
-                            {isEditing ? (
-                              <Input
-                                ref={editInputRef}
-                                value={editingLabel}
-                                onChange={e => setEditingLabel(e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') saveEditing(k.id)
-                                  if (e.key === 'Escape') cancelEditing()
-                                }}
-                                onBlur={() => saveEditing(k.id)}
-                                className="h-6 w-[160px] text-xs"
-                                disabled={updateKey.isPending}
-                              />
-                            ) : (
-                              <>
-                                {/* The label is the edit affordance itself (#705): the pencil
-                                    only appears on hover, so clicking the name is the move
-                                    everyone tries first. An unlabelled key still needs
-                                    somewhere to click, hence the muted prompt. */}
-                                <button
-                                  type="button"
-                                  onClick={() => startEditing(k)}
-                                  title={t('keys.editLabel')}
-                                  className={`rounded text-xs hover:text-foreground hover:underline underline-offset-2 ${k.label ? 'text-muted-foreground' : 'text-muted-foreground/50'} ${k.enabled ? '' : 'opacity-50'}`}
-                                >
-                                  {k.label || t('keys.editLabel')}
-                                </button>
-                                {k.baseUrl && (
-                                  <code className={`text-[11px] text-muted-foreground font-mono truncate max-w-[260px] ${k.enabled ? '' : 'opacity-50'}`} title={k.baseUrl}>
-                                    {k.baseUrl}
-                                  </code>
-                                )}
-                              </>
+                            {/* Clicking the label is still the edit affordance (#705),
+                                but the dialog also lets a credential be replaced in place. */}
+                            <button
+                              type="button"
+                              onClick={() => startEditing(k)}
+                              title={t('keys.editKey')}
+                              className={`max-w-[220px] truncate rounded text-xs hover:text-foreground hover:underline underline-offset-2 ${k.label ? 'text-muted-foreground' : 'text-muted-foreground/50'} ${k.enabled ? '' : 'opacity-50'}`}
+                            >
+                              {k.label || t('keys.editKey')}
+                            </button>
+                            {k.baseUrl && (
+                              <code className={`text-[11px] text-muted-foreground font-mono truncate max-w-[260px] ${k.enabled ? '' : 'opacity-50'}`} title={k.baseUrl}>
+                                {k.baseUrl}
+                              </code>
                             )}
                             <span className={`text-xs text-muted-foreground ${k.enabled ? '' : 'opacity-50'}`}>{statusLabelKey[status] ? t(statusLabelKey[status]) : status}</span>
                             {/* Only a SCOPED key shows anything (#657); an unscoped one stays as it always was. */}
@@ -615,16 +565,27 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                               </span>
                             )}
                             <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-                              {!isEditing && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => startEditing(k)}
-                                  aria-label={t('keys.editLabel')}
-                                  title={t('keys.editLabel')}
-                                >
-                                  <Pencil className="size-3" />
-                                </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => startEditing(k)}
+                                aria-label={t('keys.editKey')}
+                                title={t('keys.editKey')}
+                              >
+                                <Pencil className="size-3" />
+                              </Button>
+                              {!k.keyless && (
+                                <Tooltip text={t('keys.editModels')}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => setModelEditorKeyId(k.id)}
+                                    aria-label={t('keys.editModels')}
+                                    title={t('keys.editModels')}
+                                  >
+                                    <Layers className="size-3" />
+                                  </Button>
+                                </Tooltip>
                               )}
                               {!k.keyless && (
                                 <Tooltip text={t('keys.copyFullKey')}>
@@ -795,6 +756,25 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
           <ModelScopeDialog
             apiKey={scopeKey}
             onOpenChange={(open) => { if (!open) setScopeKeyId(null) }}
+          />
+        ) : null
+      })()}
+      {(() => {
+        const modelKey = modelEditorKeyId !== null ? keys.find(k => k.id === modelEditorKeyId) : undefined
+        return modelKey ? (
+          <EditModelsDialog
+            apiKey={modelKey}
+            onOpenChange={(open) => { if (!open) setModelEditorKeyId(null) }}
+          />
+        ) : null
+      })()}
+      {(() => {
+        // Resolved from the live query so a successful save closes on fresh data.
+        const editKey = editingKeyId !== null ? keys.find(k => k.id === editingKeyId) : undefined
+        return editKey ? (
+          <EditKeyDialog
+            apiKey={editKey}
+            onOpenChange={(open) => { if (!open) setEditingKeyId(null) }}
           />
         ) : null
       })()}
