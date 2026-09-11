@@ -32,6 +32,7 @@ import { geminiRouter } from './routes/gemini.js';
 import { ollamaRouter } from './routes/ollama.js';
 import { urlTokenRouter } from './routes/url-tokens.js';
 import { updateRouter } from './routes/update.js';
+import { tenantsRouter } from './routes/tenants.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createProxyRateLimiter, createAdminRateLimiter } from './middleware/rateLimit.js';
 
@@ -238,6 +239,9 @@ export function createApp(config?: Config) {
   // /api — the profile keys it mints authenticate only the /v1 inference
   // surface and are never valid here.
   app.use('/api/client-profiles', requireAuth, clientProfilesRouter);
+  // Multi-tenant API key management (#267). Dashboard-session gated;
+  // tenant keys authenticate only the /v1 inference surface.
+  app.use('/api/tenants', requireAuth, tenantsRouter);
   // Saved Playground transcripts (the chat sidebar). Dashboard-session gated
   // like every other admin route; the unified /v1 key does not open it.
   app.use('/api/conversations', requireAuth, conversationsRouter);
