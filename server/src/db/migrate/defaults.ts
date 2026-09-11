@@ -33,6 +33,7 @@ import * as quotaObservationLookup from '../migrations/20260901_000002_quota_obs
 import * as analyticsLatencyPercentileIndex from '../migrations/20260902_000001_analytics_latency_percentile_index.js';
 import * as mcpEnabledDefault from '../migrations/20260903_000001_mcp_enabled_default.js';
 import * as responseCache from '../migrations/20260903_000002_response_cache.js';
+import * as keyMonthlyBudget from '../migrations/20260904_000001_key_monthly_budget.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -78,6 +79,7 @@ export const REQUEST_CALLER_FILENAME = '20260901_000003_request_caller.ts';
 export const ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME = '20260902_000001_analytics_latency_percentile_index.ts';
 export const MCP_ENABLED_DEFAULT_FILENAME = '20260903_000001_mcp_enabled_default.ts';
 export const RESPONSE_CACHE_FILENAME = '20260903_000002_response_cache.ts';
+export const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -114,4 +116,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: ANALYTICS_LATENCY_PERCENTILE_INDEX_FILENAME, module: analyticsLatencyPercentileIndex },
   { filename: MCP_ENABLED_DEFAULT_FILENAME, module: mcpEnabledDefault },
   { filename: RESPONSE_CACHE_FILENAME, module: responseCache },
+  { filename: KEY_MONTHLY_BUDGET_FILENAME, module: keyMonthlyBudget },
 ];
