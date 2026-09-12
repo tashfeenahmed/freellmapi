@@ -47,6 +47,7 @@ import {
   isTimeoutErrorText,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
+import { parseProviderReportedSize } from './provider-size-parser.js';
 import { checkKeyHealth, markKeyHealthyFromRequest } from '../services/health.js';
 import { noteModelRetirementSignal } from '../services/model-retirement.js';
 import { getSetting } from '../db/index.js';
@@ -150,12 +151,20 @@ export function getFallbackTimeBudgetMs(): number {
 // "platform:modelId:keyId"; skipModels holds model_db_ids ruled out for the
 // rest of this request; skipPlatforms holds platforms ruled out wholesale
 // (#788) — every model and every key of them — for the rest of this request.
-// All three are request-scoped only: nothing here outlives the response, so a
-// provider that blipped once is a fresh candidate on the very next request.
+// observedTotalTokens is the provider-reported REQUESTED size parsed from the
+// first 413 / context-length body of this request, used to inflate the
+// routing estimate on the next attempt so models whose tpm_limit /
+// context_window can't fit it are skipped before they fire (#507). All four
+// are request-scoped only: nothing here outlives the response, so a provider
+// that blipped once is a fresh candidate on the very next request.
 export interface FallbackState {
   skipKeys: Set<string>;
   skipModels: Set<number>;
   skipPlatforms: Set<string>;
+  // Highest REQUESTED token count seen so far this request across all 413 /
+  // context-length rejections. Max wins (never decreases): a smaller later
+  // reading is the same request, not a smaller one.
+  observedTotalTokens?: number;
 }
 
 export function newFallbackState(): FallbackState {
@@ -318,6 +327,24 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // The trace object identifies the request, so one request's failover across
   // sibling keys counts as the single observation it is.
   noteModelRetirementSignal(route, err, getRequestTrace());
+  // Provider-reported request size (#507): if the just-failed attempt was a
+  // size-related rejection that names the request's real token count, latch it
+  // onto the request state. The route() closure on the next attempt picks it
+  // up and feeds it as the routing estimate, so the existing tpm_limit /
+  // context_window gates in router.ts skip low-ceiling models on retry
+  // instead of letting them fire and 413 again. Only fires on a size-class
+  // error — the parser is conservative and returns null for opaque bodies
+  // (every non-supported platform, the bare "Request Entity Too Large"
+  // Groq shape, and the github limit-only case), so behavior is unchanged
+  // when there's nothing to latch. Max wins so a smaller later reading of
+  // the same request can't drop the estimate.
+  if (isContextTooLargeError(err) || isProviderBadRequestError(err)) {
+    const reported = parseProviderReportedSize(route.platform, err?.message);
+    if (reported != null) {
+      const current = state.observedTotalTokens ?? 0;
+      if (reported > current) state.observedTotalTokens = reported;
+    }
+  }
   state.skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
   // #788: provider-level failures (5xx / timeout / transport / degraded) mean
   // the PROVIDER is sick, not this key — every key AND every model of that

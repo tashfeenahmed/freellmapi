@@ -1157,18 +1157,24 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     attemptLog,
     clientGone: () => clientGone,
     abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
-    route: () => routeRequest(
-      estimatedTotal,
-      state.skipKeys.size > 0 ? state.skipKeys : undefined,
-      preferredModel,
-      false,
-      false,
-      state.skipModels.size > 0 ? state.skipModels : undefined,
-      groupChain ?? resolvedChain?.chain,
-      false,
-      state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
-      outputReserve,
-    ),
+    route: () => {
+      // #507: see inbound-chat.ts — inflate the routing estimate from any
+      // provider-reported REQUESTED size latched onto state so the existing
+      // size gates in router.ts skip low-TPM / small-context models on retry.
+      const routingTotal = Math.max(estimatedTotal, state.observedTotalTokens ?? 0);
+      return routeRequest(
+        routingTotal,
+        state.skipKeys.size > 0 ? state.skipKeys : undefined,
+        preferredModel,
+        false,
+        false,
+        state.skipModels.size > 0 ? state.skipModels : undefined,
+        groupChain ?? resolvedChain?.chain,
+        false,
+        state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
+        outputReserve,
+      );
+    },
     dispatch: async (route, attempt, ctx) => {
       traceRouteEvent('Proxy', {
         event: attempt === 0 ? 'start' : 'next',

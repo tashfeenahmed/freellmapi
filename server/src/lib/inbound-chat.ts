@@ -234,18 +234,25 @@ export async function runInboundChat(
     state,
     attemptLog,
     clientGone: () => clientGone,
-    route: () => routeRequest(
-      estimatedTotal,
-      state.skipKeys.size ? state.skipKeys : undefined,
-      pin.preferredModel,
-      imageRequest,
-      wantsTools,
-      state.skipModels.size ? state.skipModels : undefined,
-      pin.strictChain,
-      input.responseFormat !== undefined,
-      state.skipPlatforms.size ? state.skipPlatforms : undefined,
-      outputReserve,
-    ),
+    route: () => {
+      // #507: after the first 413 / context-length rejection the parser
+      // latches the provider-reported REQUESTED size onto state. Inflate the
+      // routing estimate on the next attempt so low-tpm / small-window models
+      // are skipped by the existing gates in router.ts instead of re-firing.
+      const routingTotal = Math.max(estimatedTotal, state.observedTotalTokens ?? 0);
+      return routeRequest(
+        routingTotal,
+        state.skipKeys.size ? state.skipKeys : undefined,
+        pin.preferredModel,
+        imageRequest,
+        wantsTools,
+        state.skipModels.size ? state.skipModels : undefined,
+        pin.strictChain,
+        input.responseFormat !== undefined,
+        state.skipPlatforms.size ? state.skipPlatforms : undefined,
+        outputReserve,
+      );
+    },
     dispatch: async (route, attempt) => {
       if (!input.stream) {
         const result = await route.provider.chatCompletion(
