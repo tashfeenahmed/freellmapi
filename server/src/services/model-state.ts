@@ -20,6 +20,17 @@ export interface ModelOverridePatch {
 
 type StoredOverrides = Partial<ModelOverridePatch>;
 
+// Overrides are stored as one JSON blob per (platform, model_id). Alongside the
+// overridden fields, the blob records each field's PRE-OVERRIDE value under a
+// reserved key: what the catalog had applied when the user first touched the
+// field. That baseline is what makes an override undoable — a patch that sets
+// a field back to its baseline drops the field out of the blob again, so the
+// dashboard's "Local Override" badge tracks actual divergence from the catalog
+// (#1178) instead of every field a user has ever touched. Readers ignore the
+// key because it is not a field in OVERRIDE_COLUMNS, so blobs written before
+// #1178 (which carry no baselines) parse exactly as they always did.
+const CATALOG_BASELINE_KEY = 'catalogDefaults';
+
 const OVERRIDE_COLUMNS: Record<keyof ModelOverridePatch, string> = {
   displayName: 'display_name',
   intelligenceRank: 'intelligence_rank',
@@ -59,6 +70,34 @@ function cleanPatch(patch: ModelOverridePatch): StoredOverrides {
     }
   }
   return cleaned;
+}
+
+// The blob split into its two parts: the fields actually overridden, and the
+// pre-override values they are measured against.
+function parseOverridesBlob(raw: string | undefined): { overrides: StoredOverrides; baselines: StoredOverrides } {
+  const overrides = { ...parseOverrides(raw) };
+  const rawBaselines = (overrides as Record<string, unknown>)[CATALOG_BASELINE_KEY];
+  delete (overrides as Record<string, unknown>)[CATALOG_BASELINE_KEY];
+  const baselines: StoredOverrides = {};
+  if (rawBaselines && typeof rawBaselines === 'object') {
+    for (const key of Object.keys(rawBaselines as Record<string, unknown>) as Array<keyof ModelOverridePatch>) {
+      if (key in OVERRIDE_COLUMNS) baselines[key] = (rawBaselines as StoredOverrides)[key] as never;
+    }
+  }
+  return { overrides, baselines };
+}
+
+// A model row's current value for an overridable field, in the same value
+// space the PATCH body uses (booleans for the capability switches, null for
+// unset numbers). When a field is first overridden the row still holds the
+// catalog-applied value — stored overrides re-apply to rows only after each
+// catalog sync — which is exactly the baseline a returning field is measured
+// against.
+function modelRowValue(row: Record<string, unknown> | undefined, key: keyof ModelOverridePatch): unknown {
+  if (!row) return undefined;
+  const value = row[OVERRIDE_COLUMNS[key]];
+  if (key === 'supportsVision' || key === 'supportsTools' || key === 'enabled') return value === 1;
+  return value ?? null;
 }
 
 /**
@@ -213,19 +252,51 @@ export function upsertModelOverrides(
   platform: string,
   modelId: string,
   patch: ModelOverridePatch,
+  options: { baselineRow?: Record<string, unknown> } = {},
 ): StoredOverrides {
   const cleaned = cleanPatch(patch);
   if (Object.keys(cleaned).length === 0) return {};
   const existing = db
     .prepare('SELECT overrides_json FROM model_overrides WHERE platform = ? AND model_id = ?')
     .get(platform, modelId) as { overrides_json: string } | undefined;
-  const merged: StoredOverrides = { ...parseOverrides(existing?.overrides_json), ...cleaned };
+  const { overrides: stored, baselines } = parseOverridesBlob(existing?.overrides_json);
+
+  const merged: StoredOverrides = { ...stored };
+  const mergedBaselines: StoredOverrides = { ...baselines };
+  for (const key of Object.keys(cleaned) as Array<keyof ModelOverridePatch>) {
+    const next = cleaned[key] as never;
+    // Capture the pre-override value the first time this field is written
+    // under a baseline-aware caller. For fields already overridden by blobs
+    // written before #1178 the only recoverable baseline is the row's
+    // currently-applied value.
+    if (mergedBaselines[key] === undefined && options.baselineRow) {
+      const captured = modelRowValue(options.baselineRow, key);
+      if (captured !== undefined) mergedBaselines[key] = captured as never;
+    }
+    const baseline = mergedBaselines[key];
+    if (baseline !== undefined && next === baseline) {
+      // Back at the pre-override value: the override (and its baseline) drop
+      // out, so the field tracks the catalog again.
+      delete merged[key];
+      delete mergedBaselines[key];
+    } else {
+      merged[key] = next;
+    }
+  }
+
+  if (Object.keys(merged).length === 0) {
+    // Nothing left to pin: drop the row so has_overrides goes false and the
+    // dashboard's badge clears.
+    db.prepare('DELETE FROM model_overrides WHERE platform = ? AND model_id = ?').run(platform, modelId);
+    return {};
+  }
+  const blob = { ...merged, [CATALOG_BASELINE_KEY]: mergedBaselines };
   db.prepare(`
     INSERT INTO model_overrides (platform, model_id, overrides_json, updated_at)
     VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(platform, model_id)
     DO UPDATE SET overrides_json = excluded.overrides_json, updated_at = excluded.updated_at
-  `).run(platform, modelId, JSON.stringify(merged));
+  `).run(platform, modelId, JSON.stringify(blob));
   return merged;
 }
 
