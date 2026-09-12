@@ -18,6 +18,7 @@ if (arg) {
 // Lets the client adapt its chrome (drag region, traffic-light padding,
 // no Sign out) when running inside the desktop shell.
 contextBridge.exposeInMainWorld('__FREEAPI_DESKTOP__', true);
+contextBridge.exposeInMainWorld('__FREEAPI_PLATFORM__', process.platform);
 
 // The dashboard window signs in as the hidden machine account, whose password
 // is random and never shown, so it must never land on the login form. When the
@@ -39,15 +40,15 @@ contextBridge.exposeInMainWorld(
   versionArg ? versionArg.slice('--freeapi-version='.length) : null,
 );
 
-// `desktop` class on <html> activates the client's translucent backdrop
-// (html.desktop in index.css). CAREFUL: for an http:// load the preload
-// runs before the page's document is parsed — documentElement is null or
-// a placeholder that the parser replaces — so the early add is best-effort
-// (no-flash when it sticks) and MUST NOT throw, or the theme observer
-// below would never register. The client re-adds the class itself at
-// module load (App.tsx), so the effect never depends on the early add.
+// `desktop` class on <html> identifies the desktop shell. On macOS, `desktop-mac`
+// activates the translucent glass backdrop that pairs with native vibrancy;
+// on Windows and Linux, the solid theme background is preserved so contrast and
+// readability remain intact.
 function applyDesktopClass() {
   document.documentElement?.classList.add('desktop');
+  if (process.platform === 'darwin') {
+    document.documentElement?.classList.add('desktop-mac');
+  }
 }
 try {
   applyDesktopClass();
