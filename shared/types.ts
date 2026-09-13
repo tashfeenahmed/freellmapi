@@ -75,6 +75,9 @@ export type Platform =
   // Catalog-managed gateways: monthly shared credits vs daily free-model quota.
   | 'router9'
   | 'septor'
+  | 'clod'
+  | 'speechify'
+  | 'blaze'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'

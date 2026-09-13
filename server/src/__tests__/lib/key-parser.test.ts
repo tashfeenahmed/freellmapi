@@ -127,6 +127,12 @@ describe('key parser', () => {
     expect(result.skipped).toEqual(['PORT: value does not look like an API key']);
   });
 
+  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze']])('imports %s environment keys', (prefix, platform) => {
+    const result = parseKeysFromFile(`${prefix}_API_KEY=not-a-real-provider-key`, 'keys.env');
+    expect(result.keys).toHaveLength(1);
+    expect(result.keys[0].platform).toBe(platform);
+  });
+
   it('filters obvious non-key values', () => {
     expect(looksLikeApiKey('true')).toBe(false);
     expect(looksLikeApiKey('https://example.com')).toBe(false);

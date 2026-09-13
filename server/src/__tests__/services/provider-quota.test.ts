@@ -49,6 +49,11 @@ describe('provider-quota: pool inference', () => {
     expect(inferQuotaPoolKey('router9', 'another-model')).toBe('router9::monthly-credit');
     expect(inferQuotaPoolKey('septor', 'qwen3-coder-free')).toBe('septor::daily-free');
     expect(inferQuotaPoolKey('septor', 'minimax-m2.5-free')).toBe('septor::daily-free');
+    for (const model of ['first-model', 'another-model']) {
+      expect(inferQuotaPoolKey('clod', model)).toBe('clod::daily-free');
+      expect(inferQuotaPoolKey('blaze', model)).toBe('blaze::daily-free');
+      expect(inferQuotaPoolKey('speechify', model)).toBe('speechify::monthly-characters');
+    }
     expect(inferQuotaPoolKey('openrouter', 'meta-llama/llama-3.1-8b-instruct:free')).toBe('openrouter::free');
     expect(inferQuotaPoolKey('openrouter', 'openai/gpt-4o')).toBe('openrouter::account');
     // AnyAPI's 100K tokens/day is one account-wide budget, so every model on
@@ -200,6 +205,23 @@ describe('provider-quota: record + read round-trip', () => {
 });
 
 describe('provider-quota: parse from response headers (shared parseRetryAfterMs)', () => {
+  it('records Blaze token headers without fabricating a reset or per-model grant', () => {
+    const obs = parseQuotaObservationsFromResponse(new Response(null, { headers: {
+      'x-ratelimit-limit-tokens': '200000', 'x-ratelimit-remaining-tokens': '199499',
+    } }), { platform: 'blaze', modelId: 'test-model' });
+    expect(obs).toHaveLength(1);
+    expect(obs[0]).toMatchObject({ metric: 'tokens', limit: 200000, remaining: 199499, resetAt: null, quotaPoolKey: 'blaze::daily-free' });
+  });
+
+  it('records only CLōD\'s observed request window, not an invented daily token quota', () => {
+    const obs = parseQuotaObservationsFromResponse(new Response(null, { headers: {
+      'x-ratelimit-limit': '5', 'x-ratelimit-remaining': '4', 'x-ratelimit-reset': '1789230900',
+    } }), { platform: 'clod', modelId: 'test-model' });
+    expect(obs).toHaveLength(1);
+    expect(obs[0]).toMatchObject({ metric: 'requests', limit: 5, remaining: 4, quotaPoolKey: 'clod::daily-free' });
+    const speech = parseQuotaObservationsFromResponse(new Response(null), { platform: 'speechify' });
+    expect(speech.every(o => o.limit == null && o.remaining == null)).toBe(true);
+  });
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');

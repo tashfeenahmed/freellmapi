@@ -13,10 +13,11 @@ import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -610,6 +611,28 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'speechify': {
+      const fmt = p.format ?? 'mp3';
+      // Speechify exposes ogg, not OpenAI's opus name. Do not silently return
+      // a different codec for unsupported formats such as pcm or flac.
+      if (!['mp3', 'wav', 'ogg', 'aac'].includes(fmt)) {
+        throw new MediaError('Speechify supports mp3, wav, ogg and aac audio formats', 400);
+      }
+      const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const voice = !p.voice || standardVoices.has(p.voice.toLowerCase()) ? 'alec' : p.voice;
+      const r = await mediaFetch(`${SPEECHIFY_BASE_URL}/audio/speech`, 'speechify', 'audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, 'Speechify-Version': SPEECHIFY_VERSION },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice_id: voice, audio_format: fmt }),
+      });
+      const j = await r.json() as { audio_data?: unknown; audio_format?: unknown };
+      const b64 = j.audio_data;
+      if (typeof b64 !== 'string' || !b64 || b64.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b64)) {
+        throw new MediaError('Speechify returned missing or invalid base64 audio', 502);
+      }
+      if (j.audio_format !== fmt) throw new MediaError('Speechify returned a different audio format', 502);
+      return { audio: Buffer.from(b64, 'base64'), contentType: fmt === 'ogg' ? 'audio/ogg' : contentTypeFor(fmt) };
+    }
     case 'custom': {
       if (!credential.baseUrl) throw new MediaError('custom audio provider is missing base_url', 500);
       const fmt = p.format ?? 'mp3';

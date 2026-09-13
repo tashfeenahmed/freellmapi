@@ -13,6 +13,9 @@ import { ElectronHubProvider } from './electronhub.js';
 import { ExperientialProvider } from './experiential.js';
 import { Router9Provider } from './router9.js';
 import { SeptorProvider } from './septor.js';
+import { ClodProvider } from './clod.js';
+import { SpeechifyProvider } from './speechify.js';
+import { BlazeProvider } from './blaze.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -56,6 +59,9 @@ register(new ExperientialProvider());
 // the existing Premium-now / Free-after-30-days gate remains authoritative.
 register(new Router9Provider());
 register(new SeptorProvider());
+register(new ClodProvider());
+register(new SpeechifyProvider());
+register(new BlazeProvider());
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;
