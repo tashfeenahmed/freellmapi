@@ -139,11 +139,15 @@ describe('Model Provider Actions API', () => {
       const db = getDb();
       const modelId = `relay-model-${Date.now()}`;
       const endpoint = 'http://127.0.0.1:9099/v1';
+      const enc = encrypt('custom-test-key');
+      const keyId = Number(db.prepare("INSERT INTO api_keys(platform,label,base_url,encrypted_key,iv,auth_tag,status,enabled) VALUES ('custom','Test relay',?,?,?,?,'healthy',1)")
+        .run(endpoint, enc.encrypted, enc.iv, enc.authTag).lastInsertRowid);
 
       const res = await post(app, '/api/models', {
         platform: 'custom',
         modelId,
         endpointScope: endpoint,
+        keyId,
       });
 
       expect(res.status).toBe(201);

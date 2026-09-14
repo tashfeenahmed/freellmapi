@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
-import { hasProvider, resolveProvider } from '../providers/index.js';
+import { hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
   isCatalogManagedModel,
@@ -18,11 +18,8 @@ import { getActiveProfileId, ensureModelInProfiles } from '../services/profile-m
 import { endpointScopeForBaseUrl, endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { clearCustomModelTombstone, recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
 import { customModelSeed } from '../services/custom-model-seed.js';
-import { routableKeyIdsForModel } from '../services/router.js';
-import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
-import { customEndpointKeyIds } from '../services/custom-endpoint.js';
-import { decrypt } from '../lib/crypto.js';
-import { decryptProxyUrl } from '../lib/key-proxy.js';
+import { routePinnedModel } from '../services/router.js';
+import { logRequest } from '../lib/request-log.js';
 import { withKeyProxy } from '../lib/proxy.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { recordRequest, recordTokens } from '../services/ratelimit.js';
@@ -122,11 +119,18 @@ modelsRouter.post('/', (req: Request, res: Response) => {
   let endpointScope = '';
   const boundKeyId: number | null = data.keyId ?? null;
   if (data.platform === 'custom') {
-    if (data.endpointScope) {
-      endpointScope = endpointScopeForBaseUrl(data.endpointScope);
-    } else if (data.keyId != null) {
-      endpointScope = endpointScopeOfKey(db, data.keyId);
+    endpointScope = endpointScopeOfKey(db, boundKeyId);
+    if (!endpointScope) {
+      res.status(400).json({ error: { message: 'Select an existing custom endpoint key for this model' } });
+      return;
     }
+    if (data.endpointScope && endpointScopeForBaseUrl(data.endpointScope) !== endpointScope) {
+      res.status(400).json({ error: { message: 'The endpoint does not match the selected key' } });
+      return;
+    }
+  } else if (boundKeyId != null || data.endpointScope) {
+    res.status(400).json({ error: { message: 'Endpoint keys can only be bound to custom models' } });
+    return;
   }
 
   const existing = db.prepare(
@@ -358,121 +362,60 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
     return;
   }
 
-  // Per-model throttling: 5 seconds
-  const now = Date.now();
-  const lastTest = modelTestCooldowns.get(id);
-  if (lastTest && now - lastTest < MODEL_TEST_THROTTLE_MS) {
-    const waitSec = Math.ceil((MODEL_TEST_THROTTLE_MS - (now - lastTest)) / 1000);
-    res.status(429).json({
-      error: {
-        message: `Model test is throttled. Please wait ${waitSec}s before testing again.`,
-      },
-    });
-    return;
-  }
-  modelTestCooldowns.set(id, now);
-
-  const db = getDb();
-  const modelRow = db.prepare('SELECT id, platform, model_id, key_id FROM models WHERE id = ?').get(id) as {
-    id: number;
-    platform: string;
-    model_id: string;
-    key_id: number | null;
-  } | undefined;
-
+  const modelRow = fetchModelRow(id);
   if (!modelRow) {
     res.status(404).json({ error: { message: `Unknown model ${id}` } });
     return;
   }
 
-  // Find a routable or enabled key for this model
-  let keyRow: any = null;
-  const routableKeys = routableKeyIdsForModel(id);
-  if (routableKeys.length > 0) {
-    keyRow = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(routableKeys[0]);
-  } else if (modelRow.platform === 'custom') {
-    if (modelRow.key_id != null) {
-      const endpointKeyIds = customEndpointKeyIds(db, modelRow.key_id);
-      const candidateKeys = db.prepare("SELECT * FROM api_keys WHERE platform = 'custom' AND enabled = 1 ORDER BY id ASC").all() as any[];
-      keyRow = candidateKeys.find(k => endpointKeyIds.has(k.id) && scopeAllows(parseModelScope(k.model_scope_json), modelRow.model_id)) ?? null;
-    }
-  } else {
-    const candidateKeys = db.prepare('SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 ORDER BY id ASC').all(modelRow.platform) as any[];
-    keyRow = candidateKeys.find(k => scopeAllows(parseModelScope(k.model_scope_json), modelRow.model_id)) ?? null;
+  const now = Date.now();
+  for (const [modelId, testedAt] of modelTestCooldowns) {
+    if (now - testedAt >= MODEL_TEST_THROTTLE_MS) modelTestCooldowns.delete(modelId);
   }
-
-  if (!keyRow) {
-    res.json({
-      success: false,
-      modelId: modelRow.model_id,
-      latencyMs: 0,
-      error: 'No enabled API key available for this model',
-    });
+  const lastTest = modelTestCooldowns.get(id);
+  if (lastTest != null) {
+    const waitSec = Math.ceil((MODEL_TEST_THROTTLE_MS - (now - lastTest)) / 1000);
+    res.setHeader('Retry-After', String(waitSec));
+    res.status(429).json({ error: { message: `Model test is throttled. Please wait ${waitSec}s before testing again.` } });
     return;
   }
+  modelTestCooldowns.set(id, now);
 
-  let apiKey = '';
-  try {
-    apiKey = decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag);
-  } catch (err: any) {
-    res.json({
-      success: false,
-      modelId: modelRow.model_id,
-      latencyMs: 0,
-      error: `Failed to decrypt key: ${sanitizeProviderErrorMessage(err?.message)}`,
-    });
+  // Use the same key selection, quota gates and in-flight reservations as
+  // inference, pinned to this model so Test cannot silently try another one.
+  const inputEstimate = 16;
+  const outputLimit = 4;
+  const route = routePinnedModel(id, inputEstimate + outputLimit);
+  if (!route) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'No enabled API key is currently available for this model. Check model status, cooldowns and quotas.' });
     return;
   }
-
-  const provider = resolveProvider(modelRow.platform as Platform, keyRow.base_url);
-  if (!provider) {
-    res.json({
-      success: false,
-      modelId: modelRow.model_id,
-      latencyMs: 0,
-      error: `Provider "${modelRow.platform}" is not available`,
-    });
-    return;
-  }
-
-  const proxyUrl = decryptProxyUrl(keyRow);
   const startTime = Date.now();
-
   try {
-    const response = await withKeyProxy(proxyUrl, () =>
-      provider.chatCompletion(
-        apiKey,
-        [{ role: 'user', content: 'ping' }],
-        modelRow.model_id,
-        { max_tokens: 4, timeoutMs: 15_000 },
-      ),
-    );
+    const response = await withKeyProxy(route.proxyUrl, () => route.provider.chatCompletion(
+      route.apiKey, [{ role: 'user', content: 'ping' }], route.modelId,
+      { max_tokens: outputLimit, timeoutMs: 15_000 },
+    ));
     const latencyMs = Date.now() - startTime;
-
-    // Record successful test in rate-limit ledger
-    recordRequest(modelRow.platform, modelRow.model_id, keyRow.id);
-    const totalTokens = response?.usage?.total_tokens ?? (
-      (response?.usage?.prompt_tokens ?? 0) + (response?.usage?.completion_tokens ?? 0)
-    );
-    if (totalTokens > 0) {
-      recordTokens(modelRow.platform, modelRow.model_id, keyRow.id, totalTokens);
-    }
-
-    res.json({
-      success: true,
-      modelId: modelRow.model_id,
-      latencyMs,
-    });
-  } catch (err: any) {
+    const outputTokens = response.usage?.completion_tokens ?? Math.ceil((response.choices?.[0]?.message?.content?.length ?? 0) / 4);
+    const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
+    recordRequest(route.platform, route.modelId, route.keyId);
+    recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+    // The request-log transaction also settles the durable monthly ledger.
+    logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens,
+      latencyMs, null, null, route.modelId, null, 'model-test');
+    res.json({ success: true, modelId: route.modelId, latencyMs });
+  } catch (err: unknown) {
     const latencyMs = Date.now() - startTime;
-    const sanitizedError = sanitizeProviderErrorMessage(err?.message ?? err);
-    res.json({
-      success: false,
-      modelId: modelRow.model_id,
-      latencyMs,
-      error: sanitizedError,
-    });
+    const error = sanitizeProviderErrorMessage(err instanceof Error ? err.message : String(err));
+    logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0,
+      latencyMs, error, null, route.modelId, null, 'model-test');
+    res.json({ success: false, modelId: route.modelId, latencyMs, error });
+  } finally {
+    route.release?.();
   }
+
 });
 
 // List all models with availability info

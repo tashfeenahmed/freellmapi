@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Sparkles, Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Dialog, DialogClose, DialogPopup, DialogTitle } from '@/components/ui/dialog'
@@ -10,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { FieldError } from '@/components/ui/field-error'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import type { ApiKey } from '@freellmapi/shared/types'
 import { PLATFORMS, CUSTOM_GROUP } from '@/components/keys/shared'
 
 export interface AddModelDialogProps {
@@ -23,6 +25,10 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
   const queryClient = useQueryClient()
 
   const [platform, setPlatform] = useState<string>(initialPlatform ?? 'groq')
+  const [keyId, setKeyId] = useState('')
+  const { data: keys = [] } = useQuery<ApiKey[]>({ queryKey: ['keys'], queryFn: () => apiFetch('/api/keys'), enabled: open && platform === 'custom' })
+  const endpointKeys = keys.filter(key => key.platform === 'custom' && key.baseUrl)
+  const selectedKey = endpointKeys.find(key => String(key.id) === keyId)
   const [modelId, setModelId] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [contextWindow, setContextWindow] = useState('')
@@ -37,6 +43,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
   useEffect(() => {
     if (open) {
       if (initialPlatform) setPlatform(initialPlatform)
+      setKeyId('')
       setModelId('')
       setDisplayName('')
       setContextWindow('')
@@ -74,7 +81,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
     setSubmitted(true)
 
     const trimmedModelId = modelId.trim()
-    if (!trimmedModelId || !platform) return
+    if (!trimmedModelId || !platform || (platform === 'custom' && !selectedKey)) return
 
     const payload: any = {
       platform,
@@ -83,6 +90,8 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
       supportsVision,
       supportsTools,
     }
+
+    if (platform === 'custom') payload.keyId = selectedKey!.id
 
     if (contextWindow) {
       const parsed = parseInt(contextWindow, 10)
@@ -133,7 +142,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
             <select
               id="provider-platform-select"
               value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
+              onChange={(e) => { setPlatform(e.target.value); setKeyId('') }}
               className="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {allProviders.map((p) => (
@@ -143,6 +152,24 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
               ))}
             </select>
           </div>
+
+          {platform === 'custom' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="provider-endpoint-key">{t('keys.paneCustomEndpoint')}</Label>
+              <select
+                id="provider-endpoint-key"
+                value={keyId}
+                onChange={e => setKeyId(e.target.value)}
+                aria-invalid={submitted && !selectedKey}
+                className="flex h-9 w-full rounded-xl border border-input bg-background px-3 py-1.5 text-sm"
+              >
+                <option value="">{t('keys.selectKey')}</option>
+                {endpointKeys.map(key => <option key={key.id} value={String(key.id)}>{key.label || key.baseUrl} ({key.baseUrl})</option>)}
+              </select>
+              {endpointKeys.length === 0 && <Link to="/keys" className="text-sm text-primary underline">{t('keys.addCustom')}</Link>}
+              {submitted && !selectedKey && <FieldError error={t('keys.selectKey')} />}
+            </div>
+          )}
 
           {/* Model ID */}
           <div className="space-y-1.5">
