@@ -196,6 +196,7 @@ export interface RouteResult {
   keyLabel: string | null;
   platform: string;
   displayName: string;
+  contextWindow: number | null;
   /**
    * The custom endpoint this route belongs to, '' for catalog platforms (#651).
    * Carried on the route so the failure path can attribute a retirement signal
@@ -1530,6 +1531,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       proxyUrl: decryptProxyUrl(key),
       platform: entry.platform,
       displayName: entry.display_name,
+      contextWindow: entry.context_window,
       endpointScope: entry.endpoint_scope ?? '',
       rpdLimit: limits.rpd,
       tpdLimit: limits.tpd,

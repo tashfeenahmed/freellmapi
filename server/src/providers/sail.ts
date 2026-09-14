@@ -174,7 +174,7 @@ export class SailProvider extends BaseProvider {
   }
 
   private buildBody(messages: ChatMessage[], modelId: string, options?: CompletionOptions): Record<string, unknown> {
-    const maxOutputTokens = resolveMaxTokens(this.platform, options?.max_tokens);
+    const maxOutputTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
     const reasoningEffort = this.reasoningEffort(modelId, options);
     const textFormat = this.textFormat(options);
     const tools = options?.tools?.map(tool => ({

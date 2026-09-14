@@ -237,8 +237,11 @@ async function runModelCall(
     if (!route) break;
 
     const startedAt = Date.now();
+    const routeOpts = route.contextWindow != null
+      ? { ...options, contextBudget: route.contextWindow - estimatedTokens }
+      : options;
     try {
-      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, options);
+      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, routeOpts);
       const choice = result.choices?.[0];
       const text = contentToString(choice?.message?.content ?? '');
       const toolCalls = choice?.message?.tool_calls;
@@ -325,10 +328,13 @@ async function runJudgeStreaming(
     if (!route) break;
 
     const startedAt = Date.now();
+    const routeOpts = route.contextWindow != null
+      ? { ...options, contextBudget: route.contextWindow - estimatedTokens }
+      : options;
     let text = '';
     let started = false;
     try {
-      for await (const chunk of route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, options)) {
+      for await (const chunk of route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, routeOpts)) {
         const delta = (chunk as any)?.choices?.[0]?.delta?.content;
         if (typeof delta === 'string' && delta.length > 0) {
           if (!started) { started = true; cb.onStart?.({ platform: route.platform, model: route.modelId }); }
