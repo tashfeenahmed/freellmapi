@@ -514,9 +514,16 @@ export function isModelNotFoundError(err: any): boolean {
     // isProviderBadRequestError — surfacing as a request-blaming 400 instead of a
     // stale-catalog 404. These phrasings are MODEL-level (every sibling key fails
     // identically), so they belong here for the whole-model skip.
+    //
+    // Some providers (e.g. NavyAI) wrap the model id in quotes or backticks in
+    // the error message, e.g. "The model 'gpt-4.1' does not exist or is not
+    // supported for chat completions." — the quoted id breaks the contiguous
+    // substring check. Match with a permissive regex to cover this shape too.
     || msg.includes('no model found') || msg.includes('model not found')
-    || msg.includes('unknown model') || msg.includes('model does not exist')
-    || msg.includes('no such model');
+    || msg.includes('unknown model')
+    || msg.includes('model does not exist') || msg.includes('no such model')
+    || /model\s*['"`]?[^'"`]*['"`]?\s+does\s+not\s+exist/i.test(msg)
+    || /model\s*['"`]?[^'"`]*['"`]?\s+is\s+not\s+supported/i.test(msg);
 }
 
 // A 403 that suspends the ACCOUNT, not one model: NavyAI answers every model

@@ -91,6 +91,32 @@ describe('isModelNotFoundError (drives whole-model skip within a request)', () =
     expect(isModelNotFoundError(new Error('Provider API error 400: unknown model'))).toBe(true);
     expect(isModelNotFoundError(new Error('API error 400: model does not exist'))).toBe(true);
     expect(isModelNotFoundError(new Error('API error 404: no such model'))).toBe(true);
+    // NavyAI wraps the id in quotes: "The model 'gpt-4.1' does not exist..." —
+    // the quoted id breaks the contiguous substring check that the earlier
+    // line tests. Both sub-regexes (does-not-exist / is-not-supported) must
+    // catch this shape without over-triggering on unrelated 400s.
+    expect(isModelNotFoundError(Object.assign(
+      new Error("NavyAI API error 400: The model 'gpt-4.1' does not exist or is not supported for chat completions."),
+      { status: 400 },
+    ))).toBe(true);
+    expect(isModelNotFoundError(Object.assign(
+      new Error("NavyAI API error 400: The model \"gemini-2.5-flash\" does not exist"),
+      { status: 400 },
+    ))).toBe(true);
+    expect(isModelNotFoundError(Object.assign(
+      new Error("Some provider: model `foo-bar` is not supported for this API"),
+      { status: 400 },
+    ))).toBe(true);
+    // Plain model-id without quotes still hits the substring path too.
+    expect(isModelNotFoundError(Object.assign(
+      new Error("Other API: model some-model-id does not exist"),
+      { status: 400 },
+    ))).toBe(true);
+    // Sanity: a generic 400 on an unrelated error must NOT match.
+    expect(isModelNotFoundError(Object.assign(
+      new Error("Provider API error 400: invalid request body"),
+      { status: 400 },
+    ))).toBe(false);
   });
 
   it('flags 410 Gone (model pulled upstream) by message or attached status — #339', () => {
