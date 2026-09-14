@@ -93,11 +93,11 @@ FreeLLMAPI 从 `.env` 读取的全部变量，按主题分组。默认值和说�
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
-| `RESPONSE_CACHE` | `false` | 可选开启的响应缓存。开启后，一次成功的非流式 `/v1/chat/completions` 回答会存进一个有界的内存 LRU（以整个请求的规范化哈希为键），因此完全相同的后续请求直接由内存应答，不再消耗提供方额度。只做精确匹配——近似请求绝不会返回另一个提示词的答案。可在运行时通过仪表盘切换（`PUT /api/cache/config`），也可按请求用 `X-FreeLLM-Cache: on\|off` 头控制。 |
-| `RESPONSE_CACHE_PERSIST` | `true` | 将缓存的回答持久化到 SQLite，使其在重启后依然可用（对应每日额度重置后重跑相同任务的场景）。仅在 `RESPONSE_CACHE` 开启时生效，因此默认安装下完全不起作用。请注意：这会把**明文的模型响应**写入数据库文件，纯内存缓存从不这样做；设为 `false` 可继续使用缓存但只保留在内存中。条目一旦离开内存缓存（TTL 过期、LRU 逐出、`DELETE /api/cache`）对应的行会立即删除，启动时还会再清扫一次。 |
+| `RESPONSE_CACHE` | `false` | 可选开启的响应缓存。开启后，一次成功的 `/v1/chat/completions` 回答（流式与非流式皆可）会存进一个有界的内存 LRU（以整个请求的规范化哈希为键），因此完全相同的后续请求直接由内存应答，不再消耗提供方额度。只做精确匹配——近似请求绝不会返回另一个提示词的答案。可在运行时通过仪表盘切换（`PUT /api/cache/config`），也可按请求用 `X-FreeLLM-Cache: on\|off` 头控制。 |
+| `RESPONSE_CACHE_PERSIST` | `true` | 将缓存的**非流式**回答持久化到 SQLite，使其在重启后依然可用（流式重放仅存于内存，重启后必定丢失）（对应每日额度重置后重跑相同任务的场景）。仅在 `RESPONSE_CACHE` 开启时生效，因此默认安装下完全不起作用。请注意：这会把**明文的模型响应**写入数据库文件，纯内存缓存从不这样做；设为 `false` 可继续使用缓存但只保留在内存中。条目一旦离开内存缓存（TTL 过期、LRU 逐出、`DELETE /api/cache`）对应的行会立即删除，启动时还会再清扫一次。 |
 | `RESPONSE_CACHE_TTL_SECONDS` | `3600`（1 小时） | 缓存的回答保持新鲜多久，单位秒。 |
 | `RESPONSE_CACHE_MAX_TEMPERATURE` | `1.0` | 只缓存温度不高于该值的请求；更高的温度需要新鲜多样的输出。默认在开启时全部缓存；调低它（如 `0.2`）则只缓存接近确定性的调用。 |
-| `RESPONSE_CACHE_MAX_ENTRIES` | `5000` | 存储条目的硬上限；超过后按最近最少使用逐出。 |
+| `RESPONSE_CACHE_MAX_ENTRIES` | `5000` | 存储条目的硬上限，由 JSON 与流式两个存储共用（同一提示词两种方式各占一个名额）；超过后按最近最少使用逐出。 |
 | `FREELLMAPI_COMPRESSION` | `off` | 请求侧的提示词/上下文压缩。`lossless` 应用空白清理、完全重复块的引用以及可逆的表格化 JSON 编码；`standard` 再过滤工具输出和已被取代的文件读取；`aggressive` 追加基于年龄/相关性/预算的浓缩。仪表盘可以在设置里实时更改。单个请求可以用 `X-FreeLLM-Compress` 把配置的模式调低，但不能越过全局 `off` 总开关。 |
 | `REQUEST_ANALYTICS_RETENTION_DAYS` | `90` | 请求分析的留存天数。设为 `0` 取消此限制。 |
 | `REQUEST_ANALYTICS_MAX_ROWS` | `100000` | 请求分析的行数上限。设为 `0` 取消此限制。 |

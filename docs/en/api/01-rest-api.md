@@ -302,7 +302,7 @@ Only hops that already **failed** can appear. The hop actually serving your requ
 
 HTTP headers only carry printable ASCII, so a model id with characters outside that range (a Chinese name from a relay catalog, for example) is percent-encoded in the header — run the value through `decodeURIComponent` (or `urllib.parse.unquote`) to read it back.
 
-The opt-in response cache can be toggled per request with `X-FreeLLM-Cache: on|off` — an exact-match in-memory LRU for identical non-streaming requests (canonical SHA-256 keys over the full request, TTL and temperature gates, saved-token stats on the dashboard). Off by default; cache hits consume zero provider quota.
+The opt-in response cache can be toggled per request with `X-FreeLLM-Cache: on|off` — an exact-match in-memory LRU for identical requests, streaming included (a streamed hit replays the stored SSE verbatim) (canonical SHA-256 keys over the full request, TTL and temperature gates, saved-token stats on the dashboard). Off by default; cache hits consume zero provider quota.
 
 When [prompt compression](../compression/01-compression-pipeline.md) is enabled, `X-FreeLLM-Compress: off|on|lossless|standard|aggressive` can disable or lower the configured mode for one request. It cannot raise the operator's configured mode. The response reports the effective mode and estimated savings, for example `X-FreeLLM-Compress: standard; saved~=1840`.
 
@@ -448,3 +448,31 @@ Endpoints (all behind `requireAuth`):
 | `DELETE` | `/api/backups/:id` | Delete one backup |
 | `GET` | `/api/backups/tables` | Tables a dump may contain |
 | `GET` / `PUT` | `/api/backups/schedule` | Read / write the backup schedule (HH:mm, interval days, path) |
+
+## Monthly provider-key budgets
+
+Authenticated dashboard clients can set `monthlyRequestCap` and `monthlyTokenCap`
+through `PATCH /api/keys/:id`. Both are nonnegative integers; `0` means unlimited.
+These limits apply to an upstream provider key across chat, embeddings, and
+keyed media requests, and reset at 00:00 UTC on the first of each month. They do
+not apply separately to downstream client profiles.
+
+Successful request counts and reported tokens are stored in a durable monthly
+ledger. Request-log cleanup does not clear this ledger. Existing retained request
+history is backfilled during upgrade; usage already pruned before the upgrade
+cannot be reconstructed. In-flight requests reserve capacity until completion,
+including long-running streams. Failed attempts release their reservation.
+
+Token reservations use routing estimates. Actual provider token usage can differ,
+so the final response can take recorded usage above the configured token cap;
+further requests are then rejected. This is a usage guard, not an exact billing
+limit. Media requests count toward the request cap; the current media adapters
+do not report token usage. Reservations coordinate requests within one gateway
+process, not across multiple gateway replicas.
+
+When all otherwise eligible keys have exhausted their monthly budget, standard
+chat, embeddings, and media routing returns HTTP `429` with a `Retry-After` header
+pointing to the next UTC month. OpenAI-compatible endpoints also return
+`error.code: "quota_exceeded"`; other protocol adapters preserve their native
+error format. Fusion subcalls obey the caps but retain Fusion's aggregate error
+format. If another key has capacity, normal fallback can use it.

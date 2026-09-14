@@ -21,6 +21,7 @@ import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import {
   buildGroups,
+  isGroupDepleted,
   groupMatchesQuery,
   groupMaxContext,
   type FallbackEntry,
@@ -229,7 +230,7 @@ export default function FallbackPage() {
 
   // ── Model unification: a model served by several providers is always shown as
   // one logical row that links to its own page (the on/off toggle was removed). ─
-  const orderedGroups = useMemo(() => buildGroups(rows, isManual), [rows, isManual])
+  const orderedGroups = useMemo(() => buildGroups(rows, isManual, rateUsageByModel), [rows, isManual, rateUsageByModel])
 
   // Catalog search + filters (#343). Filtering operates on whole logical-model
   // groups; rank stays the model's position in the full chain so the numbers
@@ -614,7 +615,7 @@ export default function FallbackPage() {
                       <tr
                         key={g.key}
                         onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
-                        className={`group/row border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
+                        className={`group/row border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? (isGroupDepleted(g.members, rateUsageByModel) ? 'opacity-60' : '') : 'opacity-50'}`}
                       >
                         <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} rateUsage={rateUsageByModel} />
                       </tr>

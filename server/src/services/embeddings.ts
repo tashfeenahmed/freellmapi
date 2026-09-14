@@ -9,7 +9,7 @@
 // cross-provider redundancy for free.
 import { getDb, getSetting } from '../db/index.js';
 import { getClientContext } from '../lib/client-context.js';
-import { decrypt } from '../lib/crypto.js';
+import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
 import type { Db } from '../db/types.js';
@@ -39,9 +39,11 @@ export interface EmbeddingsResult {
 
 export class EmbeddingsError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -69,39 +71,6 @@ interface ProviderCredential {
   id: number;
   key: string;
   baseUrl: string | null;
-}
-
-function getProviderCredential(row: EmbeddingModelRow): ProviderCredential | null {
-  if (row.key_id != null) {
-    const keyRow = getDb().prepare(
-      "SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1",
-    ).get(row.key_id) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-    if (!keyRow) return null;
-    try {
-      return {
-        id: keyRow.id,
-        key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
-        baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-      };
-    } catch {
-      return null;
-    }
-  }
-  if (row.platform === 'custom') return null;
-
-  const keyRow = getDb().prepare(
-    "SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY RANDOM() LIMIT 1",
-  ).get(row.platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-  if (!keyRow) return null;
-  try {
-    return {
-      id: keyRow.id,
-      key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
-      baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-    };
-  } catch {
-    return null;
-  }
 }
 
 // Rough token estimate when the provider doesn't report usage (~4 chars/token).
@@ -363,8 +332,11 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
 
   let lastError: EmbeddingsError | null = null;
   for (const row of chain) {
-    const credential = getProviderCredential(row);
-    if (!credential) continue; // no usable key for this provider — try the next one
+    const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs));
+    if (!credential) {
+      if (budgetBlocked) lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
+      continue;
+    }
     const started = Date.now();
     try {
       const out = await callProvider(row, credential, inputs, dimensions);
@@ -386,11 +358,14 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
       logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
       lastError = e;
       // fall through to the next provider in the family
+    } finally {
+      credential.release();
     }
   }
 
   throw new EmbeddingsError(
     `All providers for embedding family '${family}' failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,
+    lastError?.code,
   );
 }

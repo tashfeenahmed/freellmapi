@@ -103,6 +103,19 @@ levelCounts(): { debug: number; info: number; warn: number; error: number }
 | `client_info` | User agent、IP 哈希 |
 | `served_model` | 上游报的模型（可观测性） |
 | `attempt_error_summary` | 本请求聚合的失败类别 |
+| `caller` | 产生该请求的网关通路 |
+
+### `execution_id` 与 `caller` 维度
+
+聊天补全路由发出的每个 JSON 响应体——成功、缓存/幂等重放、错误一律——都带一个
+顶层 `execution_id`，其值与 `X-Request-ID` 头相同，于是只留下响应体的客户端也能
+找回对应行及其尝试轨迹。它盖在**出站副本**上，因此重放的缓存命中报的是*本次*请求
+的 id，而不是当初填充缓存那次的。流式帧不带它（那里由头部承载）。
+
+`requests.caller` 记录请求来自哪个面：目前所有推理通路都写 `http`（OpenAI 兼容
+代理、`/v1/responses`、`/v1/messages`、Ollama 与 Gemini 线路，以及 fusion 子调用）。
+`/mcp` 只做内省、不跑推理；仪表盘 playground 调的就是同一批 HTTP 端点，与其他
+客户端无从区分。该列是自由文本，新增一个面无需迁移。
 
 ### 尝试轨迹 (`request_attempts` 表)
 

@@ -24,7 +24,7 @@ Normalization (`normalizeIdempotencyKey` in `server/src/services/idempotency.ts:
 
 Only a `SHA-256 hex` of the key is stored (`hashIdempotencyKey`) — the raw key never touches SQLite, mirroring how admin/runtime tokens are handled.
 
-Streaming requests (`stream: true`) **always bypass** idempotency (`const idemKey = !stream ? normalize... : null` in `proxy.ts:1805`). A stream cannot be replayed as a unit and the open connection is itself the retry signal — same policy as the response cache.
+Streaming requests (`stream: true`) **always bypass** idempotency (`const idemKey = !stream ? normalize... : null` in `proxy.ts:1805`). A stream cannot be replayed as a unit for a *retry* and the open connection is itself the retry signal. (The response cache no longer follows this policy: it does replay streams, keyed on request content rather than a caller-supplied key.)
 
 ---
 
@@ -180,7 +180,7 @@ Tips:
 
 ## 10. Relationship to response cache & degraded mode
 
-- **Response cache** (`services/cache.ts`, `X-FreeLLM-Cache`) is orthogonal: global, temperature-gated, in-memory LRU; idempotency is durable (SQLite), per-caller, and fingerprint-bound. Both short-circuit provider calls.
+- **Response cache** (`services/cache.ts`, `X-FreeLLM-Cache`) is orthogonal: global, temperature-gated, in-memory LRU covering streaming and non-streaming alike; idempotency is durable (SQLite), per-caller, fingerprint-bound, and non-streaming only. Both short-circuit provider calls.
 - **Degraded mode** ([`docs/en/architecture/04-degraded-mode-and-failover.md`](../architecture/04-degraded-mode-and-failover.md)) disables bandit exploration but does not affect idempotency — replays still bypass routing entirely.
 - **Failover**: only the final successful body is stored. If a request exhausts the fallback loop, nothing is stored for that key.
 

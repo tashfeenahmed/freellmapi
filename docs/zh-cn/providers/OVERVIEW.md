@@ -15,6 +15,7 @@
 | [01-supported-platforms.md](01-supported-platforms.md) | `shared/types.ts` 中声明的每个平台一行：鉴权方式（带密钥/免密钥）、适配器类（原生/OpenAI 兼容）以及集成注意事项。每种分组都有明确的数量。 |
 | [02-quotas-and-cooldowns.md](02-quotas-and-cooldowns.md) | RPM/RPD 与 TPM/TPD 窗口记账、并发租约与可选上限、冷却阶梯及其来源分类、基于探测的提前恢复、从 `Retry-After` 响应头和错误正文解析退避时间（#798），以及为什么健康检查绝不能烧掉计量额度（#882）。 |
 | [03-adding-a-new-provider.md](03-adding-a-new-provider.md) | 贡献者走查：扩展 `Platform` 联合、选择适配器、注册选项（超时、免密钥、额外请求头）、密钥校验语义、目录播种策略，以及新提供方应当随附的测试。 |
+| [04-recurring-credit-gateways.md](04-recurring-credit-gateways.md) | ElectronHub 和 Experiential Labs：共享额度、密钥校验、适配器行为及计费限制。 |
 
 ## 约定
 

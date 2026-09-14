@@ -253,7 +253,8 @@ Codex CLI 和 Agents SDK 说 **Responses API**（有状态、`previous_response_
 
 ## 13. 响应缓存（可选）
 
-- **范围**：仅非流、可缓存温度（`temperature ≤ 1` 或未设）、`X-FreeLLM-Cache: on` 或 `RESPONSE_CACHE=1`。
+- **范围**：流式与非流式皆可、可缓存温度（`temperature ≤ 1` 或未设）、`X-FreeLLM-Cache: on` 或 `RESPONSE_CACHE=1`。
 - **键**：规范化请求（模型、消息、所有采样参数、工具、stop、response_format、n、seed、惩罚、logit_bias、logprobs、top_logprobs、reasoning_effort、压缩）的 SHA-256。
-- **存储**：内存 LRU、TTL + 温度闸门。
-- **命中**：返回缓存体、`X-Routed-Via: cache`、`X-FreeLLM-Cache: HIT`，**零提供方额度消耗**。
+- **存储**：内存 LRU、TTL + 温度闸门。分两个存储 —— JSON 正文（持久化到 SQLite）与流式 SSE（仅内存），共用同一个 `RESPONSE_CACHE_MAX_ENTRIES` 上限；统计中的 `entries` 同时计入两者。
+- **命中**：返回缓存体、`X-Routed-Via: cache`、`X-FreeLLM-Cache: HIT`，**零提供方额度消耗**。流式命中会逐字节重放存储的 SSE。
+- **流式存储**：仅在请求可缓存时才缓冲帧（缓存关闭时不保留任何内容），超过 2 MB 重放上限即丢弃。被截断（`finish_reason: length`）、出错或中断的流永不存储。

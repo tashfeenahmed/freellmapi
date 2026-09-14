@@ -387,6 +387,10 @@
     "endpointEmbeddingsHint": "model: \"auto\" или семейство на вкладке «Внедрения».",
     "endpointMessages": "Сообщения",
     "endpointMessagesHint": "Совместимость с Anthropic (Claude)",
+    "quickStart": "Quick start",
+    "quickStartDesc": "Use auto for your active routing chain, or auto:fast to prioritize speed across enabled models. Replace $YOUR_KEY with your unified API key.",
+    "exampleAuto": "Auto mode (use the active chain)",
+    "exampleFast": "Fast mode (prioritize speed)",
     "anthropicTitle": "Модели Claude (Anthropic)",
     "anthropicDesc": "Направьте клиент SDK Claude или Anthropic на этот сервер. Клиенты Anthropic отправляют названия моделей Claude — сопоставьте каждое из них с автоматическим (маршрутизатор выбирает бесплатную модель) или закрепите конкретную модель.",
     "anthropicBaseUrl": "База URL",
@@ -584,7 +588,8 @@
       "subsetNote": "Этот ключ будет ограничен выбранными моделями. Изменить это можно позже в строке ключа.",
       "skip": "Не сейчас",
       "scopedOne": "Ключ ограничен 1 моделью",
-      "scopedOther": "Ключ ограничен {count} моделями"
+      "scopedOther": "Ключ ограничен {count} моделями",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Профили клиентов",
     "cpDesc": "Отдельные API-ключи для каждого клиента, каждый со своим системным промптом, который сервер применяет всегда.",
@@ -608,7 +613,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Изменить ключ",
+    "editPlatformLocked": "Поставщика и конечную точку нельзя изменить после создания.",
+    "editCredentialHint": "Оставьте пустым, чтобы сохранить текущий ключ.",
+    "editCredentialPartsRequired": "Введите и ID аккаунта, и API-токен.",
+    "editModels": "Изменить модели",
+    "editModelsHint": "Выберите модели каталога, которые может использовать этот ключ. Полный выбор снимает ограничение.",
+    "editModelsCustomHint": "Выберите зарегистрированные модели endpoint, которые может использовать этот ключ. Полный выбор снимает ограничение.",
+    "editModelsSync": "Проверить обновления каталога",
+    "editModelsSyncing": "Проверка…",
+    "editModelsSynced": "Каталог моделей проверен"
   },
   "backups": {
     "title": "Backups",

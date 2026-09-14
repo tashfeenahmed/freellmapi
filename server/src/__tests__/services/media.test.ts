@@ -58,6 +58,35 @@ describe('media service', () => {
     expect(cols).toContain('key_id');
   });
 
+  it('skips capped provider keys and keeps a reservation until image generation completes', async () => {
+    addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
+    addKey('nvidia', 'spent-key');
+    addKey('nvidia', 'available-key');
+    const db = getDb();
+    const keys = db.prepare('SELECT id FROM api_keys ORDER BY id').all() as { id: number }[];
+    db.prepare('UPDATE api_keys SET monthly_request_cap = 1').run();
+    db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, latency_ms)
+      VALUES ('nvidia', 'chat-model', ?, 'success', 1)`).run(keys[0].id);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const first = runImageGeneration('auto', { prompt: 'a cat' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const request = (fetchMock.mock.calls as unknown as [string, RequestInit][])[0][1];
+    expect(new Headers(request.headers).get('Authorization')).toBe('Bearer available-key');
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 429, code: 'quota_exceeded' });
+    finish(jsonResponse({ artifacts: [{ base64: 'AAAA' }] }));
+    await expect(first).resolves.toMatchObject({ platform: 'nvidia' });
+    expect(db.prepare('SELECT requests FROM key_monthly_usage WHERE key_id = ?').get(keys[1].id)).toEqual({ requests: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A failed attempt does not consume another request, and cannot leak its reservation.
+    db.prepare('UPDATE api_keys SET monthly_request_cap = 2 WHERE id = ?').run(keys[1].id);
+    fetchMock.mockResolvedValue(new Response('unavailable', { status: 503 }));
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 502 });
+    fetchMock.mockResolvedValue(jsonResponse({ artifacts: [{ base64: 'BBBB' }] }));
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'nvidia' });
+  });
+
   describe('image generation', () => {
     it('NVIDIA: maps artifacts[].base64 → b64_json', async () => {
       addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
@@ -405,6 +434,42 @@ describe('media service', () => {
   });
 
   describe('text-to-speech', () => {
+    it.each(['simba-3.0', 'simba-3.2'])('Speechify %s sends native fields and decodes JSON audio', async model => {
+      addMedia('speechify', model, 'audio');
+      addKey('speechify');
+      const audio = Buffer.from('ID3test-audio');
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ audio_data: audio.toString('base64'), audio_format: 'mp3', billable_characters_count: 5 }));
+      const result = await runSpeech(model, { input: 'Hello', voice: 'alloy' });
+      expect(result.audio).toEqual(audio);
+      expect(result.contentType).toBe('audio/mpeg');
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.speechify.ai/v1/audio/speech');
+      expect(new Headers(init?.headers).get('Speechify-Version')).toBe('2026-09-08');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer speechify-test-key');
+      expect(JSON.parse(String(init?.body))).toEqual({ model, input: 'Hello', voice_id: 'alec', audio_format: 'mp3' });
+    });
+
+    it('Speechify preserves native voices and requested supported formats', async () => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ audio_data: 'T2dnUw==', audio_format: 'ogg' }));
+      const result = await runSpeech('test-simba', { input: 'Hello', voice: 'native-voice-id', format: 'ogg' });
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ voice_id: 'native-voice-id', audio_format: 'ogg' });
+      expect(result.contentType).toBe('audio/ogg');
+    });
+
+    it.each(['pcm', 'flac', 'opus'])('Speechify rejects unsupported %s without sending a request', async format => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      await expect(runSpeech('test-simba', { input: 'Hello', format })).rejects.toThrow('Speechify supports');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each([{}, { audio_data: 'not base64', audio_format: 'mp3' }, { audio_data: '', audio_format: 'mp3' }, { audio_data: 'SUQz', audio_format: 'wav' }])('Speechify rejects malformed audio instead of returning JSON as sound', async body => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body));
+      await expect(runSpeech('test-simba', { input: 'Hello' })).rejects.toThrow('Speechify returned');
+    });
+
     it('Cloudflare MeloTTS: base64 audio → audio/mpeg bytes', async () => {
       addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio');
       addKey('cloudflare', 'acct:tok');

@@ -387,6 +387,10 @@
     "endpointEmbeddingsHint": "model: \"auto\" arba šeima iš Embeddings skilties",
     "endpointMessages": "Žinutės",
     "endpointMessagesHint": "Anthropic suderinama (Claude)",
+    "quickStart": "Quick start",
+    "quickStartDesc": "Use auto for your active routing chain, or auto:fast to prioritize speed across enabled models. Replace $YOUR_KEY with your unified API key.",
+    "exampleAuto": "Auto mode (use the active chain)",
+    "exampleFast": "Fast mode (prioritize speed)",
     "anthropicTitle": "Claude (Anthropic) modeliai",
     "anthropicDesc": "Nukreipkite Claude arba Anthropic SDK klientą į šį serverį. Anthropic klientai siunčia Claude modelių pavadinimus — kiekvieną priskiria Auto (maršrutizatorius pasirenka nemokamą modelį) arba prisega konkretų.",
     "anthropicBaseUrl": "Bazės URL",
@@ -584,7 +588,8 @@
       "subsetNote": "Šis raktas bus apribotas pasirinktais modeliais. Tai galėsite pakeisti vėliau rakto eilutėje.",
       "skip": "Ne dabar",
       "scopedOne": "Raktas apribotas 1 modeliu",
-      "scopedOther": "Raktas apribotas iki {count} modelių"
+      "scopedOther": "Raktas apribotas iki {count} modelių",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Klientų profiliai",
     "cpDesc": "Atskiri API raktai kiekvienam klientui, kiekvienas su sisteminiu promptu, kurį serveris visada taiko.",
@@ -608,7 +613,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Redaguoti raktą",
+    "editPlatformLocked": "Po kūrimo tiekėjo ir galinio taško keisti negalima.",
+    "editCredentialHint": "Palikite tuščią, jei norite naudoti dabartinį raktą.",
+    "editCredentialPartsRequired": "Įveskite ir paskyros ID, ir API prieigos raktą.",
+    "editModels": "Redaguoti modelius",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

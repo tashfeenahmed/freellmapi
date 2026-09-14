@@ -9,6 +9,7 @@ import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
+import { secondsUntilNextMonth } from '../services/key-budget.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
 
@@ -578,6 +579,9 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
     }
   } catch (error: any) {
     const status = error instanceof EmbeddingsError ? error.status : 502;
+    if (error instanceof EmbeddingsError && error.code === 'quota_exceeded') {
+      res.setHeader('Retry-After', secondsUntilNextMonth());
+    }
     res.status(status).json({ error: error.message ?? 'embedding request failed' });
   }
 }

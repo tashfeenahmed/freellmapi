@@ -10,6 +10,7 @@ import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../l
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { verifyCredentials } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
+import { getMonthlyBudgetCaps } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential } from '../services/custom-endpoint.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
@@ -18,6 +19,7 @@ import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../servi
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
 import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
 import type { Db } from '../db/types.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 
@@ -28,7 +30,7 @@ export const keysRouter = Router();
 // was dropped in V4 and re-added in V13 via the router.huggingface.co route.
 // SambaNova was dropped in V23 (free tier permanently retired).
 const PLATFORMS = [
-  'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'bai', 'radeon', 'nvidia', 'mistral',
+  'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
   'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
@@ -74,8 +76,13 @@ const updateKeySchema = z.object({
   modelScope: z.array(z.string().trim().min(1).max(200)).max(100).nullable().optional(),
   // #590: '' clears the per-key proxy; absent leaves it unchanged.
   proxyUrl: proxyUrlSchema.optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined, {
-  message: 'At least one of enabled, label, modelScope or proxyUrl must be provided',
+  // Monthly budget caps (#1158): 0 clears the cap (unlimited).
+  monthlyRequestCap: z.number().int().min(0).max(1_000_000_000).optional(),
+  monthlyTokenCap: z.number().int().min(0).max(1_000_000_000_000).optional(),
+  // An absent credential leaves the encrypted key untouched.
+  key: z.string().trim().min(1).optional(),
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined || data.monthlyRequestCap !== undefined || data.monthlyTokenCap !== undefined, {
+  message: 'At least one of enabled, label, modelScope, proxyUrl, key, monthlyRequestCap or monthlyTokenCap must be provided',
 });
 
 const importKeySchema = z.object({
@@ -308,12 +315,15 @@ keysRouter.get('/', (_req: Request, res: Response) => {
     }
     const cooldowns = cooldownsByKeyId.get(Number(row.id)) ?? [];
     const scope = parseModelScope(row.model_scope_json);
+    const budgetCaps = getMonthlyBudgetCaps(Number(row.id));
     return {
       id: row.id,
       platform: row.platform,
       label: row.label,
       maskedKey,
       baseUrl: row.base_url ?? null,
+      monthlyRequestCap: budgetCaps.requestCap,
+      monthlyTokenCap: budgetCaps.tokenCap,
       status: row.status,
       enabled: row.enabled === 1,
       keyless: resolveProvider(row.platform)?.keyless === true,
@@ -1508,13 +1518,48 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, key, monthlyRequestCap, monthlyTokenCap } = parsed.data;
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
+  let changedKey: string | undefined;
+
+  if (key !== undefined) {
+    const db = getDb();
+    const stored = db.prepare('SELECT platform, encrypted_key, iv, auth_tag FROM api_keys WHERE id = ?')
+      .get(id) as { platform: string; encrypted_key: string; iv: string; auth_tag: string } | undefined;
+    if (!stored) {
+      res.status(404).json({ error: { message: 'Key not found' } });
+      return;
+    }
+    if (resolveProvider(stored.platform as Platform)?.keyless === true) {
+      res.status(400).json({ error: { message: 'Keyless providers cannot store a credential' } });
+      return;
+    }
+
+    if (stored.platform === 'cloudflare') {
+      const separator = key.indexOf(':');
+      if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {
+        res.status(400).json({ error: { message: 'Cloudflare key must be in format "account_id:api_token"' } });
+        return;
+      }
+    }
+
+    try {
+      if (decrypt(stored.encrypted_key, stored.iv, stored.auth_tag) !== key) changedKey = key;
+    } catch {
+      // An undecryptable old credential is still replaceable.
+      changedKey = key;
+    }
+  }
 
   if (enabled !== undefined) {
     updates.push('enabled = ?');
     values.push(enabled ? 1 : 0);
+  }
+  if (changedKey !== undefined) {
+    const { encrypted, iv, authTag } = encrypt(changedKey);
+    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL');
+    values.push(encrypted, iv, authTag);
   }
   if (label !== undefined) {
     updates.push('label = ?');
@@ -1527,6 +1572,15 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     updates.push('proxy_encrypted = ?', 'proxy_iv = ?', 'proxy_auth_tag = ?');
     values.push(proxy.encrypted, proxy.iv, proxy.authTag);
   }
+  // Monthly budget caps (#1158): 0 = unlimited.
+  if (monthlyRequestCap !== undefined) {
+    updates.push('monthly_request_cap = ?');
+    values.push(monthlyRequestCap);
+  }
+  if (monthlyTokenCap !== undefined) {
+    updates.push('monthly_token_cap = ?');
+    values.push(monthlyTokenCap);
+  }
   // Deduped; an empty result stores NULL, which the router reads as "unscoped".
   const scopeIds = modelScope == null ? [] : [...new Set(modelScope)];
   if (modelScope !== undefined) {
@@ -1537,17 +1591,26 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   values.push(id);
 
   const db = getDb();
-  const result = db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  // Re-submitting the same key satisfies "something changed" but is a no-op;
+  // it must not turn into an invalid UPDATE with an empty SET list.
+  const result = updates.length === 0
+    ? { changes: 1 }
+    : db.transaction(() =>
+      db.prepare(`UPDATE api_keys SET ${updates.join(', ')} WHERE id = ?`).run(...values),
+    )();
 
   if (result.changes === 0) {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
 
+  if (changedKey !== undefined) clearCooldownsForKey(id);
+
   const response: Record<string, unknown> = { success: true };
   if (enabled !== undefined) response.enabled = enabled;
   if (label !== undefined) response.label = label;
   if (proxyUrl !== undefined) response.maskedProxyUrl = maskProxyUrl(proxyUrl);
+  if (key !== undefined) response.maskedKey = maskKey(key);
   if (modelScope !== undefined) response.modelScope = scopeIds.length > 0 ? scopeIds : null;
   res.json(response);
 });

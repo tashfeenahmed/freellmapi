@@ -387,6 +387,10 @@
     "endpointEmbeddingsHint": "model: \"auto\" ou uma família da aba Embeddings",
     "endpointMessages": "Messages",
     "endpointMessagesHint": "Compatível com Anthropic (Claude)",
+    "quickStart": "Quick start",
+    "quickStartDesc": "Use auto for your active routing chain, or auto:fast to prioritize speed across enabled models. Replace $YOUR_KEY with your unified API key.",
+    "exampleAuto": "Auto mode (use the active chain)",
+    "exampleFast": "Fast mode (prioritize speed)",
     "anthropicTitle": "Modelos Claude (Anthropic)",
     "anthropicDesc": "Aponte um cliente SDK do Claude ou da Anthropic para este servidor. Os clientes da Anthropic enviam nomes de modelos Claude — mapeie cada um para Auto (o roteador escolhe um modelo gratuito) ou fixe um específico.",
     "anthropicBaseUrl": "URL base",
@@ -584,7 +588,8 @@
       "subsetNote": "Esta chave ficará limitada aos modelos selecionados. Você pode alterar isso depois na linha da chave.",
       "skip": "Agora não",
       "scopedOne": "Chave limitada a 1 modelo",
-      "scopedOther": "Chave limitada a {count} modelos"
+      "scopedOther": "Chave limitada a {count} modelos",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Perfis de cliente",
     "cpDesc": "Chaves de API por cliente, cada uma com um prompt de sistema que o servidor sempre aplica.",
@@ -608,7 +613,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "Editar chave",
+    "editPlatformLocked": "O provedor e o endpoint não podem ser alterados após a criação.",
+    "editCredentialHint": "Deixe em branco para manter a chave atual.",
+    "editCredentialPartsRequired": "Informe o ID da conta e o token da API.",
+    "editModels": "Editar modelos",
+    "editModelsHint": "Escolha quais modelos do catálogo esta chave pode servir. Selecione tudo para limpar o escopo.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",

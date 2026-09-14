@@ -387,6 +387,10 @@
     "endpointEmbeddingsHint": "model : « auto » ou une famille de l'onglet Embeddings",
     "endpointMessages": "Messages",
     "endpointMessagesHint": "Compatible Anthropic (Claude)",
+    "quickStart": "Quick start",
+    "quickStartDesc": "Use auto for your active routing chain, or auto:fast to prioritize speed across enabled models. Replace $YOUR_KEY with your unified API key.",
+    "exampleAuto": "Auto mode (use the active chain)",
+    "exampleFast": "Fast mode (prioritize speed)",
     "anthropicTitle": "Modèles Claude (Anthropic)",
     "anthropicDesc": "Pointez un client SDK Claude ou Anthropic vers ce serveur. Les clients Anthropic envoient des noms de modèles Claude — associez chacun à Auto (le routeur choisit un modèle gratuit) ou fixez-en un précis.",
     "anthropicBaseUrl": "URL de base",
@@ -584,7 +588,8 @@
       "subsetNote": "Cette clé sera limitée aux modèles sélectionnés. Vous pourrez modifier cela plus tard depuis la ligne de la clé.",
       "skip": "Pas maintenant",
       "scopedOne": "Clé limitée à 1 modèle",
-      "scopedOther": "Clé limitée à {count} modèles"
+      "scopedOther": "Clé limitée à {count} modèles",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "Profils client",
     "cpDesc": "Des clés API par client, chacune avec un prompt système que le serveur applique toujours.",
@@ -608,7 +613,17 @@
     "testProxy": "Test",
     "testingProxy": "Test en cours…",
     "proxyTestOk": "Le proxy fonctionne — aller-retour en {ms} ms",
-    "proxyTestFail": "Échec du proxy : {reason}"
+    "proxyTestFail": "Échec du proxy : {reason}",
+    "editKey": "Modifier la clé",
+    "editPlatformLocked": "Le fournisseur et l’endpoint ne peuvent pas être modifiés après la création.",
+    "editCredentialHint": "Laissez vide pour conserver la clé actuelle.",
+    "editCredentialPartsRequired": "Saisissez à la fois l’ID de compte et le jeton d’API.",
+    "editModels": "Modifier les modèles",
+    "editModelsHint": "Choisissez les modèles du catalogue que cette clé peut servir. Tout sélectionner supprime la restriction.",
+    "editModelsCustomHint": "Choisissez les modèles enregistrés du endpoint que cette clé peut servir. Tout sélectionner supprime la restriction.",
+    "editModelsSync": "Vérifier les mises à jour du catalogue",
+    "editModelsSyncing": "Vérification…",
+    "editModelsSynced": "Catalogue de modèles vérifié"
   },
   "backups": {
     "title": "Sauvegardes",

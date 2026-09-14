@@ -387,6 +387,10 @@
     "endpointEmbeddingsHint": "model: \"auto\" ਜਾਂ Embeddings ਟੈਬ ਤੋਂ ਇੱਕ ਪਰਿਵਾਰ",
     "endpointMessages": "ਸੁਨੇਹੇ",
     "endpointMessagesHint": "Anthropic- ਅਨੁਕੂਲ (Claude)",
+    "quickStart": "Quick start",
+    "quickStartDesc": "Use auto for your active routing chain, or auto:fast to prioritize speed across enabled models. Replace $YOUR_KEY with your unified API key.",
+    "exampleAuto": "Auto mode (use the active chain)",
+    "exampleFast": "Fast mode (prioritize speed)",
     "anthropicTitle": "Claude (Anthropic) ਮਾਡਲ",
     "anthropicDesc": "ਇਸ ਸਰਵਰ 'ਤੇ Claude ਜਾਂ Anthropic SDK ਕਲਾਇੰਟ ਨੂੰ ਪੁਆਇੰਟ ਕਰੋ। Anthropic ਕਲਾਇੰਟ Claude ਮਾਡਲ ਨਾਮ ਭੇਜਦੇ ਹਨ — ਹਰੇਕ ਨੂੰ ਆਟੋ ਵਿੱਚ ਮੈਪ ਕਰੋ (ਰਾਊਟਰ ਇੱਕ ਮੁਫਤ ਮਾਡਲ ਚੁਣਦਾ ਹੈ) ਜਾਂ ਇੱਕ ਖਾਸ ਨੂੰ ਪਿੰਨ ਕਰੋ।",
     "anthropicBaseUrl": "ਬੇਸ URL",
@@ -584,7 +588,8 @@
       "subsetNote": "ਇਹ ਕੁੰਜੀ ਸਿਰਫ਼ ਚੁਣੇ ਗਏ ਮਾਡਲਾਂ ਤੱਕ ਸੀਮਤ ਰਹੇਗੀ। ਤੁਸੀਂ ਇਸਨੂੰ ਬਾਅਦ ਵਿੱਚ ਕੁੰਜੀ ਦੀ ਕਤਾਰ ਤੋਂ ਬਦਲ ਸਕਦੇ ਹੋ।",
       "skip": "ਹੁਣੇ ਨਹੀਂ",
       "scopedOne": "ਕੁੰਜੀ 1 ਮਾਡਲ ਤੱਕ ਸੀਮਤ",
-      "scopedOther": "ਕੁੰਜੀ {count} ਮਾਡਲਾਂ ਤੱਕ ਸੀਮਤ"
+      "scopedOther": "ਕੁੰਜੀ {count} ਮਾਡਲਾਂ ਤੱਕ ਸੀਮਤ",
+      "allSaved": "Key serves every catalog model"
     },
     "cpTitle": "ਕਲਾਇੰਟ ਪ੍ਰੋਫਾਈਲ",
     "cpDesc": "ਹਰ ਕਲਾਇੰਟ ਲਈ ਵੱਖਰੀ API ਕੁੰਜੀ, ਜਿਸਦਾ ਸਿਸਟਮ ਪ੍ਰੋਂਪਟ ਸਰਵਰ ਹਮੇਸ਼ਾ ਲਾਗੂ ਕਰਦਾ ਹੈ।",
@@ -608,7 +613,17 @@
     "testProxy": "Test",
     "testingProxy": "Testing…",
     "proxyTestOk": "Proxy works — {ms}ms round trip",
-    "proxyTestFail": "Proxy failed: {reason}"
+    "proxyTestFail": "Proxy failed: {reason}",
+    "editKey": "ਕੁੰਜੀ ਸੋਧੋ",
+    "editPlatformLocked": "ਬਣਾਉਣ ਤੋਂ ਬਾਅਦ ਪ੍ਰਦਾਤਾ ਜਾਂ ਐਂਡਪੁਆਇੰਟ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।",
+    "editCredentialHint": "ਮੌਜੂਦਾ ਕੁੰਜੀ ਰੱਖਣ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
+    "editCredentialPartsRequired": "ਖਾਤਾ ID ਅਤੇ API ਟੋਕਨ ਦੋਵੇਂ ਦਾਖਲ ਕਰੋ।",
+    "editModels": "ਮਾਡਲ ਸੋਧੋ",
+    "editModelsHint": "Choose which catalog models this key may serve. Select everything to clear the scope so future catalog models use it too.",
+    "editModelsCustomHint": "Choose which registered endpoint models this key may serve. Select everything to clear the scope.",
+    "editModelsSync": "Check catalog updates",
+    "editModelsSyncing": "Checking…",
+    "editModelsSynced": "Model catalog checked"
   },
   "backups": {
     "title": "Backups",
