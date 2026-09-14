@@ -22,9 +22,9 @@ export function EditModelsDialog({
   const { t } = useI18n()
   const queryClient = useQueryClient()
 
-  const { data: catalog = [] } = useQuery<FallbackEntry[]>({
-    queryKey: ['fallback'],
-    queryFn: () => apiFetch('/api/fallback'),
+  const { data: catalog = [] } = useQuery<Pick<FallbackEntry, 'platform' | 'modelId' | 'displayName' | 'sizeLabel' | 'contextWindow'>[]>({
+    queryKey: ['models'],
+    queryFn: () => apiFetch('/api/models'),
     enabled: apiKey.platform !== 'custom',
   })
 

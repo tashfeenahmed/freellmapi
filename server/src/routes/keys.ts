@@ -1531,6 +1531,14 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
       return;
     }
 
+    if (stored.platform === 'cloudflare') {
+      const separator = key.indexOf(':');
+      if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {
+        res.status(400).json({ error: { message: 'Cloudflare key must be in format "account_id:api_token"' } });
+        return;
+      }
+    }
+
     try {
       if (decrypt(stored.encrypted_key, stored.iv, stored.auth_tag) !== key) changedKey = key;
     } catch {

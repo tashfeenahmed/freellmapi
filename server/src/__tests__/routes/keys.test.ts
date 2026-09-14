@@ -257,6 +257,23 @@ describe('Keys API', () => {
       .get(created.id)).toEqual({ n: 0 });
   });
 
+  it('PATCH /api/keys/:id preserves a Cloudflare credential when a malformed replacement is submitted', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'cloudflare', key: 'old-account:old-token', label: 'Original',
+    });
+    for (const key of ['token-only', ':token', 'account:', 'account:   ']) {
+      const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, { key, label: 'Changed' });
+      expect(status).toBe(400);
+    }
+    const row = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('old-account:old-token');
+    expect(row.label).toBe('Original');
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, { key: 'new-account:new-token' });
+    expect(status).toBe(200);
+    const updated = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(updated.encrypted_key, updated.iv, updated.auth_tag)).toBe('new-account:new-token');
+  });
+
   it('PATCH /api/keys/:id leaves health state alone when the submitted key is unchanged', async () => {
     const { body: created } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',

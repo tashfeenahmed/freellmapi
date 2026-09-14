@@ -37,9 +37,9 @@ export function EditKeyDialog({
   const canEditCredential = !apiKey.keyless
   const provider = PLATFORMS.find(p => p.value === apiKey.platform)
   const credential = useMemo(() => {
-    if (!canEditCredential || apiKeyValue.trim()) return apiKeyValue.trim()
-    if (needsAccountId && accountId.trim()) return `${accountId.trim()}:${apiKeyValue.trim()}`
-    return ''
+    if (!canEditCredential || !apiKeyValue.trim()) return ''
+    if (needsAccountId) return accountId.trim() ? `${accountId.trim()}:${apiKeyValue.trim()}` : ''
+    return apiKeyValue.trim()
   }, [accountId, apiKeyValue, canEditCredential, needsAccountId])
 
   const credentialError = needsAccountId &&
