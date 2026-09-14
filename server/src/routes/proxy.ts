@@ -24,7 +24,7 @@ import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
@@ -1168,18 +1168,24 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     logIdentity: { surface: 'legacy completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
     abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
-    route: () => routeRequest(
-      estimatedTotal,
-      state.skipKeys.size > 0 ? state.skipKeys : undefined,
-      preferredModel,
-      false,
-      false,
-      state.skipModels.size > 0 ? state.skipModels : undefined,
-      groupChain ?? resolvedChain?.chain,
-      false,
-      state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
-      outputReserve,
-    ),
+    route: () => {
+      // #507: see inbound-chat.ts — inflate the routing estimate from any
+      // provider-reported REQUESTED size latched onto state so the existing
+      // size gates in router.ts skip low-TPM / small-context models on retry.
+      const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
+      return routeRequest(
+        routingTotal,
+        state.skipKeys.size > 0 ? state.skipKeys : undefined,
+        preferredModel,
+        false,
+        false,
+        state.skipModels.size > 0 ? state.skipModels : undefined,
+        groupChain ?? resolvedChain?.chain,
+        false,
+        state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
+        outputReserve,
+      );
+    },
     dispatch: async (route, attempt, ctx) => {
       traceRouteEvent('Proxy', {
         event: attempt === 0 ? 'start' : 'next',
@@ -2090,7 +2096,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // the padding is conservative on turns where injection is *possible* (a prior
       // model is on record). Turns where injection can't happen — every turn 1, and
       // sessions that never switched — pay no headroom tax.
-      const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
+      const routingEstimate = fallbackRoutingTokens(state, estimatedTotal, outputReserve) + (handoffPossible ? HANDOFF_MAX_TOKENS : 0);
       // Task-type routing (#1127): the client can declare code/chat intent via
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.

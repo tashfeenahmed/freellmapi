@@ -79,9 +79,16 @@ describe('Model management API', () => {
        ORDER BY id LIMIT 1
     `).get() as { id: number };
 
+    // Only an actual divergence is recorded as an override now (#1178): a
+    // capability write that restates the catalog value is a no-op. So flip
+    // the tool flag to the opposite of whatever the catalog ships.
+    const currentTools = (getDb().prepare('SELECT supports_tools FROM models WHERE id = ?')
+      .get(target.id) as { supports_tools: number }).supports_tools === 1;
+    const flippedTools = !currentTools;
+
     const { status, body } = await request(app, 'PATCH', `/api/models/${target.id}`, {
       displayName: 'Locally tuned model',
-      supportsTools: true,
+      supportsTools: flippedTools,
       contextWindow: 123456,
       fallbackEnabled: false,
     });
@@ -96,7 +103,7 @@ describe('Model management API', () => {
     `).get(target.id) as { display_name: string; supports_tools: number; context_window: number; fallback_enabled: number };
     expect(row).toEqual({
       display_name: 'Locally tuned model',
-      supports_tools: 1,
+      supports_tools: flippedTools ? 1 : 0,
       context_window: 123456,
       fallback_enabled: 0,
     });
@@ -105,7 +112,7 @@ describe('Model management API', () => {
       .get(target.id) as { overrides_json: string };
     expect(JSON.parse(override.overrides_json)).toMatchObject({
       displayName: 'Locally tuned model',
-      supportsTools: true,
+      supportsTools: flippedTools,
       contextWindow: 123456,
     });
 
@@ -113,6 +120,43 @@ describe('Model management API', () => {
     const item = listed.body.find((m: any) => m.id === target.id);
     expect(item.hasOverrides).toBe(true);
     expect(item.fallbackEnabled).toBe(false);
+  });
+
+  it('clears a local override once the field returns to its pre-override value (#1178)', async () => {
+    const db = getDb();
+    // A fresh catalog-managed row: supports_vision defaults to 0, so that is
+    // the baseline the override is measured against.
+    const insert = db.prepare(INSERT_MODEL_SQL).run(
+      TEST_MODEL_PLATFORM, 'override-heal-model', 'Override Heal Model', 9005, 9005, TEST_MODEL_SIZE_LABEL,
+    );
+    const id = Number(insert.lastInsertRowid);
+    const blob = () => {
+      const row = db.prepare(
+        "SELECT overrides_json FROM model_overrides WHERE platform = 'groq' AND model_id = 'override-heal-model'",
+      ).get() as { overrides_json: string } | undefined;
+      return row ? JSON.parse(row.overrides_json) : undefined;
+    };
+
+    // Flip vision ON: recorded as a durable override, badge on.
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: true })).status).toBe(200);
+    expect(blob()).toMatchObject({ supportsVision: true });
+    let listed = await request(app, 'GET', '/api/models');
+    expect(listed.body.find((m: any) => m.id === id).hasOverrides).toBe(true);
+
+    // Flipping it back OFF drops the override entirely: the effective value is
+    // the catalog's again, so the badge must go, not stay stuck on (#1178).
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: false })).status).toBe(200);
+    expect(blob()).toBeUndefined();
+    listed = await request(app, 'GET', '/api/models');
+    expect(listed.body.find((m: any) => m.id === id).hasOverrides).toBe(false);
+
+    // A fresh divergence re-records the override, and it still survives a
+    // catalog re-apply.
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: true })).status).toBe(200);
+    expect(blob()).toMatchObject({ supportsVision: true });
+    applyAllModelOverrides(db);
+    const row = db.prepare('SELECT supports_vision FROM models WHERE id = ?').get(id) as { supports_vision: number };
+    expect(row.supports_vision).toBe(1);
   });
 
   it('patches a custom model capability directly, without recording a catalog override', async () => {
