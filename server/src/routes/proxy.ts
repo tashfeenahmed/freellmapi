@@ -1181,6 +1181,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       outputReserve,
     ),
     dispatch: async (route, attempt, ctx) => {
+      const contextBudget = route.contextWindow != null ? route.contextWindow - estimatedInputTokens : undefined;
       traceRouteEvent('Proxy', {
         event: attempt === 0 ? 'start' : 'next',
         requestId: requestGroupId,
@@ -1228,7 +1229,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             route.apiKey,
             dispatchMessages,
             route.modelId,
-            { temperature, max_tokens, top_p, stop, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
+            { temperature, max_tokens, top_p, stop, contextBudget, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -1328,7 +1329,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         route.apiKey,
         dispatchMessages,
         route.modelId,
-        { temperature, max_tokens, top_p, stop, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
+        { temperature, max_tokens, top_p, stop, contextBudget, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
         quotaContextForRoute(route, 'chat/completions'),
       );
 
@@ -2098,6 +2099,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
     },
     dispatch: async (route, attempt, ctx) => {
+    const contextBudget = route.contextWindow != null ? route.contextWindow - estimatedInputTokens : undefined;
     const modelKey = `${route.platform}:${route.modelId}`;
     traceRouteEvent('Proxy', {
       event: attempt === 0 ? 'start' : 'next',
@@ -2240,7 +2242,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, outboundMessages, route.modelId,
-            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, stream_options: parsed.data.stream_options, ...samplingParams, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
+            { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, stream_options: parsed.data.stream_options, ...samplingParams, contextBudget, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
             quotaContextForRoute(route, 'chat/completions'),
           );
 
@@ -2622,7 +2624,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, outboundMessages, route.modelId,
-          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
+          { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, contextBudget, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) },
           quotaContextForRoute(route, 'chat/completions'),
         );
 

@@ -376,13 +376,13 @@ export function maxTokensCapFor(platform: string): number | undefined {
  * openai-compat (and its subclasses), cloudflare, cohere, google and aihorde
  * all do.
  */
-export function resolveMaxTokens(platform: string, requested: number | undefined): number | undefined {
+export function resolveMaxTokens(platform: string, requested: number | undefined, contextBudget?: number): number | undefined {
   const resolved = requested ?? defaultMaxTokensFor(platform);
   if (resolved == null) return resolved;
   // The tighter ceiling wins: a platform's hard reject applies even with the
   // operator cap off, and an operator cap below it applies everywhere.
-  const caps = [unifiedMaxTokensCap(), maxTokensCapFor(platform)].filter((c): c is number => c != null);
-  return caps.length === 0 ? resolved : Math.min(resolved, ...caps);
+  const caps = [unifiedMaxTokensCap(), maxTokensCapFor(platform), contextBudget].filter((c): c is number => c != null && c > 0);
+  return caps.length === 0 ? resolved : Math.max(1, Math.min(resolved, ...caps));
 }
 
 // ── Unified output-token cap ─────────────────────────────────────────────────

@@ -128,3 +128,31 @@ describe('per-platform max_tokens ceiling', () => {
     expect(resolveMaxTokens('github', 65536)).toBe(128);
   });
 });
+
+describe('contextBudget clamping', () => {
+  it('clamps max_tokens to the remaining context budget', () => {
+    expect(resolveMaxTokens('groq', 64000, 48000)).toBe(48000);
+  });
+
+  it('leaves max_tokens alone when it fits', () => {
+    expect(resolveMaxTokens('groq', 4096, 60000)).toBe(4096);
+  });
+
+  it('ignores contextBudget when undefined', () => {
+    expect(resolveMaxTokens('groq', 64000, undefined)).toBe(64000);
+  });
+
+  it('ignores contextBudget when zero or negative', () => {
+    expect(resolveMaxTokens('groq', 64000, 0)).toBe(64000);
+    expect(resolveMaxTokens('groq', 64000, -100)).toBe(64000);
+  });
+
+  it('floors the result at 1', () => {
+    expect(resolveMaxTokens('groq', 64000, 1)).toBe(1);
+  });
+
+  it('takes the tightest of context budget, platform cap, and operator cap', () => {
+    settingStore.set(UNIFIED_MAX_TOKENS_SETTING, '16000');
+    expect(resolveMaxTokens('github', 64000, 48000)).toBe(Math.min(GITHUB_MAX_OUTPUT_TOKENS, 16000, 48000));
+  });
+});
