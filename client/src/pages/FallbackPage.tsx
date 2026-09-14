@@ -21,6 +21,7 @@ import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import {
   buildGroups,
+  isGroupDepleted,
   groupMatchesQuery,
   groupMaxContext,
   type FallbackEntry,
@@ -176,7 +177,7 @@ export default function FallbackPage() {
     mutationFn: (payload: {
       strategy: RoutingStrategy; weights?: RoutingWeights; exploreEnabled?: boolean
       peakHoursAdjust?: boolean; peakStartHour?: number; peakEndHour?: number; peakTimezone?: string
-      keySelectionStrategy?: KeySelectionStrategy
+      keySelectionStrategy?: KeySelectionStrategy; cooldownCeilingMs?: number | null
     }) =>
       apiFetch('/api/fallback/routing', { method: 'PUT', body: JSON.stringify(payload) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
@@ -229,7 +230,7 @@ export default function FallbackPage() {
 
   // ── Model unification: a model served by several providers is always shown as
   // one logical row that links to its own page (the on/off toggle was removed). ─
-  const orderedGroups = useMemo(() => buildGroups(rows, isManual), [rows, isManual])
+  const orderedGroups = useMemo(() => buildGroups(rows, isManual, rateUsageByModel), [rows, isManual, rateUsageByModel])
 
   // Catalog search + filters (#343). Filtering operates on whole logical-model
   // groups; rank stays the model's position in the full chain so the numbers
@@ -419,6 +420,28 @@ export default function FallbackPage() {
                 </Tooltip>
               </label>
 
+              {/* Cooldown ceiling (#952). Caps the router's OWN bench guesses
+                  (escalation ladder, 402/403 day benches); provider-stated
+                  retry times are never shortened. Shown in every mode: the
+                  ladder runs regardless of how models are ranked. */}
+              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{t('strategies.cooldownCeiling')}</span>
+                <select
+                  value={routing?.cooldownCeilingMs == null ? '' : String(routing.cooldownCeilingMs)}
+                  disabled={strategyMutation.isPending}
+                  onChange={e => strategyMutation.mutate({ strategy, cooldownCeilingMs: e.target.value === '' ? null : Number(e.target.value) })}
+                  className="rounded-lg border bg-background px-2 py-1.5 text-xs text-foreground"
+                >
+                  <option value="">{t('strategies.cooldownCeilingDefault')}</option>
+                  <option value={String(10 * 60_000)}>{t('strategies.cooldownCeiling10m')}</option>
+                  <option value={String(60 * 60_000)}>{t('strategies.cooldownCeiling1h')}</option>
+                  <option value={String(6 * 60 * 60_000)}>{t('strategies.cooldownCeiling6h')}</option>
+                </select>
+                <Tooltip text={t('strategies.cooldownCeilingHint')}>
+                  <span className="cursor-help underline decoration-dotted underline-offset-2">?</span>
+                </Tooltip>
+              </label>
+
               {/* Exploration toggle (#685 follow-up): a niche knob that gives
                   unmeasured models a guaranteed chance to be tried so they build
                   reliability/speed data. Hidden in Manual mode, where
@@ -592,7 +615,7 @@ export default function FallbackPage() {
                       <tr
                         key={g.key}
                         onClick={() => navigate(`/models/chat/${encodeURIComponent(g.members[0].canonicalId ?? g.members[0].modelId)}`)}
-                        className={`group/row border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? '' : 'opacity-50'}`}
+                        className={`group/row border-b last:border-0 cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${g.members.some(m => m.enabled) ? (isGroupDepleted(g.members, rateUsageByModel) ? 'opacity-60' : '') : 'opacity-50'}`}
                       >
                         <GroupHeaderCells group={g} rank={rankByKey.get(g.key) ?? 0} onToggleGroup={handleGroupToggle} allRows={rows} rateUsage={rateUsageByModel} />
                       </tr>

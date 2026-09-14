@@ -9,6 +9,13 @@ import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
 import { SailProvider } from './sail.js';
+import { ElectronHubProvider } from './electronhub.js';
+import { ExperientialProvider } from './experiential.js';
+import { Router9Provider } from './router9.js';
+import { SeptorProvider } from './septor.js';
+import { ClodProvider } from './clod.js';
+import { SpeechifyProvider } from './speechify.js';
+import { BlazeProvider } from './blaze.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -42,6 +49,19 @@ register(new OpenAICompatProvider({
 // usage beyond that grant is pay-as-you-go. Live-tested 2026-09-01. Model rows
 // stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
 register(new SailProvider());
+
+// Free-plan grants are shared wallets, not free credits per model. Eligibility
+// and tested model rows belong in Oracle, never in bundled DB migrations.
+register(new ElectronHubProvider());
+register(new ExperientialProvider());
+// Router9 has shared monthly credits; Septor's zero-price models share daily
+// quota (its signup credit is one-time). Model rows live only in Oracle so
+// the existing Premium-now / Free-after-30-days gate remains authoritative.
+register(new Router9Provider());
+register(new SeptorProvider());
+register(new ClodProvider());
+register(new SpeechifyProvider());
+register(new BlazeProvider());
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;

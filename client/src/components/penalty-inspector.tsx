@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronDown, Clock3, Gauge, RefreshCcw } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Clock3, Eraser, Gauge, RefreshCcw } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 
@@ -102,6 +102,18 @@ export function PenaltyInspector() {
     },
   })
 
+  // #952: one bad window can walk a whole pool onto day-long benches; the
+  // per-key reset above then means clicking through every key. Lift every
+  // cooldown, penalty and failure streak in one go. Pressure rebuilds from the
+  // next live results, so a premature clear costs one more round of failures.
+  const clearAll = useMutation({
+    mutationFn: () => apiFetch('/api/fallback/penalty-inspector', { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+    },
+  })
+
   const rows = data?.rows ?? []
   if (rows.length === 0) return null
 
@@ -141,6 +153,18 @@ export function PenaltyInspector() {
 
       {!collapsed && (
       <div className="divide-y">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+          <p className="text-xs text-muted-foreground">{t('penaltyInspector.clearAllHint')}</p>
+          <button
+            type="button"
+            onClick={() => clearAll.mutate()}
+            disabled={clearAll.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+          >
+            <Eraser className="size-3.5" />
+            {t('penaltyInspector.clearAll')}
+          </button>
+        </div>
         {rows.map(row => (
           <div key={`${row.platform}:${row.modelId}:${row.modelDbId ?? 'missing'}`} className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(10rem,0.8fr)_minmax(14rem,1.3fr)]">
             <div className="min-w-0">

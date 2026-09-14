@@ -103,6 +103,9 @@ export interface RoutingData {
   /** Key-selection policy (#919). Required for the same reason as
    *  exploreEnabled: the picker renders straight from GET /routing. */
   keySelectionStrategy: KeySelectionStrategy
+  /** Ceiling on the router's own cooldown guesses in ms (#952); null = no cap
+   *  (ladder tops out at 24h, 402/403 bench a day). */
+  cooldownCeilingMs: number | null
   scores: (RoutingScore & { platform: string; modelId: string; displayName: string; enabled: boolean })[]
 }
 
@@ -372,11 +375,39 @@ export function tightestRateLimit(
   return best
 }
 
+// ── Depleted rows (#1015) ────────────────────────────────────────────────────
+// A member is depleted when its tightest time-window quota (#876) is used up —
+// exactly the state that turns its RateLimitBadge red. A member with no usage
+// data is never depleted: an idle provider may simply not have been polled
+// yet, and there is no evidence it cannot serve.
+export function isMemberDepleted(usage: RateLimitUsageRow | undefined): boolean {
+  const tightest = usage ? tightestRateLimit([usage]) : null
+  return tightest !== null && tightest.used >= tightest.limit
+}
+
+// A group is depleted only when EVERY member is — the group stays routable
+// while any single provider has headroom, the same rule the group badge reads
+// from the best member. Members without usage data count as healthy here, so
+// the table only folds a row it can prove is exhausted across the board.
+export function isGroupDepleted(
+  members: readonly { modelDbId: number }[],
+  rateUsage: ReadonlyMap<number, RateLimitUsageRow>,
+): boolean {
+  return members.length > 0 && members.every(m => isMemberDepleted(rateUsage.get(m.modelDbId)))
+}
+
 export const platformColors: Record<string, string> = {
   google:      '#4285f4',
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
+  electronhub: '#6366f1',
+  experiential: '#14b8a6',
+  router9:      '#8b5cf6',
+  septor:       '#0891b2',
+  clod:         '#16a34a',
+  speechify:    '#7c3aed',
+  blaze:        '#f97316',
   bai:         '#111827',
   radeon:      '#ed1c24',
   nvidia:      '#76b900',
@@ -423,7 +454,18 @@ export interface ModelGroupRow {
 // when ungrouped). Members are ordered like the flat chain — by manual priority
 // under the priority strategy, by live score otherwise — and groups inherit the
 // best member's position so the unified order matches the flat order.
-export function buildGroups(rows: Row[], isManual: boolean): ModelGroupRow[] {
+//
+// With rate-limit usage supplied (#1015) and the table ordering itself (score
+// mode), members and groups whose time-window quota is used up sink to the
+// bottom so healthy models stay on top. Both passes are stable sorts, so the
+// score order survives inside each partition. Manual mode deliberately opts
+// out: the visible order there is the operator's explicit drag-arranged ladder
+// and must not reshuffle under them (the graying still applies).
+export function buildGroups(
+  rows: Row[],
+  isManual: boolean,
+  rateUsage?: ReadonlyMap<number, RateLimitUsageRow>,
+): ModelGroupRow[] {
   const map = new Map<string, Row[]>()
   for (const r of rows) {
     const key = r.groupKey ?? `solo:${r.modelDbId}`
@@ -441,6 +483,11 @@ export function buildGroups(rows: Row[], isManual: boolean): ModelGroupRow[] {
       ? Math.min(...a.members.map(m => m.priority)) - Math.min(...b.members.map(m => m.priority))
       : Math.max(...b.members.map(m => m.score ?? 0)) - Math.max(...a.members.map(m => m.score ?? 0)),
   )
+  if (rateUsage && !isManual) {
+    const depleted = (m: Row) => isMemberDepleted(rateUsage.get(m.modelDbId))
+    for (const g of groups) g.members.sort((a, b) => Number(depleted(a)) - Number(depleted(b)))
+    groups.sort((a, b) => Number(isGroupDepleted(a.members, rateUsage)) - Number(isGroupDepleted(b.members, rateUsage)))
+  }
   return groups
 }
 

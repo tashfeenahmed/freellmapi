@@ -405,6 +405,42 @@ describe('media service', () => {
   });
 
   describe('text-to-speech', () => {
+    it.each(['simba-3.0', 'simba-3.2'])('Speechify %s sends native fields and decodes JSON audio', async model => {
+      addMedia('speechify', model, 'audio');
+      addKey('speechify');
+      const audio = Buffer.from('ID3test-audio');
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ audio_data: audio.toString('base64'), audio_format: 'mp3', billable_characters_count: 5 }));
+      const result = await runSpeech(model, { input: 'Hello', voice: 'alloy' });
+      expect(result.audio).toEqual(audio);
+      expect(result.contentType).toBe('audio/mpeg');
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.speechify.ai/v1/audio/speech');
+      expect(new Headers(init?.headers).get('Speechify-Version')).toBe('2026-09-08');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer speechify-test-key');
+      expect(JSON.parse(String(init?.body))).toEqual({ model, input: 'Hello', voice_id: 'alec', audio_format: 'mp3' });
+    });
+
+    it('Speechify preserves native voices and requested supported formats', async () => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ audio_data: 'T2dnUw==', audio_format: 'ogg' }));
+      const result = await runSpeech('test-simba', { input: 'Hello', voice: 'native-voice-id', format: 'ogg' });
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ voice_id: 'native-voice-id', audio_format: 'ogg' });
+      expect(result.contentType).toBe('audio/ogg');
+    });
+
+    it.each(['pcm', 'flac', 'opus'])('Speechify rejects unsupported %s without sending a request', async format => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      await expect(runSpeech('test-simba', { input: 'Hello', format })).rejects.toThrow('Speechify supports');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each([{}, { audio_data: 'not base64', audio_format: 'mp3' }, { audio_data: '', audio_format: 'mp3' }, { audio_data: 'SUQz', audio_format: 'wav' }])('Speechify rejects malformed audio instead of returning JSON as sound', async body => {
+      addMedia('speechify', 'test-simba', 'audio'); addKey('speechify');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(body));
+      await expect(runSpeech('test-simba', { input: 'Hello' })).rejects.toThrow('Speechify returned');
+    });
+
     it('Cloudflare MeloTTS: base64 audio → audio/mpeg bytes', async () => {
       addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio');
       addKey('cloudflare', 'acct:tok');

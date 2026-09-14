@@ -82,6 +82,17 @@ describe('isModelNotFoundError (drives whole-model skip within a request)', () =
     expect(isModelNotFoundError(new Error('No endpoints found for openrouter/minimax/minimax-m2.5:free'))).toBe(true);
   });
 
+  it('flags a stale/removed model reported as a 400 "No model found" (Routeway) — MODEL-level, not request shape', () => {
+    // "No model found" does NOT contain the substring "not found" (words are
+    // no/model/found), so before the phrase list it slipped through to
+    // isProviderBadRequestError and surfaced as a request-blaming 400.
+    expect(isModelNotFoundError(Object.assign(new Error('Routeway API error 400: No model found: llama-3.3-70b-instruct:free'), { status: 400 }))).toBe(true);
+    expect(isModelNotFoundError(new Error('Groq API error 400: model not found'))).toBe(true);
+    expect(isModelNotFoundError(new Error('Provider API error 400: unknown model'))).toBe(true);
+    expect(isModelNotFoundError(new Error('API error 400: model does not exist'))).toBe(true);
+    expect(isModelNotFoundError(new Error('API error 404: no such model'))).toBe(true);
+  });
+
   it('flags 410 Gone (model pulled upstream) by message or attached status — #339', () => {
     expect(isModelNotFoundError(new Error('Ollama Cloud API error 410: Gone'))).toBe(true);
     expect(isModelNotFoundError(Object.assign(new Error('Gone'), { status: 410 }))).toBe(true);

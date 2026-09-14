@@ -116,6 +116,13 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
   if (platform === 'groq') return 'groq::account';
   if (platform === 'cerebras') return 'cerebras::shared';
   if (platform === 'sail') return 'sail::monthly-credit';
+  if (platform === 'electronhub') return normalizedModelId.endsWith(':free') ? 'electronhub::daily-free' : 'electronhub::weekly-credit';
+  if (platform === 'experiential') return 'experiential::monthly-credit';
+  if (platform === 'router9') return 'router9::monthly-credit';
+  if (platform === 'septor') return 'septor::daily-free';
+  if (platform === 'clod') return 'clod::daily-free';
+  if (platform === 'speechify') return 'speechify::monthly-characters';
+  if (platform === 'blaze') return 'blaze::daily-free';
   if (platform === 'bai') return 'bai::promo';
   if (platform === 'radeon') return 'radeon::daily-free';
   if (platform === 'sambanova') return 'sambanova::shared';
@@ -164,12 +171,35 @@ function inferPoolForPlatform(platform: Platform, modelId?: string | null): stri
 }
 
 function isSharedPool(platform: Platform): boolean {
+  if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze'].includes(platform)) return true;
   return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
 
 const HEADER_SPECS: Partial<Record<Platform, HeaderSpec[]>> = {
+  // Observe upstream limits without inventing per-model budgets. CLōD's
+  // rate window is distinct from its daily grant; Speechify bills characters,
+  // not tokens, and does not publish token headers.
+  clod: [
+    { metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
+  ],
+  blaze: [
+    { metric: 'tokens', limit: 'x-ratelimit-limit-tokens', remaining: 'x-ratelimit-remaining-tokens', strategy: 'provider_reported' },
+  ],
+  // Observe actual headers only: Router9's documented request windows differ
+  // from live headers. No invented per-model quotas or credit-to-token math.
+  router9: [
+    { metric: 'credits', limit: 'x-credits-limit', remaining: 'x-credits-remaining', reset: 'x-credits-reset', strategy: 'provider_reported' },
+  ],
+  septor: [
+    { metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
+  ],
+  // Live-observed account-wide rolling-minute headers; no invented limits or
+  // conversion of credit grants into token budgets.
+  electronhub: [
+    { metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
+  ],
   groq: [
     { metric: 'requests', limit: 'x-ratelimit-limit-requests', remaining: 'x-ratelimit-remaining-requests', reset: 'x-ratelimit-reset-requests', strategy: 'provider_reported' },
     { metric: 'tokens', limit: 'x-ratelimit-limit-tokens', remaining: 'x-ratelimit-remaining-tokens', reset: 'x-ratelimit-reset-tokens', strategy: 'provider_reported' },

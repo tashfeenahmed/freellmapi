@@ -1,6 +1,8 @@
 import { getDb } from '../db/index.js';
-import { getAllPenalties } from './router.js';
+import { getAllPenalties, clearAllPenalties } from './router.js';
 import { rateLimitFactor } from './scoring.js';
+import { clearAllCooldowns } from './ratelimit.js';
+import { clearModelFailureWindows } from '../lib/fallback-loop.js';
 
 const INSPECTOR_LOOKBACK_MINUTES = 30;
 const MAX_ERRORS_PER_MODEL = 5;
@@ -89,6 +91,31 @@ function ensureInspectorRow(
 
 function addReason(row: InspectorRow, reason: InspectorReason): void {
   if (!row.reasons.includes(reason)) row.reasons.push(reason);
+}
+
+export interface RouterPressureClearResult {
+  /** Active cooldown benches lifted (every key, every model). */
+  cooldowns: number;
+  /** Models whose score penalty was dropped. */
+  penalties: number;
+  /** Models whose cross-key failure streak was reset. */
+  failureWindows: number;
+}
+
+/**
+ * The "Clear all" action behind the Router pressure panel (#952). One click
+ * releases everything the router accumulated against a pool: cooldowns (and
+ * the ladder counters behind them), score penalties, and the model-failure
+ * streaks that re-bench a model across keys. Pressure rebuilds from the next
+ * live results, so the worst case of a premature clear is one more round of
+ * failures — far better than a pool that cannot route for a day.
+ */
+export function clearRouterPressure(): RouterPressureClearResult {
+  return {
+    cooldowns: clearAllCooldowns(),
+    penalties: clearAllPenalties(),
+    failureWindows: clearModelFailureWindows(),
+  };
 }
 
 export function getPenaltyInspector(): PenaltyInspectorSnapshot {

@@ -138,7 +138,7 @@ authRouter.post('/login', (req: Request, res: Response) => {
   const { email, password } = parsed.data;
 
   if (isLockedOut(email)) {
-    res.status(429).json({ error: { message: 'Too many failed attempts. Try again later.', type: 'rate_limit_error' } });
+    res.status(429).json({ error: { message: 'Too many attempts. Wait 15 minutes or restart the app.', type: 'rate_limit_error' } });
     return;
   }
 

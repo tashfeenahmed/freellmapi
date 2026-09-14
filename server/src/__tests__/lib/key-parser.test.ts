@@ -70,6 +70,17 @@ describe('key parser', () => {
     expect(detectPlatform('AMD_TOKENFACTORY_')).toBe('radeon');
     expect(detectPlatform('SAIL_')).toBe('sail');
     expect(detectPlatform('SAIL_RESEARCH_')).toBe('sail');
+    expect(detectPlatform('ELECTRONHUB_')).toBe('electronhub');
+    expect(detectPlatform('ELECTRON_HUB_')).toBe('electronhub');
+    expect(detectPlatform('EXPERIENTIAL_')).toBe('experiential');
+    expect(detectPlatform('EXPERIENTIALLABS_')).toBe('experiential');
+    expect(detectPlatform('EXPERIENTIAL_LABS_')).toBe('experiential');
+    expect(detectPlatform('EXPLABS_')).toBe('experiential');
+    expect(detectPlatform('ROUTER9_')).toBe('router9');
+    expect(detectPlatform('ROUTER_9_')).toBe('router9');
+    expect(detectPlatform('SEPTOR_')).toBe('septor');
+    expect(detectPlatform('SEPTORLABS_')).toBe('septor');
+    expect(detectPlatform('SEPTOR_LABS_')).toBe('septor');
     expect(detectPlatform('SAMBANOVA_')).toBeNull();
   });
 
@@ -88,6 +99,14 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['radeon-cloud']).toBe('radeon');
     expect(AUTH_JSON_PROVIDER_MAP['amd-tokenfactory']).toBe('radeon');
     expect(AUTH_JSON_PROVIDER_MAP['sail-research']).toBe('sail');
+    expect(AUTH_JSON_PROVIDER_MAP['electron-hub']).toBe('electronhub');
+    expect(AUTH_JSON_PROVIDER_MAP['experiential-labs']).toBe('experiential');
+    expect(AUTH_JSON_PROVIDER_MAP['explabs']).toBe('experiential');
+    expect(AUTH_JSON_PROVIDER_MAP['router9']).toBe('router9');
+    expect(AUTH_JSON_PROVIDER_MAP['router-9']).toBe('router9');
+    expect(AUTH_JSON_PROVIDER_MAP['septor']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['septor-labs']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['septorlabs']).toBe('septor');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],
@@ -106,6 +125,12 @@ describe('key parser', () => {
       { rawKey: 'ANTHROPIC_API_KEY=sk-ant-test-value', prefix: 'ANTHROPIC_', platform: null },
     ]);
     expect(result.skipped).toEqual(['PORT: value does not look like an API key']);
+  });
+
+  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze']])('imports %s environment keys', (prefix, platform) => {
+    const result = parseKeysFromFile(`${prefix}_API_KEY=not-a-real-provider-key`, 'keys.env');
+    expect(result.keys).toHaveLength(1);
+    expect(result.keys[0].platform).toBe(platform);
   });
 
   it('filters obvious non-key values', () => {

@@ -151,7 +151,7 @@ export class OpenAICompatProvider extends BaseProvider {
   /** Requesty's Leanstral route rejects greedy sampling when temperature=0.
    * Omitting that value and supplying a neutral top_p keeps the caller's intent
    * deterministic enough while using the provider's supported sampling path. */
-  private samplingForModel(modelId: string, options?: CompletionOptions): {
+  protected samplingForModel(modelId: string, options?: CompletionOptions): {
     temperature: number | undefined;
     topP: number | undefined;
   } {

@@ -280,6 +280,57 @@ interface CacheEntry {
 // at the end (delete + set), so eviction from the front drops the coldest entry.
 const store = new Map<string, CacheEntry>();
 
+// Streaming entries live in their own LRU: a stream's replayable artifact is
+// the exact SSE byte sequence, which is structurally different from a JSON
+// completion body, so the two kinds never share a key across stores. The
+// frames are concatenated into one string on store — a hit replays the whole
+// sequence in a single write, and one string costs far less than an array of
+// hundreds of small ones.
+interface StreamCacheEntry {
+  sse: string; // verbatim `data: {...}\n\n` frames, `[DONE]` included
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+  hitCount: number;
+  createdAtMs: number;
+  lastHitAtMs: number | null;
+}
+const streamStore = new Map<string, StreamCacheEntry>();
+
+/** Last use of an entry, for cross-store recency comparison. */
+function lastUsedAtMs(entry: { createdAtMs: number; lastHitAtMs: number | null }): number {
+  return entry.lastHitAtMs ?? entry.createdAtMs;
+}
+
+/**
+ * Evict least-recently-used entries until the JSON and streaming stores hold
+ * RESPONSE_CACHE_MAX_ENTRIES *between them*. One shared budget, so enabling
+ * streaming replay cannot silently double the documented memory ceiling.
+ * Each map is itself in LRU order, so only their two front entries can be the
+ * coldest; the older of the two goes first.
+ */
+function enforceCombinedCap(): void {
+  const cap = cacheMaxEntries();
+  while (store.size + streamStore.size > cap) {
+    const jsonKey = store.keys().next().value as string | undefined;
+    const streamKey = streamStore.keys().next().value as string | undefined;
+    const jsonAge = jsonKey === undefined ? Infinity : lastUsedAtMs(store.get(jsonKey)!);
+    const streamAge = streamKey === undefined ? Infinity : lastUsedAtMs(streamStore.get(streamKey)!);
+    if (streamKey !== undefined && streamAge <= jsonAge) {
+      streamStore.delete(streamKey);
+    } else if (jsonKey !== undefined) {
+      store.delete(jsonKey);
+      // Evicting in memory but not on disk would let the table grow without
+      // bound and let a restart resurrect entries the LRU already gave up on.
+      scheduleRowDelete(jsonKey);
+    } else {
+      break; // both stores empty; cap is 0
+    }
+  }
+}
+
 // Lifetime-of-process lookup tallies, the denominator behind the dashboard's
 // hit rate. Entries alone cannot provide it: a cache that is 99% empty is 0%
 // useful, and a flushed store would otherwise read as a 100% hit rate.
@@ -343,11 +394,13 @@ export function __flushPersistenceForTests(): void {
  * Test-only: drop the in-memory LRU while leaving the SQLite table intact, the
  * way a process restart does. (clearCache() is the user-facing flush and wipes
  * both, so it cannot stand in for a restart.) Pending write-through is drained
- * first, since a real restart's writes had already landed.
+ * first, since a real restart's writes had already landed. Streaming entries
+ * are memory-only (never written through), so a restart drops them too.
  */
 export function __resetMemoryForTests(): void {
   drainPendingWrites();
   store.clear();
+  streamStore.clear();
   lookupHits = 0;
   lookupMisses = 0;
 }
@@ -434,17 +487,10 @@ export function storeCachedResponse(cacheKey: string, input: StoreInput, now = D
     lastHitAtMs: null,
   });
 
-  // Evict least-recently-used beyond the cap. The count only drifts by one per
-  // insert, so at most one entry is removed per call in steady state.
-  const cap = cacheMaxEntries();
-  while (store.size > cap) {
-    const oldest = store.keys().next().value as string | undefined;
-    if (oldest === undefined) break;
-    store.delete(oldest);
-    // Evicting in memory but not on disk would let the table grow without
-    // bound and let a restart resurrect entries the LRU already gave up on.
-    scheduleRowDelete(oldest);
-  }
+  // Evict least-recently-used beyond the cap, which is shared with the
+  // streaming store. The count only drifts by one per insert, so at most one
+  // entry is removed per call in steady state.
+  enforceCombinedCap();
 
   // Write-through to SQLite. hit_count is stored at its current in-memory value
   // (0 for a fresh store, since an overwrite resets the rolling stat with the
@@ -543,9 +589,108 @@ export function loadCacheFromDb(now = Date.now()): void {
   }
 }
 
+// ── Streaming entries ──
+
+/**
+ * Ceiling on one cached stream's replay payload. A single long answer must not
+ * be able to pin megabytes of SSE text in memory, and a stream past this size
+ * is cheap to regenerate relative to what it costs to hold. The caller stops
+ * buffering at this point too (proxy.ts), so an oversize stream never fully
+ * materializes; this is the store-side backstop.
+ */
+export const STREAM_CACHE_MAX_BYTES = 2 * 1024 * 1024;
+
+export interface CachedStreamResponse {
+  /** The whole SSE sequence, ready to write in one go. */
+  sse: string;
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface StoreStreamInput {
+  frames: string[];
+  platform: string;
+  modelId: string;
+  keyId: number | null;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
+ * Look up a cached stream. Returns null on a miss or when the entry has aged
+ * past the TTL. A hit bumps hit_count and moves the entry to MRU, and — like
+ * the JSON lookup — counts into the process-wide hit/miss tallies behind the
+ * dashboard's hit rate, so streaming traffic is not invisible there.
+ */
+export function getCachedStreamResponse(cacheKey: string, now = Date.now()): CachedStreamResponse | null {
+  const entry = streamStore.get(cacheKey);
+  if (!entry) {
+    lookupMisses += 1;
+    return null;
+  }
+
+  if (now - entry.createdAtMs > cacheTtlMs()) {
+    streamStore.delete(cacheKey);
+    lookupMisses += 1;
+    return null;
+  }
+
+  lookupHits += 1;
+  entry.hitCount += 1;
+  entry.lastHitAtMs = now;
+  streamStore.delete(cacheKey);
+  streamStore.set(cacheKey, entry);
+
+  return {
+    sse: entry.sse,
+    platform: entry.platform,
+    modelId: entry.modelId,
+    keyId: entry.keyId,
+    promptTokens: entry.promptTokens,
+    completionTokens: entry.completionTokens,
+  };
+}
+
+/**
+ * Store a completed SSE frame sequence for replay. The frames are the verbatim
+ * `data: {...}\n\n` lines (including the final `[DONE]`) the client received,
+ * concatenated, so a hit reproduces the stream byte-for-byte. Best-effort like
+ * the JSON store: an empty or oversize sequence is silently skipped, and the
+ * entry shares the JSON store's entry cap.
+ */
+export function storeCachedStreamResponse(cacheKey: string, input: StoreStreamInput, now = Date.now()): void {
+  if (!Array.isArray(input.frames) || input.frames.length === 0) return;
+  const sse = input.frames.join('');
+  if (sse.length === 0 || Buffer.byteLength(sse) > STREAM_CACHE_MAX_BYTES) return;
+
+  streamStore.delete(cacheKey);
+  streamStore.set(cacheKey, {
+    sse,
+    platform: input.platform,
+    modelId: input.modelId,
+    keyId: input.keyId,
+    promptTokens: input.promptTokens,
+    completionTokens: input.completionTokens,
+    hitCount: 0,
+    createdAtMs: now,
+    lastHitAtMs: null,
+  });
+
+  enforceCombinedCap();
+}
+
 // ── Stats / admin ──
 
 export interface CacheStats {
+  /**
+   * Entries held across BOTH stores (JSON completions + streaming replays),
+   * which is also what the shared RESPONSE_CACHE_MAX_ENTRIES cap bounds. One
+   * prompt asked both streaming and non-streaming therefore counts twice —
+   * they are two independent replayable artifacts, and two slots of the cap.
+   */
   entries: number;
   /** Hits accumulated by the entries currently held, restored from SQLite. */
   totalHits: number;
@@ -580,9 +725,14 @@ export function getCacheStats(): CacheStats {
     savedPromptTokens += entry.hitCount * entry.promptTokens;
     savedCompletionTokens += entry.hitCount * entry.completionTokens;
   }
+  for (const entry of streamStore.values()) {
+    totalHits += entry.hitCount;
+    savedPromptTokens += entry.hitCount * entry.promptTokens;
+    savedCompletionTokens += entry.hitCount * entry.completionTokens;
+  }
   const lookups = lookupHits + lookupMisses;
   return {
-    entries: store.size,
+    entries: store.size + streamStore.size,
     totalHits,
     estimatedRequestsSaved: totalHits,
     savedPromptTokens,
@@ -602,8 +752,9 @@ export function getCacheStats(): CacheStats {
  * rather than deferred: this is an admin route, not the proxy hot path.
  */
 export function clearCache(): number {
-  const removed = store.size;
+  const removed = store.size + streamStore.size;
   store.clear();
+  streamStore.clear();
   pendingWrites.length = 0;
   // The lookup tallies describe the cache that just went away; keeping them
   // would show a 90% hit rate next to zero entries right after a flush.

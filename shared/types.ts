@@ -68,6 +68,16 @@ export type Platform =
   // monthly when a payment method is attached; usage beyond the grant is
   // pay-as-you-go. Background polling is required for its flex-only models.
   | 'sail'
+  // Hosted gateways; model rows are delivered by the signed catalog only.
+  // ElectronHub renews weekly credits; Experiential renews monthly credits.
+  | 'electronhub'
+  | 'experiential'
+  // Catalog-managed gateways: monthly shared credits vs daily free-model quota.
+  | 'router9'
+  | 'septor'
+  | 'clod'
+  | 'speechify'
+  | 'blaze'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'
