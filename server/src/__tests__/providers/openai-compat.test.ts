@@ -70,6 +70,36 @@ describe('OpenAICompatProvider', () => {
     expect(capturedBody.messages[0].role).toBe('user');
   });
 
+  it('evaluates function-valued extraHeaders once per request', async () => {
+    let issued = 0;
+    const dynamic = new OpenAICompatProvider({
+      platform: 'opencode',
+      name: 'Zen',
+      baseUrl: 'https://api.test.com/v1',
+      extraHeaders: () => ({ 'x-opencode-session': `session-${++issued}` }),
+    });
+    const seen: string[] = [];
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      seen.push((init as any).headers['x-opencode-session']);
+      return {
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'test-id',
+          object: 'chat.completion',
+          created: 123,
+          model: 'test-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      } as any;
+    });
+
+    await dynamic.chatCompletion('my-key', [{ role: 'user', content: 'one' }], 'test-model');
+    await dynamic.chatCompletion('my-key', [{ role: 'user', content: 'two' }], 'test-model');
+
+    expect(seen).toEqual(['session-1', 'session-2']);
+  });
+
   describe('Moonshot assistant `partial` prefill flag (#1038)', () => {
     beforeEach(() => {
       // The custom-platform SSRF guard resolves public hosts before every
