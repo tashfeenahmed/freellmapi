@@ -634,3 +634,28 @@ export function modelRetirementSignal(err: any): ModelRetirementConfidence | nul
   if (!isModelNotFoundError(err)) return null;
   return MODEL_GONE_PHRASES.some(phrase => msg.includes(phrase)) ? 'probable' : null;
 }
+
+// A stream that ended without its terminal marker (`[DONE]` and/or a
+// finish_reason): the upstream connection was reset or the response truncated
+// mid-generation. Observed live on Kilo Gateway (5 attempts in one session,
+// #1218): the gateway answers 200, streams content, then dies without
+// `data: [DONE]` — `readSseStream` throws
+// "…stream ended unexpectedly (no [DONE], no finish_reason)".
+//
+// The truncation is UPSTREAM transport, not request shape, so the plain
+// retryable path (a fresh attempt on a sibling key, or even the same key
+// later) is the right response — but a stream that dies with zero content
+// deltas is usually the ROUTE (platform+model+key edge) that is sick, not
+// bad luck: three empty-ended truncations in a row on the same route
+// reliably precede another one. Callers use this signal to bench the route
+// after a short streak instead of re-paying the round trip every request.
+export function isStreamTruncatedError(err: any): boolean {
+  const msg = (err?.message ?? '').toLowerCase();
+  return msg.includes('stream ended unexpectedly')
+    || msg.includes('no [done], no finish_reason')
+    // undici surfaces an abrupt RST as "terminated" on the body read; with
+    // our SSE reader the top-level message is "terminated" and the real
+    // cause is buried in err.cause (see isTransportError). Count it too:
+    // a terminated mid-stream body is the same dead route either way.
+    || msg === 'terminated';
+}

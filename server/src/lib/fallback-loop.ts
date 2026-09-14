@@ -48,6 +48,7 @@ import {
   isProviderLevelError,
   isContextTooLargeError,
   isTimeoutErrorText,
+  isStreamTruncatedError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { parseProviderReportedSize } from './provider-size-parser.js';
@@ -279,6 +280,23 @@ export function cooldownDecisionForError(route: RouteResult, err: any): Cooldown
   );
 }
 
+// ── Truncated-stream streak (#1218) ──────────────────────────────────────────
+// A stream that answers 200, sends partial SSE, then dies without [DONE] /
+// finish_reason ("stream ended unexpectedly") is retried normally — one
+// truncation is common on flaky free gateways. But the same route producing
+// them back-to-back is a sick edge: bench it briefly so the ladder stops
+// re-paying the round trip. Success on the route resets the streak.
+export const TRUNCATION_STREAK_LIMIT = 3;
+// 5 min vs the ordinary 90s transient bench: the streak must add REAL distance
+// over the default or it changes nothing — the escalation ladder already gives
+// a single truncation 90s.
+export const TRUNCATION_BENCH_MS = 5 * 60 * 1000;
+const truncationStreaks = new Map<string, number>(); // "platform:modelId:keyId"
+
+export function resetTruncationStreaks(): void {
+  truncationStreaks.clear();
+}
+
 // ── Empty-completion streak (issue #751) ─────────────────────────────────────
 // The skipBench exemption below assumes an empty 'length' completion is
 // REQUEST behavior (this turn's max_tokens spent on hidden reasoning). A
@@ -408,6 +426,27 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
+  // A truncated stream (200 + partial SSE, no [DONE]/finish_reason) on the
+  // SAME route repeatedly is a sick edge, not bad luck — but a single one is
+  // common enough on flaky free gateways that benching on first sight would
+  // over-fire. Streak-bounded like empty completions (#751): N truncations in
+  // a row on this platform+model+key bench the route for one cooldown window;
+  // a success resets the streak (recordUpstreamSuccess).
+  if (isStreamTruncatedError(err)) {
+    const tk = `${route.platform}:${route.modelId}:${route.keyId}`;
+    const streak = (truncationStreaks.get(tk) ?? 0) + 1;
+    if (streak >= TRUNCATION_STREAK_LIMIT) {
+      truncationStreaks.delete(tk);
+      setCooldown(route.platform, route.modelId, route.keyId, TRUNCATION_BENCH_MS, 'heuristic');
+      console.warn(`[FallbackLoop] ${route.platform} ${route.modelId} key ${route.keyId}: ${streak} consecutive truncated streams — benching the route for ${Math.round(TRUNCATION_BENCH_MS / 1000)}s`);
+    } else {
+      truncationStreaks.set(tk, streak);
+    }
+  } else {
+    // Any other failure class on this route breaks the truncation streak: the
+    // cooldown ladder is already handling whatever that is.
+    truncationStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
+  }
   // A suspended ACCOUNT fails every model behind the key identically. The
   // per-route cooldown above benches only the model that happened to be
   // tried, so the next request picks the platform's next model and pays the
@@ -490,6 +529,9 @@ export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: numbe
   // A served request proves the model+key can complete: the empty-completion
   // streak (#751) starts over.
   emptyCompletionStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
+  // A served request is the strongest evidence the route's edge is alive:
+  // the truncated-stream streak (#1218) starts over too.
+  truncationStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
   // A served request is the strongest possible evidence the model works, so
   // clear any model-level failure streak that could bench it later.
   clearModelFailure(route);
