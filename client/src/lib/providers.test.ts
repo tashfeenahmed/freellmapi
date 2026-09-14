@@ -226,4 +226,3 @@ describe('localStorage UI state helpers', () => {
     expect(retrieved.has('cerebras')).toBe(true)
   })
 })
-
