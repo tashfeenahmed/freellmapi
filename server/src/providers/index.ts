@@ -298,6 +298,10 @@ register(new OpenAICompatProvider({
 // accepts image/video input). Balance is dashboard-only (no credits API).
 // Catalog rows live in the catalog (premium → age into free); they are NOT
 // shipped as freeapi model migrations.
+//
+// UPDATE 2026-09-13: New accounts no longer receive frictionless free trial
+// credits. Payment method attachment and prepaid credits are now required.
+// Marked as [Billing Required] — exclude from default zero-cost auto-routing.
 register(new OpenAICompatProvider({
   platform: 'reka',
   name: 'Reka',

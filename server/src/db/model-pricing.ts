@@ -180,6 +180,7 @@ export const MODEL_PRICING: PricingRow[] = [
   ['pollinations', 'openai-fast', 0.029, 0.14],
 
   // Reka (live /v1/models pricing, 2026-06-17)
+  // [Billing Required] Updated 2026-09-13: new accounts need prepaid credits.
   ['reka', 'reka-flash-3', 0.10, 0.20],
   ['reka', 'reka-edge-2603', 0.10, 0.10],
 
