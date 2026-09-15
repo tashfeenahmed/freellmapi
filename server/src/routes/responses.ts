@@ -9,7 +9,7 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, type RouteResult, type ChainRow } from '../services/router.js';
+import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -781,9 +781,29 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // Priority: explicit model > sticky session > auto routing.
   let preferredModel: number | undefined;
   let groupChain: ChainRow[] | undefined;
+  let resolvedChain: ResolvedChain | undefined;
+
+  // Sticky scope for a named auto:<profile> (or auto:smart) chain. Plain `auto`
+  // stays on the unscoped key so existing session affinity is unchanged.
+  let stickyStrategyKey: string | undefined;
 
   if (isAutoModel(requestedModelLabel)) {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader));
+    try {
+      resolvedChain = resolveRoutingChain(requestedModelLabel);
+    } catch (err: any) {
+      if (err?.status === 400) {
+        res.status(400).json({
+          error: { message: err.message, type: 'invalid_request_error' },
+        });
+        return;
+      }
+      throw err;
+    }
+    stickyStrategyKey = resolvedChain.strategyKey === 'auto' ? undefined : resolvedChain.strategyKey;
+    preferredModel = resolveStickyPreference(
+      getStickyModel(messages, sessionIdHeader, stickyStrategyKey),
+      resolvedChain.chain,
+    );
   } else if (isFusionModel(requestedModelLabel)) {
     // Fusion is a virtual model, not a row in the catalog. Its panel and
     // judge each resolve through the normal router inside runFusion below.
@@ -1116,7 +1136,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       // size latched onto state so the existing size gates in router.ts skip
       // low-TPM / small-context models on retry.
       const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
-      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
     },
     dispatch: async (route, attempt, ctx) => {
       traceRouteEvent('Responses', {
@@ -1404,7 +1424,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
           res.end();
 
           recordUpstreamSuccess(route, estimatedInputTokens + totalOutputTokens);
-          setStickyModel(messages, route.modelDbId, sessionIdHeader);
+          setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           traceRouteEvent('Responses', {
             event: 'ok',
             requestId: requestGroupId,
@@ -1529,7 +1549,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       // tokens against the rate-limit ledger; promptTokens/completionTokens
       // above already carry the chars/4 estimate.
       recordUpstreamSuccess(route, result.usage?.total_tokens ?? (promptTokens + completionTokens));
-      setStickyModel(messages, route.modelDbId, sessionIdHeader);
+      setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
 
       res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
       setFallbackHeaders(res, attempt, attemptLog);

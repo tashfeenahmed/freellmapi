@@ -514,4 +514,83 @@ describe('Model management API', () => {
     expect(missing.status).toBe(400);
     expect(JSON.stringify(missing.body)).toContain('no-such-group');
   });
+
+  function mockGroqChat(modelId: string, content: string) {
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('api.groq.com')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: () => Promise.resolve({
+            id: 'chatcmpl-chain', object: 'chat.completion', created: 1, model: modelId,
+            choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+  }
+
+  function lastServedModel(): string | undefined {
+    return (getDb().prepare('SELECT model_id FROM requests ORDER BY id DESC LIMIT 1')
+      .get() as { model_id: string } | undefined)?.model_id;
+  }
+
+  it('routes /v1/messages to model auto:<name> through that named chain (#1170)', async () => {
+    seedGroqKey();
+    const chainOnlyId = seedChainOnlyModel('named-chain-messages', 128000);
+    addToProfile(newProfile('messages-group', 8), chainOnlyId);
+    mockGroqChat('named-chain-messages', 'routed via messages-group');
+
+    const routed = await request(app, 'POST', '/v1/messages', {
+      model: 'auto:messages-group',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(routed.status).toBe(200);
+    expect(lastServedModel()).toBe('named-chain-messages');
+  });
+
+  it('rejects unknown auto:<name> on /v1/messages with 400 (#1170)', async () => {
+    seedGroqKey();
+    mockGroqChat('should-not-serve', 'silent pool fallback');
+
+    const missing = await request(app, 'POST', '/v1/messages', {
+      model: 'auto:no-such-group',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain('no-such-group');
+  });
+
+  it('routes /v1/responses to model auto:<name> through that named chain (#1170)', async () => {
+    seedGroqKey();
+    const chainOnlyId = seedChainOnlyModel('named-chain-responses', 128000);
+    addToProfile(newProfile('responses-group', 9), chainOnlyId);
+    mockGroqChat('named-chain-responses', 'routed via responses-group');
+
+    const routed = await request(app, 'POST', '/v1/responses', {
+      model: 'auto:responses-group',
+      input: 'hi',
+    });
+    expect(routed.status).toBe(200);
+    expect(lastServedModel()).toBe('named-chain-responses');
+  });
+
+  it('rejects unknown auto:<name> on /v1/responses with 400 (#1170)', async () => {
+    seedGroqKey();
+    mockGroqChat('should-not-serve', 'silent pool fallback');
+
+    const missing = await request(app, 'POST', '/v1/responses', {
+      model: 'auto:no-such-group',
+      input: 'hi',
+    });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain('no-such-group');
+  });
 });

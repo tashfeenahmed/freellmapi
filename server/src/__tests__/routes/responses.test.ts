@@ -567,7 +567,10 @@ describe('POST /v1/responses model routing priority (#579)', () => {
     expect(status).toBe(200);
     const { preferredModelDbId, chain } = routingCall();
     expect(preferredModelDbId).toBe(stickyId);
-    expect(chain).toBeUndefined();
+    // Plain auto now threads the resolved active chain (parity with
+    // /v1/chat/completions), not a singleton pin.
+    expect(chain?.map(row => row.model_db_id)).toEqual(expect.arrayContaining([pinnedId, stickyId]));
+    expect(chain?.map(row => row.model_db_id)).not.toEqual([pinnedId]);
   });
 
   it('auto routing applies when there is neither an explicit model nor a sticky session', async () => {
@@ -578,7 +581,8 @@ describe('POST /v1/responses model routing priority (#579)', () => {
     expect(status).toBe(200);
     const { preferredModelDbId, chain } = routingCall();
     expect(preferredModelDbId).toBeUndefined();
-    expect(chain).toBeUndefined();
+    expect(chain?.map(row => row.model_db_id)).toEqual(expect.arrayContaining([pinnedId, stickyId]));
+    expect(chain?.map(row => row.model_db_id)).not.toEqual([pinnedId]);
   });
 
   it.each([
