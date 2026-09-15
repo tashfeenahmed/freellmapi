@@ -27,6 +27,7 @@ export const LOW_BALANCE_ABSOLUTE_MIN_LIMIT = 200;
 // current consumption speed. Ten minutes covers bursty usage while ignoring
 // sub-hour lulls; shorter windows would jitter, longer ones would lag.
 export const RATE_OBSERVATION_WINDOW_MINUTES = 10;
+export const MIN_FORECAST_REQUESTS = 3;
 
 export interface QuotaForecastEntry {
   /** Platform the pool belongs to, e.g. 'groq'. */
@@ -72,25 +73,28 @@ function secondsUntilReset(resetAt: string | null): number | null {
 }
 
 /** Successful traffic grouped by the same key/pool identity used for observations. */
-function recentRequestCounts(now: number): Map<string, number> {
+export interface RecentQuotaActivity {
+  platform: Platform;
+  keyId: number | null;
+  pool: string;
+  count: number;
+}
+
+export function getRecentQuotaActivity(now: number): RecentQuotaActivity[] {
   const sqliteUtc = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
   const since = sqliteUtc(now - RATE_OBSERVATION_WINDOW_MINUTES * 60_000);
   const rows = getDb().prepare(`
     SELECT platform, key_id AS keyId, model_id AS modelId, COUNT(*) AS count
       FROM requests
      WHERE created_at >= ? AND datetime(created_at) >= ? AND datetime(created_at) <= ?
-       AND status = 'success' AND key_id IS NOT NULL
+       AND status = 'success'
      GROUP BY platform, key_id, model_id
-  `).all(since, since, sqliteUtc(now)) as { platform: Platform; keyId: number; modelId: string; count: number }[];
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const identity = JSON.stringify([row.platform, inferPoolForPlatform(row.platform, row.modelId), row.keyId]);
-    counts.set(identity, (counts.get(identity) ?? 0) + Number(row.count));
-  }
-  return counts;
+  `).all(since, since, sqliteUtc(now)) as { platform: Platform; keyId: number | null; modelId: string; count: number }[];
+  return rows.map(row => ({ platform: row.platform, keyId: row.keyId,
+    pool: inferPoolForPlatform(row.platform, row.modelId), count: Number(row.count) }));
 }
 
-function estimateExhaustionAt(
+export function estimateExhaustionAt(
   remaining: number,
   ratePerMin: number | null,
   resetAt: string | null,
@@ -159,9 +163,16 @@ function entryFor(row: QuotaObservationView, ratePerMin: number | null, now: num
 // Dedupe to the TIGHTEST row per platform+pool: a platform with several keys
 // sharing one account pool reports the same window per key, and the number that
 // matters for "can I keep calling" is the least headroom left.
-export function getQuotaForecast(rows = getQuotaStateForKeys(), now = Date.now()): QuotaForecastEntry[] {
+export function getQuotaForecast(
+  rows = getQuotaStateForKeys(), now = Date.now(),
+): QuotaForecastEntry[] {
   const byKey = new Map<string, QuotaForecastEntry>();
-  const counts = rows.length ? recentRequestCounts(now) : new Map<string, number>();
+  const activity = rows.length ? getRecentQuotaActivity(now) : [];
+  const counts = new Map<string, number>();
+  for (const row of activity) {
+    const identity = JSON.stringify([row.platform, row.pool, row.keyId]);
+    counts.set(identity, (counts.get(identity) ?? 0) + row.count);
+  }
   const poolKeys = new Map<string, Set<string>>();
   for (const row of rows) {
     if (row.metric !== 'requests') continue;
@@ -174,7 +185,7 @@ export function getQuotaForecast(rows = getQuotaStateForKeys(), now = Date.now()
     const keys = poolKeys.get(JSON.stringify([row.platform, row.quotaPoolKey])) ?? [];
     let count = 0;
     for (const key of keys) count += counts.get(key) ?? 0;
-    const rate = count < 3 ? null : Math.round(count / RATE_OBSERVATION_WINDOW_MINUTES * 100) / 100;
+    const rate = count < MIN_FORECAST_REQUESTS ? null : Math.round(count / RATE_OBSERVATION_WINDOW_MINUTES * 100) / 100;
     const entry = entryFor(row, rate, now);
     if (!entry) continue;
     // `pool` already carries its platform ("groq::account"), so it is the key.

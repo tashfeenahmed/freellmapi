@@ -23,11 +23,11 @@ let raw: ProviderQuotaState[]
 const pool = (overrides: Partial<QuotaOutlookPool> = {}): QuotaOutlookPool => ({
   platform:'groq',pool:'groq::account',limit:250,remaining:35,remainingPct:14,
   observedAt:'2026-09-14 19:59:00',resetAt:'2026-09-15T00:00:00Z',ratePerMin:.7,
-  estimatedExhaustionAt:'2026-09-14T20:50:00Z',status:'forecast',warning:'low_balance',...overrides,
+  recentRequestCount:7,unavailableReason:null,estimatedExhaustionAt:'2026-09-14T20:50:00Z',status:'forecast',warning:'low_balance',...overrides,
 })
 beforeAll(() => { (globalThis as unknown as {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true })
 beforeEach(() => {
-  response={generatedAt:'2026-09-14T20:00:00Z',pools:[pool()]}
+  response={generatedAt:'2026-09-14T20:00:00Z',observationWindowMinutes:10,minimumRequests:3,pools:[pool()]}
   raw=Array.from({length:25},(_,i)=>({platform:'groq',keyId:i+1,keyLabel:'Saved key '+(i+1),quotaPoolKey:'groq::account',metric:i===24?'tokens':'requests',limit:250,remaining:35,resetAt:null,resetStrategy:'unknown',source:'header',confidence:1,notes:null,observedAt:'2026-09-14 19:59:00',updatedAt:'2026-09-14 19:59:00'}))
   vi.mocked(apiFetch).mockReset().mockImplementation(async path=>path==='/api/keys'?[]:path==='/api/health'?{quotaStates:raw}:response)
   client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}})
@@ -58,17 +58,17 @@ it('loads forecasts only when the existing Quota signals tab opens and retains e
 it('shows the reset-first, soon-to-run-out and unknown states without inventing forecasts',async()=>{
   response.pools=[pool({platform:'openrouter',pool:'openrouter::free',remaining:75,remainingPct:30,warning:'exhausting_soon'}),
     pool({platform:'cerebras',pool:'cerebras::shared',status:'resets_first',warning:null,estimatedExhaustionAt:null}),
-    pool({platform:'aihorde',pool:'aihorde::anonymous',status:'unknown',warning:null,remaining:null,remainingPct:null,limit:null,ratePerMin:null,estimatedExhaustionAt:null,resetAt:null})]
+    pool({platform:'aihorde',pool:'aihorde::anonymous',status:'unknown',unavailableReason:'quota_not_reported',warning:null,remaining:null,remainingPct:null,limit:null,ratePerMin:0,estimatedExhaustionAt:null,resetAt:null})]
   await mount();await openQuota()
   expect(container.textContent).toContain('Running low soon')
   expect(container.textContent).toContain('Not before reset')
   const unknown=container.querySelector('article[aria-label="AI Horde (no key needed, slow)"]')!
-  expect(unknown.textContent).toContain('Unknown')
-  expect(unknown.textContent).toContain('Not enough data')
+  expect(unknown.textContent).toContain('Unavailable')
+  expect(unknown.textContent).toContain('Local usage is shown')
   expect(unknown.querySelector('[role="progressbar"]')).toBeNull()
 })
 it('labels stale balances as last reported and exhausted windows explicitly',async()=>{
-  response.pools=[pool({status:'stale',warning:null,ratePerMin:null,estimatedExhaustionAt:null}),
+  response.pools=[pool({status:'stale',unavailableReason:'stale_observation',warning:null,ratePerMin:0,estimatedExhaustionAt:null}),
     pool({platform:'cerebras',pool:'cerebras::shared',remaining:0,remainingPct:0,status:'exhausted',estimatedExhaustionAt:null})]
   await mount();await openQuota()
   expect(container.textContent).toContain('Needs fresh data')
@@ -94,4 +94,31 @@ it('shows an empty forecast without hiding the raw token observations',async()=>
   await mount();await openQuota()
   expect(container.querySelectorAll('article')).toHaveLength(0)
   expect(container.querySelector('details')?.textContent).toContain('Saved key 25')
+})
+
+it('shows coverage and local usage even when all provider quotas are unavailable',async()=>{
+  response.pools=[pool({platform:'kilo',pool:'kilo::anonymous',status:'unknown',unavailableReason:'quota_not_reported',
+    warning:null,limit:null,remaining:null,remainingPct:null,resetAt:null,estimatedExhaustionAt:null,recentRequestCount:2,ratePerMin:.2})]
+  await mount();await openQuota()
+  expect(container.textContent).toContain('Forecast unavailable')
+  expect(container.textContent).not.toContain('No forecast warnings')
+  expect(container.textContent).toContain('Forecasts available for 0 of 1 pools')
+  expect(container.textContent).toContain('2 successful requests through this instance in the last 10 minutes')
+  expect(container.textContent).toContain('at least 3 successful requests within 10 minutes')
+  expect(container.textContent).toContain('0.2 req/min')
+  const unavailable=[...container.querySelectorAll('details')].find(el=>el.querySelector('summary')?.textContent==='Unavailable quota pools (1)')!
+  expect(unavailable.open).toBe(false)
+  act(()=>unavailable.querySelector('summary')!.click());await flush()
+  expect(unavailable.open).toBe(true)
+  expect([...container.querySelectorAll('details')].find(el=>el.querySelector('summary')?.textContent==='Raw quota observations')?.textContent).toContain('Saved key 25')
+})
+it('explains missing resets independently of low traffic and shows usable pools before unavailable ones',async()=>{
+  response.pools=[pool({platform:'cerebras',pool:'cerebras::shared',status:'unavailable',unavailableReason:'reset_not_reported',
+    warning:null,resetAt:null,estimatedExhaustionAt:null,recentRequestCount:10,ratePerMin:1}),pool()]
+  await mount();await openQuota()
+  expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Groq')
+  expect(container.textContent).toContain('Forecasts available for 1 of 2 pools')
+  const cerebras=container.querySelector('article[aria-label="Cerebras"]')!
+  expect(cerebras.textContent).toContain('did not report a valid reset time')
+  expect(cerebras.textContent).not.toContain('at least 3')
 })

@@ -584,16 +584,21 @@ export interface QuotaOutlookPool {
   limit: number | null;
   remaining: number | null;
   remainingPct: number | null;
-  observedAt: string;
+  observedAt: string | null;
   resetAt: string | null;
-  ratePerMin: number | null;
+  /** Successful requests through this instance during the observation window. */
+  recentRequestCount: number;
+  ratePerMin: number;
+  unavailableReason: 'quota_not_reported' | 'stale_observation' | 'reset_not_reported' | 'low_confidence' | null;
   estimatedExhaustionAt: string | null;
-  status: 'unknown' | 'stale' | 'insufficient_data' | 'resets_first' | 'forecast' | 'exhausted';
+  status: 'unknown' | 'stale' | 'unavailable' | 'insufficient_data' | 'resets_first' | 'forecast' | 'exhausted';
   warning: 'low_balance' | 'exhausting_soon' | null;
 }
 
 export interface QuotaOutlookResponse {
   generatedAt: string;
+  observationWindowMinutes: number;
+  minimumRequests: number;
   pools: QuotaOutlookPool[];
 }
 

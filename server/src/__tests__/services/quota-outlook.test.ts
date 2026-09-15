@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { getQuotaOutlook } from '../../services/quota-outlook.js';
 import { getQuotaForecast } from '../../services/quota-forecast.js';
-import { getQuotaStateForKeys } from '../../services/provider-quota.js';
+import { getQuotaStateForKeys, recordQuotaObservation, recordQuotaObservationsFromResponse } from '../../services/provider-quota.js';
 
 const NOW = Date.parse('2026-09-14T20:00:00Z');
 function signal(overrides: Partial<{ platform: string; pool: string; key: number; limit: number | null; remaining: number | null; reset: string | null; observed: string; metric: string; confidence: number }> = {}) {
@@ -50,7 +50,7 @@ describe('dashboard quota outlook', () => {
 
   it('distinguishes sparse traffic from an exhausted current window', () => {
     signal({remaining:100}); traffic(2);
-    expect(getQuotaOutlook().pools[0]).toMatchObject({status:'insufficient_data',ratePerMin:null,warning:null});
+    expect(getQuotaOutlook().pools[0]).toMatchObject({status:'insufficient_data',ratePerMin:0.2,recentRequestCount:2,warning:null});
     getDb().prepare('UPDATE provider_quota_state SET remaining_value=0').run();
     expect(getQuotaOutlook().pools[0]).toMatchObject({status:'exhausted',warning:'low_balance',estimatedExhaustionAt:null});
   });
@@ -61,7 +61,8 @@ describe('dashboard quota outlook', () => {
     {observed:'invalid'}, {confidence:0.1},
   ])('does not turn unusable observations into current forecasts: %j', overrides => {
     signal(overrides); traffic(10);
-    expect(getQuotaOutlook().pools[0]).toMatchObject({status:'stale',warning:null,ratePerMin:null,estimatedExhaustionAt:null});
+    expect(getQuotaOutlook().pools[0]).toMatchObject({warning:null,ratePerMin:1,recentRequestCount:10,estimatedExhaustionAt:null});
+    expect(getQuotaOutlook().pools[0].unavailableReason).not.toBeNull();
   });
 
   it('keeps unknown request pools visible while token signals remain outside the forecast', () => {
@@ -93,4 +94,58 @@ describe('dashboard quota outlook', () => {
     expect(getDb().prepare('SELECT total_changes() AS n').get()).toEqual(changes);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+});
+
+
+it('records usage independently for a provider with no quota readings or request limits', () => {
+  traffic(2,1,'kilo','free-model');
+  expect(getQuotaOutlook()).toMatchObject({observationWindowMinutes:10,minimumRequests:3,pools:[{
+    platform:'kilo',recentRequestCount:2,ratePerMin:0.2,remaining:null,limit:null,
+    estimatedExhaustionAt:null,status:'unknown',unavailableReason:'quota_not_reported',
+  }]});
+  traffic(8,1,'kilo','another-model');
+  expect(getQuotaOutlook().pools).toHaveLength(1);
+  expect(getQuotaOutlook().pools[0]).toMatchObject({recentRequestCount:10,ratePerMin:1,estimatedExhaustionAt:null});
+});
+
+it('prefers a current observation over an exhausted stale legacy key and counts each request once', () => {
+  signal({key:0,remaining:0,observed:'2026-07-30 10:00:00'});
+  signal({key:1,remaining:100});traffic(10);
+  expect(getQuotaOutlook().pools).toHaveLength(1);
+  expect(getQuotaOutlook().pools[0]).toMatchObject({remaining:100,ratePerMin:1,status:'forecast'});
+});
+
+it('forecasts from real Groq duration headers and retains freshness after an empty health probe', () => {
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(NOW);
+  try {
+    recordQuotaObservationsFromResponse(new Response(null,{headers:{
+      'x-ratelimit-limit-requests':'100','x-ratelimit-remaining-requests':'10','x-ratelimit-reset-requests':'1h30m',
+    }}),{platform:'groq',keyId:1});traffic(10);
+    expect(getQuotaOutlook().pools[0]).toMatchObject({status:'forecast',warning:'low_balance',ratePerMin:1,estimatedExhaustionAt:'2026-09-14T20:10:00.000Z'});
+    vi.setSystemTime(NOW+11*60000);
+    recordQuotaObservation({platform:'groq',keyId:1,source:'probe',confidence:0.1});
+    expect(getQuotaOutlook().pools[0]).toMatchObject({status:'stale',unavailableReason:'stale_observation',warning:null,estimatedExhaustionAt:null});
+  } finally {vi.useRealTimers();}
+});
+
+it('retains the last actual zero after another panel reads expired headroom', () => {
+  signal({remaining:0,reset:'2026-09-14T19:30:00Z'});
+  getQuotaStateForKeys();
+  expect(getQuotaOutlook().pools[0]).toMatchObject({remaining:0,status:'stale',warning:null});
+});
+
+
+it('includes keyless successful usage but excludes failed, old and future traffic', () => {
+  const insert=getDb().prepare(`INSERT INTO requests(platform,model_id,key_id,status,created_at) VALUES ('kilo','free',NULL,?,?)`);
+  insert.run('success','2026-09-14 19:59:00');
+  insert.run('error','2026-09-14 19:59:00');
+  insert.run('success','2026-09-14 19:00:00');
+  insert.run('success','2026-09-14 20:01:00');
+  expect(getQuotaOutlook().pools[0]).toMatchObject({recentRequestCount:1,ratePerMin:0.1,estimatedExhaustionAt:null});
+});
+
+
+it('normalizes SQLite UTC reset timestamps before projecting exhaustion', () => {
+  signal({remaining:100,reset:'2026-09-14 20:30:00'});traffic(10);
+  expect(getQuotaOutlook().pools[0]).toMatchObject({resetAt:'2026-09-14T20:30:00.000Z',status:'resets_first',estimatedExhaustionAt:null});
 });
