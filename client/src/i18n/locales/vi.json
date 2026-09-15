@@ -1044,7 +1044,9 @@
       "mimo": "Tác nhân dòng lệnh của Xiaomi, nhánh của OpenCode, nhận mọi nhà cung cấp tương thích OpenAI.",
       "cursor": "Trình soạn thảo lấy AI làm gốc; đi qua đám mây của Cursor nên cần URL công khai.",
       "generic": "Mọi công cụ khác nói API OpenAI, thiết lập thủ công bằng URL cơ sở và khóa.",
-      "atomcode": "Tác nhân dòng lệnh của AtomGit, viết bằng Rust, nhận mọi điểm cuối tương thích OpenAI."
+      "atomcode": "Tác nhân dòng lệnh của AtomGit, viết bằng Rust, nhận mọi điểm cuối tương thích OpenAI.",
+      "openclaw": "Trợ lý cá nhân luôn sẵn sàng, trả lời trên WhatsApp, Telegram, Discord và nhiều nền tảng khác ngay từ máy của bạn.",
+      "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat."
     }
   },
   "update": {

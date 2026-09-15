@@ -131,6 +131,8 @@ The full, always-current list lives at **[freellmapi.co/models](https://freellma
 </tr>
 <tr>
 <td align="center"><img src="repo-assets/agents/atomcode.png" width="44" alt="AtomCode"><br/><b>AtomCode</b></td>
+<td align="center"><img src="repo-assets/agents/openclaw.png" width="44" alt="OpenClaw"><br/><b>OpenClaw</b></td>
+<td align="center"><img src="repo-assets/agents/hermes-agent.png" width="44" alt="Hermes Agent"><br/><b>Hermes Agent</b></td>
 </tr>
 </table>
 
@@ -222,6 +224,8 @@ Every generator supports `--dry-run`, creates a timestamped backup before changi
 | DeepSeek Harness | `setup-dsh` | `/v1` |
 | MiMo Code | `setup-mimo` | `/v1` |
 | AtomCode | `setup-atomcode` | `/v1` |
+| OpenClaw | `setup-openclaw` | `/v1` |
+| Hermes Agent | `setup-hermes` | `/v1` |
 | Cursor | `setup-cursor` guide | public `/v1` URL |
 
 FreeLLMAPI is local-first and single-user by design. Your provider keys stay in your SQLite database, encrypted at rest, and requests go from your machine to the upstream providers you enabled.

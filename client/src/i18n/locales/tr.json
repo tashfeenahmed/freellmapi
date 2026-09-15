@@ -1044,7 +1044,9 @@
       "mimo": "Xiaomi'nin terminal ajanı; OpenAI uyumlu her sağlayıcıyı kabul eden bir OpenCode çatallaması.",
       "cursor": "Yapay zekâ odaklı düzenleyici; Cursor bulutundan geçtiği için herkese açık bir URL ister.",
       "generic": "OpenAI API'sini konuşan diğer her araç; temel URL ve anahtarla elle kurulur.",
-      "atomcode": "AtomGit'in terminal ajanı; Rust ile yazılmış, OpenAI uyumlu her uç noktayı kabul eder."
+      "atomcode": "AtomGit'in terminal ajanı; Rust ile yazılmış, OpenAI uyumlu her uç noktayı kabul eder.",
+      "openclaw": "Kendi makinenizden WhatsApp, Telegram, Discord ve daha fazlasında yanıt veren, her zaman açık bir kişisel asistan.",
+      "hermes": "Nous Research'ün kendini geliştiren ajanı; kalıcı bellek ve becerilerle, terminalde ya da sohbet uygulamalarında."
     }
   },
   "update": {

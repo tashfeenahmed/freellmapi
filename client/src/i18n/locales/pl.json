@@ -1044,7 +1044,9 @@
       "mimo": "Agent terminalowy Xiaomi, fork OpenCode przyjmujący dowolnego dostawcę zgodnego z OpenAI.",
       "cursor": "Edytor pisany pod AI; działa przez chmurę Cursora, więc potrzebuje publicznego adresu URL.",
       "generic": "Każde inne narzędzie mówiące API OpenAI, ustawiane ręcznie adresem bazowym i kluczem.",
-      "atomcode": "Agent terminalowy AtomGit, napisany w Rust, przyjmujący dowolny endpoint zgodny z OpenAI."
+      "atomcode": "Agent terminalowy AtomGit, napisany w Rust, przyjmujący dowolny endpoint zgodny z OpenAI.",
+      "openclaw": "Zawsze dostępny osobisty asystent, który z Twojego własnego komputera odpowiada w aplikacjach WhatsApp, Telegram, Discord i innych.",
+      "hermes": "Samodoskonalący się agent Nous Research z trwałą pamięcią i umiejętnościami, w terminalu lub w aplikacjach czatowych."
     }
   },
   "update": {

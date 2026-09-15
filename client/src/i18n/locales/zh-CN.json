@@ -1044,7 +1044,9 @@
       "mimo": "小米的终端智能体，OpenCode 分支，可接任意 OpenAI 兼容供应商。",
       "cursor": "以 AI 为核心的编辑器，请求走 Cursor 云端，因此需要公网 URL。",
       "generic": "其他任何说 OpenAI 接口的工具，用基础 URL 和密钥手动配置。",
-      "atomcode": "AtomGit 的终端智能体，用 Rust 编写，可接任意 OpenAI 兼容端点。"
+      "atomcode": "AtomGit 的终端智能体，用 Rust 编写，可接任意 OpenAI 兼容端点。",
+      "openclaw": "一个常驻运行的个人助理，在你自己的机器上通过 WhatsApp、Telegram、Discord 等应答。",
+      "hermes": "Nous Research 的自我改进智能体，拥有持久记忆和技能，可在终端或聊天应用中使用。"
     }
   },
   "update": {

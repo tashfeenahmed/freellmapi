@@ -1044,7 +1044,9 @@
       "mimo": "Agen terminal dari Xiaomi, cabang OpenCode yang menerima penyedia apa pun yang kompatibel dengan OpenAI.",
       "cursor": "Penyunting yang mengutamakan AI; lewat awan Cursor, jadi perlu URL publik.",
       "generic": "Perkakas lain mana pun yang berbicara API OpenAI, disiapkan manual dengan URL dasar dan kunci.",
-      "atomcode": "Agen terminal dari AtomGit, ditulis dalam Rust, yang menerima endpoint apa pun yang kompatibel dengan OpenAI."
+      "atomcode": "Agen terminal dari AtomGit, ditulis dalam Rust, yang menerima endpoint apa pun yang kompatibel dengan OpenAI.",
+      "openclaw": "Asisten pribadi yang selalu aktif dan menjawab di WhatsApp, Telegram, Discord, dan lainnya dari mesin Anda sendiri.",
+      "hermes": "Agen dari Nous Research yang terus memperbaiki diri, dengan memori persisten dan keterampilan, di terminal atau di aplikasi chat."
     }
   },
   "update": {

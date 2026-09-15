@@ -1044,7 +1044,9 @@
       "mimo": "Xiaomi's terminal agent, an OpenCode fork that takes any OpenAI-compatible provider.",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL.",
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
-      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint."
+      "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
+      "openclaw": "तपाईंको आफ्नै मेसिनबाट WhatsApp, Telegram, Discord र अन्यमा जवाफ दिने, सधैं चालु रहने व्यक्तिगत सहायक।",
+      "hermes": "Nous Research को आफैं सुधारिने एजेन्ट, स्थायी मेमोरी र सीपहरूसहित, टर्मिनलमा वा च्याट एपहरूमा।"
     }
   },
   "update": {

@@ -28,6 +28,9 @@ dashboard (or the tray popover in the desktop app).
 | `setup-crush` | Crush |
 | `setup-dsh` | DeepSeek Harness (`dsh`) |
 | `setup-mimo` | MiMo Code (`mimo`) |
+| `setup-atomcode` | AtomCode (`atomcode`) |
+| `setup-openclaw` | OpenClaw |
+| `setup-hermes` | Hermes Agent (`hermes`) |
 | `setup-cursor` | Cursor |
 | `setup-generic` | Any OpenAI-compatible client |
 | `launch` | Run Claude Code with credentials injected into the child process |
