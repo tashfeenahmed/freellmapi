@@ -46,10 +46,22 @@ jobs:
               desktop/dist-electron/*.blockmap
               desktop/dist-electron/latest.yml
           - os: macos-latest
+            arch: arm64
             ebArgs: --mac --arm64
-            artifact: macos-dmg
+            artifact: macos-installer-arm64
             glob: |
               desktop/dist-electron/*.dmg
+              desktop/dist-electron/*.zip
+              desktop/dist-electron/*.blockmap
+              desktop/dist-electron/latest-mac.yml
+          # Build and exercise better-sqlite3 natively on Intel (#1232).
+          - os: macos-15-intel
+            arch: x64
+            ebArgs: --mac --x64
+            artifact: macos-installer-x64
+            glob: |
+              desktop/dist-electron/*.dmg
+              desktop/dist-electron/*.zip
               desktop/dist-electron/*.blockmap
               desktop/dist-electron/latest-mac.yml
           - os: ubuntu-latest
@@ -116,7 +128,7 @@ jobs:
 
       - name: Validate macOS signing credentials
         id: maccreds
-        if: matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
@@ -248,7 +260,7 @@ jobs:
           # returns as soon as it is set, so leaving that pair configured would
           # silently shadow the API key — the two cannot coexist. The API key
           # also does not expire the way an app-specific password does.
-          CSC_IDENTITY_AUTODISCOVERY: ${{ matrix.os == 'macos-latest' && startsWith(github.ref, 'refs/tags/') && steps.maccreds.outputs.signed == 'true' && 'true' || 'false' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/') && steps.maccreds.outputs.signed == 'true' && 'true' || 'false' }}
           # No CSC_LINK / CSC_KEY_PASSWORD: the step above imported the
           # certificate into a keychain of our own and exported CSC_KEYCHAIN +
           # CSC_NAME through $GITHUB_ENV. Setting CSC_LINK here would send
@@ -284,6 +296,19 @@ jobs:
           # so latest*.yml update metadata gets GENERATED, not so electron-builder
           # uploads. The "Attach installer to release" step below owns publishing.
           npx --no-install electron-builder ${{ matrix.ebArgs }} --publish never
+
+      - name: Smoke-test packaged macOS backend
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          app_dir=desktop/dist-electron/mac
+          if [ "$EXPECTED_ARCH" = arm64 ]; then app_dir="$app_dir-arm64"; fi
+          app="$app_dir/FreeLLMAPI.app"
+          ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/FreeLLMAPI" \
+            desktop/scripts/smoke-mac-package.mjs "$app" "$EXPECTED_ARCH"
 
       # electron-builder notarizes and staples the .app, then wraps it in a DMG
       # it never submits. The DMG is the file users download, so it is the file
@@ -347,7 +372,8 @@ jobs:
       # installers. So upload directly and leave the release metadata, which this
       # job has no business rewriting, exactly as the release author left it.
       - name: Attach installer to release
-        if: startsWith(github.ref, 'refs/tags/')
+        # The macOS finalizer uploads both architectures and ONE manifest.
+        if: runner.os != 'macOS' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -373,3 +399,46 @@ jobs:
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
           fi
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+
+  macos-release:
+    name: Verify and combine macOS artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - name: Install metadata tooling
+        run: npm --prefix desktop ci --ignore-scripts
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: macos-installer-*
+          path: artifacts
+      - name: Verify artifacts and merge update metadata
+        run: |
+          node desktop/scripts/merge-mac-update-metadata.mjs \
+            artifacts/macos-installer-arm64 artifacts/macos-installer-x64 \
+            artifacts/latest-mac.yml
+      - name: Upload combined update metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-update-metadata
+          path: artifacts/latest-mac.yml
+          if-no-files-found: error
+      - name: Attach both macOS installers to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          # Upload payloads first, then the manifest that advertises them.
+          gh release upload "$GITHUB_REF_NAME" \
+            artifacts/macos-installer-*/*.dmg \
+            artifacts/macos-installer-*/*.zip \
+            artifacts/macos-installer-*/*.blockmap --clobber
+          gh release upload "$GITHUB_REF_NAME" artifacts/latest-mac.yml --clobber

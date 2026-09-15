@@ -20,6 +20,7 @@
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "dev": "npm run build:all && electron .",
     "dist": "npm run build:all && npm run stage:client && electron-builder --mac --arm64 --publish never",
+    "dist:mac:x64": "npm run build:all && npm run stage:client && electron-builder --mac --x64 --publish never",
     "dist:win": "npm run build:all && npm run stage:client && electron-builder --win --x64 --publish never",
     "dist:linux": "npm run build:all && npm run stage:client && electron-builder --linux --x64 --publish never",
     "test": "vitest run"
@@ -34,6 +35,7 @@
     "electron": "^38.8.6",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.24.0",
+    "js-yaml": "^4.2.0",
     "typescript": "^5.8.0",
     "vitest": "^3.2.4"
   }

@@ -29,6 +29,7 @@ extraResources:
   - from: client-dist
     to: client-dist
 mac:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
   category: public.app-category.developer-tools
   icon: assets/icon.icns
   hardenedRuntime: true
@@ -36,10 +37,12 @@ mac:
   entitlements: assets/entitlements.mac.plist
   entitlementsInherit: assets/entitlements.mac.inherit.plist
   notarize: true
+  # Select the architecture with --arm64 or --x64 in the build command.
+  # Per-target arch lists override that selection and make each CI job build
+  # both architectures, including the native SQLite module for the other CPU.
   target:
     - target: dmg
-      arch:
-        - arm64
+    - target: zip
   extendInfo:
     LSUIElement: 1
 # The DMG is the file people actually download, so it is the file macOS

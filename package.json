@@ -19,6 +19,7 @@
     "test:migrations": "npm run test:migrations -w server",
     "desktop:dev": "npm run build -w client && npm --prefix desktop run dev",
     "desktop:dist": "npm run build -w client && npm --prefix desktop run dist",
+    "desktop:dist:mac:x64": "npm run build -w client && npm --prefix desktop run dist:mac:x64",
     "desktop:dist:win": "npm run build -w client && npm --prefix desktop run dist:win",
     "desktop:dist:linux": "npm run build -w client && npm --prefix desktop run dist:linux",
     "db:migration:up": "npm run db:migration:up -w server",

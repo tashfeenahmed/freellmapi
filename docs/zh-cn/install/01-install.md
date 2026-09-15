@@ -229,12 +229,15 @@ FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 
 **[从 Releases 下载](https://github.com/tashfeenahmed/freellmapi/releases/latest)** —— macOS 的 `.dmg` 和 Windows 的 `.exe` 安装包由 [`desktop-release`](../../../.github/workflows/desktop-release.yml) 工作流在每个版本发布时构建并附带。你也可以花几分钟从本仓库自己构建：
 
+**Mac 下载：** Apple Silicon 请选择 `arm64`，Intel 请选择 `x64`。两者都要求 macOS 12 Monterey 或更高版本，并提供 DMG 和 ZIP 下载。
+
 > **Windows 用户从源码构建的注意事项：** 构建桌面应用需要为 Electron 编译原生 SQLite 模块。在执行 `npm install` 之前，你必须先装好 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（具体来说是「使用 C++ 的桌面开发」工作负载）以及 Python。
 
 ```bash
 npm install
 npm install --prefix desktop  # 安装桌面端依赖
 npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
+npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
 npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
 ```
 
