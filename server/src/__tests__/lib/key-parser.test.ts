@@ -78,6 +78,13 @@ describe('key parser', () => {
     expect(detectPlatform('EXPLABS_')).toBe('experiential');
     expect(detectPlatform('ROUTER9_')).toBe('router9');
     expect(detectPlatform('ROUTER_9_')).toBe('router9');
+    expect(detectPlatform('LUCIDITY_')).toBe('lucidity');
+    expect(detectPlatform('AIRFORCE_')).toBe('airforce');
+    expect(detectPlatform('API_AIRFORCE_')).toBe('airforce');
+    expect(detectPlatform('DREAMPROMPTING_')).toBe('dreamprompting');
+    expect(detectPlatform('DREAM_PROMPTING_')).toBe('dreamprompting');
+    expect(detectPlatform('WATERFALL_')).toBe('waterfall');
+    expect(detectPlatform('LOGFARE_')).toBe('logfare');
     expect(detectPlatform('SEPTOR_')).toBe('septor');
     expect(detectPlatform('SEPTORLABS_')).toBe('septor');
     expect(detectPlatform('SEPTOR_LABS_')).toBe('septor');
@@ -107,6 +114,13 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['septor']).toBe('septor');
     expect(AUTH_JSON_PROVIDER_MAP['septor-labs']).toBe('septor');
     expect(AUTH_JSON_PROVIDER_MAP['septorlabs']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['lucidity']).toBe('lucidity');
+    expect(AUTH_JSON_PROVIDER_MAP['airforce']).toBe('airforce');
+    expect(AUTH_JSON_PROVIDER_MAP['api.airforce']).toBe('airforce');
+    expect(AUTH_JSON_PROVIDER_MAP['dreamprompting']).toBe('dreamprompting');
+    expect(AUTH_JSON_PROVIDER_MAP['dream-prompting']).toBe('dreamprompting');
+    expect(AUTH_JSON_PROVIDER_MAP['waterfall']).toBe('waterfall');
+    expect(AUTH_JSON_PROVIDER_MAP['logfare']).toBe('logfare');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],
@@ -127,7 +141,7 @@ describe('key parser', () => {
     expect(result.skipped).toEqual(['PORT: value does not look like an API key']);
   });
 
-  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze']])('imports %s environment keys', (prefix, platform) => {
+  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze'], ['LUCIDITY', 'lucidity'], ['AIRFORCE', 'airforce'], ['API_AIRFORCE', 'airforce'], ['DREAMPROMPTING', 'dreamprompting'], ['DREAM_PROMPTING', 'dreamprompting'], ['WATERFALL', 'waterfall'], ['LOGFARE', 'logfare']])('imports %s environment keys', (prefix, platform) => {
     const result = parseKeysFromFile(`${prefix}_API_KEY=not-a-real-provider-key`, 'keys.env');
     expect(result.keys).toHaveLength(1);
     expect(result.keys[0].platform).toBe(platform);

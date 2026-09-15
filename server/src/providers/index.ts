@@ -16,6 +16,11 @@ import { SeptorProvider } from './septor.js';
 import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
 import { BlazeProvider } from './blaze.js';
+import { LucidityProvider } from './lucidity.js';
+import { AirforceProvider } from './airforce.js';
+import { DreamPromptingProvider } from './dreamprompting.js';
+import { WaterfallProvider } from './waterfall.js';
+import { LogfareProvider } from './logfare.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -62,6 +67,13 @@ register(new SeptorProvider());
 register(new ClodProvider());
 register(new SpeechifyProvider());
 register(new BlazeProvider());
+// Five more OpenAI-compatible gateways. Each pins the response model to the
+// requested route (502 on substitution); rows stay in the hosted catalog.
+register(new LucidityProvider());
+register(new AirforceProvider());
+register(new DreamPromptingProvider());
+register(new WaterfallProvider());
+register(new LogfareProvider());
 
 // B.AI — OpenAI-compatible gateway. Provider support is first-class, but the
 // only free catalog row currently published is a limited-time 0-credit promo;

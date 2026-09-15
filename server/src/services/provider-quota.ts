@@ -123,6 +123,11 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'clod') return 'clod::daily-free';
   if (platform === 'speechify') return 'speechify::monthly-characters';
   if (platform === 'blaze') return 'blaze::daily-free';
+  if (platform === 'lucidity') return 'lucidity::daily-free';
+  if (platform === 'airforce') return 'airforce::daily-free';
+  if (platform === 'dreamprompting') return 'dreamprompting::daily-free';
+  if (platform === 'waterfall') return 'waterfall::community-free';
+  if (platform === 'logfare') return 'logfare::fair-use';
   if (platform === 'bai') return 'bai::promo';
   if (platform === 'radeon') return 'radeon::daily-free';
   if (platform === 'sambanova') return 'sambanova::shared';
@@ -171,7 +176,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 }
 
 function isSharedPool(platform: Platform): boolean {
-  if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze'].includes(platform)) return true;
+  if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;
   return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
 

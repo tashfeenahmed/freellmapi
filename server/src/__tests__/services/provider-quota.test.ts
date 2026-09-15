@@ -53,6 +53,11 @@ describe('provider-quota: pool inference', () => {
       expect(inferQuotaPoolKey('clod', model)).toBe('clod::daily-free');
       expect(inferQuotaPoolKey('blaze', model)).toBe('blaze::daily-free');
       expect(inferQuotaPoolKey('speechify', model)).toBe('speechify::monthly-characters');
+      expect(inferQuotaPoolKey('lucidity', model)).toBe('lucidity::daily-free');
+      expect(inferQuotaPoolKey('airforce', model)).toBe('airforce::daily-free');
+      expect(inferQuotaPoolKey('dreamprompting', model)).toBe('dreamprompting::daily-free');
+      expect(inferQuotaPoolKey('waterfall', model)).toBe('waterfall::community-free');
+      expect(inferQuotaPoolKey('logfare', model)).toBe('logfare::fair-use');
     }
     expect(inferQuotaPoolKey('openrouter', 'meta-llama/llama-3.1-8b-instruct:free')).toBe('openrouter::free');
     expect(inferQuotaPoolKey('openrouter', 'openai/gpt-4o')).toBe('openrouter::account');

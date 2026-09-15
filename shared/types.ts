@@ -78,6 +78,13 @@ export type Platform =
   | 'clod'
   | 'speechify'
   | 'blaze'
+  // Lucidity Composite, Api.Airforce and DreamPrompting expose daily free
+  // allowances; Waterfall and Logfare publish community / fair-use tiers.
+  | 'lucidity'
+  | 'airforce'
+  | 'dreamprompting'
+  | 'waterfall'
+  | 'logfare'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'
