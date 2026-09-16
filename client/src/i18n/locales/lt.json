@@ -867,7 +867,23 @@
     "attachUnsupported": "Failas {name} nepalaikomas. Pridėkite vaizdų (PNG, JPEG, WebP, GIF) arba tekstinių failų (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Nepavyko perskaityti failo {name}.",
     "noVisionBadge": "Be vaizdų",
-    "visionWarning": "Modelis {model} nepriima vaizdų. Pasirinkite vaizdo įvestį palaikantį modelį arba Auto."
+    "visionWarning": "Modelis {model} nepriima vaizdų. Pasirinkite vaizdo įvestį palaikantį modelį arba Auto.",
+    "dictate": "Diktuoti",
+    "dictationStop": "Stabdyti įrašymą",
+    "dictationTranscribing": "Transkribuojama…",
+    "dictationUnavailable": "Pridėkite garso modelių teikėjų, kad galėtumėte diktuoti.",
+    "dictationModel": "Diktavimo modelis",
+    "dictationFailed": "Transkripcija nepavyko: {reason}",
+    "artifactOpen": "Atverti peržiūrą",
+    "artifactPreview": "Peržiūra",
+    "artifactCode": "Kodas",
+    "artifactClose": "Užverti peržiūrą",
+    "artifactDownload": "Atsisiųsti",
+    "artifactReload": "Įkelti peržiūrą iš naujo",
+    "artifactHtml": "HTML puslapis",
+    "artifactSvg": "SVG paveikslėlis",
+    "artifactLines": "eilučių",
+    "artifactResize": "Keisti peržiūros dydį"
   },
   "playgroundSessions": {
     "heading": "Pokalbiai",
@@ -885,7 +901,9 @@
     "daysAgo": "prieš {count} d.",
     "loadFailed": "Nepavyko atidaryti šio pokalbio.",
     "renameFailed": "Nepavyko pervadinti šio pokalbio.",
-    "deleteFailed": "Nepavyko ištrinti šio pokalbio."
+    "deleteFailed": "Nepavyko ištrinti šio pokalbio.",
+    "actions": "Pokalbio veiksmai",
+    "newChat": "Naujas pokalbis"
   },
   "embeddings": {
     "title": "Modeliai",

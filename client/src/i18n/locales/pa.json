@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ਸਮਰਥਿਤ ਨਹੀਂ ਹੈ। ਚਿੱਤਰ (PNG, JPEG, WebP, GIF) ਜਾਂ ਟੈਕਸਟ ਫਾਈਲਾਂ (TXT, MD, CSV, JSON, LOG) ਨੱਥੀ ਕਰੋ।",
     "attachFailed": "{name} ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
     "noVisionBadge": "ਚਿੱਤਰ ਨਹੀਂ",
-    "visionWarning": "{model} ਚਿੱਤਰ ਸਵੀਕਾਰ ਨਹੀਂ ਕਰਦਾ। ਚਿੱਤਰ ਇੰਪੁੱਟ ਸਵੀਕਾਰ ਕਰਨ ਵਾਲਾ ਮਾਡਲ ਜਾਂ ਆਟੋ ਚੁਣੋ।"
+    "visionWarning": "{model} ਚਿੱਤਰ ਸਵੀਕਾਰ ਨਹੀਂ ਕਰਦਾ। ਚਿੱਤਰ ਇੰਪੁੱਟ ਸਵੀਕਾਰ ਕਰਨ ਵਾਲਾ ਮਾਡਲ ਜਾਂ ਆਟੋ ਚੁਣੋ।",
+    "dictate": "ਬੋਲ ਕੇ ਲਿਖੋ",
+    "dictationStop": "ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ",
+    "dictationTranscribing": "ਲਿਖਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    "dictationUnavailable": "ਬੋਲ ਕੇ ਲਿਖਣ ਲਈ ਆਡੀਓ ਮਾਡਲ ਪ੍ਰਦਾਤਾ ਸ਼ਾਮਲ ਕਰੋ।",
+    "dictationModel": "ਬੋਲ ਕੇ ਲਿਖਣ ਦਾ ਮਾਡਲ",
+    "dictationFailed": "ਲਿਖਣਾ ਅਸਫਲ: {reason}",
+    "artifactOpen": "ਪੂਰਵਦਰਸ਼ਨ ਖੋਲ੍ਹੋ",
+    "artifactPreview": "ਪੂਰਵਦਰਸ਼ਨ",
+    "artifactCode": "ਕੋਡ",
+    "artifactClose": "ਪੂਰਵਦਰਸ਼ਨ ਬੰਦ ਕਰੋ",
+    "artifactDownload": "ਡਾਊਨਲੋਡ",
+    "artifactReload": "ਪੂਰਵਦਰਸ਼ਨ ਮੁੜ ਲੋਡ ਕਰੋ",
+    "artifactHtml": "HTML ਪੰਨਾ",
+    "artifactSvg": "SVG ਤਸਵੀਰ",
+    "artifactLines": "ਲਾਈਨਾਂ",
+    "artifactResize": "ਪੂਰਵਦਰਸ਼ਨ ਦਾ ਆਕਾਰ ਬਦਲੋ"
   },
   "playgroundSessions": {
     "heading": "ਗੱਲਬਾਤ",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ਦਿਨ ਪਹਿਲਾਂ",
     "loadFailed": "ਉਹ ਗੱਲਬਾਤ ਨਹੀਂ ਖੋਲ੍ਹੀ ਜਾ ਸਕੀ।",
     "renameFailed": "ਉਸ ਗੱਲਬਾਤ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।",
-    "deleteFailed": "ਉਹ ਗੱਲਬਾਤ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ।"
+    "deleteFailed": "ਉਹ ਗੱਲਬਾਤ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ।",
+    "actions": "ਗੱਲਬਾਤ ਕਾਰਵਾਈਆਂ",
+    "newChat": "ਨਵੀਂ ਚੈਟ"
   },
   "embeddings": {
     "title": "ਮਾਡਲ",

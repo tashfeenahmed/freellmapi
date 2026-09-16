@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} غير مدعوم. أرفق صورًا (PNG، JPEG، WebP، GIF) أو ملفات نصية (TXT، MD، CSV، JSON، LOG).",
     "attachFailed": "تعذّرت قراءة {name}.",
     "noVisionBadge": "بدون صور",
-    "visionWarning": "{model} لا يقبل الصور. اختر نموذج رؤية أو «تلقائي»."
+    "visionWarning": "{model} لا يقبل الصور. اختر نموذج رؤية أو «تلقائي».",
+    "dictate": "إملاء",
+    "dictationStop": "إيقاف التسجيل",
+    "dictationTranscribing": "جارٍ التحويل إلى نص…",
+    "dictationUnavailable": "أضف مزودي نماذج الصوت لتتمكن من استخدام الإملاء.",
+    "dictationModel": "نموذج الإملاء",
+    "dictationFailed": "فشل التحويل إلى نص: {reason}",
+    "artifactOpen": "فتح المعاينة",
+    "artifactPreview": "معاينة",
+    "artifactCode": "الكود",
+    "artifactClose": "إغلاق المعاينة",
+    "artifactDownload": "تنزيل",
+    "artifactReload": "إعادة تحميل المعاينة",
+    "artifactHtml": "صفحة HTML",
+    "artifactSvg": "صورة SVG",
+    "artifactLines": "أسطر",
+    "artifactResize": "تغيير حجم المعاينة"
   },
   "playgroundSessions": {
     "heading": "المحادثات",
@@ -885,7 +901,9 @@
     "daysAgo": "قبل {count} ي",
     "loadFailed": "تعذّر فتح تلك المحادثة.",
     "renameFailed": "تعذّرت إعادة تسمية تلك المحادثة.",
-    "deleteFailed": "تعذّر حذف تلك المحادثة."
+    "deleteFailed": "تعذّر حذف تلك المحادثة.",
+    "actions": "إجراءات المحادثة",
+    "newChat": "محادثة جديدة"
   },
   "embeddings": {
     "title": "نماذج",

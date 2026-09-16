@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} പിന്തുണയ്ക്കുന്നില്ല. ചിത്രങ്ങൾ (PNG, JPEG, WebP, GIF) അല്ലെങ്കിൽ ടെക്സ്റ്റ് ഫയലുകൾ (TXT, MD, CSV, JSON, LOG) അറ്റാച്ചുചെയ്യുക.",
     "attachFailed": "{name} വായിക്കാൻ കഴിഞ്ഞില്ല.",
     "noVisionBadge": "ചിത്രങ്ങളില്ല",
-    "visionWarning": "{model} ചിത്രങ്ങൾ സ്വീകരിക്കുന്നില്ല. ഇമേജ് ഇൻപുട്ട് സ്വീകരിക്കുന്ന മോഡൽ അല്ലെങ്കിൽ ഓട്ടോ തിരഞ്ഞെടുക്കുക."
+    "visionWarning": "{model} ചിത്രങ്ങൾ സ്വീകരിക്കുന്നില്ല. ഇമേജ് ഇൻപുട്ട് സ്വീകരിക്കുന്ന മോഡൽ അല്ലെങ്കിൽ ഓട്ടോ തിരഞ്ഞെടുക്കുക.",
+    "dictate": "പറഞ്ഞ് എഴുതുക",
+    "dictationStop": "റെക്കോർഡിംഗ് നിർത്തുക",
+    "dictationTranscribing": "ട്രാൻസ്ക്രൈബ് ചെയ്യുന്നു…",
+    "dictationUnavailable": "ഡിക്ടേഷൻ ഉപയോഗിക്കാൻ ഓഡിയോ മോഡൽ ദാതാക്കളെ ചേർക്കുക.",
+    "dictationModel": "ഡിക്ടേഷൻ മോഡൽ",
+    "dictationFailed": "ട്രാൻസ്ക്രിപ്ഷൻ പരാജയപ്പെട്ടു: {reason}",
+    "artifactOpen": "പ്രിവ്യൂ തുറക്കുക",
+    "artifactPreview": "പ്രിവ്യൂ",
+    "artifactCode": "കോഡ്",
+    "artifactClose": "പ്രിവ്യൂ അടയ്ക്കുക",
+    "artifactDownload": "ഡൗൺലോഡ്",
+    "artifactReload": "പ്രിവ്യൂ വീണ്ടും ലോഡ് ചെയ്യുക",
+    "artifactHtml": "HTML പേജ്",
+    "artifactSvg": "SVG ചിത്രം",
+    "artifactLines": "വരികൾ",
+    "artifactResize": "പ്രിവ്യൂ വലുപ്പം മാറ്റുക"
   },
   "playgroundSessions": {
     "heading": "സംഭാഷണങ്ങൾ",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ദി. മുമ്പ്",
     "loadFailed": "ആ സംഭാഷണം തുറക്കാനായില്ല.",
     "renameFailed": "ആ സംഭാഷണത്തിന്റെ പേര് മാറ്റാനായില്ല.",
-    "deleteFailed": "ആ സംഭാഷണം ഇല്ലാതാക്കാനായില്ല."
+    "deleteFailed": "ആ സംഭാഷണം ഇല്ലാതാക്കാനായില്ല.",
+    "actions": "സംഭാഷണ പ്രവർത്തനങ്ങൾ",
+    "newChat": "പുതിയ ചാറ്റ്"
   },
   "embeddings": {
     "title": "മോഡലുകൾ",

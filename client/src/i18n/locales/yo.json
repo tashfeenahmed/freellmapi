@@ -867,7 +867,23 @@
     "attachUnsupported": "A ko ṣe atilẹyin fun {name}. Somọ awọn aworan (PNG, JPEG, WebP, GIF) tabi awọn faili ọrọ (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "A ko le ka {name}.",
     "noVisionBadge": "Ko si aworan",
-    "visionWarning": "{model} ko gba aworan. Yan awoṣe ti o gba aworan tabi Aifọwọyi."
+    "visionWarning": "{model} ko gba aworan. Yan awoṣe ti o gba aworan tabi Aifọwọyi.",
+    "dictate": "Sọ kí a kọ",
+    "dictationStop": "Dá gbigbasilẹ dúró",
+    "dictationTranscribing": "Ń kọ sílẹ̀…",
+    "dictationUnavailable": "Fi àwọn olùpèsè àwòṣe ohùn kún un láti lè lo sísọ kí a kọ.",
+    "dictationModel": "Àwòṣe sísọ kí a kọ",
+    "dictationFailed": "Kíkọ sílẹ̀ kùnà: {reason}",
+    "artifactOpen": "Ṣí àwòrán àkọ́kọ́",
+    "artifactPreview": "Àwòrán àkọ́kọ́",
+    "artifactCode": "Kóòdù",
+    "artifactClose": "Pa àwòrán àkọ́kọ́",
+    "artifactDownload": "Gbà sílẹ̀",
+    "artifactReload": "Tún àwòrán àkọ́kọ́ gbé",
+    "artifactHtml": "Ojú-ìwé HTML",
+    "artifactSvg": "Àwòrán SVG",
+    "artifactLines": "ìlà",
+    "artifactResize": "Yí ìwọ̀n àwòrán àkọ́kọ́ padà"
   },
   "playgroundSessions": {
     "heading": "Àwọn ìjíròrò",
@@ -885,7 +901,9 @@
     "daysAgo": "ọjọ́ {count} sẹ́yìn",
     "loadFailed": "A kò lè ṣí ìjíròrò yẹn.",
     "renameFailed": "A kò lè tún orúkọ ìjíròrò yẹn sọ.",
-    "deleteFailed": "A kò lè pa ìjíròrò yẹn rẹ́."
+    "deleteFailed": "A kò lè pa ìjíròrò yẹn rẹ́.",
+    "actions": "Àwọn ìṣe ìjíròrò",
+    "newChat": "Ìfọ̀rọ̀wérọ̀ tuntun"
   },
   "embeddings": {
     "title": "Awọn awoṣe",

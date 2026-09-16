@@ -867,7 +867,23 @@
     "attachUnsupported": "Datoteka {name} nije podržana. Priložite slike (PNG, JPEG, WebP, GIF) ili tekstualne datoteke (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Nije moguće pročitati datoteku {name}.",
     "noVisionBadge": "Bez slika",
-    "visionWarning": "Model {model} ne prihvaća slike. Odaberite model s vizijom ili Auto."
+    "visionWarning": "Model {model} ne prihvaća slike. Odaberite model s vizijom ili Auto.",
+    "dictate": "Diktiraj",
+    "dictationStop": "Zaustavi snimanje",
+    "dictationTranscribing": "Transkribiranje…",
+    "dictationUnavailable": "Dodajte pružatelje audio modela da biste mogli diktirati.",
+    "dictationModel": "Model diktiranja",
+    "dictationFailed": "Transkripcija nije uspjela: {reason}",
+    "artifactOpen": "Otvori pretpregled",
+    "artifactPreview": "Pretpregled",
+    "artifactCode": "Kod",
+    "artifactClose": "Zatvori pretpregled",
+    "artifactDownload": "Preuzmi",
+    "artifactReload": "Ponovno učitaj pretpregled",
+    "artifactHtml": "HTML stranica",
+    "artifactSvg": "SVG slika",
+    "artifactLines": "redaka",
+    "artifactResize": "Promijeni veličinu pretpregleda"
   },
   "playgroundSessions": {
     "heading": "Razgovori",
@@ -885,7 +901,9 @@
     "daysAgo": "prije {count} d",
     "loadFailed": "Nije moguće otvoriti taj razgovor.",
     "renameFailed": "Nije moguće preimenovati taj razgovor.",
-    "deleteFailed": "Nije moguće izbrisati taj razgovor."
+    "deleteFailed": "Nije moguće izbrisati taj razgovor.",
+    "actions": "Radnje razgovora",
+    "newChat": "Novi razgovor"
   },
   "embeddings": {
     "title": "Modeli",

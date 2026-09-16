@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} не се поддържа. Прикачете изображения (PNG, JPEG, WebP, GIF) или текстови файлове (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "{name} не може да бъде прочетен.",
     "noVisionBadge": "Без изображения",
-    "visionWarning": "{model} не приема изображения. Изберете модел с визия или Авто."
+    "visionWarning": "{model} не приема изображения. Изберете модел с визия или Авто.",
+    "dictate": "Диктуване",
+    "dictationStop": "Спри записа",
+    "dictationTranscribing": "Транскрибира се…",
+    "dictationUnavailable": "Добавете доставчици на аудио модели, за да използвате диктуване.",
+    "dictationModel": "Модел за диктуване",
+    "dictationFailed": "Транскрипцията се провали: {reason}",
+    "artifactOpen": "Отвори предварителен преглед",
+    "artifactPreview": "Преглед",
+    "artifactCode": "Код",
+    "artifactClose": "Затвори прегледа",
+    "artifactDownload": "Изтегли",
+    "artifactReload": "Презареди прегледа",
+    "artifactHtml": "HTML страница",
+    "artifactSvg": "SVG изображение",
+    "artifactLines": "реда",
+    "artifactResize": "Преоразмеряване на прегледа"
   },
   "playgroundSessions": {
     "heading": "Разговори",
@@ -885,7 +901,9 @@
     "daysAgo": "преди {count} д",
     "loadFailed": "Разговорът не можа да бъде отворен.",
     "renameFailed": "Разговорът не можа да бъде преименуван.",
-    "deleteFailed": "Разговорът не можа да бъде изтрит."
+    "deleteFailed": "Разговорът не можа да бъде изтрит.",
+    "actions": "Действия за разговора",
+    "newChat": "Нов чат"
   },
   "embeddings": {
     "title": "Модели",

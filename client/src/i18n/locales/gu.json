@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} સમર્થિત નથી. છબીઓ (PNG, JPEG, WebP, GIF) અથવા ટેક્સ્ટ ફાઇલો (TXT, MD, CSV, JSON, LOG) જોડો.",
     "attachFailed": "{name} વાંચી શકાયું નથી.",
     "noVisionBadge": "છબીઓ નહીં",
-    "visionWarning": "{model} છબીઓ સ્વીકારતું નથી. ઇમેજ ઇનપુટ સ્વીકારતું મોડેલ અથવા ઓટો પસંદ કરો."
+    "visionWarning": "{model} છબીઓ સ્વીકારતું નથી. ઇમેજ ઇનપુટ સ્વીકારતું મોડેલ અથવા ઓટો પસંદ કરો.",
+    "dictate": "બોલીને લખો",
+    "dictationStop": "રેકોર્ડિંગ બંધ કરો",
+    "dictationTranscribing": "લખાઈ રહ્યું છે…",
+    "dictationUnavailable": "બોલીને લખવા માટે ઑડિયો મોડેલ પ્રદાતાઓ ઉમેરો.",
+    "dictationModel": "શ્રુતલેખન મોડેલ",
+    "dictationFailed": "લખવામાં નિષ્ફળ: {reason}",
+    "artifactOpen": "પૂર્વાવલોકન ખોલો",
+    "artifactPreview": "પૂર્વાવલોકન",
+    "artifactCode": "કોડ",
+    "artifactClose": "પૂર્વાવલોકન બંધ કરો",
+    "artifactDownload": "ડાઉનલોડ",
+    "artifactReload": "પૂર્વાવલોકન ફરી લોડ કરો",
+    "artifactHtml": "HTML પેજ",
+    "artifactSvg": "SVG છબી",
+    "artifactLines": "લાઇન",
+    "artifactResize": "પૂર્વાવલોકનનું કદ બદલો"
   },
   "playgroundSessions": {
     "heading": "વાતચીત",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} દિ. પહેલાં",
     "loadFailed": "તે વાતચીત ખોલી શકાઈ નહીં.",
     "renameFailed": "તે વાતચીતનું નામ બદલી શકાયું નહીં.",
-    "deleteFailed": "તે વાતચીત કાઢી શકાઈ નહીં."
+    "deleteFailed": "તે વાતચીત કાઢી શકાઈ નહીં.",
+    "actions": "વાતચીત ક્રિયાઓ",
+    "newChat": "નવી ચેટ"
   },
   "embeddings": {
     "title": "મોડલ્સ",

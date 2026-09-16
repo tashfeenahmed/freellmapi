@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ei ole tuettu. Liitä kuvia (PNG, JPEG, WebP, GIF) tai tekstitiedostoja (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Tiedostoa {name} ei voitu lukea.",
     "noVisionBadge": "Ei kuvia",
-    "visionWarning": "{model} ei hyväksy kuvia. Valitse kuvasyötteen hyväksyvä malli tai Auto."
+    "visionWarning": "{model} ei hyväksy kuvia. Valitse kuvasyötteen hyväksyvä malli tai Auto.",
+    "dictate": "Sanele",
+    "dictationStop": "Lopeta tallennus",
+    "dictationTranscribing": "Litteroidaan…",
+    "dictationUnavailable": "Lisää äänimallien tarjoajia, jotta voit käyttää sanelua.",
+    "dictationModel": "Sanelumalli",
+    "dictationFailed": "Litterointi epäonnistui: {reason}",
+    "artifactOpen": "Avaa esikatselu",
+    "artifactPreview": "Esikatselu",
+    "artifactCode": "Koodi",
+    "artifactClose": "Sulje esikatselu",
+    "artifactDownload": "Lataa",
+    "artifactReload": "Lataa esikatselu uudelleen",
+    "artifactHtml": "HTML-sivu",
+    "artifactSvg": "SVG-kuva",
+    "artifactLines": "riviä",
+    "artifactResize": "Muuta esikatselun kokoa"
   },
   "playgroundSessions": {
     "heading": "Keskustelut",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} pv sitten",
     "loadFailed": "Keskustelua ei voitu avata.",
     "renameFailed": "Keskustelua ei voitu nimetä uudelleen.",
-    "deleteFailed": "Keskustelua ei voitu poistaa."
+    "deleteFailed": "Keskustelua ei voitu poistaa.",
+    "actions": "Keskustelun toiminnot",
+    "newChat": "Uusi keskustelu"
   },
   "embeddings": {
     "title": "Mallit",

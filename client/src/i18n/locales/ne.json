@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} समर्थित छैन। छवि (PNG, JPEG, WebP, GIF) वा पाठ फाइलहरू (TXT, MD, CSV, JSON, LOG) संलग्न गर्नुहोस्।",
     "attachFailed": "{name} पढ्न सकिएन।",
     "noVisionBadge": "छवि छैन",
-    "visionWarning": "{model} ले छवि स्वीकार गर्दैन। छवि स्वीकार गर्ने मोडेल वा स्वत: छान्नुहोस्।"
+    "visionWarning": "{model} ले छवि स्वीकार गर्दैन। छवि स्वीकार गर्ने मोडेल वा स्वत: छान्नुहोस्।",
+    "dictate": "बोलेर लेख्नुहोस्",
+    "dictationStop": "रेकर्डिङ रोक्नुहोस्",
+    "dictationTranscribing": "लेखिँदैछ…",
+    "dictationUnavailable": "बोलेर लेख्न अडियो मोडेल प्रदायकहरू थप्नुहोस्।",
+    "dictationModel": "श्रुतलेखन मोडेल",
+    "dictationFailed": "लेख्न असफल: {reason}",
+    "artifactOpen": "पूर्वावलोकन खोल्नुहोस्",
+    "artifactPreview": "पूर्वावलोकन",
+    "artifactCode": "कोड",
+    "artifactClose": "पूर्वावलोकन बन्द गर्नुहोस्",
+    "artifactDownload": "डाउनलोड",
+    "artifactReload": "पूर्वावलोकन पुनः लोड गर्नुहोस्",
+    "artifactHtml": "HTML पृष्ठ",
+    "artifactSvg": "SVG छवि",
+    "artifactLines": "पङ्क्तिहरू",
+    "artifactResize": "पूर्वावलोकनको आकार बदल्नुहोस्"
   },
   "playgroundSessions": {
     "heading": "कुराकानीहरू",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} दि. अघि",
     "loadFailed": "त्यो कुराकानी खोल्न सकिएन।",
     "renameFailed": "त्यो कुराकानीको नाम बदल्न सकिएन।",
-    "deleteFailed": "त्यो कुराकानी मेट्न सकिएन।"
+    "deleteFailed": "त्यो कुराकानी मेट्न सकिएन।",
+    "actions": "वार्तालाप कार्यहरू",
+    "newChat": "नयाँ च्याट"
   },
   "embeddings": {
     "title": "नमूनाहरू",

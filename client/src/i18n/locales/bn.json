@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} সমর্থিত নয়। ছবি (PNG, JPEG, WebP, GIF) বা পাঠ্য ফাইল (TXT, MD, CSV, JSON, LOG) সংযুক্ত করুন।",
     "attachFailed": "{name} পড়া যায়নি।",
     "noVisionBadge": "ছবি নেই",
-    "visionWarning": "{model} ছবি গ্রহণ করে না। একটি দৃষ্টি মডেল বা স্বয়ংক্রিয় নির্বাচন করুন।"
+    "visionWarning": "{model} ছবি গ্রহণ করে না। একটি দৃষ্টি মডেল বা স্বয়ংক্রিয় নির্বাচন করুন।",
+    "dictate": "বলে লিখুন",
+    "dictationStop": "রেকর্ডিং বন্ধ করুন",
+    "dictationTranscribing": "লেখা হচ্ছে…",
+    "dictationUnavailable": "বলে লেখা ব্যবহার করতে অডিও মডেলের প্রদানকারী যোগ করুন।",
+    "dictationModel": "শ্রুতলিখন মডেল",
+    "dictationFailed": "লেখা ব্যর্থ হয়েছে: {reason}",
+    "artifactOpen": "প্রিভিউ খুলুন",
+    "artifactPreview": "প্রিভিউ",
+    "artifactCode": "কোড",
+    "artifactClose": "প্রিভিউ বন্ধ করুন",
+    "artifactDownload": "ডাউনলোড",
+    "artifactReload": "প্রিভিউ পুনরায় লোড করুন",
+    "artifactHtml": "HTML পেজ",
+    "artifactSvg": "SVG ছবি",
+    "artifactLines": "লাইন",
+    "artifactResize": "প্রিভিউর আকার বদলান"
   },
   "playgroundSessions": {
     "heading": "কথোপকথন",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} দিন আগে",
     "loadFailed": "সেই কথোপকথনটি খোলা গেল না।",
     "renameFailed": "সেই কথোপকথনের নাম পরিবর্তন করা গেল না।",
-    "deleteFailed": "সেই কথোপকথনটি মুছে দেওয়া গেল না।"
+    "deleteFailed": "সেই কথোপকথনটি মুছে দেওয়া গেল না।",
+    "actions": "কথোপকথনের ক্রিয়া",
+    "newChat": "নতুন চ্যাট"
   },
   "embeddings": {
     "title": "মডেল",

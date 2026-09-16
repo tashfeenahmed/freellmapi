@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} არ არის მხარდაჭერილი. მიამაგრეთ სურათები (PNG, JPEG, WebP, GIF) ან ტექსტური ფაილები (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "{name} ვერ წაიკითხა.",
     "noVisionBadge": "სურათების გარეშე",
-    "visionWarning": "{model} არ იღებს სურათებს. აირჩიეთ ხედვის მოდელი ან ავტომატური."
+    "visionWarning": "{model} არ იღებს სურათებს. აირჩიეთ ხედვის მოდელი ან ავტომატური.",
+    "dictate": "კარნახი",
+    "dictationStop": "ჩაწერის შეწყვეტა",
+    "dictationTranscribing": "ტრანსკრიფცია…",
+    "dictationUnavailable": "კარნახის გამოსაყენებლად დაამატეთ აუდიო მოდელების პროვაიდერები.",
+    "dictationModel": "კარნახის მოდელი",
+    "dictationFailed": "ტრანსკრიფცია ვერ შესრულდა: {reason}",
+    "artifactOpen": "გადახედვის გახსნა",
+    "artifactPreview": "გადახედვა",
+    "artifactCode": "კოდი",
+    "artifactClose": "გადახედვის დახურვა",
+    "artifactDownload": "ჩამოტვირთვა",
+    "artifactReload": "გადახედვის განახლება",
+    "artifactHtml": "HTML გვერდი",
+    "artifactSvg": "SVG სურათი",
+    "artifactLines": "ხაზი",
+    "artifactResize": "გადახედვის ზომის შეცვლა"
   },
   "playgroundSessions": {
     "heading": "საუბრები",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} დღის წინ",
     "loadFailed": "ამ საუბრის გახსნა ვერ მოხერხდა.",
     "renameFailed": "ამ საუბრის გადარქმევა ვერ მოხერხდა.",
-    "deleteFailed": "ამ საუბრის წაშლა ვერ მოხერხდა."
+    "deleteFailed": "ამ საუბრის წაშლა ვერ მოხერხდა.",
+    "actions": "საუბრის მოქმედებები",
+    "newChat": "ახალი ჩატი"
   },
   "embeddings": {
     "title": "მოდელები",

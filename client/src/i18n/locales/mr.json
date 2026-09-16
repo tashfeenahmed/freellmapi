@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} समर्थित नाही. प्रतिमा (PNG, JPEG, WebP, GIF) किंवा मजकूर फाइल्स (TXT, MD, CSV, JSON, LOG) संलग्न करा.",
     "attachFailed": "{name} वाचता आले नाही.",
     "noVisionBadge": "प्रतिमा नाही",
-    "visionWarning": "{model} प्रतिमा स्वीकारत नाही. दृष्टी मॉडेल किंवा ऑटो निवडा."
+    "visionWarning": "{model} प्रतिमा स्वीकारत नाही. दृष्टी मॉडेल किंवा ऑटो निवडा.",
+    "dictate": "बोलून लिहा",
+    "dictationStop": "रेकॉर्डिंग थांबवा",
+    "dictationTranscribing": "लिहिले जात आहे…",
+    "dictationUnavailable": "बोलून लिहिण्यासाठी ऑडिओ मॉडेल प्रदाते जोडा.",
+    "dictationModel": "श्रुतलेखन मॉडेल",
+    "dictationFailed": "लिहिणे अयशस्वी: {reason}",
+    "artifactOpen": "पूर्वावलोकन उघडा",
+    "artifactPreview": "पूर्वावलोकन",
+    "artifactCode": "कोड",
+    "artifactClose": "पूर्वावलोकन बंद करा",
+    "artifactDownload": "डाउनलोड",
+    "artifactReload": "पूर्वावलोकन पुन्हा लोड करा",
+    "artifactHtml": "HTML पृष्ठ",
+    "artifactSvg": "SVG प्रतिमा",
+    "artifactLines": "ओळी",
+    "artifactResize": "पूर्वावलोकनाचा आकार बदला"
   },
   "playgroundSessions": {
     "heading": "संभाषणे",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} दि. पूर्वी",
     "loadFailed": "ते संभाषण उघडता आले नाही.",
     "renameFailed": "त्या संभाषणाचे नाव बदलता आले नाही.",
-    "deleteFailed": "ते संभाषण हटवता आले नाही."
+    "deleteFailed": "ते संभाषण हटवता आले नाही.",
+    "actions": "संवाद क्रिया",
+    "newChat": "नवीन चॅट"
   },
   "embeddings": {
     "title": "मॉडेल्स",

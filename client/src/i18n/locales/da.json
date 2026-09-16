@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} understøttes ikke. Vedhæft billeder (PNG, JPEG, WebP, GIF) eller tekstfiler (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Kunne ikke læse {name}.",
     "noVisionBadge": "Ingen billeder",
-    "visionWarning": "{model} accepterer ikke billeder. Vælg en model med billedinput eller Auto."
+    "visionWarning": "{model} accepterer ikke billeder. Vælg en model med billedinput eller Auto.",
+    "dictate": "Dikter",
+    "dictationStop": "Stop optagelse",
+    "dictationTranscribing": "Transskriberer…",
+    "dictationUnavailable": "Tilføj udbydere af lydmodeller for at kunne diktere.",
+    "dictationModel": "Dikteringsmodel",
+    "dictationFailed": "Transskription mislykkedes: {reason}",
+    "artifactOpen": "Åbn forhåndsvisning",
+    "artifactPreview": "Forhåndsvisning",
+    "artifactCode": "Kode",
+    "artifactClose": "Luk forhåndsvisning",
+    "artifactDownload": "Download",
+    "artifactReload": "Genindlæs forhåndsvisning",
+    "artifactHtml": "HTML-side",
+    "artifactSvg": "SVG-billede",
+    "artifactLines": "linjer",
+    "artifactResize": "Tilpas forhåndsvisningens størrelse"
   },
   "playgroundSessions": {
     "heading": "Samtaler",
@@ -885,7 +901,9 @@
     "daysAgo": "for {count} d. siden",
     "loadFailed": "Kunne ikke åbne den samtale.",
     "renameFailed": "Kunne ikke omdøbe den samtale.",
-    "deleteFailed": "Kunne ikke slette den samtale."
+    "deleteFailed": "Kunne ikke slette den samtale.",
+    "actions": "Samtalehandlinger",
+    "newChat": "Ny chat"
   },
   "embeddings": {
     "title": "Modeller",

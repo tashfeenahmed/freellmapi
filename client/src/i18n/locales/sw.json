@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} haitumiki. Ambatisha picha (PNG, JPEG, WebP, GIF) au faili za maandishi (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Imeshindwa kusoma {name}.",
     "noVisionBadge": "Hakuna picha",
-    "visionWarning": "{model} haikubali picha. Chagua muundo wa maono au Otomatiki."
+    "visionWarning": "{model} haikubali picha. Chagua muundo wa maono au Otomatiki.",
+    "dictate": "Sema uandikishe",
+    "dictationStop": "Simamisha kurekodi",
+    "dictationTranscribing": "Inanukuu…",
+    "dictationUnavailable": "Ongeza watoa huduma wa miundo ya sauti ili kutumia kusema uandikishe.",
+    "dictationModel": "Muundo wa kusema uandikishe",
+    "dictationFailed": "Unukuzi umeshindwa: {reason}",
+    "artifactOpen": "Fungua onyesho la kukagua",
+    "artifactPreview": "Onyesho la kukagua",
+    "artifactCode": "Msimbo",
+    "artifactClose": "Funga onyesho la kukagua",
+    "artifactDownload": "Pakua",
+    "artifactReload": "Pakia upya onyesho",
+    "artifactHtml": "Ukurasa wa HTML",
+    "artifactSvg": "Picha ya SVG",
+    "artifactLines": "mistari",
+    "artifactResize": "Badilisha ukubwa wa onyesho"
   },
   "playgroundSessions": {
     "heading": "Mazungumzo",
@@ -885,7 +901,9 @@
     "daysAgo": "siku {count} zilizopita",
     "loadFailed": "Imeshindwa kufungua mazungumzo hayo.",
     "renameFailed": "Imeshindwa kubadilisha jina la mazungumzo hayo.",
-    "deleteFailed": "Imeshindwa kufuta mazungumzo hayo."
+    "deleteFailed": "Imeshindwa kufuta mazungumzo hayo.",
+    "actions": "Vitendo vya mazungumzo",
+    "newChat": "Gumzo jipya"
   },
   "embeddings": {
     "title": "Mifano",

@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} desteklenmiyor. Görüntü (PNG, JPEG, WebP, GIF) veya metin dosyaları (TXT, MD, CSV, JSON, LOG) ekleyin.",
     "attachFailed": "{name} okunamadı.",
     "noVisionBadge": "Görüntü yok",
-    "visionWarning": "{model} görüntü kabul etmiyor. Görüntü destekleyen bir model veya Otomatik seçin."
+    "visionWarning": "{model} görüntü kabul etmiyor. Görüntü destekleyen bir model veya Otomatik seçin.",
+    "dictate": "Dikte et",
+    "dictationStop": "Kaydı durdur",
+    "dictationTranscribing": "Yazıya dökülüyor…",
+    "dictationUnavailable": "Dikteyi kullanabilmek için ses modelleri sağlayıcıları ekleyin.",
+    "dictationModel": "Dikte modeli",
+    "dictationFailed": "Yazıya dökme başarısız: {reason}",
+    "artifactOpen": "Önizlemeyi aç",
+    "artifactPreview": "Önizleme",
+    "artifactCode": "Kod",
+    "artifactClose": "Önizlemeyi kapat",
+    "artifactDownload": "İndir",
+    "artifactReload": "Önizlemeyi yenile",
+    "artifactHtml": "HTML sayfası",
+    "artifactSvg": "SVG görseli",
+    "artifactLines": "satır",
+    "artifactResize": "Önizlemeyi yeniden boyutlandır"
   },
   "playgroundSessions": {
     "heading": "Sohbetler",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} gün önce",
     "loadFailed": "Bu sohbet açılamadı.",
     "renameFailed": "Bu sohbet yeniden adlandırılamadı.",
-    "deleteFailed": "Bu sohbet silinemedi."
+    "deleteFailed": "Bu sohbet silinemedi.",
+    "actions": "Sohbet işlemleri",
+    "newChat": "Yeni sohbet"
   },
   "embeddings": {
     "title": "Modeller",

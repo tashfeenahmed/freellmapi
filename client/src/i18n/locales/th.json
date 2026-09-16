@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ไม่รองรับ กรุณาแนบรูปภาพ (PNG, JPEG, WebP, GIF) หรือไฟล์ข้อความ (TXT, MD, CSV, JSON, LOG)",
     "attachFailed": "ไม่สามารถอ่าน {name} ได้",
     "noVisionBadge": "ไม่รับรูปภาพ",
-    "visionWarning": "{model} ไม่รองรับรูปภาพ เลือกโมเดลที่รองรับรูปภาพหรืออัตโนมัติ"
+    "visionWarning": "{model} ไม่รองรับรูปภาพ เลือกโมเดลที่รองรับรูปภาพหรืออัตโนมัติ",
+    "dictate": "พูดเพื่อพิมพ์",
+    "dictationStop": "หยุดบันทึก",
+    "dictationTranscribing": "กำลังถอดเสียง…",
+    "dictationUnavailable": "เพิ่มผู้ให้บริการโมเดลเสียงเพื่อใช้การพูดเพื่อพิมพ์",
+    "dictationModel": "โมเดลพูดเพื่อพิมพ์",
+    "dictationFailed": "ถอดเสียงไม่สำเร็จ: {reason}",
+    "artifactOpen": "เปิดตัวอย่าง",
+    "artifactPreview": "ตัวอย่าง",
+    "artifactCode": "โค้ด",
+    "artifactClose": "ปิดตัวอย่าง",
+    "artifactDownload": "ดาวน์โหลด",
+    "artifactReload": "โหลดตัวอย่างใหม่",
+    "artifactHtml": "หน้า HTML",
+    "artifactSvg": "ภาพ SVG",
+    "artifactLines": "บรรทัด",
+    "artifactResize": "ปรับขนาดตัวอย่าง"
   },
   "playgroundSessions": {
     "heading": "บทสนทนา",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} วันที่แล้ว",
     "loadFailed": "ไม่สามารถเปิดบทสนทนานั้นได้",
     "renameFailed": "ไม่สามารถเปลี่ยนชื่อบทสนทนานั้นได้",
-    "deleteFailed": "ไม่สามารถลบบทสนทนานั้นได้"
+    "deleteFailed": "ไม่สามารถลบบทสนทนานั้นได้",
+    "actions": "การดำเนินการของการสนทนา",
+    "newChat": "แชทใหม่"
   },
   "embeddings": {
     "title": "โมเดล",

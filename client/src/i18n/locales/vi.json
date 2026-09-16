@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} không được hỗ trợ. Hãy đính kèm hình ảnh (PNG, JPEG, WebP, GIF) hoặc tệp văn bản (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Không thể đọc {name}.",
     "noVisionBadge": "Không hình ảnh",
-    "visionWarning": "{model} không chấp nhận hình ảnh. Hãy chọn một mô hình hỗ trợ hình ảnh hoặc Tự động."
+    "visionWarning": "{model} không chấp nhận hình ảnh. Hãy chọn một mô hình hỗ trợ hình ảnh hoặc Tự động.",
+    "dictate": "Đọc chính tả",
+    "dictationStop": "Dừng ghi âm",
+    "dictationTranscribing": "Đang chuyển thành văn bản…",
+    "dictationUnavailable": "Thêm nhà cung cấp mô hình âm thanh để dùng đọc chính tả.",
+    "dictationModel": "Mô hình đọc chính tả",
+    "dictationFailed": "Chuyển văn bản thất bại: {reason}",
+    "artifactOpen": "Mở bản xem trước",
+    "artifactPreview": "Xem trước",
+    "artifactCode": "Mã",
+    "artifactClose": "Đóng bản xem trước",
+    "artifactDownload": "Tải xuống",
+    "artifactReload": "Tải lại bản xem trước",
+    "artifactHtml": "Trang HTML",
+    "artifactSvg": "Ảnh SVG",
+    "artifactLines": "dòng",
+    "artifactResize": "Đổi kích cỡ bản xem trước"
   },
   "playgroundSessions": {
     "heading": "Cuộc trò chuyện",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ngày trước",
     "loadFailed": "Không thể mở cuộc trò chuyện đó.",
     "renameFailed": "Không thể đổi tên cuộc trò chuyện đó.",
-    "deleteFailed": "Không thể xóa cuộc trò chuyện đó."
+    "deleteFailed": "Không thể xóa cuộc trò chuyện đó.",
+    "actions": "Thao tác hội thoại",
+    "newChat": "Cuộc trò chuyện mới"
   },
   "embeddings": {
     "title": "Người mẫu",

@@ -867,7 +867,23 @@
     "attachUnsupported": "不支持 {name}。请附加图像（PNG、JPEG、WebP、GIF）或文本文件（TXT、MD、CSV、JSON、LOG）。",
     "attachFailed": "无法读取 {name}。",
     "noVisionBadge": "不支持图像",
-    "visionWarning": "{model} 不接受图像。请选择视觉模型或「自动」。"
+    "visionWarning": "{model} 不接受图像。请选择视觉模型或「自动」。",
+    "dictate": "语音输入",
+    "dictationStop": "停止录音",
+    "dictationTranscribing": "正在转写…",
+    "dictationUnavailable": "请添加音频模型的提供商以使用语音输入。",
+    "dictationModel": "语音输入模型",
+    "dictationFailed": "转写失败：{reason}",
+    "artifactOpen": "打开预览",
+    "artifactPreview": "预览",
+    "artifactCode": "代码",
+    "artifactClose": "关闭预览",
+    "artifactDownload": "下载",
+    "artifactReload": "重新加载预览",
+    "artifactHtml": "HTML 页面",
+    "artifactSvg": "SVG 图像",
+    "artifactLines": "行",
+    "artifactResize": "调整预览大小"
   },
   "playgroundSessions": {
     "heading": "对话",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} 天前",
     "loadFailed": "无法打开该对话。",
     "renameFailed": "无法重命名该对话。",
-    "deleteFailed": "无法删除该对话。"
+    "deleteFailed": "无法删除该对话。",
+    "actions": "对话操作",
+    "newChat": "新对话"
   },
   "embeddings": {
     "title": "模型",

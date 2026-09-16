@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} qoʻllab-quvvatlanmaydi. Rasm (PNG, JPEG, WebP, GIF) yoki matnli fayl (TXT, MD, CSV, JSON, LOG) biriktiring.",
     "attachFailed": "{name} oʻqib boʻlmadi.",
     "noVisionBadge": "Rasmsiz",
-    "visionWarning": "{model} rasmlarni qabul qilmaydi. Rasmni qoʻllaydigan model yoki Avtomatik variantini tanlang."
+    "visionWarning": "{model} rasmlarni qabul qilmaydi. Rasmni qoʻllaydigan model yoki Avtomatik variantini tanlang.",
+    "dictate": "Diktovka",
+    "dictationStop": "Yozib olishni to‘xtatish",
+    "dictationTranscribing": "Matnga o‘girilmoqda…",
+    "dictationUnavailable": "Diktovkadan foydalanish uchun audio modellar provayderlarini qo‘shing.",
+    "dictationModel": "Diktovka modeli",
+    "dictationFailed": "Matnga o‘girish amalga oshmadi: {reason}",
+    "artifactOpen": "Ko‘rishni ochish",
+    "artifactPreview": "Ko‘rish",
+    "artifactCode": "Kod",
+    "artifactClose": "Ko‘rishni yopish",
+    "artifactDownload": "Yuklab olish",
+    "artifactReload": "Ko‘rishni qayta yuklash",
+    "artifactHtml": "HTML sahifa",
+    "artifactSvg": "SVG rasm",
+    "artifactLines": "qator",
+    "artifactResize": "Ko‘rish o‘lchamini o‘zgartirish"
   },
   "playgroundSessions": {
     "heading": "Suhbatlar",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} kun oldin",
     "loadFailed": "Bu suhbatni ochib bo‘lmadi.",
     "renameFailed": "Bu suhbat nomini o‘zgartirib bo‘lmadi.",
-    "deleteFailed": "Bu suhbatni o‘chirib bo‘lmadi."
+    "deleteFailed": "Bu suhbatni o‘chirib bo‘lmadi.",
+    "actions": "Suhbat amallari",
+    "newChat": "Yangi chat"
   },
   "embeddings": {
     "title": "Modellar",

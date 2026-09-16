@@ -867,7 +867,23 @@
     "attachUnsupported": "Anaghị akwado {name}. Tinye onyonyo (PNG, JPEG, WebP, GIF) ma ọ bụ faịlụ ederede (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Enweghị ike ịgụ {name}.",
     "noVisionBadge": "Enweghị onyonyo",
-    "visionWarning": "{model} anaghị anabata onyonyo. Họrọ ụdị na-anabata onyonyo ma ọ bụ Akpaaka."
+    "visionWarning": "{model} anaghị anabata onyonyo. Họrọ ụdị na-anabata onyonyo ma ọ bụ Akpaaka.",
+    "dictate": "Kwuo ka e dee",
+    "dictationStop": "Kwụsị ndekọ",
+    "dictationTranscribing": "Na-edegharị…",
+    "dictationUnavailable": "Tinye ndị na-enye ụdị ụda iji jiri ikwu ka e dee.",
+    "dictationModel": "Ụdị ikwu ka e dee",
+    "dictationFailed": "Ndegharị dara: {reason}",
+    "artifactOpen": "Mepee nlele",
+    "artifactPreview": "Nlele",
+    "artifactCode": "Koodu",
+    "artifactClose": "Mechie nlele",
+    "artifactDownload": "Budata",
+    "artifactReload": "Bugharịa nlele",
+    "artifactHtml": "Ibe HTML",
+    "artifactSvg": "Onyonyo SVG",
+    "artifactLines": "ahịrị",
+    "artifactResize": "Gbanwee nha nlele"
   },
   "playgroundSessions": {
     "heading": "Mkparịta ụka",
@@ -885,7 +901,9 @@
     "daysAgo": "ụbọchị {count} gara aga",
     "loadFailed": "Enweghị ike imepe mkparịta ụka ahụ.",
     "renameFailed": "Enweghị ike ịnyegharị aha mkparịta ụka ahụ.",
-    "deleteFailed": "Enweghị ike ihichapụ mkparịta ụka ahụ."
+    "deleteFailed": "Enweghị ike ihichapụ mkparịta ụka ahụ.",
+    "actions": "Omume mkparịta ụka",
+    "newChat": "Nkata ọhụrụ"
   },
   "embeddings": {
     "title": "Ụdị",

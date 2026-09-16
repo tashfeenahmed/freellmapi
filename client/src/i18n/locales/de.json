@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} wird nicht unterstützt. Hängen Sie Bilder (PNG, JPEG, WebP, GIF) oder Textdateien (TXT, MD, CSV, JSON, LOG) an.",
     "attachFailed": "{name} konnte nicht gelesen werden.",
     "noVisionBadge": "Keine Bilder",
-    "visionWarning": "{model} akzeptiert keine Bilder. Wählen Sie ein Vision-Modell oder Auto."
+    "visionWarning": "{model} akzeptiert keine Bilder. Wählen Sie ein Vision-Modell oder Auto.",
+    "dictate": "Diktieren",
+    "dictationStop": "Aufnahme beenden",
+    "dictationTranscribing": "Wird transkribiert…",
+    "dictationUnavailable": "Fügen Sie Anbieter für Audiomodelle hinzu, um Diktat nutzen zu können.",
+    "dictationModel": "Diktiermodell",
+    "dictationFailed": "Transkription fehlgeschlagen: {reason}",
+    "artifactOpen": "Vorschau öffnen",
+    "artifactPreview": "Vorschau",
+    "artifactCode": "Code",
+    "artifactClose": "Vorschau schließen",
+    "artifactDownload": "Herunterladen",
+    "artifactReload": "Vorschau neu laden",
+    "artifactHtml": "HTML-Seite",
+    "artifactSvg": "SVG-Bild",
+    "artifactLines": "Zeilen",
+    "artifactResize": "Vorschau in der Größe ändern"
   },
   "playgroundSessions": {
     "heading": "Unterhaltungen",
@@ -885,7 +901,9 @@
     "daysAgo": "vor {count} T.",
     "loadFailed": "Diese Unterhaltung konnte nicht geöffnet werden.",
     "renameFailed": "Diese Unterhaltung konnte nicht umbenannt werden.",
-    "deleteFailed": "Diese Unterhaltung konnte nicht gelöscht werden."
+    "deleteFailed": "Diese Unterhaltung konnte nicht gelöscht werden.",
+    "actions": "Aktionen für Unterhaltung",
+    "newChat": "Neuer Chat"
   },
   "embeddings": {
     "title": "Modelle",

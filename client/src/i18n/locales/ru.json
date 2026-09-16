@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} не поддерживается. Прикрепите изображения (PNG, JPEG, WebP, GIF) или текстовые файлы (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Не удалось прочитать {name}.",
     "noVisionBadge": "Без изображений",
-    "visionWarning": "{model} не принимает изображения. Выберите модель с поддержкой изображений или «Авто»."
+    "visionWarning": "{model} не принимает изображения. Выберите модель с поддержкой изображений или «Авто».",
+    "dictate": "Диктовать",
+    "dictationStop": "Остановить запись",
+    "dictationTranscribing": "Расшифровка…",
+    "dictationUnavailable": "Добавьте провайдеров аудиомоделей, чтобы использовать диктовку.",
+    "dictationModel": "Модель диктовки",
+    "dictationFailed": "Ошибка расшифровки: {reason}",
+    "artifactOpen": "Открыть предпросмотр",
+    "artifactPreview": "Предпросмотр",
+    "artifactCode": "Код",
+    "artifactClose": "Закрыть предпросмотр",
+    "artifactDownload": "Скачать",
+    "artifactReload": "Обновить предпросмотр",
+    "artifactHtml": "HTML-страница",
+    "artifactSvg": "SVG-изображение",
+    "artifactLines": "строк",
+    "artifactResize": "Изменить размер предпросмотра"
   },
   "playgroundSessions": {
     "heading": "Чаты",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} дн. назад",
     "loadFailed": "Не удалось открыть этот чат.",
     "renameFailed": "Не удалось переименовать этот чат.",
-    "deleteFailed": "Не удалось удалить этот чат."
+    "deleteFailed": "Не удалось удалить этот чат.",
+    "actions": "Действия с беседой",
+    "newChat": "Новый чат"
   },
   "embeddings": {
     "title": "Модели",

@@ -867,7 +867,23 @@
     "attachUnsupported": "Датотека {name} није подржана. Приложите слике (PNG, JPEG, WebP, GIF) или текстуалне датотеке (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Није могуће прочитати датотеку {name}.",
     "noVisionBadge": "Без слика",
-    "visionWarning": "Модел {model} не прихвата слике. Изаберите модел са визијом или Ауто."
+    "visionWarning": "Модел {model} не прихвата слике. Изаберите модел са визијом или Ауто.",
+    "dictate": "Диктирај",
+    "dictationStop": "Заустави снимање",
+    "dictationTranscribing": "Транскрибовање…",
+    "dictationUnavailable": "Додајте провајдере аудио модела да бисте могли да диктирате.",
+    "dictationModel": "Модел диктирања",
+    "dictationFailed": "Транскрипција није успела: {reason}",
+    "artifactOpen": "Отвори преглед",
+    "artifactPreview": "Преглед",
+    "artifactCode": "Код",
+    "artifactClose": "Затвори преглед",
+    "artifactDownload": "Преузми",
+    "artifactReload": "Поново учитај преглед",
+    "artifactHtml": "HTML страница",
+    "artifactSvg": "SVG слика",
+    "artifactLines": "редова",
+    "artifactResize": "Промени величину прегледа"
   },
   "playgroundSessions": {
     "heading": "Разговори",
@@ -885,7 +901,9 @@
     "daysAgo": "пре {count} д",
     "loadFailed": "Није могуће отворити тај разговор.",
     "renameFailed": "Није могуће преименовати тај разговор.",
-    "deleteFailed": "Није могуће избрисати тај разговор."
+    "deleteFailed": "Није могуће избрисати тај разговор.",
+    "actions": "Радње разговора",
+    "newChat": "Нови разговор"
   },
   "embeddings": {
     "title": "Модели",

@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ಬೆಂಬಲಿತವಾಗಿಲ್ಲ. ಚಿತ್ರಗಳನ್ನು (PNG, JPEG, WebP, GIF) ಅಥವಾ ಪಠ್ಯ ಫೈಲ್‌ಗಳನ್ನು (TXT, MD, CSV, JSON, LOG) ಲಗತ್ತಿಸಿ.",
     "attachFailed": "{name} ಅನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "noVisionBadge": "ಚಿತ್ರಗಳಿಲ್ಲ",
-    "visionWarning": "{model} ಚಿತ್ರಗಳನ್ನು ಸ್ವೀಕರಿಸುವುದಿಲ್ಲ. ಚಿತ್ರದ ಇನ್‌ಪುಟ್ ಸ್ವೀಕರಿಸುವ ಮಾದರಿ ಅಥವಾ ಸ್ವಯಂ ಆಯ್ಕೆಮಾಡಿ."
+    "visionWarning": "{model} ಚಿತ್ರಗಳನ್ನು ಸ್ವೀಕರಿಸುವುದಿಲ್ಲ. ಚಿತ್ರದ ಇನ್‌ಪುಟ್ ಸ್ವೀಕರಿಸುವ ಮಾದರಿ ಅಥವಾ ಸ್ವಯಂ ಆಯ್ಕೆಮಾಡಿ.",
+    "dictate": "ಹೇಳಿ ಬರೆಸಿ",
+    "dictationStop": "ರೆಕಾರ್ಡಿಂಗ್ ನಿಲ್ಲಿಸಿ",
+    "dictationTranscribing": "ಲಿಪ್ಯಂತರ…",
+    "dictationUnavailable": "ಡಿಕ್ಟೇಷನ್ ಬಳಸಲು ಆಡಿಯೊ ಮಾದರಿ ಪೂರೈಕೆದಾರರನ್ನು ಸೇರಿಸಿ.",
+    "dictationModel": "ಡಿಕ್ಟೇಷನ್ ಮಾದರಿ",
+    "dictationFailed": "ಲಿಪ್ಯಂತರ ವಿಫಲ: {reason}",
+    "artifactOpen": "ಪೂರ್ವವೀಕ್ಷಣೆ ತೆರೆಯಿರಿ",
+    "artifactPreview": "ಪೂರ್ವವೀಕ್ಷಣೆ",
+    "artifactCode": "ಕೋಡ್",
+    "artifactClose": "ಪೂರ್ವವೀಕ್ಷಣೆ ಮುಚ್ಚಿ",
+    "artifactDownload": "ಡೌನ್‌ಲೋಡ್",
+    "artifactReload": "ಪೂರ್ವವೀಕ್ಷಣೆ ಮರುಲೋಡ್ ಮಾಡಿ",
+    "artifactHtml": "HTML ಪುಟ",
+    "artifactSvg": "SVG ಚಿತ್ರ",
+    "artifactLines": "ಸಾಲುಗಳು",
+    "artifactResize": "ಪೂರ್ವವೀಕ್ಷಣೆಯ ಗಾತ್ರ ಬದಲಿಸಿ"
   },
   "playgroundSessions": {
     "heading": "ಸಂಭಾಷಣೆಗಳು",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ದಿನ ಹಿಂದೆ",
     "loadFailed": "ಆ ಸಂಭಾಷಣೆಯನ್ನು ತೆರೆಯಲಾಗಲಿಲ್ಲ.",
     "renameFailed": "ಆ ಸಂಭಾಷಣೆಯನ್ನು ಮರುಹೆಸರಿಸಲಾಗಲಿಲ್ಲ.",
-    "deleteFailed": "ಆ ಸಂಭಾಷಣೆಯನ್ನು ಅಳಿಸಲಾಗಲಿಲ್ಲ."
+    "deleteFailed": "ಆ ಸಂಭಾಷಣೆಯನ್ನು ಅಳಿಸಲಾಗಲಿಲ್ಲ.",
+    "actions": "ಸಂವಾದ ಕ್ರಿಯೆಗಳು",
+    "newChat": "ಹೊಸ ಚಾಟ್"
   },
   "embeddings": {
     "title": "ಮಾದರಿಗಳು",

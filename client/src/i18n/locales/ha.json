@@ -867,7 +867,23 @@
     "attachUnsupported": "Ba a goyi bayan {name} ba. Haɗa hotuna (PNG, JPEG, WebP, GIF) ko fayilolin rubutu (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Ba a iya karanta {name} ba.",
     "noVisionBadge": "Babu hotuna",
-    "visionWarning": "{model} ba ya karɓar hotuna. Zaɓi samfurin da ke karɓar hotuna ko Auto."
+    "visionWarning": "{model} ba ya karɓar hotuna. Zaɓi samfurin da ke karɓar hotuna ko Auto.",
+    "dictate": "Faɗa a rubuta",
+    "dictationStop": "Dakatar da rikodi",
+    "dictationTranscribing": "Ana rubutawa…",
+    "dictationUnavailable": "Ƙara masu samar da samfuran sauti don amfani da faɗa a rubuta.",
+    "dictationModel": "Samfurin faɗa a rubuta",
+    "dictationFailed": "Rubutawa ta gaza: {reason}",
+    "artifactOpen": "Buɗe samfoti",
+    "artifactPreview": "Samfoti",
+    "artifactCode": "Lamba",
+    "artifactClose": "Rufe samfoti",
+    "artifactDownload": "Sauke",
+    "artifactReload": "Sake loda samfoti",
+    "artifactHtml": "Shafin HTML",
+    "artifactSvg": "Hoton SVG",
+    "artifactLines": "layuka",
+    "artifactResize": "Canja girman samfoti"
   },
   "playgroundSessions": {
     "heading": "Tattaunawa",
@@ -885,7 +901,9 @@
     "daysAgo": "kwana {count} da suka wuce",
     "loadFailed": "Ba a iya buɗe wannan tattaunawar ba.",
     "renameFailed": "Ba a iya sauya sunan wannan tattaunawar ba.",
-    "deleteFailed": "Ba a iya share wannan tattaunawar ba."
+    "deleteFailed": "Ba a iya share wannan tattaunawar ba.",
+    "actions": "Ayyukan tattaunawa",
+    "newChat": "Sabuwar tattaunawa"
   },
   "embeddings": {
     "title": "Samfura",

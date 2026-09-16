@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} støttes ikke. Legg ved bilder (PNG, JPEG, WebP, GIF) eller tekstfiler (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Kunne ikke lese {name}.",
     "noVisionBadge": "Ingen bilder",
-    "visionWarning": "{model} godtar ikke bilder. Velg en modell med bildeinput eller Auto."
+    "visionWarning": "{model} godtar ikke bilder. Velg en modell med bildeinput eller Auto.",
+    "dictate": "Dikter",
+    "dictationStop": "Stopp opptak",
+    "dictationTranscribing": "Transkriberer…",
+    "dictationUnavailable": "Legg til leverandører av lydmodeller for å kunne diktere.",
+    "dictationModel": "Dikteringsmodell",
+    "dictationFailed": "Transkripsjon mislyktes: {reason}",
+    "artifactOpen": "Åpne forhåndsvisning",
+    "artifactPreview": "Forhåndsvisning",
+    "artifactCode": "Kode",
+    "artifactClose": "Lukk forhåndsvisning",
+    "artifactDownload": "Last ned",
+    "artifactReload": "Last inn forhåndsvisningen på nytt",
+    "artifactHtml": "HTML-side",
+    "artifactSvg": "SVG-bilde",
+    "artifactLines": "linjer",
+    "artifactResize": "Endre størrelse på forhåndsvisning"
   },
   "playgroundSessions": {
     "heading": "Samtaler",
@@ -885,7 +901,9 @@
     "daysAgo": "for {count} d siden",
     "loadFailed": "Kunne ikke åpne den samtalen.",
     "renameFailed": "Kunne ikke gi den samtalen nytt navn.",
-    "deleteFailed": "Kunne ikke slette den samtalen."
+    "deleteFailed": "Kunne ikke slette den samtalen.",
+    "actions": "Samtalehandlinger",
+    "newChat": "Ny chat"
   },
   "embeddings": {
     "title": "Modeller",

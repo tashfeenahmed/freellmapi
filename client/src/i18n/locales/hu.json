@@ -867,7 +867,23 @@
     "attachUnsupported": "A(z) {name} nem támogatott. Csatolj képeket (PNG, JPEG, WebP, GIF) vagy szövegfájlokat (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "A(z) {name} nem olvasható.",
     "noVisionBadge": "Nincs kép",
-    "visionWarning": "A(z) {model} nem fogad képeket. Válassz képfeldolgozó modellt vagy az Automatikus lehetőséget."
+    "visionWarning": "A(z) {model} nem fogad képeket. Válassz képfeldolgozó modellt vagy az Automatikus lehetőséget.",
+    "dictate": "Diktálás",
+    "dictationStop": "Felvétel leállítása",
+    "dictationTranscribing": "Átírás…",
+    "dictationUnavailable": "Adjon hozzá hangmodell-szolgáltatókat a diktálás használatához.",
+    "dictationModel": "Diktálási modell",
+    "dictationFailed": "Az átírás nem sikerült: {reason}",
+    "artifactOpen": "Előnézet megnyitása",
+    "artifactPreview": "Előnézet",
+    "artifactCode": "Kód",
+    "artifactClose": "Előnézet bezárása",
+    "artifactDownload": "Letöltés",
+    "artifactReload": "Előnézet újratöltése",
+    "artifactHtml": "HTML-oldal",
+    "artifactSvg": "SVG-kép",
+    "artifactLines": "sor",
+    "artifactResize": "Előnézet átméretezése"
   },
   "playgroundSessions": {
     "heading": "Beszélgetések",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} napja",
     "loadFailed": "Nem sikerült megnyitni ezt a beszélgetést.",
     "renameFailed": "Nem sikerült átnevezni ezt a beszélgetést.",
-    "deleteFailed": "Nem sikerült törölni ezt a beszélgetést."
+    "deleteFailed": "Nem sikerült törölni ezt a beszélgetést.",
+    "actions": "Beszélgetés műveletei",
+    "newChat": "Új csevegés"
   },
   "embeddings": {
     "title": "Modellek",

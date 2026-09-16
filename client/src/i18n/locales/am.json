@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} አይደገፍም። ምስሎችን (PNG, JPEG, WebP, GIF) ወይም የጽሑፍ ፋይሎችን (TXT, MD, CSV, JSON, LOG) ያያይዙ።",
     "attachFailed": "{name} ማንበብ አልተቻለም።",
     "noVisionBadge": "ምስል የለም",
-    "visionWarning": "{model} ምስሎችን አይቀበልም። ምስል የሚቀበል ሞዴል ወይም ራስ-ሰር ይምረጡ።"
+    "visionWarning": "{model} ምስሎችን አይቀበልም። ምስል የሚቀበል ሞዴል ወይም ራስ-ሰር ይምረጡ።",
+    "dictate": "ተናግረው ይጻፉ",
+    "dictationStop": "መቅረጽ አቁም",
+    "dictationTranscribing": "እየተጻፈ ነው…",
+    "dictationUnavailable": "ተናግረው ለመጻፍ የድምፅ ሞዴል አቅራቢዎችን ያክሉ።",
+    "dictationModel": "የቃል ጽሕፈት ሞዴል",
+    "dictationFailed": "መጻፍ አልተሳካም: {reason}",
+    "artifactOpen": "ቅድመ እይታ ክፈት",
+    "artifactPreview": "ቅድመ እይታ",
+    "artifactCode": "ኮድ",
+    "artifactClose": "ቅድመ እይታ ዝጋ",
+    "artifactDownload": "አውርድ",
+    "artifactReload": "ቅድመ እይታ እንደገና ጫን",
+    "artifactHtml": "HTML ገጽ",
+    "artifactSvg": "SVG ምስል",
+    "artifactLines": "መስመሮች",
+    "artifactResize": "የቅድመ እይታ መጠን ቀይር"
   },
   "playgroundSessions": {
     "heading": "ውይይቶች",
@@ -885,7 +901,9 @@
     "daysAgo": "ከ{count} ቀን በፊት",
     "loadFailed": "ያንን ውይይት መክፈት አልተቻለም።",
     "renameFailed": "ያንን ውይይት እንደገና መሰየም አልተቻለም።",
-    "deleteFailed": "ያንን ውይይት መሰረዝ አልተቻለም።"
+    "deleteFailed": "ያንን ውይይት መሰረዝ አልተቻለም።",
+    "actions": "የውይይት ተግባራት",
+    "newChat": "አዲስ ውይይት"
   },
   "embeddings": {
     "title": "ሞዴሎች",

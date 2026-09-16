@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ကို မပံ့ပိုးပါ။ ပုံများ (PNG, JPEG, WebP, GIF) သို့မဟုတ် စာသားဖိုင်များ (TXT, MD, CSV, JSON, LOG) ကို ပူးတွဲပါ။",
     "attachFailed": "{name} ကို ဖတ်၍မရပါ။",
     "noVisionBadge": "ပုံမရ",
-    "visionWarning": "{model} သည် ပုံများကို လက်မခံပါ။ ပုံရိပ်ထည့်သွင်းမှုကို လက်ခံသော မော်ဒယ် သို့မဟုတ် အော်တို ကို ရွေးပါ။"
+    "visionWarning": "{model} သည် ပုံများကို လက်မခံပါ။ ပုံရိပ်ထည့်သွင်းမှုကို လက်ခံသော မော်ဒယ် သို့မဟုတ် အော်တို ကို ရွေးပါ။",
+    "dictate": "အသံဖြင့်ရေးရန်",
+    "dictationStop": "အသံသွင်းခြင်း ရပ်ရန်",
+    "dictationTranscribing": "စာသားပြောင်းနေသည်…",
+    "dictationUnavailable": "အသံဖြင့်ရေးရန် အသံမော်ဒယ် ပံ့ပိုးသူများ ထည့်ပါ။",
+    "dictationModel": "အသံဖြင့်ရေးမော်ဒယ်",
+    "dictationFailed": "စာသားပြောင်းခြင်း မအောင်မြင်ပါ: {reason}",
+    "artifactOpen": "အစမ်းကြည့်ရန် ဖွင့်ရန်",
+    "artifactPreview": "အစမ်းကြည့်ရှု",
+    "artifactCode": "ကုဒ်",
+    "artifactClose": "အစမ်းကြည့်ရှုမှု ပိတ်ရန်",
+    "artifactDownload": "ဒေါင်းလုဒ်",
+    "artifactReload": "အစမ်းကြည့်ရှုမှု ပြန်တင်ရန်",
+    "artifactHtml": "HTML စာမျက်နှာ",
+    "artifactSvg": "SVG ပုံ",
+    "artifactLines": "လိုင်း",
+    "artifactResize": "အစမ်းကြည့်ရှုမှု အရွယ်အစားပြောင်းရန်"
   },
   "playgroundSessions": {
     "heading": "စကားဝိုင်းများ",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ရက်က",
     "loadFailed": "ထိုစကားဝိုင်းကို ဖွင့်၍မရပါ။",
     "renameFailed": "ထိုစကားဝိုင်း၏ အမည်ကို ပြောင်း၍မရပါ။",
-    "deleteFailed": "ထိုစကားဝိုင်းကို ဖျက်၍မရပါ။"
+    "deleteFailed": "ထိုစကားဝိုင်းကို ဖျက်၍မရပါ။",
+    "actions": "စကားဝိုင်း လုပ်ဆောင်ချက်များ",
+    "newChat": "ချတ်အသစ်"
   },
   "embeddings": {
     "title": "မော်ဒယ်များ",

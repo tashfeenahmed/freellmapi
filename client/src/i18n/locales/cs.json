@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} není podporován. Připojte obrázky (PNG, JPEG, WebP, GIF) nebo textové soubory (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Soubor {name} se nepodařilo přečíst.",
     "noVisionBadge": "Bez obrázků",
-    "visionWarning": "{model} nepřijímá obrázky. Zvolte model podporující obrázky nebo Auto."
+    "visionWarning": "{model} nepřijímá obrázky. Zvolte model podporující obrázky nebo Auto.",
+    "dictate": "Diktovat",
+    "dictationStop": "Zastavit nahrávání",
+    "dictationTranscribing": "Přepisuje se…",
+    "dictationUnavailable": "Přidejte poskytovatele audio modelů, abyste mohli diktovat.",
+    "dictationModel": "Model diktování",
+    "dictationFailed": "Přepis se nezdařil: {reason}",
+    "artifactOpen": "Otevřít náhled",
+    "artifactPreview": "Náhled",
+    "artifactCode": "Kód",
+    "artifactClose": "Zavřít náhled",
+    "artifactDownload": "Stáhnout",
+    "artifactReload": "Obnovit náhled",
+    "artifactHtml": "HTML stránka",
+    "artifactSvg": "SVG obrázek",
+    "artifactLines": "řádků",
+    "artifactResize": "Změnit velikost náhledu"
   },
   "playgroundSessions": {
     "heading": "Konverzace",
@@ -885,7 +901,9 @@
     "daysAgo": "před {count} dny",
     "loadFailed": "Konverzaci se nepodařilo otevřít.",
     "renameFailed": "Konverzaci se nepodařilo přejmenovat.",
-    "deleteFailed": "Konverzaci se nepodařilo smazat."
+    "deleteFailed": "Konverzaci se nepodařilo smazat.",
+    "actions": "Akce konverzace",
+    "newChat": "Nový chat"
   },
   "embeddings": {
     "title": "Modely",

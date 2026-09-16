@@ -867,7 +867,23 @@
     "attachUnsupported": "{name}은(는) 지원되지 않습니다. 이미지(PNG, JPEG, WebP, GIF) 또는 텍스트 파일(TXT, MD, CSV, JSON, LOG)을 첨부하세요.",
     "attachFailed": "{name}을(를) 읽을 수 없습니다.",
     "noVisionBadge": "이미지 불가",
-    "visionWarning": "{model}은(는) 이미지를 지원하지 않습니다. 이미지 입력이 가능한 모델 또는 자동을 선택하세요."
+    "visionWarning": "{model}은(는) 이미지를 지원하지 않습니다. 이미지 입력이 가능한 모델 또는 자동을 선택하세요.",
+    "dictate": "받아쓰기",
+    "dictationStop": "녹음 중지",
+    "dictationTranscribing": "변환 중…",
+    "dictationUnavailable": "받아쓰기를 사용하려면 오디오 모델 제공자를 추가하세요.",
+    "dictationModel": "받아쓰기 모델",
+    "dictationFailed": "변환 실패: {reason}",
+    "artifactOpen": "미리보기 열기",
+    "artifactPreview": "미리보기",
+    "artifactCode": "코드",
+    "artifactClose": "미리보기 닫기",
+    "artifactDownload": "다운로드",
+    "artifactReload": "미리보기 새로 고침",
+    "artifactHtml": "HTML 페이지",
+    "artifactSvg": "SVG 이미지",
+    "artifactLines": "줄",
+    "artifactResize": "미리보기 크기 조절"
   },
   "playgroundSessions": {
     "heading": "대화",
@@ -885,7 +901,9 @@
     "daysAgo": "{count}일 전",
     "loadFailed": "해당 대화를 열지 못했습니다.",
     "renameFailed": "해당 대화의 이름을 변경하지 못했습니다.",
-    "deleteFailed": "해당 대화를 삭제하지 못했습니다."
+    "deleteFailed": "해당 대화를 삭제하지 못했습니다.",
+    "actions": "대화 작업",
+    "newChat": "새 채팅"
   },
   "embeddings": {
     "title": "모델",

@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} はサポートされていません。画像 (PNG、JPEG、WebP、GIF) またはテキスト ファイル (TXT、MD、CSV、JSON、LOG) を添付してください。",
     "attachFailed": "{name} を読み取れませんでした。",
     "noVisionBadge": "画像不可",
-    "visionWarning": "{model} は画像を受け付けません。ビジョン モデルまたは「自動」を選択してください。"
+    "visionWarning": "{model} は画像を受け付けません。ビジョン モデルまたは「自動」を選択してください。",
+    "dictate": "音声入力",
+    "dictationStop": "録音を停止",
+    "dictationTranscribing": "文字起こし中…",
+    "dictationUnavailable": "音声入力を使うには、音声モデルのプロバイダーを追加してください。",
+    "dictationModel": "音声入力モデル",
+    "dictationFailed": "文字起こしに失敗しました: {reason}",
+    "artifactOpen": "プレビューを開く",
+    "artifactPreview": "プレビュー",
+    "artifactCode": "コード",
+    "artifactClose": "プレビューを閉じる",
+    "artifactDownload": "ダウンロード",
+    "artifactReload": "プレビューを再読み込み",
+    "artifactHtml": "HTMLページ",
+    "artifactSvg": "SVG画像",
+    "artifactLines": "行",
+    "artifactResize": "プレビューのサイズ変更"
   },
   "playgroundSessions": {
     "heading": "会話",
@@ -885,7 +901,9 @@
     "daysAgo": "{count}日前",
     "loadFailed": "この会話を開けませんでした。",
     "renameFailed": "この会話の名前を変更できませんでした。",
-    "deleteFailed": "この会話を削除できませんでした。"
+    "deleteFailed": "この会話を削除できませんでした。",
+    "actions": "会話の操作",
+    "newChat": "新しいチャット"
   },
   "embeddings": {
     "title": "モデル",

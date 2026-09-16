@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ସମର୍ଥିତ ନୁହେଁ। ଚିତ୍ର (PNG, JPEG, WebP, GIF) କିମ୍ୱା ଟେକ୍ସଟ୍ ଫାଇଲ (TXT, MD, CSV, JSON, LOG) ସଂଲଗ୍ନ କରନ୍ତୁ।",
     "attachFailed": "{name} ପଢ଼ି ହେଲା ନାହିଁ।",
     "noVisionBadge": "ଚିତ୍ର ନାହିଁ",
-    "visionWarning": "{model} ଚିତ୍ର ଗ୍ରହଣ କରେ ନାହିଁ। ଫଟୋ ଇନପୁଟ୍ ସ୍ଵୀକାର କରୁଥିବା ମଡେଲ୍ କିମ୍ୱା ସ୍ଵତଃ ଚୟନ କରନ୍ତୁ।"
+    "visionWarning": "{model} ଚିତ୍ର ଗ୍ରହଣ କରେ ନାହିଁ। ଫଟୋ ଇନପୁଟ୍ ସ୍ଵୀକାର କରୁଥିବା ମଡେଲ୍ କିମ୍ୱା ସ୍ଵତଃ ଚୟନ କରନ୍ତୁ।",
+    "dictate": "କହି ଲେଖନ୍ତୁ",
+    "dictationStop": "ରେକର୍ଡିଂ ବନ୍ଦ କରନ୍ତୁ",
+    "dictationTranscribing": "ଲେଖା ହେଉଛି…",
+    "dictationUnavailable": "କହି ଲେଖିବା ପାଇଁ ଅଡିଓ ମଡେଲ ପ୍ରଦାନକାରୀ ଯୋଡ଼ନ୍ତୁ।",
+    "dictationModel": "ଶ୍ରୁତଲେଖ ମଡେଲ",
+    "dictationFailed": "ଲେଖା ବିଫଳ: {reason}",
+    "artifactOpen": "ପ୍ରିଭ୍ୟୁ ଖୋଲନ୍ତୁ",
+    "artifactPreview": "ପ୍ରିଭ୍ୟୁ",
+    "artifactCode": "କୋଡ୍",
+    "artifactClose": "ପ୍ରିଭ୍ୟୁ ବନ୍ଦ କରନ୍ତୁ",
+    "artifactDownload": "ଡାଉନଲୋଡ୍",
+    "artifactReload": "ପ୍ରିଭ୍ୟୁ ପୁନଃ ଲୋଡ୍ କରନ୍ତୁ",
+    "artifactHtml": "HTML ପୃଷ୍ଠା",
+    "artifactSvg": "SVG ଛବି",
+    "artifactLines": "ଧାଡ଼ି",
+    "artifactResize": "ପ୍ରିଭ୍ୟୁ ଆକାର ବଦଳାନ୍ତୁ"
   },
   "playgroundSessions": {
     "heading": "ବାର୍ତ୍ତାଳାପ",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ଦିନ ପୂର୍ବେ",
     "loadFailed": "ସେହି ବାର୍ତ୍ତାଳାପ ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",
     "renameFailed": "ସେହି ବାର୍ତ୍ତାଳାପର ନାମ ବଦଳାଯାଇପାରିଲା ନାହିଁ।",
-    "deleteFailed": "ସେହି ବାର୍ତ୍ତାଳାପ ବିଲୋପ କରାଯାଇପାରିଲା ନାହିଁ।"
+    "deleteFailed": "ସେହି ବାର୍ତ୍ତାଳାପ ବିଲୋପ କରାଯାଇପାରିଲା ନାହିଁ।",
+    "actions": "ବାର୍ତ୍ତାଳାପ କାର୍ଯ୍ୟ",
+    "newChat": "ନୂଆ ଚାଟ୍"
   },
   "embeddings": {
     "title": "ମଡେଲଗୁଡିକ",

@@ -867,7 +867,23 @@
     "attachUnsupported": "不支援 {name}。請附加圖像（PNG、JPEG、WebP、GIF）或文字檔案（TXT、MD、CSV、JSON、LOG）。",
     "attachFailed": "無法讀取 {name}。",
     "noVisionBadge": "無圖像",
-    "visionWarning": "{model} 不接受圖像。請選擇視覺模型或「自動」。"
+    "visionWarning": "{model} 不接受圖像。請選擇視覺模型或「自動」。",
+    "dictate": "語音輸入",
+    "dictationStop": "停止錄音",
+    "dictationTranscribing": "正在轉寫…",
+    "dictationUnavailable": "請新增音訊模型的供應商以使用語音輸入。",
+    "dictationModel": "語音輸入模型",
+    "dictationFailed": "轉寫失敗：{reason}",
+    "artifactOpen": "開啟預覽",
+    "artifactPreview": "預覽",
+    "artifactCode": "程式碼",
+    "artifactClose": "關閉預覽",
+    "artifactDownload": "下載",
+    "artifactReload": "重新載入預覽",
+    "artifactHtml": "HTML 頁面",
+    "artifactSvg": "SVG 圖片",
+    "artifactLines": "行",
+    "artifactResize": "調整預覽大小"
   },
   "playgroundSessions": {
     "heading": "對話",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} 天前",
     "loadFailed": "無法開啟該對話。",
     "renameFailed": "無法重新命名該對話。",
-    "deleteFailed": "無法刪除該對話。"
+    "deleteFailed": "無法刪除該對話。",
+    "actions": "對話操作",
+    "newChat": "新對話"
   },
   "embeddings": {
     "title": "模型",

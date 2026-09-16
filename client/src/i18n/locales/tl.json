@@ -867,7 +867,23 @@
     "attachUnsupported": "Hindi suportado ang {name}. Maglakip ng mga larawan (PNG, JPEG, WebP, GIF) o mga text file (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Hindi mabasa ang {name}.",
     "noVisionBadge": "Walang larawan",
-    "visionWarning": "Hindi tumatanggap ng larawan ang {model}. Pumili ng modelong tumatanggap ng larawan o Auto."
+    "visionWarning": "Hindi tumatanggap ng larawan ang {model}. Pumili ng modelong tumatanggap ng larawan o Auto.",
+    "dictate": "Idikta",
+    "dictationStop": "Ihinto ang pag-record",
+    "dictationTranscribing": "Isinasalin sa teksto…",
+    "dictationUnavailable": "Magdagdag ng mga provider ng audio model para magamit ang pagdidikta.",
+    "dictationModel": "Modelo ng pagdidikta",
+    "dictationFailed": "Nabigo ang transkripsyon: {reason}",
+    "artifactOpen": "Buksan ang preview",
+    "artifactPreview": "Preview",
+    "artifactCode": "Code",
+    "artifactClose": "Isara ang preview",
+    "artifactDownload": "I-download",
+    "artifactReload": "I-reload ang preview",
+    "artifactHtml": "HTML page",
+    "artifactSvg": "SVG image",
+    "artifactLines": "linya",
+    "artifactResize": "Baguhin ang laki ng preview"
   },
   "playgroundSessions": {
     "heading": "Mga usapan",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} araw nakalipas",
     "loadFailed": "Hindi mabuksan ang usapang iyon.",
     "renameFailed": "Hindi mapalitan ang pangalan ng usapang iyon.",
-    "deleteFailed": "Hindi matanggal ang usapang iyon."
+    "deleteFailed": "Hindi matanggal ang usapang iyon.",
+    "actions": "Mga aksyon sa usapan",
+    "newChat": "Bagong chat"
   },
   "embeddings": {
     "title": "Mga Modelo",

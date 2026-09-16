@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} មិនត្រូវបានគាំទ្រទេ។ ភ្ជាប់រូបភាព (PNG, JPEG, WebP, GIF) ឬឯកសារអត្ថបទ (TXT, MD, CSV, JSON, LOG)។",
     "attachFailed": "មិនអាចអានឯកសារ {name} បានទេ។",
     "noVisionBadge": "គ្មានរូបភាព",
-    "visionWarning": "{model} មិនទទួលយករូបភាពទេ។ សូមជ្រើសរើសម៉ូដែលដែលទទួលរូបភាព ឬ Auto។"
+    "visionWarning": "{model} មិនទទួលយករូបភាពទេ។ សូមជ្រើសរើសម៉ូដែលដែលទទួលរូបភាព ឬ Auto។",
+    "dictate": "និយាយវាយអត្ថបទ",
+    "dictationStop": "បញ្ឈប់ការថត",
+    "dictationTranscribing": "កំពុងបំលែងជាអត្ថបទ…",
+    "dictationUnavailable": "បន្ថែមអ្នកផ្តល់ម៉ូដែលសំឡេង ដើម្បីប្រើការនិយាយវាយអត្ថបទ។",
+    "dictationModel": "ម៉ូដែលនិយាយវាយអត្ថបទ",
+    "dictationFailed": "ការបំលែងបរាជ័យ: {reason}",
+    "artifactOpen": "បើកការមើលជាមុន",
+    "artifactPreview": "មើលជាមុន",
+    "artifactCode": "កូដ",
+    "artifactClose": "បិទការមើលជាមុន",
+    "artifactDownload": "ទាញយក",
+    "artifactReload": "ផ្ទុកការមើលជាមុនឡើងវិញ",
+    "artifactHtml": "ទំព័រ HTML",
+    "artifactSvg": "រូបភាព SVG",
+    "artifactLines": "បន្ទាត់",
+    "artifactResize": "ប្ដូរទំហំការមើលជាមុន"
   },
   "playgroundSessions": {
     "heading": "ការសន្ទនា",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} ថ្ងៃមុន",
     "loadFailed": "មិនអាចបើកការសន្ទនានោះបានទេ។",
     "renameFailed": "មិនអាចប្តូរឈ្មោះការសន្ទនានោះបានទេ។",
-    "deleteFailed": "មិនអាចលុបការសន្ទនានោះបានទេ។"
+    "deleteFailed": "មិនអាចលុបការសន្ទនានោះបានទេ។",
+    "actions": "សកម្មភាពការសន្ទនា",
+    "newChat": "ជជែកថ្មី"
   },
   "embeddings": {
     "title": "ម៉ូដែល",

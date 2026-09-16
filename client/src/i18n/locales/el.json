@@ -867,7 +867,23 @@
     "attachUnsupported": "Το {name} δεν υποστηρίζεται. Επισυνάψτε εικόνες (PNG, JPEG, WebP, GIF) ή αρχεία κειμένου (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Δεν ήταν δυνατή η ανάγνωση του {name}.",
     "noVisionBadge": "Χωρίς εικόνες",
-    "visionWarning": "Το {model} δεν δέχεται εικόνες. Επιλέξτε μοντέλο με υποστήριξη εικόνας ή Αυτόματο."
+    "visionWarning": "Το {model} δεν δέχεται εικόνες. Επιλέξτε μοντέλο με υποστήριξη εικόνας ή Αυτόματο.",
+    "dictate": "Υπαγόρευση",
+    "dictationStop": "Διακοπή ηχογράφησης",
+    "dictationTranscribing": "Μεταγραφή…",
+    "dictationUnavailable": "Προσθέστε παρόχους μοντέλων ήχου για να χρησιμοποιήσετε την υπαγόρευση.",
+    "dictationModel": "Μοντέλο υπαγόρευσης",
+    "dictationFailed": "Η μεταγραφή απέτυχε: {reason}",
+    "artifactOpen": "Άνοιγμα προεπισκόπησης",
+    "artifactPreview": "Προεπισκόπηση",
+    "artifactCode": "Κώδικας",
+    "artifactClose": "Κλείσιμο προεπισκόπησης",
+    "artifactDownload": "Λήψη",
+    "artifactReload": "Επαναφόρτωση προεπισκόπησης",
+    "artifactHtml": "Σελίδα HTML",
+    "artifactSvg": "Εικόνα SVG",
+    "artifactLines": "γραμμές",
+    "artifactResize": "Αλλαγή μεγέθους προεπισκόπησης"
   },
   "playgroundSessions": {
     "heading": "Συνομιλίες",
@@ -885,7 +901,9 @@
     "daysAgo": "πριν {count} ημ.",
     "loadFailed": "Δεν ήταν δυνατό το άνοιγμα αυτής της συνομιλίας.",
     "renameFailed": "Δεν ήταν δυνατή η μετονομασία αυτής της συνομιλίας.",
-    "deleteFailed": "Δεν ήταν δυνατή η διαγραφή αυτής της συνομιλίας."
+    "deleteFailed": "Δεν ήταν δυνατή η διαγραφή αυτής της συνομιλίας.",
+    "actions": "Ενέργειες συνομιλίας",
+    "newChat": "Νέα συνομιλία"
   },
   "embeddings": {
     "title": "Μοντέλα",

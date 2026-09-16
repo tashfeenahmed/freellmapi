@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} nu este acceptat. Atașează imagini (PNG, JPEG, WebP, GIF) sau fișiere text (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Nu s-a putut citi {name}.",
     "noVisionBadge": "Fără imagini",
-    "visionWarning": "{model} nu acceptă imagini. Alege un model cu suport pentru imagini sau Auto."
+    "visionWarning": "{model} nu acceptă imagini. Alege un model cu suport pentru imagini sau Auto.",
+    "dictate": "Dictează",
+    "dictationStop": "Oprește înregistrarea",
+    "dictationTranscribing": "Se transcrie…",
+    "dictationUnavailable": "Adaugă furnizori de modele audio pentru a putea folosi dictarea.",
+    "dictationModel": "Model de dictare",
+    "dictationFailed": "Transcrierea a eșuat: {reason}",
+    "artifactOpen": "Deschide previzualizarea",
+    "artifactPreview": "Previzualizare",
+    "artifactCode": "Cod",
+    "artifactClose": "Închide previzualizarea",
+    "artifactDownload": "Descarcă",
+    "artifactReload": "Reîncarcă previzualizarea",
+    "artifactHtml": "Pagină HTML",
+    "artifactSvg": "Imagine SVG",
+    "artifactLines": "linii",
+    "artifactResize": "Redimensionează previzualizarea"
   },
   "playgroundSessions": {
     "heading": "Conversații",
@@ -885,7 +901,9 @@
     "daysAgo": "acum {count} z",
     "loadFailed": "Nu s-a putut deschide acea conversație.",
     "renameFailed": "Nu s-a putut redenumi acea conversație.",
-    "deleteFailed": "Nu s-a putut șterge acea conversație."
+    "deleteFailed": "Nu s-a putut șterge acea conversație.",
+    "actions": "Acțiuni conversație",
+    "newChat": "Chat nou"
   },
   "embeddings": {
     "title": "Modele",

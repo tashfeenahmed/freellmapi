@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} nie jest obsługiwany. Załącz obrazy (PNG, JPEG, WebP, GIF) lub pliki tekstowe (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Nie udało się odczytać pliku {name}.",
     "noVisionBadge": "Bez obrazów",
-    "visionWarning": "{model} nie przyjmuje obrazów. Wybierz model obsługujący obrazy lub Auto."
+    "visionWarning": "{model} nie przyjmuje obrazów. Wybierz model obsługujący obrazy lub Auto.",
+    "dictate": "Dyktuj",
+    "dictationStop": "Zatrzymaj nagrywanie",
+    "dictationTranscribing": "Transkrypcja…",
+    "dictationUnavailable": "Dodaj dostawców modeli audio, aby korzystać z dyktowania.",
+    "dictationModel": "Model dyktowania",
+    "dictationFailed": "Transkrypcja nie powiodła się: {reason}",
+    "artifactOpen": "Otwórz podgląd",
+    "artifactPreview": "Podgląd",
+    "artifactCode": "Kod",
+    "artifactClose": "Zamknij podgląd",
+    "artifactDownload": "Pobierz",
+    "artifactReload": "Odśwież podgląd",
+    "artifactHtml": "Strona HTML",
+    "artifactSvg": "Obraz SVG",
+    "artifactLines": "wierszy",
+    "artifactResize": "Zmień rozmiar podglądu"
   },
   "playgroundSessions": {
     "heading": "Rozmowy",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} dni temu",
     "loadFailed": "Nie udało się otworzyć tej rozmowy.",
     "renameFailed": "Nie udało się zmienić nazwy tej rozmowy.",
-    "deleteFailed": "Nie udało się usunąć tej rozmowy."
+    "deleteFailed": "Nie udało się usunąć tej rozmowy.",
+    "actions": "Akcje rozmowy",
+    "newChat": "Nowy czat"
   },
   "embeddings": {
     "title": "Modele",

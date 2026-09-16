@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} tidak disokong. Lampirkan imej (PNG, JPEG, WebP, GIF) atau fail teks (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Tidak dapat membaca {name}.",
     "noVisionBadge": "Tiada imej",
-    "visionWarning": "{model} tidak menerima imej. Pilih model yang menyokong imej atau Auto."
+    "visionWarning": "{model} tidak menerima imej. Pilih model yang menyokong imej atau Auto.",
+    "dictate": "Dikte",
+    "dictationStop": "Hentikan rakaman",
+    "dictationTranscribing": "Mentranskripsi…",
+    "dictationUnavailable": "Tambah pembekal model audio untuk menggunakan dikte.",
+    "dictationModel": "Model dikte",
+    "dictationFailed": "Transkripsi gagal: {reason}",
+    "artifactOpen": "Buka pratonton",
+    "artifactPreview": "Pratonton",
+    "artifactCode": "Kod",
+    "artifactClose": "Tutup pratonton",
+    "artifactDownload": "Muat turun",
+    "artifactReload": "Muat semula pratonton",
+    "artifactHtml": "Halaman HTML",
+    "artifactSvg": "Imej SVG",
+    "artifactLines": "baris",
+    "artifactResize": "Ubah saiz pratonton"
   },
   "playgroundSessions": {
     "heading": "Perbualan",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} hari lalu",
     "loadFailed": "Tidak dapat membuka perbualan itu.",
     "renameFailed": "Tidak dapat menukar nama perbualan itu.",
-    "deleteFailed": "Tidak dapat memadam perbualan itu."
+    "deleteFailed": "Tidak dapat memadam perbualan itu.",
+    "actions": "Tindakan perbualan",
+    "newChat": "Sembang baharu"
   },
   "embeddings": {
     "title": "Model",

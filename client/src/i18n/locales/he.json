@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} אינו נתמך. צרף תמונות (PNG, JPEG, WebP, GIF) או קובצי טקסט (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "לא ניתן לקרוא את {name}.",
     "noVisionBadge": "ללא תמונות",
-    "visionWarning": "{model} אינו מקבל תמונות. בחר מודל חזון או אוטו."
+    "visionWarning": "{model} אינו מקבל תמונות. בחר מודל חזון או אוטו.",
+    "dictate": "הכתבה",
+    "dictationStop": "עצירת ההקלטה",
+    "dictationTranscribing": "מתמלל…",
+    "dictationUnavailable": "הוסיפו ספקים למודלי שמע כדי להשתמש בהכתבה.",
+    "dictationModel": "מודל הכתבה",
+    "dictationFailed": "התמלול נכשל: {reason}",
+    "artifactOpen": "פתיחת תצוגה מקדימה",
+    "artifactPreview": "תצוגה מקדימה",
+    "artifactCode": "קוד",
+    "artifactClose": "סגירת תצוגה מקדימה",
+    "artifactDownload": "הורדה",
+    "artifactReload": "טעינה מחדש של התצוגה",
+    "artifactHtml": "עמוד HTML",
+    "artifactSvg": "תמונת SVG",
+    "artifactLines": "שורות",
+    "artifactResize": "שינוי גודל התצוגה המקדימה"
   },
   "playgroundSessions": {
     "heading": "שיחות",
@@ -885,7 +901,9 @@
     "daysAgo": "לפני {count} ימים",
     "loadFailed": "לא ניתן לפתוח את השיחה.",
     "renameFailed": "לא ניתן לשנות את שם השיחה.",
-    "deleteFailed": "לא ניתן למחוק את השיחה."
+    "deleteFailed": "לא ניתן למחוק את השיחה.",
+    "actions": "פעולות שיחה",
+    "newChat": "צ׳אט חדש"
   },
   "embeddings": {
     "title": "דגמים",

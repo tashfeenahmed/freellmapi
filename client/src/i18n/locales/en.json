@@ -903,7 +903,23 @@
     "attachUnsupported": "{name} is not supported. Attach images (PNG, JPEG, WebP, GIF) or text files (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Could not read {name}.",
     "noVisionBadge": "No images",
-    "visionWarning": "{model} does not accept images. Choose a vision model or Auto."
+    "visionWarning": "{model} does not accept images. Choose a vision model or Auto.",
+    "dictate": "Dictate",
+    "dictationStop": "Stop recording",
+    "dictationTranscribing": "Transcribing…",
+    "dictationUnavailable": "Add providers for audio models to be able to use dictation.",
+    "dictationModel": "Dictation model",
+    "dictationFailed": "Transcription failed: {reason}",
+    "artifactOpen": "Open preview",
+    "artifactPreview": "Preview",
+    "artifactCode": "Code",
+    "artifactClose": "Close preview",
+    "artifactDownload": "Download",
+    "artifactReload": "Reload preview",
+    "artifactHtml": "HTML page",
+    "artifactSvg": "SVG image",
+    "artifactLines": "lines",
+    "artifactResize": "Resize preview"
   },
   "playgroundSessions": {
     "heading": "Conversations",
@@ -921,7 +937,9 @@
     "daysAgo": "{count}d ago",
     "loadFailed": "Couldn't open that conversation.",
     "renameFailed": "Couldn't rename that conversation.",
-    "deleteFailed": "Couldn't delete that conversation."
+    "deleteFailed": "Couldn't delete that conversation.",
+    "actions": "Conversation actions",
+    "newChat": "New chat"
   },
   "embeddings": {
     "title": "Models",

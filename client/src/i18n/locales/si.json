@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} සඳහා සහාය නොදක්වයි. රූප (PNG, JPEG, WebP, GIF) හෝ පෙළ ගොනු (TXT, MD, CSV, JSON, LOG) අමුණන්න.",
     "attachFailed": "{name} කියවිය නොහැකි විය.",
     "noVisionBadge": "රූප නැත",
-    "visionWarning": "{model} රූප පිළිගන්නේ නැත. රූප පිළිගන්නා ආකෘතියක් හෝ ස්වයංක්‍රීය තෝරන්න."
+    "visionWarning": "{model} රූප පිළිගන්නේ නැත. රූප පිළිගන්නා ආකෘතියක් හෝ ස්වයංක්‍රීය තෝරන්න.",
+    "dictate": "කියා ලියන්න",
+    "dictationStop": "පටිගත කිරීම නවත්වන්න",
+    "dictationTranscribing": "ලියමින්…",
+    "dictationUnavailable": "කියා ලිවීම භාවිතයට ශ්‍රව්‍ය මාදිලි සපයන්නන් එක් කරන්න.",
+    "dictationModel": "කියා ලිවීමේ මාදිලිය",
+    "dictationFailed": "ලිවීම අසාර්ථකයි: {reason}",
+    "artifactOpen": "පෙරදසුන විවෘත කරන්න",
+    "artifactPreview": "පෙරදසුන",
+    "artifactCode": "කේතය",
+    "artifactClose": "පෙරදසුන වසන්න",
+    "artifactDownload": "බාගන්න",
+    "artifactReload": "පෙරදසුන නැවත පූරණය කරන්න",
+    "artifactHtml": "HTML පිටුව",
+    "artifactSvg": "SVG රූපය",
+    "artifactLines": "පේළි",
+    "artifactResize": "පෙරදසුනේ ප්‍රමාණය වෙනස් කරන්න"
   },
   "playgroundSessions": {
     "heading": "සංවාද",
@@ -885,7 +901,9 @@
     "daysAgo": "දින {count} පෙර",
     "loadFailed": "එම සංවාදය විවෘත කළ නොහැකි විය.",
     "renameFailed": "එම සංවාදයේ නම වෙනස් කළ නොහැකි විය.",
-    "deleteFailed": "එම සංවාදය මැකිය නොහැකි විය."
+    "deleteFailed": "එම සංවාදය මැකිය නොහැකි විය.",
+    "actions": "සංවාද ක්‍රියා",
+    "newChat": "නව කතාබහ"
   },
   "embeddings": {
     "title": "ආකෘති",

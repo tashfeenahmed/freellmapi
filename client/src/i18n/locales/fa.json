@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} پشتیبانی نمی‌شود. تصویر (PNG، JPEG، WebP، GIF) یا فایل متنی (TXT، MD، CSV، JSON، LOG) پیوست کنید.",
     "attachFailed": "{name} خوانده نشد.",
     "noVisionBadge": "بدون تصویر",
-    "visionWarning": "{model} تصویر نمی‌پذیرد. یک مدل با ورودی تصویر یا خودکار را انتخاب کنید."
+    "visionWarning": "{model} تصویر نمی‌پذیرد. یک مدل با ورودی تصویر یا خودکار را انتخاب کنید.",
+    "dictate": "دیکته",
+    "dictationStop": "توقف ضبط",
+    "dictationTranscribing": "در حال رونویسی…",
+    "dictationUnavailable": "برای استفاده از دیکته، ارائه‌دهندگان مدل‌های صوتی را اضافه کنید.",
+    "dictationModel": "مدل دیکته",
+    "dictationFailed": "رونویسی ناموفق بود: {reason}",
+    "artifactOpen": "باز کردن پیش‌نمایش",
+    "artifactPreview": "پیش‌نمایش",
+    "artifactCode": "کد",
+    "artifactClose": "بستن پیش‌نمایش",
+    "artifactDownload": "دانلود",
+    "artifactReload": "بارگذاری مجدد پیش‌نمایش",
+    "artifactHtml": "صفحه HTML",
+    "artifactSvg": "تصویر SVG",
+    "artifactLines": "خط",
+    "artifactResize": "تغییر اندازه پیش‌نمایش"
   },
   "playgroundSessions": {
     "heading": "گفتگوها",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} روز پیش",
     "loadFailed": "باز کردن آن گفتگو انجام نشد.",
     "renameFailed": "تغییر نام آن گفتگو انجام نشد.",
-    "deleteFailed": "حذف آن گفتگو انجام نشد."
+    "deleteFailed": "حذف آن گفتگو انجام نشد.",
+    "actions": "اقدامات گفتگو",
+    "newChat": "گفتگوی جدید"
   },
   "embeddings": {
     "title": "مدل ها",

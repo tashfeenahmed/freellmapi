@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} no es compatible. Adjunta imágenes (PNG, JPEG, WebP, GIF) o archivos de texto (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "No se pudo leer {name}.",
     "noVisionBadge": "Sin imágenes",
-    "visionWarning": "{model} no acepta imágenes. Elige un modelo de visión o Auto."
+    "visionWarning": "{model} no acepta imágenes. Elige un modelo de visión o Auto.",
+    "dictate": "Dictar",
+    "dictationStop": "Detener grabación",
+    "dictationTranscribing": "Transcribiendo…",
+    "dictationUnavailable": "Añade proveedores de modelos de audio para poder usar el dictado.",
+    "dictationModel": "Modelo de dictado",
+    "dictationFailed": "La transcripción falló: {reason}",
+    "artifactOpen": "Abrir vista previa",
+    "artifactPreview": "Vista previa",
+    "artifactCode": "Código",
+    "artifactClose": "Cerrar vista previa",
+    "artifactDownload": "Descargar",
+    "artifactReload": "Recargar vista previa",
+    "artifactHtml": "Página HTML",
+    "artifactSvg": "Imagen SVG",
+    "artifactLines": "líneas",
+    "artifactResize": "Cambiar tamaño de la vista previa"
   },
   "playgroundSessions": {
     "heading": "Conversaciones",
@@ -885,7 +901,9 @@
     "daysAgo": "hace {count} d",
     "loadFailed": "No se pudo abrir esa conversación.",
     "renameFailed": "No se pudo cambiar el nombre de esa conversación.",
-    "deleteFailed": "No se pudo eliminar esa conversación."
+    "deleteFailed": "No se pudo eliminar esa conversación.",
+    "actions": "Acciones de la conversación",
+    "newChat": "Nuevo chat"
   },
   "embeddings": {
     "title": "Modelos",

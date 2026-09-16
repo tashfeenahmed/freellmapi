@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} stöds inte. Bifoga bilder (PNG, JPEG, WebP, GIF) eller textfiler (TXT, MD, CSV, JSON, LOG).",
     "attachFailed": "Kunde inte läsa {name}.",
     "noVisionBadge": "Inga bilder",
-    "visionWarning": "{model} accepterar inte bilder. Välj en modell med bildstöd eller Auto."
+    "visionWarning": "{model} accepterar inte bilder. Välj en modell med bildstöd eller Auto.",
+    "dictate": "Diktera",
+    "dictationStop": "Stoppa inspelning",
+    "dictationTranscribing": "Transkriberar…",
+    "dictationUnavailable": "Lägg till leverantörer för ljudmodeller för att kunna diktera.",
+    "dictationModel": "Dikteringsmodell",
+    "dictationFailed": "Transkriberingen misslyckades: {reason}",
+    "artifactOpen": "Öppna förhandsvisning",
+    "artifactPreview": "Förhandsvisning",
+    "artifactCode": "Kod",
+    "artifactClose": "Stäng förhandsvisning",
+    "artifactDownload": "Ladda ned",
+    "artifactReload": "Läs in förhandsvisningen igen",
+    "artifactHtml": "HTML-sida",
+    "artifactSvg": "SVG-bild",
+    "artifactLines": "rader",
+    "artifactResize": "Ändra storlek på förhandsvisning"
   },
   "playgroundSessions": {
     "heading": "Konversationer",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} d sedan",
     "loadFailed": "Det gick inte att öppna den konversationen.",
     "renameFailed": "Det gick inte att byta namn på den konversationen.",
-    "deleteFailed": "Det gick inte att radera den konversationen."
+    "deleteFailed": "Det gick inte att radera den konversationen.",
+    "actions": "Samtalsåtgärder",
+    "newChat": "Ny chatt"
   },
   "embeddings": {
     "title": "Modeller",

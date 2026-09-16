@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} wordt niet ondersteund. Voeg afbeeldingen (PNG, JPEG, WebP, GIF) of tekstbestanden (TXT, MD, CSV, JSON, LOG) toe.",
     "attachFailed": "Kan {name} niet lezen.",
     "noVisionBadge": "Geen afbeeldingen",
-    "visionWarning": "{model} accepteert geen afbeeldingen. Kies een model met beeldinvoer of Auto."
+    "visionWarning": "{model} accepteert geen afbeeldingen. Kies een model met beeldinvoer of Auto.",
+    "dictate": "Dicteren",
+    "dictationStop": "Opname stoppen",
+    "dictationTranscribing": "Transcriberen…",
+    "dictationUnavailable": "Voeg providers voor audiomodellen toe om dicteren te gebruiken.",
+    "dictationModel": "Dicteermodel",
+    "dictationFailed": "Transcriptie mislukt: {reason}",
+    "artifactOpen": "Voorbeeld openen",
+    "artifactPreview": "Voorbeeld",
+    "artifactCode": "Code",
+    "artifactClose": "Voorbeeld sluiten",
+    "artifactDownload": "Downloaden",
+    "artifactReload": "Voorbeeld herladen",
+    "artifactHtml": "HTML-pagina",
+    "artifactSvg": "SVG-afbeelding",
+    "artifactLines": "regels",
+    "artifactResize": "Voorbeeld vergroten of verkleinen"
   },
   "playgroundSessions": {
     "heading": "Gesprekken",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} d geleden",
     "loadFailed": "Kan dat gesprek niet openen.",
     "renameFailed": "Kan de naam van dat gesprek niet wijzigen.",
-    "deleteFailed": "Kan dat gesprek niet verwijderen."
+    "deleteFailed": "Kan dat gesprek niet verwijderen.",
+    "actions": "Gespreksacties",
+    "newChat": "Nieuwe chat"
   },
   "embeddings": {
     "title": "Modellen",

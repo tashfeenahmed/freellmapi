@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} ஆதரிக்கப்படவில்லை. படங்களை (PNG, JPEG, WebP, GIF) அல்லது உரைக் கோப்புகளை (TXT, MD, CSV, JSON, LOG) இணைக்கவும்.",
     "attachFailed": "{name} ஐப் படிக்க முடியவில்லை.",
     "noVisionBadge": "படங்கள் இல்லை",
-    "visionWarning": "{model} படங்களை ஏற்காது. பட உள்ளீட்டை ஏற்கும் மாதிரியை அல்லது ஆட்டோ என்பதைத் தேர்ந்தெடுக்கவும்."
+    "visionWarning": "{model} படங்களை ஏற்காது. பட உள்ளீட்டை ஏற்கும் மாதிரியை அல்லது ஆட்டோ என்பதைத் தேர்ந்தெடுக்கவும்.",
+    "dictate": "பேசி எழுதுங்கள்",
+    "dictationStop": "பதிவை நிறுத்து",
+    "dictationTranscribing": "எழுத்தாக்கம்…",
+    "dictationUnavailable": "பேசி எழுத ஆடியோ மாதிரி வழங்குநர்களைச் சேர்க்கவும்.",
+    "dictationModel": "பேச்சு எழுத்தாக்க மாதிரி",
+    "dictationFailed": "எழுத்தாக்கம் தோல்வி: {reason}",
+    "artifactOpen": "முன்னோட்டத்தைத் திற",
+    "artifactPreview": "முன்னோட்டம்",
+    "artifactCode": "குறியீடு",
+    "artifactClose": "முன்னோட்டத்தை மூடு",
+    "artifactDownload": "பதிவிறக்கு",
+    "artifactReload": "முன்னோட்டத்தை மீண்டும் ஏற்று",
+    "artifactHtml": "HTML பக்கம்",
+    "artifactSvg": "SVG படம்",
+    "artifactLines": "வரிகள்",
+    "artifactResize": "முன்னோட்ட அளவை மாற்று"
   },
   "playgroundSessions": {
     "heading": "உரையாடல்கள்",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} நாள் முன்",
     "loadFailed": "அந்த உரையாடலைத் திறக்க முடியவில்லை.",
     "renameFailed": "அந்த உரையாடலுக்கு மறுபெயரிட முடியவில்லை.",
-    "deleteFailed": "அந்த உரையாடலை நீக்க முடியவில்லை."
+    "deleteFailed": "அந்த உரையாடலை நீக்க முடியவில்லை.",
+    "actions": "உரையாடல் செயல்கள்",
+    "newChat": "புதிய அரட்டை"
   },
   "embeddings": {
     "title": "மாதிரிகள்",

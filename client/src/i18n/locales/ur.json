@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} سپورٹڈ نہیں ہے۔ تصاویر (PNG، JPEG، WebP، GIF) یا ٹیکسٹ فائلیں (TXT، MD، CSV، JSON، LOG) منسلک کریں۔",
     "attachFailed": "{name} کو پڑھا نہیں جا سکا۔",
     "noVisionBadge": "تصاویر نہیں",
-    "visionWarning": "{model} تصاویر قبول نہیں کرتا۔ کوئی وژن ماڈل یا آٹو منتخب کریں۔"
+    "visionWarning": "{model} تصاویر قبول نہیں کرتا۔ کوئی وژن ماڈل یا آٹو منتخب کریں۔",
+    "dictate": "بول کر لکھیں",
+    "dictationStop": "ریکارڈنگ روکیں",
+    "dictationTranscribing": "تحریر ہو رہی ہے…",
+    "dictationUnavailable": "بول کر لکھنے کے لیے آڈیو ماڈلز کے فراہم کنندگان شامل کریں۔",
+    "dictationModel": "املا ماڈل",
+    "dictationFailed": "تحریر ناکام: {reason}",
+    "artifactOpen": "پیش منظر کھولیں",
+    "artifactPreview": "پیش منظر",
+    "artifactCode": "کوڈ",
+    "artifactClose": "پیش منظر بند کریں",
+    "artifactDownload": "ڈاؤن لوڈ",
+    "artifactReload": "پیش منظر دوبارہ لوڈ کریں",
+    "artifactHtml": "HTML صفحہ",
+    "artifactSvg": "SVG تصویر",
+    "artifactLines": "لائنیں",
+    "artifactResize": "پیش منظر کا سائز بدلیں"
   },
   "playgroundSessions": {
     "heading": "گفتگوئیں",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} دن پہلے",
     "loadFailed": "وہ گفتگو نہیں کھل سکی۔",
     "renameFailed": "اس گفتگو کا نام تبدیل نہیں ہو سکا۔",
-    "deleteFailed": "وہ گفتگو حذف نہیں ہو سکی۔"
+    "deleteFailed": "وہ گفتگو حذف نہیں ہو سکی۔",
+    "actions": "گفتگو کے اعمال",
+    "newChat": "نئی چیٹ"
   },
   "embeddings": {
     "title": "ماڈلز",

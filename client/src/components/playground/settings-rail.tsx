@@ -1,4 +1,4 @@
-import { PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { ModelCombobox, type ModelComboOption } from '@/components/model-combobox'
@@ -48,6 +48,11 @@ export interface SettingsRailProps {
   onSelectModel: (value: string) => void
   /** Shown under the picker when no platform has an enabled key yet. */
   noModels: boolean
+  /** Speech-to-text picker for the composer's mic (#playground dictation). */
+  dictationValue: string
+  dictationOptions: ModelComboOption[]
+  onSelectDictation: (value: string) => void
+  noTranscription: boolean
   systemPrompt: string
   onSystemPromptChange: (value: string) => void
   sampling: SamplingSettings
@@ -132,6 +137,10 @@ export function SettingsRail({
   modelValue,
   modelOptions,
   onSelectModel,
+  dictationValue,
+  dictationOptions,
+  onSelectDictation,
+  noTranscription,
   noModels,
   systemPrompt,
   onSystemPromptChange,
@@ -161,7 +170,7 @@ export function SettingsRail({
           aria-label={t('playground.showSettings')}
           title={t('playground.showSettings')}
         >
-          <PanelRightOpen className="size-4" />
+          <ChevronsLeft className="size-4" />
         </Button>
         {tweaked && <span className="size-1.5 rounded-full bg-primary/70" />}
       </div>
@@ -169,7 +178,7 @@ export function SettingsRail({
       <div
         className={`${LAYER} w-72 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
       >
-        <div className="flex shrink-0 items-center gap-1 border-b px-2.5 py-2">
+        <div className="flex shrink-0 items-center gap-1 px-2.5 py-1">
           <span className="flex-1 truncate text-xs font-medium text-muted-foreground">
             {t('settings.title')}
           </span>
@@ -180,7 +189,7 @@ export function SettingsRail({
             aria-label={t('playground.hideSettings')}
             title={t('playground.hideSettings')}
           >
-            <PanelRightClose className="size-4" />
+            <ChevronsRight className="size-4" />
           </Button>
         </div>
 
@@ -204,6 +213,27 @@ export function SettingsRail({
                 ) : undefined
               }
             />
+          </div>
+
+          {/* Which speech-to-text model the mic uses. Auto lets the router pick
+              among the transcription models that have a key; with none, the
+              picker says what to add instead of offering an empty list. */}
+          <div className="space-y-1.5">
+            <span className="block text-xs font-medium">{t('playground.dictationModel')}</span>
+            {noTranscription ? (
+              <p className="text-xs text-muted-foreground">{t('playground.dictationUnavailable')}</p>
+            ) : (
+              <ModelCombobox
+                value={dictationValue}
+                options={dictationOptions}
+                onSelect={onSelectDictation}
+                ariaLabel={t('playground.dictationModel')}
+                placeholder={t('playground.searchModels')}
+                emptyText={t('playground.noModelsFound')}
+                align="end"
+                triggerClassName="flex h-8 w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              />
+            )}
           </div>
 
           {/* The system prompt textarea deliberately lives BELOW the composer in

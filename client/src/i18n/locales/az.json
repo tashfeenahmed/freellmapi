@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} dəstəklənmir. Şəkil (PNG, JPEG, WebP, GIF) və ya mətn faylları (TXT, MD, CSV, JSON, LOG) əlavə edin.",
     "attachFailed": "{name} oxunmadı.",
     "noVisionBadge": "Şəkilsiz",
-    "visionWarning": "{model} şəkilləri qəbul etmir. Şəkil dəstəkləyən model və ya Avtomatik seçin."
+    "visionWarning": "{model} şəkilləri qəbul etmir. Şəkil dəstəkləyən model və ya Avtomatik seçin.",
+    "dictate": "Diktə et",
+    "dictationStop": "Yazmağı dayandır",
+    "dictationTranscribing": "Transkripsiya edilir…",
+    "dictationUnavailable": "Diktədən istifadə etmək üçün audio model təminatçıları əlavə edin.",
+    "dictationModel": "Diktə modeli",
+    "dictationFailed": "Transkripsiya alınmadı: {reason}",
+    "artifactOpen": "Önizləməni aç",
+    "artifactPreview": "Önizləmə",
+    "artifactCode": "Kod",
+    "artifactClose": "Önizləməni bağla",
+    "artifactDownload": "Yüklə",
+    "artifactReload": "Önizləməni yenilə",
+    "artifactHtml": "HTML səhifəsi",
+    "artifactSvg": "SVG şəkli",
+    "artifactLines": "sətir",
+    "artifactResize": "Önizləmənin ölçüsünü dəyiş"
   },
   "playgroundSessions": {
     "heading": "Söhbətlər",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} gün əvvəl",
     "loadFailed": "Həmin söhbəti açmaq alınmadı.",
     "renameFailed": "Həmin söhbətin adını dəyişmək alınmadı.",
-    "deleteFailed": "Həmin söhbəti silmək alınmadı."
+    "deleteFailed": "Həmin söhbəti silmək alınmadı.",
+    "actions": "Söhbət əməliyyatları",
+    "newChat": "Yeni söhbət"
   },
   "embeddings": {
     "title": "Modellər",

@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} మద్దతు లేదు. చిత్రాలను (PNG, JPEG, WebP, GIF) లేదా టెక్స్ట్ ఫైల్‌లను (TXT, MD, CSV, JSON, LOG) జోడించండి.",
     "attachFailed": "{name} చదవడం సాధ్యం కాలేదు.",
     "noVisionBadge": "చిత్రాలు లేవు",
-    "visionWarning": "{model} చిత్రాలను అంగీకరించదు. చిత్రాలకు మద్దతిచ్చే మోడల్‌ని లేదా ఆటో ఎంచుకోండి."
+    "visionWarning": "{model} చిత్రాలను అంగీకరించదు. చిత్రాలకు మద్దతిచ్చే మోడల్‌ని లేదా ఆటో ఎంచుకోండి.",
+    "dictate": "మాటల్లో చెప్పండి",
+    "dictationStop": "రికార్డింగ్ ఆపు",
+    "dictationTranscribing": "లిఖితం చేస్తోంది…",
+    "dictationUnavailable": "డిక్టేషన్ ఉపయోగించడానికి ఆడియో మోడల్ ప్రొవైడర్లను జోడించండి.",
+    "dictationModel": "డిక్టేషన్ మోడల్",
+    "dictationFailed": "లిఖితం విఫలమైంది: {reason}",
+    "artifactOpen": "ప్రివ్యూ తెరువు",
+    "artifactPreview": "ప్రివ్యూ",
+    "artifactCode": "కోడ్",
+    "artifactClose": "ప్రివ్యూ మూసివేయి",
+    "artifactDownload": "డౌన్‌లోడ్",
+    "artifactReload": "ప్రివ్యూ మళ్లీ లోడ్ చేయి",
+    "artifactHtml": "HTML పేజీ",
+    "artifactSvg": "SVG చిత్రం",
+    "artifactLines": "పంక్తులు",
+    "artifactResize": "ప్రివ్యూ పరిమాణం మార్చు"
   },
   "playgroundSessions": {
     "heading": "సంభాషణలు",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} రోజుల క్రితం",
     "loadFailed": "ఆ సంభాషణను తెరవడం సాధ్యం కాలేదు.",
     "renameFailed": "ఆ సంభాషణ పేరును మార్చడం సాధ్యం కాలేదు.",
-    "deleteFailed": "ఆ సంభాషణను తొలగించడం సాధ్యం కాలేదు."
+    "deleteFailed": "ఆ సంభాషణను తొలగించడం సాధ్యం కాలేదు.",
+    "actions": "సంభాషణ చర్యలు",
+    "newChat": "కొత్త చాట్"
   },
   "embeddings": {
     "title": "మోడల్స్",

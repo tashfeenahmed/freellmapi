@@ -867,7 +867,23 @@
     "attachUnsupported": "{name} समर्थित नहीं है। छवियाँ (PNG, JPEG, WebP, GIF) या टेक्स्ट फ़ाइलें (TXT, MD, CSV, JSON, LOG) संलग्न करें।",
     "attachFailed": "{name} को पढ़ा नहीं जा सका।",
     "noVisionBadge": "छवि नहीं",
-    "visionWarning": "{model} छवियाँ स्वीकार नहीं करता। कोई दृष्टि मॉडल या ऑटो चुनें।"
+    "visionWarning": "{model} छवियाँ स्वीकार नहीं करता। कोई दृष्टि मॉडल या ऑटो चुनें।",
+    "dictate": "बोलकर लिखें",
+    "dictationStop": "रिकॉर्डिंग रोकें",
+    "dictationTranscribing": "लिखा जा रहा है…",
+    "dictationUnavailable": "बोलकर लिखने के लिए ऑडियो मॉडल के प्रदाता जोड़ें।",
+    "dictationModel": "श्रुतलेख मॉडल",
+    "dictationFailed": "लिखने में विफल: {reason}",
+    "artifactOpen": "पूर्वावलोकन खोलें",
+    "artifactPreview": "पूर्वावलोकन",
+    "artifactCode": "कोड",
+    "artifactClose": "पूर्वावलोकन बंद करें",
+    "artifactDownload": "डाउनलोड",
+    "artifactReload": "पूर्वावलोकन पुनः लोड करें",
+    "artifactHtml": "HTML पेज",
+    "artifactSvg": "SVG छवि",
+    "artifactLines": "पंक्तियाँ",
+    "artifactResize": "पूर्वावलोकन का आकार बदलें"
   },
   "playgroundSessions": {
     "heading": "बातचीत",
@@ -885,7 +901,9 @@
     "daysAgo": "{count} दि पहले",
     "loadFailed": "वह बातचीत नहीं खोली जा सकी।",
     "renameFailed": "उस बातचीत का नाम नहीं बदला जा सका।",
-    "deleteFailed": "वह बातचीत हटाई नहीं जा सकी।"
+    "deleteFailed": "वह बातचीत हटाई नहीं जा सकी।",
+    "actions": "बातचीत की क्रियाएँ",
+    "newChat": "नई चैट"
   },
   "embeddings": {
     "title": "मॉडल",
