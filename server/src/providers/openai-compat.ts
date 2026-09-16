@@ -39,6 +39,27 @@ export function isMoonshotEndpoint(baseUrl: string): boolean {
 }
 
 /**
+ * Some free-tier upstreams (notably Pollinations) answer HTTP 200 but put an
+ * out-of-credits / top-up notice in the assistant message instead of returning
+ * a 402. That reads as a successful completion, so the fallback loop never
+ * rotates off the dead key (#pollinations-inband). Detect the notice so callers
+ * can throw a payment-required error and fail over. Kept deliberately tight —
+ * requires the credits phrase AND a top-up/quest/Pollinations marker — so a
+ * genuine reply that merely discusses credits does not trip it.
+ */
+export function inBandCreditsError(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  const mentionsCredits = t.includes('enough credits') || t.includes('insufficient credit');
+  if (!mentionsCredits) return null;
+  const topUpMarker =
+    t.includes('top up') || t.includes('top-up') ||
+    t.includes('complete a quest') || t.includes('pollinations');
+  if (!topUpMarker) return null;
+  return text.trim().slice(0, 200);
+}
+
+/**
  * Generic provider for platforms that use an OpenAI-compatible API.
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
  * GitHub Models, Fireworks AI.
@@ -359,6 +380,16 @@ export class OpenAICompatProvider extends BaseProvider {
       );
     }
     normalizeChoices(data);
+    // #pollinations-inband: a 200 whose body is really an out-of-credits notice
+    // must fail over, not be returned as the answer. The "402 ... insufficient
+    // credit" wording makes isPaymentRequiredError classify it as retryable and
+    // bench the key with the day-long payment-required cooldown.
+    const creditsNotice = inBandCreditsError(
+      (data.choices ?? []).map(c => contentToString((c.message as ChatMessage)?.content)).join('\n'),
+    );
+    if (creditsNotice) {
+      throw new Error(`${this.name} API error 402: insufficient credit (upstream returned 200 with an out-of-credits notice): ${creditsNotice}`);
+    }
     data._routed_via = { platform: this.platform, model: modelId };
     return data;
   }
@@ -422,7 +453,41 @@ export class OpenAICompatProvider extends BaseProvider {
     // First-byte grace (#584): the same chat timeout that bounded the headers
     // also budgets the first stream read — NIM-style providers send SSE
     // headers instantly, then prefill long prompts for minutes.
-    yield* this.readSseStream(res, { firstByteTimeoutMs: options?.timeoutMs ?? this.timeoutMs });
+    yield* this.guardInBandCreditsError(
+      this.readSseStream(res, { firstByteTimeoutMs: options?.timeoutMs ?? this.timeoutMs }),
+    );
+  }
+
+  /**
+   * #pollinations-inband: wrap a chat stream so an in-band out-of-credits notice
+   * (a 200 that streams the top-up message as content) fails over instead of
+   * being shown as the answer. Only the FIRST content-bearing chunk is inspected
+   * — a Pollinations credits notice arrives as a single canned message — so the
+   * stream is otherwise byte-for-byte unchanged: reasoning/role chunks pass
+   * straight through (first-token ttfb intact) and every chunk after the first
+   * content one is untouched. Throwing on that first content chunk happens before
+   * it reaches the proxy's commit point, so the fallback loop can still rotate.
+   */
+  private async *guardInBandCreditsError(
+    src: AsyncGenerator<ChatCompletionChunk>,
+  ): AsyncGenerator<ChatCompletionChunk> {
+    let sawContent = false;
+    for await (const chunk of src) {
+      if (!sawContent) {
+        const content = (chunk.choices ?? [])
+          .map(c => (c.delta as { content?: unknown } | undefined)?.content)
+          .filter((c): c is string => typeof c === 'string')
+          .join('');
+        if (content) {
+          sawContent = true;
+          const notice = inBandCreditsError(content);
+          if (notice) {
+            throw new Error(`${this.name} API error 402: insufficient credit (upstream streamed an out-of-credits notice): ${notice}`);
+          }
+        }
+      }
+      yield chunk;
+    }
   }
 
   /** This provider's OpenAI-style model catalog URL. */
