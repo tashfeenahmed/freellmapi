@@ -118,10 +118,19 @@ function clearModelFailure(route: RouteResult): void {
 
 /** Bench one key on every enabled model of its platform it can route to (the
  *  route's own model is benched by the caller). For KEY-level verdicts only —
- *  an account suspension — never for a model-level one. Never throws: an
- *  unreadable catalog leaves the narrower per-route bench in place.
+ *  an account suspension, an empty balance — never for a model-level one.
+ *  Also rules the key out on those models for the rest of THIS request via
+ *  state.skipKeys, so the loop's next hop cannot land on the same account.
+ *  Never throws: an unreadable catalog leaves the narrower per-route bench in
+ *  place.
  */
-function benchKeyAcrossPlatform(route: RouteResult, durationMs: number, source: CooldownSource): void {
+function benchKeyAcrossPlatform(
+  route: RouteResult,
+  durationMs: number,
+  source: CooldownSource,
+  state: FallbackState,
+  reason: string,
+): void {
   let modelIds: string[] = [];
   try {
     modelIds = (getDb().prepare(
@@ -135,9 +144,10 @@ function benchKeyAcrossPlatform(route: RouteResult, durationMs: number, source: 
   for (const modelId of modelIds) {
     if (modelId === route.modelId) continue;
     setCooldown(route.platform, modelId, route.keyId, durationMs, source);
+    state.skipKeys.add(`${route.platform}:${modelId}:${route.keyId}`);
     benched++;
   }
-  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} reports the account suspended; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
+  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
 }
 
 // ── Wall-clock retry budget ──────────────────────────────────────────────────
@@ -419,7 +429,15 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // the next PROVIDER is the better hop.
   if (isAccountSuspendedError(err)) {
     state.skipPlatforms.add(route.platform);
-    benchKeyAcrossPlatform(route, decision.durationMs, decision.source);
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'reports the account suspended');
+  } else if (isPaymentRequiredError(err)) {
+    // A 402 is the ACCOUNT's balance, not one model's (#1239: one broke
+    // HuggingFace key answered three different models with 402 in a single
+    // request, three hops spent rediscovering the same empty wallet). Bench
+    // the key on every model of the platform for the credit window. Unlike a
+    // suspension the platform itself stays in play: a sibling key is a
+    // different wallet and may well have credits, so only THIS key is out.
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'is out of credits (402)');
   }
   // Model-level failure benching: a model failing across keys (or repeatedly on
   // one key) must sink out of routing instead of being re-picked every request.
@@ -836,7 +854,15 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
     };
   }
 
-  if (isProviderBadRequestError(lastError)) {
+  // 400 only when the trail agrees with the last error: EVERY attempt was a
+  // provider-side request rejection (or the legacy no-trail shape). A mixed
+  // trail — stale models, an empty wallet, a rate limit, and one bad-request
+  // hop that happened to come last — is not evidence the caller's request is
+  // invalid, and rendering it as one sent users debugging their own payload
+  // (#1239: 5× provider_bad_request + 3× out_of_credits read as "All routed
+  // providers rejected the request as invalid"). Those fall through to the
+  // mixed 502 below, whose message names the class breakdown.
+  if (isProviderBadRequestError(lastError) && (attempts.length === 0 || everyAttempt('provider_bad_request'))) {
     return {
       kind: 'bad_request',
       status: 400,
@@ -887,15 +913,37 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
   // those with rate limits): the upstream pool failed us, so say 502 — not 429
   // (which would promise recovery-by-waiting the attempts don't support) and
   // not 500 (which would blame our own code).
+  //
+  // The breakdown names how many attempts fell in each class so a mixed trail
+  // reads as what it is. When SOME hops were provider-side request rejections
+  // the body must not promise the request was fine either — it says which
+  // providers rejected it and leaves the verdict to the reader.
+  const breakdown = formatClassBreakdown(attempts);
+  const someBadRequest = attempts.some(a => a.errorClass === 'provider_bad_request');
+  const verdict = someBadRequest
+    ? 'Most of these failures are provider-side (stale models, exhausted credits or quotas), but some providers ' +
+      'also rejected the request shape — check the attempt trail for which ones before changing your request.'
+    : 'This is a provider-side failure, not a problem with your request; retry, or check provider status.';
   return {
     kind: 'upstream',
     status: 502,
     type: 'provider_error',
     code: 'upstream_failed',
-    message: `All ${attempts.length} routed attempt(s) failed with upstream provider errors${budgetNote}. ` +
-      `This is a provider-side failure, not a problem with your request; retry, or check provider status.` +
-      `${trail} Last error: ${safeLastError}`,
+    message: `All ${attempts.length} routed attempt(s) failed with upstream provider errors${breakdown}${budgetNote}. ` +
+      `${verdict}${trail} Last error: ${safeLastError}`,
   };
+}
+
+/** " (provider_bad_request ×5, out_of_credits ×3)" — the per-class tally of a
+ *  mixed trail, most frequent first; empty when there is nothing to tally. */
+function formatClassBreakdown(attempts: readonly AttemptRecord[]): string {
+  if (attempts.length === 0) return '';
+  const counts = new Map<AttemptErrorClass, number>();
+  for (const a of attempts) counts.set(a.errorClass, (counts.get(a.errorClass) ?? 0) + 1);
+  const parts = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cls, n]) => `${cls} ×${n}`);
+  return ` (${parts.join(', ')})`;
 }
 
 // ── Routing exhaustion (zero attempts ran) ───────────────────────────────────

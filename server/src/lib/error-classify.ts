@@ -492,6 +492,12 @@ export function isPaymentRequiredError(err: any): boolean {
     || msg.includes('insufficient balance');
 }
 
+// "model 'x' does not exist" / "model \"x\" does not exist" / "model x does not
+// exist" — one non-space token (optionally quoted) between the word "model" and
+// the verdict. Bounded so an unrelated sentence containing both words never
+// matches; the model id itself is never inspected.
+const MODEL_ID_DOES_NOT_EXIST = /\bmodel\b\s+['"`]?[^\s'"`]{1,200}['"`]?\s+(?:does\s+not|doesn't)\s+exist\b/;
+
 // A 404 "model removed/deprecated upstream" error. It's a MODEL-level failure,
 // not a key-level one: every key for the platform will 404 the same way, so the
 // retry loop skips the entire model for the rest of the request instead of
@@ -516,8 +522,20 @@ export function isModelNotFoundError(err: any): boolean {
     // identically), so they belong here for the whole-model skip.
     || msg.includes('no model found') || msg.includes('model not found')
     || msg.includes('unknown model') || msg.includes('model does not exist')
-    || msg.includes('no such model');
+    || msg.includes('no such model')
+    // The same verdict with the model id quoted in the middle (#1239: NavyAI
+    // 400 "The model 'o3-mini' does not exist or is not supported for chat
+    // completions."). The bare "model does not exist" substring above never
+    // matches that wording, so every one of a platform's stale rows was booked
+    // as provider_bad_request — no whole-model skip, a hop burned per dead
+    // model, and the exhaustion body blamed the caller's request.
+    || MODEL_ID_DOES_NOT_EXIST.test(msg)
+    // "not supported for chat completions" is MODEL-level too: the id is real
+    // but this platform cannot serve it on the endpoint we use, and a sibling
+    // key would be told the same. Route it out for the request like a 404.
+    || msg.includes('not supported for chat completions');
 }
+
 
 // A 403 that suspends the ACCOUNT, not one model: NavyAI answers every model
 // behind a benched free key with "The Free plan is temporarily disabled due to

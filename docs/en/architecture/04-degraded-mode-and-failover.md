@@ -199,7 +199,7 @@ interface FallbackHooks {
 | Error | Skip Scope | Cooldown | Model Penalty | Limit Learn |
 |-------|------------|----------|---------------|-------------|
 | 401 invalid key | key | 5 min | no | no |
-| 402 payment required | key | 24h | no | no |
+| 402 payment required | **key, every model of the platform** (#1239) | 24h | no | no |
 | 403 model forbidden | **model** | 24h | no | no |
 | 429 daily exhausted | model+key | until midnight / Retry-After | **heavy (3)** | yes |
 | 429 transient (rpm/tpm) | key | 90s / ladder | light (1) | yes |
@@ -232,10 +232,10 @@ interface FallbackHooks {
 2. **All context_too_large** → 413 `invalid_request_error` (`context_length_exceeded`).
 3. **All model_not_found** → 404 `invalid_request_error` (`model_not_found`).
 4. **Last error = degraded 400** (NVIDIA NIM) → 503 `service_unavailable` (`provider_degraded`).
-5. **Last error = provider bad request** → 400 `invalid_request_error` (`provider_rejected_request`).
+5. **All provider_bad_request** (or legacy no-trail, last error = provider bad request) → 400 `invalid_request_error` (`provider_rejected_request`). A mixed trail with only some bad-request hops falls through to 8 — the last hop's shape alone never blames the caller's request (#1239).
 6. **Circuit breaker** → 503 `service_unavailable` (`upstream_unhealthy`).
 7. **All UNAVAILABLE_UNTIL_KNOWN_TIME** (rate_limited, daily_quota_exhausted, out_of_credits, forbidden) → 429 `rate_limit_error` with `retryAtMs` + `Retry-After`.
-8. **Mixed/other** → 502 `provider_error` (`upstream_failed`) — never 500 (our bugs).
+8. **Mixed/other** → 502 `provider_error` (`upstream_failed`) — never 500 (our bugs). The message carries a per-class tally (`provider_bad_request ×5, out_of_credits ×3`) and only says "not a problem with your request" when no hop was a provider-side request rejection.
 
 **Synchronous exhaustion (zero attempts):** `routingExhaustionBody(routeErr)` maps diagnostics to same taxonomy:
 - All config (no key, no provider) → 503 `no_providers_configured`
