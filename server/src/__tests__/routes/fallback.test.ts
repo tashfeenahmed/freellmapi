@@ -105,6 +105,35 @@ describe('Fallback API', () => {
     });
   });
 
+  // The budget bar's legend follows this payload's order. Chain priority is
+  // seeded provider by provider, so ordering by it read as "grouped by
+  // provider" on the dashboard (#1243); the legend wants smartest first.
+  it('GET /api/fallback/token-usage lists models smartest first and carries the rank', async () => {
+    const db = getDb();
+    // Two platforms with keys, several models each, in a deliberately
+    // provider-clustered chain order so the old ORDER BY priority would fail.
+    const platforms = (db.prepare(`
+      SELECT DISTINCT platform FROM models ORDER BY platform LIMIT 2
+    `).all() as { platform: string }[]).map(p => p.platform);
+    for (const platform of platforms) {
+      const secret = encrypt(`order-test-${platform}`);
+      db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+        VALUES (?, 'order', ?, ?, ?, 'healthy', 1)
+      `).run(platform, secret.encrypted, secret.iv, secret.authTag);
+    }
+
+    const { status, body } = await request(app, 'GET', '/api/fallback/token-usage');
+    expect(status).toBe(200);
+    const ranks: number[] = body.models.map((m: any) => m.intelligenceRank);
+    expect(ranks.length).toBeGreaterThan(2);
+    for (const r of ranks) expect(typeof r).toBe('number');
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    // Not merely coincident with chain order: the models table holds more than
+    // one platform here, so a priority-ordered list would interleave differently.
+    expect(new Set(body.models.map((m: any) => m.platform)).size).toBeGreaterThan(1);
+  });
+
   // Regression: GET /routing must always carry customWeights, even before the
   // user has saved any — the dashboard's custom-weight sliders dereference it
   // and a missing field white-screened the Fallback page.

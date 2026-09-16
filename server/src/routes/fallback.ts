@@ -487,29 +487,33 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     ? db.prepare('SELECT id FROM profiles WHERE id = ?').get(activeProfileId) as any
     : null;
 
-  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
+  // Ordered by intelligence (rank 1 = smartest), not chain priority: the
+  // dashboard's monthly-budget bar and legend follow this order, and chain
+  // priority is seeded provider by provider, which read as "grouped by
+  // provider" (#1243). Priority stays as the tiebreaker within a rank.
+  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; intelligence_rank: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
 
   if (activeProfile) {
     // Profile mode: use profile_models chain (all models in profile, checked against enabled)
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
-             pm.priority, pm.enabled,
+             pm.priority, pm.enabled, m.intelligence_rank,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id
       WHERE pm.profile_id = ? AND m.enabled = 1
-      ORDER BY pm.priority ASC
+      ORDER BY m.intelligence_rank ASC, pm.priority ASC
     `).all(activeProfileId) as any[];
   } else {
     // Default mode: use fallback_config (only include enabled models)
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
-             fc.priority, fc.enabled,
+             fc.priority, fc.enabled, m.intelligence_rank,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
       FROM fallback_config fc
       JOIN models m ON m.id = fc.model_db_id
       WHERE m.enabled = 1
-      ORDER BY fc.priority ASC
+      ORDER BY m.intelligence_rank ASC, fc.priority ASC
     `).all() as any[];
   }
 
@@ -537,6 +541,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
         displayName: m.display_name,
         platform: m.platform,
         modelId: m.model_id,
+        intelligenceRank: m.intelligence_rank,
         budget: parseBudget(m.monthly_token_budget) * keys,
         used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
         enabled: m.enabled === 1,
