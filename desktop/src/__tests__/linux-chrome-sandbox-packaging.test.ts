@@ -47,7 +47,8 @@ describe('linux chrome-sandbox packaging (#1229)', () => {
       }>;
     }
 
-    it('chmodSyncs a 0755 chrome-sandbox to 0o4755 on linux', async () => {
+    // Windows chmod/stat does not preserve Unix mode bits (0o755 → 0o666).
+    it.skipIf(process.platform !== 'linux')('chmodSyncs a 0755 chrome-sandbox to 0o4755 on linux', async () => {
       const { chmodLinuxChromeSandbox, default: afterPack } = await loadHelper();
       directory = mkdtempSync(join(tmpdir(), 'linux-sandbox-'));
       const sandbox = join(directory, 'chrome-sandbox');
