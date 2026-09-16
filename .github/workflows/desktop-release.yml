@@ -13,6 +13,16 @@ name: Desktop release
 # Tagged runs check desktop/package.json against the tag before building — see
 # #948, where v0.8.2 through v0.8.4 shipped installers stamped 0.8.1 because
 # nobody bumped that file.
+#
+# Release recipe (installers first, then public):
+#   1. gh release create vX.Y.Z --draft --target <merge sha> --title vX.Y.Z --notes-file notes.md
+#   2. git tag vX.Y.Z <merge sha> && git push origin vX.Y.Z
+#   3. this workflow attaches every installer to the draft, then the `publish`
+#      job flips it to published once all of them are there.
+# A draft is invisible to users, so the release page never shows only the
+# automatic source archives while the ~15 minute build is still running.
+# Fallbacks below create a DRAFT for a tag pushed without a release, for the
+# same reason; `publish` takes care of it.
 
 on:
   workflow_dispatch:
@@ -395,8 +405,8 @@ jobs:
           # recipe), so it exists by now; create it rather than dropping the
           # installers on the floor if someone pushed a tag on its own.
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "::warning::no release for $GITHUB_REF_NAME yet — creating one"
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+            echo "::warning::no release for $GITHUB_REF_NAME yet — creating a draft"
+            gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes
           fi
           gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
 
@@ -434,7 +444,7 @@ jobs:
         run: |
           set -euo pipefail
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes
           fi
           # Upload payloads first, then the manifest that advertises them.
           gh release upload "$GITHUB_REF_NAME" \
@@ -442,3 +452,32 @@ jobs:
             artifacts/macos-installer-*/*.zip \
             artifacts/macos-installer-*/*.blockmap --clobber
           gh release upload "$GITHUB_REF_NAME" artifacts/latest-mac.yml --clobber
+
+  # Only once every platform has attached its installers does the release go
+  # public. A release created published (the old recipe) is left alone.
+  publish:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, macos-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the draft once installers are attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)"
+          count="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets | length')"
+          echo "release $GITHUB_REF_NAME: draft=$draft assets=$count"
+          if [ "$count" -lt 5 ]; then
+            echo "::error::only $count asset(s) attached — not publishing"
+            exit 1
+          fi
+          if [ "$draft" = "true" ]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false
+            echo "published $GITHUB_REF_NAME"
+          else
+            echo "already published; nothing to do"
+          fi
