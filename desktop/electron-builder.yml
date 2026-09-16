@@ -19,6 +19,9 @@ publish:
   owner: tashfeenahmed
   repo: freellmapi
 asar: true
+# Linux chrome-sandbox must be mode 4755 (setuid) in the .deb; otherwise
+# Electron aborts at launch (#1229). Path is relative to desktop/.
+afterPack: ./scripts/after-pack-linux-sandbox.mjs
 asarUnpack:
   - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/better-sqlite3/build/Release/**"
