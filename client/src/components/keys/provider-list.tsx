@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, CircleAlert, Copy, ExternalLink, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, Zap } from 'lucide-react'
+import { ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
 import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -38,6 +38,8 @@ import { CopyKeyDialog } from './copy-key-dialog'
 import { EditKeyDialog } from './edit-key-dialog'
 import { EditModelsDialog } from './edit-models-dialog'
 import { ModelScopeDialog } from './model-scope-dialog'
+import { TestModelsDialog } from './test-models-dialog'
+import { AddModelDialog } from './add-model-dialog'
 
 type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 
@@ -73,6 +75,11 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const [modelEditorKeyId, setModelEditorKeyId] = useState<number | null>(null)
   // #787: keys selected for bulk enable/disable/delete within a group.
   const [selectedKeyIds, setSelectedKeyIds] = useState<Set<number>>(new Set())
+  // Provider (or, for a custom endpoint, key) whose models are being test-fired,
+  // and the target a hand-typed model is being added to. Both came over from
+  // the retired Providers page; everything else that page did already lived here.
+  const [testTarget, setTestTarget] = useState<{ platform: string; keyId?: number; label: string } | null>(null)
+  const [addModelTarget, setAddModelTarget] = useState<{ platform: string; keyId?: number } | null>(null)
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
     queryFn: () => apiFetch('/api/keys'),
@@ -388,8 +395,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                       )}
                     </span>
                   </button>
-                  {(group.url || proxyEnabled) && (
-                    <DropdownMenu>
+                  <DropdownMenu>
                       <DropdownMenuTrigger
                         className={buttonVariants({ variant: 'ghost', size: 'icon-xs' })}
                         aria-label={t('keys.providerActions')}
@@ -397,6 +403,18 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52">
+                        {/* Test every model this provider serves, one real ping each
+                            (custom endpoints test per key from the row instead). */}
+                        {group.value !== 'custom' && (
+                          <DropdownMenuItem onClick={() => setTestTarget({ platform: group.value, label: group.label })}>
+                            {t('keys.testModels')}
+                            <FlaskConical className="ml-auto size-3.5" />
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => setAddModelTarget({ platform: group.value })}>
+                          {t('keys.addCustomModel')}
+                          <Sparkles className="ml-auto size-3.5" />
+                        </DropdownMenuItem>
                         {group.url && (
                           <DropdownMenuItem onClick={() => window.open(group.url, '_blank', 'noopener,noreferrer')}>
                             {t('keys.getApiKey')}
@@ -414,7 +432,6 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  )}
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.value, expanded)}
@@ -621,6 +638,26 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                       <ListPlus className="size-3" />
                                     </Button>
                                   </Tooltip>
+                                  <Tooltip text={t('keys.addCustomModel')}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setAddModelTarget({ platform: 'custom', keyId: k.id })}
+                                      aria-label={t('keys.addCustomModel')}
+                                    >
+                                      <Sparkles className="size-3" />
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip text={t('keys.testModels')}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setTestTarget({ platform: 'custom', keyId: k.id, label: k.label || k.baseUrl! })}
+                                      aria-label={t('keys.testModels')}
+                                    >
+                                      <FlaskConical className="size-3" />
+                                    </Button>
+                                  </Tooltip>
                                   <Tooltip text={t('keys.probeNow')}>
                                     <ConfirmButton
                                       variant="ghost"
@@ -738,6 +775,24 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
           open
           onOpenChange={(open) => { if (!open) setAddKeyBaseUrl(null) }}
           baseUrl={addKeyBaseUrl}
+        />
+      )}
+
+      {testTarget !== null && (
+        <TestModelsDialog
+          platform={testTarget.platform}
+          keyId={testTarget.keyId}
+          label={testTarget.label}
+          onOpenChange={(open) => { if (!open) setTestTarget(null) }}
+        />
+      )}
+
+      {addModelTarget !== null && (
+        <AddModelDialog
+          open
+          initialPlatform={addModelTarget.platform}
+          initialKeyId={addModelTarget.keyId}
+          onOpenChange={(open) => { if (!open) setAddModelTarget(null) }}
         />
       )}
 

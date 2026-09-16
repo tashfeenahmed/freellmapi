@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Sparkles, Loader2 } from 'lucide-react'
@@ -18,14 +18,40 @@ export interface AddModelDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialPlatform?: string
+  /** Opened from a custom endpoint's key row: that key is preselected. */
+  initialKeyId?: number
 }
 
-export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModelDialogProps) {
+// Register a model by typing its id — for a relay whose /models list is
+// incomplete, or a native provider row the catalog does not carry yet. Moved
+// here from the Providers page when that page was folded into Keys.
+export function AddModelDialog(props: AddModelDialogProps) {
+  // Remount the form whenever the dialog (re)opens or its target changes, so
+  // every field starts from the props — no effect-driven reset needed.
+  const formKey = `${props.open ? 'open' : 'closed'}:${props.initialPlatform ?? ''}:${props.initialKeyId ?? ''}`
+  return <AddModelForm key={formKey} {...props} />
+}
+
+interface CreateModelPayload {
+  platform: string
+  modelId: string
+  displayName?: string
+  supportsVision: boolean
+  supportsTools: boolean
+  keyId?: number
+  contextWindow?: number
+  rpmLimit?: number
+  rpdLimit?: number
+  tpmLimit?: number
+  tpdLimit?: number
+}
+
+function AddModelForm({ open, onOpenChange, initialPlatform, initialKeyId }: AddModelDialogProps) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
 
   const [platform, setPlatform] = useState<string>(initialPlatform ?? 'groq')
-  const [keyId, setKeyId] = useState('')
+  const [keyId, setKeyId] = useState(initialKeyId != null ? String(initialKeyId) : '')
   const { data: keys = [] } = useQuery<ApiKey[]>({ queryKey: ['keys'], queryFn: () => apiFetch('/api/keys'), enabled: open && platform === 'custom' })
   const endpointKeys = keys.filter(key => key.platform === 'custom' && key.baseUrl)
   const selectedKey = endpointKeys.find(key => String(key.id) === keyId)
@@ -40,25 +66,9 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
   const [supportsTools, setSupportsTools] = useState(true)
   const [submitted, setSubmitted] = useState(false)
 
-  useEffect(() => {
-    if (open) {
-      if (initialPlatform) setPlatform(initialPlatform)
-      setKeyId('')
-      setModelId('')
-      setDisplayName('')
-      setContextWindow('')
-      setRpmLimit('')
-      setRpdLimit('')
-      setTpmLimit('')
-      setTpdLimit('')
-      setSupportsVision(false)
-      setSupportsTools(true)
-      setSubmitted(false)
-    }
-  }, [open, initialPlatform])
 
   const addModelMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: CreateModelPayload) => {
       return apiFetch('/api/models', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -68,11 +78,11 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
       queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['keys'] })
-      toast.success(t('providers.modelAddedSuccess'))
+      toast.success(t('keys.modelAddedSuccess'))
       onOpenChange(false)
     },
-    onError: (err: any) => {
-      toast.error(err?.message || t('providers.modelAddFailed'))
+    onError: (err: unknown) => {
+      toast.error((err instanceof Error ? err.message : null) || t('keys.modelAddFailed'))
     },
   })
 
@@ -83,7 +93,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
     const trimmedModelId = modelId.trim()
     if (!trimmedModelId || !platform || (platform === 'custom' && !selectedKey)) return
 
-    const payload: any = {
+    const payload: CreateModelPayload = {
       platform,
       modelId: trimmedModelId,
       displayName: displayName.trim() || undefined,
@@ -125,7 +135,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
         <div className="mb-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Sparkles className="size-5 text-primary" />
-            <DialogTitle>{t('providers.addCustomModel')}</DialogTitle>
+            <DialogTitle>{t('keys.addCustomModel')}</DialogTitle>
           </div>
           <DialogClose
             aria-label={t('common.dismiss')}
@@ -138,7 +148,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Platform selection */}
           <div className="space-y-1.5">
-            <Label htmlFor="provider-platform-select">{t('providers.provider')}</Label>
+            <Label htmlFor="provider-platform-select">{t('keys.provider')}</Label>
             <select
               id="provider-platform-select"
               value={platform}
@@ -174,7 +184,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
           {/* Model ID */}
           <div className="space-y-1.5">
             <Label htmlFor="provider-model-id">
-              {t('providers.modelId')} <span className="text-destructive">*</span>
+              {t('keys.modelId')} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="provider-model-id"
@@ -184,13 +194,13 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
               aria-invalid={submitted && !modelId.trim()}
             />
             {submitted && !modelId.trim() && (
-              <FieldError error={t('providers.modelIdRequired')} />
+              <FieldError error={t('keys.modelIdRequired')} />
             )}
           </div>
 
           {/* Display Name */}
           <div className="space-y-1.5">
-            <Label htmlFor="provider-display-name">{t('providers.displayName')}</Label>
+            <Label htmlFor="provider-display-name">{t('keys.modelDisplayName')}</Label>
             <Input
               id="provider-display-name"
               value={displayName}
@@ -201,7 +211,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
 
           {/* Context Window */}
           <div className="space-y-1.5">
-            <Label htmlFor="provider-context-window">{t('providers.contextWindow')}</Label>
+            <Label htmlFor="provider-context-window">{t('keys.modelContextWindow')}</Label>
             <Input
               id="provider-context-window"
               type="number"
@@ -215,7 +225,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
           {/* Rate Limits Grid */}
           <div className="space-y-1.5 pt-1">
             <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              {t('providers.rateLimits')}
+              {t('keys.modelRateLimits')}
             </Label>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -274,10 +284,10 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
             <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/60 p-3">
               <div className="space-y-0.5">
                 <Label htmlFor="switch-tools" className="text-sm font-medium">
-                  {t('providers.supportsTools')}
+                  {t('keys.modelSupportsTools')}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  {t('providers.supportsToolsHint')}
+                  {t('keys.modelSupportsToolsHint')}
                 </p>
               </div>
               <Switch
@@ -290,10 +300,10 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
             <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/60 p-3">
               <div className="space-y-0.5">
                 <Label htmlFor="switch-vision" className="text-sm font-medium">
-                  {t('providers.supportsVision')}
+                  {t('keys.modelSupportsVision')}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  {t('providers.supportsVisionHint')}
+                  {t('keys.modelSupportsVisionHint')}
                 </p>
               </div>
               <Switch
@@ -323,7 +333,7 @@ export function AddModelDialog({ open, onOpenChange, initialPlatform }: AddModel
                   {t('common.saving')}
                 </>
               ) : (
-                t('providers.createModel')
+                t('keys.createModel')
               )}
             </Button>
           </div>
