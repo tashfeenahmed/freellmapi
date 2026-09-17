@@ -41,6 +41,8 @@ const RESPONSE_CACHE_FILENAME = '20260903_000002_response_cache.ts';
 const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.ts';
 const KEY_MONTHLY_USAGE_FILENAME = '20260914_000001_key_monthly_usage.ts';
 const QUOTA_SNAPSHOT_FRESHNESS_FILENAME = '20260915_000001_quota_snapshot_freshness.ts';
+const ATTEMPT_ENDPOINT_SCOPE_FILENAME = '20260917_000001_attempt_endpoint_scope.ts';
+const TTFB_SAMPLES_FILENAME = '20260917_000002_ttfb_samples.ts';
 
 interface SchemaRow {
   type: string;
@@ -128,6 +130,8 @@ describe('migration round trip', () => {
         KEY_MONTHLY_BUDGET_FILENAME,
         KEY_MONTHLY_USAGE_FILENAME,
         QUOTA_SNAPSHOT_FRESHNESS_FILENAME,
+        ATTEMPT_ENDPOINT_SCOPE_FILENAME,
+        TTFB_SAMPLES_FILENAME,
       ]);
     } finally {
       db.close();
