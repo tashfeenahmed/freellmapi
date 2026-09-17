@@ -68,7 +68,7 @@ export class OpenAICompatProvider extends BaseProvider {
   readonly platform: Platform;
   readonly name: string;
   private readonly baseUrl: string;
-  private readonly extraHeaders: Record<string, string> | (() => Record<string, string>);
+  private readonly extraHeaders: Record<string, string>;
   private readonly validateUrl?: string;
   /** Per-provider HTTP timeout override. OpenAI-compatible gateways often buffer
    * non-streaming responses until generation completes, and reasoning models can
@@ -86,7 +86,7 @@ export class OpenAICompatProvider extends BaseProvider {
     platform: Platform;
     name: string;
     baseUrl: string;
-    extraHeaders?: Record<string, string> | (() => Record<string, string>);
+    extraHeaders?: Record<string, string>;
     validateUrl?: string;
     timeoutMs?: number;
     keyless?: boolean;
@@ -167,14 +167,6 @@ export class OpenAICompatProvider extends BaseProvider {
    * invalid key. Everyone else sends the bearer as usual. */
   private authHeader(apiKey: string): Record<string, string> {
     return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
-  }
-
-  /** Extra headers for one upstream request. The function form is evaluated
-   * once per request so a gateway that expects fresh per-request ids (OpenCode
-   * Zen's `x-opencode-session`) does not have to live with values frozen at
-   * registration time. */
-  private requestHeaders(): Record<string, string> {
-    return typeof this.extraHeaders === 'function' ? this.extraHeaders() : this.extraHeaders;
   }
 
   /** Requesty's Leanstral route rejects greedy sampling when temperature=0.
@@ -286,7 +278,7 @@ export class OpenAICompatProvider extends BaseProvider {
       headers: {
         ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
-        ...this.requestHeaders(),
+        ...this.extraHeaders,
       },
       body: JSON.stringify({
         model: modelId,
@@ -415,7 +407,7 @@ export class OpenAICompatProvider extends BaseProvider {
       headers: {
         ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
-        ...this.requestHeaders(),
+        ...this.extraHeaders,
       },
       body: JSON.stringify({
         model: modelId,
@@ -524,7 +516,7 @@ export class OpenAICompatProvider extends BaseProvider {
       method: 'GET',
       headers: {
         ...this.authHeader(apiKey),
-        ...this.requestHeaders(),
+        ...this.extraHeaders,
       },
       // 'request' bounds: a catalog body that hangs mid-transfer must not
       // stall the health cycle past the deadline.
