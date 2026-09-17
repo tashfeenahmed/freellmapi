@@ -117,6 +117,35 @@ describe('SailProvider', () => {
     });
   });
 
+  it('does not use completion_window=asap when tools are present', async () => {
+    const bodies: any[] = [];
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      bodies.push(body);
+      return jsonResponse(completed(`resp_${bodies.length}`, body.model));
+    });
+    const provider = new SailProvider({ pollIntervalMs: 0 });
+    const tools = [{
+      type: 'function' as const,
+      function: { name: 'weather', description: 'Get weather', parameters: { type: 'object' } },
+    }];
+
+    // Non-flex-only models currently default to asap; tools require a non-ASAP window.
+    await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }],
+      'moonshotai/Kimi-K2.6', { tools });
+    await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }],
+      'zai-org/GLM-5.2-FP8', { tools: [] });
+    await provider.chatCompletion('k', [{ role: 'user', content: 'hi' }],
+      'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16', { tools });
+
+    expect(bodies[0].tools).toHaveLength(1);
+    expect(bodies[0].metadata.completion_window).toBe('flex');
+    expect(bodies[1].tools).toBeUndefined();
+    expect(bodies[1].metadata.completion_window).toBe('asap');
+    expect(bodies[2].tools).toHaveLength(1);
+    expect(bodies[2].metadata.completion_window).toBe('flex');
+  });
+
   it('uses flex background mode and clamps gpt-oss none reasoning to low', async () => {
     const bodies: any[] = [];
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {

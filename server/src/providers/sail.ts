@@ -103,8 +103,11 @@ export class SailProvider extends BaseProvider {
     };
   }
 
-  private completionWindow(modelId: string): 'asap' | 'flex' {
-    return FLEX_ONLY_MODELS.has(modelId) ? 'flex' : 'asap';
+  private completionWindow(modelId: string, options?: CompletionOptions): 'asap' | 'flex' {
+    // Sail rejects tools with completion_window=asap (HTTP 400). Flex-only
+    // models already require flex; tool-using requests use the same window.
+    if (FLEX_ONLY_MODELS.has(modelId) || options?.tools?.length) return 'flex';
+    return 'asap';
   }
 
   private reasoningEffort(modelId: string, options?: CompletionOptions): string | undefined {
@@ -189,7 +192,7 @@ export class SailProvider extends BaseProvider {
       model: modelId,
       input: this.inputItems(messages),
       background: true,
-      metadata: { completion_window: this.completionWindow(modelId) },
+      metadata: { completion_window: this.completionWindow(modelId, options) },
       ...(maxOutputTokens !== undefined ? { max_output_tokens: maxOutputTokens } : {}),
       ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       ...(options?.top_p !== undefined ? { top_p: options.top_p } : {}),
