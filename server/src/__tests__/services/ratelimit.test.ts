@@ -280,8 +280,8 @@ describe('Rate Limiter', () => {
     it('defaults to OpenRouter ~1000/day and allows env override / disable', () => {
       delete process.env[ENV];
       expect(getProviderDailyRequestCap('openrouter')).toBe(1000);
-      // ModelScope: 2000/day account-wide upstream, shipped as 1800 for margin (#581).
-      expect(getProviderDailyRequestCap('modelscope')).toBe(1800);
+      // ModelScope: ~250 魔粒/day ÷ 2 per request ≈ 125/day upstream, shipped as 100 for margin.
+      expect(getProviderDailyRequestCap('modelscope')).toBe(100);
       expect(getProviderDailyRequestCap('groq')).toBeNull(); // no shared cap
       process.env[ENV] = '50';
       expect(getProviderDailyRequestCap('openrouter')).toBe(50);
