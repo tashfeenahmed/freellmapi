@@ -1,5 +1,4 @@
 import type { Platform } from '@freellmapi/shared/types.js';
-import { randomUUID } from 'node:crypto';
 import type { BaseProvider } from './base.js';
 import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
@@ -258,51 +257,15 @@ register(new OpenAICompatProvider({
 // (no card required — billing only applies to paid models). The free roster is
 // trial-only and prompts/outputs may be used to improve the models, so we seed
 // just the docs-confirmed free IDs (migrateModelsV18) with conservative limits.
-// The Console gateway additionally expects the request to look like it came
-// from the OpenCode client: without x-opencode-session it answers
-// MissingSessionID, and the free roster answers "OpenCode's free tier can only
-// be used in OpenCode" even with a valid key. Fresh session/request ids per
-// call mirror the CLI (both the free roster and the paid Go plan were verified
-// against this header set).
-// The UA advertises the newest published OpenCode release so an upstream
-// version check cannot age into a block. The npm registry (the artifact the
-// CLI itself ships from) is the cheapest source; a failed lookup keeps the
-// last known version and the built-in fallback covers a cold first boot.
-const OPENCODE_NPM_LATEST = 'https://registry.npmjs.org/opencode-ai/latest';
-const OPENCODE_UA_FALLBACK_VERSION = '1.18.30';
-const OPENCODE_UA_VERSION_TTL_MS = 12 * 60 * 60 * 1000;
-let openCodeUaVersion = OPENCODE_UA_FALLBACK_VERSION;
-let openCodeUaVersionCheckedAt = 0;
-
-function refreshOpenCodeUaVersion(): void {
-  if (process.env.VITEST) return;
-  const now = Date.now();
-  if (now - openCodeUaVersionCheckedAt < OPENCODE_UA_VERSION_TTL_MS) return;
-  openCodeUaVersionCheckedAt = now; // stamp first so parallel calls share one lookup
-  void fetch(OPENCODE_NPM_LATEST, { signal: AbortSignal.timeout(4000) })
-    .then(res => (res.ok ? res.json() : null))
-    .then((doc: unknown) => {
-      const version = (doc as { version?: unknown } | null)?.version;
-      if (typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version)) openCodeUaVersion = version;
-    })
-    .catch(() => { /* keep the last known version */ });
-}
-
-function openCodeZenHeaders(): Record<string, string> {
-  refreshOpenCodeUaVersion();
-  return {
-    'User-Agent': `opencode/${openCodeUaVersion} ai-sdk/provider-utils/4.0.23 runtime/bun/1.3.14`,
-    'x-opencode-client': 'cli',
-    'x-opencode-project': 'global',
-    'x-opencode-session': randomUUID(),
-    'x-opencode-request': randomUUID(),
-  };
-}
+// Since 2026-09 the free roster is locked to the OpenCode client (#1249): every
+// free model answers 403 FreeTierError "OpenCode's free tier can only be used
+// from within OpenCode" on a valid key, and sending the OpenCode client headers
+// (#1204, reverted) does not change that. The catalog disables the free rows;
+// the provider stays registered for keys on OpenCode's paid models.
 register(new OpenAICompatProvider({
   platform: 'opencode',
   name: 'OpenCode Zen',
   baseUrl: 'https://opencode.ai/zen/v1',
-  extraHeaders: openCodeZenHeaders,
 }));
 
 // OVHcloud AI Endpoints — OpenAI-compatible. Two free modes: anonymous
@@ -345,9 +308,12 @@ register(new OpenAICompatProvider({
 // $0.0, please pay with fiat or send tao". The "free" tier requires a
 // non-zero balance, which conflicts with the project's no-card criterion.
 
-// Reka — OpenAI-compatible (api.reka.ai/v1). Live-probed 2026-06-17: free via a
-// recurring monthly credit grant (no card; key from platform.reka.ai), billed
-// calls succeed with no 402. The OpenAI-compatible /v1/models lists two models:
+// Reka — OpenAI-compatible (api.reka.ai/v1). No longer free for new accounts
+// (#1202): Reka's FAQ now requires prepaid credits and a $0 balance answers
+// P001 Insufficient Balance. Accounts that still hold credit keep working
+// (both models answered 200 on 2026-09-17), so the provider stays registered;
+// the old `reka-flash` id 404s and is disabled in the catalog.
+// The OpenAI-compatible /v1/models lists two models:
 // reka-flash-3 (text reasoning) and reka-edge-2603 (natively multimodal —
 // accepts image/video input). Balance is dashboard-only (no credits API).
 // Catalog rows live in the catalog (premium → age into free); they are NOT

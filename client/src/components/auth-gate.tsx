@@ -63,10 +63,13 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
 
   // Inline field feedback; the server stays authoritative. Only the setup form
   // enforces the password minimum client-side (an existing password of any
-  // length must still be able to log in).
+  // length must still be able to log in). The same goes for the email shape:
+  // the desktop app's hidden account is `desktop@localhost` (no TLD), which
+  // the login route accepts on purpose (server/src/routes/auth.ts), so a
+  // browser tab must be able to submit it after a password reset (#1250).
   const emailError = !email.trim()
     ? t('validation.required')
-    : !isEmail(email)
+    : isSetup && !isEmail(email)
       ? t('validation.email')
       : null
   const passwordError = !password

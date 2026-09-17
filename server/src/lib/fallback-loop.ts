@@ -220,6 +220,12 @@ export interface FallbackState {
   // Models (tool-capability keys) that answered provider_bad_request to THIS
   // tool request. Counted once per request however many keys were tried.
   toolRejects?: Set<string>;
+  // Per-request tally of DISTINCT models that answered model_not_found, keyed
+  // by platform (#1218): a stale catalog misses on every sibling model in a
+  // row, and the per-model skip can't see the pattern. From
+  // MODEL_NOT_FOUND_PLATFORM_LIMIT distinct misses the platform joins
+  // skipPlatforms for the rest of the request.
+  modelNotFoundPlatforms: Map<string, Set<number>>;
 }
 
 /** Total for the next dispatch. Input-only observations still need output space. */
@@ -232,8 +238,15 @@ export function fallbackRoutingTokens(state: FallbackState, estimatedTotal: numb
 }
 
 export function newFallbackState(): FallbackState {
-  return { skipKeys: new Set<string>(), skipModels: new Set<number>(), skipPlatforms: new Set<string>() };
+  return { skipKeys: new Set<string>(), skipModels: new Set<number>(), skipPlatforms: new Set<string>(), modelNotFoundPlatforms: new Map() };
 }
+
+// DISTINCT model_not_found hops on one platform, within one request, before the
+// whole platform is ruled out: a healthy catalog never misses three different
+// models in a single failover chain — a stale/broken one does it routinely
+// (NavyAI: 24 models tried in one session, 0 ok, #1218). 3 keeps one fluke
+// removal from condemning a provider.
+export const MODEL_NOT_FOUND_PLATFORM_LIMIT = 3;
 
 // Milliseconds until the next UTC midnight — when most providers' daily free
 // allocations reset. Floored at one minute so a hit seconds before midnight
@@ -405,6 +418,25 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // same tier ceiling), so it would reject the same request identically.
   if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || err?.skipModelForRequest === true) {
     state.skipModels.add(route.modelDbId);
+  }
+  // A stale CATALOG (not a single dead model) answers model-not-found on every
+  // sibling model in a row: NavyAI served 24 models over one session, 0 ok,
+  // each re-paying a 2.5–10s round trip (#1218). The per-model skip above
+  // can't see the pattern — each miss is a different model. Count DISTINCT
+  // model_not_found hops per platform within one request; from the threshold,
+  // rule the whole platform out for the rest of the request: the catalog (or
+  // the key's access to it) is broken, and the next PROVIDER is the better
+  // hop. Same request-scoped lifetime as skipModels (#111/#256 semantics).
+  // Custom relays are exempt: every relay shares the one platform id 'custom'
+  // (#651), so three misses spread over three different relays would rule out
+  // every healthy relay too. Their misses stay per-model.
+  if (isModelNotFoundError(err) && !route.endpointScope) {
+    const seen = state.modelNotFoundPlatforms.get(route.platform) ?? new Set<number>();
+    seen.add(route.modelDbId);
+    state.modelNotFoundPlatforms.set(route.platform, seen);
+    if (seen.size >= MODEL_NOT_FOUND_PLATFORM_LIMIT) {
+      state.skipPlatforms.add(route.platform);
+    }
   }
   // A model-level 404/410 that says the model is GONE (not merely missing right
   // now) outlives this request: persist it once the evidence is strong enough,
