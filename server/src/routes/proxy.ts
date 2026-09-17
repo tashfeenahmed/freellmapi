@@ -25,6 +25,7 @@ import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
+import { recordTtfbSample } from '../lib/ttfb-budget.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
@@ -1301,6 +1302,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             outputTokens: totalOutputTokens,
           });
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId, null, 'http');
+          // TTFB sample for per-endpoint budget tuning (#1262): record on success path so slow-but-alive endpoints accumulate P95 evidence.
+          recordTtfbSample(route.platform, route.endpointScope ?? '', ttfbMs ?? 0);
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
@@ -1324,6 +1327,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
               error: sanitizeProviderErrorMessage(streamErr.message),
             });
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http');
+            // On committed mid-stream errors (e.g. in-band provider error) the first byte was received — record for budget tuning (#1262).
+            if (ttfbMs != null) recordTtfbSample(route.platform, route.endpointScope ?? '', ttfbMs);
             return 'committed';
           }
           throw streamErr;

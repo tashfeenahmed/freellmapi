@@ -60,6 +60,7 @@ import { newBreaker, recordBreakerFailure } from './guardrails.js';
 import { getRequestTrace, newRequestTrace, runWithRequestTrace, type AttemptOutcome, type AttemptTraceRecord, type RequestTrace } from './attempt-trace.js';
 import { logRequest, persistRequestAttempts } from './request-log.js';
 import { withKeyProxy } from './proxy.js';
+import { effectiveBudgetMs } from './ttfb-budget.js';
 
 // Every surface caps failover hops at the same number.
 export const FALLBACK_MAX_RETRIES = 20;
@@ -1299,7 +1300,13 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
 
 async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace): Promise<void> {
   const maxRetries = hooks.maxRetries ?? FALLBACK_MAX_RETRIES;
-  const budgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
+  // Per-endpoint TTFB-aware budget (#1262 / #1218 Gap 2): the base budget is
+  // the existing global setting, but slow endpoints (P95 TTFB > base) get a
+  // wider budget = max(base, p95 + buffer). Fast endpoints keep their base.
+  // Resolved lazily from the FIRST routed attempt — route() belongs to the
+  // loop (test stubs assert its call pattern), never called ahead of it.
+  let budgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
+  let budgetResolved = hooks.timeBudgetMs !== undefined;
   const startedAt = Date.now();
   const attempts: AttemptRecord[] = hooks.attemptLog ?? [];
   const keyOrdinals = new Map<string, number>();
@@ -1373,6 +1380,11 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
+    }
+
+    if (!budgetResolved) {
+      budgetMs = effectiveBudgetMs(route.platform, route.endpointScope);
+      budgetResolved = true;
     }
 
     // Per-attempt trace record: pushed exactly once per dispatched attempt, on

@@ -22,6 +22,7 @@ import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstream
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState } from '../lib/fallback-loop.js';
+import { recordTtfbSample } from '../lib/ttfb-budget.js';
 import { routedViaValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { resolveAnthropicModel, claudeFamilyDiscoveryEntries } from '../services/anthropic-map.js';
@@ -761,6 +762,8 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
       setFallbackHeaders(res, attempt, attemptLog);
       logRequest(route.platform, route.modelId, route.keyId, 'success', promptTokens, completionTokens, Date.now() - start, null, null, pinnedModelId, null, 'http');
+      // TTFB sample — legacy non-stream path has no per-try ttfbMs; use wall-clock as a lower-bound estimate.
+      recordTtfbSample(route.platform, route.endpointScope ?? '', Date.now() - start);
       res.json(anthropicResponse);
       return 'done';
     },
@@ -1062,6 +1065,9 @@ async function streamCompletion(
     recordUpstreamSuccess(route, ctx.estimatedInputTokens + outputTokens, ctx.state);
     if (!ctx.pinned || ctx.stickyScope) setStickyModel(messages, route.modelDbId, ctx.sessionId, ctx.stickyScope ?? ctx.strategyKey);
     logRequest(route.platform, route.modelId, route.keyId, 'success', ctx.estimatedInputTokens, outputTokens, Date.now() - ctx.start, null, null, ctx.pinnedModelId, null, 'http');
+    // Stream path: ttfbMs is tracked inside the pump loop via ctx.ttfbMsCaptured.
+    // For this legacy stream handler we don't have per-try ttfbMs, so we skip
+    // the sample here — the legacy non-stream path above handles its own.
   } catch (err: any) {
     if (err instanceof StreamAlreadyStarted) throw err;
     // Client abort mid-stream: the pump's own `if (ctx.clientGone()) break`
