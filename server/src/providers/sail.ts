@@ -26,12 +26,11 @@ const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const POLL_REQUEST_TIMEOUT_MS = 30_000;
 
-// Sail serves these models only through its best-effort flex completion window.
-// Flex requests must use the Responses API in background mode and be polled.
-const FLEX_ONLY_MODELS = new Set([
-  'Qwen/Qwen3.6-35B-A3B',
-  'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16',
-]);
+// Sail rejects any request that combines `background: true` with
+// `completion_window: 'asap'` before doing any work, answering
+// `unsupported_asap_request` (HTTP 400). Every request this adapter submits
+// uses `background: true`, so the flex window is the only usable one and the
+// former flex-only roster no longer describes anything.
 
 type SailStatus = 'queued' | 'in_progress' | 'completed' | 'incomplete' | 'failed' | 'cancelled';
 
@@ -103,8 +102,10 @@ export class SailProvider extends BaseProvider {
     };
   }
 
-  private completionWindow(modelId: string): 'asap' | 'flex' {
-    return FLEX_ONLY_MODELS.has(modelId) ? 'flex' : 'asap';
+  private completionWindow(): 'asap' | 'flex' {
+    // See the note above: 'asap' is rejected for background requests, which is
+    // all this adapter sends.
+    return 'flex';
   }
 
   private reasoningEffort(modelId: string, options?: CompletionOptions): string | undefined {
@@ -189,7 +190,7 @@ export class SailProvider extends BaseProvider {
       model: modelId,
       input: this.inputItems(messages),
       background: true,
-      metadata: { completion_window: this.completionWindow(modelId) },
+      metadata: { completion_window: this.completionWindow() },
       ...(maxOutputTokens !== undefined ? { max_output_tokens: maxOutputTokens } : {}),
       ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       ...(options?.top_p !== undefined ? { top_p: options.top_p } : {}),
