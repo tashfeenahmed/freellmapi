@@ -1507,6 +1507,25 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       }
       if (isRetryableError(err)) {
         const exempt = recordRetryableFailure(route, err, hooks.state);
+        // An in-band provider error that arrives only after the attempt has
+        // silently consumed most of the operator's whole budget (#1218 Gap 3:
+        // nvidia ran 140.7s before surfacing "Service temporarily overloaded",
+        // leaving scraps for the next hop) behaved like a stall for its entire
+        // window — the hedge-abort bench would have fired had the abort landed
+        // first. Give the late error the same treatment the hedge abort gets:
+        // bench the route so the ladder's next hop keeps a usable budget,
+        // instead of re-stalling on this route every request. Errors that
+        // arrive EARLY (the common Groq tool_use_failed shape) stay unbenced —
+        // a fast verdict costs the ladder nothing.
+        const errStr = err?.message ?? '';
+        if (
+          budgetMs > 0
+          && typeof errStr === 'string' && errStr.includes('in-band provider error')
+          && Date.now() - attemptStartedAt >= budgetMs * HEDGE_BENCH_MIN_SILENT_FRACTION
+        ) {
+          setCooldown(route.platform, route.modelId, route.keyId, TRUNCATION_BENCH_MS, 'heuristic');
+          console.warn(`[FallbackLoop] ${route.platform}/${route.modelId}: in-band provider error after ${((Date.now() - attemptStartedAt) / 1000).toFixed(1)}s silent — benching the route ${Math.round(TRUNCATION_BENCH_MS / 1000)}s (#1218 Gap 3)`);
+        }
         const errorClass = classifyAttemptError(err);
         attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass });
         traceAttempt(errorClass, err);
