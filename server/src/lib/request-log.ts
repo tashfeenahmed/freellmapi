@@ -140,12 +140,12 @@ export function persistRequestAttempts(trace: RequestTrace): void {
   try {
     const db = getDb();
     const insert = db.prepare(`
-      INSERT INTO request_attempts (request_id, ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO request_attempts (request_id, ordinal, platform, model_id, endpoint_scope, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const tx = db.transaction(() => {
       for (const r of trace.records) {
-        insert.run(trace.lastRequestRowId, r.ordinal, r.platform, r.modelId, r.keyOrdinal, r.keyLabel, r.outcome, r.startOffsetMs, r.durationMs, r.errorSummary);
+        insert.run(trace.lastRequestRowId, r.ordinal, r.platform, r.modelId, r.endpointScope ?? '', r.keyOrdinal, r.keyLabel, r.outcome, r.startOffsetMs, r.durationMs, r.errorSummary);
       }
     });
     tx();
