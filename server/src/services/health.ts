@@ -421,3 +421,36 @@ export function stopHealthChecker(): void {
     cancelHealthCheck = null;
   }
 }
+
+// ── Endpoint probe (issue #1254) ─────────────────────────────────────────────
+// validateKey against ONE credential bound to a quarantined custom endpoint,
+// with NONE of the health checker's bookkeeping (same side-effect-free contract
+// as probeKeyValidity: a probe is a question, never a verdict). Catalog
+// platforms have no per-endpoint identity to quarantine, so the probe only
+// ever targets custom scopes; an endpoint with no usable credential is
+// unprobeable and the caller keeps it quarantined on backoff.
+export async function probeEndpointValidity(
+  platform: string,
+  endpointScope: string,
+  keyId: number,
+): Promise<'valid' | 'invalid' | 'error' | 'unprobeable'> {
+  if (platform !== 'custom' || !endpointScope) return 'unprobeable';
+  try {
+    const db = getDb();
+    // Any enabled credential bound to this base_url can carry the probe — the
+    // endpoint, not the credential, is the thing under test.
+    const rows = db.prepare(
+      "SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = ? AND enabled = 1"
+    ).all(endpointScope) as Array<{ id: number }>;
+    const ids = new Set(rows.map(r => r.id));
+    if (ids.size === 0 || !ids.has(keyId)) {
+      // Fall back to any sibling credential on the endpoint.
+      const first = rows[0];
+      if (!first) return 'unprobeable';
+      return probeKeyValidity(first.id);
+    }
+    return probeKeyValidity(keyId);
+  } catch {
+    return 'error';
+  }
+}
