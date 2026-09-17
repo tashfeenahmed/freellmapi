@@ -51,6 +51,7 @@ import {
   isStreamTruncatedError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
+import { benchForTools, clearToolRejections, noteToolRejection, toolCapabilityKey } from './tool-capability.js';
 import { parseProviderReportedSize } from './provider-size-parser.js';
 import { checkKeyHealth, markKeyHealthyFromRequest } from '../services/health.js';
 import { noteModelRetirementSignal } from '../services/model-retirement.js';
@@ -212,6 +213,13 @@ export interface FallbackState {
   // reading is the same request, not a smaller one.
   observedTotalTokens?: number;
   observedInputTokens?: number;
+  // The request carries `tools` (#1230). Set by the surface right after
+  // newFallbackState(); lets the failure/success paths learn which models
+  // reject tool calls in practice. Unset means "not a tool request".
+  wantsTools?: boolean;
+  // Models (tool-capability keys) that answered provider_bad_request to THIS
+  // tool request. Counted once per request however many keys were tried.
+  toolRejects?: Set<string>;
 }
 
 /** Total for the next dispatch. Input-only observations still need output space. */
@@ -457,6 +465,20 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // cooldown ladder is already handling whatever that is.
     truncationStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
   }
+  // A 400 "bad request" answer to a request that carries `tools` is how a
+  // model that does not really support tool calling shows up (#1230). The 90s
+  // transient cooldown above forgets it, so remember it per model+endpoint;
+  // after a few distinct requests the router tries that model last for tool
+  // requests (lib/tool-capability.ts). Only the final classification counts:
+  // context-too-large, model-not-found and degraded 400s are other problems.
+  if (state.wantsTools === true && classifyAttemptError(err) === 'provider_bad_request') {
+    const tk = toolCapabilityKey(route.platform, route.modelId, route.endpointScope);
+    const seen = (state.toolRejects ??= new Set<string>());
+    if (!seen.has(tk)) {
+      seen.add(tk);
+      noteToolRejection(tk, now);
+    }
+  }
   // A suspended ACCOUNT fails every model behind the key identically. The
   // per-route cooldown above benches only the model that happened to be
   // tried, so the next request picks the platform's next model and pays the
@@ -540,7 +562,16 @@ export function recordAuthFailure(route: RouteResult, state: FallbackState): voi
  * clear the model's 429 penalty. `rateLimitTokens` is whatever the surface metered
  * (the provider's usage.total_tokens for non-stream, an estimate for stream).
  */
-export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: number): void {
+export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: number, state?: FallbackState): void {
+  // A tool-carrying request that was served proves two things (#1230): this
+  // model does handle tools, and the request itself was well-formed, so the
+  // models that answered it with a 400 earlier in this chain are the ones at
+  // fault. Defer those for tool requests without waiting for more evidence.
+  if (state?.wantsTools === true) {
+    const winner = toolCapabilityKey(route.platform, route.modelId, route.endpointScope);
+    clearToolRejections(winner);
+    for (const tk of state.toolRejects ?? []) if (tk !== winner) benchForTools(tk);
+  }
   recordRequest(route.platform, route.modelId, route.keyId);
   recordTokens(route.platform, route.modelId, route.keyId, rateLimitTokens);
   recordSuccess(route.modelDbId);

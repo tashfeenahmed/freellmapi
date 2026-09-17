@@ -2076,6 +2076,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // context-handoff injection, group/unified-chain routing, and the OpenAI
   // stream turn-integrity framing.
   const state = newFallbackState();
+  // Lets the failover loop learn which models reject tool calls (#1230).
+  state.wantsTools = wantsTools;
   const attemptLog: AttemptRecord[] = [];
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
@@ -2555,7 +2557,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           const inputTokens = upstreamUsage?.prompt_tokens ?? estimatedPromptTokens;
           const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const totalTokens = upstreamUsage?.total_tokens ?? (inputTokens + outputTokens);
-          recordUpstreamSuccess(route, totalTokens);
+          recordUpstreamSuccess(route, totalTokens, state);
 
           // Cache the freshly-generated SSE sequence so an identical later
           // stream request is replayed without spending another free-tier
@@ -2762,7 +2764,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const completionTokens = result.usage?.completion_tokens
           ?? Math.ceil((contentToString(respMsg?.content ?? '').length + completionReasoningText(result).length + respToolArgChars) / 4);
         const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
-        recordUpstreamSuccess(route, totalTokens);
+        recordUpstreamSuccess(route, totalTokens, state);
         // #797: remember this turn's thinking trace so the next request from
         // the same session can restore it (clients strip it on replay).
         // normalizeChoices keeps reasoning_content on the message even when it

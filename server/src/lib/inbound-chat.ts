@@ -201,6 +201,8 @@ export async function runInboundChat(
   const state = newFallbackState();
   const attemptLog: AttemptRecord[] = [];
   const wantsTools = (input.tools?.length ?? 0) > 0;
+  // Lets the failover loop learn which models reject tool calls (#1230).
+  state.wantsTools = wantsTools;
   const imageRequest = hasImages(input.messages);
   // Capped reserve (#470); threaded to the router separately because it is an
   // exact count and must not be inflated by the context-window safety margin
@@ -335,7 +337,7 @@ export async function runInboundChat(
           promptTokens,
           completionTokens,
         };
-        recordUpstreamSuccess(route, result.usage?.total_tokens ?? promptTokens + completionTokens);
+        recordUpstreamSuccess(route, result.usage?.total_tokens ?? promptTokens + completionTokens, state);
         if (pin.pinnedLabel == null) setStickyModel(input.messages, route.modelDbId, input.sessionId);
         res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
         setFallbackHeaders(res, attempt, attemptLog);
@@ -531,7 +533,7 @@ export async function runInboundChat(
           completionTokens: outputTokens,
         };
         wire.finishStream(res, normalized);
-        recordUpstreamSuccess(route, estimatedInputTokens + outputTokens);
+        recordUpstreamSuccess(route, estimatedInputTokens + outputTokens, state);
         if (pin.pinnedLabel == null) setStickyModel(input.messages, route.modelDbId, input.sessionId);
         logRequest(
           route.platform,
