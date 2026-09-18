@@ -1,0 +1,27 @@
+# Standalone sidecar. It joins FreeLLMAPI's existing docker network so it can
+# reach the FreeLLMAPI service by its compose service name (`freellmapi`).
+# It does NOT modify the FreeLLMAPI image, source, or database directly — all
+# changes go through the FreeLLMAPI HTTP dashboard API.
+#
+# Requires the FreeLLMAPI network to already exist. Find it with:
+#   docker network ls | findstr freellmapi
+# The default compose project name is the folder name of the FreeLLMAPI repo,
+# so the network is usually `freellmapi_default`. Override via FREEAPI_NETWORK.
+
+services:
+  model-sync:
+    build: .
+    image: freellmapi-model-sync:local
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      # Persistent sync state (miss counters, cached dashboard token, db ids).
+      - ./state:/app/state
+    networks:
+      - freellmapi
+
+networks:
+  freellmapi:
+    name: ${FREEAPI_NETWORK:-freellmapi_default}
+    external: true
