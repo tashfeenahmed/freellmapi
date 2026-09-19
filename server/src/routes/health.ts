@@ -5,6 +5,13 @@ import { checkKeyHealth, checkAllKeys } from '../services/health.js';
 import { getDegradationStatus } from '../services/degradation.js';
 import { hasProvider } from '../providers/index.js';
 import { getQuotaStateForKeys } from '../services/provider-quota.js';
+import {
+  readAllModelHealthStatus,
+  readModelHealthStatusByPlatform,
+  resetModelHealth,
+  resetAllModelHealth,
+  type ModelHealthStatus,
+} from '../services/model-health.js';
 
 export const healthRouter = Router();
 
@@ -57,6 +64,35 @@ healthRouter.get('/', (_req: Request, res: Response) => {
     quotaStates: getQuotaStateForKeys(),
     degradation: getDegradationStatus(),
   });
+});
+
+// Get model-level health status (working/failing/unknown)
+healthRouter.get('/models', (_req: Request, res: Response) => {
+  const statuses = readAllModelHealthStatus();
+  res.json({
+    modelHealthStatus: statuses.map(s => ({
+      platform: s.platform,
+      modelId: s.model_id,
+      status: s.status as ModelHealthStatus,
+      lastObservationAt: s.last_observation_at,
+      lastWorkingAt: s.last_working_at,
+      lastFailureAt: s.last_failure_at,
+      failureCountInWindow: s.failure_count_in_window,
+    })),
+  });
+});
+
+// Reset model health status for a single model
+healthRouter.post('/models/reset/:platform/:modelId', (req: Request, res: Response) => {
+  const { platform, modelId } = req.params;
+  const n = resetModelHealth(platform, modelId);
+  res.json({ success: true, resetCount: n });
+});
+
+// Reset all model health statuses
+healthRouter.post('/models/reset-all', (_req: Request, res: Response) => {
+  const n = resetAllModelHealth();
+  res.json({ success: true, resetCount: n });
 });
 
 // Check a specific key

@@ -18,6 +18,7 @@ import { nextMonthResetAt } from '../services/key-budget.js';
 
 import type { RouteResult } from '../services/router.js';
 import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta } from '../services/router.js';
+import { recordModelHealthFailing, recordModelHealthWorking } from '../services/model-health.js';
 import { safeHeaderValue } from './header-value.js';
 import {
   recordRequest,
@@ -88,12 +89,12 @@ const modelFailureTimestamps = new Map<number, number[]>(); // model_db_id → t
  *  holds ≥ MODEL_FAILURE_THRESHOLD failures, bench the model on EVERY key that
  *  can route to it so the model sinks out of routing until upstream heals, then
  *  reset the counter (one bench per streak). */
-function noteModelFailure(route: RouteResult, now: number): void {
+export function noteModelFailure(route: RouteResult, now: number): boolean {
   const window = (modelFailureTimestamps.get(route.modelDbId) ?? [])
     .filter(t => now - t < MODEL_FAILURE_WINDOW_MS);
   window.push(now);
   modelFailureTimestamps.set(route.modelDbId, window);
-  if (window.length < MODEL_FAILURE_THRESHOLD) return;
+  if (window.length < MODEL_FAILURE_THRESHOLD) return false;
   // Fall back to the failing key alone when the model's key set can't be read
   // (model row gone, DB unavailable) — a narrower bench beats none.
   const keyIds = routableKeyIdsForModel(route.modelDbId);
@@ -110,11 +111,12 @@ function noteModelFailure(route: RouteResult, now: number): void {
     setCooldown(route.platform, route.modelId, keyId, MODEL_FAILURE_COOLDOWN_MS, 'heuristic');
   }
   modelFailureTimestamps.delete(route.modelDbId);
+  return true;
 }
 
 /** A served request is the strongest counter-evidence: clear the failure
  *  window so a recovered model is not benched for a stale streak. */
-function clearModelFailure(route: RouteResult): void {
+export function clearModelFailure(route: RouteResult): void {
   modelFailureTimestamps.delete(route.modelDbId);
 }
 
@@ -354,10 +356,27 @@ export function resetModelFailureWindows(): void {
 
 /** Operator clear (#952): drop every model's failure window and report how many
  *  models were mid-streak. The benches those streaks produced are ordinary
- *  cooldown rows and go with clearAllCooldowns. */
+ *  cooldown rows and go with clearAllCooldowns. Also resets the persisted
+ *  model_health_status snapshot so a restart doesn't carry forward stale
+ *  failing verdicts. */
 export function clearModelFailureWindows(): number {
   const count = modelFailureTimestamps.size;
   modelFailureTimestamps.clear();
+  emptyCompletionStreaks.clear();
+  try {
+    const db = getDb();
+    db.prepare(`
+      UPDATE model_health_status
+      SET status = 'unknown',
+          last_observation_at = datetime('now'),
+          last_working_at = NULL,
+          last_failure_at = NULL,
+          failure_count_in_window = 0,
+          window_start_ms = NULL
+    `).run();
+  } catch {
+    // DB not ready — best-effort only
+  }
   return count;
 }
 
@@ -534,7 +553,12 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   }
   // Model-level failure benching: a model failing across keys (or repeatedly on
   // one key) must sink out of routing instead of being re-picked every request.
-  noteModelFailure(route, now);
+  // The in-memory window is the source of truth; persist its verdict so it
+  // survives a restart (only when the threshold actually trips).
+  const thresholdTripped = noteModelFailure(route, now);
+  if (thresholdTripped) {
+    recordModelHealthFailing(route, classifyAttemptError(err), sanitizeProviderErrorMessage(err?.message ?? err));
+  }
   // Model-level penalty only when no sibling key can still serve (#454).
   if (!hasOtherUsableKey(route.modelDbId, route.keyId, state.skipKeys)) {
     // Hard limit signals (429/402) carry the heavier demotion; ordinary
@@ -616,6 +640,8 @@ export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: numbe
   // A served request is the strongest possible evidence the model works, so
   // clear any model-level failure streak that could bench it later.
   clearModelFailure(route);
+  // Persist the recovered verdict so it survives a restart.
+  recordModelHealthWorking(route);
   // A served request is the strongest possible evidence the key works, so clear
   // any stale 'error' status left by an earlier transport blip instead of waiting
   // for the next health pass to make the key routable again.
