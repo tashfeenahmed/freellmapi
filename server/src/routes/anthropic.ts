@@ -660,9 +660,11 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, false, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
     },
     dispatch: async (route, attempt, dispatchCtx) => {
+      const contextBudget = route.contextWindow != null ? route.contextWindow - estimatedInputTokens : undefined;
+      const routeOptions = { ...dispatchOptions, contextBudget };
       if (stream) {
         try {
-          await streamCompletion(res, route, messages, dispatchOptions, {
+          await streamCompletion(res, route, messages, routeOptions, {
             start, attempt, attemptLog, clientGone: () => clientGone, requestedModel, estimatedInputTokens, tools, pinnedModelId,
             sessionId, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, state,
           });
@@ -675,7 +677,7 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         }
       }
 
-      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, dispatchOptions);
+      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, routeOptions);
       const respMsg = result.choices?.[0]?.message;
       const respText = contentToString(respMsg?.content ?? '');
       let respToolCalls = respMsg?.tool_calls ?? [];

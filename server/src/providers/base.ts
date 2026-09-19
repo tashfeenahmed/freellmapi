@@ -163,6 +163,9 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
   stream_options?: {
     include_usage?: boolean;
   };
+  /** Remaining context budget (context_window − estimated_input_tokens) for
+   *  this route. resolveMaxTokens clamps max_tokens to fit. */
+  contextBudget?: number;
   /** Per-call HTTP timeout override. Not part of the OpenAI wire format (it is
    * stripped before the request body is built); used by the probe script so
    * NVIDIA's 15-60s serverless cold starts don't read as failures. */

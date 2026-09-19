@@ -1141,6 +1141,8 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
       return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
     },
     dispatch: async (route, attempt, ctx) => {
+      const contextBudget = route.contextWindow != null ? route.contextWindow - estimatedInputTokens : undefined;
+      const routeOpts = contextBudget != null ? { ...dispatchOpts, contextBudget } : dispatchOpts;
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',
         requestId: requestGroupId,
@@ -1235,7 +1237,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
             route.apiKey,
             messages,
             route.modelId,
-            dispatchOpts,
+            routeOpts,
             quotaContextForRoute(route, 'responses'),
           );
 
@@ -1473,7 +1475,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
         route.apiKey,
         messages,
         route.modelId,
-        dispatchOpts,
+        routeOpts,
         quotaContextForRoute(route, 'responses'),
       );
 
