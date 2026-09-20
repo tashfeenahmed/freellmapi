@@ -40,6 +40,8 @@
     "dist/config-files.d.ts",
     "dist/doctor.js",
     "dist/doctor.d.ts",
+    "dist/keys.js",
+    "dist/keys.d.ts",
     "dist/models.js",
     "dist/models.d.ts",
     "dist/tools.js",
