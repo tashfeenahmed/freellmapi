@@ -394,6 +394,29 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
     return identity;
   }
 
+  /**
+   * Desktop builds ship only on tagged GitHub Releases. Peel the latest tag
+   * to a commit SHA so the checker can compare against that, not `main` (#1270).
+   */
+  async function resolveReleaseCommitSha(): Promise<string> {
+    const release = await latestRelease();
+    const response = await fetchImpl(
+      `https://api.github.com/repos/${REPOSITORY}/commits/${encodeURIComponent(release.tagName)}`,
+      {
+        headers: githubHeaders('application/vnd.github+json'),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`GitHub tag-commit request returned HTTP ${response.status}`);
+    }
+    const body: unknown = await response.json();
+    if (!isRecord(body)) throw new Error('GitHub tag-commit response is not an object');
+    const sha = validSha(body.sha);
+    if (!sha) throw new Error('GitHub tag-commit response has an invalid commit SHA');
+    return sha;
+  }
+
   async function performCheck(currentIdentity: Identity): Promise<CheckResult> {
     const checkedAtMs = now();
     const baseResult = {
@@ -402,7 +425,22 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
       checkedAt: new Date(checkedAtMs).toISOString(),
       version: appVersion(),
     };
-    const url = `https://api.github.com/repos/${REPOSITORY}/compare/${currentIdentity.sha}...main`;
+
+    // Desktop has no installer for untagged `main` commits. Source and docker
+    // still track the default branch.
+    let compareHead = 'main';
+    if (currentIdentity.installation === 'desktop') {
+      compareHead = await resolveReleaseCommitSha();
+      if (compareHead === currentIdentity.sha) {
+        return {
+          status: 'current',
+          ...baseResult,
+          remoteSha: compareHead.slice(0, 7),
+        };
+      }
+    }
+
+    const url = `https://api.github.com/repos/${REPOSITORY}/compare/${currentIdentity.sha}...${compareHead}`;
     const response = await fetchImpl(url, {
       headers: githubHeaders('application/vnd.github+json'),
       signal: AbortSignal.timeout(10_000),
@@ -412,6 +450,10 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
       return { status: 'unknown', ...baseResult };
     }
     if (response.status === 401 || response.status === 403 || response.status === 429) {
+      if (currentIdentity.installation === 'desktop') {
+        // The main Atom tip is not an installable desktop update.
+        return { status: 'unknown', ...baseResult };
+      }
       const atomResponse = await fetchImpl(`https://github.com/${REPOSITORY}/commits/main.atom`, {
         headers: {
           Accept: 'application/atom+xml',
@@ -437,8 +479,15 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
     const upstreamStatus = compareStatus(body.status);
     if (!upstreamStatus) throw new Error('GitHub compare response has an invalid status');
 
+    let status = mapCompareStatus(upstreamStatus);
+    // GitHub "behind" means the desktop build is already ahead of the latest
+    // tag — there is still no newer installer (#1270).
+    if (currentIdentity.installation === 'desktop' && status === 'ahead') {
+      status = 'current';
+    }
+
     return {
-      status: mapCompareStatus(upstreamStatus),
+      status,
       ...baseResult,
       ...parseRemoteMetadata(body, upstreamStatus, currentIdentity.sha!),
       ...(upstreamStatus === 'ahead' ? { changes: parseChanges(body, upstreamStatus) } : {}),

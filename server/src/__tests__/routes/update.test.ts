@@ -134,6 +134,139 @@ describe('Update API', () => {
       expect(execMock).not.toHaveBeenCalled();
     });
 
+    it('does not offer untagged main commits as a desktop update', async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const href = String(input);
+        if (href.endsWith('/releases/latest')) {
+          return response({
+            tag_name: 'v0.11.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+          });
+        }
+        if (href.includes('/commits/v0.11.0')) {
+          return response({
+            sha: LOCAL_SHA,
+            commit: { message: 'v0.11.0', committer: { date: '2026-07-28T10:00:00Z' } },
+          });
+        }
+        if (href.includes(`/compare/${LOCAL_SHA}...main`)) {
+          return response(compareBody('ahead'));
+        }
+        if (href.includes(`/compare/${LOCAL_SHA}...${LOCAL_SHA}`)) {
+          return response(compareBody('identical'));
+        }
+        throw new Error(`unexpected fetch: ${href}`);
+      });
+      const { app } = createTestApp({
+        env: {
+          FREELLMAPI_COMMIT_SHA: LOCAL_SHA,
+          FREELLMAPI_INSTALL_METHOD: 'desktop',
+        },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({
+        status: 'current',
+        installation: 'desktop',
+        localSha: LOCAL_SHA.slice(0, 7),
+      });
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('...main')]),
+      );
+    });
+
+    it('reports available for desktop only when a newer tagged release exists', async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const href = String(input);
+        if (href.endsWith('/releases/latest')) {
+          return response({
+            tag_name: 'v0.12.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.12.0',
+          });
+        }
+        if (href.includes('/commits/v0.12.0')) {
+          return response({
+            sha: REMOTE_SHA,
+            commit: { message: 'v0.12.0', committer: { date: '2026-07-28T10:00:00Z' } },
+          });
+        }
+        if (href.includes(`/compare/${LOCAL_SHA}...${REMOTE_SHA}`)) {
+          return response(compareBody('ahead'));
+        }
+        if (href.includes(`/compare/${LOCAL_SHA}...main`)) {
+          return response(compareBody('ahead'));
+        }
+        throw new Error(`unexpected fetch: ${href}`);
+      });
+      const { app } = createTestApp({
+        env: {
+          FREELLMAPI_COMMIT_SHA: LOCAL_SHA,
+          FREELLMAPI_INSTALL_METHOD: 'desktop',
+        },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({
+        status: 'available',
+        installation: 'desktop',
+        remoteSha: REMOTE_SHA.slice(0, 7),
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://api.github.com/repos/tashfeenahmed/freellmapi/compare/${LOCAL_SHA}...${REMOTE_SHA}`,
+        expect.any(Object),
+      );
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('...main')]),
+      );
+    });
+
+    it('does not treat the untagged main Atom tip as a desktop update', async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const href = String(input);
+        if (href.endsWith('/releases/latest')) {
+          return response({
+            tag_name: 'v0.11.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+          });
+        }
+        if (href.includes('/commits/v0.11.0')) {
+          return response({ sha: LOCAL_SHA });
+        }
+        if (href.includes('/compare/')) {
+          return response({ message: 'API rate limit exceeded' }, 403);
+        }
+        if (href.includes('commits/main.atom')) {
+          return atomResponse([
+            { sha: REMOTE_SHA, message: 'Untagged main tip', date: '2026-07-28T13:00:00Z' },
+            { sha: LOCAL_SHA, message: 'Latest tagged release', date: '2026-07-28T10:00:00Z' },
+          ]);
+        }
+        throw new Error(`unexpected fetch: ${href}`);
+      });
+      const { app } = createTestApp({
+        env: {
+          FREELLMAPI_COMMIT_SHA: LOCAL_SHA,
+          FREELLMAPI_INSTALL_METHOD: 'desktop',
+        },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.status).toBe(200);
+      expect(result.body.status).toBe('current');
+      expect(result.body.status).not.toBe('available');
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('commits/main.atom')]),
+      );
+    });
+
     it('uses an explicitly configured update-check token for authenticated rate limits', async () => {
       const fetchMock = vi.fn(async () => response(compareBody('identical')));
       const { app } = createTestApp({
