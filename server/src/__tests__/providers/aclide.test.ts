@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AclideProvider } from '../../providers/aclide.js';
 import { getProvider } from '../../providers/index.js';
 import { AUTH_JSON_PROVIDER_MAP, detectPlatform } from '../../lib/key-parser.js';
+import { isRetryableError } from '../../lib/error-classify.js';
 
 const model = 'z-ai/glm-4.7-flashx';
 const messages = [{ role: 'user' as const, content: 'Say OK' }];
@@ -134,5 +135,25 @@ describe('ACLIDE Responses adapter', () => {
     const fetch = vi.spyOn(global, 'fetch');
     await expect(new AclideProvider().chatCompletion('k', [{ role: 'user', content: [{ type: 'input_audio', input_audio: {} }] }], model)).rejects.toThrow('content block');
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // #1277 follow-up: these used to be fatal, so one ACLIDE hop ended the chain.
+  it('words a 400 so the chain fails over instead of ending', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(json({ error: { message: 'invalid parameter temperature' } }, 400));
+    const err = await new AclideProvider().chatCompletion('k', messages, model).catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 400 });
+    expect((err as Error).message).toContain('ACLIDE API error 400:');
+    expect((err as Error).message).toContain('invalid parameter temperature');
+    expect(isRetryableError(err)).toBe(true);
+  });
+
+  it('lets another provider serve a request shape it cannot express', async () => {
+    const provider = new AclideProvider();
+    const audio = await provider.chatCompletion('k', [{ role: 'user', content: [{ type: 'input_audio', input_audio: {} }] }], model).catch((e: unknown) => e);
+    const tool = await provider.chatCompletion('k', [{ role: 'tool', content: 'x' }], model).catch((e: unknown) => e);
+    for (const err of [audio, tool]) {
+      expect(err).toMatchObject({ status: 422 });
+      expect(isRetryableError(err)).toBe(true);
+    }
   });
 });

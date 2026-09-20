@@ -37,6 +37,13 @@ function upstreamError(message: string): Error {
   return Object.assign(new Error(`ACLIDE ${message}`), { status: 502 });
 }
 
+// A request this adapter cannot express is ACLIDE's limit, not the caller's
+// mistake: stamped 422 so the chain moves on to a provider that can serve it
+// instead of ending at the first hop.
+function unsupportedRequest(message: string): Error {
+  return Object.assign(new Error(`ACLIDE ${message}`), { status: 422 });
+}
+
 /** ACLIDE exposes Responses, NOT Chat Completions. Streaming clients receive
  * buffered compatibility chunks after a terminal response, as with Sail.
  * No model rows are seeded here: the signed catalog owns the release gate. */
@@ -52,7 +59,7 @@ export class AclideProvider extends BaseProvider {
     const input: Record<string, unknown>[] = [];
     for (const message of messages) {
       if (message.role === 'tool') {
-        if (!message.tool_call_id) throw new Error('ACLIDE tool messages require tool_call_id');
+        if (!message.tool_call_id) throw unsupportedRequest('tool messages require tool_call_id');
         input.push({ type: 'function_call_output', call_id: message.tool_call_id, output: contentToString(message.content) });
         continue;
       }
@@ -67,7 +74,7 @@ export class AclideProvider extends BaseProvider {
             if (typeof image?.url === 'string') return { type: 'input_image', image_url: image.url, ...(image.detail ? { detail: image.detail } : {}) };
           }
           // Never silently erase media the caller relied on.
-          throw new Error(`ACLIDE does not support this content block: ${part.type ?? 'unknown'}`);
+          throw unsupportedRequest(`does not support this content block: ${part.type ?? 'unknown'}`);
         });
       }
       if (contentToString(message.content) || !message.tool_calls?.length || Array.isArray(content) && content.length) {
@@ -123,7 +130,9 @@ export class AclideProvider extends BaseProvider {
       const body = await res.text();
       let detail: unknown = body;
       try { detail = JSON.parse(body); } catch { /* Keep non-JSON diagnostics. */ }
-      throw providerHttpError(res, `ACLIDE error (HTTP ${res.status})`, detail);
+      // The shared "<name> API error <status>: <text>" wording is what the
+      // failover classifier reads; without it a 400 ended the whole chain.
+      throw providerHttpError(res, `ACLIDE API error ${res.status}: ${body.slice(0, 500)}`, detail);
     }
     const response = await res.json() as AclideResponse;
     if (response.model !== modelId) throw upstreamError('returned a different or missing model identity');

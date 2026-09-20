@@ -485,11 +485,26 @@ export function isContextTooLargeError(err: any): boolean {
 // A 402 Payment Required / out-of-credits error. Distinct from a transient 429:
 // it won't recover on the next window, so the caller benches the model+key with
 // PAYMENT_REQUIRED_COOLDOWN_MS (a full day) rather than the 90s transient cooldown.
+//
+// The digits 402 only count as the STATUS. A bare `includes('402')` also
+// matched token counts and request ids ("Limit 30000, Requested 34026",
+// "14023 tokens used"), and since the 402 bench covers the key on every model
+// of the platform for a day (#1239), one unlucky number took a whole provider
+// out. So: an error that states another status is never a 402 by its digits,
+// and otherwise 402 has to stand alone rather than sit inside a longer number.
+const STATED_STATUS = /\bapi error (\d{3})\b|\(http (\d{3})\)/;
+const STANDALONE_402 = /(?<![\w.])402(?![\w.])/;
+
 export function isPaymentRequiredError(err: any): boolean {
-  const msg = (err.message ?? '').toLowerCase();
-  return msg.includes('402') || msg.includes('payment required')
+  const msg = String(err?.message ?? '').toLowerCase();
+  if (msg.includes('payment required')
     || msg.includes('insufficient_quota') || msg.includes('insufficient credit')
-    || msg.includes('insufficient balance');
+    || msg.includes('insufficient balance')) return true;
+
+  const stated = msg.match(STATED_STATUS);
+  const status = typeof err?.status === 'number' ? err.status : Number(stated?.[1] ?? stated?.[2]);
+  if (Number.isFinite(status)) return status === 402;
+  return STANDALONE_402.test(msg);
 }
 
 // "model 'x' does not exist" / "model \"x\" does not exist" / "model x does not

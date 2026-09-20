@@ -211,6 +211,31 @@ describe('isRetryableError', () => {
       expect(isPaymentRequiredError(new Error('429 Too Many Requests'))).toBe(false);
       expect(isPaymentRequiredError(new Error('503 Service Unavailable'))).toBe(false);
     });
+
+    // #1277 follow-up: the digits 402 inside a token count or id are not a
+    // status. The 402 bench takes the key off every model of the platform for
+    // a day, so these false positives emptied whole providers.
+    it('isPaymentRequiredError ignores 402 inside other numbers and under another status', () => {
+      for (const message of [
+        'groq API error 413: Request too large. Limit 30000, Requested 34026',
+        'openrouter API error 429: rate limit, 14023 tokens used',
+        'provider API error 500: upstream request id 8f402ab',
+        'ACLIDE API error 400: max_tokens 402 is below the minimum',
+        'timeout after 4.402s',
+      ]) {
+        expect(isPaymentRequiredError(new Error(message)), message).toBe(false);
+      }
+      expect(isPaymentRequiredError(Object.assign(new Error('Requested 402 tokens'), { status: 413 }))).toBe(false);
+    });
+
+    it('isPaymentRequiredError still catches every real out-of-credits shape', () => {
+      expect(isPaymentRequiredError(new Error('402 Payment Required'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('upstream returned 402'))).toBe(true);
+      expect(isPaymentRequiredError(Object.assign(new Error('no credits left'), { status: 402 }))).toBe(true);
+      expect(isPaymentRequiredError(new Error('Pollinations API error 402: insufficient credit'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('provider API error 429: insufficient balance (1008)'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('openai API error 429: insufficient_quota'))).toBe(true);
+    });
   });
 
   describe('410 Gone & un-enumerated upstream statuses fail over instead of 502 (#337/#339)', () => {
