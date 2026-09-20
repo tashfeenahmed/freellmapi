@@ -71,6 +71,19 @@ describe('handleProcessError', () => {
     expect(log).toHaveBeenCalledOnce();
   });
 
+  it('swallows EPIPE without writing back to the broken output pipe', () => {
+    const exit = vi.fn();
+    const log = vi.fn();
+    const decision = handleProcessError(
+      'uncaughtException',
+      Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }),
+      { exit, log },
+    );
+    expect(decision).toBe('swallow');
+    expect(exit).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it('exits(1) on a genuine bug, preserving fail-fast', () => {
     const exit = vi.fn();
     const log = vi.fn();

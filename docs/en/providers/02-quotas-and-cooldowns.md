@@ -30,7 +30,7 @@ A 429 blocks that model+key pair for a period:
 
 | Mechanism | Duration | Notes |
 | --- | --- | --- |
-| Transient cooldown | 90s | Per-minute-window 429; recovers within ~one window. |
+| Transient cooldown | 90s (configurable) | Per-minute-window 429 **and** a bare transport failure (timeout, DNS, reset, "fetch failed") on a non-local key — the latter carries no quota signal, so it always takes this flat bench rather than the escalation ladder. Recovers within ~one window. Configurable via the `transient_cooldown_ms` setting, then the `TRANSIENT_COOLDOWN_MS` env var, else this default — same precedence as `FALLBACK_TIME_BUDGET_MS` (see [env vars](../env/01-variables.md)). Deliberately **not** subject to the operator ceiling below: change it directly instead. |
 | Escalation ladder | 2min → 10min → 1h → 1 day | Hits tracked over a rolling 24h window; a genuinely exhausted daily quota quarantines the key for the rest of the day instead of looping through short cooldowns. A successful request clears the hit counter. |
 | Unknown-limit ceiling | capped at 10min | When exhaustion is guessed rather than measured, the bench is capped since the verdict is a guess. |
 | Payment required (402) | 1 day | Out-of-credits. |

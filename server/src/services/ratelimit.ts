@@ -933,7 +933,44 @@ function clearCooldownHits(platform: string, modelId: string, keyId: number): vo
 }
 
 // Short cooldown for a transient (per-minute) 429 — recovers within ~one window.
+// Also the bench applied to a bare transport/connection failure (timeout, DNS,
+// reset, "fetch failed") on a non-local key: those carry no quota information
+// (quotaSignal is false for them — see CooldownLimitOptions), so they always
+// take this flat path rather than the escalation ladder below. Configurable
+// (issue: a single-key model with no sibling to fail over to turned a ~73s
+// transport blip into a multi-minute full outage, since a burst of failures
+// within the bench window each re-set it to "now + this" rather than escalating)
+// via the `transient_cooldown_ms` setting, then the TRANSIENT_COOLDOWN_MS env
+// var, else this default — same settings-then-env-then-default precedence as
+// getFallbackTimeBudgetMs (lib/fallback-loop.ts) and providerTimeoutMs
+// (lib/provider-timeout.ts). Deliberately NOT run through capCooldownMs: the
+// operator ceiling (routing_cooldown_ceiling_ms) only ever shortens a bench, and
+// 90s is already below its 1-minute floor in the default case, so capping it
+// would be a no-op unless an operator sets both knobs — direct configuration of
+// this value is the more legible way to change it.
 const TRANSIENT_COOLDOWN_MS = 90 * 1000;
+const TRANSIENT_COOLDOWN_SETTING = 'transient_cooldown_ms';
+
+/** The effective transient-failure cooldown in ms: the `transient_cooldown_ms`
+ *  setting when present and a valid non-negative number, else the
+ *  TRANSIENT_COOLDOWN_MS env var under the same rule, else the 90s default. 0
+ *  is a valid override (no bench — retry immediately), matching
+ *  getFallbackTimeBudgetMs's own n >= 0 acceptance. */
+export function getTransientCooldownMs(): number {
+  let stored: string | undefined;
+  try {
+    stored = getSetting(TRANSIENT_COOLDOWN_SETTING);
+  } catch {
+    stored = undefined; // DB not ready — never throw on the proxy hot path
+  }
+  const candidates = [stored, process.env.TRANSIENT_COOLDOWN_MS];
+  for (const raw of candidates) {
+    if (raw === undefined || raw.trim() === '') continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return TRANSIENT_COOLDOWN_MS;
+}
 
 // Ceiling for the null-limits escalation path. A provider that publishes no
 // RPD/TPD gives us no counter to check, so "daily-exhausted" there is inferred
@@ -1140,7 +1177,7 @@ export function getCooldownDecisionForLimit(
       recentHitCount(platform, modelId, keyId, now) >= NULL_LIMIT_HIT_THRESHOLD;
   }
   const dailyExhausted = rpdExhausted || tpdExhausted;
-  let base = TRANSIENT_COOLDOWN_MS;
+  let base = getTransientCooldownMs();
   if (dailyExhausted || heuristicallyExhausted) {
     // The ladder step is taken either way, so a route whose real limits get
     // seeded (or learned) later resumes escalating where it left off rather

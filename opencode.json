@@ -6,7 +6,8 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "FreeLLMAPI (local)",
       "options": {
-        "baseURL": "http://127.0.0.1:3001/v1"
+        "baseURL": "http://127.0.0.1:3001/v1",
+        "apiKey": "{env:FREELLMAPI_API_KEY}"
       },
       "models": {
         "auto": {

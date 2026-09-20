@@ -69,6 +69,17 @@ function describeError(err: unknown): string {
   return code ? `${code} (${message ?? 'no message'})` : (message ?? String(err));
 }
 
+/**
+ * stderr itself can be the failed transport. Writing an EPIPE diagnostic back
+ * to that same stream creates another uncaught EPIPE, which otherwise turns a
+ * single broken log pipe into an unbounded error/log loop. Do not emit this
+ * one class of already-handled diagnostic; it is neither actionable nor safe
+ * to write through the pipe that just failed.
+ */
+function isBrokenOutputPipe(err: unknown): boolean {
+  return walkErrorChain(err).some(link => link.code === 'EPIPE');
+}
+
 export interface SafetyNetHooks {
   log?: (...args: unknown[]) => void;
   exit?: (code: number) => void;
@@ -88,7 +99,9 @@ export function handleProcessError(
   const log = hooks.log ?? console.error;
   const decision = classifyProcessError(err);
   if (decision === 'swallow') {
-    log(`[safety-net] swallowed transient ${kind}: ${describeError(err)}`);
+    if (!isBrokenOutputPipe(err)) {
+      log(`[safety-net] swallowed transient ${kind}: ${describeError(err)}`);
+    }
     return 'swallow';
   }
   log(`[safety-net] fatal ${kind}:`, err);

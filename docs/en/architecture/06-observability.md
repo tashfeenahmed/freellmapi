@@ -255,6 +255,7 @@ interface AttemptTraceRecord {
 | `RESPONSE_CACHE` | `0` | Enable response cache (opt-in) |
 | `REQUEST_MAX_TOKENS_BUDGET` | `0` (off) | Per-request token ceiling |
 | `FALLBACK_TIME_BUDGET_MS` | `45000` | Retry budget (affects exhaustion) |
+| `TRANSIENT_COOLDOWN_MS` | `90000` | Bench after a per-minute 429 or bare transport failure |
 | `MAX_CONSECUTIVE_UPSTREAM_FAILS` | `0` (off) | Circuit breaker threshold |
 | `EXPOSE_FALLBACK_DETAIL_HEADER` | `0` | Opt-in X-Fallback-Detail |
 | `COOLDOWN_PROBE_DISABLED` | `0` | Kill switch for probe job |
