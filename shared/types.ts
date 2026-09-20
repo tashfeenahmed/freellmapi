@@ -68,6 +68,8 @@ export type Platform =
   // monthly when a payment method is attached; usage beyond the grant is
   // pay-as-you-go. Background polling is required for its flex-only models.
   | 'sail'
+  // Responses-only gateway; a shared monthly free allowance, not per model.
+  | 'aclide'
   // Hosted gateways; model rows are delivered by the signed catalog only.
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'

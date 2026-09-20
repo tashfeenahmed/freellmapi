@@ -242,6 +242,10 @@ export const GITHUB_MAX_OUTPUT_TOKENS = 400;
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  // ACLIDE uses Responses; these Chat Completions parameters have no mapping.
+  aclide: {
+    drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
+  },
   // Sail's stable Responses API accepts temperature/top_p, JSON Schema output,
   // tools and reasoning effort. The remaining Chat Completions knobs are not
   // supported and are intentionally omitted by the dedicated adapter.

@@ -403,6 +403,7 @@ export const platformColors: Record<string, string> = {
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
+  aclide:      '#6366f1',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
   router9:      '#8b5cf6',

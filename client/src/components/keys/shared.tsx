@@ -26,6 +26,7 @@ export function GetKeyLink({ url }: { url: string }) {
 // form disables the key field and submits a sentinel the backend stores so
 // routing treats the platform as configured.
 export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean }[] = [
+  { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
   { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
   { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
