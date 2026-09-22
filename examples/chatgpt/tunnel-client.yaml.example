@@ -4,7 +4,7 @@ config_version: 1
 
 control_plane:
   # Replace this non-secret placeholder with the tunnel id from OpenAI Platform.
-  tunnel_id: tunnel_00000000000000000000000000000000
+  tunnel_id: tunnel_6ab227c1c7948191ac054f07e4cf1c4e
   api_key: env:CONTROL_PLANE_API_KEY
 
 mcp:
