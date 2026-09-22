@@ -39,6 +39,7 @@ export interface ParseResult {
 
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
+  MOONDREAM_: 'moondream',
   GOOGLE_: 'google',
   GEMINI_: 'google',
   GROQ_: 'groq',
@@ -133,6 +134,7 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   groq: 'groq',
   sail: 'sail',
   aclide: 'aclide',
+  moondream: 'moondream',
   'sail-research': 'sail',
   sailresearch: 'sail',
   electronhub: 'electronhub',

@@ -242,6 +242,12 @@ export const GITHUB_MAX_OUTPUT_TOKENS = 400;
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  // Moondream maps reasoning effort to a boolean and max_tokens to
+  // max_completion_tokens. 4096 is the documented upstream output ceiling.
+  moondream: {
+    drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs', 'response_format'],
+    maxTokensCap: 4096,
+  },
   // ACLIDE uses Responses; these Chat Completions parameters have no mapping.
   aclide: {
     drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
@@ -434,6 +440,8 @@ export function platformDropsResponseFormat(platform: string): boolean {
  *  every surface supports, plus tools when the model does, minus the
  *  platform's droplist. */
 export function supportedParametersFor(platform: string, caps: { tools?: boolean } = {}): string[] {
+  // Unlike the generic base set, Moondream has neither stop nor tools.
+  if (platform === 'moondream') return ['temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stream', 'reasoning_effort'];
   const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
   const dropped = new Set<string>(policy?.drop ?? []);
   const params = [

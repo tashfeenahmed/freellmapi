@@ -10,6 +10,7 @@ import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
 import { SailProvider } from './sail.js';
 import { AclideProvider } from './aclide.js';
+import { MoondreamProvider } from './moondream.js';
 import { ElectronHubProvider } from './electronhub.js';
 import { ExperientialProvider } from './experiential.js';
 import { Router9Provider } from './router9.js';
@@ -56,6 +57,7 @@ register(new OpenAICompatProvider({
 // stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
 register(new SailProvider());
 register(new AclideProvider());
+register(new MoondreamProvider());
 
 // Free-plan grants are shared wallets, not free credits per model. Eligibility
 // and tested model rows belong in Oracle, never in bundled DB migrations.

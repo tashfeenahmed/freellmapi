@@ -404,6 +404,7 @@ export const platformColors: Record<string, string> = {
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
   aclide:      '#6366f1',
+  moondream:   '#6d5dfc',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
   router9:      '#8b5cf6',

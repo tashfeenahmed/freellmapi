@@ -53,6 +53,8 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
     expect(groq).toMatchObject({ platform: 'groq', configured: false, keyCount: 0 });
     expect(typeof groq.name).toBe('string');
     expect(typeof groq.keyless).toBe('boolean');
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'moondream'))
+      .toMatchObject({ platform: 'moondream', name: 'Moondream', configured: false, keyless: false });
     expect(body.summary).toEqual({
       total: body.providers.length,
       configured: 0,
