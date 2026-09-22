@@ -249,6 +249,12 @@ export abstract class BaseProvider {
    */
   protected async validationResult(res: Response): Promise<KeyValidationResult> {
     if (res.status !== 401 && res.status !== 403) return true;
+    // A Cloudflare bot challenge ("Just a moment...") is a 403 about the
+    // caller's IP and User-Agent, not about the key. Surface it as
+    // inconclusive so health never auto-disables a good key behind it (#1298).
+    if (res.headers?.get('cf-mitigated') === 'challenge') {
+      throw providerHttpError(res, `${this.name} key validation blocked by a Cloudflare challenge (HTTP ${res.status}); the key was not checked`);
+    }
 
     let body: any = null;
     try {
