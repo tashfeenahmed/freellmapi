@@ -93,6 +93,8 @@ In Docker, `127.0.0.1` is the container, not your machine — see [03-outbound-p
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `REQUEST_BODY_LIMIT_MB` | `25` | JSON body limit in MB for the inference surfaces (`/v1`, `/v1beta`, `/mcp`, Ollama `/api/*`). Vision requests embed base64 images in the body and replay them with every turn, so large sessions can clear 10MB; this ceiling only gates parsing — inbound image normalization shrinks the payload afterwards. Raise it if bigger payloads are rejected with 413 `request_too_large`. |
+| `MCP_INFERENCE_DEFAULT_MODEL` | `auto` | Default model id or named chain used by the MCP `ask_freellmapi` tool when the caller omits `model`. This is the model setting for a ChatGPT connection; each tool call may still override it. |
+| `MCP_INFERENCE_TIMEOUT_MS` | `120000` | Timeout for `ask_freellmapi`, from 1,000 to 300,000 ms. An invalid value falls back to 120 seconds. This does not change ordinary `/v1` request timeouts. |
 | `IMAGE_NORMALIZE` | `on` | Inbound image normalization master switch (`off` disables entirely). Data-URL images over the threshold are downscaled to the long-edge cap and re-encoded (JPEG, or PNG only when the alpha channel carries real transparency) before routing, shrinking replayed screenshots ~6–10x. Also normalizes exotic formats upstreams reject (bmp/gif/tiff/avif/webp → jpeg/png); gif keeps its first frame only. Every upstream resizes internally anyway (OpenAI to 2048px, Anthropic to 1568px), so pixels beyond the cap are transport waste. |
 | `IMAGE_NORMALIZE_MAX_DIMENSION` | `2048` | Long-edge cap in pixels for normalized images. |
 | `IMAGE_NORMALIZE_THRESHOLD_KB` | `1024` | Images above this size (KB) are candidates for downscaling. |

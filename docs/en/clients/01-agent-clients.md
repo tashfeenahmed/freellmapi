@@ -287,9 +287,10 @@ telemetry.
 
 ## MCP server
 
-On top of inference, the router is an **MCP server**: agents can introspect it mid-session
-(usable models and the params each one honors, provider health, usage and cache stats,
-routing strategy).
+On top of the OpenAI-compatible API, the router is an **MCP server**: agents can ask a
+FreeLLMAPI model to perform a text task and introspect the gateway mid-session (usable
+models and the params each one honors, provider health, usage and cache stats, routing
+strategy).
 
 The MCP surface is a setting rather than an always-on endpoint (#925). **Fresh installs
 start with it off**; installs that already had provider keys configured when they upgraded
@@ -313,6 +314,59 @@ claude mcp add --transport http freellmapi http://localhost:3001/mcp \
 
 Any MCP client that speaks Streamable HTTP works the same way: point it at `/mcp` with the
 unified key as a Bearer token.
+
+### ChatGPT (private Secure MCP Tunnel)
+
+`ask_freellmapi` makes FreeLLMAPI directly callable from a ChatGPT conversation. It uses
+the same `/v1/chat/completions` implementation as every OpenAI-compatible client, so model
+routing, fallback, response caching, prompt compression, token accounting, execution ids,
+and redacted provider errors stay consistent. The result includes the answer, requested and
+served model, usage, route, fallback trail, cache/compression state, and execution id.
+
+The three relevant settings are deliberately separate:
+
+| Setting | Where it lives | Example |
+| --- | --- | --- |
+| Base URL | `mcp.server_urls[].url` in tunnel-client | `http://127.0.0.1:3001/mcp` |
+| API key | `FREELLMAPI_MCP_AUTHORIZATION` environment variable | `Bearer freellmapi-...` |
+| Default model | FreeLLMAPI `MCP_INFERENCE_DEFAULT_MODEL` | `auto`, a model id, or `auto:<profile>` |
+
+1. Enable the MCP surface as shown above. Optionally set the default model before starting
+   FreeLLMAPI:
+
+   ```bash
+   MCP_INFERENCE_DEFAULT_MODEL=auto
+   MCP_INFERENCE_TIMEOUT_MS=120000
+   ```
+
+2. Copy [`examples/chatgpt/tunnel-client.yaml.example`](../../../examples/chatgpt/tunnel-client.yaml.example)
+   outside the repository or into an ignored local file, replace its non-secret `tunnel_id`,
+   and provide both secrets only through the process environment. The FreeLLMAPI variable
+   contains the complete HTTP header value, including `Bearer `:
+
+   ```powershell
+   $env:CONTROL_PLANE_API_KEY = '<OpenAI tunnel runtime key>'
+   $env:FREELLMAPI_MCP_AUTHORIZATION = 'Bearer <FreeLLMAPI unified key>'
+   tunnel-client doctor --profile-file .\tunnel-client.yaml --explain
+   tunnel-client run --profile-file .\tunnel-client.yaml
+   ```
+
+   ```bash
+   export CONTROL_PLANE_API_KEY='<OpenAI tunnel runtime key>'
+   export FREELLMAPI_MCP_AUTHORIZATION='Bearer <FreeLLMAPI unified key>'
+   tunnel-client doctor --profile-file ./tunnel-client.yaml --explain
+   tunnel-client run --profile-file ./tunnel-client.yaml
+   ```
+
+3. In ChatGPT, enable **Settings → Security and login → Developer mode**. Open the Plugins
+   directory, create a developer-mode plugin, choose **Tunnel**, and select the tunnel id.
+   Review the discovered tools before saving. Start with `healthcheck`; use
+   `ask_freellmapi` for inference and `list_models` when selecting an explicit model.
+
+The tunnel's static MCP headers are sent only to the configured FreeLLMAPI origin. Do not
+put either API key in the YAML file, MCP URL, screenshots, logs, or commits. A public plugin
+deployment is a different security model and needs a stable public HTTPS endpoint plus the
+authentication required by ChatGPT; the private tunnel above is the local-first path.
 
 FreeLLMAPI is local-first and single-user by design. Your provider keys stay in
 your SQLite database, encrypted at rest, and requests go from your machine to the
