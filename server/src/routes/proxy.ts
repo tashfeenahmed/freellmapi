@@ -5,7 +5,8 @@ import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, TokenUsage } from '@freellmapi/shared/types.js';
 import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledVisionModel, hasEnabledToolsModel, routingReserveTokens } from '../services/router.js';
 import { secondsUntilNextMonth } from '../services/key-budget.js';
-import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
+import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
 import { getDb } from '../db/index.js';
@@ -691,14 +692,6 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
   } catch (err: any) {
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
-    // Relay the chain's back-off only when every provider was rate limited
-    // (soonest stated Retry-After, or the budget reset) — overriding the
-    // month-long budget header inferenceBudgetCode set when a sibling comes
-    // back sooner. A lone upstream 429 the chain failed over from never does.
-    if (err instanceof EmbeddingsError) {
-      const retrySec = embeddingsRetryAfterSec(err);
-      if (retrySec !== undefined) res.setHeader('Retry-After', retrySec);
-    }
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
     res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type, ...code } });
   }
@@ -717,12 +710,11 @@ const ImageBody = z.object({
 });
 
 function inferenceBudgetCode(error: { code?: string; retryAfterMs?: number }, res: Response): { code?: string } {
-  if (error.code === 'quota_exceeded') res.setHeader('Retry-After', secondsUntilNextMonth());
-  else if (error.retryAfterMs !== undefined && !res.getHeader('Retry-After')) {
-    // No local budget block, but the upstream stated a back-off: relay it so
-    // an SDK client sleeps the stated amount instead of hammering the chain.
-    res.setHeader('Retry-After', Math.max(1, Math.ceil(error.retryAfterMs / 1000)));
-  }
+  // retryAfterMs is set by the embeddings/media services only when the whole
+  // chain was rate limited (soonest stated back-off, budget resets included),
+  // so it wins over the month-long budget reset when a sibling returns sooner.
+  if (error.retryAfterMs !== undefined) res.setHeader('Retry-After', retryAfterSeconds(error.retryAfterMs));
+  else if (error.code === 'quota_exceeded') res.setHeader('Retry-After', secondsUntilNextMonth());
   return error.code ? { code: error.code } : {};
 }
 

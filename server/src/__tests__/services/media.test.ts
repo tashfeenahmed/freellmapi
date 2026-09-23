@@ -88,22 +88,42 @@ describe('media service', () => {
   });
 
   describe('image generation', () => {
-    it('keeps a stated upstream Retry-After when every provider is rate-limited', async () => {
-      addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
-      addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 'image');
+    function twoImageProviders() {
+      addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image', 1);
+      addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 'image', 2);
       addKey('nvidia');
       addKey('siliconflow');
-      // First provider states a back-off, the last one fails without a hint:
-      // the concrete hint must still reach the client.
-      globalThis.fetch = vi.fn(async (url: string) =>
-        String(url).includes('siliconflow')
-          ? new Response('nope', { status: 429 })
-          : new Response('slow down', { status: 429, headers: { 'retry-after': '17' } }),
-      ) as any;
-      await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({
-        status: 429,
-        retryAfterMs: 17_000,
-      });
+    }
+    const limited = (ra?: string) => new Response('slow down', { status: 429, headers: ra ? { 'retry-after': ra } : {} });
+    const byHost = (nvidia: () => Response, siliconflow: () => Response) =>
+      vi.fn(async (url: string) => (String(url).includes('siliconflow') ? siliconflow() : nvidia())) as any;
+
+    it('relays the SOONEST Retry-After when every provider is rate-limited', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('5'), () => limited('60'));
+      await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 429, retryAfterMs: 5_000 });
+    });
+
+    it('drops the hint when a rate-limited provider stated no delay', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => limited());
+      const err = await runImageGeneration('auto', { prompt: 'a cat' }).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('drops the hint when the chain ends in a non-rate-limit failure', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => new Response('boom', { status: 500 }));
+      const err = await runImageGeneration('auto', { prompt: 'a cat' }).catch(e => e);
+      expect(err.status).toBe(502);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('fails over past a rate-limited provider', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => jsonResponse({ images: [{ url: 'https://x/y.png' }] }));
+      await expect(runImageGeneration('auto', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'siliconflow' });
     });
 
     it('NVIDIA: maps artifacts[].base64 → b64_json', async () => {
