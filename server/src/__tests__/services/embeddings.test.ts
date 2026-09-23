@@ -168,6 +168,30 @@ describe('embeddings service', () => {
       await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'])).rejects.toMatchObject({ status: 429 });
     });
 
+    it('surfaces the upstream Retry-After on a fully-exhausted chain', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      mockFetch(async () => new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '17' },
+      }));
+
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 17_000 });
+    });
+
+    it('keeps a stated Retry-After even when the last provider failed without one', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('boom', { status: 500 }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+
+      // nvidia 429s with a hint, openrouter 500s without one: the hint wins.
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 502, retryAfterMs: 30_000 });
+    });
+
     it('throws 503 when the family has no enabled providers', async () => {
       getDb().prepare("UPDATE embedding_models SET enabled = 0 WHERE family = 'bge-m3'").run();
       await expect(runEmbeddings('bge-m3', ['hello'])).rejects.toMatchObject({ status: 503 });

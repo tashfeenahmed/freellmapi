@@ -8,6 +8,8 @@
 // always works: with one provider it just uses that one, with several it gets
 // cross-provider redundancy for free.
 import { getDb, getSetting } from '../db/index.js';
+import { secondsUntilNextMonth } from './key-budget.js';
+import { parseRetryAfterMs } from '../providers/base.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
@@ -40,11 +42,30 @@ export interface EmbeddingsResult {
 export class EmbeddingsError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** Back-off the upstream provider stated (`Retry-After` header or a
+   *  retry-delay field in the error body), in milliseconds. Kept separate from
+   *  the message so the route can answer the client with a real Retry-After
+   *  instead of a bare 429, the same way the chat router benches keys. */
+  retryAfterMs?: number;
+  constructor(message: string, status: number, code?: string, retryAfterMs?: number) {
     super(message);
     this.status = status;
     this.code = code;
+    this.retryAfterMs = retryAfterMs;
   }
+}
+
+/** EmbeddingsError for a non-OK upstream response: status, truncated body and
+ *  any stated back-off read off the `Retry-After` header before the body is
+ *  consumed. */
+async function upstreamEmbeddingsError(r: Response): Promise<EmbeddingsError> {
+  const retryAfterMs = parseRetryAfterMs(r.headers?.get('retry-after') ?? null);
+  return new EmbeddingsError(
+    `upstream ${r.status}: ${(await r.text()).slice(0, 200)}`,
+    r.status,
+    undefined,
+    retryAfterMs,
+  );
 }
 
 export function listEmbeddingModels(): EmbeddingModelRow[] {
@@ -121,7 +142,7 @@ async function openAiStyleEmbed(
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   }, platform, 'embedding', FETCH_TIMEOUT_MS);
   if (!r.ok) {
-    throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
+    throw await upstreamEmbeddingsError(r);
   }
   const j = (await r.json()) as {
     data?: { index?: number; embedding: number[] }[];
@@ -261,7 +282,7 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
         },
         row.platform, 'embedding', FETCH_TIMEOUT_MS,
       );
-      if (!r.ok) throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
+      if (!r.ok) throw await upstreamEmbeddingsError(r);
       const j = await r.json() as number[][] | number[];
       const vectors = Array.isArray(j[0]) ? (j as number[][]) : [j as number[]];
       return { vectors, inputTokens: null };
@@ -278,7 +299,7 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
         }),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       }, row.platform, 'embedding', FETCH_TIMEOUT_MS);
-      if (!r.ok) throw new EmbeddingsError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status);
+      if (!r.ok) throw await upstreamEmbeddingsError(r);
       const j = (await r.json()) as { embeddings?: { float?: number[][] }; meta?: { billed_units?: { input_tokens?: number } } };
       return { vectors: j.embeddings?.float ?? [], inputTokens: j.meta?.billed_units?.input_tokens ?? null };
     }
@@ -331,6 +352,11 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
   }
 
   let lastError: EmbeddingsError | null = null;
+  // Most recent concrete back-off seen anywhere in the chain. A provider that
+  // stated "retry in 17s" followed by one that failed without a hint still
+  // deserves its hint surfaced, so it survives the loop independently of
+  // lastError.
+  let lastRetryAfterMs: number | undefined;
   for (const row of chain) {
     const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs));
     if (!credential) {
@@ -357,6 +383,7 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
       const e = err instanceof EmbeddingsError ? err : new EmbeddingsError(String(err?.message ?? err), 502);
       logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
       lastError = e;
+      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
       // fall through to the next provider in the family
     } finally {
       credential.release();
@@ -367,5 +394,19 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
     `All providers for embedding family '${family}' failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,
     lastError?.code,
+    // A provider that stated when to come back still wins even when a later
+    // sibling in the chain failed without a hint: surface the most recent
+    // concrete back-off so the client doesn't hammer the gateway.
+    lastError?.retryAfterMs ?? lastRetryAfterMs,
   );
+}
+
+/** Whole seconds the client should wait before retrying an embeddings request:
+ *  the monthly-budget reset for a local quota block, otherwise the upstream
+ *  `Retry-After` hint when the last failure carried one. Undefined means the
+ *  caller shouldn't set the header. */
+export function embeddingsRetryAfterSec(err: EmbeddingsError): number | undefined {
+  if (err.code === 'quota_exceeded') return secondsUntilNextMonth();
+  if (err.retryAfterMs !== undefined) return Math.max(1, Math.ceil(err.retryAfterMs / 1000));
+  return undefined;
 }

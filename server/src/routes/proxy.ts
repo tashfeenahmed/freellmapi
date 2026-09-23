@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, TokenUsage } from '@freellmapi/shared/types.js';
 import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledVisionModel, hasEnabledToolsModel, routingReserveTokens } from '../services/router.js';
 import { secondsUntilNextMonth } from '../services/key-budget.js';
-import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
 import { getDb } from '../db/index.js';
@@ -691,6 +691,13 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
   } catch (err: any) {
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
+    // Honor the upstream back-off (Retry-After header or stated retry delay)
+    // so an SDK client sleeps the right amount instead of hammering the chain.
+    // inferenceBudgetCode already set the header for a local budget block.
+    if (err instanceof EmbeddingsError && !res.getHeader('Retry-After')) {
+      const retrySec = embeddingsRetryAfterSec(err);
+      if (retrySec !== undefined) res.setHeader('Retry-After', retrySec);
+    }
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
     res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type, ...code } });
   }

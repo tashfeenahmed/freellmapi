@@ -10,7 +10,7 @@ import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { secondsUntilNextMonth } from '../services/key-budget.js';
-import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
 
 export const ollamaRouter = Router();
@@ -585,8 +585,13 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
     }
   } catch (error: any) {
     const status = error instanceof EmbeddingsError ? error.status : 502;
-    if (error instanceof EmbeddingsError && error.code === 'quota_exceeded') {
-      res.setHeader('Retry-After', secondsUntilNextMonth());
+    if (error instanceof EmbeddingsError) {
+      if (error.code === 'quota_exceeded') {
+        res.setHeader('Retry-After', secondsUntilNextMonth());
+      } else {
+        const retrySec = embeddingsRetryAfterSec(error);
+        if (retrySec !== undefined) res.setHeader('Retry-After', retrySec);
+      }
     }
     res.status(status).json({ error: error.message ?? 'embedding request failed' });
   }
