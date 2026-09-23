@@ -88,6 +88,24 @@ describe('media service', () => {
   });
 
   describe('image generation', () => {
+    it('keeps a stated upstream Retry-After when every provider is rate-limited', async () => {
+      addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
+      addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 'image');
+      addKey('nvidia');
+      addKey('siliconflow');
+      // First provider states a back-off, the last one fails without a hint:
+      // the concrete hint must still reach the client.
+      globalThis.fetch = vi.fn(async (url: string) =>
+        String(url).includes('siliconflow')
+          ? new Response('nope', { status: 429 })
+          : new Response('slow down', { status: 429, headers: { 'retry-after': '17' } }),
+      ) as any;
+      await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({
+        status: 429,
+        retryAfterMs: 17_000,
+      });
+    });
+
     it('NVIDIA: maps artifacts[].base64 → b64_json', async () => {
       addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
       addKey('nvidia');

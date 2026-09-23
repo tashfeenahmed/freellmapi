@@ -8,6 +8,7 @@
 // published catalog and arrive via catalog-sync (premium on the live tier within
 // ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
+import { parseRetryAfterMs } from '../providers/base.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
@@ -56,10 +57,15 @@ export class MediaError extends Error {
   status: number;
   /** Optional machine-readable error code surfaced in the OpenAI-shaped body. */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** Back-off the upstream provider stated (`Retry-After` header), in
+   *  milliseconds — relayed to the client so an SDK sleeps the stated amount
+   *  instead of hammering the chain, mirroring the embeddings path. */
+  retryAfterMs?: number;
+  constructor(message: string, status: number, code?: string, retryAfterMs?: number) {
     super(message);
     this.status = status;
     this.code = code;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -237,7 +243,12 @@ async function mediaFetch(
   );
   if (!r.ok) {
     const body = await r.text().catch(() => '');
-    throw new MediaError(`${platform} ${r.status}: ${body.slice(0, 200)}`, r.status);
+    throw new MediaError(
+      `${platform} ${r.status}: ${body.slice(0, 200)}`,
+      r.status,
+      undefined,
+      parseRetryAfterMs(r.headers?.get('retry-after') ?? null),
+    );
   }
   return r;
 }
@@ -725,7 +736,7 @@ function logMedia(row: Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>
   }
 }
 
-function chainError(modality: MediaModality, lastError: MediaError | null): MediaError {
+function chainError(modality: MediaModality, lastError: MediaError | null, retryAfterMs?: number): MediaError {
   // Only statuses the CALLER can act on are passed through. 400 (bad prompt,
   // duration the model does not accept) and 413 (upload too large) describe
   // the caller's own request, and 429 is the long-standing rate-limit signal.
@@ -740,6 +751,10 @@ function chainError(modality: MediaModality, lastError: MediaError | null): Medi
     `All ${modality} providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     status,
     lastError?.code,
+    // Most recent concrete upstream back-off anywhere in the chain wins, so a
+    // provider that said "come back in Ns" is honored even when a later
+    // sibling failed without a hint.
+    lastError?.retryAfterMs ?? retryAfterMs,
   );
 }
 
@@ -747,6 +762,7 @@ function chainError(modality: MediaModality, lastError: MediaError | null): Medi
 export async function runImageGeneration(model: string | undefined, params: ImageParams): Promise<ImageResult> {
   const chain = resolveMediaChain(model, 'image');
   let lastError: MediaError | null = null;
+  let lastRetryAfterMs: number | undefined;
   for (const row of chain) {
     const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
       ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
@@ -767,11 +783,12 @@ export async function runImageGeneration(model: string | undefined, params: Imag
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       lastError = e;
+      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
     } finally {
       credential.release();
     }
   }
-  throw chainError('image', lastError);
+  throw chainError('image', lastError, lastRetryAfterMs);
 }
 
 /** Generate a video, failing over across catalogued text-to-video providers.
@@ -784,6 +801,7 @@ export async function runVideoGeneration(
 ): Promise<VideoResult> {
   const chain = resolveMediaChain(model, 'video');
   let lastError: MediaError | null = null;
+  let lastRetryAfterMs: number | undefined;
   for (const row of chain) {
     throwIfClientGone(clientSignal);
     const { credential, budgetBlocked } = reserveProviderCredential(row, 0,
@@ -803,13 +821,14 @@ export async function runVideoGeneration(
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       if (e.status === 429 && credential.id != null) setCooldown(row.platform, row.model_id, credential.id);
       lastError = e;
+      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
       // A caller that hung up gets no second generation charged to its account.
       throwIfClientGone(clientSignal);
     } finally {
       credential.release();
     }
   }
-  throw chainError('video', lastError);
+  throw chainError('video', lastError, lastRetryAfterMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -1056,6 +1075,7 @@ export async function runTranscription(model: string | undefined, p: Transcripti
     throw new MediaError(`Audio file exceeds the ${maxMb} MB provider upload limit.`, 413);
   }
   let lastError: MediaError | null = null;
+  let lastRetryAfterMs: number | undefined;
   for (const m of usable) {
     const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0,
       keyId => isOnCooldown(m.platform, m.modelId, keyId));
@@ -1079,17 +1099,19 @@ export async function runTranscription(model: string | undefined, p: Transcripti
         setCooldown(m.platform, m.modelId, credential.id);
       }
       lastError = e;
+      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
     } finally {
       credential.release();
     }
   }
-  throw chainError('transcription', lastError);
+  throw chainError('transcription', lastError, lastRetryAfterMs);
 }
 
 /** Synthesize speech, failing over across providers serving the modality. */
 export async function runSpeech(model: string | undefined, params: SpeechParams): Promise<SpeechResult> {
   const chain = resolveMediaChain(model, 'audio');
   let lastError: MediaError | null = null;
+  let lastRetryAfterMs: number | undefined;
   for (const row of chain) {
     const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
       ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
@@ -1108,9 +1130,10 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       lastError = e;
+      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
     } finally {
       credential.release();
     }
   }
-  throw chainError('audio', lastError);
+  throw chainError('audio', lastError, lastRetryAfterMs);
 }

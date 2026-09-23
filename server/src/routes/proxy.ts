@@ -708,8 +708,13 @@ const ImageBody = z.object({
   response_format: z.enum(['url', 'b64_json']).optional(),
 });
 
-function inferenceBudgetCode(error: { code?: string }, res: Response): { code?: string } {
+function inferenceBudgetCode(error: { code?: string; retryAfterMs?: number }, res: Response): { code?: string } {
   if (error.code === 'quota_exceeded') res.setHeader('Retry-After', secondsUntilNextMonth());
+  else if (error.retryAfterMs !== undefined && !res.getHeader('Retry-After')) {
+    // No local budget block, but the upstream stated a back-off: relay it so
+    // an SDK client sleeps the stated amount instead of hammering the chain.
+    res.setHeader('Retry-After', Math.max(1, Math.ceil(error.retryAfterMs / 1000)));
+  }
   return error.code ? { code: error.code } : {};
 }
 
