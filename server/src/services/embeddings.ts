@@ -10,6 +10,7 @@
 import { getDb, getSetting } from '../db/index.js';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { parseRetryAfterMs } from '../providers/base.js';
+import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
@@ -352,15 +353,16 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
   }
 
   let lastError: EmbeddingsError | null = null;
-  // Most recent concrete back-off seen anywhere in the chain. A provider that
-  // stated "retry in 17s" followed by one that failed without a hint still
-  // deserves its hint surfaced, so it survives the loop independently of
-  // lastError.
-  let lastRetryAfterMs: number | undefined;
+  // Upstream back-offs across the whole chain: only a chain that was rate
+  // limited end to end earns a Retry-After, and then the soonest one.
+  const hints = new RetryHintTracker();
   for (const row of chain) {
     const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs));
     if (!credential) {
-      if (budgetBlocked) lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
+      if (budgetBlocked) {
+        lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
+        hints.record(429, secondsUntilNextMonth() * 1000);
+      }
       continue;
     }
     const started = Date.now();
@@ -383,7 +385,7 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
       const e = err instanceof EmbeddingsError ? err : new EmbeddingsError(String(err?.message ?? err), 502);
       logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
       lastError = e;
-      if (e.retryAfterMs !== undefined) lastRetryAfterMs = e.retryAfterMs;
+      hints.record(e.status, e.retryAfterMs);
       // fall through to the next provider in the family
     } finally {
       credential.release();
@@ -394,19 +396,16 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
     `All providers for embedding family '${family}' failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,
     lastError?.code,
-    // A provider that stated when to come back still wins even when a later
-    // sibling in the chain failed without a hint: surface the most recent
-    // concrete back-off so the client doesn't hammer the gateway.
-    lastError?.retryAfterMs ?? lastRetryAfterMs,
+    lastError && lastError.status === 429 ? hints.retryAfterMs() : undefined,
   );
 }
 
 /** Whole seconds the client should wait before retrying an embeddings request:
- *  the monthly-budget reset for a local quota block, otherwise the upstream
- *  `Retry-After` hint when the last failure carried one. Undefined means the
- *  caller shouldn't set the header. */
+ *  the soonest upstream back-off when the whole chain was rate limited, else the
+ *  monthly-budget reset for a local quota block. Undefined means the caller
+ *  shouldn't set the header. */
 export function embeddingsRetryAfterSec(err: EmbeddingsError): number | undefined {
+  if (err.retryAfterMs !== undefined) return retryAfterSeconds(err.retryAfterMs);
   if (err.code === 'quota_exceeded') return secondsUntilNextMonth();
-  if (err.retryAfterMs !== undefined) return Math.max(1, Math.ceil(err.retryAfterMs / 1000));
   return undefined;
 }

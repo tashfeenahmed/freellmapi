@@ -691,10 +691,11 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
   } catch (err: any) {
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
-    // Honor the upstream back-off (Retry-After header or stated retry delay)
-    // so an SDK client sleeps the right amount instead of hammering the chain.
-    // inferenceBudgetCode already set the header for a local budget block.
-    if (err instanceof EmbeddingsError && !res.getHeader('Retry-After')) {
+    // Relay the chain's back-off only when every provider was rate limited
+    // (soonest stated Retry-After, or the budget reset) — overriding the
+    // month-long budget header inferenceBudgetCode set when a sibling comes
+    // back sooner. A lone upstream 429 the chain failed over from never does.
+    if (err instanceof EmbeddingsError) {
       const retrySec = embeddingsRetryAfterSec(err);
       if (retrySec !== undefined) res.setHeader('Retry-After', retrySec);
     }

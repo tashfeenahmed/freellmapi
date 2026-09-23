@@ -36,6 +36,7 @@ const PURE_MODULES = [
   'header-value.ts',
   'provider-identity.ts',
   'provider-size-parser.ts',
+  'retry-hint.ts',
   'structured-output.ts',
   'tool-args.ts',
   'tool-call-rescue.ts',
