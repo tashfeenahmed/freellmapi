@@ -166,8 +166,8 @@ describe('key parser', () => {
     const result = parseExportJson(exportJson);
     expect(result).not.toBeNull();
     expect(result!.keys).toHaveLength(2);
-    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google' });
-    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq' });
+    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google', label: 'Google Key' });
+    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq', label: 'Groq Key' });
     expect(result!.skipped).toHaveLength(0);
   });
 
@@ -242,7 +242,7 @@ describe('key parser', () => {
     });
     const result = parseKeysFromFile(exportJson, 'freellmapi-keys.json');
     expect(result.keys).toHaveLength(1);
-    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral' });
+    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral', label: 'Mistral Key' });
   });
 
   it('handles CSV via parseKeysFromFile', () => {

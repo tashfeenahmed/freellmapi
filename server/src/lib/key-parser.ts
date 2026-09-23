@@ -397,7 +397,7 @@ export function parseExportJson(content: string): ParseResult | null {
         ? (Object.entries(PREFIX_MAP).find(([, v]) => v === platform)?.[0] ?? `${platform.toUpperCase()}_`)
         : '';
       const baseUrl = typeof row.baseUrl === 'string' ? row.baseUrl.trim() : '';
-      result.keys.push({ rawKey: `${label}=${keyValue}`, prefix, platform, ...(baseUrl ? { baseUrl } : {}) });
+      result.keys.push({ rawKey: `${label}=${keyValue}`, prefix, platform, label, ...(baseUrl ? { baseUrl } : {}) });
     }
     return result;
   }
@@ -452,7 +452,9 @@ export function parseCsv(content: string): KeyPair[] {
     const fields = splitCsvLine(lines[i]!);
     const platform = (fields[0] ?? '').trim();
     const key = (fields[1] ?? '').trim();
-    const label = (fields[2] ?? '').trim();
+    // Undo the export's CSV formula guard (a leading ' before =, +, -, @, tab
+    // or CR) so a guarded label comes back as the user typed it.
+    const label = (fields[2] ?? '').trim().replace(/^'(?=[=+\-@\t\r])/, '');
     const baseUrl = (fields[3] ?? '').trim();
 
     if (!key || !platform) continue;
