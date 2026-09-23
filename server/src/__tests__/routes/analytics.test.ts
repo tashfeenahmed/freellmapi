@@ -779,6 +779,9 @@ describe('Analytics API', () => {
       insertRaw({ status: 'error', error: 'Too Many Requests', createdAt: '2026-05-29 11:02:00' });
       insertRaw({ status: 'error', error: 'Timeout awaiting response headers', createdAt: '2026-05-29 11:03:00' });
       insertRaw({ status: 'error', error: 'ETIMEDOUT after 30000ms', createdAt: '2026-05-29 11:04:00' });
+      // "timed out" is how our own abort paths word it; the '%500%' rule used to
+      // claim this one via the "5000ms" in the message.
+      insertRaw({ status: 'error', error: 'fusion tool call timed out after 5000ms', createdAt: '2026-05-29 11:05:00' });
 
       const { status, body } = await request(app, '/api/analytics/error-distribution?range=24h');
       expect(status).toBe(200);
@@ -786,7 +789,7 @@ describe('Analytics API', () => {
       const cat = (name: string) => body.byCategory.find((c: any) => c.category === name)?.count ?? 0;
       expect(cat('Auth Error (401)')).toBe(2);
       expect(cat('Rate Limited (429)')).toBe(1);
-      expect(cat('Timeout/Connection')).toBe(2);
+      expect(cat('Timeout/Connection')).toBe(3);
       expect(cat('Other')).toBe(0);
     });
 
