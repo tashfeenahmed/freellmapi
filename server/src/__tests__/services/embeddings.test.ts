@@ -168,6 +168,86 @@ describe('embeddings service', () => {
       await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'])).rejects.toMatchObject({ status: 429 });
     });
 
+    it('surfaces the upstream Retry-After on a fully-exhausted chain', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      mockFetch(async () => new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '17' },
+      }));
+
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 17_000 });
+    });
+
+    it('surfaces the SOONEST back-off, not the last one, when every provider rate-limits', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '60' },
+      }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '5' },
+      }));
+      // nvidia comes back in 5s, openrouter in 60s: the client may retry in 5s.
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 5_000 });
+    });
+
+    it('parses an HTTP-date Retry-After', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const when = new Date(Date.now() + 42_000).toUTCString();
+      mockFetch(async () => new Response('slow down', { status: 429, headers: { 'Retry-After': when } }));
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeGreaterThan(35_000);
+      expect(err.retryAfterMs).toBeLessThanOrEqual(42_000);
+    });
+
+    it('clamps an absurd Retry-After to a day', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      mockFetch(async () => new Response('slow down', { status: 429, headers: { 'Retry-After': '99999999999' } }));
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 24 * 60 * 60 * 1000 });
+    });
+
+    it('drops the hint when a sibling failed for a non-rate-limit reason', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('boom', { status: 500 }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      // nvidia 429s with a hint, openrouter 500s: waiting 30s is no promise.
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(502);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('drops the hint when another rate-limited provider stated no delay', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('slow down', { status: 429 }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('does not surface a 429 hint when a later provider succeeds', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(2048));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      const out = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
+      expect(out.platform).toBe('openrouter');
+    });
+
     it('throws 503 when the family has no enabled providers', async () => {
       getDb().prepare("UPDATE embedding_models SET enabled = 0 WHERE family = 'bge-m3'").run();
       await expect(runEmbeddings('bge-m3', ['hello'])).rejects.toMatchObject({ status: 503 });
