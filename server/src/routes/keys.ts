@@ -138,6 +138,18 @@ function parseUpload(file: Express.Multer.File) {
   return parseKeysFromFile(content, file.originalname);
 }
 
+/** Name/value halves of a parsed key. A format that carries a label (CSV,
+ *  export JSON) names it outright: splitting `label=value` on the first '='
+ *  would cut a label like `team=alpha` short and prepend its tail to the
+ *  stored secret. */
+function splitParsedKey(parsedKey: { rawKey: string; label?: string }) {
+  const { rawKey, label } = parsedKey;
+  if (label !== undefined && rawKey.startsWith(`${label}=`)) {
+    return { keyName: label, keyValue: rawKey.slice(label.length + 1) };
+  }
+  return splitRawKey(rawKey);
+}
+
 function splitRawKey(rawKey: string) {
   const eqIndex = rawKey.indexOf('=');
   return {
@@ -1191,7 +1203,7 @@ keysRouter.post('/import', (req: Request, res: Response, next: NextFunction) => 
       const urlVerdicts = new Map<string, { allowed: boolean; reason?: string }>();
 
       for (const parsedKey of result.keys) {
-        const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+        const { keyName, keyValue } = splitParsedKey(parsedKey);
         if (!parsedKey.platform) {
           skipped.push(keyName);
           continue;
@@ -1300,7 +1312,7 @@ keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) =>
       for (const file of files) {
         const result = parseUpload(file);
         for (const parsedKey of result.keys) {
-          const { keyName, keyValue } = splitRawKey(parsedKey.rawKey);
+          const { keyName, keyValue } = splitParsedKey(parsedKey);
           const isDuplicate = existingKeys.has(keyValue.trim());
           if (isDuplicate) duplicateCount++;
           keys.push({

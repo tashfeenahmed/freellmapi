@@ -166,8 +166,8 @@ describe('key parser', () => {
     const result = parseExportJson(exportJson);
     expect(result).not.toBeNull();
     expect(result!.keys).toHaveLength(2);
-    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google' });
-    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq' });
+    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google', label: 'Google Key' });
+    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq', label: 'Groq Key' });
     expect(result!.skipped).toHaveLength(0);
   });
 
@@ -183,22 +183,22 @@ describe('key parser', () => {
   it('parses CSV format with header', () => {
     const csv = 'platform,key,label\n"google","AIza-test","Google Key"\n"groq","gsk-test","Groq Key"\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google' },
-      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'Google Key' },
+      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq', label: 'Groq Key' },
     ]);
   });
 
   it('parses CSV format without header', () => {
     const csv = 'google,AIza-test,Google Key\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'Google Key' },
     ]);
   });
 
   it('parses the base_url column that makes a custom row importable', () => {
     const csv = 'platform,key,label,base_url\n"custom","sk-local","LM Studio","http://192.168.1.5:1234/v1"\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'CUSTOM_KEY', value: 'sk-local', platform: 'custom', baseUrl: 'http://192.168.1.5:1234/v1' },
+      { key: 'CUSTOM_KEY', value: 'sk-local', platform: 'custom', label: 'LM Studio', baseUrl: 'http://192.168.1.5:1234/v1' },
     ]);
   });
 
@@ -210,8 +210,8 @@ describe('key parser', () => {
       '"groq","gsk-abc","work, primary",""\n' +
       '"google","AIza-test","say ""hi""",""\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'GROQ_KEY', value: 'gsk-abc', platform: 'groq' },
-      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google' },
+      { key: 'GROQ_KEY', value: 'gsk-abc', platform: 'groq', label: 'work, primary' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'say "hi"' },
     ]);
   });
 
@@ -224,6 +224,11 @@ describe('key parser', () => {
     expect(result.skipped).toEqual([]);
     expect(result.keys.map(k => k.platform)).toEqual(['groq', 'custom']);
     expect(result.keys[1]!.baseUrl).toBe('http://192.168.1.5:1234/v1');
+    // Labels survive the round trip: rawKey's name half is what the import
+    // route stores as the key label, so an export/import cycle used to
+    // rename every key to the generated GROQ_KEY / CUSTOM_KEY.
+    expect(result.keys[0]!.rawKey).toBe('work, primary=gsk-abc');
+    expect(result.keys[1]!.rawKey).toBe('say "hi"=sk-local');
   });
 
   it('handles export JSON via parseKeysFromFile', () => {
@@ -237,13 +242,15 @@ describe('key parser', () => {
     });
     const result = parseKeysFromFile(exportJson, 'freellmapi-keys.json');
     expect(result.keys).toHaveLength(1);
-    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral' });
+    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral', label: 'Mistral Key' });
   });
 
   it('handles CSV via parseKeysFromFile', () => {
     const csv = 'platform,key,label\n"nvidia","nv-test","Nvidia Key"\n';
     const result = parseKeysFromFile(csv, 'freellmapi-keys.csv');
     expect(result.keys).toHaveLength(1);
-    expect(result.keys[0]).toEqual({ rawKey: 'NVIDIA_KEY=nv-test', prefix: 'NVIDIA_', platform: 'nvidia' });
+    // The CSV label wins over the generated name, matching the export JSON
+    // path above: the import route stores the rawKey name as the label.
+    expect(result.keys[0]).toEqual({ rawKey: 'Nvidia Key=nv-test', prefix: 'NVIDIA_', platform: 'nvidia', label: 'Nvidia Key' });
   });
 });

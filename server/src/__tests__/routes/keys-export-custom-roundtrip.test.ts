@@ -123,6 +123,27 @@ describe('#687 custom endpoints survive an export/import round trip', () => {
     expect(snapshot()).toEqual(before);
   });
 
+  it.each(['csv', 'json'])('a %s export keeps awkward labels and secrets intact on re-import', async (format) => {
+    getDb().prepare('DELETE FROM api_keys').run();
+    // '=' in a label used to split the stored rawKey in the wrong place,
+    // truncating the label and prepending its tail to the secret. The export's
+    // formula guard also writes =/+/-/@ labels with a leading quote.
+    addKey('groq', 'gsk-eq', 'team=alpha');
+    addKey('groq', 'gsk-formula', '=HYPERLINK("x")');
+    addKey('google', 'goog-comma', 'work, "primary"');
+    addKey('google', 'goog-dash', '-backup');
+    const labelled = () => (getDb().prepare('SELECT platform, label, encrypted_key, iv, auth_tag FROM api_keys').all() as any[])
+      .map(r => `${r.platform}|${r.label}|${decrypt(r.encrypted_key, r.iv, r.auth_tag)}`)
+      .sort();
+    const before = labelled();
+    const text = await exportText(app, format);
+
+    getDb().prepare('DELETE FROM api_keys').run();
+    const { body } = await importFile(app, `keys.${format}`, text);
+    expect(body.errors).toEqual([]);
+    expect(labelled()).toEqual(before);
+  });
+
   it('a custom key with no base_url is skipped rather than orphaned', async () => {
     getDb().prepare('DELETE FROM api_keys').run();
     const { body } = await importFile(app, 'keys.csv', 'platform,key,label,base_url\n"custom","orphan","No URL",""\n');
