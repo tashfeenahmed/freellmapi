@@ -317,7 +317,7 @@ print("Routed via:", resp.headers.get("x-routed-via"))
 
 ### 贡献者
 
-约 90 位贡献者的头像墙维护在[英文 README](README.md#contributors) 里。它几乎每次合并都会变动，所以只保留一份，不在各语言版本中重复。
+约 130 位贡献者的头像墙维护在[英文 README](README.md#contributors) 里。它几乎每次合并都会变动，所以只保留一份，不在各语言版本中重复。
 
 ## 免责声明
 
