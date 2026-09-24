@@ -19,9 +19,12 @@ export function UnifiedKeySection() {
   })
 
   const regenerate = useMutation({
-    mutationFn: () => apiFetch('/api/settings/api-key/regenerate', { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unified-key'] })
+    mutationFn: () => apiFetch<{ apiKey: string }>('/api/settings/api-key/regenerate', { method: 'POST' }),
+    onSuccess: (res) => {
+      // Write the fresh key into the cache BEFORE unmasking: invalidating
+      // alone would leave the old, now-revoked key in the cache until the
+      // refetch lands, and it would flash unmasked in the meantime.
+      queryClient.setQueryData<{ apiKey: string }>(['unified-key'], { apiKey: res.apiKey })
       // Reveal the fresh key right away: the whole point of regenerating is
       // to move apps to the new value, and a masked box hides exactly the
       // string they need to copy next. Showing it doubles as the success

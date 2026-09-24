@@ -72,7 +72,7 @@ it('regenerates on the confirming click and reveals the fresh key', async () => 
     if (path === '/api/settings/api-key') {
       return { apiKey: calls.regenerate ? 'sk-fresh-key-after-regen' : 'sk-old-key-before-regen' }
     }
-    if (path === '/api/settings/api-key/regenerate') { calls.regenerate++; return { ok: true } }
+    if (path === '/api/settings/api-key/regenerate') { calls.regenerate++; return { apiKey: 'sk-fresh-key-after-regen' } }
     return { ok: true }
   })
   await mount()
@@ -100,4 +100,30 @@ it('keeps the key masked when the user disarms the confirmation', async () => {
   await flush()
   expect(apiFetch).not.toHaveBeenCalledWith('/api/settings/api-key/regenerate', expect.anything())
   expect(container.querySelector('code.select-all')!.textContent).not.toContain('sk-secret-value-123')
+})
+
+it('never shows the revoked key unmasked while the new one loads', async () => {
+  // The GET refetch never resolves after regeneration: the fresh key must
+  // come straight from the regenerate response, not from a refetch.
+  let regenerated = false
+  vi.mocked(apiFetch).mockImplementation(async path => {
+    if (path === '/api/settings/api-key') {
+      return regenerated ? new Promise(() => {}) : { apiKey: 'sk-old-key-before-regen' }
+    }
+    if (path === '/api/settings/api-key/regenerate') { regenerated = true; return { apiKey: 'sk-fresh-key-after-regen' } }
+    return { ok: true }
+  })
+  await mount()
+
+  const seen: string[] = []
+  const code = () => container.querySelector('code.select-all')!
+  const observer = new MutationObserver(() => seen.push(code().textContent ?? ''))
+  observer.observe(container, { subtree: true, characterData: true, childList: true })
+
+  await click(findButton('Regenerate')!)
+  await click(findButton('Confirm')!)
+  observer.disconnect()
+
+  expect(seen.some(text => text.includes('sk-old-key-before-regen'))).toBe(false)
+  expect(code().textContent).toContain('sk-fresh-key-after-regen')
 })
