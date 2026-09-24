@@ -209,6 +209,7 @@
     "noKey": "താക്കോൽ ഇല്ല",
     "dragToReorder": "പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക",
     "dragToReorderGroup": "മോഡൽ പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക",
+    "moveToRank": "റാങ്കിലേക്ക്",
     "providerCount": "{count} ദാതാക്കൾ",
     "servedBy": "{providers} സേവനം നൽകുന്നു",
     "viewProviders": "ദാതാക്കളെ കാണുക",

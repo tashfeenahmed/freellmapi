@@ -209,6 +209,7 @@
     "noKey": "无密钥",
     "dragToReorder": "拖动以重新排序",
     "dragToReorderGroup": "拖动以重新排序模型",
+    "moveToRank": "跳转到排名",
     "providerCount": "{count} 个提供方",
     "servedBy": "由 {providers} 提供",
     "viewProviders": "查看提供方",

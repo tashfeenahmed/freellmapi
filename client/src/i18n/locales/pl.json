@@ -209,6 +209,7 @@
     "noKey": "brak klucza",
     "dragToReorder": "Przeciągnij, aby zmienić kolejność",
     "dragToReorderGroup": "Przeciągnij, aby zmienić kolejność modelu",
+    "moveToRank": "Przejdź do rangi",
     "providerCount": "Dostawcy {count}",
     "servedBy": "Obsługiwane przez {providers}",
     "viewProviders": "Zobacz dostawców",

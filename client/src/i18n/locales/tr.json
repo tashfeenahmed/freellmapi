@@ -209,6 +209,7 @@
     "noKey": "anahtar yok",
     "dragToReorder": "Yeniden sıralamak için sürükleyin",
     "dragToReorderGroup": "Modeli yeniden sıralamak için sürükleyin",
+    "moveToRank": "Rütbeye git",
     "providerCount": "{count} sağlayıcıları",
     "servedBy": "{providers} tarafından sunulmaktadır",
     "viewProviders": "Sağlayıcıları görüntüle",

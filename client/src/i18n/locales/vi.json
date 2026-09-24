@@ -209,6 +209,7 @@
     "noKey": "không có chìa khóa",
     "dragToReorder": "Kéo để sắp xếp lại",
     "dragToReorderGroup": "Kéo để sắp xếp lại mô hình",
+    "moveToRank": "Nhảy đến hạng",
     "providerCount": "Nhà cung cấp {count}",
     "servedBy": "Được phục vụ bởi {providers}",
     "viewProviders": "Xem nhà cung cấp",

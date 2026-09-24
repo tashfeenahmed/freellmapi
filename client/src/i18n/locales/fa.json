@@ -209,6 +209,7 @@
     "noKey": "بدون کلید",
     "dragToReorder": "برای سفارش مجدد بکشید",
     "dragToReorderGroup": "برای سفارش مجدد مدل بکشید",
+    "moveToRank": "پرش به رتبه",
     "providerCount": "ارائه دهندگان {count}",
     "servedBy": "ارائه شده توسط {providers}",
     "viewProviders": "ارائه دهندگان را مشاهده کنید",

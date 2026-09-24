@@ -209,6 +209,7 @@
     "noKey": "चावी नाही",
     "dragToReorder": "पुनर्क्रमित करण्यासाठी ड्रॅग करा",
     "dragToReorderGroup": "मॉडेल पुनर्क्रमित करण्यासाठी ड्रॅग करा",
+    "moveToRank": "क्रमांकावर जा",
     "providerCount": "{count} प्रदाता",
     "servedBy": "{providers} द्वारे सेवा दिली",
     "viewProviders": "प्रदाते पहा",

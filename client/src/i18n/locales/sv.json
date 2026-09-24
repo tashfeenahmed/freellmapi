@@ -209,6 +209,7 @@
     "noKey": "Ingen nyckel",
     "dragToReorder": "Dra för att omordna",
     "dragToReorderGroup": "Dra för att omordna modellen",
+    "moveToRank": "Hoppa till rang",
     "providerCount": "{count} leverantörer",
     "servedBy": "Trafikerad av {providers}",
     "viewProviders": "Visa leverantörer",

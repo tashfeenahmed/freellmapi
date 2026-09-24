@@ -209,6 +209,7 @@
     "noKey": "אין מפתח",
     "dragToReorder": "גרר לסידור מחדש",
     "dragToReorderGroup": "גרור לסדר מחדש מודל",
+    "moveToRank": "קפיצה לדירוג",
     "providerCount": "ספקי {count}",
     "servedBy": "משרת על ידי {providers}",
     "viewProviders": "הצג ספקים",

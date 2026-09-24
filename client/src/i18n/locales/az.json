@@ -209,6 +209,7 @@
     "noKey": "Açar yoxdur",
     "dragToReorder": "Yenidən sıralamaq üçün sürükləmə",
     "dragToReorderGroup": "Modeli yenidən sıralamaq üçün sürükləmə",
+    "moveToRank": "Reytinqə keçid",
     "providerCount": "{count} təminatçıları",
     "servedBy": "Xidmət {providers}",
     "viewProviders": "Bax təminatçıları",

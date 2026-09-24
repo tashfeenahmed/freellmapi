@@ -209,6 +209,7 @@
     "noKey": "ไม่มีกุญแจ",
     "dragToReorder": "ลากเพื่อเรียงลำดับใหม่",
     "dragToReorderGroup": "ลากเพื่อจัดลำดับโมเดลใหม่",
+    "moveToRank": "ไปที่อันดับ",
     "providerCount": "ผู้ให้บริการ {count}",
     "servedBy": "ให้บริการโดย {providers}",
     "viewProviders": "ดูผู้ให้บริการ",

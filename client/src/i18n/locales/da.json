@@ -209,6 +209,7 @@
     "noKey": "Ingen nøgle",
     "dragToReorder": "Træk for at omorganisere",
     "dragToReorderGroup": "Træk for at omarrangere modellen",
+    "moveToRank": "Hop til rang",
     "providerCount": "{count} udbydere",
     "servedBy": "Betjent af {providers}",
     "viewProviders": "Se udbydere",

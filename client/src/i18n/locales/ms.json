@@ -209,6 +209,7 @@
     "noKey": "tiada kunci",
     "dragToReorder": "Seret untuk menyusun semula",
     "dragToReorderGroup": "Seret untuk menyusun semula model",
+    "moveToRank": "Lompat ke pangkat",
     "providerCount": "{count} penyedia",
     "servedBy": "Dihidangkan oleh {providers}",
     "viewProviders": "Lihat penyedia",

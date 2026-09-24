@@ -209,6 +209,7 @@
     "noKey": "გასაღების გარეშე",
     "dragToReorder": "გადაიტანეთ ხელახლა შეკვეთისთვის",
     "dragToReorderGroup": "გადაიტანეთ მოდელის ხელახლა შეკვეთისთვის",
+    "moveToRank": "გადასვლა რანგზე",
     "providerCount": "{count} პროვაიდერები",
     "servedBy": "ემსახურება {providers}",
     "viewProviders": "პროვაიდერების ნახვა",

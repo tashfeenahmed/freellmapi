@@ -209,6 +209,7 @@
     "noKey": "немає ключа",
     "dragToReorder": "Перетягніть, щоб змінити порядок",
     "dragToReorderGroup": "Перетягніть, щоб змінити порядок моделі",
+    "moveToRank": "Перейти до рангу",
     "providerCount": "Провайдери {count}",
     "servedBy": "Обслуговує {providers}",
     "viewProviders": "Переглянути постачальників",

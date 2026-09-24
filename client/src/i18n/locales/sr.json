@@ -209,6 +209,7 @@
     "noKey": "без кључа",
     "dragToReorder": "Превуците да бисте променили редослед",
     "dragToReorderGroup": "Превуците да бисте променили редослед модела",
+    "moveToRank": "Скочи на ранг",
     "providerCount": "{count} провајдери",
     "servedBy": "Служи {providers}",
     "viewProviders": "Погледајте добављаче",

@@ -501,6 +501,16 @@ export function buildGroups(
   return groups
 }
 
+// Clamp a typed 1-based rank (#1317) to a valid 0-based index into the visible
+// chain. Jump-to-rank edits clamp instead of erroring: 1 means "front", a
+// number past the end means "last", and garbage falls back to staying put.
+export function clampRankToIndex(toRank: number, length: number): number {
+  if (!Number.isFinite(toRank)) return -1
+  const i = Math.trunc(toRank) - 1
+  if (i < 0) return 0
+  return i > length - 1 ? length - 1 : i
+}
+
 /**
  * Whether a search query matches a logical-model group (#1056). The hay covers
  * everything the table can DISPLAY for the group: its label, canonical id, and

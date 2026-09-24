@@ -209,6 +209,7 @@
     "noKey": "သော့မရှိ",
     "dragToReorder": "ပြန်စီစဉ်ရန် ဆွဲပါ",
     "dragToReorderGroup": "မော်ဒယ်ကို ပြန်စီရန် ဆွဲယူပါ",
+    "moveToRank": "အဆင့်သို့ သွားရန်",
     "providerCount": "{count} ပံ့ပိုးသူများ",
     "servedBy": "ဝန်ဆောင်မှုပေးသူ {providers}",
     "viewProviders": "ပံ့ပိုးသူများကို ကြည့်ရှုပါ",

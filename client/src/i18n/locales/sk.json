@@ -209,6 +209,7 @@
     "noKey": "Bez kľúča",
     "dragToReorder": "Drag na preusporiadanie",
     "dragToReorderGroup": "Drag na preusporiadanie modelu",
+    "moveToRank": "Prejsť na pozíciu",
     "providerCount": "{count} poskytovatelia",
     "servedBy": "Obsluhované {providers}",
     "viewProviders": "Zobraziť poskytovateľov",

@@ -209,6 +209,7 @@
     "noKey": "Be rakto",
     "dragToReorder": "Vilkimas į pertvarką",
     "dragToReorderGroup": "Vilkimas į pertvarkos modelį",
+    "moveToRank": "Peršokti į poziciją",
     "providerCount": "{count} teikėjai",
     "servedBy": "Aptarnavo {providers}",
     "viewProviders": "Peržiūrėti tiekėjai",

@@ -209,6 +209,7 @@
     "noKey": "কোন চাবি নেই",
     "dragToReorder": "পুনরায় সাজাতে টেনে আনুন",
     "dragToReorderGroup": "মডেল পুনরায় সাজাতে টেনে আনুন",
+    "moveToRank": "র‍্যাংকে যান",
     "providerCount": "{count} প্রদানকারী",
     "servedBy": "{providers} দ্বারা পরিবেশিত",
     "viewProviders": "প্রদানকারী দেখুন",

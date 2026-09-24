@@ -209,6 +209,7 @@
     "noKey": "कुञ्जी छैन",
     "dragToReorder": "पुन: क्रमबद्ध गर्न तान्नुहोस्",
     "dragToReorderGroup": "नमूना पुन: क्रमबद्ध गर्न तान्नुहोस्",
+    "moveToRank": "र्याङ्कमा जानुहोस्",
     "providerCount": "प्रदायकहरू {count} गर्नुहोस्",
     "servedBy": "{providers} द्वारा सेवा गरिएको",
     "viewProviders": "प्रदायक हेर्नुहोस्",

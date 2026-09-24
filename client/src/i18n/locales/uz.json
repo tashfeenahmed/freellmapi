@@ -209,6 +209,7 @@
     "noKey": "kalit yo'q",
     "dragToReorder": "Qayta tartiblash uchun torting",
     "dragToReorderGroup": "Modelni qayta tartiblash uchun torting",
+    "moveToRank": "Rangga o‘tish",
     "providerCount": "{count} provayderlari",
     "servedBy": "{providers} tomonidan xizmat qiladi",
     "viewProviders": "Provayderlarni ko'rish",

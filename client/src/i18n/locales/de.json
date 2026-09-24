@@ -209,6 +209,7 @@
     "noKey": "kein Schlüssel",
     "dragToReorder": "Zum Neuanordnen ziehen",
     "dragToReorderGroup": "Ziehen Sie, um das Modell neu anzuordnen",
+    "moveToRank": "Zu Rang springen",
     "providerCount": "{count}-Anbieter",
     "servedBy": "Bereitgestellt von {providers}",
     "viewProviders": "Anbieter anzeigen",

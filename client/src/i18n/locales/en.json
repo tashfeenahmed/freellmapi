@@ -209,6 +209,7 @@
     "noKey": "no key",
     "dragToReorder": "Drag to reorder",
     "dragToReorderGroup": "Drag to reorder model",
+    "moveToRank": "Jump to rank",
     "providerCount": "{count} providers",
     "servedBy": "Served by {providers}",
     "viewProviders": "View providers",

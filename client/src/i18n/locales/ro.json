@@ -209,6 +209,7 @@
     "noKey": "fără cheie",
     "dragToReorder": "Rezistența la reordonare",
     "dragToReorderGroup": "Drag la reordonare a modelului",
+    "moveToRank": "Sari la poziția",
     "providerCount": "{count} furnizori",
     "servedBy": "Deservit de {providers}",
     "viewProviders": "Vezi furnizorii",

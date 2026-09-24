@@ -209,6 +209,7 @@
     "noKey": "Nincs kulcs",
     "dragToReorder": "Drag újrarendezéshez",
     "dragToReorderGroup": "Drag a modell újrarendezéséhez",
+    "moveToRank": "Ugrás rangszámra",
     "providerCount": "{count} szolgáltatók",
     "servedBy": "A {providers} által szolgálva",
     "viewProviders": "Szolgáltatók megtekintése",

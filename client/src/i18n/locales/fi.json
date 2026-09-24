@@ -209,6 +209,7 @@
     "noKey": "ei avainta",
     "dragToReorder": "Drag ja järjestä uudelleen",
     "dragToReorderGroup": "Vetäminen uudelleenjärjestelyyn mallin uudelleenjärjestelyyn",
+    "moveToRank": "Siirry sijalle",
     "providerCount": "{count} palveluntarjoajat",
     "servedBy": "Palvelevat {providers}",
     "viewProviders": "Näytä palveluntarjoajat",

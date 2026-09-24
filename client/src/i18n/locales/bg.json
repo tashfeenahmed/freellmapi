@@ -209,6 +209,7 @@
     "noKey": "Без ключ",
     "dragToReorder": "Съпротивление за пренареждане",
     "dragToReorderGroup": "Модел за пренареждане на влачене",
+    "moveToRank": "Към позиция",
     "providerCount": "{count} доставчици",
     "servedBy": "Обслужван от {providers}",
     "viewProviders": "Вижте доставчиците",

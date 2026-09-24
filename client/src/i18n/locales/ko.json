@@ -209,6 +209,7 @@
     "noKey": "열쇠 없음",
     "dragToReorder": "드래그하여 재정렬하세요.",
     "dragToReorderGroup": "드래그하여 모델 재정렬",
+    "moveToRank": "순위이동",
     "providerCount": "{count} 제공업체",
     "servedBy": "{providers} 제공",
     "viewProviders": "공급자 보기",

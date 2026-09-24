@@ -209,6 +209,7 @@
     "noKey": "لا يوجد مفتاح",
     "dragToReorder": "اسحب لإعادة الترتيب",
     "dragToReorderGroup": "اسحب لإعادة ترتيب النموذج",
+    "moveToRank": "الانتقال إلى الترتيب",
     "providerCount": "مقدمي {count}",
     "servedBy": "يخدمها {providers}",
     "viewProviders": "عرض مقدمي الخدمة",

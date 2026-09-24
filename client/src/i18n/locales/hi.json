@@ -209,6 +209,7 @@
     "noKey": "कोई कुंजी नहीं",
     "dragToReorder": "पुनः व्यवस्थित करने के लिए खींचें",
     "dragToReorderGroup": "मॉडल को पुनः व्यवस्थित करने के लिए खींचें",
+    "moveToRank": "रैंक पर जाएँ",
     "providerCount": "{count} प्रदाता",
     "servedBy": "{providers} द्वारा सेवा प्रदान की गई",
     "viewProviders": "प्रदाताओं को देखें",

@@ -209,6 +209,7 @@
     "noKey": "aucune clé",
     "dragToReorder": "Glisser pour réordonner",
     "dragToReorderGroup": "Glisser pour réorganiser le modèle",
+    "moveToRank": "Aller au rang",
     "providerCount": "{count} fournisseurs",
     "servedBy": "Fourni par {providers}",
     "viewProviders": "Voir les fournisseurs",

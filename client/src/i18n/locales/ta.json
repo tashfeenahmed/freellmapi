@@ -209,6 +209,7 @@
     "noKey": "சாவி இல்லை",
     "dragToReorder": "மறுவரிசைப்படுத்த இழுக்கவும்",
     "dragToReorderGroup": "மாதிரியை மறுவரிசைப்படுத்த இழுக்கவும்",
+    "moveToRank": "வரிசைக்குச் செல்",
     "providerCount": "{count} வழங்குநர்கள்",
     "servedBy": "{providers} ஆல் வழங்கப்பட்டது",
     "viewProviders": "வழங்குநர்களைக் காண்க",

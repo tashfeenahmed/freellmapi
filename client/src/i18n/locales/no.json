@@ -209,6 +209,7 @@
     "noKey": "Ingen nøkkel",
     "dragToReorder": "Dra for å omorganisere",
     "dragToReorderGroup": "Dra for å omorganisere modellen",
+    "moveToRank": "Hopp til rang",
     "providerCount": "{count} leverandører",
     "servedBy": "Betjent av {providers}",
     "viewProviders": "Vis leverandører",

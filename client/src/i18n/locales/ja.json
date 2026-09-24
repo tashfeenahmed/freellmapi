@@ -209,6 +209,7 @@
     "noKey": "鍵がありません",
     "dragToReorder": "ドラッグして並べ替えます",
     "dragToReorderGroup": "ドラッグしてモデルを並べ替えます",
+    "moveToRank": "ランクへ移動",
     "providerCount": "{count}プロバイダー",
     "servedBy": "{providers}が提供",
     "viewProviders": "プロバイダーを表示する",

@@ -209,6 +209,7 @@
     "noKey": "χωρίς κλειδί",
     "dragToReorder": "Σύρετε για αναδιάταξη",
     "dragToReorderGroup": "Σύρετε για να αλλάξετε τη σειρά του μοντέλου",
+    "moveToRank": "Μετάβαση στην κατάταξη",
     "providerCount": "{count} παρόχων",
     "servedBy": "Σερβίρεται από {providers}",
     "viewProviders": "Προβολή παρόχων",

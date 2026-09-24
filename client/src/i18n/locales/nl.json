@@ -209,6 +209,7 @@
     "noKey": "Geen sleutel",
     "dragToReorder": "Slepen om te herschikken",
     "dragToReorderGroup": "Sleep om model te herschikken",
+    "moveToRank": "Ga naar positie",
     "providerCount": "{count} aanbieders",
     "servedBy": "Bediend door {providers}",
     "viewProviders": "Bekijk aanbieders",

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -268,13 +268,67 @@ export const dragDots = (
   </svg>
 )
 
+// The rank cell, editable in manual mode (#1317). Dragging a model from rank
+// 140 to rank 3 across a long chain is dozens of rows of pointer travel; an
+// operator with a target rank in mind should just type it. The number is a
+// button that swaps in a tiny inline input: Enter commits, Escape cancels,
+// blur commits (matching how lightweight inline editors behave in spreadsheets
+// and OS file renames). Out-of-range or unparseable values are clamped by the
+// caller; an unchanged rank just closes the editor.
+export function RankEditor({ rank, onMoveRank }: { rank: number; onMoveRank: (toRank: number) => void }) {
+  const { t } = useI18n()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function commit() {
+    setEditing(false)
+    const n = Number.parseInt(draft, 10)
+    if (Number.isFinite(n) && n > 0 && n !== rank) onMoveRank(n)
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="number"
+        min={1}
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onClick={e => e.stopPropagation()}
+        onBlur={commit}
+        onKeyDown={e => {
+          e.stopPropagation()
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        aria-label={t('models.moveToRank')}
+        className="w-9 rounded border bg-background px-1 py-0.5 text-center font-mono text-xs tabular-nums"
+      />
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={e => { e.stopPropagation(); setDraft(String(rank)); setEditing(true) }}
+      title={t('models.moveToRank')}
+      aria-label={t('models.moveToRank')}
+      className="w-full text-center font-mono text-xs text-muted-foreground tabular-nums underline decoration-dotted decoration-transparent underline-offset-2 hover:decoration-current hover:text-foreground transition-colors"
+    >
+      {rank}
+    </button>
+  )
+}
+
 // The collapsed header row for a logical-model group: name, provider count,
 // union vision/tools badges, the best member's axis bars + score, and a single
 // switch that enables/disables every provider in the group.
-export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRows, rateUsage }: {
+export function GroupHeaderCells({ group, rank, dragHandle, editableRank, onMoveRank, onToggleGroup, allRows, rateUsage }: {
   group: ModelGroupRow
   rank: number
   dragHandle?: ReactNode
+  // Manual mode only: renders the rank as a click-to-type jump editor (#1317).
+  editableRank?: boolean
+  onMoveRank?: (toRank: number) => void
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
   // Every configured row, for endpoint disambiguation. Two relays serving one
   // model id land in different display groups the moment one copy is renamed,
@@ -319,7 +373,11 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   return (
     <>
       <td className="py-2 pl-3 pr-1 w-6 align-middle">{dragHandle ?? <span className="text-muted-foreground/30 select-none">·</span>}</td>
-      <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">{rank}</td>
+      <td className="py-2 pr-2 w-6 text-center font-mono text-xs text-muted-foreground tabular-nums align-middle">
+        {editableRank && onMoveRank
+          ? <RankEditor rank={rank} onMoveRank={onMoveRank} />
+          : rank}
+      </td>
       <td className="py-2 pr-3 align-middle">
         <div className="flex items-center gap-1.5 min-w-0">
           <Link to={`/models/chat/${detailId}`} aria-label={t('models.viewProviders')} onClick={e => e.stopPropagation()} className="flex items-center gap-2 flex-wrap text-left min-w-0">
@@ -381,9 +439,11 @@ export function GroupHeaderCells({ group, rank, dragHandle, onToggleGroup, allRo
   )
 }
 
-export function SortableGroupRow({ group, rank, onToggleGroup, allRows, rateUsage }: {
+export function SortableGroupRow({ group, rank, editableRank, onMoveRank, onToggleGroup, allRows, rateUsage }: {
   group: ModelGroupRow
   rank: number
+  editableRank?: boolean
+  onMoveRank?: (toRank: number) => void
   onToggleGroup: (memberIds: number[], enabled: boolean) => void
   allRows?: readonly Row[]
   rateUsage?: ReadonlyMap<number, RateLimitUsageRow>
@@ -414,7 +474,7 @@ export function SortableGroupRow({ group, rank, onToggleGroup, allRows, rateUsag
       onClick={() => navigate(`/models/chat/${detailId}`)}
       className={`group/row border-b last:border-0 bg-card cursor-pointer transition-colors hover:[&>td]:bg-muted/50 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${isDragging ? 'opacity-50' : ''} ${anyEnabled ? (depleted ? 'opacity-60' : '') : 'opacity-50'}`}
     >
-      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} onToggleGroup={onToggleGroup} allRows={allRows} rateUsage={rateUsage} />
+      <GroupHeaderCells group={group} rank={rank} dragHandle={handle} editableRank={editableRank} onMoveRank={onMoveRank} onToggleGroup={onToggleGroup} allRows={allRows} rateUsage={rateUsage} />
     </tr>
   )
 }

@@ -209,6 +209,7 @@
     "noKey": "ቁልፍ የለም",
     "dragToReorder": "እንደገና ለማዘዝ ይጎትቱ",
     "dragToReorderGroup": "ሞዴሉን እንደገና ለማዘዝ ይጎትቱ",
+    "moveToRank": "ወደ ደረጃ ዘልለው",
     "providerCount": "{count} አቅራቢዎች",
     "servedBy": "በ {providers} አገልግሏል",
     "viewProviders": "አቅራቢዎችን ይመልከቱ",

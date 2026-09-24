@@ -209,6 +209,7 @@
     "noKey": "Bez klíče",
     "dragToReorder": "Tah pro přeuspořádání",
     "dragToReorderGroup": "Tah pro přeuspořádání modelu",
+    "moveToRank": "Přejít na pozici",
     "providerCount": "{count} poskytovatelé",
     "servedBy": "Obsluhováno {providers}",
     "viewProviders": "Zobrazit poskytovatele",

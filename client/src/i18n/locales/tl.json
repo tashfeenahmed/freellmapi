@@ -209,6 +209,7 @@
     "noKey": "walang susi",
     "dragToReorder": "I-drag para mag-ayos muli",
     "dragToReorderGroup": "I-drag upang ayusin muli ang modelo",
+    "moveToRank": "Tumalon sa ranggo",
     "providerCount": "{count} mga tagapagbigay",
     "servedBy": "Pinagsilbihan ni {providers}",
     "viewProviders": "Tingnan ang mga provider",

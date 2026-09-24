@@ -209,6 +209,7 @@
     "noKey": "Nema ključa",
     "dragToReorder": "Povlačenje radi ponovnog redoslijeda",
     "dragToReorderGroup": "Povlačenje za promjenu redoslijeda modela",
+    "moveToRank": "Skoči na plasman",
     "providerCount": "{count} pružatelji usluga",
     "servedBy": "Služio {providers}",
     "viewProviders": "Pogledajte pružatelje usluga",
