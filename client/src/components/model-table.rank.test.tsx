@@ -110,6 +110,34 @@ describe('rank cell jump-to-rank (#1317)', () => {
     expect(rankButton()).toBeTruthy()
   })
 
+  it('a blur that follows Escape (focused input unmounting) still commits nothing', () => {
+    const onMove = vi.fn()
+    render(onMove)
+    act(() => { rankButton().click() })
+    const input = container.querySelector('input[type="number"]') as HTMLInputElement
+    act(() => { type(input, '1') })
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    expect(onMove).not.toHaveBeenCalled()
+    expect(rankButton()).toBeTruthy()
+  })
+
+  it('a blur that follows Enter does not commit a second time', () => {
+    const onMove = vi.fn()
+    render(onMove)
+    act(() => { rankButton().click() })
+    const input = container.querySelector('input[type="number"]') as HTMLInputElement
+    act(() => { type(input, '3') })
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    expect(onMove).toHaveBeenCalledTimes(1)
+    expect(onMove).toHaveBeenCalledWith(3)
+  })
+
   it('blur commits; committing the same rank as before does nothing', () => {
     const onMove = vi.fn()
     render(onMove)

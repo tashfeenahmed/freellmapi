@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -279,11 +279,22 @@ export function RankEditor({ rank, onMoveRank }: { rank: number; onMoveRank: (to
   const { t } = useI18n()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  // Set once the edit is settled (Enter, Escape or blur). Unmounting a focused
+  // input can fire blur after Escape/Enter already ran, so without this guard
+  // Escape could fall through to the blur-commit path, or Enter commit twice.
+  const settled = useRef(false)
 
   function commit() {
+    if (settled.current) return
+    settled.current = true
     setEditing(false)
     const n = Number.parseInt(draft, 10)
     if (Number.isFinite(n) && n > 0 && n !== rank) onMoveRank(n)
+  }
+
+  function cancel() {
+    settled.current = true
+    setEditing(false)
   }
 
   if (editing) {
@@ -299,7 +310,7 @@ export function RankEditor({ rank, onMoveRank }: { rank: number; onMoveRank: (to
         onKeyDown={e => {
           e.stopPropagation()
           if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') setEditing(false)
+          if (e.key === 'Escape') cancel()
         }}
         aria-label={t('models.moveToRank')}
         className="w-9 rounded border bg-background px-1 py-0.5 text-center font-mono text-xs tabular-nums"
@@ -309,7 +320,7 @@ export function RankEditor({ rank, onMoveRank }: { rank: number; onMoveRank: (to
   return (
     <button
       type="button"
-      onClick={e => { e.stopPropagation(); setDraft(String(rank)); setEditing(true) }}
+      onClick={e => { e.stopPropagation(); settled.current = false; setDraft(String(rank)); setEditing(true) }}
       title={t('models.moveToRank')}
       aria-label={t('models.moveToRank')}
       className="w-full text-center font-mono text-xs text-muted-foreground tabular-nums underline decoration-dotted decoration-transparent underline-offset-2 hover:decoration-current hover:text-foreground transition-colors"
