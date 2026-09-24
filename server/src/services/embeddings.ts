@@ -16,6 +16,7 @@ import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
 import type { Db } from '../db/types.js';
+import { SPEKA_BASE_URL } from '../providers/speka.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -112,6 +113,7 @@ export const EMBEDDING_PLATFORMS = new Set([
   'huggingface',
   'cohere',
   'sealion',
+  'speka',
 ]);
 
 interface ProviderCallResult {
@@ -260,6 +262,8 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed('https://models.github.ai/inference/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'sealion':
       return openAiStyleEmbed('https://api.sea-lion.ai/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
+    case 'speka':
+      return openAiStyleEmbed(`${SPEKA_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions);
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');

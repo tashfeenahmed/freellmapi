@@ -121,6 +121,33 @@ describe('embeddings service', () => {
   });
 
   describe('runEmbeddings', () => {
+    it('routes catalog-managed Speka embeddings with bearer auth, sorted vectors and usage', async () => {
+      addKey('speka');
+      getDb().prepare(`INSERT INTO embedding_models
+        (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+        VALUES ('speka-test-embed', 'speka', 'nvidia/nemotron-3-embed-1b', 'Speka embedding', 2, 1, 1, '$1/month shared')`).run();
+      const fetchMock = mockFetch(async () => new Response(JSON.stringify({
+        data: [{ index: 1, embedding: [0.3, 0.4] }, { index: 0, embedding: [0.1, 0.2] }], usage: { prompt_tokens: 7 },
+      })));
+      const result = await runEmbeddings('speka-test-embed', ['first', 'second']);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://speka.me/v1/embeddings');
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('authorization')).toBe('Bearer speka-test-key');
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+        model: 'nvidia/nemotron-3-embed-1b', input: ['first', 'second'], encoding_format: 'float',
+      });
+      expect(result).toMatchObject({ platform: 'speka', modelId: 'nvidia/nemotron-3-embed-1b', dimensions: 2,
+        inputTokens: 7, vectors: [[0.1, 0.2], [0.3, 0.4]] });
+    });
+
+    it('retains Speka embedding rate-limit backoff', async () => {
+      addKey('speka');
+      getDb().prepare(`INSERT INTO embedding_models
+        (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+        VALUES ('speka-test-embed', 'speka', 'nvidia/nemotron-3-embed-1b', 'Speka embedding', 2, 1, 1, '$1/month shared')`).run();
+      mockFetch(async () => new Response('rate limited', { status: 429, headers: { 'Retry-After': '20' } }));
+      await expect(runEmbeddings('speka-test-embed', ['hello'])).rejects.toMatchObject({ status: 429, retryAfterMs: 20_000 });
+    });
+
     it('rejects unknown models with a 400', async () => {
       await expect(runEmbeddings('no-such-model', ['hi'])).rejects.toMatchObject({ status: 400 });
     });

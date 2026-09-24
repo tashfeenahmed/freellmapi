@@ -70,6 +70,8 @@ export type Platform =
   | 'sail'
   // Responses-only gateway; a shared monthly free allowance, not per model.
   | 'aclide'
+  // OpenAI-compatible chat and embeddings; one shared $1 monthly allowance.
+  | 'speka'
   // Hosted vision API: $5/workspace in recurring monthly credits, shared
   // across models. Signed catalog only; no bundled model seeds.
   | 'moondream'

@@ -117,6 +117,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'cerebras') return 'cerebras::shared';
   if (platform === 'sail') return 'sail::monthly-credit';
   if (platform === 'aclide') return 'aclide::monthly-credit';
+  if (platform === 'speka') return 'speka::monthly-credit';
   if (platform === 'electronhub') return normalizedModelId.endsWith(':free') ? 'electronhub::daily-free' : 'electronhub::weekly-credit';
   if (platform === 'experiential') return 'experiential::monthly-credit';
   if (platform === 'router9') return 'router9::monthly-credit';
@@ -178,6 +179,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 
 function isSharedPool(platform: Platform): boolean {
   if (platform === 'aclide') return true;
+  if (platform === 'speka') return true;
   if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;
   return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
 }
