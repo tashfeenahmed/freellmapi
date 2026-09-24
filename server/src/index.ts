@@ -6,6 +6,7 @@ import { restoreProxySettings, flushProxyCache } from './lib/proxy.js';
 import { startWakeDetect } from './lib/wake-detect.js';
 import { startCatalogSync } from './services/catalog-sync.js';
 import { startCooldownProbe } from './services/cooldown-probe.js';
+import { startEndpointHealth, setProbeKeyResolver } from './services/endpoint-health.js';
 import { startCustomModelSync } from './services/custom-model-sync.js';
 import { installProcessSafetyNet } from './lib/process-safety-net.js';
 import { NodeScheduler } from './lib/scheduler.js';
@@ -82,6 +83,17 @@ async function main() {
     startHealthChecker(scheduler);
     startCatalogSync(scheduler);
     startCooldownProbe(scheduler);
+    // Endpoint health state machine (#1254): background probe recovery for
+    // quarantined custom endpoints. The probe needs a credential per endpoint;
+    // resolve it lazily so endpoint-health.ts doesn't import custom-endpoint.ts
+    // at module load.
+    setProbeKeyResolver((_scope) => {
+      const row = getDb().prepare(
+        "SELECT id FROM api_keys WHERE platform = 'custom' AND base_url = ? AND enabled = 1 LIMIT 1"
+      ).get(_scope.endpointScope) as { id: number } | undefined;
+      return row ? row.id : null;
+    });
+    startEndpointHealth(scheduler);
     startDbBackupPump(getDb(), scheduler, config.dbPath ?? undefined);
     startBackupScheduler(scheduler);
     startCustomModelSync(getDb(), scheduler);

@@ -35,6 +35,7 @@ import { platformDropsResponseFormat } from '../lib/sampling-params.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from './model-groups.js';
 import { getActiveProfileId } from './profile-models.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
+import { isEndpointQuarantined, isEndpointSuspect } from './endpoint-health.js';
 import { isDegraded } from './degradation.js';
 import { modelStatsKey, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 import { isToolBenched } from '../lib/tool-capability.js';
@@ -1866,8 +1867,15 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
     if (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve)) return true;
     return allowMarginViolators && fitsContextWindowStrict(e.context_window, estimatedTokens);
   };
-  const servableFilter = (allowMarginViolators: boolean) => chain.filter(e => {
+  const servableFilter = (allowMarginViolators: boolean, allowSuspect = true) => chain.filter(e => {
     if (!passesContextGate(e, allowMarginViolators)) return false;
+    // Endpoint health gate (#1254): a quarantined endpoint is skipped at chain
+    // construction, not merely demoted — probing it with real traffic is what
+    // the state machine exists to prevent. Suspect endpoints get the same
+    // two-pass treatment as margin violators: preferred away while a healthier
+    // candidate exists, still servable when nothing does.
+    if (!allowSuspect && isEndpointSuspect(e.platform, e.endpoint_scope ?? '')) return false;
+    if (isEndpointQuarantined(e.platform, e.endpoint_scope ?? '')) return false;
     const keyIds = keysByPlatform.get(e.platform);
     if (!keyIds) return false;
     // Same endpoint-pool rule the router applies (#619).
@@ -1885,7 +1893,12 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
       canUseProviderTokens(e.platform, kid, e.model_id, estimatedTokens),
     );
   });
-  let servable = servableFilter(false);
+  // Three passes (#1254): prefer endpoints the health state machine has no
+  // complaint about; fall back to suspect ones when nothing healthier exists;
+  // finally allow margin violators so a request packed to the advertised
+  // window still keeps its one attempt.
+  let servable = servableFilter(false, false);
+  if (servable.length === 0) servable = servableFilter(false);
   if (servable.length === 0) servable = servableFilter(true);
 
   // Deterministic (expected-score) ordering so the panel faithfully follows the
