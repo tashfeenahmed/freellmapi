@@ -212,6 +212,8 @@ npx freellmapi setup-claude --url http://localhost:3001 --api-key <unified-key>
 
 Every generator supports `--dry-run`, creates a timestamped backup before changing an existing file, and merges into the user's configuration. Launchers keep credentials out of config files entirely: `npx freellmapi launch` for Claude Code and `npx freellmapi launch-codex` for Codex.
 
+Provider keys can be managed from the terminal too, with a dashboard session token (`FREELLMAPI_DASHBOARD_TOKEN` or `--token`): `npx freellmapi keys add|list|remove|test <platform>`, where `keys test` re-checks stored keys. See [cli/README.md](cli/README.md#provider-keys).
+
 | Agent | Automated setup | Base URL |
 | --- | --- | --- |
 | Claude Code | `setup-claude` | root |
