@@ -32,6 +32,7 @@ import {
   type CooldownDecision,
   type CooldownSource,
 } from '../services/ratelimit.js';
+import { noteEndpointFailure, noteEndpointSuccess } from '../services/endpoint-health.js';
 import {
   isRetryableError,
   isRateLimitSignal,
@@ -409,6 +410,14 @@ function consumeSkipBenchExemption(route: RouteResult, err: any): boolean {
  * Callers add the just-failed key to skipKeys via this function (do not pre-add).
  */
 export function recordRetryableFailure(route: RouteResult, err: any, state: FallbackState, now: number = Date.now()): boolean {
+  // Endpoint-level structural failure bookkeeping (#1254): a 404-from-relay /
+  // 5xx / timeout / transport failure is evidence about the ENDPOINT, and the
+  // endpoint health state machine accumulates it across requests — the one
+  // memory the per-request skip sets and the timer-based cooldown ladder
+  // cannot provide. Periodic failures (429/402) are deliberately filtered
+  // inside noteEndpointFailure. The raw error rides along so definitive
+  // model-gone wording (410/EOL) can escalate the endpoint faster (#1254 PR 3).
+  noteEndpointFailure(route.platform, route.endpointScope ?? '', classifyAttemptError(err), now, err);
   // `skipModelForRequest: true` = the failure is MODEL behavior, not key
   // state (ignored response_format, JSON truncated at max_tokens): a sibling
   // key would reproduce it exactly, so rule out the whole model for this
@@ -607,6 +616,9 @@ export function recordUpstreamSuccess(route: RouteResult, rateLimitTokens: numbe
   recordRequest(route.platform, route.modelId, route.keyId);
   recordTokens(route.platform, route.modelId, route.keyId, rateLimitTokens);
   recordSuccess(route.modelDbId);
+  // A served request proves the ENDPOINT can complete too (#1254) — stronger
+  // evidence than any background probe, so clear the endpoint's health record.
+  noteEndpointSuccess(route.platform, route.endpointScope ?? '');
   // A served request proves the model+key can complete: the empty-completion
   // streak (#751) starts over.
   emptyCompletionStreaks.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
@@ -1404,6 +1416,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         platform: route.platform,
         modelId: route.modelId,
         keyOrdinal: keyOrdinal(route),
+        endpointScope: route.endpointScope ?? '',
         keyLabel: route.keyLabel ?? null,
         outcome,
         startOffsetMs: attemptStartedAt - startedAt,
