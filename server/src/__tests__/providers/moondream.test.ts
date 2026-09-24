@@ -49,6 +49,12 @@ describe('Moondream hosted adapter', () => {
     expect(result._routed_via).toEqual({ platform: 'moondream', model });
   });
 
+  it('clamps max_completion_tokens to the route\'s remaining context budget', async () => {
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(completion()));
+    await new MoondreamProvider().chatCompletion('k', messages, model, { max_tokens: 2048, contextBudget: 300 });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).max_completion_tokens).toBe(300);
+  });
+
   it('preserves vision input, strips replay-only fields and obeys upstream output ceiling', async () => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(completion()));
     await new MoondreamProvider().chatCompletion('k', [

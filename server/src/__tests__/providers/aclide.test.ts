@@ -38,6 +38,12 @@ describe('ACLIDE Responses adapter', () => {
     expect(result._routed_via).toEqual({ platform: 'aclide', model });
   });
 
+  it('clamps max_output_tokens to the route\'s remaining context budget', async () => {
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(completed()));
+    await new AclideProvider().chatCompletion('k', messages, model, { max_tokens: 4096, contextBudget: 300 });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).max_output_tokens).toBe(300);
+  });
+
   it('preserves multimodal input, tool history and JSON schema', async () => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json({ ...completed(), output: [
       { type: 'function_call', call_id: 'call_2', name: 'weather', arguments: '{}' },

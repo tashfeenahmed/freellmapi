@@ -88,7 +88,7 @@ export class AclideProvider extends BaseProvider {
   }
 
   private body(messages: ChatMessage[], modelId: string, options?: CompletionOptions): Record<string, unknown> {
-    const maxOutput = resolveMaxTokens(this.platform, options?.max_tokens);
+    const maxOutput = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
     const format = options?.response_format;
     const body: Record<string, unknown> = { model: modelId, input: this.input(messages), store: false, stream: false };
     if (maxOutput !== undefined) body.max_output_tokens = maxOutput;

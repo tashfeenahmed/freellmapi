@@ -52,7 +52,7 @@ export class MoondreamProvider extends BaseProvider {
     return {
       model: modelId, messages: input, stream,
       temperature: options?.temperature, top_p: options?.top_p,
-      max_completion_tokens: resolveMaxTokens(this.platform, options?.max_tokens),
+      max_completion_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
       ...(options?.reasoning_effort !== undefined ? { reasoning: options.reasoning_effort !== 'none' } : {}),
       ...(stream && options?.stream_options ? { stream_options: options.stream_options } : {}),
     };
