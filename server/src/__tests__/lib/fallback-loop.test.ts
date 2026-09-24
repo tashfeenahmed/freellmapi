@@ -21,6 +21,7 @@ import {
   recordRetryableFailure,
   recordUpstreamSuccess,
   resetEmptyCompletionStreaks,
+  resetTruncationStreaks,
   exhaustedRetryError,
   formatAttemptTrail,
   classifyAttemptError,
@@ -29,6 +30,8 @@ import {
   DEFAULT_FALLBACK_TIME_BUDGET_MS,
   AUTH_FAILURE_COOLDOWN_MS,
   EMPTY_COMPLETION_STREAK_LIMIT,
+  TRUNCATION_STREAK_LIMIT,
+  TRUNCATION_BENCH_MS,
   type AttemptRecord,
   type FallbackHooks,
   type FallbackState,
@@ -83,6 +86,7 @@ beforeEach(() => {
   mockCheckKeyHealth.mockResolvedValue('invalid');
   getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
   resetEmptyCompletionStreaks();
+  resetTruncationStreaks();
 });
 
 describe('isKeyAuthError (401 = key-fatal, rotate instead of 502)', () => {
@@ -275,6 +279,64 @@ describe('empty-completion streak lifts the skipBench exemption (#751)', () => {
     expect(dispatch).toHaveBeenCalledTimes(EMPTY_COMPLETION_STREAK_LIMIT - 1 + 2);
     expect(onExhausted).toHaveBeenCalledTimes(1);
     expect(onExhausted.mock.calls[0][0].status).toBe(503);
+  });
+});
+
+describe('truncated-stream streak benches a sick route (#1218)', () => {
+  const truncErr = (name: string) =>
+    new Error(`${name} stream ended unexpectedly (no [DONE], no finish_reason) — connection reset or truncated upstream`);
+  const cooldownExpiry = (route: RouteResult): number | undefined => {
+    const row = getDb().prepare(
+      'SELECT expires_at_ms FROM rate_limit_cooldowns WHERE platform = ? AND key_id = ?',
+    ).get('fake', route.keyId) as { expires_at_ms: number } | undefined;
+    return row?.expires_at_ms;
+  };
+
+  it('a single truncation keeps the ordinary short transient bench', () => {
+    const route = fakeRoute();
+    recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    // The retryable ladder already benches briefly; the streak adds nothing yet.
+    const expiry = cooldownExpiry(route);
+    expect(expiry).toBeDefined();
+    expect(expiry! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+  });
+
+  it(`extends the bench to TRUNCATION_BENCH_MS from the Nth consecutive truncation on the same model+key`, () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+      expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+    }
+    // Streak limit reached: the bench is now the full truncation window.
+    recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    expect(cooldownExpiry(route)! - Date.now()).toBeGreaterThanOrEqual(TRUNCATION_BENCH_MS - 1000);
+  });
+
+  it('a success on the route resets the streak', () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    recordUpstreamSuccess(route, 0);
+    getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+  });
+
+  it('a differently-classified failure on the route breaks the streak', () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    // A 429 takes the cooldown ladder — and breaks the truncation streak.
+    recordRetryableFailure(route, Object.assign(new Error('429 Too Many Requests'), { status: 429 }), newFallbackState());
+    getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
   });
 });
 

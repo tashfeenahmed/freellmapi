@@ -280,7 +280,9 @@ function mergeEnv(existing: string, generated: string): string {
       .filter(line => line && !line.startsWith('#') && line.includes('='))
       .map(line => [line.slice(0, line.indexOf('=')), line]),
   );
-  const lines = existing.split(/\r?\n/);
+  // An absent or empty file has no lines: splitting '' yields [''] and that
+  // empty line survived as a blank first line in every freshly written .env.
+  const lines = existing.trim() ? existing.split(/\r?\n/) : [];
   const seen = new Set<string>();
   const output = lines.map(line => {
     const separator = line.indexOf('=');

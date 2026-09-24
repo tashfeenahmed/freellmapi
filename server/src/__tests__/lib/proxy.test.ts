@@ -26,6 +26,18 @@ import {
   parseRegProxy,
 } from '../../lib/proxy.js';
 
+// #838 reads the OS-wide proxy (scutil/reg/gsettings) as a last-resort
+// fallback when neither the env nor the DB configures one. A developer
+// machine can genuinely have that set (macOS System Settings → Proxies),
+// which fails every "no proxy configured" case below for the same reason
+// clearProxyEnv() exists — the ambient system, not the code under test.
+// '' parses as "no proxy" in every platform branch, so the suite sees a
+// clean machine regardless of the host's system settings.
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  execFileSync: () => '',
+}));
+
 // Every env var the proxy config reads, in both the upper- and lower-case
 // spellings the convention allows. Cleared around each test so a developer
 // machine that genuinely sits behind a corporate proxy doesn't fail the suite.

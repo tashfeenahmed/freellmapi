@@ -4,7 +4,7 @@
 
 ## 包清单
 
-`desktop/package.json` `freellmapi-desktop@0.9.2` —— Electron `38.8.6`、`better-sqlite3@12.10.0`、`electron-builder@25.1.8`、`esbuild@0.24.0`。入口 `build/main.mjs`（`type: module`）。AppId `com.freellmapi.desktop`，发布 `github:tashfeenahmed/freellmapi`（`desktop/electron-builder.yml`）。`asar` + `client-dist` 位于 `extraResources`；按系统划分的签名目标（mac `dmg` `arm64` 经 `refresh-mac-update-metadata.mjs` 签名/公证/钉装、win `nsis`+`zip` `x64`、linux `AppImage`+`deb`+`tar.xz`+`rpm` `x64` 自 #981 `d8fae97` 起）。
+`desktop/package.json` `freellmapi-desktop@0.9.2` —— Electron `38.8.6`、`better-sqlite3@12.10.0`、`electron-builder@25.1.8`、`esbuild@0.24.0`。入口 `build/main.mjs`（`type: module`）。AppId `com.freellmapi.desktop`，发布 `github:tashfeenahmed/freellmapi`（`desktop/electron-builder.yml`）。`asar` + `client-dist` 位于 `extraResources`；按系统划分的签名目标（mac `dmg`+`zip` `arm64`+`x64` 经 `refresh-mac-update-metadata.mjs` 签名/公证/钉装、win `nsis`+`zip` `x64`、linux `AppImage`+`deb`+`tar.xz`+`rpm` `x64` 自 #981 `d8fae97` 起）。
 
 ## 构建流水线
 

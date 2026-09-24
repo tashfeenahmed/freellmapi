@@ -4,7 +4,7 @@
 
 ## Package manifest
 
-`desktop/package.json` `freellmapi-desktop@0.9.2` — Electron `38.8.6`, `better-sqlite3@12.10.0`, `electron-builder@25.1.8`, `esbuild@0.24.0`. Entry `build/main.mjs` (`type: module`). AppId `com.freellmapi.desktop`, publish `github:tashfeenahmed/freellmapi` (`desktop/electron-builder.yml`). `asar` + `client-dist` in `extraResources`; per-OS signing targets (mac `dmg` `arm64` signed/notarized/stapled via `refresh-mac-update-metadata.mjs`, win `nsis`+`zip` `x64`, linux `AppImage`+`deb`+`tar.xz`+`rpm` `x64` since #981 `d8fae97`).
+`desktop/package.json` `freellmapi-desktop@0.9.2` — Electron `38.8.6`, `better-sqlite3@12.10.0`, `electron-builder@25.1.8`, `esbuild@0.24.0`. Entry `build/main.mjs` (`type: module`). AppId `com.freellmapi.desktop`, publish `github:tashfeenahmed/freellmapi` (`desktop/electron-builder.yml`). `asar` + `client-dist` in `extraResources`; per-OS signing targets (mac `dmg`+`zip` `arm64`+`x64` signed/notarized/stapled via `refresh-mac-update-metadata.mjs`, win `nsis`+`zip` `x64`, linux `AppImage`+`deb`+`tar.xz`+`rpm` `x64` since #981 `d8fae97`).
 
 ## Build pipeline
 

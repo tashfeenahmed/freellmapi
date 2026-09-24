@@ -16,7 +16,13 @@ function checkModel(requested: string, returned: string): void {
 export class SeptorProvider extends OpenAICompatProvider {
   constructor() {
     // /models rejects missing and invalid credentials (401), unlike Router9.
-    super({ platform: 'septor', name: 'Septor Labs', baseUrl: 'https://api.septorlabs.com/v1' });
+    // Cloudflare in front challenges tool User-Agents (Node's default "node",
+    // curl) from datacenter IPs with a 403 HTML page, which read as a bad key
+    // on self-hosted VPS installs (#1298). A product UA passes.
+    super({
+      platform: 'septor', name: 'Septor Labs', baseUrl: 'https://api.septorlabs.com/v1',
+      extraHeaders: { 'User-Agent': 'FreeLLMAPI/1.0' },
+    });
   }
 
   override async chatCompletion(

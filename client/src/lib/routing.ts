@@ -115,7 +115,9 @@ export type Row = FallbackEntry & Partial<RoutingScore>
 export interface TokenUsageData {
   totalBudget: number
   totalUsed: number
-  models: { displayName: string; platform: string; modelId?: string; budget: number; used?: number }[]
+  /** Served smartest-first (intelligenceRank 1 = smartest); the bar and its
+   *  legend keep that order. */
+  models: { displayName: string; platform: string; modelId?: string; intelligenceRank?: number; budget: number; used?: number }[]
 }
 
 // Custom endpoints all share the generic 'custom' platform id, so show the
@@ -401,6 +403,9 @@ export const platformColors: Record<string, string> = {
   groq:        '#f55036',
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
+  aclide:      '#6366f1',
+  speka:       '#0d9488',
+  moondream:   '#6d5dfc',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
   router9:      '#8b5cf6',
@@ -408,6 +413,11 @@ export const platformColors: Record<string, string> = {
   clod:         '#16a34a',
   speechify:    '#7c3aed',
   blaze:        '#f97316',
+  lucidity:     '#6366f1',
+  airforce:     '#0ea5e9',
+  dreamprompting: '#db2777',
+  waterfall:    '#0d9488',
+  logfare:      '#ca8a04',
   bai:         '#111827',
   radeon:      '#ed1c24',
   nvidia:      '#76b900',

@@ -798,18 +798,24 @@ export class GoogleProvider extends BaseProvider {
       reader.cancel().catch(() => { /* upstream already gone */ });
     }
 
+    // Reaching here means the body ended with neither `[DONE]` nor any
+    // `finishReason` — both legitimate terminators `return` from inside the
+    // loop above, so the only way out to this point is the `if (done) break`
+    // on an abrupt EOF (an h2 END_STREAM from an edge, or the backend cutting
+    // the generation mid-answer).
+    //
+    // This used to synthesize `finish_reason: 'stop'`, which told the client a
+    // half-written answer had completed normally: no failover, the request row
+    // logged 'success', and the route never benched. base.ts:392-397 states the
+    // opposite contract for every adapter that goes through readSseStream —
+    // "a stream that ends without [DONE] AND without any finish_reason is a
+    // truncated generation, not a completion" — and throws (base.ts:471). This
+    // adapter parses Gemini's own frame format and reads the body itself, so it
+    // never inherited that. Throw the same message: isStreamTruncatedError
+    // (lib/error-classify.ts:685) matches on it, and the fallback loop already
+    // fails over and bench-counts the streak (lib/fallback-loop.ts:485).
     if (!emittedFinish) {
-      yield {
-        id,
-        object: 'chat.completion.chunk',
-        created: Math.floor(Date.now() / 1000),
-        model: modelId,
-        choices: [{
-          index: 0,
-          delta: {},
-          finish_reason: sawToolCalls ? 'tool_calls' : 'stop',
-        }],
-      };
+      throw new Error(`${this.name} stream ended unexpectedly (no [DONE], no finish_reason) — connection reset or truncated upstream`);
     }
   }
 

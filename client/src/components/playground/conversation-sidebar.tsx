@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen, Pencil, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ConfirmButton } from '@/components/confirm-button'
-import { relativeTime, type ConversationSummary } from '@/lib/playground-conversations'
+import { ChevronsLeft, ChevronsRight, MoreHorizontal, Pencil, SquarePen, Trash2 } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import type { ConversationSummary } from '@/lib/playground-conversations'
 import { useI18n } from '@/i18n'
 
 // The Playground's saved-conversation rail. Collapses to a narrow strip (the
@@ -46,6 +51,8 @@ export function ConversationSidebar({
 }) {
   const { t } = useI18n()
   const [renamingId, setRenamingId] = useState<number | null>(null)
+  // Which row's Delete is armed (first click); cleared when its menu closes.
+  const [armedDeleteId, setArmedDeleteId] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
   // Re-render once a minute so "2m ago" doesn't quietly go stale while a long
@@ -93,43 +100,45 @@ export function ConversationSidebar({
           aria-label={t('playgroundSessions.showSidebar')}
           title={t('playgroundSessions.showSidebar')}
         >
-          <PanelLeftOpen className="size-4" />
+          <ChevronsRight className="size-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={onNew}
-          aria-label={t('playgroundSessions.newConversation')}
-          title={t('playgroundSessions.newConversation')}
+          aria-label={t('playgroundSessions.newChat')}
+          title={t('playgroundSessions.newChat')}
         >
-          <MessageSquarePlus className="size-4" />
+          <SquarePen className="size-4" />
         </Button>
       </div>
 
       <div
         className={`${LAYER} w-60 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
       >
-        <div className="flex shrink-0 items-center gap-1 border-b px-2.5 py-2">
-          <span className="flex-1 truncate text-xs font-medium text-muted-foreground">
-            {t('playgroundSessions.heading')}
-          </span>
+        {/* Two lines: the collapse control alone on the first, then New chat as
+            a proper button spanning the width. No heading — the list explains
+            itself. */}
+        <div className="flex shrink-0 flex-col gap-1.5 border-b border-border/40 px-2 pt-1 pb-2">
+          <div className="flex items-center justify-end">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggle}
+              aria-label={t('playgroundSessions.hideSidebar')}
+              title={t('playgroundSessions.hideSidebar')}
+            >
+              <ChevronsLeft className="size-4" />
+            </Button>
+          </div>
           <Button
-            variant="ghost"
-            size="icon-sm"
+            variant="outline"
+            size="sm"
+            className="w-full justify-center gap-2"
             onClick={onNew}
-            aria-label={t('playgroundSessions.newConversation')}
-            title={t('playgroundSessions.newConversation')}
           >
-            <MessageSquarePlus className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onToggle}
-            aria-label={t('playgroundSessions.hideSidebar')}
-            title={t('playgroundSessions.hideSidebar')}
-          >
-            <PanelLeftClose className="size-4" />
+            <SquarePen className="size-4" />
+            <span className="truncate">{t('playgroundSessions.newChat')}</span>
           </Button>
         </div>
 
@@ -142,7 +151,7 @@ export function ConversationSidebar({
             <ul className="space-y-0.5">
               {conversations.map(conversation => {
                 const isActive = conversation.id === activeId
-                const when = relativeTime(conversation.updatedAt)
+                const armed = armedDeleteId === conversation.id
                 return (
                   <li key={conversation.id}>
                     {renamingId === conversation.id ? (
@@ -174,34 +183,39 @@ export function ConversationSidebar({
                           <span className="block truncate text-sm">
                             {conversation.title || t('playgroundSessions.untitled')}
                           </span>
-                          <span className="block truncate text-[11px] text-muted-foreground tabular-nums">
-                            {t(`playgroundSessions.${when.key}`, { count: when.count })}
-                            {' · '}
-                            {t('playgroundSessions.messageCount', { count: conversation.messageCount })}
-                          </span>
                         </button>
-                        {/* Row actions stay out of the way until the row is
-                            hovered or focused, so the list reads as titles. */}
-                        <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => startRename(conversation)}
-                            aria-label={t('playgroundSessions.rename')}
-                            title={t('playgroundSessions.rename')}
+                        {/* One "…" per row, shown on hover/focus (and while its
+                            menu is open) so the list reads as titles only. Delete
+                            arms on the first click and fires on the second, the
+                            dashboard's usual two-step, without leaving the menu. */}
+                        <DropdownMenu
+                          onOpenChange={open => { if (!open) setArmedDeleteId(null) }}
+                        >
+                          <DropdownMenuTrigger
+                            className={`${buttonVariants({ variant: 'ghost', size: 'icon-xs' })} shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 data-popup-open:opacity-100 data-pressed:opacity-100`}
+                            aria-label={t('playgroundSessions.actions')}
+                            title={t('playgroundSessions.actions')}
                           >
-                            <Pencil className="size-3" />
-                          </Button>
-                          <ConfirmButton
-                            size="icon-xs"
-                            armedSize="xs"
-                            onConfirm={() => onDelete(conversation.id)}
-                            aria-label={t('common.delete')}
-                            title={t('common.delete')}
-                          >
-                            <Trash2 className="size-3" />
-                          </ConfirmButton>
-                        </div>
+                            <MoreHorizontal className="size-3.5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => startRename(conversation)}>
+                              <Pencil />
+                              {t('playgroundSessions.rename')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              closeOnClick={armed}
+                              onClick={() => {
+                                if (armed) { setArmedDeleteId(null); onDelete(conversation.id) }
+                                else setArmedDeleteId(conversation.id)
+                              }}
+                            >
+                              <Trash2 />
+                              {armed ? t('common.confirm') : t('common.delete')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                   </li>

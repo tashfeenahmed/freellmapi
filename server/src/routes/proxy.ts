@@ -4,7 +4,9 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, TokenUsage } from '@freellmapi/shared/types.js';
 import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledVisionModel, hasEnabledToolsModel, routingReserveTokens } from '../services/router.js';
+import { secondsUntilNextMonth } from '../services/key-budget.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
 import { getDb } from '../db/index.js';
@@ -23,7 +25,7 @@ import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
-import { runFallbackLoop, newFallbackState, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
@@ -689,8 +691,9 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     const status = err instanceof EmbeddingsError ? err.status : 502;
+    const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
-    res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type } });
+    res.status(status).json({ error: { message: `embedding error: ${err?.message ?? 'unknown'}`, type, ...code } });
   }
 });
 
@@ -705,6 +708,15 @@ const ImageBody = z.object({
   size: z.string().optional(),
   response_format: z.enum(['url', 'b64_json']).optional(),
 });
+
+function inferenceBudgetCode(error: { code?: string; retryAfterMs?: number }, res: Response): { code?: string } {
+  // retryAfterMs is set by the embeddings/media services only when the whole
+  // chain was rate limited (soonest stated back-off, budget resets included),
+  // so it wins over the month-long budget reset when a sibling returns sooner.
+  if (error.retryAfterMs !== undefined) res.setHeader('Retry-After', retryAfterSeconds(error.retryAfterMs));
+  else if (error.code === 'quota_exceeded') res.setHeader('Retry-After', secondsUntilNextMonth());
+  return error.code ? { code: error.code } : {};
+}
 
 function mediaErrorType(status: number): string {
   if (status === 400 || status === 413) return 'invalid_request_error';
@@ -732,8 +744,9 @@ proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     const status = err instanceof MediaError ? err.status : 502;
+    const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
-    res.status(httpStatus).json({ error: { message: `image generation error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
+    res.status(httpStatus).json({ error: { message: `image generation error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status), ...code } });
   }
 });
 
@@ -789,9 +802,10 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
     // Nothing to report to a socket that is already gone.
     if (clientAbort.signal.aborted || res.writableEnded) return;
     const status = err instanceof MediaError ? err.status : 502;
+    const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
     res.status(httpStatus).json({
-      error: { message: `video generation error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) },
+      error: { message: `video generation error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status), ...code },
     });
   }
 });
@@ -821,8 +835,9 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
     res.send(result.audio);
   } catch (err: any) {
     const status = err instanceof MediaError ? err.status : 502;
+    const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
-    res.status(httpStatus).json({ error: { message: `speech error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status) } });
+    res.status(httpStatus).json({ error: { message: `speech error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status), ...code } });
   }
 });
 
@@ -943,8 +958,8 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
     res.json({ text: result.text });
   } catch (err: any) {
     const status = err instanceof MediaError ? err.status : 502;
+    const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
-    const code = err instanceof MediaError && err.code ? { code: err.code } : {};
     res.status(httpStatus).json({ error: { message: `transcription error: ${err?.message ?? 'unknown'}`, type: mediaErrorType(status), ...code } });
   }
 });
@@ -1158,18 +1173,24 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     logIdentity: { surface: 'legacy completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
     abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
-    route: () => routeRequest(
-      estimatedTotal,
-      state.skipKeys.size > 0 ? state.skipKeys : undefined,
-      preferredModel,
-      false,
-      false,
-      state.skipModels.size > 0 ? state.skipModels : undefined,
-      groupChain ?? resolvedChain?.chain,
-      false,
-      state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
-      outputReserve,
-    ),
+    route: () => {
+      // #507: see inbound-chat.ts — inflate the routing estimate from any
+      // provider-reported REQUESTED size latched onto state so the existing
+      // size gates in router.ts skip low-TPM / small-context models on retry.
+      const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
+      return routeRequest(
+        routingTotal,
+        state.skipKeys.size > 0 ? state.skipKeys : undefined,
+        preferredModel,
+        false,
+        false,
+        state.skipModels.size > 0 ? state.skipModels : undefined,
+        groupChain ?? resolvedChain?.chain,
+        false,
+        state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
+        outputReserve,
+      );
+    },
     dispatch: async (route, attempt, ctx) => {
       const contextBudget = route.contextWindow != null ? route.contextWindow - estimatedInputTokens : undefined;
       traceRouteEvent('Proxy', {
@@ -1664,6 +1685,24 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   }
   max_tokens = budgetCheck.maxTokens;
 
+  // Client-disconnect fan-out: the flag stops the loop before the NEXT
+  // attempt; the AbortController (threaded to the provider as
+  // CompletionOptions.signal) additionally cancels the IN-FLIGHT upstream
+  // fetch and any body/stream read, so tokens stop burning and the in-flight
+  // lease frees immediately. 'close' also fires on normal completion —
+  // writableEnded distinguishes a real disconnect.
+  //
+  // This controller is declared before the Fusion branch because Fusion uses
+  // the same cancellation signal as the ordinary fallback loop below.
+  let clientGone = false;
+  const clientAbort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientGone = true;
+      clientAbort.abort(newClientAbortError());
+    }
+  });
+
   // ── Fusion: multi-model synthesis ──────────────────────────────────────────
   // The virtual "fusion" model fans the prompt out to a panel of diverse models
   // in parallel, then a judge synthesizes one answer. It routes each panel/judge
@@ -1672,7 +1711,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Image requests run on vision-capable panel members; tool requests run on
   // tool-capable members and return the first structured tool call directly.
   if (isFusionModel(requestedModel)) {
-    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams };
+    // Keep Fusion's sequential tool fallback tied to the caller's socket. The
+    // Responses route already threads this signal; the legacy Chat surface
+    // needs the same cancellation so a disconnected client does not leave a
+    // bounded-but-expensive provider call running in the background.
+    const fusionOptions = { temperature, max_tokens, top_p, stop, tools, tool_choice, parallel_tool_calls, ...samplingParams, signal: clientAbort.signal };
     const fusionConfig = parsed.data.fusion ?? {};
 
     if (stream) {
@@ -1736,7 +1779,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         }
       } catch (err: any) {
         const message = err instanceof FusionError ? err.message : `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`;
-        const type = err instanceof FusionError && err.status === 429 ? 'rate_limit_error' : 'server_error';
+        const type = err instanceof FusionError
+          ? (err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error')
+          : 'server_error';
         writeFrame({ error: { message, type } });
       }
       try { res.write('data: [DONE]\n\n'); res.end(); } catch { /* socket gone */ }
@@ -1773,7 +1818,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       res.json({ ...response, execution_id: requestGroupId });
     } catch (err: any) {
       if (err instanceof FusionError) {
-        res.status(err.status).json({ error: { message: err.message, type: err.status === 429 ? 'rate_limit_error' : 'invalid_request_error' }, execution_id: requestGroupId });
+        res.status(err.status).json({
+          error: {
+            message: err.message,
+            type: err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error',
+          },
+          execution_id: requestGroupId,
+        });
       } else {
         res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' }, execution_id: requestGroupId });
       }
@@ -2031,25 +2082,13 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // context-handoff injection, group/unified-chain routing, and the OpenAI
   // stream turn-integrity framing.
   const state = newFallbackState();
+  // Lets the failover loop learn which models reject tool calls (#1230).
+  state.wantsTools = wantsTools;
   const attemptLog: AttemptRecord[] = [];
-  // Client-disconnect fan-out: the flag stops the loop before the NEXT
-  // attempt; the AbortController (threaded to the provider as
-  // CompletionOptions.signal) additionally cancels the IN-FLIGHT upstream
-  // fetch and any body/stream read, so tokens stop burning and the in-flight
-  // lease frees immediately. 'close' also fires on normal completion —
-  // writableEnded distinguishes a real disconnect.
-  let clientGone = false;
-  const clientAbort = new AbortController();
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
   const hedgeAbort = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) {
-      clientGone = true;
-      clientAbort.abort(newClientAbortError());
-    }
-  });
 
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
@@ -2065,7 +2104,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // the padding is conservative on turns where injection is *possible* (a prior
       // model is on record). Turns where injection can't happen — every turn 1, and
       // sessions that never switched — pay no headroom tax.
-      const routingEstimate = handoffPossible ? estimatedTotal + HANDOFF_MAX_TOKENS : estimatedTotal;
+      const routingEstimate = fallbackRoutingTokens(state, estimatedTotal, outputReserve) + (handoffPossible ? HANDOFF_MAX_TOKENS : 0);
       // Task-type routing (#1127): the client can declare code/chat intent via
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
@@ -2525,7 +2564,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           const inputTokens = upstreamUsage?.prompt_tokens ?? estimatedPromptTokens;
           const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const totalTokens = upstreamUsage?.total_tokens ?? (inputTokens + outputTokens);
-          recordUpstreamSuccess(route, totalTokens);
+          recordUpstreamSuccess(route, totalTokens, state);
 
           // Cache the freshly-generated SSE sequence so an identical later
           // stream request is replayed without spending another free-tier
@@ -2732,7 +2771,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const completionTokens = result.usage?.completion_tokens
           ?? Math.ceil((contentToString(respMsg?.content ?? '').length + completionReasoningText(result).length + respToolArgChars) / 4);
         const totalTokens = result.usage?.total_tokens ?? (promptTokens + completionTokens);
-        recordUpstreamSuccess(route, totalTokens);
+        recordUpstreamSuccess(route, totalTokens, state);
         // #797: remember this turn's thinking trace so the next request from
         // the same session can restore it (clients strip it on replay).
         // normalizeChoices keeps reasoning_content on the message even when it

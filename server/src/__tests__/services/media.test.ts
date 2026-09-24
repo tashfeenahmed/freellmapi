@@ -58,7 +58,74 @@ describe('media service', () => {
     expect(cols).toContain('key_id');
   });
 
+  it('skips capped provider keys and keeps a reservation until image generation completes', async () => {
+    addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
+    addKey('nvidia', 'spent-key');
+    addKey('nvidia', 'available-key');
+    const db = getDb();
+    const keys = db.prepare('SELECT id FROM api_keys ORDER BY id').all() as { id: number }[];
+    db.prepare('UPDATE api_keys SET monthly_request_cap = 1').run();
+    db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, latency_ms)
+      VALUES ('nvidia', 'chat-model', ?, 'success', 1)`).run(keys[0].id);
+    let finish!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const first = runImageGeneration('auto', { prompt: 'a cat' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const request = (fetchMock.mock.calls as unknown as [string, RequestInit][])[0][1];
+    expect(new Headers(request.headers).get('Authorization')).toBe('Bearer available-key');
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 429, code: 'quota_exceeded' });
+    finish(jsonResponse({ artifacts: [{ base64: 'AAAA' }] }));
+    await expect(first).resolves.toMatchObject({ platform: 'nvidia' });
+    expect(db.prepare('SELECT requests FROM key_monthly_usage WHERE key_id = ?').get(keys[1].id)).toEqual({ requests: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A failed attempt does not consume another request, and cannot leak its reservation.
+    db.prepare('UPDATE api_keys SET monthly_request_cap = 2 WHERE id = ?').run(keys[1].id);
+    fetchMock.mockResolvedValue(new Response('unavailable', { status: 503 }));
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 502 });
+    fetchMock.mockResolvedValue(jsonResponse({ artifacts: [{ base64: 'BBBB' }] }));
+    await expect(runImageGeneration('auto', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'nvidia' });
+  });
+
   describe('image generation', () => {
+    function twoImageProviders() {
+      addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image', 1);
+      addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 'image', 2);
+      addKey('nvidia');
+      addKey('siliconflow');
+    }
+    const limited = (ra?: string) => new Response('slow down', { status: 429, headers: ra ? { 'retry-after': ra } : {} });
+    const byHost = (nvidia: () => Response, siliconflow: () => Response) =>
+      vi.fn(async (url: string) => (String(url).includes('siliconflow') ? siliconflow() : nvidia())) as any;
+
+    it('relays the SOONEST Retry-After when every provider is rate-limited', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('5'), () => limited('60'));
+      await expect(runImageGeneration('auto', { prompt: 'a cat' })).rejects.toMatchObject({ status: 429, retryAfterMs: 5_000 });
+    });
+
+    it('drops the hint when a rate-limited provider stated no delay', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => limited());
+      const err = await runImageGeneration('auto', { prompt: 'a cat' }).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('drops the hint when the chain ends in a non-rate-limit failure', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => new Response('boom', { status: 500 }));
+      const err = await runImageGeneration('auto', { prompt: 'a cat' }).catch(e => e);
+      expect(err.status).toBe(502);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('fails over past a rate-limited provider', async () => {
+      twoImageProviders();
+      globalThis.fetch = byHost(() => limited('17'), () => jsonResponse({ images: [{ url: 'https://x/y.png' }] }));
+      await expect(runImageGeneration('auto', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'siliconflow' });
+    });
+
     it('NVIDIA: maps artifacts[].base64 → b64_json', async () => {
       addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image');
       addKey('nvidia');

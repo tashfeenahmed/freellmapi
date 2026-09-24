@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
+import { ConfirmButton } from '@/components/confirm-button'
 import { useI18n } from '@/i18n'
 
 export function UnifiedKeySection() {
@@ -18,8 +19,18 @@ export function UnifiedKeySection() {
   })
 
   const regenerate = useMutation({
-    mutationFn: () => apiFetch('/api/settings/api-key/regenerate', { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['unified-key'] }),
+    mutationFn: () => apiFetch<{ apiKey: string }>('/api/settings/api-key/regenerate', { method: 'POST' }),
+    onSuccess: (res) => {
+      // Write the fresh key into the cache BEFORE unmasking: invalidating
+      // alone would leave the old, now-revoked key in the cache until the
+      // refetch lands, and it would flash unmasked in the meantime.
+      queryClient.setQueryData<{ apiKey: string }>(['unified-key'], { apiKey: res.apiKey })
+      // Reveal the fresh key right away: the whole point of regenerating is
+      // to move apps to the new value, and a masked box hides exactly the
+      // string they need to copy next. Showing it doubles as the success
+      // feedback, so no toast (and no new key in 60 locale files) is needed.
+      setShowKey(true)
+    },
   })
 
   const apiKey = data?.apiKey ?? ''
@@ -46,14 +57,19 @@ export function UnifiedKeySection() {
             {t('keys.unifiedKeyDescBefore')}<code className="font-mono">api_key</code>{t('keys.unifiedKeyDescAfter')}
           </p>
         </div>
-        <Button
+        {/* Regenerating revokes the key every running app authenticates with,
+            so it goes through the dashboard's two-step destructive idiom
+            (ConfirmButton) instead of firing on a single click. */}
+        <ConfirmButton
           variant="ghost"
           size="sm"
-          onClick={() => regenerate.mutate()}
+          // Armed label stays the shared "Confirm" — the same destructive
+          // idiom every other ConfirmButton on the dashboard uses.
           disabled={regenerate.isPending || isError}
+          onConfirm={() => regenerate.mutate()}
         >
           {t('keys.regenerate')}
-        </Button>
+        </ConfirmButton>
       </div>
 
       {isError ? (
@@ -86,6 +102,27 @@ export function UnifiedKeySection() {
         <span className="text-muted-foreground">{t('keys.endpointEmbeddings')}</span>
         <code className="font-mono">/v1/embeddings <span className="text-muted-foreground">({t('keys.endpointEmbeddingsHint')})</span></code>
       </div>
+
+      <details className="group mt-4 rounded-xl border bg-muted/40 p-3">
+        <summary className="cursor-pointer select-none text-xs font-medium">{t('keys.quickStart')}</summary>
+        <p className="mt-2 text-xs text-muted-foreground">{t('keys.quickStartDesc')}</p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">{t('keys.exampleAuto')}</div>
+            <pre className="overflow-x-auto rounded-lg bg-background p-3 font-mono text-[11px] leading-relaxed"><code>{`curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer $YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`}</code></pre>
+          </div>
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">{t('keys.exampleFast')}</div>
+            <pre className="overflow-x-auto rounded-lg bg-background p-3 font-mono text-[11px] leading-relaxed"><code>{`curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer $YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"auto:fast","messages":[{"role":"user","content":"Hello"}]}'`}</code></pre>
+          </div>
+        </div>
+      </details>
     </section>
   )
 }

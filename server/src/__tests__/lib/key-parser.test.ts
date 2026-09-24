@@ -78,6 +78,13 @@ describe('key parser', () => {
     expect(detectPlatform('EXPLABS_')).toBe('experiential');
     expect(detectPlatform('ROUTER9_')).toBe('router9');
     expect(detectPlatform('ROUTER_9_')).toBe('router9');
+    expect(detectPlatform('LUCIDITY_')).toBe('lucidity');
+    expect(detectPlatform('AIRFORCE_')).toBe('airforce');
+    expect(detectPlatform('API_AIRFORCE_')).toBe('airforce');
+    expect(detectPlatform('DREAMPROMPTING_')).toBe('dreamprompting');
+    expect(detectPlatform('DREAM_PROMPTING_')).toBe('dreamprompting');
+    expect(detectPlatform('WATERFALL_')).toBe('waterfall');
+    expect(detectPlatform('LOGFARE_')).toBe('logfare');
     expect(detectPlatform('SEPTOR_')).toBe('septor');
     expect(detectPlatform('SEPTORLABS_')).toBe('septor');
     expect(detectPlatform('SEPTOR_LABS_')).toBe('septor');
@@ -107,6 +114,13 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['septor']).toBe('septor');
     expect(AUTH_JSON_PROVIDER_MAP['septor-labs']).toBe('septor');
     expect(AUTH_JSON_PROVIDER_MAP['septorlabs']).toBe('septor');
+    expect(AUTH_JSON_PROVIDER_MAP['lucidity']).toBe('lucidity');
+    expect(AUTH_JSON_PROVIDER_MAP['airforce']).toBe('airforce');
+    expect(AUTH_JSON_PROVIDER_MAP['api.airforce']).toBe('airforce');
+    expect(AUTH_JSON_PROVIDER_MAP['dreamprompting']).toBe('dreamprompting');
+    expect(AUTH_JSON_PROVIDER_MAP['dream-prompting']).toBe('dreamprompting');
+    expect(AUTH_JSON_PROVIDER_MAP['waterfall']).toBe('waterfall');
+    expect(AUTH_JSON_PROVIDER_MAP['logfare']).toBe('logfare');
     const result = parseAuthJson(JSON.stringify({
       credential_pool: {
         gemini: [{ id: '1', label: 'Gemini', auth_type: 'api_key', access_token: 'AIza-test' }],
@@ -127,7 +141,7 @@ describe('key parser', () => {
     expect(result.skipped).toEqual(['PORT: value does not look like an API key']);
   });
 
-  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze']])('imports %s environment keys', (prefix, platform) => {
+  it.each([['CLOD', 'clod'], ['SPEECHIFY', 'speechify'], ['BLAZE', 'blaze'], ['BLAZEAPI', 'blaze'], ['LUCIDITY', 'lucidity'], ['AIRFORCE', 'airforce'], ['API_AIRFORCE', 'airforce'], ['DREAMPROMPTING', 'dreamprompting'], ['DREAM_PROMPTING', 'dreamprompting'], ['WATERFALL', 'waterfall'], ['LOGFARE', 'logfare']])('imports %s environment keys', (prefix, platform) => {
     const result = parseKeysFromFile(`${prefix}_API_KEY=not-a-real-provider-key`, 'keys.env');
     expect(result.keys).toHaveLength(1);
     expect(result.keys[0].platform).toBe(platform);
@@ -152,8 +166,8 @@ describe('key parser', () => {
     const result = parseExportJson(exportJson);
     expect(result).not.toBeNull();
     expect(result!.keys).toHaveLength(2);
-    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google' });
-    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq' });
+    expect(result!.keys[0]).toEqual({ rawKey: 'Google Key=AIza-test-key', prefix: 'GOOGLE_', platform: 'google', label: 'Google Key' });
+    expect(result!.keys[1]).toEqual({ rawKey: 'Groq Key=gsk-test-key', prefix: 'GROQ_', platform: 'groq', label: 'Groq Key' });
     expect(result!.skipped).toHaveLength(0);
   });
 
@@ -169,23 +183,52 @@ describe('key parser', () => {
   it('parses CSV format with header', () => {
     const csv = 'platform,key,label\n"google","AIza-test","Google Key"\n"groq","gsk-test","Groq Key"\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google' },
-      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'Google Key' },
+      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq', label: 'Groq Key' },
     ]);
   });
 
   it('parses CSV format without header', () => {
     const csv = 'google,AIza-test,Google Key\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'Google Key' },
     ]);
   });
 
   it('parses the base_url column that makes a custom row importable', () => {
     const csv = 'platform,key,label,base_url\n"custom","sk-local","LM Studio","http://192.168.1.5:1234/v1"\n';
     expect(parseCsv(csv)).toEqual([
-      { key: 'CUSTOM_KEY', value: 'sk-local', platform: 'custom', baseUrl: 'http://192.168.1.5:1234/v1' },
+      { key: 'CUSTOM_KEY', value: 'sk-local', platform: 'custom', label: 'LM Studio', baseUrl: 'http://192.168.1.5:1234/v1' },
     ]);
+  });
+
+  // RFC 4180 quoting: the CSV export quotes every cell and doubles quotes in
+  // labels, so a label with a comma or a quote is routine. The old single
+  // regex could not represent those lines and silently dropped the whole row.
+  it('parses quoted labels containing commas and escaped quotes', () => {
+    const csv = 'platform,key,label,base_url\n' +
+      '"groq","gsk-abc","work, primary",""\n' +
+      '"google","AIza-test","say ""hi""",""\n';
+    expect(parseCsv(csv)).toEqual([
+      { key: 'GROQ_KEY', value: 'gsk-abc', platform: 'groq', label: 'work, primary' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'say "hi"' },
+    ]);
+  });
+
+  it('round-trips a full export through parseKeysFromFile', () => {
+    // Exactly what GET /api/keys/export?format=csv writes for three keys.
+    const csv = 'platform,key,label,base_url\n' +
+      '"groq","gsk-abc","work, primary",""\n' +
+      '"custom","sk-local","say ""hi""","http://192.168.1.5:1234/v1"\n';
+    const result = parseKeysFromFile(csv, 'freellmapi-keys.csv');
+    expect(result.skipped).toEqual([]);
+    expect(result.keys.map(k => k.platform)).toEqual(['groq', 'custom']);
+    expect(result.keys[1]!.baseUrl).toBe('http://192.168.1.5:1234/v1');
+    // Labels survive the round trip: rawKey's name half is what the import
+    // route stores as the key label, so an export/import cycle used to
+    // rename every key to the generated GROQ_KEY / CUSTOM_KEY.
+    expect(result.keys[0]!.rawKey).toBe('work, primary=gsk-abc');
+    expect(result.keys[1]!.rawKey).toBe('say "hi"=sk-local');
   });
 
   it('handles export JSON via parseKeysFromFile', () => {
@@ -199,13 +242,15 @@ describe('key parser', () => {
     });
     const result = parseKeysFromFile(exportJson, 'freellmapi-keys.json');
     expect(result.keys).toHaveLength(1);
-    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral' });
+    expect(result.keys[0]).toEqual({ rawKey: 'Mistral Key=mist-test', prefix: 'MISTRAL_', platform: 'mistral', label: 'Mistral Key' });
   });
 
   it('handles CSV via parseKeysFromFile', () => {
     const csv = 'platform,key,label\n"nvidia","nv-test","Nvidia Key"\n';
     const result = parseKeysFromFile(csv, 'freellmapi-keys.csv');
     expect(result.keys).toHaveLength(1);
-    expect(result.keys[0]).toEqual({ rawKey: 'NVIDIA_KEY=nv-test', prefix: 'NVIDIA_', platform: 'nvidia' });
+    // The CSV label wins over the generated name, matching the export JSON
+    // path above: the import route stores the rawKey name as the label.
+    expect(result.keys[0]).toEqual({ rawKey: 'Nvidia Key=nv-test', prefix: 'NVIDIA_', platform: 'nvidia', label: 'Nvidia Key' });
   });
 });

@@ -27,6 +27,7 @@ import {
   type HeadroomThresholds,
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS } from '../lib/error-classify.js';
+import { checkMonthlyBudget, reserveMonthlyBudget } from './key-budget.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
 import { modelsWithOverriddenField } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
@@ -36,6 +37,7 @@ import { getActiveProfileId } from './profile-models.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
 import { isDegraded } from './degradation.js';
 import { modelStatsKey, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
+import { isToolBenched } from '../lib/tool-capability.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getKeyQuotaHeadroom, inferQuotaPoolKey } from './provider-quota.js';
 import type { BaseProvider } from '../providers/base.js';
@@ -1500,6 +1502,11 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     if (!canMakeRequest(entry.platform, entry.model_id, key.id, limits)) { note('rpm/rpd-limit'); continue; }
     if (!canUseTokens(entry.platform, entry.model_id, key.id, estimatedTokens, limits)) { note('tpm/tpd-limit'); continue; }
     if (!canUseProviderTokens(entry.platform, key.id, entry.model_id, estimatedTokens)) { note('provider-daily-token-cap'); continue; }
+    // Monthly budget (#1158): a key whose request/token caps are spent for the
+    // current UTC month is not a candidate — same skip semantics as the daily
+    // gates above. The Retry-After (next-month boundary) surfaces through the
+    // fallback exhaustion path rather than blocking here.
+    if (!checkMonthlyBudget(key.id, estimatedTokens).allowed) { note('monthly-budget-cap'); continue; }
 
     let decryptedKey: string;
     try {
@@ -1519,6 +1526,9 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     roundRobinIndex.set(rrKey, idx);
     // Taken only once the key has cleared every gate and is definitely being
     // returned, so a rejected candidate never consumes concurrency budget.
+    const proxyUrl = decryptProxyUrl(key);
+    const budget = reserveMonthlyBudget(key.id, estimatedTokens);
+    if (!budget.allowed) { note('monthly-budget-cap'); continue; }
     const leaseId = acquireLease(entry.platform, entry.model_id, key.id, estimatedTokens);
     return {
       provider: resolvedProvider,
@@ -1528,14 +1538,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       keyId: key.id,
       keyLabel: key.label || null,
       // Decrypted once here, at the point the row is already in hand (#590).
-      proxyUrl: decryptProxyUrl(key),
+      proxyUrl,
       platform: entry.platform,
       displayName: entry.display_name,
       contextWindow: entry.context_window,
       endpointScope: entry.endpoint_scope ?? '',
       rpdLimit: limits.rpd,
       tpdLimit: limits.tpd,
-      release: () => releaseLease(leaseId),
+      release: () => { releaseLease(leaseId); budget.release(); },
     };
   }
 
@@ -1902,18 +1912,23 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
  */
 export function resolveFusionCandidate(modelId: string): FusionCandidate | null {
   const db = getDb();
-  const row = db.prepare(`
+  const rows = db.prepare(`
     SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name,
            m.size_label, m.supports_vision, m.supports_tools
     FROM models m
     WHERE m.model_id = ? AND m.enabled = 1
     ORDER BY m.intelligence_rank ASC, m.id ASC
-    LIMIT 1
-  `).get(modelId) as {
+  `).all(modelId) as {
     model_db_id: number; platform: string; model_id: string; display_name: string;
     size_label: string; supports_vision: number; supports_tools: number;
-  } | undefined;
-  if (row) {
+  }[];
+  if (rows.length > 0) {
+    // A logical model can have several enabled provider rows. Prefer one with
+    // an enabled, healthy/unknown key before falling back to the deterministic
+    // ranking. Without this check a duplicate alias can pin fusion to a
+    // keyless provider (for example a free relay) while a configured provider
+    // for the same model is available.
+    const row = rows.find(candidate => routableKeyIdsForModel(candidate.model_db_id).length > 0) ?? rows[0];
     return {
       modelDbId: row.model_db_id,
       platform: row.platform,
@@ -1932,7 +1947,11 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   if (isUnifyEnabled()) {
     const resolved = resolveRequestedIdForDispatch(modelId, getModelGroups());
     if (resolved && resolved.memberDbIds.length > 0) {
-      const top = resolveModelGroupCandidates(resolved.memberDbIds, resolved.demotedDbIds)[0];
+      const candidates = resolveModelGroupCandidates(resolved.memberDbIds, resolved.demotedDbIds);
+      // Bare unified aliases may resolve to a provider row that is enabled in
+      // the catalog but has no usable key. Select the first routable member so
+      // an explicit fusion panel does not waste a slot on that dead end.
+      const top = candidates.find(candidate => routableKeyIdsForModel(candidate.model_db_id).length > 0) ?? candidates[0];
       if (top) {
         return {
           modelDbId: top.model_db_id,
@@ -1990,6 +2009,9 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       if (skipPlatforms?.has(e.platform)) return false;
       if (requireVision && !e.supports_vision) return false;
       if (requireTools && !e.supports_tools) return false;
+      // Never spend the exploration slot on a model that keeps rejecting tool
+      // requests (#1230); it stays reachable at the back of the main walk.
+      if (requireTools && isToolBenched(e.platform, e.model_id, e.endpoint_scope)) return false;
       if (requireStructured && platformDropsResponseFormat(e.platform)) return false;
       if (!fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve)) return false;
       if (e.tpm_limit != null && estimatedTokens > e.tpm_limit) return false;
@@ -2070,12 +2092,22 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
   // sweep margin-fitting models first; ones that only fit the advertised window
   // stay eligible behind them. Worst case is one classified context_too_large
   // hop instead of no route at all.
+  //
+  // Same soft treatment for models that keep answering tool requests with a 400
+  // (#1230, lib/tool-capability.ts): on a tool request they go to the very back
+  // instead of being excluded, so the worst case is the old order, never an
+  // empty pool. An explicit pin keeps its place: the client named that model.
   const servingChain: ChainRow[] = [];
   const marginDeferred: ChainRow[] = [];
+  const toolDeferred: ChainRow[] = [];
   for (const e of routableChain) {
+    if (requireTools && e.model_db_id !== preferredModelDbId && isToolBenched(e.platform, e.model_id, e.endpoint_scope)) {
+      toolDeferred.push(e);
+      continue;
+    }
     (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve) ? servingChain : marginDeferred).push(e);
   }
-  servingChain.push(...marginDeferred);
+  servingChain.push(...marginDeferred, ...toolDeferred);
 
   for (const entry of servingChain) {
     const label = `${entry.platform}/${entry.model_id}`;

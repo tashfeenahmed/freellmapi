@@ -8,6 +8,8 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import {
   applyAllModelOverrides,
+  refreshModelOverrideBaselines,
+  routableContextWindow,
   applyModelOverrides,
   deleteTombstonedCatalogModels,
   isCatalogModelTombstoned,
@@ -249,11 +251,6 @@ function isCatalog(value: unknown): value is Catalog {
   );
 }
 
-function routableContextWindow(platform: string, modelId: string, contextWindow: number | null): number | null {
-  if (platform === 'github' && modelId === 'openai/gpt-4.1') return 8000;
-  return contextWindow;
-}
-
 /**
  * Apply a verified catalog to the local DB inside one transaction.
  *
@@ -427,10 +424,12 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         // Catalog disable wins (dead upstream); local disable also wins.
         const enabled = m.enabled ? row.enabled : 0;
         updateModel.run({ ...fields, id: row.id, enabled });
+        refreshModelOverrideBaselines(db, m.platform, m.modelId);
         applyModelOverrides(db, m.platform, m.modelId);
         counts.updated++;
       } else {
         insertModel.run({ ...fields, platform: m.platform, modelId: m.modelId, enabled: m.enabled ? 1 : 0 });
+        refreshModelOverrideBaselines(db, m.platform, m.modelId);
         applyModelOverrides(db, m.platform, m.modelId);
         counts.inserted++;
       }

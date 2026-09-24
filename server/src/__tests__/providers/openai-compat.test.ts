@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import dns from 'node:dns';
-import { OpenAICompatProvider } from '../../providers/openai-compat.js';
+import { OpenAICompatProvider, inBandCreditsError } from '../../providers/openai-compat.js';
 
 describe('OpenAICompatProvider', () => {
   let provider: OpenAICompatProvider;
@@ -1037,5 +1037,96 @@ describe('reasoning: request knob + <think> extraction (P2 #16)', () => {
     expect(chunks).toHaveLength(4);
     expect(chunks.map(c => c.choices?.[0]?.delta?.content ?? '').join('')).toBe('Hello world');
     expect(chunks.some(c => (c.choices?.[0]?.delta as any)?.reasoning_content != null)).toBe(false);
+  });
+});
+
+describe('OpenAICompatProvider in-band out-of-credits notice (#pollinations-inband)', () => {
+  // The canned Pollinations top-up message returned as a 200 body.
+  const CREDITS = "The account behind this API key doesn't have enough credits. " +
+    'Please top up (https://enter.pollinations.ai/top-up?ref=agent_low_balance_topup) or ' +
+    'complete a quest (https://enter.pollinations.ai/quests?ref=agent_low_balance_quests), then try again.';
+
+  afterEach(() => vi.restoreAllMocks());
+
+  const provider = () => new OpenAICompatProvider({ platform: 'groq', name: 'Pollinations', baseUrl: 'https://x/v1' });
+
+  function sse(frames: string[]): any {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const f of frames) controller.enqueue(encoder.encode(f));
+        controller.close();
+      },
+    });
+    return { ok: true, body: stream, headers: new Headers() };
+  }
+  const dataFrame = (delta: Record<string, unknown>, finish: string | null = null) =>
+    `data: ${JSON.stringify({ id: 's1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+  async function collect<T>(g: AsyncGenerator<T>): Promise<T[]> {
+    const out: T[] = [];
+    for await (const c of g) out.push(c);
+    return out;
+  }
+
+  describe('inBandCreditsError', () => {
+    it('flags the Pollinations notice and a truncated prefix of it', () => {
+      expect(inBandCreditsError(CREDITS)).toBeTruthy();
+      expect(inBandCreditsError("doesn't have enough credits. Please top up")).toBeTruthy();
+    });
+    it('does not flag a genuine reply that merely mentions credits', () => {
+      expect(inBandCreditsError("You don't need enough credits upfront — just enable billing.")).toBeNull();
+      expect(inBandCreditsError('Here is a poem about the ocean.')).toBeNull();
+      expect(inBandCreditsError('')).toBeNull();
+      expect(inBandCreditsError(undefined)).toBeNull();
+    });
+  });
+
+  it('non-stream: throws a payment-required error instead of returning the notice', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation(async () => ({
+      ok: true,
+      headers: new Headers(),
+      json: () => Promise.resolve({
+        id: 'x', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{ index: 0, message: { role: 'assistant', content: CREDITS }, finish_reason: 'stop' }],
+      }),
+    }) as any);
+    await expect(provider().chatCompletion('k', [{ role: 'user', content: 'q' }], 'm'))
+      .rejects.toThrow(/402|insufficient credit/i);
+  });
+
+  it('non-stream: a normal reply is returned unchanged', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation(async () => ({
+      ok: true,
+      headers: new Headers(),
+      json: () => Promise.resolve({
+        id: 'x', object: 'chat.completion', created: 1, model: 'm',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'hello there' }, finish_reason: 'stop' }],
+      }),
+    }) as any);
+    const res = await provider().chatCompletion('k', [{ role: 'user', content: 'q' }], 'm');
+    expect(res.choices[0].message.content).toBe('hello there');
+  });
+
+  it('stream: throws before yielding any chunk when the body is a credits notice', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation(async () => sse([
+      dataFrame({ role: 'assistant' }),
+      dataFrame({ content: CREDITS }),
+      dataFrame({}, 'stop'),
+      'data: [DONE]\n\n',
+    ]));
+    await expect(collect(provider().streamChatCompletion('k', [{ role: 'user', content: 'q' }], 'm')))
+      .rejects.toThrow(/402|insufficient credit/i);
+  });
+
+  it('stream: a normal reply passes through unchanged', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation(async () => sse([
+      dataFrame({ role: 'assistant' }),
+      dataFrame({ content: 'Hello ' }),
+      dataFrame({ content: 'world' }),
+      dataFrame({}, 'stop'),
+      'data: [DONE]\n\n',
+    ]));
+    const chunks = await collect(provider().streamChatCompletion('k', [{ role: 'user', content: 'q' }], 'm'));
+    expect(chunks.map(c => c.choices?.[0]?.delta?.content ?? '').join('')).toBe('Hello world');
   });
 });

@@ -3,7 +3,6 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import readline from 'node:readline/promises';
 import { spawn } from 'node:child_process';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -108,6 +107,13 @@ async function promptForKey(): Promise<string> {
       'No API key supplied. Pass --api-key or set FREELLMAPI_API_KEY.',
     );
   }
+  // Imported lazily, not statically: `node:readline/promises` only exists on
+  // Node >=17.4, and a static import of it crashes the whole CLI at load time
+  // on older runtimes (#1283) — `npx freellmapi --help` died with
+  // ERR_UNKNOWN_BUILTIN_MODULE before main() or the engines check could say
+  // anything useful. Deferring it means only the interactive key prompt needs
+  // a modern Node; every other command degrades to the readable error below.
+  const readline = (await import('node:readline/promises')).default;
   let muted = false;
   const output = new Writable({
     write(chunk, _encoding, callback) {
@@ -464,12 +470,33 @@ function isDirectExecution(): boolean {
   }
 }
 
+/** Minimum Node major this CLI actually runs on: `AbortSignal.timeout`
+ *  (17.3), global `fetch` (18), `node:readline/promises` (17.4) — rounded to
+ *  the package's engines floor of 20. npm treats `engines` as a warning by
+ *  default (and npm 6, still common on Windows boxes hitting #1283, ignores it
+ *  for `npx`), so without this check an unsupported runtime gets a stack
+ *  trace instead of a sentence. Returns null when the runtime is fine. */
+export function unsupportedNodeVersion(
+  version: string | undefined = process.versions.node,
+  major: number | undefined = Number(version?.split('.')[0]),
+): string | null {
+  if (!version || !Number.isFinite(major)) return null; // Non-Node runtimes: don't guess.
+  if (major >= 20) return null;
+  return `freellmapi requires Node.js 20 or newer (found ${version}). Install one from https://nodejs.org and re-run.`;
+}
+
 if (isDirectExecution()) {
-  main().then(
-    code => { process.exitCode = code; },
-    error => {
-      process.stderr.write(`freellmapi: ${error instanceof Error ? error.message : String(error)}\n`);
-      process.exitCode = 1;
-    },
-  );
+  const unsupported = unsupportedNodeVersion();
+  if (unsupported) {
+    process.stderr.write(`freellmapi: ${unsupported}\n`);
+    process.exitCode = 1;
+  } else {
+    main().then(
+      code => { process.exitCode = code; },
+      error => {
+        process.stderr.write(`freellmapi: ${error instanceof Error ? error.message : String(error)}\n`);
+        process.exitCode = 1;
+      },
+    );
+  }
 }

@@ -197,7 +197,7 @@ interface FallbackHooks {
 | 错误 | 跳过范围 | 冷却 | 模型惩罚 | 限额学习 |
 |-------|------------|------|---------------|-------------|
 | 401 无效密钥 | 密钥 | 5 min | 否 | 否 |
-| 402 需付款 | 密钥 | 24h | 否 | 否 |
+| 402 需付款 | **密钥，覆盖该平台全部模型** (#1239) | 24h | 否 | 否 |
 | 403 模型被禁 | **模型** | 24h | 否 | 否 |
 | 429 每日耗尽 | 模型+密钥 | 到午夜 / Retry-After | **重 (3)** | 是 |
 | 429 瞬时 (rpm/tpm) | 密钥 | 90s / 阶梯 | 轻 (1) | 是 |
@@ -230,7 +230,7 @@ interface FallbackHooks {
 2. **全 context_too_large** → 413 `invalid_request_error` (`context_length_exceeded`)。
 3. **全 model_not_found** → 404 `invalid_request_error` (`model_not_found`)。
 4. **末尾错误 = degraded 400**（NVIDIA NIM） → 503 `service_unavailable` (`provider_degraded`)。
-5. **末尾错误 = 提供方坏请求** → 400 `invalid_request_error` (`provider_rejected_request`)。
+5. **全 provider_bad_request**（或无 trail 的旧形态且末尾错误 = 提供方坏请求） → 400 `invalid_request_error` (`provider_rejected_request`)。混合 trail 中仅部分为坏请求时落到第 8 条——末尾一跳的形态不再单独归咎于调用方请求（#1239）。
 6. **断路器** → 503 `service_unavailable` (`upstream_unhealthy`)。
 7. **全 UNAVAILABLE_UNTIL_KNOWN_TIME**（rate_limited、daily_quota_exhausted、out_of_credits、forbidden） → 429 `rate_limit_error` 带 `retryAtMs` + `Retry-After`。
 8. **混合/其他** → 502 `provider_error` (`upstream_failed`) —— 绝不 500（那是我们的 bug）。

@@ -17,3 +17,18 @@ export function parseBudget(s: string): number {
   const unit = m[3] === 'M' ? 1_000_000 : 1_000;
   return high * unit;
 }
+
+// Sort score for the "budget" preset on the fallback/profiles dashboards.
+// Shares parseBudget so rate-limit labels can't masquerade as budgets: the
+// per-route copies this replaced multiplied the bare number in
+// "free · 40 RPM" by 1e6 because the 'M' in "RPM" hit the unit check, ranking
+// a 40-requests-per-minute model as a 40-million-token budget.
+// tpd_limit still wins when present (a concrete daily cap beats a "~" label),
+// and "unlimited"/"∞" labels keep sorting above every parsed budget.
+export function monthlyBudgetScore(m: { monthly_token_budget: string; tpd_limit: number | null }): number {
+  if (m.tpd_limit != null) return m.tpd_limit * 30;
+  const str = m.monthly_token_budget;
+  if (!str) return 0;
+  if (str.toLowerCase().includes('unlimited') || str.includes('∞')) return Infinity;
+  return parseBudget(str);
+}

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
@@ -8,15 +9,27 @@ import {
   isCatalogManagedModel,
   overriddenFieldNames,
   recordCatalogModelTombstone,
+  clearCatalogModelTombstone,
   upsertModelOverrides,
   type ModelOverridePatch,
 } from '../services/model-state.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
-import { getActiveProfileId } from '../services/profile-models.js';
-import { endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
-import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
+import { getActiveProfileId, ensureModelInProfiles } from '../services/profile-models.js';
+import { endpointScopeForBaseUrl, endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
+import { clearCustomModelTombstone, recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
+import { customModelSeed } from '../services/custom-model-seed.js';
+import { routePinnedModel } from '../services/router.js';
+import { logRequest } from '../lib/request-log.js';
+import { withKeyProxy } from '../lib/proxy.js';
+import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
+import { recordRequest, recordTokens } from '../services/ratelimit.js';
 
 export const modelsRouter = Router();
+
+// Throttle map for model test endpoint: modelDbId -> lastTestTimestamp
+const modelTestCooldowns = new Map<number, number>();
+const MODEL_TEST_THROTTLE_MS = 5000;
+
 
 const modelUpdateSchema = z.object({
   displayName: z.string().min(1).max(200).optional(),
@@ -73,6 +86,137 @@ function fetchModelRow(id: number): ModelRow | undefined {
     .get(id) as ModelRow | undefined;
 }
 
+const createModelSchema = z.object({
+  platform: z.string().min(1).max(50),
+  modelId: z.string().min(1).max(200),
+  displayName: z.string().min(1).max(200).optional(),
+  contextWindow: z.number().int().positive().nullable().optional(),
+  rpmLimit: z.number().int().positive().nullable().optional(),
+  rpdLimit: z.number().int().positive().nullable().optional(),
+  tpmLimit: z.number().int().positive().nullable().optional(),
+  tpdLimit: z.number().int().positive().nullable().optional(),
+  supportsVision: z.boolean().optional(),
+  supportsTools: z.boolean().optional(),
+  keyId: z.number().int().positive().nullable().optional(),
+  endpointScope: z.string().nullable().optional(),
+}).strict();
+
+modelsRouter.post('/', (req: Request, res: Response) => {
+  const parsed = createModelSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    return;
+  }
+
+  const data = parsed.data;
+  if (!hasProvider(data.platform as Platform) && data.platform !== 'custom') {
+    res.status(400).json({ error: { message: `Invalid platform "${data.platform}"` } });
+    return;
+  }
+
+  const db = getDb();
+
+  let endpointScope = '';
+  const boundKeyId: number | null = data.keyId ?? null;
+  if (data.platform === 'custom') {
+    endpointScope = endpointScopeOfKey(db, boundKeyId);
+    if (!endpointScope) {
+      res.status(400).json({ error: { message: 'Select an existing custom endpoint key for this model' } });
+      return;
+    }
+    if (data.endpointScope && endpointScopeForBaseUrl(data.endpointScope) !== endpointScope) {
+      res.status(400).json({ error: { message: 'The endpoint does not match the selected key' } });
+      return;
+    }
+  } else if (boundKeyId != null || data.endpointScope) {
+    res.status(400).json({ error: { message: 'Endpoint keys can only be bound to custom models' } });
+    return;
+  }
+
+  const existing = db.prepare(
+    'SELECT id FROM models WHERE platform = ? AND model_id = ? AND endpoint_scope = ?'
+  ).get(data.platform, data.modelId, endpointScope) as { id: number } | undefined;
+
+  if (existing) {
+    res.status(409).json({ error: { message: `Model "${data.modelId}" already exists for platform "${data.platform}"` } });
+    return;
+  }
+
+  const seed = customModelSeed(db);
+
+  const insertModel = db.transaction(() => {
+    // Clear any tombstone so manual re-creation brings the model back into active state
+    if (data.platform === 'custom') {
+      clearCustomModelTombstone(db, endpointScope, data.modelId);
+    } else {
+      clearCatalogModelTombstone(db, 'chat', data.platform, data.modelId);
+    }
+
+    const info = db.prepare(`
+      INSERT INTO models (
+        platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+        rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
+        enabled, supports_vision, supports_tools, key_id, source, endpoint_scope
+      ) VALUES (
+        @platform, @modelId, @displayName, @intelligenceRank, @speedRank, @sizeLabel,
+        @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, '', @contextWindow,
+        1, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
+      )
+    `).run({
+      platform: data.platform,
+      modelId: data.modelId,
+      displayName: data.displayName || data.modelId,
+      intelligenceRank: seed.intelligenceRank,
+      speedRank: seed.speedRank,
+      sizeLabel: seed.sizeLabel,
+      rpmLimit: data.rpmLimit ?? null,
+      rpdLimit: data.rpdLimit ?? null,
+      tpmLimit: data.tpmLimit ?? null,
+      tpdLimit: data.tpdLimit ?? null,
+      contextWindow: data.contextWindow ?? null,
+      supportsVision: data.supportsVision ? 1 : 0,
+      supportsTools: data.supportsTools !== undefined ? (data.supportsTools ? 1 : 0) : 1,
+      keyId: boundKeyId,
+      endpointScope,
+    });
+
+    const modelDbId = Number(info.lastInsertRowid);
+
+    const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelDbId);
+    if (!inChain) {
+      const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
+      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelDbId, max.m + 1);
+    }
+    ensureModelInProfiles(db, modelDbId);
+
+    return modelDbId;
+  });
+
+  const createdId = insertModel();
+
+  res.status(201).json({
+    success: true,
+    id: createdId,
+    model: {
+      id: createdId,
+      platform: data.platform,
+      modelId: data.modelId,
+      displayName: data.displayName || data.modelId,
+      contextWindow: data.contextWindow ?? null,
+      rpmLimit: data.rpmLimit ?? null,
+      rpdLimit: data.rpdLimit ?? null,
+      tpmLimit: data.tpmLimit ?? null,
+      tpdLimit: data.tpdLimit ?? null,
+      supportsVision: Boolean(data.supportsVision),
+      supportsTools: data.supportsTools ?? true,
+      enabled: true,
+      source: 'custom',
+      endpointScope: endpointScope || null,
+      keyId: boundKeyId,
+    },
+  });
+});
+
 modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
@@ -92,8 +236,10 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
     // next daily pass re-registers a model the operator removed on purpose.
     recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
     db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+    db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
     db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(id);
     deleteUnusedCustomEndpointKey(db, row.key_id);
+    pruneUnavailableSavedFusionConfig();
   });
   remove();
   res.json({ success: true });
@@ -131,6 +277,14 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     const disablesModel = modelPatch.enabled === false;
 
     if (modelKeys.length > 0) {
+      // The row as it stands BEFORE the update below. For a catalog model this
+      // is the catalog-applied value (stored overrides re-apply to rows only
+      // after each sync), i.e. the baseline an override that returns to the
+      // catalog default is recognised against (#1178).
+      const preUpdateRow = isCatalogManagedModel(row)
+        ? db.prepare('SELECT * FROM models WHERE id = ?').get(id) as Record<string, unknown> | undefined
+        : undefined;
+
       const assignments: string[] = [];
       const values: unknown[] = [];
       for (const key of modelKeys) {
@@ -151,7 +305,7 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
             overridePatch[key] = modelPatch[key] as never;
           }
         }
-        upsertModelOverrides(db, row.platform, row.model_id, overridePatch);
+        upsertModelOverrides(db, row.platform, row.model_id, overridePatch, { baselineRow: preUpdateRow });
       }
 
       if (disablesModel) {
@@ -199,12 +353,77 @@ modelsRouter.delete('/:id', (req: Request, res: Response) => {
       recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
     }
     db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+    db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
     db.prepare('DELETE FROM models WHERE id = ?').run(id);
     if (row.platform === 'custom') deleteUnusedCustomEndpointKey(db, row.key_id);
+    pruneUnavailableSavedFusionConfig();
   });
   remove();
 
   res.json({ success: true, tombstoned: isCatalogManagedModel(row) });
+});
+
+modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: { message: 'Invalid id' } });
+    return;
+  }
+
+  const modelRow = fetchModelRow(id);
+  if (!modelRow) {
+    res.status(404).json({ error: { message: `Unknown model ${id}` } });
+    return;
+  }
+
+  const now = Date.now();
+  for (const [modelId, testedAt] of modelTestCooldowns) {
+    if (now - testedAt >= MODEL_TEST_THROTTLE_MS) modelTestCooldowns.delete(modelId);
+  }
+  const lastTest = modelTestCooldowns.get(id);
+  if (lastTest != null) {
+    const waitSec = Math.ceil((MODEL_TEST_THROTTLE_MS - (now - lastTest)) / 1000);
+    res.setHeader('Retry-After', String(waitSec));
+    res.status(429).json({ error: { message: `Model test is throttled. Please wait ${waitSec}s before testing again.` } });
+    return;
+  }
+  modelTestCooldowns.set(id, now);
+
+  // Use the same key selection, quota gates and in-flight reservations as
+  // inference, pinned to this model so Test cannot silently try another one.
+  const inputEstimate = 16;
+  const outputLimit = 4;
+  const route = routePinnedModel(id, inputEstimate + outputLimit);
+  if (!route) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'No enabled API key is currently available for this model. Check model status, cooldowns and quotas.' });
+    return;
+  }
+  const startTime = Date.now();
+  try {
+    const response = await withKeyProxy(route.proxyUrl, () => route.provider.chatCompletion(
+      route.apiKey, [{ role: 'user', content: 'ping' }], route.modelId,
+      { max_tokens: outputLimit, timeoutMs: 15_000 },
+    ));
+    const latencyMs = Date.now() - startTime;
+    const outputTokens = response.usage?.completion_tokens ?? Math.ceil((response.choices?.[0]?.message?.content?.length ?? 0) / 4);
+    const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
+    recordRequest(route.platform, route.modelId, route.keyId);
+    recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+    // The request-log transaction also settles the durable monthly ledger.
+    logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens,
+      latencyMs, null, null, route.modelId, null, 'model-test');
+    res.json({ success: true, modelId: route.modelId, latencyMs });
+  } catch (err: unknown) {
+    const latencyMs = Date.now() - startTime;
+    const error = sanitizeProviderErrorMessage(err instanceof Error ? err.message : String(err));
+    logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0,
+      latencyMs, error, null, route.modelId, null, 'model-test');
+    res.json({ success: false, modelId: route.modelId, latencyMs, error });
+  } finally {
+    route.release?.();
+  }
+
 });
 
 // List all models with availability info

@@ -68,6 +68,13 @@ export type Platform =
   // monthly when a payment method is attached; usage beyond the grant is
   // pay-as-you-go. Background polling is required for its flex-only models.
   | 'sail'
+  // Responses-only gateway; a shared monthly free allowance, not per model.
+  | 'aclide'
+  // OpenAI-compatible chat and embeddings; one shared $1 monthly allowance.
+  | 'speka'
+  // Hosted vision API: $5/workspace in recurring monthly credits, shared
+  // across models. Signed catalog only; no bundled model seeds.
+  | 'moondream'
   // Hosted gateways; model rows are delivered by the signed catalog only.
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'
@@ -78,6 +85,13 @@ export type Platform =
   | 'clod'
   | 'speechify'
   | 'blaze'
+  // Lucidity Composite, Api.Airforce and DreamPrompting expose daily free
+  // allowances; Waterfall and Logfare publish community / fair-use tiers.
+  | 'lucidity'
+  | 'airforce'
+  | 'dreamprompting'
+  | 'waterfall'
+  | 'logfare'
   // B.AI — OpenAI-compatible gateway. Its catalog row is a live-tested,
   // limited-time 0-credit promotion, not a recurring free allowance.
   | 'bai'
@@ -114,8 +128,8 @@ export type Platform =
   // platform.agnes-ai.com (no card).
   | 'agnes'
   // Reka — OpenAI-compatible. Native multimodal models (reka-edge takes
-  // image/video); free via a recurring monthly credit grant, key from
-  // platform.reka.ai (no card).
+  // image/video). New accounts need prepaid credits (#1202); key from
+  // platform.reka.ai.
   | 'reka'
   // SiliconFlow — OpenAI-compatible. Registered for its FREE generative-media
   // models (FLUX.1-schnell image, CosyVoice2 TTS) routed via services/media.ts;
@@ -237,6 +251,9 @@ export interface Model {
   enabled: boolean;
   supportsVision: boolean;
   supportsTools: boolean;
+  source?: 'catalog' | 'custom';
+  keyId?: number | null;
+  endpointScope?: string | null;
 }
 
 // ---- Quirks ----
@@ -303,6 +320,8 @@ export interface ApiKey {
   /** Model ids this key is limited to; null = serves every model of its
    *  platform (#657). */
   modelScope?: string[] | null;
+  /** The per-key proxy override with its password masked (#590); '' = none. */
+  maskedProxyUrl?: string;
   models?: ApiKeyModel[];
   cooldowns?: ApiKeyCooldown[];
 }
@@ -571,4 +590,77 @@ export interface ProviderQuotaObservation extends ProviderQuotaState {
   endpoint: string | null;
   rawJson: string | null;
   createdAt: string;
+}
+
+export interface QuotaOutlookPool {
+  platform: Platform;
+  pool: string;
+  limit: number | null;
+  remaining: number | null;
+  remainingPct: number | null;
+  observedAt: string | null;
+  resetAt: string | null;
+  /** Successful requests through this instance during the observation window. */
+  recentRequestCount: number;
+  ratePerMin: number;
+  unavailableReason: 'quota_not_reported' | 'stale_observation' | 'reset_not_reported' | 'low_confidence' | null;
+  estimatedExhaustionAt: string | null;
+  status: 'unknown' | 'stale' | 'unavailable' | 'insufficient_data' | 'resets_first' | 'forecast' | 'exhausted';
+  warning: 'low_balance' | 'exhausting_soon' | null;
+}
+
+export interface QuotaOutlookResponse {
+  generatedAt: string;
+  observationWindowMinutes: number;
+  minimumRequests: number;
+  pools: QuotaOutlookPool[];
+}
+
+// ---- Provider Dashboard Types ----
+
+export type ProviderHealthStatus = 'healthy' | 'issues' | 'rate_limited' | 'unknown' | 'unconfigured';
+
+export interface ProviderSummary {
+  platform: Platform;
+  name: string;
+  totalKeys: number;
+  enabledKeys: number;
+  healthyKeys: number;
+  totalModels: number;
+  activeModels: number;
+  status: ProviderHealthStatus;
+  isConfigured: boolean;
+}
+
+export interface GroupedProvider {
+  id: string;
+  platform: Platform;
+  name: string;
+  url?: string;
+  baseUrl?: string | null;
+  endpointScope?: string | null;
+  keyless?: boolean;
+  keys: ApiKey[];
+  models: Model[];
+  summary: ProviderSummary;
+}
+
+export interface CustomModelCreate {
+  platform: Platform;
+  modelId: string;
+  displayName?: string;
+  contextWindow?: number | null;
+  rpmLimit?: number | null;
+  rpdLimit?: number | null;
+  tpmLimit?: number | null;
+  tpdLimit?: number | null;
+  supportsVision?: boolean;
+  supportsTools?: boolean;
+}
+
+export interface ModelTestResult {
+  success: boolean;
+  modelId: string;
+  latencyMs: number;
+  error?: string;
 }

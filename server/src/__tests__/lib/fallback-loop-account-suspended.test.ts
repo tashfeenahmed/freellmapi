@@ -166,3 +166,56 @@ describe('a suspended account benches the whole key, not one model', () => {
     expect(classifyAttemptError(SUSPENDED())).toBe('forbidden');
   });
 });
+
+// A stale CATALOG misses on every sibling model in a row (#1218): the per-model
+// skip can't see the pattern (each miss is a different model), so from
+// MODEL_NOT_FOUND_PLATFORM_LIMIT distinct model_not_found hops on one platform
+// — within one request — the whole platform is ruled out for the rest of it.
+describe('distinct model_not_found hops short-circuit the platform within one request', () => {
+  // Plain phrasing that the EXISTING isModelNotFoundError substring checks
+  // already match — this PR is independent of the quoted-id regex widening
+  // (#1219); together the two cover NavyAI's exact wording.
+  const notFoundErr = () => Object.assign(
+    new Error('NavyAI API error 400: model does not exist'),
+    { status: 400 },
+  );
+
+  it('rules the platform out from the Nth DISTINCT model miss', () => {
+    const state = newFallbackState();
+    recordRetryableFailure(routeFor(models[0], keyA), notFoundErr(), state);
+    recordRetryableFailure(routeFor(models[1], keyA), notFoundErr(), state);
+    // Under the limit: the platform stays reachable for the next hop.
+    expect(state.skipPlatforms.has(PLATFORM)).toBe(false);
+    recordRetryableFailure(routeFor(models[2], keyA), notFoundErr(), state);
+    expect(state.skipPlatforms.has(PLATFORM)).toBe(true);
+  });
+
+  it('repeated misses on the SAME model do not count toward the limit', () => {
+    const state = newFallbackState();
+    for (let i = 0; i < 5; i++) {
+      recordRetryableFailure(routeFor(models[0], keyA), notFoundErr(), state);
+    }
+    expect(state.skipPlatforms.has(PLATFORM)).toBe(false);
+  });
+
+  it('never rules out the shared custom platform: each relay has its own catalog', () => {
+    const state = newFallbackState();
+    // Three different relays, one stale model each. They all carry the platform
+    // id 'custom', so a platform-wide skip would take healthy relays with it.
+    models.slice(0, 3).forEach((model, i) => {
+      const route = { ...routeFor(model, keyA), platform: 'custom', endpointScope: `https://relay-${i}.example/v1` };
+      recordRetryableFailure(route, notFoundErr(), state);
+    });
+    expect(state.skipPlatforms.has('custom')).toBe(false);
+    // The per-model skip still applies.
+    expect(state.skipModels.size).toBe(3);
+  });
+
+  it('misses on sibling keys of the same platform tally together (the catalog is shared)', () => {
+    const state = newFallbackState();
+    recordRetryableFailure(routeFor(models[0], keyA), notFoundErr(), state);
+    recordRetryableFailure(routeFor(models[1], keyB), notFoundErr(), state);
+    recordRetryableFailure(routeFor(models[2], keyA), notFoundErr(), state);
+    expect(state.skipPlatforms.has(PLATFORM)).toBe(true);
+  });
+});

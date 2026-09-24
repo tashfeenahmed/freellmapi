@@ -9,7 +9,7 @@ import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
-import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
+import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
 
 export const ollamaRouter = Router();
@@ -377,6 +377,12 @@ function ollamaWire(model: string): InboundChatWire {
   };
 }
 
+// Every handler below RETURNS its promise rather than voiding it, so Express
+// 5 forwards a rejection to errorHandler — the same treatment the OpenAI and
+// Anthropic surfaces get from their `async` handlers. A voided promise leaves
+// the router and resurfaces as an `unhandledRejection`, which the process
+// safety net classifies as fatal for anything that is not a transport error,
+// so one failing request exited the whole gateway instead of answering 500.
 ollamaRouter.post('/api/chat', (req, res) => {
   if (!authorize(req, res)) return;
   const parsed = chatSchema.safeParse(req.body);
@@ -402,7 +408,7 @@ ollamaRouter.post('/api/chat', (req, res) => {
   const options = body.options as Record<string, unknown> | undefined;
   const rawSession = req.headers['x-ollama-session-id'] ?? req.headers['x-session-id'];
   const sessionId = Array.isArray(rawSession) ? rawSession[0] : rawSession;
-  void runInboundChat(req, res, {
+  return runInboundChat(req, res, {
     model,
     messages: ollamaMessages(body.messages),
     stream: body.stream !== false,
@@ -522,7 +528,7 @@ ollamaRouter.post('/api/generate', (req, res) => {
       ? `${body.prompt}\n\nComplete the text before this suffix:\n${body.suffix}`
       : body.prompt,
   });
-  void runInboundChat(req, res, {
+  return runInboundChat(req, res, {
     model,
     messages,
     stream: body.stream !== false,
@@ -578,12 +584,16 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
     }
   } catch (error: any) {
     const status = error instanceof EmbeddingsError ? error.status : 502;
+    if (error instanceof EmbeddingsError) {
+      const retrySec = embeddingsRetryAfterSec(error);
+      if (retrySec !== undefined) res.setHeader('Retry-After', retrySec);
+    }
     res.status(status).json({ error: error.message ?? 'embedding request failed' });
   }
 }
 
 ollamaRouter.post('/api/embed', (req, res) => {
-  void handleEmbed(req, res, false);
+  return handleEmbed(req, res, false);
 });
 
 // The dashboard already owns POST /api/embeddings. A valid dashboard session
@@ -603,5 +613,5 @@ ollamaRouter.post('/api/embeddings', (req: Request, res: Response, next: NextFun
     res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
     return;
   }
-  void handleEmbed(req, res, true);
+  return handleEmbed(req, res, true);
 });

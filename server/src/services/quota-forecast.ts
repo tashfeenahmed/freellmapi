@@ -1,5 +1,7 @@
 import type { QuotaObservationView } from './provider-quota.js';
-import { getQuotaStateForKeys } from './provider-quota.js';
+import { getQuotaStateForKeys, inferPoolForPlatform } from './provider-quota.js';
+import { getDb } from '../db/index.js';
+import type { Platform } from '@freellmapi/shared/types.js';
 
 // Daily free-tier balance forecast (#1104). Free tiers reset on a per-account
 // window (usually UTC midnight) and the only way to know how much headroom is
@@ -20,6 +22,12 @@ export const LOW_BALANCE_ABSOLUTE = 20; // ...or fewer than 20 requests left
 // percentage rule alone decides, otherwise a small tier would warn from its
 // first request onwards and the flag would mean nothing.
 export const LOW_BALANCE_ABSOLUTE_MIN_LIMIT = 200;
+
+// Rate observation window: look at requests in the last N minutes to estimate
+// current consumption speed. Ten minutes covers bursty usage while ignoring
+// sub-hour lulls; shorter windows would jitter, longer ones would lag.
+export const RATE_OBSERVATION_WINDOW_MINUTES = 10;
+export const MIN_FORECAST_REQUESTS = 3;
 
 export interface QuotaForecastEntry {
   /** Platform the pool belongs to, e.g. 'groq'. */
@@ -43,6 +51,18 @@ export interface QuotaForecastEntry {
   low_balance: boolean;
   /** Seconds until reset_at, or null when reset_at is unknown/expired. */
   seconds_until_reset: number | null;
+
+  // --- estimated-exhaustion fields (the #1104 extension) ---
+
+  /** Observed request rate in the last `RATE_OBSERVATION_WINDOW_MINUTES` minutes,
+   *  or null when there is not enough recent request volume to estimate honestly.
+   *  Non-null values are rounded to 2 decimal places. */
+  rate_per_min: number | null;
+  /** ISO timestamp of when the current window is expected to be exhausted at the
+   *  observed rate, or null when the rate is too low / unknown to predict. A pool
+   *  whose window has already expired or whose remaining is unknown is excluded
+   *  regardless. */
+  estimated_exhaustion_at: string | null;
 }
 
 function secondsUntilReset(resetAt: string | null): number | null {
@@ -52,7 +72,51 @@ function secondsUntilReset(resetAt: string | null): number | null {
   return Math.floor(ms / 1000);
 }
 
-function entryFor(row: QuotaObservationView): QuotaForecastEntry | null {
+/** Successful traffic grouped by the same key/pool identity used for observations. */
+export interface RecentQuotaActivity {
+  platform: Platform;
+  keyId: number | null;
+  pool: string;
+  count: number;
+}
+
+export function getRecentQuotaActivity(now: number): RecentQuotaActivity[] {
+  const sqliteUtc = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+  const since = sqliteUtc(now - RATE_OBSERVATION_WINDOW_MINUTES * 60_000);
+  const rows = getDb().prepare(`
+    SELECT platform, key_id AS keyId, model_id AS modelId, COUNT(*) AS count
+      FROM requests
+     WHERE created_at >= ? AND datetime(created_at) >= ? AND datetime(created_at) <= ?
+       AND status = 'success'
+     GROUP BY platform, key_id, model_id
+  `).all(since, since, sqliteUtc(now)) as { platform: Platform; keyId: number | null; modelId: string; count: number }[];
+  return rows.map(row => ({ platform: row.platform, keyId: row.keyId,
+    pool: inferPoolForPlatform(row.platform, row.modelId), count: Number(row.count) }));
+}
+
+export function estimateExhaustionAt(
+  remaining: number,
+  ratePerMin: number | null,
+  resetAt: string | null,
+  now: number,
+): string | null {
+  // No observed rate → no honest projection. Rates too low to matter are
+  // excluded at the caller level (rate_per_min itself is null).
+  if (ratePerMin === null || ratePerMin <= 0) return null;
+  // Remaining is known (caller checks) and limit is positive (enforced below).
+  const minutesUntilEmpty = remaining / ratePerMin;
+  const secondsFromNow = Math.ceil(minutesUntilEmpty * 60);
+  const ms = now + secondsFromNow * 1000;
+  // Never project past the natural window reset: if the window expires first,
+  // we have headroom even if the request count would otherwise exhaust the
+  // pool — the quota header tracks the remaining *before* reset, not absolute
+  // spending.
+  const resetMs = resetAt ? new Date(resetAt).getTime() : Infinity;
+  if (!Number.isFinite(ms) || Number.isNaN(resetMs) || ms >= resetMs || ms <= now) return null;
+  return new Date(ms).toISOString();
+}
+
+function entryFor(row: QuotaObservationView, ratePerMin: number | null, now: number): QuotaForecastEntry | null {
   // Only request-based windows are predictable from quota headers; token pools
   // reset semantics vary too much across providers to forecast honestly.
   if (row.metric !== 'requests') return null;
@@ -74,6 +138,13 @@ function entryFor(row: QuotaObservationView): QuotaForecastEntry | null {
       || remaining / limit < LOW_BALANCE_THRESHOLD;
   }
 
+  // Rate projection is gated on remaining being known (unknown remaining makes
+  // any rate look like a free lunch until the next quota refresh).
+  if (remaining === null) ratePerMin = null;
+  const estimatedExhaustionAt = (remaining !== null && ratePerMin !== null && remaining > 0)
+    ? estimateExhaustionAt(remaining, ratePerMin, row.resetAt ?? null, now)
+    : null;
+
   return {
     platform: row.platform,
     pool: row.quotaPoolKey ?? `${row.platform}::default`,
@@ -84,16 +155,38 @@ function entryFor(row: QuotaObservationView): QuotaForecastEntry | null {
     reset_at: row.resetAt ?? null,
     low_balance: lowBalance,
     seconds_until_reset: secondsUntilReset(row.resetAt ?? null),
+    rate_per_min: ratePerMin,
+    estimated_exhaustion_at: estimatedExhaustionAt,
   };
 }
 
 // Dedupe to the TIGHTEST row per platform+pool: a platform with several keys
 // sharing one account pool reports the same window per key, and the number that
 // matters for "can I keep calling" is the least headroom left.
-export function getQuotaForecast(): QuotaForecastEntry[] {
+export function getQuotaForecast(
+  rows = getQuotaStateForKeys(), now = Date.now(),
+): QuotaForecastEntry[] {
   const byKey = new Map<string, QuotaForecastEntry>();
-  for (const row of getQuotaStateForKeys()) {
-    const entry = entryFor(row);
+  const activity = rows.length ? getRecentQuotaActivity(now) : [];
+  const counts = new Map<string, number>();
+  for (const row of activity) {
+    const identity = JSON.stringify([row.platform, row.pool, row.keyId]);
+    counts.set(identity, (counts.get(identity) ?? 0) + row.count);
+  }
+  const poolKeys = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (row.metric !== 'requests') continue;
+    const pool = JSON.stringify([row.platform, row.quotaPoolKey]);
+    const keys = poolKeys.get(pool) ?? new Set<string>();
+    keys.add(JSON.stringify([row.platform, row.quotaPoolKey, row.keyId]));
+    poolKeys.set(pool, keys);
+  }
+  for (const row of rows) {
+    const keys = poolKeys.get(JSON.stringify([row.platform, row.quotaPoolKey])) ?? [];
+    let count = 0;
+    for (const key of keys) count += counts.get(key) ?? 0;
+    const rate = count < MIN_FORECAST_REQUESTS ? null : Math.round(count / RATE_OBSERVATION_WINDOW_MINUTES * 100) / 100;
+    const entry = entryFor(row, rate, now);
     if (!entry) continue;
     // `pool` already carries its platform ("groq::account"), so it is the key.
     const key = entry.pool;

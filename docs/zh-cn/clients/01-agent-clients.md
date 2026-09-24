@@ -49,6 +49,8 @@ npx freellmapi setup-dsh --url http://localhost:3001 --api-key <统一密钥>
 | **Kilo Code** | `setup-kilo` | `http://localhost:3001/v1` | OpenAI Chat |
 | **Crush** | `setup-crush` | `http://localhost:3001/v1` | OpenAI Chat |
 | **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
+| **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
+| **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat（`provider: custom`） |
 | **QwenPaw** | 手动配置 | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` 打印指引 | 公共 `https://…/v1` | OpenAI Chat |
 | **其他** | `setup-generic` 打印现成配置块 | `http://localhost:3001/v1` | OpenAI Chat |
@@ -67,6 +69,30 @@ npx @deepseek-ai/dsh web
 ```
 
 设置是热重载的，所以运行中的 `dsh` 下一次请求就会用上这条路由。`--profile <name>` 添加第二条路由（`freellmapi-<name>`）而不改变默认模型；`--model <id>` 固定默认值。路由只声明文本——在 `freellmapi.models` 下给某模型条目加上 `input: [text, image]` 即可发图。尊重 `DSH_HOME`。
+
+### OpenClaw
+
+[OpenClaw](https://docs.openclaw.ai/) 是常驻运行的个人助理，通过其网关接入 WhatsApp、Telegram、Discord 等渠道。它只读取一份 JSON5 文档 `~/.openclaw/openclaw.json`，每个模型端点都是 `models.providers` 下的一个条目；其自带目录不认识的提供方必须写明 `baseUrl`、`api` 和非空的 `models` 列表。`setup-openclaw` 在那里写入一个 `freellmapi` 提供方——`api: openai-completions`、网关的 `/v1` base URL、以及实时目录作为 `models` 列表——并把 `freellmapi/auto` 设为 `agents.defaults.model.primary` 的默认模型。密钥以 OpenClaw 自己的替换语法 `${FREELLMAPI_API_KEY}` 引用，值写进 `~/.openclaw/.env`（权限 0600），这是 OpenClaw 自行加载的全局环境文件，所以无需导出。两次写入都是结构化合并：其他提供方、默认模型上的 `fallbacks`、以及文件里的其他设置保持原样。
+
+```bash
+npx freellmapi setup-openclaw --url http://localhost:3001 --api-key <统一密钥>
+npm install -g openclaw@latest --allow-scripts=openclaw
+openclaw agent exec --model freellmapi/auto "Say hello"   # 无需启动网关守护进程
+```
+
+正在运行的 `openclaw gateway` 需要重启才会读到变更。`--profile <name>` 会添加第二个提供方（`freellmapi-<name>`）而不改动默认模型；`--model <id>` 固定默认模型。OpenClaw 对自定义端点只发送 SDK 的通用 User-Agent，所以该提供方带有静态的 `User-Agent: openclaw` 请求头——Agents 页面的"最近出现"徽章正是据此点亮。模型默认声明为纯文本；给 `models.providers.freellmapi.models` 里的视觉模型加上 `input: ["text", "image"]` 即可发送图片。设置了 `OPENCLAW_CONFIG_PATH`、`OPENCLAW_STATE_DIR`、`OPENCLAW_HOME` 时会被尊重。
+
+### Hermes Agent（`hermes`）
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 是 Nous Research 的自我进化智能体，可在终端使用，也可通过其网关接入 Telegram、Discord 等聊天软件。`~/.hermes/config.yaml` 是端点的唯一事实来源：`OPENAI_BASE_URL` 只对 api.openai.com 生效，`OPENAI_API_KEY` 也只会发给 OpenAI 的主机，所以自定义端点必须写在 `model` 块里。`setup-hermes` 写入这个块——`provider: custom`、`api_mode: chat_completions`、网关的 `/v1` 作为 `base_url`、所选模型作为 `default` 并附上来自实时目录的 `context_length`——并以 Hermes 自己的替换语法 `api_key: "${FREELLMAPI_API_KEY}"` 引用密钥，值写进 `~/.hermes/.env`（权限 0600），Hermes 会自行加载。全新安装自带 `model: ""`（"尚未配置"的哨兵值）；替换它正是 `hermes setup` 会做的事，也正是无人值守首次运行能跳过向导的原因。文件里的其他键保持原样。
+
+```bash
+npx freellmapi setup-hermes --url http://localhost:3001 --api-key <统一密钥>
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
+hermes -z "Say hello"
+```
+
+正在运行的 `hermes gateway` 需要重启才会读到变更。`--profile <name>` 改为添加 `providers.freellmapi-<name>` 条目——在对话里用 `/model custom:freellmapi-<name>:auto` 选择——不改动默认模型；`--model <id>` 固定默认模型。Hermes 对自定义端点只发送 SDK 的通用 User-Agent，所以该块带有 `default_headers: { User-Agent: hermes-agent }`，Agents 页面的"最近出现"徽章据此识别。设置了 `HERMES_HOME` 时会被尊重。
 
 ### QwenPaw
 

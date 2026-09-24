@@ -20,6 +20,7 @@ import {
   resolveRequestedIdForDispatch,
 } from '../services/model-groups.js';
 import {
+  fallbackRoutingTokens,
   newFallbackState,
   recordUpstreamSuccess,
   runFallbackLoop,
@@ -200,6 +201,8 @@ export async function runInboundChat(
   const state = newFallbackState();
   const attemptLog: AttemptRecord[] = [];
   const wantsTools = (input.tools?.length ?? 0) > 0;
+  // Lets the failover loop learn which models reject tool calls (#1230).
+  state.wantsTools = wantsTools;
   const imageRequest = hasImages(input.messages);
   // Capped reserve (#470); threaded to the router separately because it is an
   // exact count and must not be inflated by the context-window safety margin
@@ -235,18 +238,25 @@ export async function runInboundChat(
     attemptLog,
     logIdentity: { surface: 'inbound chat', requestedModel: input.model ?? 'auto' },
     clientGone: () => clientGone,
-    route: () => routeRequest(
-      estimatedTotal,
-      state.skipKeys.size ? state.skipKeys : undefined,
-      pin.preferredModel,
-      imageRequest,
-      wantsTools,
-      state.skipModels.size ? state.skipModels : undefined,
-      pin.strictChain,
-      input.responseFormat !== undefined,
-      state.skipPlatforms.size ? state.skipPlatforms : undefined,
-      outputReserve,
-    ),
+    route: () => {
+      // #507: after the first 413 / context-length rejection the parser
+      // latches the provider-reported REQUESTED size onto state. Inflate the
+      // routing estimate on the next attempt so low-tpm / small-window models
+      // are skipped by the existing gates in router.ts instead of re-firing.
+      const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
+      return routeRequest(
+        routingTotal,
+        state.skipKeys.size ? state.skipKeys : undefined,
+        pin.preferredModel,
+        imageRequest,
+        wantsTools,
+        state.skipModels.size ? state.skipModels : undefined,
+        pin.strictChain,
+        input.responseFormat !== undefined,
+        state.skipPlatforms.size ? state.skipPlatforms : undefined,
+        outputReserve,
+      );
+    },
     dispatch: async (route, attempt) => {
       if (!input.stream) {
         const result = await route.provider.chatCompletion(
@@ -327,7 +337,7 @@ export async function runInboundChat(
           promptTokens,
           completionTokens,
         };
-        recordUpstreamSuccess(route, result.usage?.total_tokens ?? promptTokens + completionTokens);
+        recordUpstreamSuccess(route, result.usage?.total_tokens ?? promptTokens + completionTokens, state);
         if (pin.pinnedLabel == null) setStickyModel(input.messages, route.modelDbId, input.sessionId);
         res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
         setFallbackHeaders(res, attempt, attemptLog);
@@ -523,7 +533,7 @@ export async function runInboundChat(
           completionTokens: outputTokens,
         };
         wire.finishStream(res, normalized);
-        recordUpstreamSuccess(route, estimatedInputTokens + outputTokens);
+        recordUpstreamSuccess(route, estimatedInputTokens + outputTokens, state);
         if (pin.pinnedLabel == null) setStickyModel(input.messages, route.modelDbId, input.sessionId);
         logRequest(
           route.platform,

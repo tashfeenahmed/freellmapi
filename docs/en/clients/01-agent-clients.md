@@ -55,6 +55,8 @@ context windows.
 | **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **MiMo Code** | `setup-mimo` | `http://localhost:3001/v1` | OpenAI Chat |
 | **AtomCode** | `setup-atomcode` | `http://localhost:3001/v1` | OpenAI Chat (`type = "openai"`) |
+| **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
+| **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat (`provider: custom`) |
 | **QwenPaw** | Manual setup | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
 | **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
@@ -62,7 +64,7 @@ context windows.
 The root-vs-`/v1` distinction matters: Claude Code expects the server root
 because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
-Roo, Kilo, Crush, MiMo Code, AtomCode, QwenPaw, and DeepSeek Harness—expect their configured
+Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, QwenPaw, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
 
 ### DeepSeek Harness (`dsh`)
@@ -140,6 +142,70 @@ AtomCode has no environment-variable fallback for the key, so it is written
 into the config file; the file is created with mode 0600 and a timestamped
 backup is taken before an existing one is changed. `--model <id>` pins the
 default model.
+
+### OpenClaw
+
+[OpenClaw](https://docs.openclaw.ai/) is the always-on personal assistant
+that answers on WhatsApp, Telegram, Discord and the other channels its
+gateway connects to. It reads one JSON5 document, `~/.openclaw/openclaw.json`,
+and every model endpoint is an entry under `models.providers`; a provider its
+bundled catalog does not know must spell out `baseUrl`, `api` and a non-empty
+`models` list. `setup-openclaw` writes a `freellmapi` provider there —
+`api: openai-completions`, the gateway's `/v1` base URL, the live catalog as
+its `models` list — and makes `freellmapi/auto` the default model under
+`agents.defaults.model.primary`. The key is referenced as
+`${FREELLMAPI_API_KEY}`, OpenClaw's own substitution, and the value goes into
+`~/.openclaw/.env` (mode 0600), the global env file OpenClaw loads on its own,
+so nothing needs exporting. Both writes are structural merges: other
+providers, `fallbacks` on the default model, and every other setting in the
+file are left as they were.
+
+```bash
+npx freellmapi setup-openclaw --url http://localhost:3001 --api-key <unified-key>
+npm install -g openclaw@latest --allow-scripts=openclaw
+openclaw agent exec --model freellmapi/auto "Say hello"   # no gateway daemon needed
+```
+
+A running `openclaw gateway` needs a restart to pick the change up.
+`--profile <name>` adds a second provider (`freellmapi-<name>`) without
+changing the default model; `--model <id>` pins the default. OpenClaw sends a
+bare SDK user agent to custom endpoints, so the provider carries a static
+`User-Agent: openclaw` header — that is what lights the "seen recently" badge
+on the Agents page. Models are declared text-only; add `input: ["text",
+"image"]` to a model entry under `models.providers.freellmapi.models` to send
+it images. `OPENCLAW_CONFIG_PATH`, `OPENCLAW_STATE_DIR` and `OPENCLAW_HOME` are
+honoured when set.
+
+### Hermes Agent (`hermes`)
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/docs/) is Nous
+Research's self-improving agent, in the terminal or behind Telegram, Discord
+and the other messengers its gateway serves. `~/.hermes/config.yaml` is its
+single source of truth for the endpoint: `OPENAI_BASE_URL` is ignored for
+anything but api.openai.com and `OPENAI_API_KEY` is only sent to OpenAI hosts,
+so a custom endpoint has to be declared in the `model` block. `setup-hermes`
+writes that block — `provider: custom`, `api_mode: chat_completions`, the
+gateway's `/v1` as `base_url`, the chosen model as `default` with its
+`context_length` from the live catalog — and references the key as
+`api_key: "${FREELLMAPI_API_KEY}"`, Hermes's own substitution, with the value
+in `~/.hermes/.env` (mode 0600), which Hermes loads on its own. A fresh
+install ships `model: ""`, the "not configured" sentinel; replacing it is
+exactly what `hermes setup` would do, and it is what lets a headless first
+run skip the wizard. Every other key in the file is left as it was.
+
+```bash
+npx freellmapi setup-hermes --url http://localhost:3001 --api-key <unified-key>
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
+hermes -z "Say hello"
+```
+
+A running `hermes gateway` needs a restart to pick the change up.
+`--profile <name>` adds a `providers.freellmapi-<name>` entry instead —
+picked inside a chat with `/model custom:freellmapi-<name>:auto` — and leaves
+the default model alone; `--model <id>` pins the default. Hermes sends a bare
+SDK user agent to custom endpoints, so the block carries
+`default_headers: { User-Agent: hermes-agent }`, which is what the Agents
+page's "seen recently" badge keys on. `HERMES_HOME` is honoured when set.
 
 ### QwenPaw
 

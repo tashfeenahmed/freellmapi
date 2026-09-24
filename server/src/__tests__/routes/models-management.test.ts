@@ -79,9 +79,16 @@ describe('Model management API', () => {
        ORDER BY id LIMIT 1
     `).get() as { id: number };
 
+    // Only an actual divergence is recorded as an override now (#1178): a
+    // capability write that restates the catalog value is a no-op. So flip
+    // the tool flag to the opposite of whatever the catalog ships.
+    const currentTools = (getDb().prepare('SELECT supports_tools FROM models WHERE id = ?')
+      .get(target.id) as { supports_tools: number }).supports_tools === 1;
+    const flippedTools = !currentTools;
+
     const { status, body } = await request(app, 'PATCH', `/api/models/${target.id}`, {
       displayName: 'Locally tuned model',
-      supportsTools: true,
+      supportsTools: flippedTools,
       contextWindow: 123456,
       fallbackEnabled: false,
     });
@@ -96,7 +103,7 @@ describe('Model management API', () => {
     `).get(target.id) as { display_name: string; supports_tools: number; context_window: number; fallback_enabled: number };
     expect(row).toEqual({
       display_name: 'Locally tuned model',
-      supports_tools: 1,
+      supports_tools: flippedTools ? 1 : 0,
       context_window: 123456,
       fallback_enabled: 0,
     });
@@ -105,7 +112,7 @@ describe('Model management API', () => {
       .get(target.id) as { overrides_json: string };
     expect(JSON.parse(override.overrides_json)).toMatchObject({
       displayName: 'Locally tuned model',
-      supportsTools: true,
+      supportsTools: flippedTools,
       contextWindow: 123456,
     });
 
@@ -113,6 +120,43 @@ describe('Model management API', () => {
     const item = listed.body.find((m: any) => m.id === target.id);
     expect(item.hasOverrides).toBe(true);
     expect(item.fallbackEnabled).toBe(false);
+  });
+
+  it('clears a local override once the field returns to its pre-override value (#1178)', async () => {
+    const db = getDb();
+    // A fresh catalog-managed row: supports_vision defaults to 0, so that is
+    // the baseline the override is measured against.
+    const insert = db.prepare(INSERT_MODEL_SQL).run(
+      TEST_MODEL_PLATFORM, 'override-heal-model', 'Override Heal Model', 9005, 9005, TEST_MODEL_SIZE_LABEL,
+    );
+    const id = Number(insert.lastInsertRowid);
+    const blob = () => {
+      const row = db.prepare(
+        "SELECT overrides_json FROM model_overrides WHERE platform = 'groq' AND model_id = 'override-heal-model'",
+      ).get() as { overrides_json: string } | undefined;
+      return row ? JSON.parse(row.overrides_json) : undefined;
+    };
+
+    // Flip vision ON: recorded as a durable override, badge on.
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: true })).status).toBe(200);
+    expect(blob()).toMatchObject({ supportsVision: true });
+    let listed = await request(app, 'GET', '/api/models');
+    expect(listed.body.find((m: any) => m.id === id).hasOverrides).toBe(true);
+
+    // Flipping it back OFF drops the override entirely: the effective value is
+    // the catalog's again, so the badge must go, not stay stuck on (#1178).
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: false })).status).toBe(200);
+    expect(blob()).toBeUndefined();
+    listed = await request(app, 'GET', '/api/models');
+    expect(listed.body.find((m: any) => m.id === id).hasOverrides).toBe(false);
+
+    // A fresh divergence re-records the override, and it still survives a
+    // catalog re-apply.
+    expect((await request(app, 'PATCH', `/api/models/${id}`, { supportsVision: true })).status).toBe(200);
+    expect(blob()).toMatchObject({ supportsVision: true });
+    applyAllModelOverrides(db);
+    const row = db.prepare('SELECT supports_vision FROM models WHERE id = ?').get(id) as { supports_vision: number };
+    expect(row.supports_vision).toBe(1);
   });
 
   it('patches a custom model capability directly, without recording a catalog override', async () => {
@@ -466,6 +510,85 @@ describe('Model management API', () => {
     const missing = await request(app, 'POST', '/v1/chat/completions', {
       model: 'auto:no-such-group',
       messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain('no-such-group');
+  });
+
+  function mockGroqChat(modelId: string, content: string) {
+    const origFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('api.groq.com')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: () => Promise.resolve({
+            id: 'chatcmpl-chain', object: 'chat.completion', created: 1, model: modelId,
+            choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
+          }),
+        } as any;
+      }
+      return origFetch(url, init);
+    });
+  }
+
+  function lastServedModel(): string | undefined {
+    return (getDb().prepare('SELECT model_id FROM requests ORDER BY id DESC LIMIT 1')
+      .get() as { model_id: string } | undefined)?.model_id;
+  }
+
+  it('routes /v1/messages to model auto:<name> through that named chain (#1170)', async () => {
+    seedGroqKey();
+    const chainOnlyId = seedChainOnlyModel('named-chain-messages', 128000);
+    addToProfile(newProfile('messages-group', 8), chainOnlyId);
+    mockGroqChat('named-chain-messages', 'routed via messages-group');
+
+    const routed = await request(app, 'POST', '/v1/messages', {
+      model: 'auto:messages-group',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(routed.status).toBe(200);
+    expect(lastServedModel()).toBe('named-chain-messages');
+  });
+
+  it('rejects unknown auto:<name> on /v1/messages with 400 (#1170)', async () => {
+    seedGroqKey();
+    mockGroqChat('should-not-serve', 'silent pool fallback');
+
+    const missing = await request(app, 'POST', '/v1/messages', {
+      model: 'auto:no-such-group',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+    expect(missing.status).toBe(400);
+    expect(JSON.stringify(missing.body)).toContain('no-such-group');
+  });
+
+  it('routes /v1/responses to model auto:<name> through that named chain (#1170)', async () => {
+    seedGroqKey();
+    const chainOnlyId = seedChainOnlyModel('named-chain-responses', 128000);
+    addToProfile(newProfile('responses-group', 9), chainOnlyId);
+    mockGroqChat('named-chain-responses', 'routed via responses-group');
+
+    const routed = await request(app, 'POST', '/v1/responses', {
+      model: 'auto:responses-group',
+      input: 'hi',
+    });
+    expect(routed.status).toBe(200);
+    expect(lastServedModel()).toBe('named-chain-responses');
+  });
+
+  it('rejects unknown auto:<name> on /v1/responses with 400 (#1170)', async () => {
+    seedGroqKey();
+    mockGroqChat('should-not-serve', 'silent pool fallback');
+
+    const missing = await request(app, 'POST', '/v1/responses', {
+      model: 'auto:no-such-group',
+      input: 'hi',
     });
     expect(missing.status).toBe(400);
     expect(JSON.stringify(missing.body)).toContain('no-such-group');

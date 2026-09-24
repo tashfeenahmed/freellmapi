@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { initDb, getDb, setSetting } from '../../db/index.js';
 import {
   restoreProxySettings,
@@ -15,6 +15,18 @@ import {
   applyFetchRelayToken,
   encodeFetchRelayToken,
 } from '../../lib/proxy.js';
+
+// #838 reads the OS-wide proxy (scutil/reg/gsettings) as a last-resort
+// fallback when neither the env nor the DB configures one. A developer
+// machine can genuinely have that set (macOS System Settings → Proxies),
+// which fails every "no proxy configured" case below for the same reason
+// clearProxyEnv() exists — the ambient system, not the code under test.
+// '' parses as "no proxy" in every platform branch, so the suite sees a
+// clean machine regardless of the host's system settings.
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  execFileSync: () => '',
+}));
 
 // #949: the desktop embedder builds the app without server/src/index.ts, so
 // the proxy state it starts with is whatever the module defaults are — an

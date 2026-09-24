@@ -14,6 +14,12 @@ afterEach(() => {
 });
 
 describe('safe config writes', () => {
+  it('writes a fresh env file without a leading blank line', () => {
+    const rendered = renderFile({ path: '/unused', format: 'env', content: 'FREELLMAPI_API_KEY=k\n' }, '');
+    expect(rendered).toBe('FREELLMAPI_API_KEY=k\n');
+    expect(renderFile({ path: '/unused', format: 'env', content: 'FREELLMAPI_API_KEY=k\n' }, rendered)).toBe(rendered);
+  });
+
   it('renders a fresh Continue config idempotently', () => {
     const generated = [
       '# freellmapi:start',

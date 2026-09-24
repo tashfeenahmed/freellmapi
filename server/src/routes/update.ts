@@ -402,7 +402,20 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
       checkedAt: new Date(checkedAtMs).toISOString(),
       version: appVersion(),
     };
-    const url = `https://api.github.com/repos/${REPOSITORY}/compare/${currentIdentity.sha}...main`;
+    // A desktop build can only be replaced by installing a published release,
+    // so it must compare against the latest tag rather than `main` (#1270):
+    // untagged commits on main have no installer, and offering them produced
+    // an "Update available" that did nothing when clicked.
+    let compareTarget = 'main';
+    if (currentIdentity.installation === 'desktop') {
+      try {
+        compareTarget = (await latestRelease()).tagName;
+      } catch {
+        return { status: 'unknown', ...baseResult };
+      }
+    }
+
+    const url = `https://api.github.com/repos/${REPOSITORY}/compare/${currentIdentity.sha}...${compareTarget}`;
     const response = await fetchImpl(url, {
       headers: githubHeaders('application/vnd.github+json'),
       signal: AbortSignal.timeout(10_000),
@@ -412,6 +425,11 @@ export function createUpdateRouter(options: UpdateRouterOptions = {}): Router {
       return { status: 'unknown', ...baseResult };
     }
     if (response.status === 401 || response.status === 403 || response.status === 429) {
+      // The Atom feed tracks `main` only; for a desktop install it would
+      // reintroduce the bug this branch fixes, so let the rate limit surface.
+      if (currentIdentity.installation === 'desktop') {
+        throw new Error(`GitHub compare request returned HTTP ${response.status}`);
+      }
       const atomResponse = await fetchImpl(`https://github.com/${REPOSITORY}/commits/main.atom`, {
         headers: {
           Accept: 'application/atom+xml',

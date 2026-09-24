@@ -32,10 +32,10 @@
 | `pollinations` | Pollinations | 带密钥 | 原生（`PollinationsProvider`） | 即使密钥已被撤销，`GET /v1/models` 也返回 200，因此校验改为探测需鉴权的 `/account/key`（#608）。 |
 | `llm7` | LLM7.io | 带密钥（基础模型可匿名） | OpenAI 兼容 | 免费档每小时 100 次请求。 |
 | `huggingface` | Hugging Face Router | 带密钥 | OpenAI 兼容 | `router.huggingface.co` 元路由器（V13 重新加入）；免费档每月循环发放 $0.10 路由额度。 |
-| `opencode` | OpenCode Zen | 带密钥 | OpenAI 兼容 | 仅限试用的促销免费名册，经文档确认的 id 通过 `migrateModelsV18` 播种。 |
+| `opencode` | OpenCode Zen | 带密钥 | OpenAI 兼容 | 自 2026-09 起免费名册仅限 OpenCode 客户端使用（403 FreeTierError，#1249），已在目录中停用；仅支持付费模型。 |
 | `ovh` | OVHcloud AI Endpoints | 免密钥 | OpenAI 兼容 | 匿名档：每 IP 每模型每分钟 2 次请求（实测更严）；鉴权档要求绑定了支付方式的 Public Cloud 项目（`migrateModelsV26`）。 |
 | `agnes` | Agnes AI | 带密钥 | OpenAI 兼容 | 专有模型以 $0/词元促销提供；约 30 个并发请求后开始出现 429；为推理首字节设 60s 超时。 |
-| `reka` | Reka | 带密钥 | OpenAI 兼容 | 通过每月循环的额度赠金免费（无需信用卡）；余额只在仪表盘可见。 |
+| `reka` | Reka | 带密钥 | OpenAI 兼容 | 自 2026-09 起新账号不再免费：需预付额度（#1202）。仍有余额的账号可继续使用；余额只在仪表盘可见。 |
 | `siliconflow` | SiliconFlow | 带密钥 | OpenAI 兼容 | 主要为 FREE 生成媒体模型而注册（FLUX.1-schnell 图像、CosyVoice2 TTS），经由 `services/media.ts` 路由。 |
 | `routeway` | Routeway | 带密钥 | OpenAI 兼容 | 要求浏览器风格的 User-Agent（Cloudflare 对其他值报错误 1010）；实测免费池约 5 rpm，比文档写的 20 rpm / 200 rpd 更严。 |
 | `bazaarlink` | BazaarLink | 带密钥 | OpenAI 兼容 | 只有 `auto:free` 路由进了目录——直接指定模型 id 是付费的（#385）。 |

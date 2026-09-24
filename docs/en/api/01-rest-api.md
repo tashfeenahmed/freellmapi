@@ -448,3 +448,38 @@ Endpoints (all behind `requireAuth`):
 | `DELETE` | `/api/backups/:id` | Delete one backup |
 | `GET` | `/api/backups/tables` | Tables a dump may contain |
 | `GET` / `PUT` | `/api/backups/schedule` | Read / write the backup schedule (HH:mm, interval days, path) |
+
+## Monthly provider-key budgets
+
+Authenticated dashboard clients can set `monthlyRequestCap` and `monthlyTokenCap`
+through `PATCH /api/keys/:id`. Both are nonnegative integers; `0` means unlimited.
+These limits apply to an upstream provider key across chat, embeddings, and
+keyed media requests, and reset at 00:00 UTC on the first of each month. They do
+not apply separately to downstream client profiles.
+
+Successful request counts and reported tokens are stored in a durable monthly
+ledger. Request-log cleanup does not clear this ledger. Existing retained request
+history is backfilled during upgrade; usage already pruned before the upgrade
+cannot be reconstructed. In-flight requests reserve capacity until completion,
+including long-running streams. Failed attempts release their reservation.
+
+Token reservations use routing estimates. Actual provider token usage can differ,
+so the final response can take recorded usage above the configured token cap;
+further requests are then rejected. This is a usage guard, not an exact billing
+limit. Media requests count toward the request cap; the current media adapters
+do not report token usage. Reservations coordinate requests within one gateway
+process, not across multiple gateway replicas.
+
+When all otherwise eligible keys have exhausted their monthly budget, standard
+chat, embeddings, and media routing returns HTTP `429` with a `Retry-After` header
+pointing to the next UTC month. OpenAI-compatible endpoints also return
+`error.code: "quota_exceeded"`; other protocol adapters preserve their native
+error format. Fusion subcalls obey the caps but retain Fusion's aggregate error
+format. If another key has capacity, normal fallback can use it.
+
+Embeddings additionally relay the upstream providers' own back-off. A provider
+that answers `429` is simply skipped for the next one in the family; only when
+every provider in the family was rate limited and each stated a `Retry-After`
+does the gateway's `429` carry one: the soonest of them, in whole seconds
+(clamped to 24h). A chain that also hit a non-rate-limit failure returns `502`
+without `Retry-After`, since waiting would not be a promise.
