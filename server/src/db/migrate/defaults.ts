@@ -32,6 +32,7 @@ import * as requestCaller from '../migrations/20260901_000003_request_caller.js'
 import * as quotaObservationLookup from '../migrations/20260901_000002_quota_observation_lookup.js';
 import * as analyticsLatencyPercentileIndex from '../migrations/20260902_000001_analytics_latency_percentile_index.js';
 import * as mcpEnabledDefault from '../migrations/20260903_000001_mcp_enabled_default.js';
+import * as modelHealthStatus from '../migrations/20260915_000002_model_health_status.js';
 import * as responseCache from '../migrations/20260903_000002_response_cache.js';
 import * as keyMonthlyBudget from '../migrations/20260904_000001_key_monthly_budget.js';
 import * as keyMonthlyUsage from '../migrations/20260914_000001_key_monthly_usage.js';
@@ -86,6 +87,7 @@ export const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.t
 export const REQUEST_MODEL_ATTRIBUTION_FILENAME = '20260913_000001_request_model_attribution.ts';
 export const KEY_MONTHLY_USAGE_FILENAME = '20260914_000001_key_monthly_usage.ts';
 export const QUOTA_SNAPSHOT_FRESHNESS_FILENAME = '20260915_000001_quota_snapshot_freshness.ts';
+export const MODEL_HEALTH_STATUS_FILENAME = '20260915_000002_model_health_status.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -126,4 +128,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: REQUEST_MODEL_ATTRIBUTION_FILENAME, module: requestModelAttribution },
   { filename: KEY_MONTHLY_USAGE_FILENAME, module: keyMonthlyUsage },
   { filename: QUOTA_SNAPSHOT_FRESHNESS_FILENAME, module: quotaSnapshotFreshness },
+  { filename: MODEL_HEALTH_STATUS_FILENAME, module: modelHealthStatus },
 ];
