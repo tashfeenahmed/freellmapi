@@ -50,9 +50,26 @@ export function getRequestMaxTokensBudget(): number {
   return readGuardrailValue(REQUEST_MAX_TOKENS_BUDGET_SETTING, 'REQUEST_MAX_TOKENS_BUDGET');
 }
 
-/** Consecutive-upstream-failure breaker threshold; 0 = disabled. */
+/** Consecutive-upstream-failure breaker threshold. Default 10: a conservative
+ *  trip point that stops a doomed chain (all keys dead) after 10 wasted
+ *  attempts instead of grinding the whole pool. 0 = disabled; the settings
+ *  table and MAX_CONSECUTIVE_UPSTREAM_FAILS still override. */
 export function getMaxConsecutiveUpstreamFails(): number {
-  return readGuardrailValue(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING, 'MAX_CONSECUTIVE_UPSTREAM_FAILS');
+  const v = readGuardrailValue(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING, 'MAX_CONSECUTIVE_UPSTREAM_FAILS');
+  return v > 0 ? v : (storedExplicitlyZero() ? 0 : 10);
+}
+
+// readGuardrailValue cannot distinguish "unset" (→ default 10) from an
+// explicit 0 (→ operator disabled it). Re-read just for that distinction.
+function storedExplicitlyZero(): boolean {
+  for (const raw of [safeSetting(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING), process.env.MAX_CONSECUTIVE_UPSTREAM_FAILS]) {
+    if (raw !== undefined && raw.trim() !== '' && Number(raw) === 0) return true;
+  }
+  return false;
+}
+
+function safeSetting(key: string): string | undefined {
+  try { return getSetting(key); } catch { return undefined; }
 }
 
 // ── Token budget (pre-flight) ────────────────────────────────────────────────

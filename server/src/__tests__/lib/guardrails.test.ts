@@ -33,9 +33,16 @@ afterEach(() => {
 });
 
 describe('guardrail setting getters (setting → env → 0)', () => {
-  it('default to 0 (disabled) when nothing is configured', () => {
+  it('breaker defaults to 10 when nothing is configured; token budget to 0', () => {
     expect(getRequestMaxTokensBudget()).toBe(0);
+    expect(getMaxConsecutiveUpstreamFails()).toBe(10);
+    // An explicit 0 (setting or env) still disables the breaker.
+    settingStore.set(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING, '0');
     expect(getMaxConsecutiveUpstreamFails()).toBe(0);
+    settingStore.delete(MAX_CONSECUTIVE_UPSTREAM_FAILS_SETTING);
+    process.env.MAX_CONSECUTIVE_UPSTREAM_FAILS = '0';
+    expect(getMaxConsecutiveUpstreamFails()).toBe(0);
+    delete process.env.MAX_CONSECUTIVE_UPSTREAM_FAILS;
   });
 
   it('read the settings-table value', () => {
