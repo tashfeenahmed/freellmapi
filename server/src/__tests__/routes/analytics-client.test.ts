@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { getDb, initDb } from '../../db/index.js';
+import { initDb } from '../../db/index.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 
 async function get(app: Express, path: string, token: string) {

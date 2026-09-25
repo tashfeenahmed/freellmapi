@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { execStatement } from './mock-sql.js';
 
 const { Pool } = pg;
 
@@ -117,6 +118,21 @@ function createInMemoryMockPool() {
   tables.set('media_models', []);
   tables.set('api_keys', []);
   tables.set('requests', []);
+  // Tables restored by 006_compat_tables (see migrations/006_compat_tables.ts).
+  tables.set('profiles', []);
+  tables.set('profile_models', []);
+  tables.set('fallback_config', []);
+  tables.set('embedding_models', []);
+  tables.set('custom_model_tombstones', []);
+  tables.set('quirks', []);
+  tables.set('quirk_targets', []);
+  tables.set('provider_quota_observations', []);
+  tables.set('provider_quota_state', []);
+  tables.set('response_cache', []);
+  tables.set('idempotency_claims', []);
+  tables.set('server_logs', []);
+  tables.set('backups', []);
+  tables.set('url_tokens', []);
 
   let idCounter = 1;
 
@@ -409,11 +425,22 @@ function createInMemoryMockPool() {
     }
 
     if (upper.startsWith('DELETE')) {
-      return { rows: [], rowCount: 1 };
+      const generic = execStatement(tables, trimmed, params, nextId);
+      return { rows: generic?.rows ?? [], rowCount: generic?.changes ?? 1 };
     }
+
+    // Anything the hand-written branches above do not recognise: hand it to the
+    // small SQL engine, which covers the tables restored by 006_compat_tables
+    // and anything else the code writes with plain statements. Without this the
+    // mock answered "no rows" for every table the migration had not recreated,
+    // which is how those code paths stayed broken and unnoticed.
+    const generic = execStatement(tables, trimmed, params, nextId);
+    if (generic) return { rows: generic.rows ?? [], rowCount: generic.changes || generic.rows?.length || 0 };
 
     return { rows: [], rowCount: 0 };
   };
+
+  const nextId = () => idCounter++;
 
   return {
     query: mockQuery,
@@ -471,6 +498,11 @@ function createInMemoryMockPool() {
           const rows = tables.get('requests') || [];
           return rows[rows.length - 1];
         }
+        // Not one of the hand-written shapes above: run it for real. This is
+        // what makes the tables restored by 006_compat_tables usable in tests
+        // instead of silently answering "no rows".
+        const generic = execStatement(tables, sql, args, nextId);
+        if (generic) return generic.rows?.[0];
         return undefined;
       },
       all: (...args: any[]) => {
@@ -527,6 +559,10 @@ function createInMemoryMockPool() {
           }
           return Array.from(map.values());
         }
+        // Not one of the hand-written shapes above: run it for real, so the
+        // tables restored by 006_compat_tables actually return their rows.
+        const generic = execStatement(tables, sql, argList, nextId);
+        if (generic) return generic.rows ?? [];
         return [];
       },
       run: (...args: any[]) => {
@@ -735,6 +771,11 @@ function createInMemoryMockPool() {
           if (row) row.base_url = null;
           return { changes: 1, lastInsertRowid: 0 };
         }
+        // Not one of the hand-written shapes above: execute it for real, so the
+        // writes against the tables restored by 006_compat_tables (and any
+        // other plain INSERT/UPDATE/DELETE) take effect in tests.
+        const generic = execStatement(tables, sql, args, nextId);
+        if (generic) return { changes: generic.changes, lastInsertRowid: generic.lastInsertRowid };
         return { changes: 1, lastInsertRowid: 1 };
       },
     }),

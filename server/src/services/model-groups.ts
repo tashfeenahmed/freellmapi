@@ -380,7 +380,7 @@ export function getModelGroups(): ModelGroup[] {
   const overrides = getUnifyOverrides();
   let fingerprint = JSON.stringify(overrides);
   for (const r of rows) {
-    fingerprint += ` ${r.model_db_id}${r.platform}${r.model_id}${r.display_name}${r.intelligence_rank}${r.endpoint_scope ?? ''}`;
+    fingerprint += `\0${r.model_db_id}${r.platform}${r.model_id}${r.display_name}${r.intelligence_rank}${r.endpoint_scope ?? ''}`;
   }
   if (groupsCache?.fingerprint === fingerprint) return groupsCache.groups;
   const groups = groupRows(rows, overrides);
