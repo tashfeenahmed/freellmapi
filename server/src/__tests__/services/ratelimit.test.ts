@@ -282,6 +282,8 @@ describe('Rate Limiter', () => {
       expect(getProviderDailyRequestCap('openrouter')).toBe(1000);
       // ModelScope: 2000/day account-wide upstream, shipped as 1800 for margin (#581).
       expect(getProviderDailyRequestCap('modelscope')).toBe(1800);
+      // Requesty: 200/day across all free models, shipped as 180 for margin.
+      expect(getProviderDailyRequestCap('requesty')).toBe(180);
       expect(getProviderDailyRequestCap('groq')).toBeNull(); // no shared cap
       process.env[ENV] = '50';
       expect(getProviderDailyRequestCap('openrouter')).toBe(50);
@@ -305,6 +307,15 @@ describe('Rate Limiter', () => {
       expect(canUseProvider('openrouter', testId)).toBe(true); // 2 < 3
       recordRequest('openrouter', 'model-c', testId);
       expect(canUseProvider('openrouter', testId)).toBe(false); // 3 >= 3
+    });
+
+    it('shares the Requesty daily cap across its free models by default', () => {
+      for (let i = 0; i < 179; i++) {
+        recordRequest('requesty', i % 2 ? 'google/gemma-4-31b-it' : 'nvidia/nemotron-3-super-120b-a12b', testId);
+      }
+      expect(canUseProvider('requesty', testId)).toBe(true); // 179 < 180
+      recordRequest('requesty', 'mistral/leanstral-1-5', testId);
+      expect(canUseProvider('requesty', testId)).toBe(false); // 180 >= 180
     });
   });
 
