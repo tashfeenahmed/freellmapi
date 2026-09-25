@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-
-import type { Db } from '../types.js';
+import pg from 'pg';
 import { DEFAULT_MIGRATIONS, type MigrationModule } from './defaults.js';
 
 export type MigrationDirection = 'up' | 'down';
@@ -19,11 +18,6 @@ export interface MigrationStatus {
   appliedAt: string | null;
 }
 
-interface AppliedMigrationRow {
-  filename: string;
-  applied_at: string;
-}
-
 interface MigrationRecord {
   filename: string;
   module?: MigrationModule;
@@ -34,60 +28,40 @@ const DEFAULT_MIGRATIONS_DIR = path.resolve(__dirname, '../migrations');
 
 const CREATE_MIGRATIONS_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS migrations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename TEXT NOT NULL UNIQUE,
-    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
+    id SERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL UNIQUE,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
 `;
 
 export async function runMigrations(
-  db: Db,
+  pool: pg.Pool,
   direction: MigrationDirection = 'up',
   options: MigrationRunnerOptions = {},
 ): Promise<void> {
-  initializeMigrationTracking(db);
+  await ensureMigrationsTable(pool);
   const records = getMigrationRecords(options);
 
   if (direction === 'up') {
-    await runPendingMigrations(db, records, options);
+    await runPendingMigrations(pool, records, options);
     return;
   }
 
   if (direction === 'down') {
-    await runLatestDownMigration(db, records, options);
+    await runLatestDownMigration(pool, records, options);
     return;
   }
 
   throw new Error(`Unknown migration direction: ${direction}`);
 }
 
-export function runMigrationsSync(
-  db: Db,
-  direction: MigrationDirection = 'up',
-): void {
-  initializeMigrationTracking(db);
-  const records = getDefaultMigrationRecords();
-
-  if (direction === 'up') {
-    runPendingMigrationsSync(db, records);
-    return;
-  }
-
-  if (direction === 'down') {
-    runLatestDownMigrationSync(db, records);
-    return;
-  }
-
-  throw new Error(`Unknown migration direction: ${direction}`);
-}
-
-export function getMigrationStatuses(
-  db: Db,
+export async function getMigrationStatuses(
+  pool: pg.Pool,
   options: MigrationRunnerOptions = {},
-): MigrationStatus[] {
-  initializeMigrationTracking(db);
+): Promise<MigrationStatus[]> {
+  await ensureMigrationsTable(pool);
 
-  const applied = getAppliedMigrations(db);
+  const applied = await getAppliedMigrations(pool);
   return getMigrationRecords(options).map(record => ({
     filename: record.filename,
     status: applied.has(record.filename) ? 'applied' : 'pending',
@@ -95,126 +69,84 @@ export function getMigrationStatuses(
   }));
 }
 
-function initializeMigrationTracking(db: Db): void {
-  ensureMigrationsTable(db);
-}
-
-function ensureMigrationsTable(db: Db): void {
-  db.exec(CREATE_MIGRATIONS_TABLE_SQL);
+async function ensureMigrationsTable(pool: pg.Pool): Promise<void> {
+  await pool.query(CREATE_MIGRATIONS_TABLE_SQL);
 }
 
 async function runPendingMigrations(
-  db: Db,
+  pool: pg.Pool,
   records: readonly MigrationRecord[],
   options: MigrationRunnerOptions,
 ): Promise<void> {
-  const applied = getAppliedMigrations(db);
+  const applied = await getAppliedMigrations(pool);
 
   for (const record of records) {
     if (applied.has(record.filename)) continue;
 
     const migration = await loadMigrationModule(record, options);
-    const applyMigration = db.transaction(() => {
-      migration.up(db);
-      db.prepare('INSERT INTO migrations (filename) VALUES (?)').run(record.filename);
-    });
-
-    applyMigration();
-    applied.set(record.filename, new Date().toISOString());
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await migration.up(client);
+      await client.query('INSERT INTO migrations (filename) VALUES ($1)', [record.filename]);
+      await client.query('COMMIT');
+      applied.set(record.filename, new Date().toISOString());
+      console.log(`[migration] Applied ${record.filename}`);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 }
 
 async function runLatestDownMigration(
-  db: Db,
+  pool: pg.Pool,
   records: readonly MigrationRecord[],
   options: MigrationRunnerOptions,
 ): Promise<void> {
-  const row = db.prepare(`
+  const res = await pool.query(`
     SELECT filename
       FROM migrations
      ORDER BY id DESC
      LIMIT 1
-  `).get() as { filename: string } | undefined;
-
+  `);
+  const row = res.rows[0] as { filename: string } | undefined;
   if (!row) return;
 
-  const record = records.find(record => record.filename === row.filename);
+  const record = records.find(r => r.filename === row.filename);
   if (!record) throw new Error(`Migration file not found: ${row.filename}`);
 
   const migration = await loadMigrationModule(record, options);
-  const revertMigration = db.transaction(() => {
-    migration.down(db);
-    db.prepare('DELETE FROM migrations WHERE filename = ?').run(row.filename);
-  });
-
-  revertMigration();
-}
-
-function runPendingMigrationsSync(
-  db: Db,
-  records: readonly MigrationRecord[],
-): void {
-  const applied = getAppliedMigrations(db);
-
-  for (const record of records) {
-    if (applied.has(record.filename)) continue;
-    if (!record.module) throw new Error(`Migration ${record.filename} cannot run synchronously`);
-
-    const applyMigration = db.transaction(() => {
-      record.module!.up(db);
-      db.prepare('INSERT INTO migrations (filename) VALUES (?)').run(record.filename);
-    });
-
-    applyMigration();
-    applied.set(record.filename, new Date().toISOString());
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await migration.down(client);
+    await client.query('DELETE FROM migrations WHERE filename = $1', [row.filename]);
+    await client.query('COMMIT');
+    console.log(`[migration] Reverted ${row.filename}`);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-function runLatestDownMigrationSync(
-  db: Db,
-  records: readonly MigrationRecord[],
-): void {
-  const row = db.prepare(`
-    SELECT filename
-      FROM migrations
-     ORDER BY id DESC
-     LIMIT 1
-  `).get() as { filename: string } | undefined;
-
-  if (!row) return;
-
-  const record = records.find(record => record.filename === row.filename);
-  if (!record?.module) throw new Error(`Migration ${row.filename} cannot run synchronously`);
-
-  const revertMigration = db.transaction(() => {
-    record.module!.down(db);
-    db.prepare('DELETE FROM migrations WHERE filename = ?').run(row.filename);
-  });
-
-  revertMigration();
-}
-
-function getAppliedMigrations(db: Db): Map<string, string> {
-  const rows = db.prepare(`
+async function getAppliedMigrations(pool: pg.Pool): Promise<Map<string, string>> {
+  const res = await pool.query(`
     SELECT filename, applied_at
       FROM migrations
      ORDER BY filename ASC
-  `).all() as AppliedMigrationRow[];
-
-  return new Map(rows.map(row => [row.filename, row.applied_at]));
+  `);
+  return new Map(res.rows.map((row: any) => [row.filename, new Date(row.applied_at).toISOString()]));
 }
 
 function getMigrationRecords(options: MigrationRunnerOptions): MigrationRecord[] {
-  if (isDefaultMigrationSet(options)) return getDefaultMigrationRecords();
+  if (isDefaultMigrationSet(options)) return [...DEFAULT_MIGRATIONS];
 
   return getMigrationFilenames(options).map(filename => ({ filename }));
-}
-
-function getDefaultMigrationRecords(): MigrationRecord[] {
-  return DEFAULT_MIGRATIONS.map(migration => ({
-    filename: migration.filename,
-    module: migration.module,
-  }));
 }
 
 function getMigrationFilenames(options: MigrationRunnerOptions): string[] {
@@ -242,7 +174,7 @@ async function loadMigrationModule(
 
   const imported = await import(pathToFileURL(migrationPath).href) as Partial<MigrationModule>;
   if (typeof imported.up !== 'function' || typeof imported.down !== 'function') {
-    throw new Error(`Migration ${record.filename} must export up(db) and down(db) functions`);
+    throw new Error(`Migration ${record.filename} must export up(client) and down(client) functions`);
   }
 
   return {

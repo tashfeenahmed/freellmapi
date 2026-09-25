@@ -83,64 +83,75 @@ export function ConversationSidebar({
   }
 
   return (
-    <div
-      className={`relative shrink-0 overflow-hidden border-e bg-card transition-[width] duration-200 ease-out motion-reduce:transition-none ${
-        open ? 'w-60' : 'w-11'
-      }`}
-    >
-      <div
-        className={`${LAYER} w-11 items-center gap-1 py-3 ${
-          open ? 'invisible opacity-0' : 'visible opacity-100'
-        }`}
-      >
-        <Button
-          variant="ghost"
-          size="icon-sm"
+    <>
+      {/* Mobile Backdrop when open on screens < lg */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden"
           onClick={onToggle}
-          aria-label={t('playgroundSessions.showSidebar')}
-          title={t('playgroundSessions.showSidebar')}
-        >
-          <ChevronsRight className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onNew}
-          aria-label={t('playgroundSessions.newChat')}
-          title={t('playgroundSessions.newChat')}
-        >
-          <SquarePen className="size-4" />
-        </Button>
-      </div>
+        />
+      )}
 
       <div
-        className={`${LAYER} w-60 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        className={`bg-card transition-all duration-200 ease-out motion-reduce:transition-none ${
+          open
+            ? 'fixed inset-y-0 start-0 z-50 w-64 shadow-2xl border-e lg:static lg:z-auto lg:w-60 lg:shadow-none'
+            : 'hidden lg:block relative shrink-0 w-11 overflow-hidden border-e'
+        }`}
       >
-        {/* Two lines: the collapse control alone on the first, then New chat as
-            a proper button spanning the width. No heading — the list explains
-            itself. */}
-        <div className="flex shrink-0 flex-col gap-1.5 border-b border-border/40 px-2 pt-1 pb-2">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onToggle}
-              aria-label={t('playgroundSessions.hideSidebar')}
-              title={t('playgroundSessions.hideSidebar')}
-            >
-              <ChevronsLeft className="size-4" />
-            </Button>
-          </div>
+        <div
+          className={`${LAYER} w-11 items-center gap-1 py-3 ${
+            open ? 'invisible opacity-0' : 'visible opacity-100'
+          }`}
+        >
           <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-2"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onToggle}
+            aria-label={t('playgroundSessions.showSidebar')}
+            title={t('playgroundSessions.showSidebar')}
+          >
+            <ChevronsRight className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onNew}
+            aria-label={t('playgroundSessions.newChat')}
+            title={t('playgroundSessions.newChat')}
           >
             <SquarePen className="size-4" />
-            <span className="truncate">{t('playgroundSessions.newChat')}</span>
           </Button>
         </div>
+
+        <div
+          className={`${LAYER} w-64 lg:w-60 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        >
+          {/* Two lines: the collapse control alone on the first, then New chat as
+              a proper button spanning the width. No heading — the list explains
+              itself. */}
+          <div className="flex shrink-0 flex-col gap-1.5 border-b border-border/40 px-2 pt-1 pb-2">
+            <div className="flex items-center justify-end">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onToggle}
+                aria-label={t('playgroundSessions.hideSidebar')}
+                title={t('playgroundSessions.hideSidebar')}
+              >
+                <ChevronsLeft className="size-4" />
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-center gap-2"
+              onClick={onNew}
+            >
+              <SquarePen className="size-4" />
+              <span className="truncate">{t('playgroundSessions.newChat')}</span>
+            </Button>
+          </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {conversations.length === 0 ? (
@@ -225,6 +236,7 @@ export function ConversationSidebar({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

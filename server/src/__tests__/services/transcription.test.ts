@@ -50,9 +50,11 @@ function params(overrides: Record<string, unknown> = {}) {
 }
 
 describe('transcription service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
-    initDb(':memory:');
+    await initDb(':memory:');
+    getDb().prepare("DELETE FROM media_models").run();
+    getDb().prepare("DELETE FROM api_keys").run();
     // Cooldowns live in a module-level map that outlives the per-test :memory:
     // DB; key ids restart at 1 in every test, so stale entries must be purged.
     for (let id = 1; id <= 10; id++) clearCooldownsForKey(id);

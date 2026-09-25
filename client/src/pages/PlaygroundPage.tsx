@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleAlert, FileText, X } from 'lucide-react'
+import { ChevronRight, CircleAlert, FileText, PanelLeftOpen, PanelRightOpen, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { Button } from '@/components/ui/button'
 import { buildModelOptions } from '@/lib/model-groups'
 import type { Chain } from '@/components/chain-manager'
 import { Markdown } from '@/components/markdown'
@@ -901,6 +902,7 @@ export default function PlaygroundPage() {
   // leaves the old one in the sidebar. (resetConversationState stops an open
   // stream too, or its next frame would paste the half-finished answer back
   // into the empty transcript.)
+  const handleClear = handleNewConversation
 
   // Searchable picker options: auto + fusion pinned at the top, then every model
   // ordered BY INTELLIGENCE — size tier first (Frontier→Small), then the catalog
@@ -967,6 +969,44 @@ export default function PlaygroundPage() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* The page header, reduced to a slim bar: the title, what is answering,
+            and mobile triggers for conversation sidebar & settings rail on < lg */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 border-b px-3 sm:px-4 py-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="lg:hidden shrink-0"
+            onClick={toggleSidebar}
+            aria-label={t('playgroundSessions.showSidebar')}
+            title={t('playgroundSessions.showSidebar')}
+          >
+            <PanelLeftOpen className="size-4" />
+          </Button>
+
+          <h1 className="shrink-0 text-xs sm:text-sm font-semibold tracking-tight">{t('playground.title')}</h1>
+          <span className="min-w-0 truncate text-xs text-muted-foreground">
+            <span aria-hidden="true">· </span>{activeModelLabel}
+          </span>
+
+          <div className="ms-auto flex items-center gap-1">
+            {messages.length > 0 && (
+              <Button variant="outline" size="sm" className="h-7 text-xs px-2 sm:px-3 sm:h-8" onClick={handleClear}>
+                {t('playground.clear')}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="lg:hidden shrink-0"
+              onClick={toggleSettings}
+              aria-label={t('playground.showSettings')}
+              title={t('playground.showSettings')}
+            >
+              <PanelRightOpen className="size-4" />
+            </Button>
+          </div>
+        </div>
+
         <div ref={transcriptRef} className="min-h-0 flex-1 overflow-y-auto p-6">
           {/* The chat sits in a centred column; the composer below shares its width. */}
           <div className="mx-auto h-full w-full max-w-3xl space-y-4">
@@ -997,7 +1037,7 @@ export default function PlaygroundPage() {
                     <div className={`flex flex-col gap-1 ${msg.role === 'user' ? 'max-w-[80%] items-end' : 'w-full items-start'}`}>
                       {showBubble && (
                         <div
-                          className={`group relative text-sm leading-relaxed ${
+                          className={`group relative text-xs sm:text-sm leading-relaxed ${
                             msg.role === 'user'
                               ? 'rounded-2xl bg-primary px-4 py-2.5 text-primary-foreground'
                               : msg.isError

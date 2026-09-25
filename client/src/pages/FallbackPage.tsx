@@ -346,8 +346,8 @@ export default function FallbackPage() {
         {tokenUsage && tokenUsage.totalBudget > 0 && <TokenUsageBar data={tokenUsage} />}
 
         {/* Strategy selector */}
-        <section className="rounded-3xl border bg-card p-5">
-          <div className="flex items-baseline justify-between mb-3">
+        <section className="rounded-2xl sm:rounded-3xl border bg-card p-3.5 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-2 mb-3">
             <h2 className="text-sm font-medium">{t('strategies.title')}</h2>
             {routing?.weights && (
               <span className="text-xs text-muted-foreground tabular-nums">

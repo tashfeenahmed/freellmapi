@@ -21,7 +21,7 @@ describe('app shell heights', () => {
     // from scrolling. Padded routes keep plain min-height and scroll as a
     // document — clipping them under h-dvh would leave long pages with no
     // scrollbar at all.
-    expect(app).toMatch(/fullBleed \? 'h-dvh overflow-hidden' : 'min-h-screen'/)
+    expect(app).toMatch(/fullBleed \? 'h-dvh overflow-hidden' : 'min-h-screen min-w-0 max-w-full overflow-x-hidden'/)
   })
 
   it('passes a definite height down the flex chain to the page', () => {

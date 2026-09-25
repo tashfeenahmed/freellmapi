@@ -122,7 +122,12 @@ export type DeclarativeConfig = z.infer<typeof declarativeConfigSchema>;
 export interface DeclarativeConfigResult {
   applied: boolean;
   source?: string;
-  /** True when the `admin` entry created the first dashboard account. */
+  /**
+   * True when the `admin` entry created the first dashboard account. The
+   * account is created asynchronously — PostgreSQL auth is async, so
+   * provisioning is dispatched detached and this flag is set once the account
+   * lands. False when the entry was ignored (an account already exists).
+   */
   admin: boolean;
   /** True when a `license` entry was handed to background activation. */
   license: boolean;
@@ -484,16 +489,6 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
   };
 
   const apply = db.transaction(() => {
-    if (parsed.data.admin) {
-      if (userCount() === 0) {
-        createUser(parsed.data.admin.email, parsed.data.admin.password);
-        result.admin = true;
-      } else {
-        const warning = 'admin: a dashboard account already exists — entry ignored';
-        result.warnings.push(warning);
-        console.warn(`[config] ${warning}`);
-      }
-    }
     for (const key of parsed.data.keys ?? []) {
       const warning = missingKeyWarning(key);
       if (warning) {
@@ -525,6 +520,16 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
   });
   apply();
 
+  // Dashboard-account provisioning talks to the auth service, whose PostgreSQL
+  // reads and writes are async and therefore cannot join the synchronous DB
+  // apply above. It runs detached for the same reason license activation does:
+  // boot must not block on it. The upstream guarantee is kept — the entry only
+  // ever creates the FIRST account, so once a user exists it degrades to a
+  // warning and config cannot take over a claimed install.
+  if (parsed.data.admin) {
+    void provisionConfiguredAdmin(parsed.data.admin, result);
+  }
+
   // License activation needs the license service — network I/O has no place in
   // the synchronous DB apply. It runs detached so a slow or unreachable
   // service never delays boot; a failure logs a warning and leaves settings
@@ -534,6 +539,33 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
     void activateConfiguredLicense(parsed.data.license);
   }
   return result;
+}
+
+/**
+ * Create the first dashboard account from declarative config. Never overwrites
+ * an existing install: with any user present the entry is ignored with a
+ * warning, mirroring the schema-level contract (minimum password length
+ * included). Exported for tests, which await it directly.
+ */
+export async function provisionConfiguredAdmin(
+  admin: { email: string; password: string },
+  result?: DeclarativeConfigResult,
+): Promise<boolean> {
+  try {
+    if (await userCount() > 0) {
+      const warning = 'admin: a dashboard account already exists — entry ignored';
+      result?.warnings.push(warning);
+      console.warn(`[config] ${warning}`);
+      return false;
+    }
+    await createUser(admin.email, admin.password);
+    if (result) result.admin = true;
+    console.log('[config] admin account created');
+    return true;
+  } catch (err) {
+    console.warn(`[config] admin: ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
 }
 
 /**

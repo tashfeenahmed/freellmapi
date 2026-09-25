@@ -294,38 +294,40 @@ describe('declarative config admin', () => {
     getDb().prepare('DELETE FROM sessions').run();
   });
 
-  it('creates the first dashboard account only while no user exists', () => {
+  it('creates the first dashboard account only while no user exists', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const first = applyDeclarativeConfig({
       admin: { email: 'Ops@Example.com', password: 'correct horse battery' },
     });
-    expect(first.admin).toBe(true);
-    expect(userCount()).toBe(1);
+    // PostgreSQL auth is async in this fork, so provisioning runs detached:
+    // the flag and the row land a tick later instead of before the return.
+    await vi.waitFor(() => expect(first.admin).toBe(true));
+    await vi.waitFor(async () => expect(await userCount()).toBe(1));
     // Email is normalized on write, password verifies via the same helpers
     // the /api/auth routes use.
-    expect(verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
+    expect(await verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
 
     const second = applyDeclarativeConfig({
       admin: { email: 'attacker@example.com', password: 'totally different' },
     });
+    await vi.waitFor(() => expect(second.warnings.some(w => w.startsWith('admin:'))).toBe(true));
     expect(second.admin).toBe(false);
-    expect(second.warnings.some(w => w.startsWith('admin:'))).toBe(true);
-    expect(userCount()).toBe(1);
+    expect(await userCount()).toBe(1);
     // The original account is untouched — the second entry changed nothing.
-    expect(verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
-    expect(verifyCredentials('attacker@example.com', 'totally different')).toBeNull();
+    expect(await verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
+    expect(await verifyCredentials('attacker@example.com', 'totally different')).toBeNull();
     warn.mockRestore();
   });
 
-  it('rejects malformed admin entries at schema validation', () => {
+  it('rejects malformed admin entries at schema validation', async () => {
     expect(() => applyDeclarativeConfig({
       admin: { email: 'not-an-email', password: 'long-enough-password' },
     })).toThrow(/invalid declarative config/);
     expect(() => applyDeclarativeConfig({
       admin: { email: 'a@b.co', password: 'short' },
     })).toThrow(/invalid declarative config/);
-    expect(userCount()).toBe(0);
+    expect(await userCount()).toBe(0);
   });
 });
 

@@ -49,8 +49,8 @@ export function UnifiedKeySection() {
   }
 
   return (
-    <section className="rounded-3xl border bg-card p-5">
-      <div className="flex items-start justify-between gap-4 mb-3">
+    <section className="rounded-2xl sm:rounded-3xl border bg-card p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4 mb-3">
         <div>
           <h2 className="text-sm font-medium">{t('keys.unifiedKey')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -63,6 +63,7 @@ export function UnifiedKeySection() {
         <ConfirmButton
           variant="ghost"
           size="sm"
+          className="self-start sm:self-auto shrink-0"
           // Armed label stays the shared "Confirm" — the same destructive
           // idiom every other ConfirmButton on the dashboard uses.
           disabled={regenerate.isPending || isError}
@@ -73,24 +74,26 @@ export function UnifiedKeySection() {
       </div>
 
       {isError ? (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive break-words">
           {t('keys.serverUnreachableBefore')}<code className="font-mono">{baseUrl.replace('/v1', '')}</code>{t('keys.serverUnreachableAfter')}
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-lg select-all truncate tabular-nums">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <code className="flex-1 font-mono text-xs bg-muted px-3 py-2 rounded-lg select-all truncate tabular-nums min-w-0">
             {showKey ? apiKey : masked}
           </code>
-          <Button variant="outline" size="sm" onClick={() => setShowKey(!showKey)}>
-            {showKey ? t('keys.hideKey') : t('keys.showKey')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void copy()}>
-            {copied ? t('keys.copiedKey') : t('keys.copyKey')}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" onClick={() => setShowKey(!showKey)}>
+              {showKey ? t('keys.hideKey') : t('keys.showKey')}
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" onClick={() => void copy()}>
+              {copied ? t('keys.copiedKey') : t('keys.copyKey')}
+            </Button>
+          </div>
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs overflow-x-auto">
         <span className="text-muted-foreground">{t('keys.baseUrl')}</span>
         <code className="font-mono">{baseUrl}</code>
         <span className="text-muted-foreground">{t('keys.endpointChat')}</span>

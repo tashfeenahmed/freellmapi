@@ -1,5 +1,10 @@
-import { getDb, type Db } from '../db/index.js';
+import { getDb } from '../db/index.js';
 import { endpointScopeForBaseUrl } from './endpoint-scope.js';
+
+// The fork's DB handle is the PostgreSQL pool with the legacy SQLite-style
+// `prepare()` shim attached (db/postgres.ts). Derived from getDb() rather than
+// imported so the module keeps compiling against either db layer.
+type Db = ReturnType<typeof getDb>;
 
 const DEFAULT_BUFFER_MS = 10_000;
 const DEFAULT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -98,7 +103,7 @@ function percentile(samples: Sample[], totalWeight: number, quantile: number): n
 }
 
 function statsFor(db: Db, config: Config, now: number): Map<string, EndpointTtfbStats> {
-  if (cache?.db === db && cache.windowMs === config.windowMs && cache.halfLifeMs === config.halfLifeMs
+  if (cache && cache.db === db && cache.windowMs === config.windowMs && cache.halfLifeMs === config.halfLifeMs
     && now >= cache.time && now - cache.time < CACHE_TTL_MS) return cache.stats;
 
   // Keep the created_at range index usable despite SQLite/ISO timestamp

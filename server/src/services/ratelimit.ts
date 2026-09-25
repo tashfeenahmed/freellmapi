@@ -1246,10 +1246,19 @@ export function setCooldown(
 export function isOnCooldown(platform: string, modelId: string, keyId: number): boolean {
   const key = `${platform}:${modelId}:${keyId}:cooldown`;
   const now = Date.now();
+
+  const expiry = cooldowns.get(key);
+  if (expiry !== undefined) {
+    if (now > expiry) {
+      cooldowns.delete(key);
+      return false;
+    }
+    return true;
+  }
+
   const persistedExpiry = persistedCooldownExpiry(platform, modelId, keyId);
   if (persistedExpiry !== undefined && persistedExpiry !== null) {
     if (now > persistedExpiry) {
-      cooldowns.delete(key);
       clearPersistedCooldown(platform, modelId, keyId);
       return false;
     }
@@ -1257,13 +1266,7 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
     return true;
   }
 
-  const expiry = cooldowns.get(key);
-  if (!expiry) return false;
-  if (now > expiry) {
-    cooldowns.delete(key);
-    return false;
-  }
-  return true;
+  return false;
 }
 
 export interface ActiveCooldown {

@@ -166,23 +166,29 @@ Based on public documentation, July 2026 — corrections welcome.
 - **Self-updating model catalog** — the router syncs a signed catalog from freellmapi.co twice a day: new models, quota changes, and provider quirk fixes land automatically. Free installs track the monthly snapshot, which each model joins 30 days after it lands in the live feed; premium routers get it same-day. [Premium →](#premium-live-catalog)
 - **Sticky sessions & context handoff** — conversations stay on one model for 30 minutes; an optional compact handoff note keeps the thread coherent when a mid-chat switch does happen. [Details →](docs/en/clients/01-agent-clients.md#context-handoff)
 - **Prompt compression (opt-in)** — a shared, fail-open request pipeline can deduplicate prompts, filter tool output, compact repeated JSON, and trim stale context before cache lookup and routing. [Details →](docs/en/compression/01-compression-pipeline.md)
-- **Encrypted keys, one token out** — provider keys are AES-256-GCM encrypted in SQLite and decrypted in-memory per request; your apps only ever see a single unified `freellmapi-…` bearer token.
+- **Encrypted keys, one token out** — provider credentials are AES-256-GCM encrypted in Neon PostgreSQL and cached in-memory; your apps only ever see a single unified `freellmapi-…` bearer token with zero database queries on the inference hot path.
+- **Production-ready on Render & Neon Free Tier** — Designed specifically for Render Free Tier compute + Neon Serverless PostgreSQL persistence, with in-memory hourly metric aggregation flushed asynchronously.
 - **Admin dashboard & analytics** — React UI to manage keys, reorder the chain, run a playground, and read p50/p95/TTFT analytics over 24h–90d windows; login-gated, dark/light themes, [60 languages](#languages).
 - **ChatGPT-ready MCP server & interactive docs** — ChatGPT and other MCP clients can call FreeLLMAPI inference, list usable models, inspect provider health/usage/cache/routing metadata, and manage the routing strategy over `/mcp`; a dependency-free OpenAPI viewer lives at `/v1/docs`. [ChatGPT and coding agents →](docs/en/clients/01-agent-clients.md#mcp-server)
 - **Ops niceties** — opt-in response cache, encrypted DB backups, periodic key health checks, bulk key import/export, declarative startup config. [Install & deploy →](docs/en/install/01-install.md)
-- **Runs anywhere Node 20+ runs** — Windows, macOS, Linux servers, or a small ARM SBC (Raspberry Pi included). ~40 MB RSS at idle behind PM2 / systemd / whatever supervisor you prefer.
+- **Runs anywhere Node 20+ runs** — Render, Neon, Docker, Windows, macOS, Linux servers, or a small ARM SBC (Raspberry Pi included). ~40 MB RSS at idle behind PM2 / systemd / whatever supervisor you prefer.
 
 The scope is deliberately narrow — see [what's not supported yet](docs/en/architecture/00-high-level-index.md#not-yet-supported).
 
 ## Quick start
 
+### 1. Cloud Deploy (Render Free Tier + Neon PostgreSQL)
+Deploy FreeLLMAPI with zero hosting costs:
+1. Create a free PostgreSQL database at [neon.tech](https://neon.tech).
+2. Deploy a Web Service on [render.com](https://render.com) pointing to this repository (`DATABASE_URL`, `ENCRYPTION_KEY`, `npm run build`, `node server/dist/server/src/index.js`).
+3. See **[Production Deployment Guide](docs/install.md#production-deployment-render--neon-postgresql)** for details.
+
+### 2. Local / Docker Deploy
 **One-liner** (Docker required — sets up `~/freellmapi`, generates an encryption key, pulls the image, and starts the container):
 
 ```bash
 curl -fsSL https://freellmapi.co/install.sh | bash
 ```
-
-Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`.
 
 Open http://localhost:3001, add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 

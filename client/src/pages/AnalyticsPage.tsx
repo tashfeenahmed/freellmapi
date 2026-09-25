@@ -324,35 +324,35 @@ function formatTokens(n?: number): string {
 
 function Stat({ icon: Icon, label, value, sub, hint, className }: { icon: LucideIcon; label: string; value: string | number; sub?: string; hint?: string; className?: string }) {
   const card = (
-    <div className="rounded-3xl border bg-card px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Icon className="size-3.5" aria-hidden="true" />
+    <div className="rounded-2xl sm:rounded-3xl border bg-card px-3 sm:px-4 py-2.5 sm:py-3 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider truncate">{label}</p>
+        <span className="flex size-6 sm:size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Icon className="size-3 sm:size-3.5" aria-hidden="true" />
         </span>
       </div>
-      <p className={`text-xl font-semibold tabular-nums mt-1 ${className ?? ''}`}>{value}</p>
+      <p className={`text-lg sm:text-xl font-semibold tabular-nums mt-0.5 sm:mt-1 truncate ${className ?? ''}`}>{value}</p>
       {/* Optional second figure, so one card can carry two related numbers
           instead of spending another slot in the summary row. */}
-      {sub ? <p className="text-[11px] text-muted-foreground tabular-nums truncate">{sub}</p> : null}
+      {sub ? <p className="text-[10px] sm:text-[11px] text-muted-foreground tabular-nums truncate">{sub}</p> : null}
     </div>
   )
   // Same portal tooltip as the routing strategy chips. Opens BELOW the card:
   // the stats row sits right under the sticky navbar.
-  return hint ? <HoverTooltip text={hint} side="bottom" className="block">{card}</HoverTooltip> : card
+  return hint ? <HoverTooltip text={hint} side="bottom" className="block min-w-0">{card}</HoverTooltip> : card
 }
 
 function Panel({ icon: Icon, title, actions, children }: { icon: LucideIcon; title: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border bg-card">
-      <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-medium">
-          <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-          {title}
+    <div className="rounded-2xl sm:rounded-3xl border bg-card overflow-hidden min-w-0">
+      <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-medium min-w-0">
+          <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="truncate">{title}</span>
         </h3>
         {actions}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-3 sm:p-4 min-w-0">{children}</div>
     </div>
   )
 }
@@ -728,11 +728,11 @@ export default function AnalyticsPage() {
 
       <div className="space-y-6">
         {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {summaryLoading ? (
             // Same count as the cards below, cache card included, so the row
             // does not reflow when the summary lands.
-            Array.from({ length: cacheStats?.enabled ? 9 : 8 }).map((_, i) => <Skeleton key={i} className="h-[74px] rounded-3xl" />)
+            Array.from({ length: cacheStats?.enabled ? 9 : 8 }).map((_, i) => <Skeleton key={i} className="h-[68px] sm:h-[74px] rounded-2xl sm:rounded-3xl" />)
           ) : (
             <>
               <Stat icon={Activity} label={t('analytics.requests')} value={summary?.totalRequests ?? 0} hint={requestsHint} />
@@ -913,7 +913,7 @@ export default function AnalyticsPage() {
             {errors.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">{t('analytics.noErrors')}</p>
             ) : (
-              <div className="max-h-[240px] overflow-y-auto -mx-4">
+              <div className="max-h-[240px] overflow-x-auto overflow-y-auto -mx-3 sm:-mx-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -991,7 +991,7 @@ export default function AnalyticsPage() {
               {!recentCalls?.rows?.length ? (
                 <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
               ) : (
-                <div className="max-h-[420px] overflow-y-auto -mx-4">
+                <div className="max-h-[420px] overflow-x-auto overflow-y-auto -mx-3 sm:-mx-4">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1056,7 +1056,7 @@ export default function AnalyticsPage() {
               {byPlatform.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
               ) : (
-                <div className="max-h-[360px] overflow-y-auto -mx-4">
+                <div className="max-h-[360px] overflow-x-auto overflow-y-auto -mx-3 sm:-mx-4">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1106,7 +1106,7 @@ export default function AnalyticsPage() {
               {byModel.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">{t('common.noData')}</p>
               ) : (
-                <div className="max-h-[360px] overflow-y-auto -mx-4">
+                <div className="max-h-[360px] overflow-x-auto overflow-y-auto -mx-3 sm:-mx-4">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1146,7 +1146,7 @@ export default function AnalyticsPage() {
           {byKey.length > 0 && (
             <div className="lg:col-span-2">
               <Panel icon={KeyRound} title={t('analytics.usageByKey')}>
-                <div className="max-h-[360px] overflow-y-auto -mx-4">
+                <div className="max-h-[360px] overflow-x-auto overflow-y-auto -mx-3 sm:-mx-4">
                   <Table>
                     <TableHeader>
                       <TableRow>

@@ -153,125 +153,137 @@ export function SettingsRail({
   const tweaked = samplingActiveCount(sampling) > 0 || systemPrompt.trim().length > 0
 
   return (
-    <div
-      className={`relative shrink-0 overflow-hidden border-s bg-card transition-[width] duration-200 ease-out motion-reduce:transition-none ${
-        open ? 'w-72' : 'w-11'
-      }`}
-    >
-      <div
-        className={`${LAYER} w-11 items-center gap-1 py-3 ${
-          open ? 'invisible opacity-0' : 'visible opacity-100'
-        }`}
-      >
-        <Button
-          variant="ghost"
-          size="icon-sm"
+    <>
+      {/* Mobile Backdrop when open on screens < lg */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden"
           onClick={onToggle}
-          aria-label={t('playground.showSettings')}
-          title={t('playground.showSettings')}
-        >
-          <ChevronsLeft className="size-4" />
-        </Button>
-        {tweaked && <span className="size-1.5 rounded-full bg-primary/70" />}
-      </div>
+        />
+      )}
 
       <div
-        className={`${LAYER} w-72 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        className={`bg-card transition-all duration-200 ease-out motion-reduce:transition-none ${
+          open
+            ? 'fixed inset-y-0 end-0 z-50 w-72 shadow-2xl border-s lg:static lg:z-auto lg:shadow-none'
+            : 'hidden lg:block relative shrink-0 w-11 overflow-hidden border-s'
+        }`}
       >
-        <div className="flex shrink-0 items-center gap-1 px-2.5 py-1">
-          <span className="flex-1 truncate text-xs font-medium text-muted-foreground">
-            {t('settings.title')}
-          </span>
+        <div
+          className={`${LAYER} w-11 items-center gap-1 py-3 ${
+            open ? 'invisible opacity-0' : 'visible opacity-100'
+          }`}
+        >
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={onToggle}
-            aria-label={t('playground.hideSettings')}
-            title={t('playground.hideSettings')}
+            aria-label={t('playground.showSettings')}
+            title={t('playground.showSettings')}
           >
-            <ChevronsRight className="size-4" />
+            <ChevronsLeft className="size-4" />
           </Button>
+          {tweaked && <span className="size-1.5 rounded-full bg-primary/70" />}
         </div>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
-          <div className="space-y-1.5">
-            <span className="block text-xs font-medium">{t('common.model')}</span>
-            <ModelCombobox
-              value={modelValue}
-              options={modelOptions}
-              onSelect={onSelectModel}
-              ariaLabel={t('playground.selectModel')}
-              placeholder={t('playground.searchModels')}
-              emptyText={t('playground.noModelsFound')}
-              align="end"
-              triggerClassName="flex h-8 w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-              footer={
-                noModels ? (
-                  // Models only appear once a platform has an enabled key. Without
-                  // one, the list is just Auto/Fusion and looks broken — say why. (#269)
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('playground.noModels')}</div>
-                ) : undefined
-              }
-            />
+        <div
+          className={`${LAYER} w-72 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        >
+          <div className="flex shrink-0 items-center gap-1 px-2.5 py-1">
+            <span className="flex-1 truncate text-xs font-medium text-muted-foreground">
+              {t('settings.title')}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggle}
+              aria-label={t('playground.hideSettings')}
+              title={t('playground.hideSettings')}
+            >
+              <ChevronsRight className="size-4" />
+            </Button>
           </div>
 
-          {/* Which speech-to-text model the mic uses. Auto lets the router pick
-              among the transcription models that have a key; with none, the
-              picker says what to add instead of offering an empty list. */}
-          <div className="space-y-1.5">
-            <span className="block text-xs font-medium">{t('playground.dictationModel')}</span>
-            {noTranscription ? (
-              <p className="text-xs text-muted-foreground">{t('playground.dictationUnavailable')}</p>
-            ) : (
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium">{t('common.model')}</span>
               <ModelCombobox
-                value={dictationValue}
-                options={dictationOptions}
-                onSelect={onSelectDictation}
-                ariaLabel={t('playground.dictationModel')}
+                value={modelValue}
+                options={modelOptions}
+                onSelect={onSelectModel}
+                ariaLabel={t('playground.selectModel')}
                 placeholder={t('playground.searchModels')}
                 emptyText={t('playground.noModelsFound')}
                 align="end"
                 triggerClassName="flex h-8 w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                footer={
+                  noModels ? (
+                    // Models only appear once a platform has an enabled key. Without
+                    // one, the list is just Auto/Fusion and looks broken — say why. (#269)
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">{t('playground.noModels')}</div>
+                  ) : undefined
+                }
               />
-            )}
-          </div>
-
-          {/* The system prompt textarea deliberately lives BELOW the composer in
-              DOM order (the rail is the last column): `textarea` first-match
-              selectors still land on the message box. */}
-          <div className="space-y-1.5">
-            <label htmlFor="playground-system-prompt" className="flex items-center gap-1.5 text-xs font-medium">
-              {t('playground.systemPromptLabel')}
-              {systemPrompt.trim() && <span className="size-1.5 rounded-full bg-primary/70" />}
-            </label>
-            <textarea
-              id="playground-system-prompt"
-              value={systemPrompt}
-              onChange={e => onSystemPromptChange(e.target.value)}
-              placeholder={t('playground.systemPromptPlaceholder')}
-              rows={4}
-              className="max-h-64 min-h-[88px] w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <div className="space-y-0.5">
-              <span className="block text-xs font-medium">{t('playground.samplingHeading')}</span>
-              <p className="text-[11px] leading-snug text-muted-foreground">
-                {t('playground.samplingHelp')}
-              </p>
             </div>
-            {SAMPLING_FIELDS.map(field => (
-              <SamplingControlRow
-                key={field}
-                field={field}
-                settings={sampling}
-                onChange={onSamplingChange}
+
+            {/* Which speech-to-text model the mic uses. Auto lets the router pick
+                among the transcription models that have a key; with none, the
+                picker says what to add instead of offering an empty list. */}
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium">{t('playground.dictationModel')}</span>
+              {noTranscription ? (
+                <p className="text-xs text-muted-foreground">{t('playground.dictationUnavailable')}</p>
+              ) : (
+                <ModelCombobox
+                  value={dictationValue}
+                  options={dictationOptions}
+                  onSelect={onSelectDictation}
+                  ariaLabel={t('playground.dictationModel')}
+                  placeholder={t('playground.searchModels')}
+                  emptyText={t('playground.noModelsFound')}
+                  align="end"
+                  triggerClassName="flex h-8 w-full items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                />
+              )}
+            </div>
+
+            {/* The system prompt textarea deliberately lives BELOW the composer in
+                DOM order (the rail is the last column): `textarea` first-match
+                selectors still land on the message box. */}
+            <div className="space-y-1.5">
+              <label htmlFor="playground-system-prompt" className="flex items-center gap-1.5 text-xs font-medium">
+                {t('playground.systemPromptLabel')}
+                {systemPrompt.trim() && <span className="size-1.5 rounded-full bg-primary/70" />}
+              </label>
+              <textarea
+                id="playground-system-prompt"
+                value={systemPrompt}
+                onChange={e => onSystemPromptChange(e.target.value)}
+                placeholder={t('playground.systemPromptPlaceholder')}
+                rows={4}
+                className="max-h-64 min-h-[88px] w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               />
-            ))}
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <span className="block text-xs font-medium">{t('playground.samplingHeading')}</span>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {t('playground.samplingHelp')}
+                </p>
+              </div>
+              {SAMPLING_FIELDS.map(field => (
+                <SamplingControlRow
+                  key={field}
+                  field={field}
+                  settings={sampling}
+                  onChange={onSamplingChange}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

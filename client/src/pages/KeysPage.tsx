@@ -71,7 +71,7 @@ export default function KeysPage() {
         title={t('keys.pageTitle')}
         description={t('keys.pageDescription')}
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             {(tab === 'providers' || tab === 'quotaSignals') && keys.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => checkAll.mutate()} disabled={checkAll.isPending}>
                 {checkAll.isPending ? t('keys.checking') : t('keys.checkAll')}
@@ -95,7 +95,7 @@ export default function KeysPage() {
               options={KEYS_TABS.map(tb => ({ value: tb.id, label: t(tb.labelKey) }))}
               ariaLabel={t('keys.pageTitle')}
             />
-          </>
+          </div>
         }
       />
 

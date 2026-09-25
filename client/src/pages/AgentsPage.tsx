@@ -89,7 +89,7 @@ export default function AgentsPage() {
         }
       />
 
-      <section className="mb-6 rounded-3xl border bg-card p-5">
+      <section className="mb-6 rounded-2xl sm:rounded-3xl border bg-card p-4 sm:p-5">
         <h2 className="text-sm font-medium">{t('agents.quickstartTitle')}</h2>
         <p className="mt-0.5 max-w-prose text-xs text-muted-foreground">{t('agents.quickstart')}</p>
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
@@ -108,7 +108,7 @@ export default function AgentsPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {toolCatalog.map(tool => {
           const traffic = seen.get(analyticsIds[tool.id] ?? tool.id)
           const command = `npx freellmapi ${tool.command} --url ${origin}`

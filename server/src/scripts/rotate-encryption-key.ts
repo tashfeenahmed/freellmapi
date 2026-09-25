@@ -2,50 +2,15 @@
 /**
  * rotate-encryption-key — re-encrypt every stored secret under a new
  * ENCRYPTION_KEY without losing a single value.
- *
- * Why this exists: AES-256-GCM is authenticated, so a DB carried over to a
- * different ENCRYPTION_KEY fails loudly on the first decrypt — every stored
- * API key, proxy override, client-profile credential and the Fetch Relay
- * token becomes unreadable at once, and there is no recovery path short of
- * re-entering secrets by hand.
- * Rotating keys (compromise, policy expiry, onboarding) therefore has to walk
- * the ciphertext, decrypt each value with the OLD key and re-encrypt it with
- * the NEW one, atomically, before the new key ever becomes active.
- *
- * The cipher parameters deliberately mirror server/src/lib/crypto.ts
- * (aes-256-gcm, 32-byte key hex, 16-byte IV, 16-byte GCM tag) so a value
- * written here decrypts under the running server exactly like one written by
- * `encrypt()`. The script does NOT touch the module-level key cache — it
- * performs every decrypt with `--old-key` and every encrypt with `--new-key`
- * explicitly, so it is safe to run while the server is stopped (recommended)
- * or even live (a writer that fires mid-run sees only already-migrated rows
- * because both keys are valid until the process restarts with the new key).
- *
- * Usage:
- *   tsx src/scripts/rotate-encryption-key.ts --old-key <64hex> --new-key <64hex> [--db <path>] [--dry-run]
- *
- *   --old-key  the current key (hex, 64 chars). Falls back to ENCRYPTION_KEY.
- *   --new-key  the key to rotate to (hex, 64 chars). Required.
- *   --db       SQLite path (default: the server's data/freeapi.db).
- *   --dry-run  decrypt + print every affected row WITHOUT writing anything.
- *
- * Exits 0 on success (or a clean dry run), 1 on any decrypt/validation error.
- * Nothing is written unless EVERY row decrypts — a partial rotate would leave
- * the DB in a mixed-key state that is exactly the failure this script exists
- * to prevent.
  */
-import Database from 'better-sqlite3';
 import crypto from 'crypto';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getPostgresPool } from '../db/postgres.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_HEX_LEN = 64;
 const AUTH_TAG_BYTES = 16;
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_DB = path.resolve(__dirname, '../../data/freeapi.db');
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -81,190 +46,70 @@ export function decryptWith(key: Buffer, encrypted: string, iv: string, authTag:
   return decrypted;
 }
 
-/**
- * Ciphertext stored in dedicated columns: the IV and tag live next to their
- * ciphertext in sibling columns, all TEXT.
- */
-interface ColumnGroup {
-  kind: 'columns';
-  table: string;
-  idColumn: string;
-  encrypted: string;
-  iv: string;
-  authTag: string;
-  label: string;
-}
-
-/**
- * Ciphertext stored as a JSON blob in a single `settings` value, in the shape
- * `JSON.stringify(encrypt(plaintext))` — i.e. `{"encrypted","iv","authTag"}`.
- * The Fetch Relay bearer token is written this way by
- * `encodeFetchRelayToken()` (server/src/lib/proxy.ts) and read back by
- * `decodeFetchRelayToken()`, which degrades to '' with a warning when the
- * value will not decrypt. Miss it here and a rotate silently drops the relay
- * credential on the next restart.
- */
-interface SettingGroup {
-  kind: 'setting';
-  table: 'settings';
-  settingKey: string;
-  label: string;
-}
-
-type EncryptionGroup = ColumnGroup | SettingGroup;
-
-// Every place a secret is persisted. Keep this in step with the `encrypt()`
-// call sites in server/src/lib/crypto.ts consumers: api_keys (keys.ts,
-// custom-endpoint.ts, declarative-config.ts), api_keys proxy columns
-// (lib/key-proxy.ts), client_profiles (routes/client-profiles.ts) and the
-// settings blob (lib/proxy.ts).
-const ENCRYPTION_GROUPS: EncryptionGroup[] = [
-  { kind: 'columns', table: 'api_keys', idColumn: 'id', encrypted: 'encrypted_key', iv: 'iv', authTag: 'auth_tag', label: 'api key' },
-  { kind: 'columns', table: 'api_keys', idColumn: 'id', encrypted: 'proxy_encrypted', iv: 'proxy_iv', authTag: 'proxy_auth_tag', label: 'per-key proxy override' },
-  { kind: 'columns', table: 'client_profiles', idColumn: 'id', encrypted: 'encrypted_key', iv: 'iv', authTag: 'auth_tag', label: 'client-profile credential' },
-  { kind: 'setting', table: 'settings', settingKey: 'fetch_relay_token', label: 'fetch relay token' },
-];
-
-interface RowToRotate {
-  group: EncryptionGroup;
-  /** Row id for column groups, the settings key for settings blobs. */
-  id: number | string;
-  plaintext: string;
-  reEncrypted: { encrypted: string; iv: string; authTag: string };
-}
-
-/** Result of a rotate attempt: rows re-encrypted, or an error that aborted it. */
-export interface RotateResult {
-  rows: RowToRotate[];
-  error?: string;
-}
-
-/** The read surface rotateSecrets needs — better-sqlite3 and the app's Db both satisfy it. */
 export interface RotateReadDb {
-  prepare(sql: string): { all(...args: unknown[]): unknown[]; get(...args: unknown[]): unknown };
+  query<T = any>(sql: string, params?: any[]): Promise<{ rows: T[] }>;
 }
 
-/** The write surface applyRotation needs, including better-sqlite3's transaction(). */
 export interface RotateWriteDb {
-  prepare(sql: string): { run(...args: unknown[]): unknown };
-  // Deliberately phrased as "a callable taking the same arguments" rather than
-  // "returns F": better-sqlite3 hands back a Transaction<F> (F plus .deferred
-  // and friends) while the app's Db type returns F itself, and both satisfy
-  // this shape.
-  transaction<A extends unknown[]>(fn: (...args: A) => void): (...args: A) => unknown;
+  query<T = any>(sql: string, params?: any[]): Promise<{ rows: T[] }>;
 }
 
-/**
- * Core rotate routine, exported so tests can drive it against an in-memory
- * DB. Decrypts every stored secret with `oldKey` and re-encrypts with
- * `newKey`. Returns `{ rows }` on success and `{ rows: [], error }` when ANY
- * value fails to decrypt — the caller must treat the error case as "nothing
- * written".
- */
-export function rotateSecrets(
+export async function rotateSecretsAsync(
   db: RotateReadDb,
   oldKey: Buffer,
   newKey: Buffer,
-): RotateResult {
-  const rowsToRotate: RowToRotate[] = [];
+) {
+  const rowsToRotate: Array<{
+    table: string;
+    id: number | string;
+    plaintext: string;
+    reEncrypted: { encrypted: string; iv: string; authTag: string };
+  }> = [];
 
-  for (const group of ENCRYPTION_GROUPS) {
-    const cols = db.prepare(`PRAGMA table_info(${group.table})`).all() as Array<{ name: string }>;
-    const names = new Set(cols.map((c) => c.name));
-
-    // Ciphertext held as (encrypted, iv, auth_tag) columns.
-    if (group.kind === 'columns') {
-      if (!names.has(group.encrypted) || !names.has(group.iv) || !names.has(group.authTag)) {
-        continue;
-      }
-
-      const rows = db.prepare(
-        `SELECT ${group.idColumn} AS id, ${group.encrypted} AS enc, ${group.iv} AS iv, ${group.authTag} AS tag ` +
-        `FROM ${group.table} WHERE ${group.encrypted} IS NOT NULL`,
-      ).all() as Array<{ id: number; enc: string; iv: string; tag: string }>;
-
-      for (const row of rows) {
-        let plaintext: string;
-        try {
-          plaintext = decryptWith(oldKey, row.enc, row.iv, row.tag);
-        } catch (err) {
-          return {
-            rows: [],
-            error: `cannot decrypt ${group.label} #${row.id} with --old-key — wrong key or corrupted ciphertext (${(err as Error).message}). Aborting; nothing was written.`,
-          };
-        }
-        rowsToRotate.push({ group, id: row.id, plaintext, reEncrypted: encryptWith(newKey, plaintext) });
-      }
-      continue;
-    }
-
-    // Ciphertext held as a JSON blob in settings.value.
-    if (!names.has('key') || !names.has('value')) continue;
-
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(group.settingKey) as { value: string } | undefined;
-    // An unset or cleared setting stores '' rather than a blob — nothing to do.
-    if (!row || !row.value) continue;
-
-    let parsed: { encrypted?: string; iv?: string; authTag?: string };
+  // 1. Credentials table
+  const creds = await db.query(
+    'SELECT id, encrypted_value AS enc, iv, auth_tag AS tag FROM credentials WHERE encrypted_value IS NOT NULL'
+  );
+  for (const row of creds.rows) {
+    const enc = row.enc ?? row.encrypted_value;
+    const tag = row.tag ?? row.auth_tag;
+    if (!enc || !row.iv || !tag) continue;
     try {
-      parsed = JSON.parse(row.value) as { encrypted?: string; iv?: string; authTag?: string };
-    } catch {
+      const plaintext = decryptWith(oldKey, enc, row.iv, tag);
+      rowsToRotate.push({
+        table: 'credentials',
+        id: row.id,
+        plaintext,
+        reEncrypted: encryptWith(newKey, plaintext),
+      });
+    } catch (err: any) {
       return {
         rows: [],
-        error: `${group.label} (settings.${group.settingKey}) is not valid JSON — refusing to guess. Aborting; nothing was written.`,
+        error: `cannot decrypt credential #${row.id} with --old-key (${err.message})`,
       };
     }
-    if (!parsed.encrypted || !parsed.iv || !parsed.authTag) {
-      return {
-        rows: [],
-        error: `${group.label} (settings.${group.settingKey}) is missing encrypted/iv/authTag. Aborting; nothing was written.`,
-      };
-    }
-
-    let plaintext: string;
-    try {
-      plaintext = decryptWith(oldKey, parsed.encrypted, parsed.iv, parsed.authTag);
-    } catch (err) {
-      return {
-        rows: [],
-        error: `cannot decrypt ${group.label} (settings.${group.settingKey}) with --old-key — wrong key or corrupted ciphertext (${(err as Error).message}). Aborting; nothing was written.`,
-      };
-    }
-    rowsToRotate.push({ group, id: group.settingKey, plaintext, reEncrypted: encryptWith(newKey, plaintext) });
   }
 
   return { rows: rowsToRotate };
 }
 
-/**
- * Apply a rotate result: write every re-encrypted value back to its row, in
- * one transaction. Exported so main() and tests share the exact write path.
- */
-export function applyRotation(
+export async function applyRotationAsync(
   db: RotateWriteDb,
-  rows: RowToRotate[],
-): void {
-  const write = db.transaction((items: RowToRotate[]) => {
-    for (const r of items) {
-      if (r.group.kind === 'setting') {
-        // Same encoding encodeFetchRelayToken() writes, so the running server
-        // reads it back unchanged.
-        db.prepare('UPDATE settings SET value = ? WHERE key = ?')
-          .run(JSON.stringify(r.reEncrypted), r.group.settingKey);
-        continue;
-      }
-      db.prepare(
-        `UPDATE ${r.group.table} SET ${r.group.encrypted} = ?, ${r.group.iv} = ?, ${r.group.authTag} = ? WHERE ${r.group.idColumn} = ?`,
-      ).run(r.reEncrypted.encrypted, r.reEncrypted.iv, r.reEncrypted.authTag, r.id);
+  rows: Array<{ table: string; id: number | string; reEncrypted: { encrypted: string; iv: string; authTag: string } }>,
+) {
+  for (const r of rows) {
+    if (r.table === 'credentials') {
+      await db.query(
+        'UPDATE credentials SET encrypted_value = $1, iv = $2, auth_tag = $3, updated_at = NOW() WHERE id = $4',
+        [r.reEncrypted.encrypted, r.reEncrypted.iv, r.reEncrypted.authTag, r.id]
+      );
     }
-  });
-  write(rows);
+  }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const oldKeyHex = arg('old-key') ?? process.env.ENCRYPTION_KEY;
   const newKeyHex = arg('new-key');
-  const dbPath = arg('db') ?? DEFAULT_DB;
   const dryRun = flag('dry-run');
 
   if (!oldKeyHex) {
@@ -275,10 +120,6 @@ function main(): void {
     console.error('error: --new-key is required');
     process.exit(1);
   }
-  if (!fs.existsSync(dbPath)) {
-    console.error(`error: database not found at ${dbPath}`);
-    process.exit(1);
-  }
 
   const oldKey = parseHexKey(oldKeyHex, 'old');
   const newKey = parseHexKey(newKeyHex, 'new');
@@ -287,40 +128,32 @@ function main(): void {
     process.exit(1);
   }
 
-  const db = new Database(dbPath, { readonly: dryRun });
+  const pool = getPostgresPool();
   try {
-    const result = rotateSecrets(db, oldKey, newKey);
+    const result = await rotateSecretsAsync(pool, oldKey, newKey);
     if (result.error) {
       console.error(`error: ${result.error}`);
       process.exit(1);
     }
 
-    const rowsToRotate = result.rows;
-    if (rowsToRotate.length === 0) {
+    if (result.rows.length === 0) {
       console.log('No encrypted values found — nothing to rotate.');
       return;
     }
 
     if (dryRun) {
-      console.log(`[dry-run] would rotate ${rowsToRotate.length} value(s):`);
-      for (const r of rowsToRotate) {
-        const where = r.group.kind === 'setting' ? `settings.${r.group.settingKey}` : `#${r.id}`;
-        console.log(`  ${r.group.label} ${where} -> ${r.plaintext.slice(0, 3)}*** (${r.plaintext.length} chars)`);
-      }
+      console.log(`[dry-run] would rotate ${result.rows.length} value(s)`);
       return;
     }
 
-    applyRotation(db, rowsToRotate);
-
-    console.log(`Rotated ${rowsToRotate.length} value(s) to the new key.`);
-    console.log('Next steps: set ENCRYPTION_KEY to the new key (or overwrite the .encryption-key file next to the DB) and restart the server.');
-  } finally {
-    db.close();
+    await applyRotationAsync(pool, result.rows);
+    console.log(`Rotated ${result.rows.length} value(s) to the new key.`);
+  } catch (err: any) {
+    console.error('Rotation failed:', err?.message ?? err);
+    process.exit(1);
   }
 }
 
-// Only run when invoked directly (`tsx src/scripts/rotate-encryption-key.ts`),
-// not when the module is imported by tests for `rotateSecrets`/`encryptWith`.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main();
+  void main();
 }

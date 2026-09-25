@@ -363,11 +363,11 @@ export default function LogsPage() {
         </div>
       )}
 
-      <div className="relative rounded-3xl border bg-card">
+      <div className="relative rounded-2xl sm:rounded-3xl border bg-card overflow-hidden">
         <div
           ref={listRef}
           onScroll={handleScroll}
-          className="max-h-[65vh] min-h-[240px] overflow-y-auto p-3"
+          className="max-h-[65vh] min-h-[240px] overflow-x-auto overflow-y-auto p-2 sm:p-3"
         >
           {levels.length === 0 ? (
             <EmptyState
