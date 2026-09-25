@@ -340,7 +340,10 @@
     "weightSpeed": "வேகம்",
     "weightIntelligence": "உளவுத்துறை",
     "weightRequired": "குறைந்தபட்சம் ஒரு எடை பூஜ்ஜியத்திற்கு மேல் இருக்க வேண்டும்.",
-    "scoreColumn": "மதிப்பெண்"
+    "scoreColumn": "மதிப்பெண்",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "திசைவி அழுத்தம்",

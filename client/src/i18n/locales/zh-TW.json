@@ -340,7 +340,10 @@
     "weightSpeed": "速度",
     "weightIntelligence": "智慧",
     "weightRequired": "至少一個權重必須大於零。",
-    "scoreColumn": "分數"
+    "scoreColumn": "分數",
+    "minReliabilityFloor": "最低可靠性門檻",
+    "minReliabilityFloorHint": "模型實際成功率低於此值時不再參與路由。0.8 表示 80%。留空表示關閉——歷史樣本太少的模型始終保留，以便新模型仍有機會被嘗試。不會清空整條候選鏈。",
+    "minReliabilityFloorOff": "關閉"
   },
   "penaltyInspector": {
     "title": "路由壓力",

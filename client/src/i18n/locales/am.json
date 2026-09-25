@@ -340,7 +340,10 @@
     "weightSpeed": "ፍጥነት",
     "weightIntelligence": "አእምሮ",
     "weightRequired": "ቢያንስ አንድ ክብደት ከዜሮ በላይ መሆን አለበት.",
-    "scoreColumn": "ውጤት"
+    "scoreColumn": "ውጤት",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "የራውተር ግፊት",

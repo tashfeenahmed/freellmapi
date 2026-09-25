@@ -340,7 +340,10 @@
     "weightSpeed": "వేగం",
     "weightIntelligence": "ఇంటెలిజెన్స్",
     "weightRequired": "కనీసం ఒక బరువు తప్పనిసరిగా సున్నా కంటే ఎక్కువగా ఉండాలి.",
-    "scoreColumn": "స్కోర్"
+    "scoreColumn": "స్కోర్",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "రూటర్ ఒత్తిడి",

@@ -340,7 +340,10 @@
     "weightSpeed": "Velocidade",
     "weightIntelligence": "Inteligência",
     "weightRequired": "Pelo menos um peso deve ser maior que zero.",
-    "scoreColumn": "Pontuação"
+    "scoreColumn": "Pontuação",
+    "minReliabilityFloor": "Piso mínimo de confiabilidade",
+    "minReliabilityFloorHint": "Remove um modelo do roteamento quando sua taxa de sucesso observada cai abaixo deste valor. 0,8 significa 80%. Deixe em branco para desativar — modelos com pouco histórico são sempre mantidos para que modelos novos ainda possam ser testados. Nunca esvazia toda a cadeia.",
+    "minReliabilityFloorOff": "Desativado"
   },
   "penaltyInspector": {
     "title": "Pressão do roteador",

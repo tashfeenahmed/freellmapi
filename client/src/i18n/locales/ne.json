@@ -340,7 +340,10 @@
     "weightSpeed": "गति",
     "weightIntelligence": "इन्टेलिजेन्स",
     "weightRequired": "कम्तीमा एउटा तौल शून्यभन्दा माथि हुनुपर्छ ।",
-    "scoreColumn": "प्राप्ताङ्क"
+    "scoreColumn": "प्राप्ताङ्क",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "राउटरको चाप",

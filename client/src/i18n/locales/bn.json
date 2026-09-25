@@ -340,7 +340,10 @@
     "weightSpeed": "গতি",
     "weightIntelligence": "বুদ্ধিমত্তা",
     "weightRequired": "কমপক্ষে একটি ওজন শূন্যের উপরে হতে হবে।",
-    "scoreColumn": "স্কোর"
+    "scoreColumn": "স্কোর",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "রাউটারের চাপ",

@@ -340,7 +340,10 @@
     "weightSpeed": "სიჩქარე",
     "weightIntelligence": "დაზვერვა",
     "weightRequired": "მინიმუმ ერთი წონა უნდა იყოს ნულის ზემოთ.",
-    "scoreColumn": "ქულა"
+    "scoreColumn": "ქულა",
+    "minReliabilityFloor": "Minimum reliability floor",
+    "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
+    "minReliabilityFloorOff": "Disabled"
   },
   "penaltyInspector": {
     "title": "როუტერის წნევა",

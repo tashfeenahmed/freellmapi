@@ -340,7 +340,10 @@
     "weightSpeed": "Vitesse",
     "weightIntelligence": "Intelligence",
     "weightRequired": "Au moins une pondération doit être supérieure à zéro.",
-    "scoreColumn": "Score"
+    "scoreColumn": "Score",
+    "minReliabilityFloor": "Seuil de fiabilité minimal",
+    "minReliabilityFloorHint": "Retire un modèle du routage dès que son taux de succès observé passe sous cette valeur. 0,8 signifie 80 %. Laissez vide pour désactiver — les modèles avec trop peu d'historique sont toujours conservés afin que les nouveaux modèles puissent encore être essayés. Ne vide jamais toute la chaîne.",
+    "minReliabilityFloorOff": "Désactivé"
   },
   "penaltyInspector": {
     "title": "Pression sur le routeur",

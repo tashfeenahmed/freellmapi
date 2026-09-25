@@ -340,7 +340,10 @@
     "weightSpeed": "速度",
     "weightIntelligence": "インテリジェンス",
     "weightRequired": "少なくとも 1 つの重みがゼロより大きくなければなりません。",
-    "scoreColumn": "スコア"
+    "scoreColumn": "スコア",
+    "minReliabilityFloor": "最低信頼性しきい値",
+    "minReliabilityFloorHint": "観測された成功率がこの値を下回ったモデルをルーティングから除外します。0.8 は 80% を意味します。空欄で無効 — 履歴が少なすぎるモデルは常に保持され、新しいモデルも試行され続けます。チェーン全体が空になることはありません。",
+    "minReliabilityFloorOff": "無効"
   },
   "penaltyInspector": {
     "title": "ルーターの圧力",
