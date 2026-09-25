@@ -207,14 +207,31 @@ function enabledModelCount(platform: string): number {
 
 // Non-null when the just-added key has no usable models yet, so the client can
 // explain the silence instead of leaving the user staring at an empty list.
+//
+// The old copy told users to "add ${platform} as a custom OpenAI-compatible
+// provider with its base URL" without ever naming that URL (#1327): every
+// attempt failed with a URL-typo or a wrong-path error, and for providers
+// whose API is not OpenAI-compatible at all (Speechify's entitlement endpoint)
+// the advice was flat-out unworkable. So: quote the provider's own base URL
+// when it speaks the OpenAI-compatible protocol the custom-provider path
+// speaks, and only offer that workaround for those providers.
 function noModelsNotice(platform: string): string | undefined {
   if (enabledModelCount(platform) > 0) return undefined;
+  const provider = resolveProvider(platform as Platform);
+  // OpenAICompatProvider exposes its endpoint through the modelsUrl getter;
+  // duck-typing on it avoids importing the class purely for an instanceof.
+  const compatBaseUrl = typeof (provider as { modelsUrl?: unknown } | undefined)?.modelsUrl === 'string'
+    ? String((provider as unknown as { modelsUrl: string }).modelsUrl).replace(/\/models\/?$/, '')
+    : null;
+  const workaround = compatBaseUrl
+    ? ` Add a Premium license key to use them now, or add ${platform} as a custom ` +
+      `OpenAI-compatible provider with base URL ${compatBaseUrl}.`
+    : ' Add a Premium license key to use them now; this provider has no ' +
+      'OpenAI-compatible endpoint, so the custom-provider workaround does not apply.';
   return (
     `Key saved, but no ${platform} models are in your current catalog yet. ` +
     `Newer providers are published to the premium catalog first and appear ` +
-    `for free-tier installs once they age into the monthly catalog. Add a ` +
-    `Premium license key to use them now, or add ${platform} as a custom ` +
-    `OpenAI-compatible provider with its base URL.`
+    `for free-tier installs once they age into the monthly catalog.${workaround}`
   );
 }
 

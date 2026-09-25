@@ -123,6 +123,30 @@ describe('Keys API', () => {
     expect(body.notice).toMatch(/no agnes models/i);
   });
 
+  it('#1327: the no-catalog notice names the provider base URL so the custom-provider workaround is actionable', async () => {
+    const db = getDb();
+    db.prepare("UPDATE models SET enabled = 0 WHERE platform = 'agnes'").run();
+
+    const { body } = await request(app, 'POST', '/api/keys', {
+      platform: 'agnes',
+      key: 'agnes_test_key_123456',
+    });
+    // Agnes is an OpenAI-compat provider: the notice must quote its actual
+    // base URL, which is what the workaround tells the user to paste.
+    expect(body.notice).toMatch(/base URL https:\/\/apihub\.agnes-ai\.com\/v1/);
+  });
+
+  it('#1327: a non-OpenAI-compat provider gets no bogus custom-provider advice', async () => {
+    const { body } = await request(app, 'POST', '/api/keys', {
+      platform: 'speechify',
+      key: 'speechify_test_key_123456',
+    });
+    // Speechify speaks its own entitlement API; suggesting the custom
+    // OpenAI-compatible path for it sends users into a dead end.
+    expect(body.notice ?? '').toMatch(/speechify/i);
+    expect(body.notice ?? '').not.toMatch(/custom OpenAI-compatible provider with base URL/);
+  });
+
   it('POST /api/keys does not warn when the platform has catalog models', async () => {
     const { status, body } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',
