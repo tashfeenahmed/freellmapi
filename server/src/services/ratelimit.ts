@@ -560,10 +560,11 @@ export function modelWindowUsedFraction(
 //   PROVIDER_DAILY_REQUEST_CAP_OPENROUTER=50   (set 0 to disable the cap)
 const DEFAULT_PROVIDER_DAILY_REQUEST_CAPS: Record<string, number> = {
   openrouter: 1000,
-  // ModelScope's free tier is 2000 requests/day across the whole account (all
-  // models share it). 1800 leaves margin for validation probes and for drift
+  // ModelScope's free tier moved to magic-grain (魔粒) metering in 2026-08:
+  // ~250 魔粒/day account-wide at ~2 魔粒 per request (observed 2026-08-14)
+  // ≈ 125 requests/day. 100 leaves margin for validation probes and for drift
   // between our ledger and the provider's own daily boundary (#581).
-  modelscope: 1800,
+  modelscope: 100,
 };
 
 const DEFAULT_PROVIDER_DAILY_TOKEN_CAPS: Record<string, number> = {
