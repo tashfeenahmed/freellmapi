@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
+import { decrypt } from '../../lib/crypto.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -122,6 +123,69 @@ describe('Keys API', () => {
     expect(body.notice).toMatch(/no agnes models/i);
   });
 
+  it('#1327: the no-catalog notice names the provider base URL so the custom-provider workaround is actionable', async () => {
+    const db = getDb();
+    db.prepare("UPDATE models SET enabled = 0 WHERE platform = 'agnes'").run();
+
+    const { body } = await request(app, 'POST', '/api/keys', {
+      platform: 'agnes',
+      key: 'agnes_test_key_123456',
+    });
+    // Agnes is an OpenAI-compat provider: the notice must quote its actual
+    // base URL, which is what the workaround tells the user to paste.
+    expect(body.notice).toMatch(/base URL https:\/\/apihub\.agnes-ai\.com\/v1/);
+  });
+
+  it('#1327: a non-OpenAI-compat provider gets no bogus custom-provider advice', async () => {
+    const db = getDb();
+    db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
+    const { body } = await request(app, 'POST', '/api/keys', {
+      platform: 'speechify',
+      key: 'speechify_test_key_123456',
+    });
+    // Speechify speaks its own TTS API; suggesting the custom
+    // OpenAI-compatible path for it sends users into a dead end.
+    expect(body.notice).toMatch(/no speechify models/i);
+    expect(body.notice).not.toMatch(/custom OpenAI-compatible/);
+  });
+
+  it('#1327: a media-only provider whose TTS models are in the catalog gets no notice', async () => {
+    const db = getDb();
+    db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
+    db.prepare(`
+      INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled)
+      VALUES ('speechify', 'simba-english', 'Speechify Simba English', 'audio', 1, 1)
+    `).run();
+    try {
+      const { status, body } = await request(app, 'POST', '/api/keys', {
+        platform: 'speechify',
+        key: 'speechify_test_key_123456',
+      });
+      expect(status).toBe(201);
+      expect(body.modelsAvailable).toBe(1);
+      expect(body.notice).toBeUndefined();
+    } finally {
+      db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
+    }
+  });
+
+  it('#1327: a Premium install is not told to add a Premium license key', async () => {
+    const db = getDb();
+    db.prepare("UPDATE models SET enabled = 0 WHERE platform = 'agnes'").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_applied_tier', 'live')").run();
+    try {
+      const { body } = await request(app, 'POST', '/api/keys', {
+        platform: 'agnes',
+        key: 'agnes_test_key_123456',
+      });
+      expect(body.notice).toMatch(/Premium catalog does not list any agnes models/);
+      expect(body.notice).not.toMatch(/Add a Premium license key/);
+      expect(body.notice).toMatch(/base URL https:\/\/apihub\.agnes-ai\.com\/v1/);
+    } finally {
+      db.prepare("DELETE FROM settings WHERE key = 'catalog_applied_tier'").run();
+    }
+  });
+
   it('POST /api/keys does not warn when the platform has catalog models', async () => {
     const { status, body } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',
@@ -151,6 +215,16 @@ describe('Keys API', () => {
       key: 'test',
     });
     expect(status).toBe(400);
+  });
+
+  it.each(['aclide', 'speka', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'])('accepts a %s key without seeding gated model rows', async platform => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform, key: 'not-a-real-test-key-12345', label: 'Gateway test',
+    });
+    expect(status).toBe(201);
+    expect(body.platform).toBe(platform);
+    expect(body.modelsAvailable).toBe(0);
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM models WHERE platform = ?').get(platform)).toEqual({ n: 0 });
   });
 
   it('POST /api/keys rejects missing key', async () => {
@@ -215,6 +289,88 @@ describe('Keys API', () => {
     const { body: keys } = await request(app, 'GET', '/api/keys');
     expect(keys[0].enabled).toBe(false);
     expect(keys[0].label).toBe('Disabled key');
+  });
+
+  it('PATCH /api/keys/:id replaces the credential without changing its stable identity', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_old_key_123456',
+      label: 'Before',
+    });
+    getDb().prepare(`
+      INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms)
+      VALUES ('groq', 'llama-3.3-70b', ?, ?)
+    `).run(created.id, Date.now() + 60_000);
+
+    const { status, body } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'gsk_new_key_654321',
+    });
+
+    expect(status).toBe(200);
+    expect(body.maskedKey).toContain('gsk_new_key_654321'.slice(-4));
+    const row = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('gsk_new_key_654321');
+    expect(row.platform).toBe('groq');
+    expect(row.label).toBe('Before');
+    expect(row.enabled).toBe(1);
+    expect(row.status).toBe('unknown');
+    expect(row.last_checked_at).toBeNull();
+    expect(row.last_health_error).toBeNull();
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM rate_limit_cooldowns WHERE key_id = ?')
+      .get(created.id)).toEqual({ n: 0 });
+  });
+
+  it('PATCH /api/keys/:id preserves a Cloudflare credential when a malformed replacement is submitted', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'cloudflare', key: 'old-account:old-token', label: 'Original',
+    });
+    for (const key of ['token-only', ':token', 'account:', 'account:   ']) {
+      const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, { key, label: 'Changed' });
+      expect(status).toBe(400);
+    }
+    const row = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('old-account:old-token');
+    expect(row.label).toBe('Original');
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, { key: 'new-account:new-token' });
+    expect(status).toBe(200);
+    const updated = getDb().prepare('SELECT * FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(updated.encrypted_key, updated.iv, updated.auth_tag)).toBe('new-account:new-token');
+  });
+
+  it('PATCH /api/keys/:id leaves health state alone when the submitted key is unchanged', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_same_key_123456',
+    });
+    getDb().prepare(`
+      UPDATE api_keys
+         SET status = 'healthy', last_checked_at = datetime('now'), last_health_error = NULL
+       WHERE id = ?
+    `).run(created.id);
+
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'gsk_same_key_123456',
+    });
+
+    expect(status).toBe(200);
+    const row = getDb().prepare('SELECT status, last_checked_at FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(row.status).toBe('healthy');
+    expect(row.last_checked_at).toBeTruthy();
+  });
+
+  it('PATCH /api/keys/:id rejects a credential for a keyless provider', async () => {
+    const { body: created } = await request(app, 'POST', '/api/keys', {
+      platform: 'kilo',
+      key: '',
+    });
+
+    const { status } = await request(app, 'PATCH', `/api/keys/${created.id}`, {
+      key: 'unexpected-secret',
+    });
+
+    expect(status).toBe(400);
+    const row = getDb().prepare('SELECT encrypted_key, iv, auth_tag FROM api_keys WHERE id = ?').get(created.id) as any;
+    expect(decrypt(row.encrypted_key, row.iv, row.auth_tag)).toBe('no-key');
   });
 
   it('PATCH /api/keys/:id clears label', async () => {

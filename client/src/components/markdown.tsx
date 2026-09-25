@@ -1,8 +1,51 @@
-import { memo, isValidElement, type ReactNode } from 'react'
+import { memo, isValidElement, useContext, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { AppWindow, Image as ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './copy-button'
+import { CodeBlock } from './code-block'
+import { artifactKindOf, type ArtifactKind } from '@/lib/artifacts'
+import { ArtifactHostContext } from '@/lib/artifact-host'
+import { useI18n } from '@/i18n'
+
+
+function fenceLanguage(children: ReactNode): string {
+  const child = Array.isArray(children) ? children[0] : children
+  if (!isValidElement(child)) return ''
+  const cls = (child.props as { className?: string }).className ?? ''
+  return /language-([^\s]+)/.exec(cls)?.[1]?.toLowerCase() ?? ''
+}
+
+function ArtifactCard({ kind, language, code }: { kind: ArtifactKind; language: string; code: string }) {
+  const { t } = useI18n()
+  const host = useContext(ArtifactHostContext)!
+  const active = host.activeCode === code
+  const title = /<title[^>]*>([^<]{1,120})<\/title>/i.exec(code)?.[1]?.trim()
+    || t(kind === 'svg' ? 'playground.artifactSvg' : 'playground.artifactHtml')
+  const Icon = kind === 'svg' ? ImageIcon : AppWindow
+  return (
+    <button
+      type="button"
+      onClick={() => host.open(kind, language, code)}
+      className={cn(
+        'group/artifact my-2 flex w-full max-w-md items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted/60 first:mt-0 last:mb-0',
+        active && 'border-foreground/40',
+      )}
+      aria-pressed={active}
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{title}</span>
+        <span className="block text-xs text-muted-foreground">
+          {t('playground.artifactOpen')} · {code.split('\n').length} {t('playground.artifactLines')}
+        </span>
+      </span>
+    </button>
+  )
+}
 
 // react-markdown hands <pre> its rendered <code> element, not the raw source,
 // so pull the text back out of the React tree for the copy button.
@@ -15,6 +58,13 @@ function nodeText(node: ReactNode): string {
 }
 
 function Pre({ children }: { children?: ReactNode }) {
+  const host = useContext(ArtifactHostContext)
+  if (host) {
+    const language = fenceLanguage(children)
+    const code = nodeText(children).replace(/\n$/, '')
+    const kind = artifactKindOf(language, code)
+    if (kind) return <ArtifactCard kind={kind} language={language} code={code} />
+  }
   return (
     <pre className="group relative my-2 overflow-x-auto rounded-lg border bg-background/60 p-3 first:mt-0 last:mb-0">
       <CopyButton
@@ -99,11 +149,8 @@ const components: Components = {
   code: ({ className, children, ...props }) => {
     const isBlock = /language-/.test(className ?? '')
     if (isBlock) {
-      return (
-        <code className={cn('font-mono text-[12.5px] leading-relaxed', className)} {...props}>
-          {children}
-        </code>
-      )
+      const language = /language-([^\s]+)/.exec(className ?? '')?.[1] ?? null
+      return <CodeBlock code={nodeText(children).replace(/\n$/, '')} language={language} className={className} />
     }
     return (
       <code

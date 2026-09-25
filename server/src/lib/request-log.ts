@@ -15,6 +15,12 @@ export function logRequest(
   _ttfbMs: number | null = null,
   _requestedModel: string | null = null,
   _servedModel: string | null = null,
+  // Which gateway pathway produced the request ('http' for the OpenAI-
+  // compatible proxy, /v1/responses, /v1/messages, the Ollama + Gemini wires
+  // and fusion's sub-calls). Upstream persists it on the request row; the
+  // fork's memory-first telemetry has no per-caller breakdown, so the value is
+  // accepted (and ignored) here to keep every upstream call site compiling.
+  _caller: string | null = null,
 ) {
   try {
     const isSuccess = status === 'success';

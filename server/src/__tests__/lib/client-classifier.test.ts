@@ -37,6 +37,38 @@ describe('client agent classification', () => {
     expect(classifyClientAgent(request('/v1/chat/completions', {
       'user-agent': 'deepseek-harness/0.3.1 (+https://github.com/deepseek-ai/deepseek-harness)',
     }))).toBe('deepseek-harness');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'atomcode/5.0.9',
+    }))).toBe('atomcode');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'RooCode/3.50.4',
+    }))).toBe('roo');
+  });
+
+  it('recognizes OpenClaw by the static header its generated provider sends', () => {
+    // A custom provider in OpenClaw gets the bare openai-node UA, so the
+    // generator sets `headers: { User-Agent: 'openclaw' }`; the bare word and
+    // the `openclaw/<version>` form OpenClaw uses natively both count.
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'openclaw',
+    }))).toBe('openclaw');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'openclaw/2026.9.4',
+    }))).toBe('openclaw');
+    // The unmodified SDK UA still files under openai-sdk, so a hand-written
+    // provider without the header is not misattributed.
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'OpenAI/JS 7.8.0',
+    }))).toBe('openai-sdk');
+  });
+
+  it('recognizes Hermes Agent by its header and its model-probe UA', () => {
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'hermes-agent',
+    }))).toBe('hermes-agent');
+    expect(classifyClientAgent(request('/v1/models', {
+      'user-agent': 'hermes-cli/0.21.3',
+    }))).toBe('hermes-agent');
   });
 
   it('separates MiMo Code from the OpenCode it derives from', () => {

@@ -311,3 +311,33 @@ export function stopCatalogSync(): void {
     cancelInterval = null;
   }
 }
+
+/** Raw response from the catalog service's license activation endpoint. */
+export interface LicenseActivation {
+  valid: boolean;
+  plan: string | null;
+  status: string | null;
+  expiresAt: string | null;
+  reason?: string;
+}
+
+/**
+ * Validate a key with the license service. Returns null when the service is
+ * unreachable — distinguishable from a rejected key, so a transient outage can
+ * be warned about instead of reported as a bad key. Shared by the dashboard's
+ * POST /api/premium/key and declarative `license` config.
+ */
+export async function validateLicenseKey(key: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<LicenseActivation | null> {
+  try {
+    const res = await fetch(`${catalogBaseUrl()}/v1/license/activate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return (await res.json()) as LicenseActivation;
+  } catch {
+    return null;
+  }
+}
+

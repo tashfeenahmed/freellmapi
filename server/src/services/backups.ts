@@ -467,7 +467,16 @@ export function restoreBackup(db: Db, id: number): RestoreResult {
     // One transaction for the whole file: better-sqlite3 rolls it back if any
     // statement throws, so a bad dump leaves the database exactly as it was.
     db.transaction(() => {
+      // Replaying historical log rows is not new provider usage. In a full
+      // restore the ledger is restored separately; in a partial log restore
+      // the existing ledger remains authoritative. Keep DDL in this same
+      // transaction so a failed restore also restores the trigger.
+      const usageTrigger = header.tables.includes('requests')
+        ? db.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'requests_key_monthly_usage'").get() as { sql: string } | undefined
+        : undefined;
+      if (usageTrigger) db.exec('DROP TRIGGER requests_key_monthly_usage');
       db.exec(sql);
+      if (usageTrigger) db.exec(usageTrigger.sql);
     })();
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

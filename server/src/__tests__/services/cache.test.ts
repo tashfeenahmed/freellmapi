@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, setSetting, getDb } from '../../db/index.js';
 import {
   computeCacheKey,
   getCachedResponse,
   storeCachedResponse,
+  getCachedStreamResponse,
+  storeCachedStreamResponse,
+  STREAM_CACHE_MAX_BYTES,
   getCacheStats,
   clearCache,
   loadCacheFromDb,
@@ -358,6 +361,130 @@ describe('response cache', () => {
     });
   });
 
+  describe('streaming cache', () => {
+    const frames = (text: string) => [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+
+    it('returns null on a streaming miss', () => {
+      expect(getCachedStreamResponse('does-not-exist')).toBeNull();
+    });
+
+    it('replays the exact SSE frames on a streaming hit', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'stream me')] });
+      storeCachedStreamResponse(key, {
+        frames: frames('streamed answer'),
+        platform: 'groq',
+        modelId: 'llama-3.3-70b',
+        keyId: 7,
+        promptTokens: 10,
+        completionTokens: 5,
+      });
+      const hit = getCachedStreamResponse(key);
+      expect(hit).not.toBeNull();
+      expect(hit!.sse).toBe(frames('streamed answer').join(''));
+      expect(hit!.platform).toBe('groq');
+      expect(hit!.modelId).toBe('llama-3.3-70b');
+    });
+
+    it('keeps JSON and streaming entries separate for the same key', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'both')] });
+      store(key, 'json answer');
+      storeCachedStreamResponse(key, {
+        frames: frames('stream answer'),
+        platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      });
+      // The JSON store still serves its entry; the stream store its own.
+      expect((getCachedResponse(key)!.body as any).choices[0].message.content).toBe('json answer');
+      expect(getCachedStreamResponse(key)!.sse).toBe(frames('stream answer').join(''));
+    });
+
+    it('rejects an empty frame list (nothing to replay)', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'empty')] });
+      storeCachedStreamResponse(key, {
+        frames: [],
+        platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      });
+      expect(getCachedStreamResponse(key)).toBeNull();
+    });
+
+    it('counts streaming hits in the aggregated stats and clearCache clears both', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'stats')] });
+      storeCachedStreamResponse(key, {
+        frames: frames('a'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 10, completionTokens: 5,
+      });
+      getCachedStreamResponse(key);
+      getCachedStreamResponse(key);
+      const stats = getCacheStats();
+      expect(stats.entries).toBe(1);
+      expect(stats.totalHits).toBe(2);
+      expect(stats.savedPromptTokens).toBe(20); // 2 hits × 10
+      expect(clearCache()).toBe(1);
+      expect(getCacheStats().entries).toBe(0);
+    });
+
+    it('counts streaming lookups in lookupHits / lookupMisses (dashboard hit rate)', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'rate')] });
+      // Two misses: an absent key, then an expired entry.
+      expect(getCachedStreamResponse(key)).toBeNull();
+      storeCachedStreamResponse(key, {
+        frames: frames('a'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      }, 1_000);
+      expect(getCachedStreamResponse(key, 1_000 + 2 * 3600 * 1000)).toBeNull(); // past the 1h TTL
+      // Then a hit on a fresh entry.
+      storeCachedStreamResponse(key, {
+        frames: frames('a'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      }, 2_000);
+      expect(getCachedStreamResponse(key, 2_100)).not.toBeNull();
+
+      const stats = getCacheStats();
+      expect(stats.lookupMisses).toBe(2);
+      expect(stats.lookupHits).toBe(1);
+      expect(stats.hitRate).toBeCloseTo(1 / 3);
+    });
+
+    it('skips a stream that outgrew the replay byte ceiling', () => {
+      const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'huge')] });
+      const huge = 'x'.repeat(STREAM_CACHE_MAX_BYTES + 1);
+      storeCachedStreamResponse(key, {
+        frames: [`data: ${huge}\n\n`],
+        platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      });
+      expect(getCachedStreamResponse(key)).toBeNull();
+      expect(getCacheStats().entries).toBe(0);
+    });
+
+    it('shares one RESPONSE_CACHE_MAX_ENTRIES budget with the JSON store', () => {
+      process.env.RESPONSE_CACHE_MAX_ENTRIES = '3';
+      const base = 1_700_000_000_000;
+      const k = (t: string) => computeCacheKey({ model: 'auto', messages: [msg('user', t)] });
+      store(k('j1'), 'v1', base + 1);
+      store(k('j2'), 'v2', base + 2);
+      storeCachedStreamResponse(k('s1'), {
+        frames: frames('s1'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      }, base + 3);
+      expect(getCacheStats().entries).toBe(3); // full, counting both stores
+
+      // A 4th entry (either kind) evicts the coldest across BOTH stores, so
+      // the total never exceeds the documented cap.
+      storeCachedStreamResponse(k('s2'), {
+        frames: frames('s2'), platform: 'groq', modelId: 'm', keyId: 1, promptTokens: 1, completionTokens: 1,
+      }, base + 4);
+      expect(getCacheStats().entries).toBe(3);
+      expect(getCachedResponse(k('j1'), base + 5)).toBeNull();           // oldest overall, evicted
+      expect(getCachedResponse(k('j2'), base + 5)).not.toBeNull();
+      expect(getCachedStreamResponse(k('s1'), base + 5)).not.toBeNull();
+      expect(getCachedStreamResponse(k('s2'), base + 5)).not.toBeNull();
+
+      // And a JSON insert can evict a colder STREAM entry, not just its own kind.
+      store(k('j3'), 'v3', base + 6);
+      store(k('j4'), 'v4', base + 7);
+      expect(getCacheStats().entries).toBe(3);
+      expect(getCachedStreamResponse(k('s1'), base + 8)).toBeNull();
+    });
+  });
+
   describe('settings-backed toggle (no restart)', () => {
     it('the stored setting enables the cache even with the env var unset', () => {
       delete process.env.RESPONSE_CACHE;
@@ -553,6 +680,70 @@ describe('response cache', () => {
       expect(getCachedResponse(key, t0 + 120_000)).toBeNull();
       __flushPersistenceForTests();
       expect(rowCount()).toBe(0);
+    });
+
+    describe('batched hit-count flush', () => {
+      const hitRow = (key: string) => getDb()
+        .prepare('SELECT hit_count, last_hit_at_ms FROM response_cache WHERE cache_key = ?')
+        .get(key) as { hit_count: number; last_hit_at_ms: number | null } | undefined;
+
+      beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
+      afterEach(() => { vi.useRealTimers(); });
+
+      it('writes many hits in one debounced pass', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'batched')] });
+        const t0 = 5_000_000;
+        store(key, 'answer', t0);
+        __flushPersistenceForTests();
+        getCachedResponse(key, t0 + 1);
+        getCachedResponse(key, t0 + 2);
+        getCachedResponse(key, t0 + 3);
+        __flushPersistenceForTests();
+        // Nothing written per hit: the row still holds the stored value.
+        expect(hitRow(key)!.hit_count).toBe(0);
+
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)).toEqual({ hit_count: 3, last_hit_at_ms: t0 + 3 });
+      });
+
+      it('clearCache() drops pending counts so they never land on a re-stored entry', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'cleared-pending')] });
+        store(key, 'old answer');
+        __flushPersistenceForTests();
+        getCachedResponse(key);
+        getCachedResponse(key);
+
+        clearCache();
+        store(key, 'fresh answer');
+        __flushPersistenceForTests();
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+
+        expect(hitRow(key)!.hit_count).toBe(0);
+        expect(getCacheStats().totalHits).toBe(0);
+      });
+
+      it('a re-store drops the old entry\'s pending count', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'restored-pending')] });
+        store(key, 'old answer');
+        __flushPersistenceForTests();
+        getCachedResponse(key);
+        getCachedResponse(key);
+
+        // Overwrite before the flush timer fires: the fresh row starts at 0.
+        store(key, 'new answer');
+        __flushPersistenceForTests();
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)!.hit_count).toBe(0);
+
+        // Hits on the new entry still flush normally.
+        getCachedResponse(key);
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)!.hit_count).toBe(1);
+      });
     });
 
     it('clearCache() purges SQLite too, so a restart does not resurrect entries', () => {

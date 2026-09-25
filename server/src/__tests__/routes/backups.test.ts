@@ -6,7 +6,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
-import { createBackup } from '../../services/backups.js';
+import { createBackup, restoreBackup } from '../../services/backups.js';
 
 let dashToken = '';
 let dataDir = '';
@@ -88,6 +88,23 @@ describe('Backups API', () => {
 
     const after = await request(app, 'GET', '/api/backups?page=1&pageSize=20');
     expect(after.body.items.some((item: { id: number }) => item.id === created.body.backup.id)).toBe(false);
+  });
+
+  it('restores request history without charging the monthly ledger twice', () => {
+    const db = getDb();
+    const keyId = 851_901;
+    const insert = () => db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms)
+      VALUES ('groq', 'backup-ledger-test', ?, 'success', 10, 5, 1)`).run(keyId);
+    const usage = () => db.prepare('SELECT requests, tokens FROM key_monthly_usage WHERE key_id = ?').get(keyId);
+    insert();
+    const full = createBackup(db);
+    restoreBackup(db, full.id);
+    expect(usage()).toEqual({ requests: 1, tokens: 15 });
+    const partial = createBackup(db, { tables: ['requests'] });
+    restoreBackup(db, partial.id);
+    expect(usage()).toEqual({ requests: 1, tokens: 15 });
+    insert();
+    expect(usage()).toEqual({ requests: 2, tokens: 30 });
   });
 
   it('round-trips the schedule setting', async () => {

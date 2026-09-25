@@ -90,6 +90,8 @@ Example `freellmapi.config.json`:
 
 ```json
 {
+  "admin": { "email": "ops@example.com", "password": "change-me-min-8-chars" },
+  "license": "premium license key from freellmapi.co",
   "keys": [
     { "platform": "groq", "key": "gsk_...", "label": "main" }
   ],
@@ -105,6 +107,12 @@ Example `freellmapi.config.json`:
   "routing": { "strategy": "balanced" }
 }
 ```
+
+The optional `admin` entry creates the first dashboard account while no account
+exists (ignored with a warning afterwards — a claimed install can't be taken
+over by config), and `license` activates a Premium key against the license
+service in the background. Both fields are optional; the file carries plaintext
+secrets, so protect it like `ENCRYPTION_KEY`.
 
 ## Published Image
 

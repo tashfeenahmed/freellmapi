@@ -82,6 +82,17 @@ describe('isModelNotFoundError (drives whole-model skip within a request)', () =
     expect(isModelNotFoundError(new Error('No endpoints found for openrouter/minimax/minimax-m2.5:free'))).toBe(true);
   });
 
+  it('flags a stale/removed model reported as a 400 "No model found" (Routeway) — MODEL-level, not request shape', () => {
+    // "No model found" does NOT contain the substring "not found" (words are
+    // no/model/found), so before the phrase list it slipped through to
+    // isProviderBadRequestError and surfaced as a request-blaming 400.
+    expect(isModelNotFoundError(Object.assign(new Error('Routeway API error 400: No model found: llama-3.3-70b-instruct:free'), { status: 400 }))).toBe(true);
+    expect(isModelNotFoundError(new Error('Groq API error 400: model not found'))).toBe(true);
+    expect(isModelNotFoundError(new Error('Provider API error 400: unknown model'))).toBe(true);
+    expect(isModelNotFoundError(new Error('API error 400: model does not exist'))).toBe(true);
+    expect(isModelNotFoundError(new Error('API error 404: no such model'))).toBe(true);
+  });
+
   it('flags 410 Gone (model pulled upstream) by message or attached status — #339', () => {
     expect(isModelNotFoundError(new Error('Ollama Cloud API error 410: Gone'))).toBe(true);
     expect(isModelNotFoundError(Object.assign(new Error('Gone'), { status: 410 }))).toBe(true);
@@ -199,6 +210,31 @@ describe('isRetryableError', () => {
       expect(isPaymentRequiredError(new Error('HuggingFace Router API error 402: Payment required'))).toBe(true);
       expect(isPaymentRequiredError(new Error('429 Too Many Requests'))).toBe(false);
       expect(isPaymentRequiredError(new Error('503 Service Unavailable'))).toBe(false);
+    });
+
+    // #1277 follow-up: the digits 402 inside a token count or id are not a
+    // status. The 402 bench takes the key off every model of the platform for
+    // a day, so these false positives emptied whole providers.
+    it('isPaymentRequiredError ignores 402 inside other numbers and under another status', () => {
+      for (const message of [
+        'groq API error 413: Request too large. Limit 30000, Requested 34026',
+        'openrouter API error 429: rate limit, 14023 tokens used',
+        'provider API error 500: upstream request id 8f402ab',
+        'ACLIDE API error 400: max_tokens 402 is below the minimum',
+        'timeout after 4.402s',
+      ]) {
+        expect(isPaymentRequiredError(new Error(message)), message).toBe(false);
+      }
+      expect(isPaymentRequiredError(Object.assign(new Error('Requested 402 tokens'), { status: 413 }))).toBe(false);
+    });
+
+    it('isPaymentRequiredError still catches every real out-of-credits shape', () => {
+      expect(isPaymentRequiredError(new Error('402 Payment Required'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('upstream returned 402'))).toBe(true);
+      expect(isPaymentRequiredError(Object.assign(new Error('no credits left'), { status: 402 }))).toBe(true);
+      expect(isPaymentRequiredError(new Error('Pollinations API error 402: insufficient credit'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('provider API error 429: insufficient balance (1008)'))).toBe(true);
+      expect(isPaymentRequiredError(new Error('openai API error 429: insufficient_quota'))).toBe(true);
     });
   });
 

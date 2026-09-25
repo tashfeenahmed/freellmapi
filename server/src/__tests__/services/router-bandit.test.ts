@@ -10,6 +10,7 @@ import { resetModelWeightOverrides } from '../../services/model-weight-overrides
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
 import { addToActiveChain } from '../helpers/chain.js';
+import { benchForTools, resetToolCapability, toolCapabilityKey } from '../../lib/tool-capability.js';
 
 vi.mock('../../services/ratelimit.js', async () => {
   const actual = await vi.importActual('../../services/ratelimit.js');
@@ -489,5 +490,63 @@ describe('bandit router', () => {
     // on the number the user actually sees: it must move by at least 2 points.
     const shown = (v: number) => Math.round(v * 100);
     expect(shown(after.intelligence)).toBeGreaterThanOrEqual(shown(before.intelligence) + 2);
+  });
+});
+
+// #1230: a model that keeps answering tool requests with a 400 is tried LAST
+// for tool requests. Soft preference only: it never empties the pool and it
+// never affects requests without tools.
+describe('tool-rejecting models are deferred for tool requests (#1230)', () => {
+  beforeEach(() => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
+    initDb(':memory:');
+    getDb().exec('DELETE FROM fallback_config; DELETE FROM api_keys; DELETE FROM models; DELETE FROM requests;');
+    vi.clearAllMocks();
+    (ratelimit.canMakeRequest as any).mockReturnValue(true);
+    (ratelimit.canUseTokens as any).mockReturnValue(true);
+    (ratelimit.isOnCooldown as any).mockReturnValue(false);
+    resetToolCapability();
+    setRoutingStrategy('priority');
+    setExploreEnabled(false);
+  });
+  afterEach(() => { resetToolCapability(); });
+
+  const seed = () => {
+    const first = addModel({ platform: 'google', modelId: 'first', name: 'First', intelligenceRank: 1, sizeLabel: 'Large', budget: '~1M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'second', name: 'Second', intelligenceRank: 2, sizeLabel: 'Large', budget: '~1M', priority: 2 });
+    return first;
+  };
+  const route = (requireTools: boolean, preferred?: number) => routeRequest(100, undefined, preferred, false, requireTools).modelId;
+
+  it('keeps the operator order until a model is benched', () => {
+    seed();
+    expect(route(true)).toBe('first');
+  });
+
+  it('tries the benched model last on a tool request', () => {
+    seed();
+    benchForTools(toolCapabilityKey('google', 'first', ''));
+    expect(route(true)).toBe('second');
+  });
+
+  it('leaves requests without tools alone', () => {
+    seed();
+    benchForTools(toolCapabilityKey('google', 'first', ''));
+    expect(route(false)).toBe('first');
+  });
+
+  it('still routes to a benched model when it is the only one left', () => {
+    seed();
+    benchForTools(toolCapabilityKey('google', 'first', ''));
+    benchForTools(toolCapabilityKey('groq', 'second', ''));
+    // Everything is deferred, so the original order is what remains.
+    expect(route(true)).toBe('first');
+  });
+
+  it('an explicit pin keeps its place', () => {
+    const first = seed();
+    benchForTools(toolCapabilityKey('google', 'first', ''));
+    expect(route(true, first)).toBe('first');
   });
 });

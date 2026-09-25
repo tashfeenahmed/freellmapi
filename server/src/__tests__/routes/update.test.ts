@@ -161,6 +161,92 @@ describe('Update API', () => {
       expect(request?.headers).not.toHaveProperty('Authorization');
     });
 
+    it('compares desktop installs against the latest release tag, not main', async () => {
+      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+        if (String(url).includes('/releases/latest')) {
+          return response({
+            tag_name: 'v0.11.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+          });
+        }
+        return response(compareBody('identical'));
+      });
+      const { app } = createTestApp({
+        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.body).toMatchObject({ status: 'current', installation: 'desktop' });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://api.github.com/repos/tashfeenahmed/freellmapi/compare/${LOCAL_SHA}...v0.11.0`,
+        expect.any(Object),
+      );
+      // 'identical' against the tag: no update offered for untagged main commits.
+      expect(result.body.remoteSha).toBe(LOCAL_SHA.slice(0, 7));
+    });
+
+    it('reports an update when a desktop install trails the latest tag', async () => {
+      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+        if (String(url).includes('/releases/latest')) {
+          return response({
+            tag_name: 'v0.12.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.12.0',
+          });
+        }
+        return response(compareBody('ahead'));
+      });
+      const { app } = createTestApp({
+        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.body).toMatchObject({ status: 'available', installation: 'desktop' });
+    });
+
+    it('reports unknown for a desktop install when no release tag can be resolved', async () => {
+      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+        if (String(url).includes('/releases/latest')) return response({ message: 'no releases' }, 404);
+        return response(compareBody('ahead'));
+      });
+      const { app } = createTestApp({
+        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.body).toMatchObject({ status: 'unknown', installation: 'desktop' });
+      // Without a tag to compare against, main must not be dialed at all.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('never falls back to the main-branch Atom feed for a desktop install', async () => {
+      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+        if (String(url).includes('/releases/latest')) {
+          return response({
+            tag_name: 'v0.11.0',
+            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+          });
+        }
+        return response({ message: 'rate limited' }, 403);
+      });
+      const { app } = createTestApp({
+        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+        fetch: fetchMock,
+      });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      // The Atom feed only tracks main; falling back to it would re-offer
+      // untagged commits, so the request must surface as an upstream error.
+      expect(result.status).toBe(502);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
     it('reports disabled without resolving Git identity or making a network request', async () => {
       const fetchMock = vi.fn();
       const execMock = vi.fn(async () => ({ stdout: `${LOCAL_SHA}\n` }));

@@ -51,6 +51,30 @@ describe('POST /v1/responses (#96)', () => {
     expect((await post(app, '/v1/responses', { model: 'auto' }, key)).status).toBe(400);
   });
 
+  it('accepts Codex additional_tools metadata items', async () => {
+    mockRouteRequest.mockClear();
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', {
+      input: [
+        { type: 'additional_tools', id: 'at_1', role: 'developer', tools: [{ type: 'shell' }] },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hello' }] },
+      ],
+      stream: false,
+    }, key);
+    expect(status).toBe(200);
+    expect(JSON.parse(text).output_text).toBe('ok');
+  });
+
   // #118: image parts now translate to image_url content blocks, so an image
   // request must be routed with requireVision=true (only vision-capable models
   // are candidates; a text-only pinned model is skipped, falling back to a
@@ -543,7 +567,10 @@ describe('POST /v1/responses model routing priority (#579)', () => {
     expect(status).toBe(200);
     const { preferredModelDbId, chain } = routingCall();
     expect(preferredModelDbId).toBe(stickyId);
-    expect(chain).toBeUndefined();
+    // Plain auto now threads the resolved active chain (parity with
+    // /v1/chat/completions), not a singleton pin.
+    expect(chain?.map(row => row.model_db_id)).toEqual(expect.arrayContaining([pinnedId, stickyId]));
+    expect(chain?.map(row => row.model_db_id)).not.toEqual([pinnedId]);
   });
 
   it('auto routing applies when there is neither an explicit model nor a sticky session', async () => {
@@ -554,7 +581,8 @@ describe('POST /v1/responses model routing priority (#579)', () => {
     expect(status).toBe(200);
     const { preferredModelDbId, chain } = routingCall();
     expect(preferredModelDbId).toBeUndefined();
-    expect(chain).toBeUndefined();
+    expect(chain?.map(row => row.model_db_id)).toEqual(expect.arrayContaining([pinnedId, stickyId]));
+    expect(chain?.map(row => row.model_db_id)).not.toEqual([pinnedId]);
   });
 
   it.each([

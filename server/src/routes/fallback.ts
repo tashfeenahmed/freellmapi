@@ -9,15 +9,23 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
-import { parseBudget } from '../lib/budget.js';
+import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
-import { getPenaltyInspector } from '../services/penalty-inspector.js';
+import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
+import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { getQuotaOutlook } from '../services/quota-outlook.js';
 
 export const fallbackRouter = Router();
+
+// Dashboard-session authenticated by app.ts. Polling only reads saved quota
+// observations and request history, never provider endpoints or key material.
+fallbackRouter.get('/quota-forecast', (_req: Request, res: Response) => {
+  res.json(getQuotaOutlook());
+});
 
 // ── Bandit routing strategy ─────────────────────────────────────────────────
 // GET  /routing → active strategy, preset weights, and the per-model score
@@ -30,11 +38,19 @@ fallbackRouter.get('/routing', (_req: Request, res: Response) => {
     peakStartHour: peakHours.startHour,
     peakEndHour: peakHours.endHour,
     peakTimezone: peakHours.timezone,
+    cooldownCeilingMs: getCooldownCeilingMs(),
   });
 });
 
 fallbackRouter.get('/penalty-inspector', (_req: Request, res: Response) => {
   res.json(getPenaltyInspector());
+});
+
+// DELETE /penalty-inspector → lift every cooldown, penalty and failure streak
+// at once (#952). The per-key DELETE /api/keys/:id/cooldowns stays for the
+// surgical case; this is the escape hatch for a pool that cannot route at all.
+fallbackRouter.delete('/penalty-inspector', (_req: Request, res: Response) => {
+  res.json(clearRouterPressure());
 });
 
 const routingSchema = z.object({
@@ -59,6 +75,12 @@ const routingSchema = z.object({
   // `strategy`, which ranks MODELS — the two are set from the same form, so
   // they round-trip through the same request.
   keySelectionStrategy: z.enum(['auto', 'least-remaining']).optional(),
+  // Ceiling on automatic cooldowns (#952): 1 min .. 24 h in ms, null = no cap
+  // (the escalation ladder keeps its 24h top step and 402/403 bench a day).
+  cooldownCeilingMs: z.number().int()
+    .min(MIN_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at least ${MIN_COOLDOWN_CEILING_MS} (1 minute)` })
+    .max(MAX_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at most ${MAX_COOLDOWN_CEILING_MS} (24 hours)` })
+    .nullable().optional(),
 });
 
 // PUT /routing → switch strategy. Presets are just weight vectors over the three
@@ -86,6 +108,9 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
   }
   if (parsed.data.keySelectionStrategy !== undefined) {
     setKeySelectionStrategy(parsed.data.keySelectionStrategy);
+  }
+  if (parsed.data.cooldownCeilingMs !== undefined) {
+    setCooldownCeilingMs(parsed.data.cooldownCeilingMs);
   }
   try {
     setPeakHoursConfig({
@@ -115,6 +140,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
     peakStartHour: peak.startHour,
     peakEndHour: peak.endHour,
     peakTimezone: peak.timezone,
+    cooldownCeilingMs: getCooldownCeilingMs(),
   });
 });
 
@@ -371,29 +397,6 @@ const SORT_PRESETS: Record<string, string> = {
   speed: 'm.speed_rank ASC',
 };
 
-function getBudgetScore(m: { monthly_token_budget: string; tpd_limit: number | null }): number {
-  if (m.tpd_limit != null) return m.tpd_limit * 30;
-  
-  const str = m.monthly_token_budget;
-  if (!str) return 0;
-  if (str.toLowerCase().includes('unlimited') || str.includes('∞')) return Infinity;
-  
-  const cleanStr = str.split('(')[0];
-  const matches = cleanStr.match(/[\d.]+/g);
-  let maxNum = 0;
-  if (matches) {
-    maxNum = Math.max(...matches.map(mStr => parseFloat(mStr)));
-  }
-  
-  let mult = 1;
-  const upper = cleanStr.toUpperCase();
-  if (upper.includes('B')) mult = 1_000_000_000;
-  else if (upper.includes('M')) mult = 1_000_000;
-  else if (upper.includes('K')) mult = 1_000;
-
-  return maxNum * mult;
-}
-
 fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   const preset = String(req.params.preset);
   const db = getDb();
@@ -402,7 +405,7 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
 
   if (preset === 'budget') {
     const allModels = db.prepare(`SELECT id, monthly_token_budget, tpd_limit FROM models`).all() as any[];
-    allModels.sort((a, b) => getBudgetScore(b) - getBudgetScore(a));
+    allModels.sort((a, b) => monthlyBudgetScore(b) - monthlyBudgetScore(a));
     models = allModels.map(m => ({ id: m.id }));
   } else {
     const orderBy = SORT_PRESETS[preset];
@@ -461,29 +464,33 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     ? db.prepare('SELECT id FROM profiles WHERE id = ?').get(activeProfileId) as any
     : null;
 
-  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
+  // Ordered by intelligence (rank 1 = smartest), not chain priority: the
+  // dashboard's monthly-budget bar and legend follow this order, and chain
+  // priority is seeded provider by provider, which read as "grouped by
+  // provider" (#1243). Priority stays as the tiebreaker within a rank.
+  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; intelligence_rank: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
 
   if (activeProfile) {
     // Profile mode: use profile_models chain (all models in profile, checked against enabled)
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
-             pm.priority, pm.enabled,
+             pm.priority, pm.enabled, m.intelligence_rank,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id
       WHERE pm.profile_id = ? AND m.enabled = 1
-      ORDER BY pm.priority ASC
+      ORDER BY m.intelligence_rank ASC, pm.priority ASC
     `).all(activeProfileId) as any[];
   } else {
     // Default mode: use fallback_config (only include enabled models)
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
-             fc.priority, fc.enabled,
+             fc.priority, fc.enabled, m.intelligence_rank,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
       FROM fallback_config fc
       JOIN models m ON m.id = fc.model_db_id
       WHERE m.enabled = 1
-      ORDER BY fc.priority ASC
+      ORDER BY m.intelligence_rank ASC, fc.priority ASC
     `).all() as any[];
   }
 
@@ -511,6 +518,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
         displayName: m.display_name,
         platform: m.platform,
         modelId: m.model_id,
+        intelligenceRank: m.intelligence_rank,
         budget: parseBudget(m.monthly_token_budget) * keys,
         used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
         enabled: m.enabled === 1,

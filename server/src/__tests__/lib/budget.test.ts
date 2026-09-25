@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseBudget } from '../../lib/budget.js';
+import { parseBudget, monthlyBudgetScore } from '../../lib/budget.js';
 
 describe('parseBudget', () => {
   it('parses token-count labels to their upper bound', () => {
@@ -25,5 +25,36 @@ describe('parseBudget', () => {
   it('returns 0 for empty/missing input', () => {
     expect(parseBudget('')).toBe(0);
     expect(parseBudget(undefined as unknown as string)).toBe(0);
+  });
+});
+
+describe('monthlyBudgetScore', () => {
+  const score = (b: string, tpd: number | null = null) =>
+    monthlyBudgetScore({ monthly_token_budget: b, tpd_limit: tpd });
+
+  it('scores token labels by their parsed upper bound', () => {
+    expect(score('~25M')).toBe(25_000_000);
+    expect(score('~1-3M')).toBe(3_000_000);
+    expect(score('~500K')).toBe(500_000);
+    expect(score('~3M (1k credits)')).toBe(3_000_000);
+  });
+
+  it('scores rate-limit labels as 0 instead of inflating them (the "40 RPM" bug)', () => {
+    // The old per-route copy matched the bare 40 and applied the 'M' unit
+    // from "RPM", scoring 40,000,000 — above every real free-tier budget.
+    expect(score('free · 40 RPM')).toBe(0);
+    expect(score('free · 200/hr per IP')).toBe(0);
+    expect(score('credits-based')).toBe(0);
+    expect(score('free · 40 RPM')).toBeLessThan(score('~25M'));
+  });
+
+  it('prefers a concrete tpd_limit over any label', () => {
+    expect(score('~120M', 1_000_000)).toBe(30_000_000);
+    expect(score('', 100_000)).toBe(3_000_000);
+  });
+
+  it('keeps unlimited labels above every parsed budget', () => {
+    expect(score('unlimited')).toBe(Infinity);
+    expect(score('∞')).toBe(Infinity);
   });
 });

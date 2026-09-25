@@ -1,9 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { getSetting, initDb } from '../../db/index.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { applyFetchRelayToken, applyProxyMode, applyProxyUrl } from '../../lib/proxy.js';
+
+// #838 falls back to the OS-wide proxy (scutil/reg/gsettings) when nothing is
+// configured in the DB or the env, so on a machine whose system proxy is set
+// the "clears the proxy on an empty string" case would read the ambient proxy
+// back. '' parses as "no proxy" in every platform branch.
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  execFileSync: () => '',
+}));
 
 async function request(app: Express, method: string, path: string, body: any, token: string) {
   const server = app.listen(0, '127.0.0.1');

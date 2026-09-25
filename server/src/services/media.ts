@@ -8,15 +8,19 @@
 // published catalog and arrive via catalog-sync (premium on the live tier within
 // ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
+import { parseRetryAfterMs } from '../providers/base.js';
+import { RetryHintTracker } from '../lib/retry-hint.js';
+import { secondsUntilNextMonth } from './key-budget.js';
 import { getClientContext } from '../lib/client-context.js';
-import { decrypt } from '../lib/crypto.js';
+import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -55,10 +59,15 @@ export class MediaError extends Error {
   status: number;
   /** Optional machine-readable error code surfaced in the OpenAI-shaped body. */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** Back-off the upstream provider stated (`Retry-After` header), in
+   *  milliseconds — relayed to the client so an SDK sleeps the stated amount
+   *  instead of hammering the chain, mirroring the embeddings path. */
+  retryAfterMs?: number;
+  constructor(message: string, status: number, code?: string, retryAfterMs?: number) {
     super(message);
     this.status = status;
     this.code = code;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -208,42 +217,10 @@ export function listAllMediaModels(): MediaModelRow[] {
 }
 
 interface ProviderCredential {
+  release?: () => void;
   id: number | null;
   key: string | null;
   baseUrl: string | null;
-}
-
-function getProviderCredential(row: Pick<MediaModelRow, 'platform' | 'key_id'>): ProviderCredential | null {
-  if (row.key_id != null) {
-    const keyRow = getDb()
-      .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1")
-      .get(row.key_id) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-    if (!keyRow) return null;
-    try {
-      return {
-        id: keyRow.id,
-        key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
-        baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-      };
-    } catch {
-      return null;
-    }
-  }
-  if (row.platform === 'custom') return null;
-
-  const keyRow = getDb()
-    .prepare("SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') ORDER BY RANDOM() LIMIT 1")
-    .get(row.platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; base_url: string | null } | undefined;
-  if (!keyRow) return null;
-  try {
-    return {
-      id: keyRow.id,
-      key: decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag),
-      baseUrl: keyRow.base_url?.trim().replace(/\/+$/, '') ?? null,
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function mediaFetch(
@@ -268,7 +245,12 @@ async function mediaFetch(
   );
   if (!r.ok) {
     const body = await r.text().catch(() => '');
-    throw new MediaError(`${platform} ${r.status}: ${body.slice(0, 200)}`, r.status);
+    throw new MediaError(
+      `${platform} ${r.status}: ${body.slice(0, 200)}`,
+      r.status,
+      undefined,
+      parseRetryAfterMs(r.headers?.get('retry-after') ?? null),
+    );
   }
   return r;
 }
@@ -610,6 +592,28 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'speechify': {
+      const fmt = p.format ?? 'mp3';
+      // Speechify exposes ogg, not OpenAI's opus name. Do not silently return
+      // a different codec for unsupported formats such as pcm or flac.
+      if (!['mp3', 'wav', 'ogg', 'aac'].includes(fmt)) {
+        throw new MediaError('Speechify supports mp3, wav, ogg and aac audio formats', 400);
+      }
+      const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const voice = !p.voice || standardVoices.has(p.voice.toLowerCase()) ? 'alec' : p.voice;
+      const r = await mediaFetch(`${SPEECHIFY_BASE_URL}/audio/speech`, 'speechify', 'audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, 'Speechify-Version': SPEECHIFY_VERSION },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice_id: voice, audio_format: fmt }),
+      });
+      const j = await r.json() as { audio_data?: unknown; audio_format?: unknown };
+      const b64 = j.audio_data;
+      if (typeof b64 !== 'string' || !b64 || b64.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b64)) {
+        throw new MediaError('Speechify returned missing or invalid base64 audio', 502);
+      }
+      if (j.audio_format !== fmt) throw new MediaError('Speechify returned a different audio format', 502);
+      return { audio: Buffer.from(b64, 'base64'), contentType: fmt === 'ogg' ? 'audio/ogg' : contentTypeFor(fmt) };
+    }
     case 'custom': {
       if (!credential.baseUrl) throw new MediaError('custom audio provider is missing base_url', 500);
       const fmt = p.format ?? 'mp3';
@@ -734,7 +738,7 @@ function logMedia(row: Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>
   }
 }
 
-function chainError(modality: MediaModality, lastError: MediaError | null): MediaError {
+function chainError(modality: MediaModality, lastError: MediaError | null, hints: RetryHintTracker): MediaError {
   // Only statuses the CALLER can act on are passed through. 400 (bad prompt,
   // duration the model does not accept) and 413 (upload too large) describe
   // the caller's own request, and 429 is the long-standing rate-limit signal.
@@ -748,6 +752,11 @@ function chainError(modality: MediaModality, lastError: MediaError | null): Medi
   return new MediaError(
     `All ${modality} providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     status,
+    lastError?.code,
+    // A 429 from one provider is failed over, so its Retry-After is only the
+    // client's business when EVERY provider was rate limited with a stated
+    // delay — then the soonest one (same rule as the chat exhaustion path).
+    status === 429 ? hints.retryAfterMs() : undefined,
   );
 }
 
@@ -755,11 +764,19 @@ function chainError(modality: MediaModality, lastError: MediaError | null): Medi
 export async function runImageGeneration(model: string | undefined, params: ImageParams): Promise<ImageResult> {
   const chain = resolveMediaChain(model, 'image');
   let lastError: MediaError | null = null;
+  // Only a chain rate limited end to end earns a Retry-After (the soonest).
+  const hints = new RetryHintTracker();
   for (const row of chain) {
-    const credential = KEYLESS_CAPABLE.has(row.platform)
-      ? { id: null, key: null, baseUrl: null }
-      : getProviderCredential(row);
-    if (!credential) continue; // no usable key for this provider — try the next
+    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
+      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
+      : reserveProviderCredential(row, 0);
+    if (!credential) {
+      if (budgetBlocked) {
+        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+        hints.record(429, secondsUntilNextMonth() * 1000);
+      }
+      continue;
+    }
     const started = Date.now();
     try {
       const images = await callImageProvider(row, credential, params);
@@ -772,9 +789,12 @@ export async function runImageGeneration(model: string | undefined, params: Imag
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       lastError = e;
+      hints.record(e.status, e.retryAfterMs);
+    } finally {
+      credential.release();
     }
   }
-  throw chainError('image', lastError);
+  throw chainError('image', lastError, hints);
 }
 
 /** Generate a video, failing over across catalogued text-to-video providers.
@@ -787,11 +807,19 @@ export async function runVideoGeneration(
 ): Promise<VideoResult> {
   const chain = resolveMediaChain(model, 'video');
   let lastError: MediaError | null = null;
+  // Only a chain rate limited end to end earns a Retry-After (the soonest).
+  const hints = new RetryHintTracker();
   for (const row of chain) {
     throwIfClientGone(clientSignal);
-    const credential = getProviderCredential(row);
-    if (!credential) continue;
-    if (credential.id != null && isOnCooldown(row.platform, row.model_id, credential.id)) continue;
+    const { credential, budgetBlocked } = reserveProviderCredential(row, 0,
+      keyId => isOnCooldown(row.platform, row.model_id, keyId));
+    if (!credential) {
+      if (budgetBlocked) {
+        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+        hints.record(429, secondsUntilNextMonth() * 1000);
+      }
+      continue;
+    }
     const started = Date.now();
     try {
       const out = await callVideoProvider(row, credential, params, clientSignal);
@@ -803,11 +831,14 @@ export async function runVideoGeneration(
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       if (e.status === 429 && credential.id != null) setCooldown(row.platform, row.model_id, credential.id);
       lastError = e;
+      hints.record(e.status, e.retryAfterMs);
       // A caller that hung up gets no second generation charged to its account.
       throwIfClientGone(clientSignal);
+    } finally {
+      credential.release();
     }
   }
-  throw chainError('video', lastError);
+  throw chainError('video', lastError, hints);
 }
 
 // ---------------------------------------------------------------------------
@@ -850,7 +881,7 @@ interface SttCandidate {
   platform: string;
   modelId: string;
   /** The api_keys row this model is bound to, or null to pick any healthy key
-   *  for the platform. Custom endpoints ALWAYS carry one: getProviderCredential
+   *  for the platform. Custom endpoints ALWAYS carry one: reserveProviderCredential
    *  refuses to guess a key for platform 'custom', so dropping this here would
    *  silently skip every custom STT row. */
   keyId: number | null;
@@ -1054,10 +1085,18 @@ export async function runTranscription(model: string | undefined, p: Transcripti
     throw new MediaError(`Audio file exceeds the ${maxMb} MB provider upload limit.`, 413);
   }
   let lastError: MediaError | null = null;
+  // Only a chain rate limited end to end earns a Retry-After (the soonest).
+  const hints = new RetryHintTracker();
   for (const m of usable) {
-    const credential = getProviderCredential({ platform: m.platform, key_id: m.keyId });
-    if (!credential) continue; // no usable key for this provider — try the next
-    if (credential.id != null && isOnCooldown(m.platform, m.modelId, credential.id)) continue;
+    const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0,
+      keyId => isOnCooldown(m.platform, m.modelId, keyId));
+    if (!credential) {
+      if (budgetBlocked) {
+        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+        hints.record(429, secondsUntilNextMonth() * 1000);
+      }
+      continue;
+    }
     const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
     const started = Date.now();
     try {
@@ -1074,20 +1113,31 @@ export async function runTranscription(model: string | undefined, p: Transcripti
         setCooldown(m.platform, m.modelId, credential.id);
       }
       lastError = e;
+      hints.record(e.status, e.retryAfterMs);
+    } finally {
+      credential.release();
     }
   }
-  throw chainError('transcription', lastError);
+  throw chainError('transcription', lastError, hints);
 }
 
 /** Synthesize speech, failing over across providers serving the modality. */
 export async function runSpeech(model: string | undefined, params: SpeechParams): Promise<SpeechResult> {
   const chain = resolveMediaChain(model, 'audio');
   let lastError: MediaError | null = null;
+  // Only a chain rate limited end to end earns a Retry-After (the soonest).
+  const hints = new RetryHintTracker();
   for (const row of chain) {
-    const credential = KEYLESS_CAPABLE.has(row.platform)
-      ? { id: null, key: null, baseUrl: null }
-      : getProviderCredential(row);
-    if (!credential) continue;
+    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
+      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
+      : reserveProviderCredential(row, 0);
+    if (!credential) {
+      if (budgetBlocked) {
+        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+        hints.record(429, secondsUntilNextMonth() * 1000);
+      }
+      continue;
+    }
     const started = Date.now();
     try {
       const out = await callSpeechProvider(row, credential, params);
@@ -1098,7 +1148,10 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       lastError = e;
+      hints.record(e.status, e.retryAfterMs);
+    } finally {
+      credential.release();
     }
   }
-  throw chainError('audio', lastError);
+  throw chainError('audio', lastError, hints);
 }

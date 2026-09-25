@@ -241,6 +241,33 @@ describe('applyCatalog', () => {
     expect(getDb().prepare("SELECT id FROM models WHERE platform = 'some-future-provider'").get()).toBeUndefined();
   });
 
+  it('imports the new chat providers and keeps Speechify exclusively in audio', () => {
+    const models = existingAsCatalogModels();
+    models.push(baseModel({ platform: 'clod', modelId: 'test-clod' }));
+    models.push(baseModel({ platform: 'blaze', modelId: 'test-blaze' }));
+    models.push(baseModel({ platform: 'speechify', modelId: 'test-simba', modality: 'audio' }));
+    applyCatalog(getDb(), catalogOf(models));
+    for (const platform of ['clod', 'blaze']) {
+      expect(getDb().prepare('SELECT enabled FROM models WHERE platform = ?').get(platform)).toEqual({ enabled: 1 });
+    }
+    expect(getDb().prepare("SELECT id FROM models WHERE platform = 'speechify'").get()).toBeUndefined();
+    expect(getDb().prepare("SELECT model_id, modality, enabled FROM media_models WHERE platform = 'speechify'").get()).toEqual({ model_id: 'test-simba', modality: 'audio', enabled: 1 });
+  });
+
+  it('adds Speka chat and embedding rows only when the signed catalog supplies them', () => {
+    expect(getDb().prepare("SELECT id FROM models WHERE platform = 'speka'").get()).toBeUndefined();
+    expect(getDb().prepare("SELECT id FROM embedding_models WHERE platform = 'speka'").get()).toBeUndefined();
+    const catalog = catalogOf([...existingAsCatalogModels(), baseModel({ platform: 'speka', modelId: 'z-ai/glm-5.3' })]);
+    catalog.embeddings = [...existingAsCatalogEmbeddings(), {
+      family: 'nemotron-3-embed-1b-speka', platform: 'speka', modelId: 'nvidia/nemotron-3-embed-1b',
+      displayName: 'Nemotron 3 Embed 1B (Speka)', dimensions: 2048, maxInputTokens: 8192,
+      priority: 1, enabled: true, quotaLabel: '$1/month shared',
+    }];
+    applyCatalog(getDb(), catalog);
+    expect(getDb().prepare("SELECT enabled FROM models WHERE platform = 'speka'").get()).toEqual({ enabled: 1 });
+    expect(getDb().prepare("SELECT dimensions, enabled FROM embedding_models WHERE platform = 'speka'").get()).toEqual({ dimensions: 2048, enabled: 1 });
+  });
+
   it('applies the full embedding snapshot and retires a replaced provider id', () => {
     const embeddings = existingAsCatalogEmbeddings();
     const openRouter = embeddings.find(

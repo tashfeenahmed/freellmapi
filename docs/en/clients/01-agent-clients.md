@@ -1,0 +1,421 @@
+**English** · [简体中文](../../zh-cn/clients/01-agent-clients.md)
+
+# Clients & coding agents
+
+[← Back to README](../README.md) · [Documentation index](../README.md)
+
+- [OpenAI-compatible clients](#openai-compatible-clients)
+- [Coding agents](#coding-agents)
+- [QwenPaw](#qwenpaw)
+- [Native Gemini clients](#native-gemini-clients)
+- [Ollama clients](#ollama-clients)
+- [Headerless clients](#headerless-clients)
+- [MCP server](#mcp-server)
+- [VS Code ghost-text autocomplete (Continue)](#vs-code-ghost-text-autocomplete-continue)
+- [Context Handoff](#context-handoff)
+
+## OpenAI-compatible clients
+
+Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
+
+- **LangChain, LlamaIndex, official OpenAI SDKs**: set `base_url` to
+  `http://localhost:3001/v1` and use the unified key from the dashboard.
+- **Local GPU boxes**: add custom OpenAI-compatible endpoints for Ollama,
+  llama.cpp, LM Studio, vLLM, or an internal gateway.
+
+## Coding agents
+
+Use the generator instead of hand-editing a client configuration:
+
+```bash
+export FREELLMAPI_API_KEY=<unified-key>   # or pass --api-key on each command
+npx freellmapi setup-claude --url http://localhost:3001 --dry-run
+npx freellmapi setup-claude --url http://localhost:3001
+npx freellmapi setup-dsh --url http://localhost:3001 --api-key <unified-key>
+```
+
+`--dry-run` prints a diff. Real writes merge with the existing configuration
+and create a timestamped backup first. `--profile <name>` creates a named
+Claude/Codex profile. The live `/v1/models` catalog supplies the model ids and
+context windows.
+
+| Agent | Automated command | Manual base URL | Wire |
+| --- | --- | --- | --- |
+| **Claude Code** | `setup-claude` or credential-free-on-disk `launch` | `http://localhost:3001` | Anthropic Messages |
+| **Codex CLI** | `setup-codex` or `launch-codex` | `http://localhost:3001/v1` | Responses (`wire_api = "responses"`) |
+| **Cline** | `setup-cline` | `http://localhost:3001/v1` | OpenAI Chat |
+| **Continue** | `setup-continue` | `http://localhost:3001/v1` | OpenAI Chat / legacy Completions |
+| **Aider** | `setup-aider` | `http://localhost:3001/v1` | OpenAI Chat |
+| **OpenCode** | `setup-opencode` | `http://localhost:3001/v1` | OpenAI Chat |
+| **Goose** | `setup-goose` | `http://localhost:3001/v1` | OpenAI Chat |
+| **Qwen Code** | `setup-qwen` | `http://localhost:3001/v1` | OpenAI Chat (native Gemini also works) |
+| **Roo Code** | `setup-roo` | `http://localhost:3001/v1` | OpenAI Chat |
+| **Kilo Code** | `setup-kilo` | `http://localhost:3001/v1` | OpenAI Chat |
+| **Crush** | `setup-crush` | `http://localhost:3001/v1` | OpenAI Chat |
+| **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
+| **MiMo Code** | `setup-mimo` | `http://localhost:3001/v1` | OpenAI Chat |
+| **AtomCode** | `setup-atomcode` | `http://localhost:3001/v1` | OpenAI Chat (`type = "openai"`) |
+| **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
+| **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat (`provider: custom`) |
+| **QwenPaw** | Manual setup | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
+| **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
+| **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
+
+The root-vs-`/v1` distinction matters: Claude Code expects the server root
+because it appends the Anthropic Messages path. OpenAI-compatible clients in
+this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
+Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, QwenPaw, and DeepSeek Harness—expect their configured
+base URL to include `/v1`.
+
+### DeepSeek Harness (`dsh`)
+
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) keeps
+every provider as a route under `llm-pi-ai.providers` in
+`$DSH_HOME/settings.yaml` (`~/.dsh` by default). `setup-dsh` adds a
+`freellmapi` route there — `api: openai-completions`, the gateway's `/v1`
+base URL, and the live catalog as the route's `models` list, which DSH
+requires for a provider its installed catalog does not ship — and makes
+`freellmapi/auto` the default model. The key goes into `$DSH_HOME/.env`
+(mode 0600) as `FREELLMAPI_API_KEY`, the environment layer DSH reads on its
+own, so nothing needs exporting. Both writes are structural merges: other
+routes, comments, and settings in the file are left as they were.
+
+```bash
+npx freellmapi setup-dsh --url http://localhost:3001 --api-key <unified-key>
+npx @deepseek-ai/dsh web
+```
+
+Settings are hot-reloaded, so a running `dsh` uses the route on its next
+request. `--profile <name>` adds a second route (`freellmapi-<name>`) without
+changing the default model; `--model <id>` pins the default. Routes are
+declared text-only — add `input: [text, image]` to a model entry under
+`freellmapi.models` to send it images. `DSH_HOME` is honoured when set.
+
+### MiMo Code (`mimo`)
+
+[MiMo Code](https://mimo.xiaomi.com/mimocode) is an OpenCode derivative, so it
+takes any OpenAI-compatible endpoint as a custom entry under `provider` — an
+`npm` package to speak with (`@ai-sdk/openai-compatible`), the credentials in
+`options`, and a `models` map. `setup-mimo` writes that entry as `freellmapi`
+and names `freellmapi/<model>` as the default `model`.
+
+The file is `config.json` in MiMo's own global config directory:
+`$XDG_CONFIG_HOME/mimocode` (`~/.config/mimocode` on macOS and Linux), or
+`$MIMOCODE_HOME/config` when `MIMOCODE_HOME` is set. That directory merges
+`config.json`, `mimocode.json` and `mimocode.jsonc` in that order, so the
+generated file is the weakest layer and anything you hand-write in
+`mimocode.json` still wins. The write itself is a structural merge, so other
+providers and settings already in `config.json` are left as they were.
+
+```bash
+npx freellmapi setup-mimo --url http://localhost:3001
+export FREELLMAPI_API_KEY=<unified-key>
+mimo
+```
+
+The key is referenced as `{env:FREELLMAPI_API_KEY}`, MiMo's own substitution
+syntax, so it stays out of the config file. There is no `MIMOCODE_API_KEY` or
+`MIMOCODE_BASE_URL`: MiMo's environment variables locate resources and toggle
+features, they are not a general fallback for config fields. Each model is
+declared with the `limit.context` and `limit.output` pair MiMo's schema
+requires, both taken from the live catalog.
+
+### AtomCode (`atomcode`)
+
+[AtomCode](https://atomcode.atomgit.com/docs/en/) is AtomGit's terminal
+coding agent, written in Rust. It reads `~/.atomcode/config.toml`, where a
+root `default_provider` key names one `[providers.<id>]` table and
+`type = "openai"` makes that table speak the OpenAI-compatible wire.
+`setup-atomcode` writes a `[providers.freellmapi]` table — `base_url` on the
+gateway's `/v1`, the unified key as `api_key`, the chosen model and its
+`context_window` from the live catalog — and sets `default_provider` to it.
+The write is a structural merge: the root key is placed above any existing
+tables, only the `freellmapi` table is replaced, and other `[providers.*]`
+tables and settings in the file are left as they were.
+
+```bash
+npx freellmapi setup-atomcode --url http://localhost:3001 --api-key <unified-key>
+atomcode
+```
+
+AtomCode has no environment-variable fallback for the key, so it is written
+into the config file; the file is created with mode 0600 and a timestamped
+backup is taken before an existing one is changed. `--model <id>` pins the
+default model.
+
+### OpenClaw
+
+[OpenClaw](https://docs.openclaw.ai/) is the always-on personal assistant
+that answers on WhatsApp, Telegram, Discord and the other channels its
+gateway connects to. It reads one JSON5 document, `~/.openclaw/openclaw.json`,
+and every model endpoint is an entry under `models.providers`; a provider its
+bundled catalog does not know must spell out `baseUrl`, `api` and a non-empty
+`models` list. `setup-openclaw` writes a `freellmapi` provider there —
+`api: openai-completions`, the gateway's `/v1` base URL, the live catalog as
+its `models` list — and makes `freellmapi/auto` the default model under
+`agents.defaults.model.primary`. The key is referenced as
+`${FREELLMAPI_API_KEY}`, OpenClaw's own substitution, and the value goes into
+`~/.openclaw/.env` (mode 0600), the global env file OpenClaw loads on its own,
+so nothing needs exporting. Both writes are structural merges: other
+providers, `fallbacks` on the default model, and every other setting in the
+file are left as they were.
+
+```bash
+npx freellmapi setup-openclaw --url http://localhost:3001 --api-key <unified-key>
+npm install -g openclaw@latest --allow-scripts=openclaw
+openclaw agent exec --model freellmapi/auto "Say hello"   # no gateway daemon needed
+```
+
+A running `openclaw gateway` needs a restart to pick the change up.
+`--profile <name>` adds a second provider (`freellmapi-<name>`) without
+changing the default model; `--model <id>` pins the default. OpenClaw sends a
+bare SDK user agent to custom endpoints, so the provider carries a static
+`User-Agent: openclaw` header — that is what lights the "seen recently" badge
+on the Agents page. Models are declared text-only; add `input: ["text",
+"image"]` to a model entry under `models.providers.freellmapi.models` to send
+it images. `OPENCLAW_CONFIG_PATH`, `OPENCLAW_STATE_DIR` and `OPENCLAW_HOME` are
+honoured when set.
+
+### Hermes Agent (`hermes`)
+
+[Hermes Agent](https://hermes-agent.nousresearch.com/docs/) is Nous
+Research's self-improving agent, in the terminal or behind Telegram, Discord
+and the other messengers its gateway serves. `~/.hermes/config.yaml` is its
+single source of truth for the endpoint: `OPENAI_BASE_URL` is ignored for
+anything but api.openai.com and `OPENAI_API_KEY` is only sent to OpenAI hosts,
+so a custom endpoint has to be declared in the `model` block. `setup-hermes`
+writes that block — `provider: custom`, `api_mode: chat_completions`, the
+gateway's `/v1` as `base_url`, the chosen model as `default` with its
+`context_length` from the live catalog — and references the key as
+`api_key: "${FREELLMAPI_API_KEY}"`, Hermes's own substitution, with the value
+in `~/.hermes/.env` (mode 0600), which Hermes loads on its own. A fresh
+install ships `model: ""`, the "not configured" sentinel; replacing it is
+exactly what `hermes setup` would do, and it is what lets a headless first
+run skip the wizard. Every other key in the file is left as it was.
+
+```bash
+npx freellmapi setup-hermes --url http://localhost:3001 --api-key <unified-key>
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
+hermes -z "Say hello"
+```
+
+A running `hermes gateway` needs a restart to pick the change up.
+`--profile <name>` adds a `providers.freellmapi-<name>` entry instead —
+picked inside a chat with `/model custom:freellmapi-<name>:auto` — and leaves
+the default model alone; `--model <id>` pins the default. Hermes sends a bare
+SDK user agent to custom endpoints, so the block carries
+`default_headers: { User-Agent: hermes-agent }`, which is what the Agents
+page's "seen recently" badge keys on. `HERMES_HOME` is honoured when set.
+
+### QwenPaw
+
+[QwenPaw](https://github.com/agentscope-ai/QwenPaw) supports custom providers
+that use the OpenAI `chat.completions` API. Start FreeLLMAPI, create or copy a
+unified key from its dashboard, then open **Settings → Models** in the QwenPaw
+Console:
+
+1. Under **Providers**, choose **Add Provider**.
+2. Give it a **Provider ID** such as `freellmapi` and a **Provider Name** such
+   as `FreeLLMAPI`, and set the API compatibility mode to OpenAI
+   `chat.completions`.
+3. Open the new provider's settings and set **Base URL** to
+   `http://localhost:3001/v1` and **API Key** to your FreeLLMAPI unified key.
+4. On the provider's models page, add a model. Use `auto` as the **Model ID**
+   to let FreeLLMAPI route the request, or copy a current id from
+   `GET http://localhost:3001/v1/models`.
+5. Save, then pick the model as the default (or per chat) and send a test
+   message.
+
+If QwenPaw runs in a container, `localhost` refers to that container rather
+than the host running FreeLLMAPI. Use a hostname or host-gateway address that
+the QwenPaw container can reach, while keeping the `/v1` suffix. Do not put the
+unified key in a URL, screenshot, or issue report. See QwenPaw's
+[official model configuration guide](https://qwenpaw.agentscope.io/docs/models)
+for the current Console field names.
+
+## Native Gemini clients
+
+Gemini CLI and Gemini-lineage clients can speak Google's wire format directly:
+
+```bash
+export GOOGLE_GEMINI_BASE_URL=http://localhost:3001
+export GEMINI_API_KEY=freellmapi-your-unified-key
+gemini
+```
+
+The native surface implements `GET /v1beta/models`, model metadata,
+`generateContent`, `streamGenerateContent` (including `?alt=sse`), and
+`countTokens`. Authentication accepts `x-goog-api-key`, Bearer, or Gemini's
+`?key=` fallback. Prefer the header: query credentials leak into history and
+proxy logs.
+
+The **Keys → Agents** tab maps Gemini Pro, Flash, and Flash-Lite family names to
+Auto or a pinned catalog model.
+
+## Ollama clients
+
+Ollama emulation is off by default. Enable one of these modes on
+**Keys → Agents**:
+
+- `open-loopback`: no key on this machine only. The socket peer must be
+  `127.0.0.1`/`::1`; enabling desktop LAN access does not widen it.
+  **Docker note:** inside a container the socket peer is the Docker bridge
+  IP, not loopback, so this mode refuses even host-local traffic through a
+  published port — use `key-required` for Docker deployments.
+- `key-required`: clients must send `Authorization: Bearer <unified-key>`.
+
+The exact endpoints are `/api/tags`, `/api/chat`, `/api/generate`, `/api/show`,
+`/api/version`, `/api/embed`, and legacy `/api/embeddings`. Streaming uses
+newline-delimited JSON, not SSE. Point Zed, JetBrains AI Assistant, or another
+Ollama-capable client at `http://localhost:3001`.
+
+## Headerless clients
+
+If a client cannot set headers, create a separately revocable token on
+**Keys → Agents** and use:
+
+```text
+http://localhost:3001/v1/t/<token>/chat/completions
+http://localhost:3001/v1/t/<token>/responses
+http://localhost:3001/v1/t/<token>/models
+```
+
+The same prefix exposes `/api/chat` and `/api/tags`. Never put the unified API
+key in a URL. URL tokens have independent hashes and immediate revocation
+because URLs routinely leak into shell history, reverse-proxy logs, and
+telemetry.
+
+## MCP server
+
+On top of the OpenAI-compatible API, the router is an **MCP server**: agents can ask a
+FreeLLMAPI model to perform a text task and introspect the gateway mid-session (usable
+models and the params each one honors, provider health, usage and cache stats, routing
+strategy).
+
+The MCP surface is a setting rather than an always-on endpoint (#925). **Fresh installs
+start with it off**; installs that already had provider keys configured when they upgraded
+keep it on, so an existing Claude Code or Cline session does not break on upgrade. Toggle
+it on the Keys page under **Agent compatibility**, or from the API:
+
+```bash
+curl -X PUT http://localhost:3001/api/settings/enable-mcp \
+  -H "Authorization: Bearer <dashboard-token>" -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+```
+
+While it is off, every verb on `/mcp` answers `403` with a JSON-RPC error saying so.
+
+For Claude Code:
+
+```bash
+claude mcp add --transport http freellmapi http://localhost:3001/mcp \
+  --header "Authorization: Bearer freellmapi-your-unified-key"
+```
+
+Any MCP client that speaks Streamable HTTP works the same way: point it at `/mcp` with the
+unified key as a Bearer token.
+
+### ChatGPT (private Secure MCP Tunnel)
+
+`ask_freellmapi` makes FreeLLMAPI directly callable from a ChatGPT conversation. It uses
+the same `/v1/chat/completions` implementation as every OpenAI-compatible client, so model
+routing, fallback, response caching, prompt compression, token accounting, execution ids,
+and redacted provider errors stay consistent. The result includes the answer, requested and
+served model, usage, route, fallback trail, cache/compression state, and execution id.
+
+The three relevant settings are deliberately separate:
+
+| Setting | Where it lives | Example |
+| --- | --- | --- |
+| Base URL | `mcp.server_urls[].url` in tunnel-client | `http://127.0.0.1:3001/mcp` |
+| API key | `FREELLMAPI_MCP_AUTHORIZATION` environment variable | `Bearer freellmapi-...` |
+| Default model | FreeLLMAPI `MCP_INFERENCE_DEFAULT_MODEL` | `auto`, a model id, or `auto:<profile>` |
+
+1. Enable the MCP surface as shown above. Optionally set the default model before starting
+   FreeLLMAPI:
+
+   ```bash
+   MCP_INFERENCE_DEFAULT_MODEL=auto
+   MCP_INFERENCE_TIMEOUT_MS=120000
+   ```
+
+2. Copy [`examples/chatgpt/tunnel-client.yaml.example`](../../../examples/chatgpt/tunnel-client.yaml.example)
+   outside the repository or into an ignored local file, replace its non-secret `tunnel_id`,
+   and provide both secrets only through the process environment. The FreeLLMAPI variable
+   contains the complete HTTP header value, including `Bearer `:
+
+   ```powershell
+   $env:CONTROL_PLANE_API_KEY = '<OpenAI tunnel runtime key>'
+   $env:FREELLMAPI_MCP_AUTHORIZATION = 'Bearer <FreeLLMAPI unified key>'
+   tunnel-client doctor --profile-file .\tunnel-client.yaml --explain
+   tunnel-client run --profile-file .\tunnel-client.yaml
+   ```
+
+   ```bash
+   export CONTROL_PLANE_API_KEY='<OpenAI tunnel runtime key>'
+   export FREELLMAPI_MCP_AUTHORIZATION='Bearer <FreeLLMAPI unified key>'
+   tunnel-client doctor --profile-file ./tunnel-client.yaml --explain
+   tunnel-client run --profile-file ./tunnel-client.yaml
+   ```
+
+3. In ChatGPT, enable **Settings → Security and login → Developer mode**. Open the Plugins
+   directory, create a developer-mode plugin, choose **Tunnel**, and select the tunnel id.
+   Review the discovered tools before saving. Start with `healthcheck`; use
+   `ask_freellmapi` for inference and `list_models` when selecting an explicit model.
+
+The tunnel's static MCP headers are sent only to the configured FreeLLMAPI origin. Do not
+put either API key in the YAML file, MCP URL, screenshots, logs, or commits. A public plugin
+deployment is a different security model and needs a stable public HTTPS endpoint plus the
+authentication required by ChatGPT; the private tunnel above is the local-first path.
+
+FreeLLMAPI is local-first and single-user by design. Your provider keys stay in
+your SQLite database, encrypted at rest, and requests go from your machine to the
+upstream providers you enabled.
+
+## VS Code ghost-text autocomplete (Continue)
+
+FreeLLMAPI exposes `/v1/completions` for editor autocomplete clients that send legacy OpenAI prompt/suffix requests. Example Continue config:
+
+```yaml
+models:
+  - name: FreeLLMAPI Autocomplete
+    provider: openai
+    model: auto
+    apiBase: http://localhost:3001/v1
+    apiKey: freellmapi-your-unified-key
+    useLegacyCompletionsEndpoint: true
+    roles:
+      - autocomplete
+```
+
+## Context Handoff
+
+When FreeLLMAPI falls over to a different model mid-conversation (quota, rate limit, cooldown), the new model has no idea it is picking up someone else's task. **Context handoff** adds a single compact `system` message to the outbound request that tells the new model exactly that:
+
+```
+FreeLLMAPI context handoff:
+You are taking over an ongoing conversation from another model (groq:llama-3 → google:gemini-flash).
+Continue the user's task using the conversation context already provided in this request.
+Do not restart the task, re-ask already answered setup questions, or discard prior tool results.
+Respect the user's latest message as the highest-priority instruction.
+
+Recent session summary:
+User: …
+Assistant: …
+```
+
+**Enable it in `.env`:**
+
+```env
+FREELLMAPI_CONTEXT_HANDOFF=on_model_switch
+```
+
+**How it works:**
+
+- Messages per session are stored in memory (TTL: 3 hours).
+- Only injected when the selected model changes for a given session key.
+- Not injected on the first request, on same-model continuations, or if a handoff message is already present.
+- Session key: `X-Session-Id` header if present, otherwise SHA-1 of the first user message (same as sticky sessions).
+- Storage is in-memory only. Nothing is written to disk or logged.
+
+> **Important:** Context Handoff improves continuity for conversations routed through FreeLLMAPI. It cannot recover provider-internal hidden state or messages that were never sent to the proxy.

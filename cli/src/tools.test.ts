@@ -11,6 +11,10 @@ beforeEach(() => {
   vi.stubEnv('XDG_CONFIG_HOME', '');
   vi.stubEnv('MIMOCODE_HOME', '');
   vi.stubEnv('DSH_HOME', '');
+  vi.stubEnv('OPENCLAW_HOME', '');
+  vi.stubEnv('OPENCLAW_STATE_DIR', '');
+  vi.stubEnv('OPENCLAW_CONFIG_PATH', '');
+  vi.stubEnv('HERMES_HOME', '');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -204,7 +208,7 @@ describe('tool generators', () => {
     expect(JSON.stringify(config)).not.toContain('freellmapi-test-key');
   });
 
-  it('uses Crush openai-compat schema and lists every catalog model', () => {
+  it('uses Crush openai-compat schema, lists every catalog model, and selects the default', () => {
     const config = tools.find(tool => tool.id === 'crush')!
       .generate(context).files[0].value as any;
     expect(config.$schema).toBe('https://charm.land/crush.json');
@@ -213,6 +217,12 @@ describe('tool generators', () => {
       'fast-coder',
       'reasoning-model',
     ]);
+    // A provider entry alone is never used: Crush auto-detects from whatever
+    // credentials it finds on the machine unless `models.large`/`small` name it.
+    expect(config.models).toEqual({
+      large: { provider: 'freellmapi', model: 'fast-coder' },
+      small: { provider: 'freellmapi', model: 'fast-coder' },
+    });
     for (const model of config.providers.freellmapi.models) {
       expect(model).toMatchObject({
         cost_per_1m_in: 0,
@@ -223,6 +233,69 @@ describe('tool generators', () => {
         supports_attachments: false,
       });
     }
+  });
+
+  it('keeps `auto` in the OpenCode, Crush and Goose rosters when it is the default', () => {
+    // OpenCode resolves `freellmapi/auto` only if `auto` is a declared model,
+    // and Crush's `models.large` must name a listed model; with `auto` in the
+    // live catalog all three generators put it first rather than filter it out.
+    const liveContext: GenerateContext = {
+      ...context,
+      models: [{ id: 'auto', name: 'Auto', available: true, context_window: 200_000 }, ...context.models],
+    };
+    const opencode = tools.find(tool => tool.id === 'opencode')!.generate(liveContext).files[0].value as any;
+    expect(opencode.model).toBe('freellmapi/auto');
+    expect(Object.keys(opencode.provider.freellmapi.models)).toEqual(['auto', 'fast-coder', 'reasoning-model']);
+    const crush = tools.find(tool => tool.id === 'crush')!.generate(liveContext).files[0].value as any;
+    expect(crush.models.large.model).toBe('auto');
+    expect(crush.providers.freellmapi.models[0].id).toBe('auto');
+    const goose = tools.find(tool => tool.id === 'goose')!.generate(liveContext);
+    const provider = goose.files.find(file => file.path.endsWith('freellmapi.json'))!.value as any;
+    expect(provider.models[0].name).toBe('auto');
+    // Qwen Code silently falls back to the first listed model when the selected
+    // one is missing (it picked `fusion`); Kilo refuses to start outright.
+    const qwen = tools.find(tool => tool.id === 'qwen')!.generate(liveContext).files[0].value as any;
+    expect(qwen.modelProviders.openai.models[0].id).toBe('auto');
+    const kilo = tools.find(tool => tool.id === 'kilo')!.generate(liveContext).files[0].value as any;
+    expect(kilo.model).toBe('openai-compatible/auto');
+    expect(Object.keys(kilo.provider['openai-compatible'].models)[0]).toBe('auto');
+  });
+
+  it('delivers the Continue secret through ~/.continue/.env', () => {
+    const generation = tools.find(tool => tool.id === 'continue')!.generate(context);
+    const env = generation.files.find(file => file.path.endsWith('.env'))!;
+    expect(env.path).toBe('/home/tester/.continue/.env');
+    expect(env.sensitive).toBe(true);
+    expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
+    const config = generation.files.find(file => file.path.endsWith('config.yaml'))!.content!;
+    expect(config).not.toContain('freellmapi-test-key');
+  });
+
+  it('gives Roo an openai profile for the extension and a separate CLI import with an openrouter one', () => {
+    const files = tools.find(tool => tool.id === 'roo')!.generate(context).files;
+    const value = files[0].value as any;
+    const configs = value.providerProfiles.apiConfigs;
+    expect(value.providerProfiles.currentApiConfigName).toBe('freellmapi');
+    // The CLI forces its provider onto the CURRENT profile of the file it
+    // imports, so its file must make the openrouter-type profile current.
+    const cli = files[1].value as any;
+    expect(files[1].path).toBe('/home/tester/.roo/freellmapi-cli.json');
+    expect(cli.providerProfiles.currentApiConfigName).toBe('freellmapi-cli');
+    expect(cli.providerProfiles.apiConfigs['freellmapi-cli']).toEqual(configs['freellmapi-cli']);
+    expect(files[2].path).toBe('/home/tester/.roo/cli-settings.json');
+    expect(files[2].value).toEqual({ provider: 'openrouter', model: 'fast-coder' });
+    expect(configs.freellmapi).toMatchObject({
+      apiProvider: 'openai',
+      openAiBaseUrl: 'http://localhost:3000/v1',
+      openAiModelId: 'fast-coder',
+      openAiCustomModelInfo: { contextWindow: 131072, maxTokens: 8192 },
+    });
+    expect(configs['freellmapi-cli']).toEqual({
+      apiProvider: 'openrouter',
+      openRouterBaseUrl: 'http://localhost:3000/v1',
+      openRouterApiKey: 'freellmapi-test-key',
+      openRouterModelId: 'fast-coder',
+    });
   });
 
   it('declares a complete DeepSeek Harness route and claims the default model', () => {
@@ -313,6 +386,83 @@ describe('tool generators', () => {
       };
     expect(value.model).toBe('freellmapi/auto');
     expect(Object.keys(value.provider.freellmapi.models)).toContain('auto');
+  });
+
+  it('writes OpenClaw as a custom provider plus the default model ref, key via its own .env', () => {
+    // OpenClaw resolves `${VAR}` in openclaw.json from the global
+    // ~/.openclaw/.env it loads itself, so the pair works with nothing
+    // exported. A custom origin gets no attribution header from OpenClaw, so
+    // the provider carries a static User-Agent the gateway can classify.
+    const [config, env] = tools.find(tool => tool.id === 'openclaw')!.generate(context).files;
+    expect(config.path).toBe('/home/tester/.openclaw/openclaw.json');
+    expect(config.format).toBe('json');
+    const value = config.value as {
+      agents: { defaults: { model: { primary: string } } }
+      models: { providers: Record<string, { baseUrl: string; apiKey: string; api: string; headers: Record<string, string>; models: { id: string }[] }> }
+    };
+    expect(value.agents.defaults.model.primary).toBe('freellmapi/fast-coder');
+    const provider = value.models.providers.freellmapi;
+    expect(provider.baseUrl).toBe('http://localhost:3000/v1');
+    expect(provider.apiKey).toBe('${FREELLMAPI_API_KEY}');
+    expect(provider.api).toBe('openai-completions');
+    expect(provider.headers).toEqual({ 'User-Agent': 'openclaw' });
+    expect(provider.models.map(model => model.id)).toEqual(['fast-coder', 'reasoning-model']);
+    expect(env.path).toBe('/home/tester/.openclaw/.env');
+    expect(env.sensitive).toBe(true);
+    expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
+  });
+
+  it('gives a named OpenClaw profile its own provider without touching the default model', () => {
+    const generation = tools.find(tool => tool.id === 'openclaw')!.generate({ ...context, profile: 'Work Box' });
+    const value = generation.files[0].value as { agents?: unknown; models: { providers: Record<string, unknown> } };
+    expect(value.agents).toBeUndefined();
+    expect(Object.keys(value.models.providers)).toEqual(['freellmapi-work-box']);
+  });
+
+  it('honours OPENCLAW_CONFIG_PATH and OPENCLAW_STATE_DIR the way OpenClaw does', () => {
+    vi.stubEnv('OPENCLAW_STATE_DIR', '/srv/claw');
+    const [config, env] = tools.find(tool => tool.id === 'openclaw')!.generate(context).files;
+    expect(config.path).toBe('/srv/claw/openclaw.json');
+    expect(env.path).toBe('/srv/claw/.env');
+    vi.stubEnv('OPENCLAW_CONFIG_PATH', '/etc/openclaw.json');
+    expect(tools.find(tool => tool.id === 'openclaw')!.generate(context).files[0].path).toBe('/etc/openclaw.json');
+  });
+
+  it('writes Hermes Agent as a custom model block with the key routed through its .env', () => {
+    // config.yaml is Hermes's single source of truth for the endpoint:
+    // OPENAI_BASE_URL is ignored for non-OpenAI hosts and OPENAI_API_KEY is only
+    // sent to OpenAI hosts, so both go in the `model` block, the key as the
+    // `${VAR}` form Hermes expands from ~/.hermes/.env. Leftover key_env keys
+    // from the wizard are retired so they cannot shadow api_key.
+    const [config, env] = tools.find(tool => tool.id === 'hermes')!.generate(context).files;
+    expect(config.path).toBe('/home/tester/.hermes/config.yaml');
+    expect(config.format).toBe('yaml');
+    expect(config.value).toEqual({
+      model: {
+        provider: 'custom',
+        default: 'fast-coder',
+        base_url: 'http://localhost:3000/v1',
+        api_key: '${FREELLMAPI_API_KEY}',
+        api_mode: 'chat_completions',
+        context_length: 131072,
+        default_headers: { 'User-Agent': 'hermes-agent' },
+        key_env: undefined,
+        api_key_env: undefined,
+      },
+    });
+    expect(env.path).toBe('/home/tester/.hermes/.env');
+    expect(env.sensitive).toBe(true);
+    expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
+  });
+
+  it('gives a named Hermes profile a providers entry instead of the default model', () => {
+    vi.stubEnv('HERMES_HOME', '/srv/hermes');
+    const [config] = tools.find(tool => tool.id === 'hermes')!.generate({ ...context, profile: 'lab' }).files;
+    expect(config.path).toBe('/srv/hermes/config.yaml');
+    const value = config.value as { model?: unknown; providers: Record<string, { api: string; default_model: string }> };
+    expect(value.model).toBeUndefined();
+    expect(value.providers['freellmapi-lab'].api).toBe('http://localhost:3000/v1');
+    expect(value.providers['freellmapi-lab'].default_model).toBe('fast-coder');
   });
 
   it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {

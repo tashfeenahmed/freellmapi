@@ -1,12 +1,19 @@
 import fs from 'fs';
 import { z } from 'zod';
 import type { Db } from '../db/types.js';
-import { getDb } from '../db/index.js';
+import { getDb, getSetting, setSetting } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
 import { ensureModelInProfiles } from './profile-models.js';
 import { customModelSeed } from './custom-model-seed.js';
+import { createUser, userCount } from './auth.js';
+import {
+  SETTING_LICENSE_KEY,
+  refreshLicenseStatus,
+  syncCatalog,
+  validateLicenseKey,
+} from './catalog-sync.js';
 import { endpointRefMatches, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 import {
   clearCatalogModelTombstone,
@@ -77,7 +84,22 @@ const fallbackEntrySchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+// First-run dashboard account. Created only while the users table is empty —
+// since declarative config is applied before the HTTP listener starts, an
+// `admin` entry closes the unauthenticated POST /api/auth/setup window
+// entirely (no setup code is even minted). Once an account exists the entry
+// degrades to a warning, so config can never take over a claimed install.
+// Minimums mirror the signup schema in routes/auth.ts.
+const adminSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
 const declarativeConfigSchema = z.object({
+  admin: adminSchema.optional(),
+  // Premium license key (freellmapi.co). Same minimum as the dashboard's
+  // POST /api/premium/key length gate.
+  license: z.string().min(8).optional(),
   keys: z.array(keySchema).optional(),
   customProviders: z.array(customProviderSchema).optional(),
   models: z.array(modelSchema).optional(),
@@ -100,6 +122,15 @@ export type DeclarativeConfig = z.infer<typeof declarativeConfigSchema>;
 export interface DeclarativeConfigResult {
   applied: boolean;
   source?: string;
+  /**
+   * True when the `admin` entry created the first dashboard account. The
+   * account is created asynchronously — PostgreSQL auth is async, so
+   * provisioning is dispatched detached and this flag is set once the account
+   * lands. False when the entry was ignored (an account already exists).
+   */
+  admin: boolean;
+  /** True when a `license` entry was handed to background activation. */
+  license: boolean;
   keys: number;
   customModels: number;
   models: number;
@@ -447,6 +478,8 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
   const result: DeclarativeConfigResult = {
     applied: true,
     source,
+    admin: false,
+    license: false,
     keys: 0,
     customModels: 0,
     models: 0,
@@ -486,18 +519,95 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
     }
   });
   apply();
+
+  // Dashboard-account provisioning talks to the auth service, whose PostgreSQL
+  // reads and writes are async and therefore cannot join the synchronous DB
+  // apply above. It runs detached for the same reason license activation does:
+  // boot must not block on it. The upstream guarantee is kept — the entry only
+  // ever creates the FIRST account, so once a user exists it degrades to a
+  // warning and config cannot take over a claimed install.
+  if (parsed.data.admin) {
+    void provisionConfiguredAdmin(parsed.data.admin, result);
+  }
+
+  // License activation needs the license service — network I/O has no place in
+  // the synchronous DB apply. It runs detached so a slow or unreachable
+  // service never delays boot; a failure logs a warning and leaves settings
+  // untouched, the same contract as the dashboard's POST /api/premium/key.
+  if (parsed.data.license) {
+    result.license = true;
+    void activateConfiguredLicense(parsed.data.license);
+  }
   return result;
+}
+
+/**
+ * Create the first dashboard account from declarative config. Never overwrites
+ * an existing install: with any user present the entry is ignored with a
+ * warning, mirroring the schema-level contract (minimum password length
+ * included). Exported for tests, which await it directly.
+ */
+export async function provisionConfiguredAdmin(
+  admin: { email: string; password: string },
+  result?: DeclarativeConfigResult,
+): Promise<boolean> {
+  try {
+    if (await userCount() > 0) {
+      const warning = 'admin: a dashboard account already exists — entry ignored';
+      result?.warnings.push(warning);
+      console.warn(`[config] ${warning}`);
+      return false;
+    }
+    await createUser(admin.email, admin.password);
+    if (result) result.admin = true;
+    console.log('[config] admin account created');
+    return true;
+  } catch (err) {
+    console.warn(`[config] admin: ${err instanceof Error ? err.message : err}`);
+    return false;
+  }
+}
+
+/**
+ * Activate a Premium license key from declarative config. Idempotent across
+ * boots: a stored key identical to the configured one short-circuits before
+ * any network call, while a different key re-activates (rotation). Exported
+ * for tests.
+ */
+export async function activateConfiguredLicense(key: string): Promise<void> {
+  const trimmed = key.trim();
+  try {
+    if (getSetting(SETTING_LICENSE_KEY) === trimmed) return;
+    const result = await validateLicenseKey(trimmed);
+    if (result === null) {
+      console.warn('[config] license: could not reach the license service — key left unconfigured');
+      return;
+    }
+    if (!result.valid) {
+      console.warn(`[config] license: key rejected (${result.reason ?? 'invalid'}) — left unconfigured`);
+      return;
+    }
+    setSetting(SETTING_LICENSE_KEY, trimmed);
+    await refreshLicenseStatus();
+    // Live-tier sync kicks off right away so the upgrade is visible within
+    // seconds; its own catch-all logs failures.
+    void syncCatalog(true);
+    console.log('[config] license activated — live catalog sync started');
+  } catch (err) {
+    console.warn(`[config] license activation failed: ${err instanceof Error ? err.message : err}`);
+  }
 }
 
 export function applyDeclarativeConfigFromEnv(): DeclarativeConfigResult {
   const loaded = readConfigFromEnv();
   if (!loaded) {
-    return { applied: false, keys: 0, customModels: 0, models: 0, fallback: 0, routing: false, warnings: [] };
+    return { applied: false, admin: false, license: false, keys: 0, customModels: 0, models: 0, fallback: 0, routing: false, warnings: [] };
   }
   const result = applyDeclarativeConfig(loaded.value, loaded.source);
   console.log(
     `[config] applied ${loaded.source}: ${result.keys} keys, ${result.customModels} custom models, ` +
       `${result.models} model edits, ${result.fallback} fallback rows${result.routing ? ', routing' : ''}` +
+      `${result.admin ? ', admin account created' : ''}${result.license ? ', license activation started' : ''}` +
       `${result.warnings.length > 0 ? `, ${result.warnings.length} entries skipped` : ''}`,
   );
   return result;

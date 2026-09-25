@@ -21,6 +21,7 @@ import {
   recordRetryableFailure,
   recordUpstreamSuccess,
   resetEmptyCompletionStreaks,
+  resetTruncationStreaks,
   exhaustedRetryError,
   formatAttemptTrail,
   classifyAttemptError,
@@ -29,6 +30,8 @@ import {
   DEFAULT_FALLBACK_TIME_BUDGET_MS,
   AUTH_FAILURE_COOLDOWN_MS,
   EMPTY_COMPLETION_STREAK_LIMIT,
+  TRUNCATION_STREAK_LIMIT,
+  TRUNCATION_BENCH_MS,
   type AttemptRecord,
   type FallbackHooks,
   type FallbackState,
@@ -83,6 +86,7 @@ beforeEach(() => {
   mockCheckKeyHealth.mockResolvedValue('invalid');
   getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
   resetEmptyCompletionStreaks();
+  resetTruncationStreaks();
 });
 
 describe('isKeyAuthError (401 = key-fatal, rotate instead of 502)', () => {
@@ -275,6 +279,64 @@ describe('empty-completion streak lifts the skipBench exemption (#751)', () => {
     expect(dispatch).toHaveBeenCalledTimes(EMPTY_COMPLETION_STREAK_LIMIT - 1 + 2);
     expect(onExhausted).toHaveBeenCalledTimes(1);
     expect(onExhausted.mock.calls[0][0].status).toBe(503);
+  });
+});
+
+describe('truncated-stream streak benches a sick route (#1218)', () => {
+  const truncErr = (name: string) =>
+    new Error(`${name} stream ended unexpectedly (no [DONE], no finish_reason) — connection reset or truncated upstream`);
+  const cooldownExpiry = (route: RouteResult): number | undefined => {
+    const row = getDb().prepare(
+      'SELECT expires_at_ms FROM rate_limit_cooldowns WHERE platform = ? AND key_id = ?',
+    ).get('fake', route.keyId) as { expires_at_ms: number } | undefined;
+    return row?.expires_at_ms;
+  };
+
+  it('a single truncation keeps the ordinary short transient bench', () => {
+    const route = fakeRoute();
+    recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    // The retryable ladder already benches briefly; the streak adds nothing yet.
+    const expiry = cooldownExpiry(route);
+    expect(expiry).toBeDefined();
+    expect(expiry! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+  });
+
+  it(`extends the bench to TRUNCATION_BENCH_MS from the Nth consecutive truncation on the same model+key`, () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+      expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+    }
+    // Streak limit reached: the bench is now the full truncation window.
+    recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    expect(cooldownExpiry(route)! - Date.now()).toBeGreaterThanOrEqual(TRUNCATION_BENCH_MS - 1000);
+  });
+
+  it('a success on the route resets the streak', () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    recordUpstreamSuccess(route, 0);
+    getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
+  });
+
+  it('a differently-classified failure on the route breaks the streak', () => {
+    const route = fakeRoute();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    // A 429 takes the cooldown ladder — and breaks the truncation streak.
+    recordRetryableFailure(route, Object.assign(new Error('429 Too Many Requests'), { status: 429 }), newFallbackState());
+    getDb().prepare('DELETE FROM rate_limit_cooldowns').run();
+    for (let i = 1; i < TRUNCATION_STREAK_LIMIT; i++) {
+      recordRetryableFailure(route, truncErr(route.displayName), newFallbackState());
+    }
+    expect(cooldownExpiry(route)! - Date.now()).toBeLessThan(TRUNCATION_BENCH_MS);
   });
 });
 
@@ -756,5 +818,88 @@ describe('runFallbackLoop: client disconnect + attempt log', () => {
 
     expect(attemptLog).toHaveLength(2); // the two failures, not the success
     expect(attemptLog[0].errorClass).toBe('rate_limited');
+  });
+});
+
+// The diagnostics line used to live in each surface's onRoutingExhausted hook,
+// and only routes/proxy.ts ever implemented it — so an opaque routing_error on
+// /v1/messages, /v1/responses or an inbound wire recorded nothing about WHY the
+// pool was empty. It belongs to the loop: these tests pin it there, for every
+// surface, including one that supplies no identity at all.
+describe('runFallbackLoop: routing-exhaustion diagnostics belong to the loop', () => {
+  const routeError = (diagnostics: string[]) =>
+    Object.assign(new Error('all candidates exhausted'), { status: 429, diagnostics });
+
+  const warnedLine = (warn: ReturnType<typeof vi.spyOn>): string | undefined =>
+    warn.mock.calls.map(c => String(c[0])).find(l => l.includes('routing exhausted'));
+
+  it('logs the router per-candidate disposition when no upstream was tried', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'anthropic messages', requestId: 'abcdef12-3456-7890', requestedModel: 'claude-x' },
+        route: () => { throw routeError(['glm-4.7 @zai: cooldown 42s', 'llama @groq: rpd 0 left']); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('anthropic messages');
+      expect(line).toContain('req=abcdef');           // hyphens stripped, 6 chars
+      expect(line).toContain('requested=claude-x');
+      expect(line).toContain('candidates=2');
+      expect(line).toContain('glm-4.7 @zai: cooldown 42s');
+      expect(line).toContain('llama @groq: rpd 0 left');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('still fires for a surface that supplies no logIdentity', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        route: () => { throw routeError(['solo @fake: no usable key']); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('unidentified surface');
+      expect(line).toContain('candidates=1');
+      expect(line).toContain('solo @fake: no usable key');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('handles a RouteError carrying no diagnostics at all', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'inbound chat' },
+        route: () => { throw Object.assign(new Error('nothing routable'), { status: 429 }); },
+      }));
+      const line = warnedLine(warn);
+      expect(line).toBeDefined();
+      expect(line).toContain('inbound chat');
+      expect(line).toContain('candidates=0');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('stays silent when attempts already ran — the attempt trail explains those', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      let call = 0;
+      await runFallbackLoop(hooksSkeleton({
+        logIdentity: { surface: 'chat completions' },
+        route: () => {
+          if (call++ === 0) return fakeRoute();
+          throw routeError(['everything @fake: cooldown']);
+        },
+        dispatch: async () => { throw Object.assign(new Error('Too Many Requests'), { status: 429 }); },
+      }));
+      expect(warnedLine(warn)).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

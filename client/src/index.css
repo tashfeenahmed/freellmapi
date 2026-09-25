@@ -136,15 +136,15 @@
         @apply bg-background text-foreground;
         font-feature-settings: 'ss01', 'cv11', 'tnum';
     }
-    /* Desktop shell (html.desktop set by the app's preload): let the
-       window's vibrancy show through a translucent backdrop so the
+    /* Desktop shell: on macOS where the window has native sidebar vibrancy,
+       let the vibrancy show through a translucent backdrop so the
        dashboard reads as real glass, like the tray popover. Cards and
-       popovers stay opaque on top. No effect in the browser, where
-       .desktop is never set. */
-    html.desktop body {
+       popovers stay opaque on top. On Windows and Linux, keep the solid
+       background so contrast and legibility are preserved. */
+    html.desktop.desktop-mac body {
         background-color: transparent;
     }
-    html.desktop .desktop-backdrop {
+    html.desktop.desktop-mac .desktop-backdrop {
         background-color: color-mix(in oklab, var(--background) 55%, transparent);
     }
     code, pre, kbd, samp {
@@ -160,3 +160,34 @@
         font-feature-settings: 'ss01';
     }
 }
+
+/* ── Syntax highlighting (highlight.js spans, see lib/highlight.ts) ─────────
+   One restrained palette per theme: keywords and tags carry the accent,
+   strings warm, comments recede, everything else stays the text colour. */
+.code-highlight { color: var(--foreground); }
+.code-highlight .hljs-comment, .code-highlight .hljs-quote { color: oklch(0.55 0 0); font-style: italic; }
+.code-highlight .hljs-keyword, .code-highlight .hljs-selector-tag, .code-highlight .hljs-built_in,
+.code-highlight .hljs-type, .code-highlight .hljs-literal, .code-highlight .hljs-doctag,
+.code-highlight .hljs-meta { color: oklch(0.45 0.18 290); }
+.code-highlight .hljs-tag, .code-highlight .hljs-name, .code-highlight .hljs-selector-class,
+.code-highlight .hljs-selector-id, .code-highlight .hljs-section, .code-highlight .hljs-title { color: oklch(0.48 0.16 250); }
+.code-highlight .hljs-attr, .code-highlight .hljs-attribute, .code-highlight .hljs-variable,
+.code-highlight .hljs-template-variable, .code-highlight .hljs-property, .code-highlight .hljs-params { color: oklch(0.5 0.12 45); }
+.code-highlight .hljs-string, .code-highlight .hljs-regexp, .code-highlight .hljs-addition,
+.code-highlight .hljs-template-tag, .code-highlight .hljs-symbol, .code-highlight .hljs-bullet { color: oklch(0.5 0.14 150); }
+.code-highlight .hljs-number, .code-highlight .hljs-link { color: oklch(0.5 0.15 25); }
+.code-highlight .hljs-deletion { color: oklch(0.5 0.18 25); }
+.code-highlight .hljs-emphasis { font-style: italic; }
+.code-highlight .hljs-strong { font-weight: 600; }
+.dark .code-highlight .hljs-comment, .dark .code-highlight .hljs-quote { color: oklch(0.6 0 0); }
+.dark .code-highlight .hljs-keyword, .dark .code-highlight .hljs-selector-tag, .dark .code-highlight .hljs-built_in,
+.dark .code-highlight .hljs-type, .dark .code-highlight .hljs-literal, .dark .code-highlight .hljs-doctag,
+.dark .code-highlight .hljs-meta { color: oklch(0.78 0.12 290); }
+.dark .code-highlight .hljs-tag, .dark .code-highlight .hljs-name, .dark .code-highlight .hljs-selector-class,
+.dark .code-highlight .hljs-selector-id, .dark .code-highlight .hljs-section, .dark .code-highlight .hljs-title { color: oklch(0.78 0.11 240); }
+.dark .code-highlight .hljs-attr, .dark .code-highlight .hljs-attribute, .dark .code-highlight .hljs-variable,
+.dark .code-highlight .hljs-template-variable, .dark .code-highlight .hljs-property, .dark .code-highlight .hljs-params { color: oklch(0.8 0.1 60); }
+.dark .code-highlight .hljs-string, .dark .code-highlight .hljs-regexp, .dark .code-highlight .hljs-addition,
+.dark .code-highlight .hljs-template-tag, .dark .code-highlight .hljs-symbol, .dark .code-highlight .hljs-bullet { color: oklch(0.78 0.12 150); }
+.dark .code-highlight .hljs-number, .dark .code-highlight .hljs-link { color: oklch(0.78 0.12 30); }
+.dark .code-highlight .hljs-deletion { color: oklch(0.7 0.16 25); }

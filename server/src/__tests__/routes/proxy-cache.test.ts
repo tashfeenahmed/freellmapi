@@ -35,7 +35,7 @@ function authHeaders() {
 // Mock every groq chat-completion call, counting how many actually reach the
 // provider (separately for streaming vs non-streaming). The whole point of the
 // cache is that a repeat non-streaming request does NOT reach the provider.
-function mockGroq(content: string) {
+function mockGroq(content: string, streamOpts: { finish?: string; failMidStream?: boolean } = {}) {
   const origFetch = global.fetch;
   const counter = { calls: 0, streamCalls: 0 };
   vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
@@ -47,8 +47,28 @@ function mockGroq(content: string) {
         const sse = [
           { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'openai/gpt-oss-120b', choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
           { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'openai/gpt-oss-120b', choices: [{ index: 0, delta: { content }, finish_reason: null }] },
-          { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'openai/gpt-oss-120b', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } },
+          { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'openai/gpt-oss-120b', choices: [{ index: 0, delta: {}, finish_reason: streamOpts.finish ?? 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } },
         ].map(f => `data: ${JSON.stringify(f)}\n\n`).join('') + 'data: [DONE]\n\n';
+        if (streamOpts.failMidStream) {
+          // Upstream dies partway through: the client keeps the frames it
+          // already got, but the turn never completed, so nothing may be
+          // cached. Pull-driven so the proxy really has flushed headers and
+          // forwarded a content chunk before the error lands.
+          const enc = new TextEncoder();
+          const frame = (delta: Record<string, unknown>) =>
+            enc.encode(`data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'openai/gpt-oss-120b', choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`);
+          let pulls = 0;
+          const body = new ReadableStream<Uint8Array>({
+            async pull(controller) {
+              pulls++;
+              if (pulls === 1) return void controller.enqueue(frame({ role: 'assistant', content: null }));
+              if (pulls === 2) return void controller.enqueue(frame({ content }));
+              await new Promise(resolve => setTimeout(resolve, 5));
+              controller.error(new Error('upstream stream broke'));
+            },
+          });
+          return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }) as any;
+        }
         return new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }) as any;
       }
       counter.calls++;
@@ -194,27 +214,79 @@ describe('Response cache (proxy integration)', () => {
     }
   });
 
-  it('a streaming request bypasses the cache: never served from it, never populates it', async () => {
-    const counter = mockGroq('cached four');
+  it('replays a second identical streaming request from cache, byte for byte', async () => {
+    const counter = mockGroq('streamed four');
 
-    // A non-streaming request populates the cache.
-    const first = await chat();
+    const first = await chat({ stream: true });
+    expect(first.status).toBe(200);
     expect(first.headers.get('x-freellm-cache')).toBe('MISS');
-    expect(counter.calls).toBe(1);
-
-    // An identical STREAMING request must not be served from the cache, so it
-    // reaches the provider's streaming endpoint despite the cached entry.
-    const streamed = await chat({ stream: true });
-    expect(streamed.status).toBe(200);
+    expect(first.raw).toContain('streamed four');
+    expect(first.raw.endsWith('data: [DONE]\n\n')).toBe(true);
     expect(counter.streamCalls).toBe(1);
 
-    // And it did not overwrite/populate a cache entry: a following identical
-    // non-streaming request is still a HIT served from the original entry, with
-    // no new non-streaming provider call.
-    const third = await chat();
-    expect(third.headers.get('x-freellm-cache')).toBe('HIT');
-    expect(third.body.choices[0].message.content).toBe('cached four');
+    const second = await chat({ stream: true });
+    expect(second.status).toBe(200);
+    expect(second.headers.get('x-freellm-cache')).toBe('HIT');
+    expect(second.headers.get('x-routed-via')).toBe('cache');
+    expect(second.headers.get('content-type')).toContain('text/event-stream');
+    // Identical SSE bytes, and no second provider stream.
+    expect(second.raw).toBe(first.raw);
+    expect(counter.streamCalls).toBe(1);
+  });
+
+  it('keeps the streaming and non-streaming entries for one prompt apart', async () => {
+    const counter = mockGroq('four');
+    await chat();                  // JSON MISS, populates the JSON store
+    const streamed = await chat({ stream: true });
+    // The JSON entry is never replayed as SSE: the stream is a MISS of its own.
+    expect(streamed.headers.get('x-freellm-cache')).toBe('MISS');
+    expect(counter.streamCalls).toBe(1);
+    // ...and storing it did not disturb the JSON entry.
+    const json = await chat();
+    expect(json.headers.get('x-freellm-cache')).toBe('HIT');
+    expect(json.body.choices[0].message.content).toBe('four');
     expect(counter.calls).toBe(1);
+  });
+
+  it('does not cache a truncated stream (finish_reason length)', async () => {
+    const counter = mockGroq('cut off mid-', { finish: 'length' });
+    const first = await chat({ stream: true });
+    expect(first.status).toBe(200);
+    expect(counter.streamCalls).toBe(1);
+    // Nothing was stored, so the repeat goes back to the provider.
+    const second = await chat({ stream: true });
+    expect(second.headers.get('x-freellm-cache')).toBe('MISS');
+    expect(counter.streamCalls).toBe(2);
+  });
+
+  it('does not cache a stream that broke mid-flight', async () => {
+    const counter = mockGroq('half an ans', { failMidStream: true });
+    const first = await chat({ stream: true });
+    // Headers were already flushed and content forwarded before the break.
+    expect(first.headers.get('x-freellm-cache')).toBe('MISS');
+    expect(first.raw).toContain('half an ans');
+    expect(first.raw).toContain('stream_error'); // the break is surfaced to the client
+    const before = counter.streamCalls;
+    // Nothing was stored, so the repeat goes back to the provider.
+    const second = await chat({ stream: true });
+    expect(second.headers.get('x-freellm-cache')).toBe('MISS');
+    expect(counter.streamCalls).toBeGreaterThan(before);
+  });
+
+  it('retains nothing when the cache is off: a stream buffers no frames', async () => {
+    process.env.RESPONSE_CACHE = '';
+    try {
+      const counter = mockGroq('uncached');
+      const first = await chat({ stream: true });
+      expect(first.headers.get('x-freellm-cache')).toBe('OFF');
+      const second = await chat({ stream: true });
+      expect(second.headers.get('x-freellm-cache')).toBe('OFF');
+      expect(counter.streamCalls).toBe(2);
+      const stats = await request(app, 'GET', '/api/cache/stats');
+      expect(stats.body.entries).toBe(0);
+    } finally {
+      process.env.RESPONSE_CACHE = 'on';
+    }
   });
 
   it('exposes cache stats and savings on the admin endpoint', async () => {

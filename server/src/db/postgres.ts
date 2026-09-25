@@ -152,6 +152,14 @@ function createInMemoryMockPool() {
 
       const rows = tables.get(tableName) || [];
 
+      // `userCount()` (auth service) asks for COUNT(*); the generic fallback
+      // returns the raw rows, and `rows[0].c` would then read as 0 users
+      // forever — which would let a declarative `admin` entry re-provision an
+      // install that already has an account.
+      if (tableName === 'users' && /COUNT\(\*\)\s+AS\s+C\b/i.test(trimmed)) {
+        return { rows: [{ c: String(rows.length) }], rowCount: 1 };
+      }
+
       if (upper.includes('FROM CREDENTIALS C') && upper.includes('JOIN PROVIDERS P')) {
         const creds = tables.get('credentials') || [];
         const provs = tables.get('providers') || [];
@@ -321,6 +329,13 @@ function createInMemoryMockPool() {
           }
         });
         if (record.enabled === undefined) record.enabled = true;
+        // The real schema makes `users.email` unique; without the same refusal
+        // here a duplicate dashboard account would silently be created in tests.
+        if (tableName === 'users' && rows.some(r => r.email === record.email)) {
+          const dup: any = new Error('duplicate key value violates unique constraint "users_email_key"');
+          dup.code = '23505';
+          throw dup;
+        }
         rows.push(record);
         tables.set(tableName, rows);
         return { rows: [record], rowCount: 1 };
@@ -672,6 +687,18 @@ function createInMemoryMockPool() {
           tables.set('models', rows);
           tables.set('providers', provs);
           return { changes: 1, lastInsertRowid: record.id };
+        }
+        // Auth tables: test setup clears them between cases. Sessions go first
+        // so a stale token can never outlive the account it belonged to.
+        if (u.includes('DELETE FROM SESSIONS')) {
+          const rows = tables.get('sessions') || [];
+          tables.set('sessions', []);
+          return { changes: rows.length, lastInsertRowid: 0 };
+        }
+        if (u.includes('DELETE FROM USERS')) {
+          const rows = tables.get('users') || [];
+          tables.set('users', []);
+          return { changes: rows.length, lastInsertRowid: 0 };
         }
         if (u.includes('DELETE FROM API_KEYS')) {
           const rows = tables.get('api_keys') || [];

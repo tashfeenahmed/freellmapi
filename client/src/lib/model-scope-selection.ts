@@ -49,7 +49,7 @@ export const MODEL_PICKER_MIN_MODELS = 6
  * be ticked apart.
  */
 export function scopeCandidates(
-  entries: readonly FallbackEntry[],
+  entries: readonly Pick<FallbackEntry, 'platform' | 'modelId' | 'displayName' | 'sizeLabel' | 'contextWindow'>[],
   platform: string,
 ): ScopeCandidate[] {
   // 'custom' rows are per-endpoint, not per-platform — one custom key must

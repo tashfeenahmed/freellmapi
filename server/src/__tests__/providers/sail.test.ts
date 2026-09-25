@@ -64,7 +64,7 @@ describe('SailProvider', () => {
       input: [{ role: 'user', content: 'Reply OK' }],
       background: true,
       max_output_tokens: 64,
-      metadata: { completion_window: 'asap' },
+      metadata: { completion_window: 'flex' },
       reasoning: { effort: 'none' },
       temperature: 0,
     });
@@ -133,7 +133,9 @@ describe('SailProvider', () => {
 
     expect(bodies[0].metadata).toEqual({ completion_window: 'flex' });
     expect(bodies[0].background).toBe(true);
-    expect(bodies[1].metadata).toEqual({ completion_window: 'asap' });
+    // 'asap' is rejected for background requests, so the flex window is used
+    // for every model now, not just the former flex-only roster.
+    expect(bodies[1].metadata).toEqual({ completion_window: 'flex' });
     expect(bodies[1].reasoning).toEqual({ effort: 'low' });
   });
 
