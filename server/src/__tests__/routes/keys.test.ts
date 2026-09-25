@@ -137,14 +137,53 @@ describe('Keys API', () => {
   });
 
   it('#1327: a non-OpenAI-compat provider gets no bogus custom-provider advice', async () => {
+    const db = getDb();
+    db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
     const { body } = await request(app, 'POST', '/api/keys', {
       platform: 'speechify',
       key: 'speechify_test_key_123456',
     });
-    // Speechify speaks its own entitlement API; suggesting the custom
+    // Speechify speaks its own TTS API; suggesting the custom
     // OpenAI-compatible path for it sends users into a dead end.
-    expect(body.notice ?? '').toMatch(/speechify/i);
-    expect(body.notice ?? '').not.toMatch(/custom OpenAI-compatible provider with base URL/);
+    expect(body.notice).toMatch(/no speechify models/i);
+    expect(body.notice).not.toMatch(/custom OpenAI-compatible/);
+  });
+
+  it('#1327: a media-only provider whose TTS models are in the catalog gets no notice', async () => {
+    const db = getDb();
+    db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
+    db.prepare(`
+      INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled)
+      VALUES ('speechify', 'simba-english', 'Speechify Simba English', 'audio', 1, 1)
+    `).run();
+    try {
+      const { status, body } = await request(app, 'POST', '/api/keys', {
+        platform: 'speechify',
+        key: 'speechify_test_key_123456',
+      });
+      expect(status).toBe(201);
+      expect(body.modelsAvailable).toBe(1);
+      expect(body.notice).toBeUndefined();
+    } finally {
+      db.prepare("DELETE FROM media_models WHERE platform = 'speechify'").run();
+    }
+  });
+
+  it('#1327: a Premium install is not told to add a Premium license key', async () => {
+    const db = getDb();
+    db.prepare("UPDATE models SET enabled = 0 WHERE platform = 'agnes'").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_applied_tier', 'live')").run();
+    try {
+      const { body } = await request(app, 'POST', '/api/keys', {
+        platform: 'agnes',
+        key: 'agnes_test_key_123456',
+      });
+      expect(body.notice).toMatch(/Premium catalog does not list any agnes models/);
+      expect(body.notice).not.toMatch(/Add a Premium license key/);
+      expect(body.notice).toMatch(/base URL https:\/\/apihub\.agnes-ai\.com\/v1/);
+    } finally {
+      db.prepare("DELETE FROM settings WHERE key = 'catalog_applied_tier'").run();
+    }
   });
 
   it('POST /api/keys does not warn when the platform has catalog models', async () => {

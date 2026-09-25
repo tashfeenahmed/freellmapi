@@ -5,6 +5,8 @@ import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
 import { resolveProvider, getAllProviders } from '../providers/index.js';
+import { OpenAICompatProvider } from '../providers/openai-compat.js';
+import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
@@ -197,41 +199,58 @@ export function isExportableKey(row: { platform: string; baseUrl: string | null;
   return v.length > 0 && v !== 'no-key';
 }
 
+// Every model a platform's key can serve: chat rows, plus embedding and
+// generative-media rows. Media-only providers (Speechify is TTS-only) never
+// have a chat row, so counting `models` alone reported "no models" — and fired
+// the no-catalog notice — for them even on a fully synced Premium install
+// (#1327).
 function enabledModelCount(platform: string): number {
   const db = getDb();
-  const row = db.prepare(
-    'SELECT COUNT(*) AS c FROM models WHERE platform = ? AND enabled = 1',
-  ).get(platform) as { c: number };
+  const row = db.prepare(`
+    SELECT (SELECT COUNT(*) FROM models           WHERE platform = ? AND enabled = 1)
+         + (SELECT COUNT(*) FROM embedding_models WHERE platform = ? AND enabled = 1)
+         + (SELECT COUNT(*) FROM media_models     WHERE platform = ? AND enabled = 1) AS c
+  `).get(platform, platform, platform) as { c: number };
   return row.c;
+}
+
+// The public API root the custom-provider workaround needs, or null when the
+// platform does not speak the OpenAI-compatible protocol that path speaks
+// (e.g. Speechify's own TTS API), in which case that advice is a dead end.
+function openAICompatBaseUrl(platform: string): string | null {
+  const provider = resolveProvider(platform as Platform);
+  if (!(provider instanceof OpenAICompatProvider)) return null;
+  return provider.modelsUrl.replace(/\/models\/?$/, '');
 }
 
 // Non-null when the just-added key has no usable models yet, so the client can
 // explain the silence instead of leaving the user staring at an empty list.
 //
-// The old copy told users to "add ${platform} as a custom OpenAI-compatible
-// provider with its base URL" without ever naming that URL (#1327): every
-// attempt failed with a URL-typo or a wrong-path error, and for providers
-// whose API is not OpenAI-compatible at all (Speechify's entitlement endpoint)
-// the advice was flat-out unworkable. So: quote the provider's own base URL
-// when it speaks the OpenAI-compatible protocol the custom-provider path
-// speaks, and only offer that workaround for those providers.
+// #1327: the old copy told a Premium user to "add a Premium license key", and
+// told everyone to add the provider as a custom OpenAI-compatible endpoint
+// "with its base URL" without naming it — even for providers with no such
+// endpoint. The notice now matches the install's actual catalog tier, names
+// the base URL, and only offers the custom-provider route where it works.
 function noModelsNotice(platform: string): string | undefined {
   if (enabledModelCount(platform) > 0) return undefined;
-  const provider = resolveProvider(platform as Platform);
-  // OpenAICompatProvider exposes its endpoint through the modelsUrl getter;
-  // duck-typing on it avoids importing the class purely for an instanceof.
-  const compatBaseUrl = typeof (provider as { modelsUrl?: unknown } | undefined)?.modelsUrl === 'string'
-    ? String((provider as unknown as { modelsUrl: string }).modelsUrl).replace(/\/models\/?$/, '')
+  const baseUrl = openAICompatBaseUrl(platform);
+  const customRoute = baseUrl
+    ? `add ${platform} as a custom OpenAI-compatible provider with base URL ${baseUrl}`
     : null;
-  const workaround = compatBaseUrl
-    ? ` Add a Premium license key to use them now, or add ${platform} as a custom ` +
-      `OpenAI-compatible provider with base URL ${compatBaseUrl}.`
-    : ' Add a Premium license key to use them now; this provider has no ' +
-      'OpenAI-compatible endpoint, so the custom-provider workaround does not apply.';
+  const premium = getSyncState().appliedTier === 'live';
+  if (premium) {
+    return (
+      `Key saved, but your Premium catalog does not list any ${platform} models yet. ` +
+      `Try Check for updates on the Premium page to pull the latest catalog` +
+      (customRoute ? `, or ${customRoute}.` : '.')
+    );
+  }
   return (
     `Key saved, but no ${platform} models are in your current catalog yet. ` +
     `Newer providers are published to the premium catalog first and appear ` +
-    `for free-tier installs once they age into the monthly catalog.${workaround}`
+    `for free-tier installs once they age into the monthly catalog. ` +
+    `Add a Premium license key to use them now` +
+    (customRoute ? `, or ${customRoute}.` : '.')
   );
 }
 
