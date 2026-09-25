@@ -45,7 +45,7 @@ Some providers enforce **one quota across the whole account**, not per model:
 
 | Pool | Providers | Config |
 |------|-----------|--------|
-| Daily requests | OpenRouter (1000/day free, 50/day <10 credits), ModelScope (2000→1800 margin) | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` |
+| Daily requests | OpenRouter (1000/day free, 50/day <10 credits), ModelScope (2000→1800 margin), Requesty (200→180 margin) | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` |
 | Daily tokens | NavyAI (150K/day shared, model multipliers) | `PROVIDER_DAILY_TOKEN_CAP_<PLATFORM>` |
 | Minute requests | NVIDIA NIM (40 RPM account-wide) | `PROVIDER_MINUTE_REQUEST_CAP_<PLATFORM>` |
 

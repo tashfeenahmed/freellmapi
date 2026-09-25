@@ -564,6 +564,12 @@ const DEFAULT_PROVIDER_DAILY_REQUEST_CAPS: Record<string, number> = {
   // models share it). 1800 leaves margin for validation probes and for drift
   // between our ledger and the provider's own daily boundary (#581).
   modelscope: 1800,
+  // Requesty's free tier is 200 requests/day per account, shared by every free
+  // model (requesty.ai/free-models, no card). The catalog rows each carry
+  // rpd 200, so without this gate the router could spend 200 per model. 180
+  // leaves the same margin as ModelScope for cooldown probes and drift from
+  // Requesty's own daily reset.
+  requesty: 180,
 };
 
 const DEFAULT_PROVIDER_DAILY_TOKEN_CAPS: Record<string, number> = {

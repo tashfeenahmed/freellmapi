@@ -45,7 +45,7 @@ releaseLease(leaseId)  // finally 块里，幂等
 
 | 池 | 提供方 | 配置 |
 |------|-----------|--------|
-| 每日请求 | OpenRouter（免费 1000/天，<10 积分 50/天）、ModelScope（2000→1800 边际） | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` |
+| 每日请求 | OpenRouter（免费 1000/天，<10 积分 50/天）、ModelScope（2000→1800 边际）、Requesty（200→180 边际） | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` |
 | 每日词元 | NavyAI（共享 150K/天，模型乘数） | `PROVIDER_DAILY_TOKEN_CAP_<PLATFORM>` |
 | 每分钟请求 | NVIDIA NIM（账号级 40 RPM） | `PROVIDER_MINUTE_REQUEST_CAP_<PLATFORM>` |
 
