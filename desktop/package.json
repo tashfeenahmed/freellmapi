@@ -26,7 +26,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0"
+    "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.0",

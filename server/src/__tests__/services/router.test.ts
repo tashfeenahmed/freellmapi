@@ -4,6 +4,7 @@ import { encrypt } from '../../lib/crypto.js';
 import {
   getAllPenalties,
   recordRateLimitHit,
+  recordSuccess,
   routeRequest,
   setRoutingStrategy,
 } from '../../services/router.js';

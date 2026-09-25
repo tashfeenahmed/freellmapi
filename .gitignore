@@ -25,3 +25,7 @@ update-hermes.sh
 
 # Monetization planning — private, never committed
 monetization/
+
+# Test coverage output (untracked cruft)
+coverage/
+server/coverage/

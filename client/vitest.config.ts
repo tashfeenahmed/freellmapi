@@ -36,7 +36,13 @@ export default defineConfig({
   // file (`files: []` + project references), so `jsx: react-jsx` from
   // tsconfig.app.json never reaches it. Say it here instead.
   esbuild: { jsx: 'automatic' },
+  // Mirrors the vite.config.ts define so components reading __SERVER_PORT__
+  // (api-usage, KeysPage, ModelDetailPage) resolve it under vitest too.
+  define: {
+    __SERVER_PORT__: JSON.stringify('3001'),
+  },
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

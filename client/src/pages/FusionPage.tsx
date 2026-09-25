@@ -26,18 +26,22 @@ interface SavedFusionConfig {
   expose_panel: boolean
 }
 
-interface FusionConfigResponse {
+export interface FusionConfigResponse {
   config: SavedFusionConfig
   maxK: number
 }
 
-interface FallbackEntry {
+export interface FallbackEntry {
   modelDbId: number
   platform: string
   modelId: string
   displayName: string
   enabled: boolean
   keyCount: number
+  groupKey?: string
+  canonicalId?: string
+  groupLabel?: string
+  sizeLabel?: string
 }
 
 const JUDGE_AUTO = '__auto__'

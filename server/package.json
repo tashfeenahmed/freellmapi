@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run --pool=forks --fileParallelism=false",
+    "test:coverage": "vitest run --pool=forks --fileParallelism=false --coverage --coverage.include='src/**/*.ts' --coverage.exclude='src/__tests__/**' --coverage.exclude='src/scripts/**' --coverage.exclude='src/index.ts' --coverage.exclude='src/db/migrations.ts' --coverage.exclude='src/providers/**'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --pool=forks --fileParallelism=false --coverage",
     "test:migrations": "vitest run --pool=forks --fileParallelism=false src/__tests__/db/migrate/roundtrip.test.ts",
@@ -28,8 +29,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "multer": "^2.2.0",
-    "sharp": "^0.35.3",
+    "multer": ">=2.3.0",
+    "sharp": ">=0.35.4",
     "socks-proxy-agent": "^10.0.0",
     "undici": "^6.21.0",
     "zod": "^3.24.4"

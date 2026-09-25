@@ -36,6 +36,12 @@
     "node": ">=20.18.0 <25.0.0",
     "npm": ">=10.0.0"
   },
+  "overrides": {
+    "fast-uri": "3.1.6",
+    "js-yaml": "4.3.2",
+    "hono": "4.13.5",
+    "qs": "6.16.0"
+  },
   "allowScripts": {
     "better-sqlite3@12.10.0": true,
     "esbuild@0.28.2": true,
