@@ -1,12 +1,13 @@
 # Gitleaks config for freellmapi
-# False positives in tests + docs are allowlisted. Real secrets must still fail.
-title = "freellmapi"
+# Extends default rules; false positives in tests + docs are allowlisted.
+# Real secrets must still fail.
+[extend]
+useDefault = true
 
 [allowlist]
-description = "Global: obvious placeholders and documentation examples"
+description = "Test mocks, doc placeholders, migration labels, false positives"
 regexes = [
   '''freellmapi-your-unified-key''',
-  '''freellmapi-yy[Bb]our-unified-key''',
   '''gsk_same_key_123456''',
   '''gsk_test123456789''',
   '''agnes_test_key_123456''',
