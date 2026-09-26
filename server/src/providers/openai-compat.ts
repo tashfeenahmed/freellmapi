@@ -16,6 +16,16 @@ import { providerTimeoutMs } from '../lib/provider-timeout.js';
 import { isAbortLikeError } from '../lib/error-classify.js';
 import { contentToString } from '../lib/content.js';
 
+/** The sentinel the Keys page stores for keyless/custom endpoints (routes/
+ * keys.ts keeps `no-key` for "auth off"), plus the empty string a caller can
+ * hand a provider when no credential exists. A keyless provider sends no
+ * Authorization header for these and a real bearer for anything else (#1331).
+ * Exported so validateKey and the request path share one definition. */
+export function isAnonymousCredential(apiKey: string | null | undefined): boolean {
+  const v = apiKey?.trim() ?? '';
+  return v === '' || v === 'no-key';
+}
+
 /** Hosts that ARE Moonshot's OpenAI-compatible API (api.moonshot.ai,
  * api.moonshot.cn, api.kimi.com and their subdomains). */
 const MOONSHOT_HOST_SUFFIXES = ['moonshot.ai', 'moonshot.cn', 'kimi.com'];
@@ -162,11 +172,17 @@ export class OpenAICompatProvider extends BaseProvider {
     return res.statusText;
   }
 
-  /** Keyless providers (Kilo's anonymous free tier) must send NO Authorization
-   * header — a stored sentinel like `Bearer no-key` could be treated as an
-   * invalid key. Everyone else sends the bearer as usual. */
+  /** Anonymous access sends NO Authorization header: keyless providers
+   * (Kilo's anonymous free tier) holding the stored `no-key` sentinel, and
+   * custom endpoints whose stored credential is the same sentinel with auth
+   * off. Sending `Bearer no-key` upstream is never right — upstreams read it
+   * as an invalid key. A REAL key saved on a keyless platform is used instead
+   * of the anonymous path, and a real key on a custom endpoint still gets its
+   * bearer (#1331): the presence of a credential decides at request time —
+   * Kilo, OVH and AI Horde all accept both modes per their docs. */
   private authHeader(apiKey: string): Record<string, string> {
-    return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
+    if (isAnonymousCredential(apiKey)) return {};
+    return { 'Authorization': `Bearer ${apiKey.trim()}` };
   }
 
   /** Requesty's Leanstral route rejects greedy sampling when temperature=0.
