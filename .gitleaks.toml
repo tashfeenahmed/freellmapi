@@ -1,0 +1,31 @@
+# Gitleaks config for freellmapi
+# Extends default rules; false positives in tests + docs are allowlisted.
+# Real secrets must still fail.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test mocks, doc placeholders, migration labels, false positives"
+regexes = [
+  '''freellmapi-your-unified-key''',
+  '''gsk_same_key_123456''',
+  '''gsk_test123456789''',
+  '''agnes_test_key_123456''',
+  '''sk-prod-secret-123''',
+  '''sk-relay''',
+  '''nv-test''',
+  '''MYRELAY_API_KEY''',
+  '''0123456789abcdef''',
+  '''replace-with-64-char-hex''',
+  '''20260823_000003_attempt_key_la''',
+  '''p95LatencyMs''',
+]
+paths = [
+  '''server/src/__tests__/''',
+  '''server/src/db/migrate/defaults\.ts''',
+  '''server/src/lib/db-backup\.ts''',
+  '''client/src/pages/AnalyticsPage\.tsx''',
+  '''docs/''',
+  '''docker/README\.md''',
+  '''README\.md''',
+]
