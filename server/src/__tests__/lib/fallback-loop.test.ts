@@ -26,6 +26,7 @@ import {
   formatAttemptTrail,
   classifyAttemptError,
   msUntilNextUtcMidnight,
+  msUntilNextPacificMidnight,
   getFallbackTimeBudgetMs,
   DEFAULT_FALLBACK_TIME_BUDGET_MS,
   AUTH_FAILURE_COOLDOWN_MS,
@@ -120,6 +121,29 @@ describe('isKeyAuthError (401 = key-fatal, rotate instead of 502)', () => {
 });
 
 describe('isDailyQuotaExhaustedError + midnight benching (drift: 90s cooldown on a dead-for-the-day provider)', () => {
+  it.each([
+    ['2026-09-27T12:00:00Z', '2026-09-28T07:00:00Z'],
+    ['2026-01-27T12:00:00Z', '2026-01-28T08:00:00Z'],
+    ['2026-03-08T08:00:00Z', '2026-03-09T07:00:00Z'],
+    ['2026-11-01T07:00:00Z', '2026-11-02T08:00:00Z'],
+  ])('uses the Pacific reset from %s through DST', (now, reset) => {
+    expect(msUntilNextPacificMidnight(Date.parse(now))).toBe(Date.parse(reset) - Date.parse(now));
+  });
+
+  it('keeps a Gemini daily violation benched past a short RetryInfo delay', () => {
+    const err = Object.assign(new Error('Quota exceeded'), {
+      status: 429, dailyQuotaExhausted: true, retryAfterMs: 17_000,
+    });
+    expect(isDailyQuotaExhaustedError(err)).toBe(true);
+    const duration = cooldownForError(fakeRoute({ platform: 'google' }), err);
+    expect(Math.abs(duration - msUntilNextPacificMidnight())).toBeLessThan(1_000);
+  });
+
+  it('keeps a Gemini per-minute violation on the transient cooldown', () => {
+    const err = Object.assign(new Error('Quota exceeded'), { status: 429, dailyQuotaExhausted: false, retryAfterMs: 17_000 });
+    expect(cooldownForError(fakeRoute({ platform: 'google' }), err)).toBe(90_000);
+  });
+
   it('flags real daily-allocation 429 bodies', () => {
     expect(isDailyQuotaExhaustedError(new Error('Cloudflare API error 429: you have used up your daily free allocation of 10,000 neurons'))).toBe(true);
     expect(isDailyQuotaExhaustedError(new Error('Rate limit exceeded: free-models-per-day'))).toBe(true);

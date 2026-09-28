@@ -90,6 +90,36 @@ describe('GoogleProvider', () => {
     expect(await provider.validateKey('invalid-key')).toMatchObject({ valid: false });
   });
 
+  it.each([false, true])('preserves daily quota evidence with streaming=%s (#1339)', async (stream) => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ error: {
+      message: 'You exceeded your current quota.',
+      details: [
+        { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [
+          { quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' },
+          { quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' },
+        ] },
+        { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '17s' },
+      ],
+    } }), { status: 429 }));
+    const messages = [{ role: 'user' as const, content: 'Hi' }];
+    const request = stream
+      ? provider.streamChatCompletion('test-key', messages, 'gemini-2.5-pro').next()
+      : provider.chatCompletion('test-key', messages, 'gemini-2.5-pro');
+    await expect(request).rejects.toMatchObject({ status: 429, dailyQuotaExhausted: true, retryAfterMs: 17_000 });
+  });
+
+  it.each([
+    [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }] }],
+    [{ '@type': 'type.googleapis.com/google.rpc.Help', quotaId: 'PerDay' }],
+    [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: null }],
+  ])('does not invent daily exhaustion from other details (%j)', async (...details) => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ error: {
+      message: 'Quota exceeded', details,
+    } }), { status: 429 }));
+    await expect(provider.chatCompletion('test-key', [], 'gemini-2.5-pro'))
+      .rejects.toMatchObject({ dailyQuotaExhausted: false });
+  });
+
   // #268: Google reports a bad key as HTTP 400 INVALID_ARGUMENT / API_KEY_INVALID,
   // not 401/403. A confirmed-bad key must return false (→ auto-disable counter).
   it('validateKey returns false for a genuinely invalid key (HTTP 400 API_KEY_INVALID)', async () => {

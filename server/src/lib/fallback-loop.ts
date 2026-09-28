@@ -257,6 +257,25 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
   return Math.max(next - now, 60_000);
 }
 
+const pacificDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric',
+});
+const pacificHour = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', hour: 'numeric', hourCycle: 'h23',
+});
+
+/** Gemini daily quotas reset at midnight Pacific, including DST transitions.
+ * https://ai.google.dev/gemini-api/docs/rate-limits */
+export function msUntilNextPacificMidnight(now = Date.now()): number {
+  const parts = pacificDate.formatToParts(now);
+  const part = (name: string) => Number(parts.find(p => p.type === name)!.value);
+  // 08:00 UTC on the next Pacific date is either midnight (PST) or 01:00
+  // (PDT). Read the offset on that date, not now: DST days have 23/25 hours.
+  const candidate = Date.UTC(part('year'), part('month') - 1, part('day') + 1, 8);
+  const midnight = candidate - Number(pacificHour.format(candidate)) * 3_600_000;
+  return Math.max(midnight - now, 60_000);
+}
+
 /**
  * The one true cooldown-duration selection after a retryable upstream failure:
  *   - 402 out-of-credits  → a full day (PAYMENT_REQUIRED_COOLDOWN_MS)
@@ -271,6 +290,8 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
  *     provider Retry-After wins over the midnight heuristic: rolling daily
  *     windows (Groq RPD "try again in 7m12s" with a Retry-After header) reset
  *     well before midnight, and the provider knows its own reset time best.
+ *     Gemini daily violations instead wait until midnight Pacific; a shorter
+ *     RetryInfo can refer to a simultaneous per-minute violation.
  *   - anything else → the transient/daily escalation ladder, honoring the
  *     provider's Retry-After as a floor (getCooldownDurationForLimit).
  */
@@ -296,6 +317,11 @@ export function cooldownDecisionForError(route: RouteResult, err: any): Cooldown
   if (isAccountSuspendedError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
   if (isModelAccessForbiddenError(err)) return { durationMs: getModelForbiddenCooldownMs(), source: 'tier' };
   if (isDailyQuotaExhaustedError(err)) {
+    if (route.platform === 'google') {
+      // RetryInfo can describe a simultaneous per-minute violation. It cannot
+      // reopen a daily allowance before the Pacific reset (#1339).
+      return { durationMs: Math.max(msUntilNextPacificMidnight(), err?.retryAfterMs ?? 0), source: 'authoritative' };
+    }
     return { durationMs: err?.retryAfterMs ?? msUntilNextUtcMidnight(), source: 'authoritative' };
   }
   return getCooldownDecisionForLimit(

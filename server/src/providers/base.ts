@@ -19,6 +19,8 @@ import { extractThinkTagsFromStream } from '../lib/think-tags.js';
 export interface ProviderHttpError extends Error {
   status?: number;
   retryAfterMs?: number;
+  /** Explicit daily-window violation from structured upstream quota details. */
+  dailyQuotaExhausted?: boolean;
 }
 
 /** Upper bound on a provider-supplied back-off. A malformed or hostile

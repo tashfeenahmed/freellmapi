@@ -353,6 +353,7 @@ export function isKeyAuthError(err: any): boolean {
 // benches until the next UTC midnight instead. Requires BOTH a daily marker and
 // a quota/allocation marker so an ordinary per-minute 429 never matches.
 export function isDailyQuotaExhaustedError(err: any): boolean {
+  if (err?.dailyQuotaExhausted === true) return true;
   const msg = (err?.message ?? '').toLowerCase();
   if (!/daily|per[ -_]?day|\btoday\b/.test(msg)) return false;
   return /allocation|quota|limit|exhaust|used up/.test(msg);
