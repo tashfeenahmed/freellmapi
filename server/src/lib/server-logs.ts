@@ -54,6 +54,17 @@ export const MAX_MESSAGE_LENGTH = 6000;
 const TRUNCATION_SUFFIX = '… [truncated]';
 
 /**
+ * Ceiling on warn/error rows written per second. The table is pruned only on
+ * the request path, so an idle server has no retention at all; a log storm (a
+ * dead stdout feeding the safety net, a provider erroring in a tight loop) must
+ * not be able to grow it without bound. Lines over the cap still reach the live
+ * ring — only the row is skipped — and the next line after the window rolls
+ * writes one summary row saying how many were dropped.
+ */
+export const PERSIST_MAX_PER_SECOND = 50;
+const PERSIST_WINDOW_MS = 1000;
+
+/**
  * The viewer polls GET /api/logs every couple of seconds. If the deployment in
  * front of us emits access-log lines, those polls would be the loudest thing in
  * the buffer and every poll would manufacture the content of the next one.
@@ -108,6 +119,11 @@ let persisting = false;
 
 /** Reentrancy guard for the boot seed, for the same reason as `persisting`. */
 let seeding = false;
+
+/** Persist rate-cap window (see PERSIST_MAX_PER_SECOND). */
+let persistWindowStartMs = 0;
+let persistWindowCount = 0;
+let persistSuppressed = 0;
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
@@ -193,8 +209,39 @@ export function recordLogEntry(options: RecordLogOptions): ServerLogEntry | null
   if (requestId) entry.requestId = requestId;
 
   push(entry);
-  if (PERSISTED_LEVELS.has(entry.level)) persist(entry);
+  if (PERSISTED_LEVELS.has(entry.level)) persistCapped(entry);
   return entry;
+}
+
+function persistCapped(entry: ServerLogEntry): void {
+  if (entry.tsMs - persistWindowStartMs >= PERSIST_WINDOW_MS || entry.tsMs < persistWindowStartMs) {
+    const dropped = persistSuppressed;
+    persistWindowStartMs = entry.tsMs;
+    persistWindowCount = 0;
+    persistSuppressed = 0;
+    if (dropped > 0) {
+      const summary: ServerLogEntry = {
+        id: ++lastId,
+        tsMs: entry.tsMs,
+        level: 'warn',
+        source: 'server-logs',
+        message: `[server-logs] ${dropped} warn/error lines not persisted (over ${PERSIST_MAX_PER_SECOND}/s); they reached the live view only`,
+      };
+      // Keep ids increasing in arrival order: the summary takes the next id and
+      // the line that rolled the window is re-stamped after it.
+      entry.id = ++lastId;
+      ring.splice(ring.length - 1, 0, summary);
+      if (ring.length > RING_CAPACITY) ring.shift();
+      persist(summary);
+      persistWindowCount++;
+    }
+  }
+  if (persistWindowCount >= PERSIST_MAX_PER_SECOND) {
+    persistSuppressed++;
+    return;
+  }
+  persistWindowCount++;
+  persist(entry);
 }
 
 function push(entry: ServerLogEntry): void {
@@ -493,6 +540,9 @@ export function resetServerLogsForTest(): void {
   seeding = false;
   mirroring = false;
   persisting = false;
+  persistWindowStartMs = 0;
+  persistWindowCount = 0;
+  persistSuppressed = 0;
 }
 
 /** Test/introspection seam: the ring exactly as stored. */
