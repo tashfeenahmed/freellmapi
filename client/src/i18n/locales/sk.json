@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Mesačný limit tokenov",
     "capUnlimitedPlaceholder": "Neobmedzene",
     "capEditHint": "Limity sa resetujú 1. dňa o 00:00 UTC. Pre neobmedzene nechajte prázdne.",
-    "monthlyUsageLine": "{requests} požiadaviek, {tokens} tokenov tento mesiac",
-    "monthlyUsageResets": "Reset {date}"
+    "monthlyUsageLine": "{requests} požiadaviek, {tokens} tokenov tento mesiac"
   },
   "backups": {
     "title": "Backups",

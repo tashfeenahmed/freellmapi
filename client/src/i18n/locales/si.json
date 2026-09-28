@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "මාසික ටෝකන් සීමාව",
     "capUnlimitedPlaceholder": "සීමා රහිත",
     "capEditHint": "සීමාවන් සෑම මාසයකම 1 වන දා 00:00 UTC ට යළි සකසයි. සීමා රහිතට හිස්ව තබන්න.",
-    "monthlyUsageLine": "මෙම මාසය ඉල්ලීම් {requests}, ටෝකන් {tokens}",
-    "monthlyUsageResets": "යළි සැකසීම {date}"
+    "monthlyUsageLine": "මෙම මාසය ඉල්ලීම් {requests}, ටෝකන් {tokens}"
   },
   "backups": {
     "title": "Backups",

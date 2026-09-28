@@ -18,12 +18,11 @@ type UpdateBody = {
   monthlyTokenCap?: number
 }
 
-/** Parse a budget-cap input: empty means "no change" (null); otherwise a
- *  non-negative integer (0 clears the cap). Invalid → null so the field is
- *  simply not submitted. */
+/** Parse a budget-cap input: blank or 0 means unlimited (0); otherwise a
+ *  non-negative integer. Anything else is invalid (null). */
 function parseCap(raw: string): number | null {
   const trimmed = raw.trim()
-  if (!trimmed) return null
+  if (!trimmed) return 0
   if (!/^\d+$/.test(trimmed)) return null
   const n = Number(trimmed)
   return Number.isSafeInteger(n) ? n : null
@@ -68,8 +67,11 @@ export function EditKeyDialog({
     (accountId.trim() ? !apiKeyValue.trim() : Boolean(apiKeyValue.trim()))
     ? t('keys.editCredentialPartsRequired')
     : null
-  const requestCapChanged = parseCap(requestCap) !== (apiKey.monthlyRequestCap || 0) || requestCap.trim() !== capToInput(apiKey.monthlyRequestCap)
-  const tokenCapChanged = parseCap(tokenCap) !== (apiKey.monthlyTokenCap || 0) || tokenCap.trim() !== capToInput(apiKey.monthlyTokenCap)
+  const requestCapValue = parseCap(requestCap)
+  const tokenCapValue = parseCap(tokenCap)
+  const capError = requestCapValue === null || tokenCapValue === null
+  const requestCapChanged = requestCapValue !== (apiKey.monthlyRequestCap || 0)
+  const tokenCapChanged = tokenCapValue !== (apiKey.monthlyTokenCap || 0)
   const hasChanges = label !== apiKey.label || Boolean(credential) || requestCapChanged || tokenCapChanged
 
   const updateKey = useMutation({
@@ -83,7 +85,7 @@ export function EditKeyDialog({
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (credentialError) {
+    if (credentialError || capError) {
       setAttempted(true)
       return
     }
@@ -91,18 +93,8 @@ export function EditKeyDialog({
     const body: UpdateBody = {}
     if (label !== apiKey.label) body.label = label
     if (credential) body.key = credential
-    // Cap fields: an emptied field means "unlimited" (0); an unparsable
-    // value is not sent at all (the server would reject it anyway).
-    if (requestCap.trim() !== capToInput(apiKey.monthlyRequestCap)) {
-      const parsed = parseCap(requestCap)
-      if (parsed !== null) body.monthlyRequestCap = parsed
-      else if (!requestCap.trim()) body.monthlyRequestCap = 0
-    }
-    if (tokenCap.trim() !== capToInput(apiKey.monthlyTokenCap)) {
-      const parsed = parseCap(tokenCap)
-      if (parsed !== null) body.monthlyTokenCap = parsed
-      else if (!tokenCap.trim()) body.monthlyTokenCap = 0
-    }
+    if (requestCapChanged && requestCapValue !== null) body.monthlyRequestCap = requestCapValue
+    if (tokenCapChanged && tokenCapValue !== null) body.monthlyTokenCap = tokenCapValue
     if (Object.keys(body).length > 0) updateKey.mutate(body)
     else onOpenChange(false)
   }
@@ -181,48 +173,45 @@ export function EditKeyDialog({
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="edit-key-request-cap">{t('keys.monthlyRequestCapLabel')}</Label>
-              <Input
-                id="edit-key-request-cap"
-                inputMode="numeric"
-                value={requestCap}
-                onChange={e => setRequestCap(e.target.value)}
-                placeholder={t('keys.capUnlimitedPlaceholder')}
-                className="font-mono text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="edit-key-token-cap">{t('keys.monthlyTokenCapLabel')}</Label>
-              <Input
-                id="edit-key-token-cap"
-                inputMode="numeric"
-                value={tokenCap}
-                onChange={e => setTokenCap(e.target.value)}
-                placeholder={t('keys.capUnlimitedPlaceholder')}
-                className="font-mono text-xs"
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-            <span>
+          {/* Monthly budget (#1158) stays one collapsed line; it opens by
+              default only when a cap is already set, so a cap is never hidden. */}
+          <details className="group" open={Boolean(apiKey.monthlyRequestCap || apiKey.monthlyTokenCap) || undefined}>
+            <summary className="cursor-pointer select-none text-[11px] text-muted-foreground hover:text-foreground">
               {apiKey.monthlyUsage
                 ? t('keys.monthlyUsageLine', {
                     requests: apiKey.monthlyUsage.requests.toLocaleString(),
                     tokens: apiKey.monthlyUsage.tokens.toLocaleString(),
                   })
-                : null}
-            </span>
-            {apiKey.monthlyUsage?.resetsAt && (
-              <span>
-                {t('keys.monthlyUsageResets', {
-                  date: new Date(apiKey.monthlyUsage.resetsAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                })}
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-muted-foreground">{t('keys.capEditHint')}</p>
+                : t('keys.monthlyRequestCapLabel')}
+            </summary>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="edit-key-request-cap">{t('keys.monthlyRequestCapLabel')}</Label>
+                <Input
+                  id="edit-key-request-cap"
+                  inputMode="numeric"
+                  value={requestCap}
+                  onChange={e => setRequestCap(e.target.value)}
+                  placeholder={t('keys.capUnlimitedPlaceholder')}
+                  className="font-mono text-xs"
+                  aria-invalid={attempted && requestCapValue === null}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="edit-key-token-cap">{t('keys.monthlyTokenCapLabel')}</Label>
+                <Input
+                  id="edit-key-token-cap"
+                  inputMode="numeric"
+                  value={tokenCap}
+                  onChange={e => setTokenCap(e.target.value)}
+                  placeholder={t('keys.capUnlimitedPlaceholder')}
+                  className="font-mono text-xs"
+                  aria-invalid={attempted && tokenCapValue === null}
+                />
+              </div>
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">{t('keys.capEditHint')}</p>
+          </details>
 
           {updateKey.isError && (
             <p className="text-xs text-destructive">{(updateKey.error as Error).message}</p>

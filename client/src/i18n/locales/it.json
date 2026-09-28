@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Limite mensile di token",
     "capUnlimitedPlaceholder": "Illimitato",
     "capEditHint": "I limiti si azzerano il 1 del mese alle 00:00 UTC. Lascia vuoto per illimitato.",
-    "monthlyUsageLine": "{requests} richieste, {tokens} token questo mese",
-    "monthlyUsageResets": "Ripristino il {date}"
+    "monthlyUsageLine": "{requests} richieste, {tokens} token questo mese"
   },
   "backups": {
     "title": "Backups",

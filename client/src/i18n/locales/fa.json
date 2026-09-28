@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "سقف ماهانه توکن‌ها",
     "capUnlimitedPlaceholder": "نامحدود",
     "capEditHint": "سقف‌ها در اول هر ماه ساعت ۰۰:۰۰ UTC بازنشانی می‌شوند. برای نامحدود خالی بگذارید.",
-    "monthlyUsageLine": "{requests} درخواست، {tokens} توکن در این ماه",
-    "monthlyUsageResets": "بازنشانی {date}"
+    "monthlyUsageLine": "{requests} درخواست، {tokens} توکن در این ماه"
   },
   "backups": {
     "title": "Backups",

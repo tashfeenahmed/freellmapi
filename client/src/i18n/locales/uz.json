@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Oylik token chegarasi",
     "capUnlimitedPlaceholder": "Cheksiz",
     "capEditHint": "Chegaralar har oyning 1-sana 00:00 UTC da tiklanadi. Cheksiz uchun bo‘sh qoldiring.",
-    "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token",
-    "monthlyUsageResets": "Tiklanish {date}"
+    "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token"
   },
   "backups": {
     "title": "Backups",

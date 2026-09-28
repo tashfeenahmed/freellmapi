@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Месячный лимит токенов",
     "capUnlimitedPlaceholder": "Без ограничений",
     "capEditHint": "Лимиты сбрасываются 1-го числа в 00:00 UTC. Оставьте пустым для безлимита.",
-    "monthlyUsageLine": "{requests} запросов, {tokens} токенов в этом месяце",
-    "monthlyUsageResets": "Сброс {date}"
+    "monthlyUsageLine": "{requests} запросов, {tokens} токенов в этом месяце"
   },
   "backups": {
     "title": "Backups",

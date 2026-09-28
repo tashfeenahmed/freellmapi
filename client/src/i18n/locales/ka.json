@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "თვიური ტოკენების ლიმიტი",
     "capUnlimitedPlaceholder": "შეუზღუდავი",
     "capEditHint": "ლიმიტები სათითაო თვის 1-ს 00:00 UTC აღდგება. დატოვეთ ცარიელი შეუზღუდავისთვის.",
-    "monthlyUsageLine": "ამ თვეში {requests} მოთხოვნა, {tokens} ტოკენი",
-    "monthlyUsageResets": "აღდგენა {date}"
+    "monthlyUsageLine": "ამ თვეში {requests} მოთხოვნა, {tokens} ტოკენი"
   },
   "backups": {
     "title": "Backups",

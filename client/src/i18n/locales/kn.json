@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "ಮಾಸಿಕ ಟೋಕನ್ ಮಿತಿ",
     "capUnlimitedPlaceholder": "ಅಪರಿಮಿತ",
     "capEditHint": "ಮಿತಿಗಳು ಪ್ರತಿ ತಿಂಗಳು 1 ರಂದು 00:00 UTC ನಲ್ಲಿ ಮರುಹೊಂದಿಸುತ್ತವೆ. ಅಪರಿಮಿತಕ್ಕೆ ಖಾಲಿ ಬಿಡಿ.",
-    "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು",
-    "monthlyUsageResets": "ಮರುಹೊಂದಿಸುವಿಕೆ {date}"
+    "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು"
   },
   "backups": {
     "title": "Backups",

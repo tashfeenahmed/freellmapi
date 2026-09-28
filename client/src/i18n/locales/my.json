@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "လစဉ်တိုကင်အကန့်အသတ်",
     "capUnlimitedPlaceholder": "အကန့်အသတ်မရှိ",
     "capEditHint": "အကန့်အသတ်များကို လ၏ ပထမရက် ၀၀:၀၀ UTC တွင် ပြန်ချမှတ်သည်။ မရှိလိုပါက ဗလာထားပါ။",
-    "monthlyUsageLine": "ယခုလ တောင်းဆိုမှု {requests}၊ တိုကင် {tokens}",
-    "monthlyUsageResets": "ပြန်ချမှတ်မည် {date}"
+    "monthlyUsageLine": "ယခုလ တောင်းဆိုမှု {requests}၊ တိုကင် {tokens}"
   },
   "backups": {
     "title": "Backups",

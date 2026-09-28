@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Mjesečno ograničenje tokena",
     "capUnlimitedPlaceholder": "Neograničeno",
     "capEditHint": "Ograničenja se resetiraju 1. u 00:00 UTC. Ostavite prazno za neograničeno.",
-    "monthlyUsageLine": "{requests} zahtjeva, {tokens} tokena ovaj mjesec",
-    "monthlyUsageResets": "Reset {date}"
+    "monthlyUsageLine": "{requests} zahtjeva, {tokens} tokena ovaj mjesec"
   },
   "backups": {
     "title": "Backups",

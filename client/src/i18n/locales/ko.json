@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "월 토큰 한도",
     "capUnlimitedPlaceholder": "무제한",
     "capEditHint": "한도는 매월 1일 00:00 UTC에 초기화됩니다. 무제한이려면 비워 두세요.",
-    "monthlyUsageLine": "이번 달 요청 {requests}회, 토큰 {tokens}",
-    "monthlyUsageResets": "초기화 {date}"
+    "monthlyUsageLine": "이번 달 요청 {requests}회, 토큰 {tokens}"
   },
   "backups": {
     "title": "Backups",

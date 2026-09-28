@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Had token bulanan",
     "capUnlimitedPlaceholder": "Tanpa had",
     "capEditHint": "Had diset semula pada 1 haribulan 00:00 UTC. Biarkan kosong untuk tanpa had.",
-    "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini",
-    "monthlyUsageResets": "Set semula {date}"
+    "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini"
   },
   "backups": {
     "title": "Backups",

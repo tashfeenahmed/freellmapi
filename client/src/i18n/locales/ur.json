@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "ماہانہ ٹوکن کی حد",
     "capUnlimitedPlaceholder": "لامحدود",
     "capEditHint": "حدیں ہر مہینے کی 1 تاریخ کو 00:00 UTC پر ری سیٹ ہوتی ہیں۔ لامحدود کے لیے خالی چھوڑیں۔",
-    "monthlyUsageLine": "اس مہینے {requests} درخواستیں، {tokens} ٹوکن",
-    "monthlyUsageResets": "ری سیٹ {date}"
+    "monthlyUsageLine": "اس مہینے {requests} درخواستیں، {tokens} ٹوکن"
   },
   "backups": {
     "title": "Backups",

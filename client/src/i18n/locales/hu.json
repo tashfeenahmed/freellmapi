@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Havi token keret",
     "capUnlimitedPlaceholder": "Korlátlan",
     "capEditHint": "A keretek havonta 1-jén 00:00 UTC-kor nullázódnak. Korlátlanhoz hagyja üresen.",
-    "monthlyUsageLine": "{requests} kérés, {tokens} token ebben a hónapban",
-    "monthlyUsageResets": "Nullázás: {date}"
+    "monthlyUsageLine": "{requests} kérés, {tokens} token ebben a hónapban"
   },
   "backups": {
     "title": "Backups",

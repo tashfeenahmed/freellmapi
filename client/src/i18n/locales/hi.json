@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "मासिक टोकन सीमा",
     "capUnlimitedPlaceholder": "असीमित",
     "capEditHint": "सीमाएँ हर महीने की 1 तारीख़ को 00:00 UTC पर रीसेट होती हैं। असीमित के लिए खाली छोड़ें।",
-    "monthlyUsageLine": "इस माह {requests} अनुरोध, {tokens} टोकन",
-    "monthlyUsageResets": "{date} पर रीसेट"
+    "monthlyUsageLine": "इस माह {requests} अनुरोध, {tokens} टोकन"
   },
   "backups": {
     "title": "Backups",

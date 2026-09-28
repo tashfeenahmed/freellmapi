@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "מכסת טוקנים חודשית",
     "capUnlimitedPlaceholder": "ללא הגבלה",
     "capEditHint": "המכסות מתאפסות ב-1 בחודש ב-00:00 UTC. השאירו ריק כדי להישאר ללא הגבלה.",
-    "monthlyUsageLine": "{requests} בקשות, {tokens} טוקנים החודש",
-    "monthlyUsageResets": "איפוס {date}"
+    "monthlyUsageLine": "{requests} בקשות, {tokens} טוקנים החודש"
   },
   "backups": {
     "title": "Backups",

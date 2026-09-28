@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Μηνιαίο όριο tokens",
     "capUnlimitedPlaceholder": "Απεριόριστο",
     "capEditHint": "Τα όρια μηδενίζονται την 1η στις 00:00 UTC. Αφήστε κενό για απεριόριστο.",
-    "monthlyUsageLine": "{requests} αιτήματα, {tokens} tokens αυτόν τον μήνα",
-    "monthlyUsageResets": "Επαναφορά {date}"
+    "monthlyUsageLine": "{requests} αιτήματα, {tokens} tokens αυτόν τον μήνα"
   },
   "backups": {
     "title": "Backups",

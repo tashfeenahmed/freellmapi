@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Månadslimit för tokens",
     "capUnlimitedPlaceholder": "Obegränsat",
     "capEditHint": "Gränserna nollställs den 1:a kl 00:00 UTC. Lämna tomt för obegränsat.",
-    "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad",
-    "monthlyUsageResets": "Nollställs {date}"
+    "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad"
   },
   "backups": {
     "title": "Backups",

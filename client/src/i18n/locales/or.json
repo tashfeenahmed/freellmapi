@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "ମାସିକ ଟୋକେନ୍ ସୀମା",
     "capUnlimitedPlaceholder": "ଅସୀମିତ",
     "capEditHint": "ସୀମା ପ୍ରତି ମାସର ୧ ତାରିଖରେ ୦୦:୦୦ UTC ରେ ରିସେଟ୍ ହୁଏ। ଅସୀମିତ ପାଇଁ ଖାଲି ରଖନ୍ତୁ।",
-    "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍",
-    "monthlyUsageResets": "ରିସେଟ୍ {date}"
+    "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍"
   },
   "backups": {
     "title": "Backups",

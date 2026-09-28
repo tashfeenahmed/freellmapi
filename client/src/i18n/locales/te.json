@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "నెలవారీ టోకెన్ పరిమితి",
     "capUnlimitedPlaceholder": "అపరిమితం",
     "capEditHint": "ప్రతి నెలా 1వ తేదీన 00:00 UTCకు పరిమితులు రీసెట్ అవుతాయి. అపరిమితంగా కావాలంటే ఖాళీగా వదిలండి.",
-    "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు",
-    "monthlyUsageResets": "రీసెట్ {date}"
+    "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు"
   },
   "backups": {
     "title": "Backups",

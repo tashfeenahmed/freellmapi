@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Limită lunară de tokeni",
     "capUnlimitedPlaceholder": "Nelimitat",
     "capEditHint": "Limitele se resetează în ziua 1 la 00:00 UTC. Lasă gol pentru nelimitat.",
-    "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta",
-    "monthlyUsageResets": "Resetare {date}"
+    "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta"
   },
   "backups": {
     "title": "Backups",

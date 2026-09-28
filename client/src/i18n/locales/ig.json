@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Oke token ọnwa",
     "capUnlimitedPlaceholder": "Enweghị oke",
     "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
-    "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
-    "monthlyUsageResets": "Mbugharị {date}"
+    "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a"
   },
   "backups": {
     "title": "Backups",

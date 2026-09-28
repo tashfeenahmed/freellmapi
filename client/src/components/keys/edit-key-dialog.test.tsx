@@ -96,10 +96,25 @@ describe('editing provider credentials', () => {
       onOpenChange={onOpenChange}
     />)
     expect(container.textContent).toContain('42 requests')
-    expect(container.textContent).toContain('1234 tokens')
+    expect(container.textContent).toContain(`${(1234).toLocaleString()} tokens`)
     await submit()
     expect(apiFetch).not.toHaveBeenCalled()
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+  it('keeps the budget collapsed when no cap is set', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 0, monthlyTokenCap: 0 }} onOpenChange={onOpenChange} />)
+    expect(document.querySelector('details')!.open).toBe(false)
+  })
+  it('opens the budget when a cap is already set', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 50 }} onOpenChange={onOpenChange} />)
+    expect(document.querySelector('details')!.open).toBe(true)
+  })
+  it('does not submit a non-numeric cap', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq' }} onOpenChange={onOpenChange} />)
+    enter('#edit-key-request-cap', '10k')
+    await submit()
+    expect(apiFetch).not.toHaveBeenCalled()
+    expect(container.querySelector('#edit-key-request-cap')!.getAttribute('aria-invalid')).toBe('true')
   })
   it('loads model choices from the full catalog instead of a limited active chain', async () => {
     vi.mocked(apiFetch).mockImplementation(async path => path === '/api/models'

@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Plafond mensuel de jetons",
     "capUnlimitedPlaceholder": "Illimité",
     "capEditHint": "Les plafonds sont réinitialisés le 1er à 00:00 UTC. Laissez vide pour illimité.",
-    "monthlyUsageLine": "{requests} requêtes, {tokens} jetons ce mois",
-    "monthlyUsageResets": "Réinitialisation le {date}"
+    "monthlyUsageLine": "{requests} requêtes, {tokens} jetons ce mois"
   },
   "backups": {
     "title": "Sauvegardes",

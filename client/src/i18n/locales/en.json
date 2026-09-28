@@ -684,8 +684,7 @@
     "monthlyTokenCapLabel": "Monthly token cap",
     "capUnlimitedPlaceholder": "Unlimited",
     "capEditHint": "Caps reset on the 1st, 00:00 UTC. Leave blank for unlimited.",
-    "monthlyUsageLine": "{requests} requests, {tokens} tokens this month",
-    "monthlyUsageResets": "Resets {date}"
+    "monthlyUsageLine": "{requests} requests, {tokens} tokens this month"
   },
   "backups": {
     "title": "Backups",
