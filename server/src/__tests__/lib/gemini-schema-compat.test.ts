@@ -252,3 +252,79 @@ describe('sanitizeForGemini vendor extensions and pass-through', () => {
     expect(JSON.stringify(sanitizeForGemini(input))).toBe(JSON.stringify(input));
   });
 });
+
+describe('sanitizeForGemini items shapes (#1334)', () => {
+  // Gemini requires `items` on every ARRAY ("…items: missing field" otherwise)
+  // and rejects a list-valued `items`; `items: {}` and `items: { anyOf }` are
+  // accepted. Shapes below were checked against the live API.
+  it('reproduces #1334: a nested array whose tuple lived in prefixItems gets items', () => {
+    const out = sanitizeForGemini({
+      type: 'object',
+      properties: {
+        query: {
+          type: 'object',
+          properties: {
+            where: {
+              type: 'array',
+              items: { type: 'array', prefixItems: [{ type: 'string' }, { type: 'string' }, {}] },
+            },
+          },
+        },
+      },
+    }) as any;
+    expect(out.properties.query.properties.where).toEqual({ type: 'array', items: { type: 'array', items: {} } });
+  });
+
+  it('turns prefixItems into an anyOf over its members', () => {
+    const out = sanitizeForGemini({
+      type: 'array',
+      prefixItems: [{ type: 'string' }, { type: 'integer' }],
+    }) as Record<string, unknown>;
+    expect(out.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'integer' }] });
+  });
+
+  it('collapses a tuple items array into anyOf over its members', () => {
+    const out = sanitizeForGemini({
+      type: 'array',
+      items: [{ type: 'string' }, { type: 'integer' }],
+    }) as Record<string, unknown>;
+    expect(out.items).toEqual({ anyOf: [{ type: 'string' }, { type: 'integer' }] });
+  });
+
+  it('unwraps a single-member tuple and keeps its keywords', () => {
+    const out = sanitizeForGemini({
+      type: 'array',
+      items: [{ type: 'string', enum: ['a', 'b'] }],
+    }) as Record<string, unknown>;
+    expect(out.items).toEqual({ type: 'string', enum: ['a', 'b'] });
+  });
+
+  it('adds items: {} to an array that has none', () => {
+    expect(sanitizeForGemini({ type: 'array' })).toEqual({ type: 'array', items: {} });
+    expect(sanitizeForGemini({ type: ['array', 'null'] })).toEqual({ type: 'array', nullable: true, items: {} });
+  });
+
+  it('keeps an empty items object instead of dropping it', () => {
+    expect(sanitizeForGemini({ type: 'array', items: {} })).toEqual({ type: 'array', items: {} });
+  });
+
+  it('maps boolean, null and schema-less tuple items to items: {}', () => {
+    expect(sanitizeForGemini({ type: 'array', items: true })).toEqual({ type: 'array', items: {} });
+    expect(sanitizeForGemini({ type: 'array', items: null })).toEqual({ type: 'array', items: {} });
+    expect(sanitizeForGemini({ type: 'array', items: [{ type: 'string' }, true] })).toEqual({ type: 'array', items: {} });
+  });
+
+  it('does not treat parameters named items or type as keywords', () => {
+    const input = { type: 'object', properties: { items: { type: 'string' }, type: { type: 'string' } } };
+    expect(sanitizeForGemini(input)).toEqual(input);
+  });
+
+  it('leaves non-array schemas without items alone', () => {
+    expect(sanitizeForGemini({ type: 'string' })).toEqual({ type: 'string' });
+  });
+
+  it('keeps a normal single-schema items untouched', () => {
+    const input = { type: 'array', items: { type: 'string', description: 'tag' } };
+    expect(JSON.stringify(sanitizeForGemini(input))).toBe(JSON.stringify(input));
+  });
+});

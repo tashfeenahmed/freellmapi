@@ -66,6 +66,14 @@ function isLockedOut(email: string): boolean {
   const a = attempts.get(throttleKey(email));
   return !!a && a.lockedUntil > Date.now();
 }
+// Seconds until the per-email lockout lifts (0 when not locked). The 429
+// carries this as Retry-After so a client (or a scripted login retry loop)
+// backs off for the ACTUAL remaining time instead of the worst-case 15 min.
+function lockoutRetryAfterSec(email: string, now = Date.now()): number {
+  const a = attempts.get(throttleKey(email));
+  if (!a || a.lockedUntil <= now) return 0;
+  return Math.max(1, Math.ceil((a.lockedUntil - now) / 1000));
+}
 function recordFailure(email: string): void {
   const key = throttleKey(email);
   const a = attempts.get(key) ?? { count: 0, lockedUntil: 0 };
@@ -176,6 +184,10 @@ authRouter.post('/login', (req: Request, res: Response) => {
   const { email, password } = parsed.data;
 
   if (isLockedOut(email)) {
+    // RFC 6585: a 429 must say when the client may return. The whole gateway
+    // already does this (proxy limiter, exhaustion Retry-After, monthly budget
+    // cap); the dashboard's own lockout was the one 429 that didn't.
+    res.setHeader('Retry-After', String(lockoutRetryAfterSec(email)));
     res.status(429).json({ error: { message: 'Too many attempts. Wait 15 minutes or restart the app.', type: 'rate_limit_error' } });
     return;
   }
@@ -294,6 +306,7 @@ authRouter.post('/forgot-password', (_req: Request, res: Response) => {
   }
   const now = Date.now();
   if (now - lastResetCodeAt < RESET_CODE_MIN_INTERVAL_MS) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((RESET_CODE_MIN_INTERVAL_MS - (now - lastResetCodeAt)) / 1000))));
     res.status(429).json({ error: { message: 'Too many reset-code requests. Try again later.', type: 'rate_limit_error' } });
     return;
   }

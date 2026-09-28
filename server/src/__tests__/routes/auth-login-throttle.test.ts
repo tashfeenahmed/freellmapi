@@ -69,6 +69,21 @@ describe('login brute-force throttling', () => {
   // brute force as the reason. Express runs middleware in registration order,
   // so the limiter has to be registered before the /api/auth mount or the
   // login route answers and ends the response before the limiter is entered.
+  // RFC 6585: a 429 must carry Retry-After. The gateway's other 429s (proxy
+  // limiter, key exhaustion, monthly budget) all do; the per-email lockout
+  // was the one that told the client nothing about when to come back.
+  it('lockout 429 carries a Retry-After within the 15-minute window', async () => {
+    const EMAIL2 = 'retry-after@example.com';
+    for (let i = 0; i < 5; i++) {
+      expect((await login(EMAIL2, `wrong-${i}`)).status).toBe(401);
+    }
+    const locked = await login(EMAIL2, 'wrong');
+    expect(locked.status).toBe(429);
+    const retryAfter = Number(locked.headers.get('retry-after'));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(15 * 60);
+  });
+
   it('routes login through the per-IP admin limiter', async () => {
     // A fresh address, so the lockout the previous test armed (the bucket map
     // is module state and outlives the DB reset) cannot mask the header check.
