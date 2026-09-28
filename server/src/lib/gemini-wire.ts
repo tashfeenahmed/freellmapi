@@ -189,39 +189,52 @@ function sanitizeSchema(schema: unknown, insidePropertiesMap: boolean, ctx: Sani
   // Keywords written alongside a `$ref` (description, overrides) win over the
   // definition they point at.
   const merged = inlined ? { ...inlined, ...out } : out;
-  // Gemini's Schema proto models `items` as a single Schema message, so a JSON
-  // Schema array tuple (`items: [...]`) or a keyword-shaped leftover survives
-  // sanitization as a struct the proto validator rejects with
-  // "…items.items: missing field" (#1334 — Claude Code sends tuple arrays in
-  // tool schemas). Collapse a tuple to the union of its member schemas; drop
-  // `items` entirely when nothing concrete survives, since an empty or
-  // non-Schema `items` object is exactly the shape that 400s, while an
-  // omitted `items` is valid (unconstrained element type).
-  if ('items' in merged) {
-    const items = merged.items;
-    if (Array.isArray(items)) {
-      const branches = items
-        .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && !Array.isArray(entry))
-        .map(entry => {
-          const { minItems: _m, maxItems: _x, uniqueItems: _u, ...rest } = entry;
-          // An entry that sanitized to nothing cannot be a Schema proto either.
-          return Object.keys(rest).length > 0 ? rest : null;
-        })
-        .filter((entry): entry is Record<string, unknown> => entry !== null);
-      if (branches.length === 1) merged.items = branches[0];
-      else if (branches.length > 1) merged.items = { anyOf: branches };
-      else delete merged.items;
-    } else if (items && typeof items === 'object') {
-      const keys = Object.keys(items as Record<string, unknown>);
-      if (keys.length === 0) delete merged.items;
-    } else if (items == null) {
-      delete merged.items;
+  // A `properties` map is keyed by parameter names, not keywords; a tool
+  // param literally named `items` or `type` must not be read as a schema.
+  if (insidePropertiesMap) return merged;
+  return normalizeArrayItems(merged, schema as Record<string, unknown>, ctx);
+}
+
+// Gemini's Schema proto models `items` as a single Schema message and requires
+// it on every ARRAY: an array without `items` 400s with "…items: missing
+// field" (#1334 — Claude Code's nested tuple params lose their element schema
+// once `prefixItems` is stripped), and a JSON Schema tuple (`items: [...]`)
+// 400s with "Proto field is not repeating". Tuples become an `anyOf` over their
+// members, and an array with no usable element schema gets `items: {}`, which
+// Gemini accepts as "any element" (both verified against the live API).
+function normalizeArrayItems(
+  merged: Record<string, unknown>,
+  source: Record<string, unknown>,
+  ctx: SanitizeContext,
+): Record<string, unknown> {
+  const members: unknown[] = [];
+  if (Array.isArray(source.prefixItems)) {
+    members.push(...(sanitizeSchema(source.prefixItems, false, ctx) as unknown[]));
+  }
+  let single: Record<string, unknown> | undefined;
+  if (Array.isArray(merged.items)) members.push(...merged.items);
+  else if (isSchemaObject(merged.items)) single = merged.items;
+
+  if (members.length > 0) {
+    const branches = [...members, ...(single ? [single] : [])];
+    if (branches.every(isSchemaObject) && branches.every(b => Object.keys(b).length > 0)) {
+      merged.items = branches.length === 1 ? branches[0] : { anyOf: branches };
     } else {
-      // `items: true` (or any non-object) is JSON Schema but not a Schema proto.
-      delete merged.items;
+      // A boolean/empty member accepts anything, so the union does too.
+      merged.items = {};
     }
+  } else if (single === undefined && ('items' in merged || isArrayType(merged.type))) {
+    merged.items = {};
   }
   return merged;
+}
+
+function isSchemaObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isArrayType(type: unknown): boolean {
+  return typeof type === 'string' && type.toLowerCase() === 'array';
 }
 
 function serializeResponse(value: unknown): string {
