@@ -18,6 +18,7 @@ import { contentToString, stripImagesFromMessages } from '../lib/content.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { getSetting, setSetting } from '../db/index.js';
 import type { CompletionOptions } from '../providers/base.js';
+import { routeOutputBudget } from '../lib/output-cap.js';
 
 // The virtual model id that triggers multi-model synthesis. Mirrors how
 // `auto` is a virtual id the router intercepts (see routes/proxy.ts).
@@ -275,9 +276,7 @@ async function runModelCall(
     if (!route) break;
 
     const startedAt = Date.now();
-    const routeOpts = route.contextWindow != null
-      ? { ...options, contextBudget: route.contextWindow - estimatedTokens }
-      : options;
+    const routeOpts = { ...options, contextBudget: routeOutputBudget(route, estimatedTokens) };
     try {
       const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, routeOpts);
       const choice = result.choices?.[0];
@@ -366,9 +365,7 @@ async function runJudgeStreaming(
     if (!route) break;
 
     const startedAt = Date.now();
-    const routeOpts = route.contextWindow != null
-      ? { ...options, contextBudget: route.contextWindow - estimatedTokens }
-      : options;
+    const routeOpts = { ...options, contextBudget: routeOutputBudget(route, estimatedTokens) };
     let text = '';
     let started = false;
     try {

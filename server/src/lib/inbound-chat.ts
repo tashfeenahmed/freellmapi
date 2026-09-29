@@ -32,6 +32,7 @@ import {
 import { routedViaValue } from './header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from './guardrails.js';
 import { contentToString, estimateInputTokens } from './content.js';
+import { routeOutputBudget } from './output-cap.js';
 import { normalizeMessageImages } from './image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from './tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from './tool-validate.js';
@@ -254,7 +255,7 @@ export async function runInboundChat(
           route.apiKey,
           input.messages,
           route.modelId,
-          options,
+          { ...options, contextBudget: routeOutputBudget(route, estimatedInputTokens) },
         );
         const message = result.choices?.[0]?.message;
         let text = contentToString(message?.content ?? '');
@@ -381,7 +382,7 @@ export async function runInboundChat(
           route.apiKey,
           input.messages,
           route.modelId,
-          options,
+          { ...options, contextBudget: routeOutputBudget(route, estimatedInputTokens) },
         );
         for await (const chunk of stream) {
           if (clientGone) break;
