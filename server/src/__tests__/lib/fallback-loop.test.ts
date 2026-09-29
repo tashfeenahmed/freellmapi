@@ -156,6 +156,23 @@ describe('isDailyQuotaExhaustedError + midnight benching (drift: 90s cooldown on
     expect(isDailyQuotaExhaustedError(new Error('503 Service Unavailable'))).toBe(false);
   });
 
+  // Live Groq bodies (2026-09-29): every limit error ends with the same
+  // "Upgrade to Dev Tier today" upsell, which used to read as a daily marker.
+  const GROQ_UPSELL = 'Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing';
+
+  it('does not read Groq\'s "Upgrade to Dev Tier today" upsell as a daily quota', () => {
+    const tooLarge = Object.assign(new Error(`Groq API error 413: Request too large for model \`openai/gpt-oss-20b\` in organization \`org_x\` service tier \`on_demand\` on tokens per minute (TPM): Limit 8000, Requested 12122, please reduce your message size and try again. ${GROQ_UPSELL}`), { status: 413 });
+    const perMinute = Object.assign(new Error(`Groq API error 429: Rate limit reached for model \`openai/gpt-oss-120b\` in organization \`org_x\` service tier \`on_demand\` on tokens per minute (TPM): Limit 8000, Used 6000, Requested 4000. Please try again in 15s. ${GROQ_UPSELL}`), { status: 429 });
+    expect(isDailyQuotaExhaustedError(tooLarge)).toBe(false);
+    expect(classifyAttemptError(tooLarge)).toBe('context_too_large');
+    expect(isDailyQuotaExhaustedError(perMinute)).toBe(false);
+  });
+
+  it('still flags a Groq requests-per-day 429 that carries the upsell', () => {
+    const perDay = Object.assign(new Error(`Groq API error 429: Rate limit reached for model \`llama-3.3-70b-versatile\` in organization \`org_x\` service tier \`on_demand\` on requests per day (RPD): Limit 1000, Used 1000, Requested 1. Please try again in 1m26s. Need more requests? Upgrade to Dev Tier today at https://console.groq.com/settings/billing`), { status: 429 });
+    expect(isDailyQuotaExhaustedError(perDay)).toBe(true);
+  });
+
   it('cooldownForError benches a daily-allocation 429 until the next UTC midnight', () => {
     const route = fakeRoute();
     const err = Object.assign(new Error('you have used up your daily free allocation of 10,000 neurons'), { status: 429 });

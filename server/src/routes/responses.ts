@@ -13,7 +13,7 @@ import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStick
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { contentToString, messageHasImage } from '../lib/content.js';
+import { contentToString, estimateInputTokens, messageHasImage } from '../lib/content.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -725,10 +725,7 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
   // bytes (see lib/image-normalize.ts). Mutates the image blocks in place.
   await normalizeMessageImages(messages);
 
-  const estimatedInputTokens = messages.reduce(
-    (sum, m) => sum + Math.ceil(contentToString(m.content).length / 4),
-    0,
-  );
+  const estimatedInputTokens = estimateInputTokens(messages, tools);
 
   // Image requests must route to a vision-capable model (mirrors
   // /chat/completions, proxy.ts). Reject up front with a clear message when

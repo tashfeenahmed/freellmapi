@@ -352,9 +352,17 @@ export function isKeyAuthError(err: any): boolean {
 // makes the router re-pick a dead-for-the-day provider all day, so the caller
 // benches until the next UTC midnight instead. Requires BOTH a daily marker and
 // a quota/allocation marker so an ordinary per-minute 429 never matches.
+//
+// Groq ends every limit error, per-minute and request-too-large alike, with
+// "Need more tokens? Upgrade to Dev Tier today at …". That "today" is sales
+// copy, not a window, so it is cut before looking for a daily marker; and a
+// request too big for the model is never a spent allowance.
+const UPGRADE_UPSELL = /\bupgrade to [^.?!]*?\btoday\b/g;
+
 export function isDailyQuotaExhaustedError(err: any): boolean {
   if (err?.dailyQuotaExhausted === true) return true;
-  const msg = (err?.message ?? '').toLowerCase();
+  if (isContextTooLargeError(err)) return false;
+  const msg = (err?.message ?? '').toLowerCase().replace(UPGRADE_UPSELL, '');
   if (!/daily|per[ -_]?day|\btoday\b/.test(msg)) return false;
   return /allocation|quota|limit|exhaust|used up/.test(msg);
 }

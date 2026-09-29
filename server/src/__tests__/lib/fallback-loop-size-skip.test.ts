@@ -18,7 +18,7 @@ import {
   recordRetryableFailure,
   resetModelFailureWindows,
 } from '../../lib/fallback-loop.js';
-import { resetKeyLocalityCache } from '../../services/ratelimit.js';
+import { isOnCooldown, resetKeyLocalityCache } from '../../services/ratelimit.js';
 import {
   setRoutingStrategy,
   clearAllPenalties,
@@ -234,5 +234,21 @@ describe('FallbackState.observedTotalTokens (#507)', () => {
     const localEstimate = 3700;
     const routingTotal = Math.max(localEstimate, state.observedTotalTokens ?? 0);
     expect(routingTotal).toBe(localEstimate);
+  });
+});
+
+describe('request-too-large failures', () => {
+  it('skip the model for this request without benching it for smaller ones', () => {
+    // An oversized agent turn says nothing about the model's health; a
+    // cooldown here made the next ordinary request find the pool rate limited.
+    // A key of its own: earlier cases leave in-memory cooldowns on `keyId`.
+    const freshKey = insertKey('size-no-bench');
+    resetKeyLocalityCache();
+    const state = newFallbackState();
+    const err = Object.assign(new Error('Groq API error 413: Request too large for model `x` on tokens per minute (TPM): Limit 8000, Requested 17679, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing'), { status: 413 });
+    recordRetryableFailure(routeFor(modelSmall, freshKey), err, state);
+    expect(state.skipModels.has(modelSmall.id)).toBe(true);
+    expect(state.observedTotalTokens).toBe(17679);
+    expect(isOnCooldown(PLATFORM, modelSmall.model_id, freshKey)).toBe(false);
   });
 });

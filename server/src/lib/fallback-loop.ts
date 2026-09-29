@@ -499,6 +499,16 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
   }
+  // Too big for this model is a fact about the REQUEST, not the model's
+  // health: it still serves every smaller request. Skip it for this request
+  // (above) and learn the reported ceiling so the router sizes it out next
+  // time, but no cooldown and no penalty. Benching it let one oversized agent
+  // turn (Claude Code ships ~16k tokens of tool schemas) sink every small-TPM
+  // model it touched, so later ordinary requests found the pool rate limited.
+  if (isContextTooLargeError(err)) {
+    learnLimitFromError(route.modelDbId, err);
+    return false;
+  }
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);

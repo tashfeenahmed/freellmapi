@@ -11,7 +11,7 @@ import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, Me
 import multer from 'multer';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
-import { contentToString, messageHasImage, normalizeOutboundContent, sanitizeResponse, truncateMessagesForGithub } from '../lib/content.js';
+import { contentToString, estimateInputTokens, messageHasImage, normalizeOutboundContent, sanitizeResponse, truncateMessagesForGithub } from '../lib/content.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -1629,10 +1629,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Non-streaming requests reconcile against the provider's real `usage` block;
   // streaming does the same when stream_options.include_usage produces a final
   // usage frame, and otherwise falls back to this estimate.
-  const estimatedInputTokens = messages.reduce((sum, m) => {
-    const text = contentToString(m.content);
-    return sum + Math.ceil(text.length / 4);
-  }, 0);
+  const estimatedInputTokens = estimateInputTokens(messages, tools);
 
   // Image requests must route to a vision-capable model. Reject up front with a
   // clear message when none is enabled, rather than silently dropping the image
