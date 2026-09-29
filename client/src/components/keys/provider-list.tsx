@@ -46,6 +46,21 @@ type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 // #787: what the batch bar can do to the selected keys of one group.
 type BulkAction = 'enable' | 'disable' | 'delete'
 
+/** What the keys-page search box matches per row (#1056 applied to /keys).
+ *  The row RENDERS the endpoint URL for custom rows, so the query must reach
+ *  it: until now a relay at api.unorouter.com was invisible to a host search
+ *  even though the fallback table had carried its endpoint in the hay since
+ *  #1056 fixed exactly this there. Extracted as a pure function so the
+ *  contract is testable without mounting the page. */
+export function keyMatchesQuery(k: ApiKey, query: string): boolean {
+  const q = query.toLowerCase()
+  return (
+    (k.label ?? '').toLowerCase().includes(q) ||
+    (k.maskedKey ?? '').toLowerCase().includes(q) ||
+    (k.baseUrl ?? '').toLowerCase().includes(q)
+  )
+}
+
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
 // KeysPage stays a thin shell. `onAddKey` opens the shared Add key dialog.
@@ -278,15 +293,15 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   }
 
   // Search narrows either whole groups (label match) or the keys within them
-  // (label / masked-key match); the status filter then trims the result set.
+  // (label / masked-key / endpoint-URL match); the status filter then trims
+  // the result set. The baseUrl term is #1056's lesson applied here: a custom
+  // row renders "api.unorouter.com" on screen, so searching that host must
+  // find the row the same way the fallback table's search does.
   const visibleGroups = grouped
     .map(group => {
       if (!q) return group
       if (group.label.toLowerCase().includes(q)) return group
-      const matchingKeys = group.keys.filter(k =>
-        (k.label ?? '').toLowerCase().includes(q) ||
-        (k.maskedKey ?? '').toLowerCase().includes(q),
-      )
+      const matchingKeys = group.keys.filter(k => keyMatchesQuery(k, q))
       return { ...group, keys: matchingKeys }
     })
     .filter(group => group.keys.length > 0 && matchStatus(group))
