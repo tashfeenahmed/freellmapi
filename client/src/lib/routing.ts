@@ -405,6 +405,7 @@ export const platformColors: Record<string, string> = {
   sail:        '#0ea5e9',
   aclide:      '#6366f1',
   speka:       '#0d9488',
+  llmtr:       '#0f766e',
   moondream:   '#6d5dfc',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
