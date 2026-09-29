@@ -771,7 +771,9 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);
-      sendError(res, 502, 'api_error', `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`);
+      const policyBlocked = err?.code === 'zero_spend_blocked';
+      sendError(res, policyBlocked ? 403 : 502, policyBlocked ? 'permission_error' : 'api_error',
+        policyBlocked ? sanitizeProviderErrorMessage(err.message) : `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`);
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
       setFallbackHeaders(res, info.attempts.length, info.attempts);

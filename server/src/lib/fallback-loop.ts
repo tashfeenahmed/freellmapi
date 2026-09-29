@@ -1533,6 +1533,13 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         traceAttempt('timeout', err);
         return;
       }
+      if (err?.code === 'zero_spend_blocked') {
+        // No provider was called. Logging an upstream error here would also
+        // poison the bandit's reliability history and estimated token usage.
+        console.warn(`[FallbackLoop] local outbound policy denied request: ${sanitizeProviderErrorMessage(err.message)}`);
+        hooks.onFatal(route, err, attempt);
+        return;
+      }
       hooks.logFailure(route, err, attempt);
       if (isKeyAuthError(err)) {
         // KEY-fatal, not request-fatal: rotate past the bad key and revalidate

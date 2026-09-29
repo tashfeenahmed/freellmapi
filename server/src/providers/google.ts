@@ -10,6 +10,7 @@ import type {
 import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { contentToString } from '../lib/content.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { ZeroSpendError } from '../lib/zero-spend.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs, streamStallTimeoutMs } from '../lib/provider-timeout.js';
 import { sanitizeForGemini } from '../lib/gemini-wire.js';
@@ -370,7 +371,8 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
       const mimeType = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
       return { mimeType, data: buf.toString('base64') };
-    } catch {
+    } catch (err) {
+      if (err instanceof ZeroSpendError) throw err;
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
+import { hasZeroSpendEvidence, hasZeroSpendKeyEvidence } from '../lib/zero-spend.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { decryptProxyUrl } from '../lib/key-proxy.js';
@@ -1415,6 +1416,11 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   const db = getDb();
   const label = `${entry.platform}/${entry.model_id}`;
 
+  if (!hasZeroSpendEvidence(entry.platform, entry.model_id)) {
+    diag?.push(`${label}: zero-spend policy: missing, stale or ineligible evidence`);
+    return null;
+  }
+
   if (!hasProvider(entry.platform as Platform)) {
     diag?.push(`${label}: no provider registered`);
     return null;
@@ -1518,6 +1524,10 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       continue;
     }
 
+    if (!hasZeroSpendKeyEvidence(entry.platform, entry.model_id, decryptedKey)) {
+      note('zero-spend-key-evidence');
+      continue;
+    }
     const resolvedProvider = entry.platform === 'custom'
       ? resolveProvider('custom', key.base_url)
       : provider;

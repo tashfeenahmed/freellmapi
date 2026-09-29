@@ -13,6 +13,7 @@
     "test": "npm run test:bootstrap && npm run test:hooks && npm run test -w server && npm run test -w cli && npm run test -w client --if-present",
     "test:bootstrap": "node --test scripts/dev-bootstrap.test.mjs",
     "test:hooks": "node --test .claude/hooks/contributing-check.test.mjs",
+    "test:outbound-policy": "npm run test -w server -- src/__tests__/lib/zero-spend.test.ts src/__tests__/integration/zero-spend-routing.test.ts",
     "build": "npm run build -w server && npm run build -w cli && npm run build -w client",
     "lint": "npm run lint -w server && npm run lint -w cli",
     "build:server": "npm run build -w server",

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "platform": "openrouter",
+      "model": "REPLACE_WITH_EXACT_PUBLISHER_MODEL:free",
+      "keySha256": "REPLACE_WITH_LOCALLY_CALCULATED_SHA256",
+      "enabled": false,
+      "price": "verified_zero",
+      "accountPlan": "free",
+      "overage": "blocked",
+      "verifiedAt": "REPLACE_WITH_CURRENT_ISO_TIMESTAMP",
+      "expiresAt": "REPLACE_WITH_ISO_TIMESTAMP_WITHIN_SEVEN_DAYS",
+      "source": "https://openrouter.ai/docs/guides/routing/model-variants/free",
+      "accountEvidence": "REPLACE_WITH_DATED_LOCAL_ACCOUNT_VERIFICATION_REFERENCE",
+      "purposes": ["research"],
+      "privacy": "public-only"
+    }
+  ]
+}

@@ -1428,10 +1428,12 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);
-      res.status(502).json({
+      const policyBlocked = err?.code === 'zero_spend_blocked';
+      res.status(policyBlocked ? 403 : 502).json({
         error: {
-          message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
-          type: 'provider_error',
+          message: policyBlocked ? sanitizeProviderErrorMessage(err.message) : `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
+          type: policyBlocked ? 'permission_error' : 'provider_error',
+          ...(policyBlocked ? { code: 'zero_spend_blocked' } : {}),
         },
         execution_id: requestGroupId,
       });
@@ -2886,10 +2888,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     onFatal: (route, err, attempt) => {
       // Non-retryable error (bare 4xx, etc.): don't retry.
       setFallbackHeaders(res, attempt, attemptLog);
-      res.status(502).json({
+      const policyBlocked = err?.code === 'zero_spend_blocked';
+      res.status(policyBlocked ? 403 : 502).json({
         error: {
-          message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
-          type: 'provider_error',
+          message: policyBlocked ? sanitizeProviderErrorMessage(err.message) : `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
+          type: policyBlocked ? 'permission_error' : 'provider_error',
+          ...(policyBlocked ? { code: 'zero_spend_blocked' } : {}),
         },
         execution_id: requestGroupId,
       });
