@@ -27,7 +27,6 @@ describe('parseMaxTokensCeiling', () => {
     expect(parseMaxTokensCeiling('Together API error 400: max_tokens (128000) exceeds the model maximum output tokens of 65536')).toBe(65536);
     expect(parseMaxTokensCeiling('Fireworks 400: max_tokens: 128000 is greater than the maximum 16384')).toBe(16384);
     expect(parseMaxTokensCeiling('DeepInfra 400: max_tokens must be less than 8192')).toBe(8192);
-    expect(parseMaxTokensCeiling('Mistral 400: max_new_tokens exceeds 32768')).toBe(32768);
     expect(parseMaxTokensCeiling('custom endpoint 422: max_output_tokens: 100000 is at most 16384')).toBe(16384);
   });
 
@@ -35,6 +34,13 @@ describe('parseMaxTokensCeiling', () => {
     expect(parseMaxTokensCeiling('Cloudflare API error 413: AiError: Ai: The estimated number of input and maximum output tokens (24092) exceeded this model context window limit (24000).')).toBeNull();
     expect(parseMaxTokensCeiling('Groq API error 413: Request too large for model `x` on tokens per minute (TPM): Limit 8000, Requested 17679')).toBeNull();
     expect(parseMaxTokensCeiling('max_tokens must be a positive integer')).toBeNull();
+  });
+
+  it('never reads a number that belongs to some other limit', () => {
+    expect(parseMaxTokensCeiling('max_tokens: requested 16000, the number of input tokens exceeds 200 tokens')).toBeNull();
+    expect(parseMaxTokensCeiling('Request exceeds 30000 TPM limit; max_tokens=4096')).toBeNull();
+    expect(parseMaxTokensCeiling('quota exceeds 500 credits; set max_tokens lower')).toBeNull();
+    expect(parseMaxTokensCeiling('max_completion_tokens: messages must have less than 1000 items')).toBeNull();
   });
 });
 
@@ -50,6 +56,12 @@ describe('learned output caps', () => {
   it('does not learn from a non-400 status', () => {
     expect(learnOutputCapFromError(route, Object.assign(new Error(OLLAMA), { status: 503 }))).toBeNull();
     expect(learnedOutputCap('ollama', 'nemotron-3-ultra')).toBeUndefined();
+  });
+
+  it('ignores a reading below the floor', () => {
+    expect(learnOutputCapFromError(route, Object.assign(new Error('max_tokens must be at most 512'), { status: 400 }))).toBeNull();
+    expect(learnedOutputCap('ollama', 'nemotron-3-ultra')).toBeUndefined();
+    expect(learnOutputCapFromError(route, Object.assign(new Error('max_tokens must be at most 1024'), { status: 400 }))).toBe(1024);
   });
 
   it('lowers the route output budget to the learned cap', () => {

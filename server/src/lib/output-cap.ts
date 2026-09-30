@@ -19,11 +19,18 @@ const MAX_TOKENS_PARAM = /\b(max_tokens|max_completion_tokens|max_output_tokens|
 // The number that follows a ceiling phrase: "less than or equal to `65536`",
 // "maximum output tokens (65536)", "at most 32768", "no more than 8192",
 // "exceeds the maximum allowed value of 4096" (OpenRouter), "greater than the
-// maximum 16384" (Fireworks), "exceeds 32768" (Mistral). The `exceed` branch
-// still demands the number within four non-word characters, so "exceed the
-// remaining context" (no number) and "exceeds the context window limit"
-// (word characters in between) stay unmatched.
-const CEILING = /(?:less than or equal to|less than|at most|no (?:more|greater) than|(?:cannot|must not|can not) exceed|exceed[sd]?|greater than the maximum|maximum output tokens|maximum allowed value|max output tokens|maximum value|output limit|maximum is|is at most)\W{0,4}(?:of\s+)?\W{0,2}(\d{3,7})/;
+// maximum 16384" (Fireworks), "must be less than 8192" (DeepInfra). No bare
+// "exceeds N" or "less than N": those read any number in the message ("input
+// tokens exceeds 200", "exceeds 30000 TPM").
+const CEILING_PHRASE = '(?:less than or equal to|must be less than|at most|no (?:more|greater) than|(?:cannot|must not|can not) exceed|greater than the maximum|maximum output tokens|maximum allowed value|max output tokens|maximum value|output limit|maximum is)\\W{0,4}(?:of\\s+)?\\W{0,2}(\\d{3,7})';
+// The ceiling phrase must follow the parameter name within the same clause
+// (60 characters, no '.' or ';' in between), so a number that belongs to some
+// other limit in a message that merely mentions max_tokens is never learned.
+const CEILING = new RegExp(`\\b(?:max_tokens|max_completion_tokens|max_output_tokens|maxoutputtokens|max_new_tokens)\\b[^.;]{0,60}?${CEILING_PHRASE}`);
+// A learned ceiling below this is almost certainly a misread (a real output
+// limit this small is not something a client would hit by accident), and a
+// wrong low cap would truncate every reply on the model until restart.
+export const MIN_LEARNED_OUTPUT_CAP = 1024;
 
 function capKey(platform: string, modelId: string): string {
   return `${platform}:${modelId}`;
@@ -43,12 +50,13 @@ export function parseMaxTokensCeiling(message: unknown): number | null {
 }
 
 /** Learn the ceiling from a max_tokens rejection. Returns it, or null when the
- *  error is not one. The lowest reading wins. */
+ *  error is not one, or when the reading is below MIN_LEARNED_OUTPUT_CAP. The
+ *  lowest reading wins. */
 export function learnOutputCapFromError(route: { platform: string; modelId: string }, err: any): number | null {
   const status = typeof err?.status === 'number' ? err.status : 0;
   if (status !== 0 && status !== 400 && status !== 422) return null;
   const ceiling = parseMaxTokensCeiling(err?.message);
-  if (ceiling == null) return null;
+  if (ceiling == null || ceiling < MIN_LEARNED_OUTPUT_CAP) return null;
   const key = capKey(route.platform, route.modelId);
   const current = learned.get(key);
   learned.set(key, current == null ? ceiling : Math.min(current, ceiling));
