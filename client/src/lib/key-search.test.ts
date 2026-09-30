@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import type { ApiKey } from '../../../../shared/types'
-import { keyMatchesQuery } from './provider-list'
+import type { ApiKey } from '../../../shared/types'
+import { keyMatchesQuery } from './key-search'
 
 // The keys-page search box must be able to reach every string the row
 // renders. A custom endpoint row prints its baseUrl; before this the filter

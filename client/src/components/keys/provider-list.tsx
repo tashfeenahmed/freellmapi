@@ -22,6 +22,7 @@ import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import { keyMatchesQuery } from '@/lib/key-search'
 import {
   PLATFORMS,
   CUSTOM_GROUP,
@@ -45,21 +46,6 @@ type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 
 // #787: what the batch bar can do to the selected keys of one group.
 type BulkAction = 'enable' | 'disable' | 'delete'
-
-/** What the keys-page search box matches per row (#1056 applied to /keys).
- *  The row RENDERS the endpoint URL for custom rows, so the query must reach
- *  it: until now a relay at api.unorouter.com was invisible to a host search
- *  even though the fallback table had carried its endpoint in the hay since
- *  #1056 fixed exactly this there. Extracted as a pure function so the
- *  contract is testable without mounting the page. */
-export function keyMatchesQuery(k: ApiKey, query: string): boolean {
-  const q = query.toLowerCase()
-  return (
-    (k.label ?? '').toLowerCase().includes(q) ||
-    (k.maskedKey ?? '').toLowerCase().includes(q) ||
-    (k.baseUrl ?? '').toLowerCase().includes(q)
-  )
-}
 
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
