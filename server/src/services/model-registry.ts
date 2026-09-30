@@ -64,6 +64,7 @@ export type {
   ModelOverridePatch,
   CatalogTombstoneSource,
   CatalogModelTombstone,
+  DeleteChatModelResult,
 } from './model-state.js';
 export {
   overriddenFieldNames,
@@ -82,4 +83,5 @@ export {
   deleteTombstonedCatalogModels,
   routableContextWindow,
   refreshModelOverrideBaselines,
+  deleteChatModel,
 } from './model-state.js';
