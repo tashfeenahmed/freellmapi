@@ -16,6 +16,9 @@ server/data/
 /tunnel-client.yaml
 .DS_Store
 
+# Local dev console output (e.g. `npm run dev > dev.log 2>&1`)
+dev.log
+
 # TypeScript incremental build cache
 *.tsbuildinfo
 
