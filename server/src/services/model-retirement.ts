@@ -16,7 +16,7 @@
 import { getDb } from '../db/index.js';
 import { modelRetirementSignal } from '../lib/error-classify.js';
 import { summarizeAttemptError } from '../lib/error-redaction.js';
-import { isCatalogManagedModel, retireCatalogModelUpstream } from './model-state.js';
+import { isCatalogManagedModel, retireCatalogModelUpstream } from './model-registry.js';
 import { modelStatsKey } from '../lib/endpoint-scope.js';
 import { providerLog } from '../lib/server-logs.js';
 
