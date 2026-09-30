@@ -6,18 +6,19 @@ import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
+  clearCatalogModelTombstone,
+  clearCustomModelTombstone,
+  customModelSeed,
   isCatalogManagedModel,
   overriddenFieldNames,
   recordCatalogModelTombstone,
-  clearCatalogModelTombstone,
+  recordCustomModelTombstone,
   upsertModelOverrides,
   type ModelOverridePatch,
-} from '../services/model-state.js';
+} from '../services/model-registry.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
 import { getActiveProfileId, ensureModelInProfiles } from '../services/profile-models.js';
 import { endpointScopeForBaseUrl, endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
-import { clearCustomModelTombstone, recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
-import { customModelSeed } from '../services/custom-model-seed.js';
 import { routePinnedModel } from '../services/router.js';
 import { logRequest } from '../lib/request-log.js';
 import { withKeyProxy } from '../lib/proxy.js';

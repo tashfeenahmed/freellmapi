@@ -29,7 +29,7 @@ import {
 import { TIMEOUT_ERROR_MARKERS } from '../lib/error-classify.js';
 import { checkMonthlyBudget, reserveMonthlyBudget } from './key-budget.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
-import { modelsWithOverriddenField } from './model-state.js';
+import { modelsWithOverriddenField } from './model-registry.js';
 import { parseBudget } from '../lib/budget.js';
 import { platformDropsResponseFormat } from '../lib/sampling-params.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from './model-groups.js';

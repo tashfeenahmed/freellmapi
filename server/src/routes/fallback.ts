@@ -15,7 +15,7 @@ import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-in
 import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
-import { overriddenFieldNames } from '../services/model-state.js';
+import { overriddenFieldNames } from '../services/model-registry.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
 
