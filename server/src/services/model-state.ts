@@ -1,5 +1,8 @@
 import type { Db } from '../db/types.js';
 import type { applyCatalog } from './catalog-sync.js';
+import { endpointScopeOfKey } from '../lib/endpoint-scope.js';
+import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { recordCustomModelTombstone } from './custom-model-tombstone.js';
 
 export type CatalogModelKind = 'chat' | 'media';
 
@@ -430,4 +433,63 @@ export function deleteTombstonedCatalogModels(db: Db): number {
   }
 
   return chatRows.length + mediaRows.length;
+}
+
+// ── Single-model deletion ────────────────────────────────────────────────────
+//
+// Deleting one chat model is always the same sequence, in this order: record
+// the "keep it deleted" tombstone matching the row's identity, drop its
+// fallback chain entry and its profile memberships (`fallback_config` has no
+// ON DELETE CASCADE, so these stay manual), then drop the row. Custom rows
+// additionally sweep their endpoint key when nothing is bound to it any more.
+// Callers used to repeat this per route and had to know which tombstone
+// flavor applied; that knowledge lives here now. Pruning the saved fusion
+// config stays with the caller: it belongs to the dashboard fusion domain,
+// and pulling it in here would cycle model-state → fusion → router → barrel.
+//
+// The bulk key-deletion path (routes/keys.ts) deliberately stays separate: it
+// is set-based across chat/embedding/media tables with legacy sweeps and
+// default-embedding repair, and folding it into per-row calls would spread
+// complexity instead of removing it.
+//
+// The caller owns the transaction, exactly as before.
+
+export type DeleteChatModelResult = {
+  /** Which keep-deleted marker was recorded, if any. */
+  tombstoned: 'catalog' | 'custom' | null;
+  platform: string;
+  modelId: string;
+};
+
+/**
+ * Delete one chat model row by id. Returns undefined when the row is missing
+ * (or, with `onlyPlatform`, when it is not on that platform) having written
+ * nothing, so routes can answer 404.
+ */
+export function deleteChatModel(
+  db: Db,
+  id: number,
+  onlyPlatform?: string,
+): DeleteChatModelResult | undefined {
+  const row = db.prepare(
+    'SELECT id, platform, model_id, key_id, source FROM models WHERE id = ?',
+  ).get(id) as
+    | { id: number; platform: string; model_id: string; key_id: number | null; source: string }
+    | undefined;
+  if (!row || (onlyPlatform !== undefined && row.platform !== onlyPlatform)) return undefined;
+
+  let tombstoned: DeleteChatModelResult['tombstoned'] = null;
+  if (isCatalogManagedModel(row)) {
+    recordCatalogModelTombstone(db, 'chat', row.platform, row.model_id);
+    tombstoned = 'catalog';
+  } else if (row.platform === 'custom') {
+    recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
+    tombstoned = 'custom';
+  }
+  db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+  db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
+  db.prepare('DELETE FROM models WHERE id = ?').run(id);
+  if (row.platform === 'custom') deleteUnusedCustomEndpointKey(db, row.key_id);
+
+  return { tombstoned, platform: row.platform, modelId: row.model_id };
 }
