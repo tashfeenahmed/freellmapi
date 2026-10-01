@@ -1141,7 +1141,8 @@
       "generic": "Mọi công cụ khác nói API OpenAI, thiết lập thủ công bằng URL cơ sở và khóa.",
       "atomcode": "Tác nhân dòng lệnh của AtomGit, viết bằng Rust, nhận mọi điểm cuối tương thích OpenAI.",
       "openclaw": "Trợ lý cá nhân luôn sẵn sàng, trả lời trên WhatsApp, Telegram, Discord và nhiều nền tảng khác ngay từ máy của bạn.",
-      "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat."
+      "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat.",
+      "pi": "Một tác nhân dòng lệnh tối giản mà bạn định hình bằng tiện ích mở rộng, kỹ năng và mẫu prompt của riêng mình."
     }
   },
   "update": {

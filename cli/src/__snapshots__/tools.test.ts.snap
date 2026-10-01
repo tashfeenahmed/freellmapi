@@ -651,6 +651,79 @@ exports[`tool generators > setup-opencode has stable golden output 1`] = `
 }
 `;
 
+exports[`tool generators > setup-pi has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "format": "json",
+      "path": "/home/tester/.pi/agent/models.json",
+      "sensitive": true,
+      "value": {
+        "providers": {
+          "freellmapi": {
+            "api": "openai-completions",
+            "apiKey": "freellmapi-test-key",
+            "baseUrl": "http://localhost:3000/v1",
+            "headers": {
+              "User-Agent": "pi-coding-agent",
+            },
+            "models": [
+              {
+                "contextWindow": 131072,
+                "cost": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "input": 0,
+                  "output": 0,
+                },
+                "id": "fast-coder",
+                "input": [
+                  "text",
+                ],
+                "maxTokens": 8192,
+                "name": "Fast Coder",
+                "reasoning": false,
+              },
+              {
+                "contextWindow": 262144,
+                "cost": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "input": 0,
+                  "output": 0,
+                },
+                "id": "reasoning-model",
+                "input": [
+                  "text",
+                ],
+                "maxTokens": 8192,
+                "name": "Reasoning Model",
+                "reasoning": false,
+              },
+            ],
+            "name": "FreeLLMAPI",
+          },
+        },
+      },
+    },
+    {
+      "format": "json",
+      "path": "/home/tester/.pi/agent/settings.json",
+      "value": {
+        "defaultModel": "fast-coder",
+        "defaultProvider": "freellmapi",
+      },
+    },
+  ],
+  "notes": [
+    "Install Pi with: npm install -g @earendil-works/pi-coding-agent (or curl -fsSL https://pi.dev/install.sh | sh)",
+    "Try it with: pi -p "Say hello" — freellmapi/fast-coder is the default model.",
+    "Every catalog model is in /model; a running Pi session picks the change up when /model is opened.",
+    "Models are declared text-only; give a vision model \`input: ["text", "image"]\` under providers.freellmapi in models.json to send it images.",
+  ],
+}
+`;
+
 exports[`tool generators > setup-qwen has stable golden output 1`] = `
 {
   "files": [

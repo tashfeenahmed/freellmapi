@@ -31,6 +31,7 @@ dashboard (or the tray popover in the desktop app).
 | `setup-atomcode` | AtomCode (`atomcode`) |
 | `setup-openclaw` | OpenClaw |
 | `setup-hermes` | Hermes Agent (`hermes`) |
+| `setup-pi` | Pi (`pi`) |
 | `setup-cursor` | Cursor |
 | `setup-generic` | Any OpenAI-compatible client |
 | `launch` | Run Claude Code with credentials injected into the child process |

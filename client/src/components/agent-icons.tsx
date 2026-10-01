@@ -57,6 +57,8 @@ import { cn } from '@/lib/utils'
 //   hermes    Hermes Agent lettermark only: the published mark (NousResearch/hermes-agent   Nous Research TM, nominative use
 //                          website/static/img/logo.png) is a raster portrait and the SVG
 //                          favicon is a text glyph, so neither fits the 24px grid
+//   pi        Pi           pi.dev/favicon.svg (the monochrome mark; the press kit's       Earendil TM, nominative use
+//                          three-colour logo is the same geometry)
 //
 //   id        light tile        ratio  dark tile         ratio  dark-mode treatment
 //   claude    #D37152            3.08  #D97757            5.52  brand #D97757 on dark; light tile is
@@ -93,6 +95,8 @@ import { cn } from '@/lib/utils'
 //                                                               3.00 on the light tile, right at the line)
 //   hermes    #000000           19.26  #FFFFFF           17.22  published pair (the logo is flat black artwork
 //                                                               on white, so it inverts on the dark tile)
+//   pi        #111111           17.32  #F6F6F6           15.94  published pair (the favicon's own light and
+//                                                               dark-scheme fills)
 //   generic   currentColor         —   currentColor         —   not a brand mark
 //
 // Cursor also publishes a 2.5D cube in five warm greys (#43413c #55544f #72716d
@@ -268,6 +272,19 @@ const brands: Record<string, Brand> = {
   // the published pair treatment: black on the light tile, white on the dark.
   hermes: {
     tint: '[--mk:#000000] dark:[--mk:#FFFFFF]',
+  },
+  // pi.dev/favicon.svg, drawn on a 560-unit box with three solid blocks.
+  // Scaled 0.0375 and centred, so it spans 21 units: a mark that fills its
+  // whole square reads heavier than the set's outlined marks at full size.
+  pi: {
+    tint: '[--mk:#111111] dark:[--mk:#F6F6F6]',
+    art: (
+      <g transform="translate(1.5 1.5) scale(0.0375)">
+        <path d="M420 280H280V140H0V0H420V280Z" />
+        <path d="M560 560H420V280H560V560Z" />
+        <path d="M140 560H0V140H140V280H280V420H140V560Z" />
+      </g>
+    ),
   },
   // Any other OpenAI-compatible client: our own terminal glyph, not a brand
   // mark, so it keeps the page foreground colour on both tiles.

@@ -837,6 +837,79 @@ function hermes(ctx: GenerateContext): Generation {
   };
 }
 
+// Pi (pi.dev, @earendil-works/pi-coding-agent) keeps user configuration in its
+// agent directory, $PI_CODING_AGENT_DIR (default ~/.pi/agent). An endpoint Pi
+// does not ship is a provider entry in models.json — `baseUrl`, `api` and the
+// `models` it serves — and `api: openai-completions` is the adapter for a
+// /v1/chat/completions backend. Pi does not load a .env file of its own, so the
+// key is written literally (the file is created 0600); its `$NAME` form would
+// need the variable exported in every shell that starts Pi. A provider entry
+// alone only adds models to `/model`: the startup choice is `defaultProvider`
+// plus `defaultModel` in settings.json, which a named profile leaves alone.
+function piAgentDir(homeDir: string): string {
+  return process.env.PI_CODING_AGENT_DIR?.trim() || path.join(homeDir, '.pi', 'agent');
+}
+
+function pi(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const dir = piAgentDir(ctx.homeDir);
+  const provider = ctx.profile === 'default'
+    ? 'freellmapi'
+    : `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const roster = catalogModels(ctx.models);
+  const entries = [model, ...roster.filter(entry => entry.id !== model.id)]
+    .map(entry => ({
+      id: entry.id,
+      name: entry.name ?? entry.id,
+      // The gateway picks the upstream per request, so no model can promise a
+      // thinking API; Pi then sends no reasoning effort at all.
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: contextWindow(entry),
+      maxTokens: outputLimit(entry),
+    }));
+  const files: Generation['files'] = [{
+    path: path.join(dir, 'models.json'),
+    format: 'json',
+    sensitive: true,
+    value: {
+      providers: {
+        [provider]: {
+          name: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+          baseUrl: v1Url(ctx.url),
+          api: 'openai-completions',
+          apiKey: ctx.apiKey,
+          // Pi names itself only to a few hosts it knows; a custom endpoint gets
+          // the bare openai-node SDK user agent, which the gateway's analytics
+          // would file under "openai-sdk". This is the UA Pi already sends to
+          // Cloudflare, so analytics can name the client.
+          headers: { 'User-Agent': 'pi-coding-agent' },
+          models: entries,
+        },
+      },
+    },
+  }];
+  if (ctx.profile === 'default') {
+    files.push({
+      path: path.join(dir, 'settings.json'),
+      format: 'json',
+      value: { defaultProvider: provider, defaultModel: model.id },
+    });
+  }
+  return {
+    files,
+    notes: [
+      'Install Pi with: npm install -g @earendil-works/pi-coding-agent (or curl -fsSL https://pi.dev/install.sh | sh)',
+      ctx.profile === 'default'
+        ? `Try it with: pi -p "Say hello" — ${provider}/${model.id} is the default model.`
+        : `Try it with: pi --model ${provider}/${model.id} -p "Say hello" — the default model is unchanged.`,
+      'Every catalog model is in /model; a running Pi session picks the change up when /model is opened.',
+      `Models are declared text-only; give a vision model \`input: ["text", "image"]\` under providers.${provider} in models.json to send it images.`,
+    ],
+  };
+}
+
 function cursor(_ctx: GenerateContext): Generation {
   return {
     files: [],
@@ -912,6 +985,7 @@ const metadata = [
   ['atomcode', 'AtomCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-atomcode', 'https://atomcode.atomgit.com/docs/en/', atomcode],
   ['openclaw', 'OpenClaw', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-openclaw', 'https://docs.openclaw.ai/gateway/config-tools/custom-providers', openclaw],
   ['hermes', 'Hermes Agent', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-hermes', 'https://hermes-agent.nousresearch.com/docs/', hermes],
+  ['pi', 'Pi', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-pi', 'https://pi.dev/docs/latest/models', pi],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;

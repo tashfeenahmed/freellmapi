@@ -15,6 +15,7 @@ beforeEach(() => {
   vi.stubEnv('OPENCLAW_STATE_DIR', '');
   vi.stubEnv('OPENCLAW_CONFIG_PATH', '');
   vi.stubEnv('HERMES_HOME', '');
+  vi.stubEnv('PI_CODING_AGENT_DIR', '');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -463,6 +464,59 @@ describe('tool generators', () => {
     expect(value.model).toBeUndefined();
     expect(value.providers['freellmapi-lab'].api).toBe('http://localhost:3000/v1');
     expect(value.providers['freellmapi-lab'].default_model).toBe('fast-coder');
+  });
+
+  it('writes Pi as a models.json provider plus the startup default in settings.json', () => {
+    // Pi has no .env of its own, so the key is literal in the 0600 models.json.
+    // A provider entry only fills /model; defaultProvider + defaultModel in
+    // settings.json is what a fresh `pi` starts on. A custom origin gets the
+    // bare openai-node UA from Pi, so the provider names the client itself.
+    const [models, settings] = tools.find(tool => tool.id === 'pi')!.generate(context).files;
+    expect(models.path).toBe('/home/tester/.pi/agent/models.json');
+    expect(models.format).toBe('json');
+    expect(models.sensitive).toBe(true);
+    const provider = (models.value as { providers: Record<string, any> }).providers.freellmapi;
+    expect(provider).toMatchObject({
+      name: 'FreeLLMAPI',
+      baseUrl: 'http://localhost:3000/v1',
+      api: 'openai-completions',
+      apiKey: 'freellmapi-test-key',
+      headers: { 'User-Agent': 'pi-coding-agent' },
+    });
+    expect(provider.models.map((model: { id: string }) => model.id)).toEqual(['fast-coder', 'reasoning-model']);
+    expect(provider.models[0]).toEqual({
+      id: 'fast-coder',
+      name: 'Fast Coder',
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 131072,
+      maxTokens: 8192,
+    });
+    expect(settings.path).toBe('/home/tester/.pi/agent/settings.json');
+    expect(settings.sensitive).toBeUndefined();
+    expect(settings.value).toEqual({ defaultProvider: 'freellmapi', defaultModel: 'fast-coder' });
+  });
+
+  it('keeps `auto` first in the Pi roster when it is the default', () => {
+    const liveContext: GenerateContext = {
+      ...context,
+      models: [{ id: 'auto', name: 'Auto', available: true, context_window: 200_000 }, ...context.models],
+    };
+    const [models, settings] = tools.find(tool => tool.id === 'pi')!.generate(liveContext).files;
+    const provider = (models.value as { providers: Record<string, { models: { id: string }[] }> }).providers.freellmapi;
+    expect(provider.models.map(model => model.id)).toEqual(['auto', 'fast-coder', 'reasoning-model']);
+    expect(settings.value).toEqual({ defaultProvider: 'freellmapi', defaultModel: 'auto' });
+  });
+
+  it('gives a named Pi profile its own provider and leaves the default model alone', () => {
+    vi.stubEnv('PI_CODING_AGENT_DIR', '/srv/pi');
+    const files = tools.find(tool => tool.id === 'pi')!.generate({ ...context, profile: 'Work Box' }).files;
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe('/srv/pi/models.json');
+    const providers = (files[0].value as { providers: Record<string, { name: string }> }).providers;
+    expect(Object.keys(providers)).toEqual(['freellmapi-work-box']);
+    expect(providers['freellmapi-work-box'].name).toBe('FreeLLMAPI (Work Box)');
   });
 
   it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {

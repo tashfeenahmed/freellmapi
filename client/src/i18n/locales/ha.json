@@ -1141,7 +1141,8 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Mataimaki na kai da ke aiki koyaushe, yana amsawa a WhatsApp, Telegram, Discord da sauransu daga na'urarka.",
-      "hermes": "Wakilin Nous Research mai inganta kansa, da ƙwaƙwalwa mai dorewa da ƙwarewa, a cikin terminal ko a manhajojin hira."
+      "hermes": "Wakilin Nous Research mai inganta kansa, da ƙwaƙwalwa mai dorewa da ƙwarewa, a cikin terminal ko a manhajojin hira.",
+      "pi": "Ƙaramin wakilin terminal da kuke tsara shi da naku ƙarin abubuwa, ƙwarewa da samfuran umarni."
     }
   },
   "update": {

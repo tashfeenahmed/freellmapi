@@ -1141,7 +1141,8 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "En ständigt tillgänglig personlig assistent som svarar på WhatsApp, Telegram, Discord med mera från din egen dator.",
-      "hermes": "Nous Researchs självförbättrande agent med beständigt minne och färdigheter, i terminalen eller i chattappar."
+      "hermes": "Nous Researchs självförbättrande agent med beständigt minne och färdigheter, i terminalen eller i chattappar.",
+      "pi": "En minimal terminalagent som du formar med egna tillägg, färdigheter och promptmallar."
     }
   },
   "update": {

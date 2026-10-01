@@ -51,6 +51,7 @@ npx freellmapi setup-dsh --url http://localhost:3001 --api-key <统一密钥>
 | **DeepSeek Harness** | `setup-dsh` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
 | **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat（`provider: custom`） |
+| **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
 | **QwenPaw** | 手动配置 | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` 打印指引 | 公共 `https://…/v1` | OpenAI Chat |
 | **其他** | `setup-generic` 打印现成配置块 | `http://localhost:3001/v1` | OpenAI Chat |
@@ -93,6 +94,18 @@ hermes -z "Say hello"
 ```
 
 正在运行的 `hermes gateway` 需要重启才会读到变更。`--profile <name>` 改为添加 `providers.freellmapi-<name>` 条目——在对话里用 `/model custom:freellmapi-<name>:auto` 选择——不改动默认模型；`--model <id>` 固定默认模型。Hermes 对自定义端点只发送 SDK 的通用 User-Agent，所以该块带有 `default_headers: { User-Agent: hermes-agent }`，Agents 页面的"最近出现"徽章据此识别。设置了 `HERMES_HOME` 时会被尊重。
+
+### Pi（`pi`）
+
+[Pi](https://pi.dev) 是一个极简的终端智能体框架，可用你自己的扩展、技能和提示词模板来定制。Pi 未内置的端点写在 `~/.pi/agent/models.json` 的 provider 条目里。`setup-pi` 在其中添加 `freellmapi` provider——`api: openai-completions`、网关的 `/v1` 作为 `baseUrl`，并列出实时目录中的全部模型及其上下文窗口（所选模型排在最前）——再在 `~/.pi/agent/settings.json` 中设置 `defaultProvider` 和 `defaultModel`，让全新启动的 `pi` 直接使用它。Pi 不会自行加载 `.env` 文件，所以密钥直接写入 `models.json`（以 0600 权限创建）。两个文件中的其他 provider 和设置保持原样。
+
+```bash
+npx freellmapi setup-pi --url http://localhost:3001 --api-key <统一密钥>
+npm install -g @earendil-works/pi-coding-agent
+pi -p "Say hello"
+```
+
+正在运行的会话在打开 `/model` 时会重新加载 `models.json`。`--profile <name>` 改为添加 `freellmapi-<name>` provider——用 `pi --model freellmapi-<name>/<model>` 或在 `/model` 中选择——不改动默认模型；`--model <id>` 固定默认模型。模型声明为纯文本、`reasoning: false`；要给视觉模型发送图片，在其 `input` 中加上 `"image"`。Pi 对自定义端点只发送 SDK 的通用 User-Agent，所以该 provider 带有 `headers: { "User-Agent": "pi-coding-agent" }`，Agents 页面的"最近出现"徽章据此识别。设置了 `PI_CODING_AGENT_DIR` 时会被尊重。
 
 ### QwenPaw
 

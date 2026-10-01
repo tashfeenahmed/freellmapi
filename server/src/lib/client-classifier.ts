@@ -17,6 +17,7 @@ export const CLIENT_AGENTS = [
   'atomcode',
   'openclaw',
   'hermes-agent',
+  'pi',
   'cursor',
   'gemini-cli',
   'zed',
@@ -72,6 +73,10 @@ export function classifyClientAgent(req: Request): ClientAgent {
   // `default_headers` sends `hermes-agent`, and its /v1/models probe sends
   // `hermes-cli/<version>` on its own.
   if (/hermes[- ]?agent|\bhermes-cli\b/.test(ua)) return 'hermes-agent';
+  // Pi likewise only names itself to hosts it knows; the generator's provider
+  // header sends `pi-coding-agent`, and Pi's own UA is
+  // `pi/<version> (<platform>; node/<version>; <arch>)`.
+  if (/\bpi-coding-agent\b|^pi\/\d/.test(ua)) return 'pi';
   if (/opencode/.test(ua)) return 'opencode';
   if (/\bcline\b/.test(ua)) return 'cline';
   // The Roo Code extension and CLI send `RooCode/<version>`.

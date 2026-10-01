@@ -57,6 +57,7 @@ context windows.
 | **AtomCode** | `setup-atomcode` | `http://localhost:3001/v1` | OpenAI Chat (`type = "openai"`) |
 | **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat (`provider: custom`) |
+| **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **QwenPaw** | Manual setup | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
 | **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
@@ -64,7 +65,7 @@ context windows.
 The root-vs-`/v1` distinction matters: Claude Code expects the server root
 because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
-Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, QwenPaw, and DeepSeek Harness—expect their configured
+Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, QwenPaw, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
 
 ### DeepSeek Harness (`dsh`)
@@ -206,6 +207,35 @@ the default model alone; `--model <id>` pins the default. Hermes sends a bare
 SDK user agent to custom endpoints, so the block carries
 `default_headers: { User-Agent: hermes-agent }`, which is what the Agents
 page's "seen recently" badge keys on. `HERMES_HOME` is honoured when set.
+
+### Pi (`pi`)
+
+[Pi](https://pi.dev) is a minimal terminal agent harness you extend with your
+own extensions, skills and prompt templates. Endpoints it does not ship are
+provider entries in `~/.pi/agent/models.json`. `setup-pi` adds a `freellmapi`
+provider there — `api: openai-completions`, the gateway's `/v1` as `baseUrl`,
+and every model in the live catalog with its context window, the chosen model
+first — then sets `defaultProvider` and `defaultModel` in
+`~/.pi/agent/settings.json` so a fresh `pi` starts on it. Pi does not load a
+`.env` file of its own, so the key is written into `models.json`, which is
+created with mode 0600. Other providers and settings in both files are left
+as they were.
+
+```bash
+npx freellmapi setup-pi --url http://localhost:3001 --api-key <unified-key>
+npm install -g @earendil-works/pi-coding-agent
+pi -p "Say hello"
+```
+
+A running session reloads `models.json` when `/model` is opened.
+`--profile <name>` adds a `freellmapi-<name>` provider instead, picked with
+`pi --model freellmapi-<name>/<model>` or from `/model`, and leaves the
+default model alone; `--model <id>` pins the default. Models are declared
+text-only with `reasoning: false`. To send images to a vision model, add
+`"image"` to its `input`. Pi sends a bare SDK user agent to custom endpoints,
+so the provider carries `headers: { "User-Agent": "pi-coding-agent" }`, which
+is what the Agents page's "seen recently" badge keys on.
+`PI_CODING_AGENT_DIR` is honoured when set.
 
 ### QwenPaw
 
