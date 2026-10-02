@@ -4,20 +4,19 @@ import { z } from 'zod';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
-import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
+  clearCatalogModelTombstone,
+  clearCustomModelTombstone,
+  customModelSeed,
+  deleteChatModel,
   isCatalogManagedModel,
   overriddenFieldNames,
-  recordCatalogModelTombstone,
-  clearCatalogModelTombstone,
   upsertModelOverrides,
   type ModelOverridePatch,
-} from '../services/model-state.js';
+} from '../services/model-registry.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
 import { getActiveProfileId, ensureModelInProfiles } from '../services/profile-models.js';
 import { endpointScopeForBaseUrl, endpointScopeOfKey, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
-import { clearCustomModelTombstone, recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
-import { customModelSeed } from '../services/custom-model-seed.js';
 import { routePinnedModel } from '../services/router.js';
 import { logRequest } from '../lib/request-log.js';
 import { withKeyProxy } from '../lib/proxy.js';
@@ -225,23 +224,15 @@ modelsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const row = db.prepare("SELECT id, key_id, model_id FROM models WHERE id = ? AND platform = 'custom'").get(id) as { id: number; key_id: number | null; model_id: string } | undefined;
-  if (!row) {
+  const remove = db.transaction(() => {
+    const result = deleteChatModel(db, id, 'custom');
+    if (result) pruneUnavailableSavedFusionConfig();
+    return result;
+  });
+  if (!remove()) {
     res.status(404).json({ error: { message: `Unknown custom model ${id}` } });
     return;
   }
-
-  const remove = db.transaction(() => {
-    // #926: keep this deletion across the scheduled custom-model sync, or the
-    // next daily pass re-registers a model the operator removed on purpose.
-    recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
-    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
-    db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
-    db.prepare("DELETE FROM models WHERE id = ? AND platform = 'custom'").run(id);
-    deleteUnusedCustomEndpointKey(db, row.key_id);
-    pruneUnavailableSavedFusionConfig();
-  });
-  remove();
   res.json({ success: true });
 });
 
@@ -345,22 +336,17 @@ modelsRouter.delete('/:id', (req: Request, res: Response) => {
   }
 
   const remove = db.transaction(() => {
-    if (isCatalogManagedModel(row)) {
-      recordCatalogModelTombstone(db, 'chat', row.platform, row.model_id);
-    } else if (row.platform === 'custom') {
-      // #926: same "keep it deleted" contract for custom relay models — the
-      // scheduled custom-model sync must not resurrect this row.
-      recordCustomModelTombstone(db, endpointScopeOfKey(db, row.key_id), row.model_id);
-    }
-    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
-    db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
-    db.prepare('DELETE FROM models WHERE id = ?').run(id);
-    if (row.platform === 'custom') deleteUnusedCustomEndpointKey(db, row.key_id);
-    pruneUnavailableSavedFusionConfig();
+    const result = deleteChatModel(db, id);
+    if (result) pruneUnavailableSavedFusionConfig();
+    return result;
   });
-  remove();
+  const result = remove();
+  if (!result) {
+    res.status(404).json({ error: { message: `Unknown model ${id}` } });
+    return;
+  }
 
-  res.json({ success: true, tombstoned: isCatalogManagedModel(row) });
+  res.json({ success: true, tombstoned: result.tombstoned === 'catalog' });
 });
 
 modelsRouter.post('/:id/test', async (req: Request, res: Response) => {

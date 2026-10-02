@@ -6,7 +6,6 @@ import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
 import { ensureModelInProfiles } from './profile-models.js';
-import { customModelSeed } from './custom-model-seed.js';
 import { createUser, userCount } from './auth.js';
 import {
   SETTING_LICENSE_KEY,
@@ -17,10 +16,11 @@ import {
 import { endpointRefMatches, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js';
 import {
   clearCatalogModelTombstone,
+  customModelSeed,
   isCatalogManagedModel,
   upsertModelOverrides,
   type ModelOverridePatch,
-} from './model-state.js';
+} from './model-registry.js';
 
 const modelEntrySchema = z.union([
   z.string().min(1),

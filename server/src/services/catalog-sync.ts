@@ -14,7 +14,7 @@ import {
   deleteTombstonedCatalogModels,
   isCatalogModelTombstoned,
   reinstateUpstreamRetiredCatalogModel,
-} from './model-state.js';
+} from './model-registry.js';
 import { ensureAllModelsInProfiles } from './profile-models.js';
 
 // Generative-media modalities are routed into the separate media_models table

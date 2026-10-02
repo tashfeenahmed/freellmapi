@@ -14,12 +14,12 @@ import { verifyCredentials } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential } from '../services/custom-endpoint.js';
-import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
+import { registerCustomModels, registerCustomChatModels } from '../services/model-registry.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
-import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
+import { recordCustomModelTombstone } from '../services/model-registry.js';
 import {
   builtinDiscoveryEligibility,
   builtinDiscoveryMode,
