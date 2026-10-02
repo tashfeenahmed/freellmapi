@@ -34,6 +34,12 @@ export interface AttemptTraceRecord {
   // Per-request key ordinal (key1, key2…), same anonymization as the
   // X-Fallback-Trail header — never the internal key id.
   keyOrdinal: number;
+  // Endpoint identity the attempt ran against (#1254): `models.endpoint_scope`
+  // — '' for catalog platforms, the normalized base_url for custom relays.
+  // Failure attribution needs this to tell WHICH relay died when several
+  // serve the same model id; without it the endpoint health layer (issue
+  // #1254) cannot quarantine one relay without punishing the others.
+  endpointScope: string;
   // Operator-facing key label (api_keys.label) at attempt time (#869). Null
   // when the key had no label — the dashboard shows the ordinal alone then.
   // A snapshot, not a live join: renaming the key later must not rewrite

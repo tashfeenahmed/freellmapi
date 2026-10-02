@@ -37,6 +37,7 @@ import * as keyMonthlyBudget from '../migrations/20260904_000001_key_monthly_bud
 import * as keyMonthlyUsage from '../migrations/20260914_000001_key_monthly_usage.js';
 import * as quotaSnapshotFreshness from '../migrations/20260915_000001_quota_snapshot_freshness.js';
 import * as requestModelAttribution from '../migrations/20260913_000001_request_model_attribution.js';
+import * as attemptEndpointScope from '../migrations/20260917_000001_attempt_endpoint_scope.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -86,6 +87,7 @@ export const KEY_MONTHLY_BUDGET_FILENAME = '20260904_000001_key_monthly_budget.t
 export const REQUEST_MODEL_ATTRIBUTION_FILENAME = '20260913_000001_request_model_attribution.ts';
 export const KEY_MONTHLY_USAGE_FILENAME = '20260914_000001_key_monthly_usage.ts';
 export const QUOTA_SNAPSHOT_FRESHNESS_FILENAME = '20260915_000001_quota_snapshot_freshness.ts';
+export const ATTEMPT_ENDPOINT_SCOPE_FILENAME = '20260917_000001_attempt_endpoint_scope.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -126,4 +128,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: REQUEST_MODEL_ATTRIBUTION_FILENAME, module: requestModelAttribution },
   { filename: KEY_MONTHLY_USAGE_FILENAME, module: keyMonthlyUsage },
   { filename: QUOTA_SNAPSHOT_FRESHNESS_FILENAME, module: quotaSnapshotFreshness },
+  { filename: ATTEMPT_ENDPOINT_SCOPE_FILENAME, module: attemptEndpointScope },
 ];
