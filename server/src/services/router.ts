@@ -983,11 +983,22 @@ interface ScoredEntry {
 // must scale to match or the headroom guardrail damps a multi-key model to the
 // floor after just one account's worth of tokens.
 function usableKeyCountsByPlatform(db: Db): Map<string, number> {
+  // Per-request GROUP BY on api_keys; only changes on key writes. Real-time
+  // correctness is backed by selectKeyForModel's live per-key checks — a stale
+  // count can at worst walk one extra candidate, never route to a dead key.
+  // ponytail: 5s TTL instead of write-point invalidation; per-write hooks if that ever matters.
+  if (cachesEnabled() && keyCountsCache && keyCountsCache.db === db && Date.now() - keyCountsCache.at < KEY_COUNTS_TTL_MS) {
+    return keyCountsCache.map;
+  }
   const rows = db.prepare(
     "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
   ).all() as { platform: string; count: number }[];
-  return new Map(rows.map(r => [r.platform, r.count]));
+  const map = new Map(rows.map(r => [r.platform, r.count]));
+  keyCountsCache = { db, at: Date.now(), map };
+  return map;
 }
+const KEY_COUNTS_TTL_MS = 5_000;
+let keyCountsCache: { db: Db; at: number; map: Map<string, number> } | null = null;
 
 function scoreChainEntry(
   entry: ChainRow,
@@ -1178,10 +1189,29 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
  * (`auto:<name>`) correctly refused. `fallback_config` is the chain only for an
  * install with no profile at all.
  */
+// Chain cache: the active chain only changes on admin writes (models/profiles/
+// fallback_config), not per request — but routeRequest used to re-run the JOIN
+// on every request (synchronously, on the event loop). Cache by db+profileId
+// with a 1s TTL safety net; a profile switch changes profileId so it takes
+// effect immediately. Copy on return: callers like routeRequest splice/unshift.
+// Bypassed under NODE_ENV=test: suites write chain tables via raw SQL and route
+// immediately afterwards.
+let chainCache: { db: Db; profileId: number | null; rows: ChainRow[]; at: number } | null = null;
+const CHAIN_CACHE_TTL_MS = 1_000;
+
+function cachesEnabled(): boolean {
+  return process.env.NODE_ENV !== 'test';
+}
+
 function getActiveChain(db: Db): ChainRow[] {
   const profileId = getActiveProfileId(db);
+  if (cachesEnabled() && chainCache && chainCache.db === db && chainCache.profileId === profileId
+      && Date.now() - chainCache.at < CHAIN_CACHE_TTL_MS) {
+    return chainCache.rows.slice();
+  }
+  let rows: ChainRow[];
   if (profileId != null) {
-    return db.prepare(`
+    rows = db.prepare(`
       SELECT pm.model_db_id, pm.priority, pm.enabled,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
@@ -1192,18 +1222,20 @@ function getActiveChain(db: Db): ChainRow[] {
       WHERE pm.profile_id = ?
       ORDER BY pm.priority ASC
     `).all(profileId) as ChainRow[];
+  } else {
+    rows = db.prepare(`
+      SELECT fc.model_db_id, fc.priority, fc.enabled,
+             m.platform, m.model_id, m.display_name, m.intelligence_rank,
+             m.size_label, m.monthly_token_budget,
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
+             m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+      FROM fallback_config fc
+      JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
+      ORDER BY fc.priority ASC
+    `).all() as ChainRow[];
   }
-
-  return db.prepare(`
-    SELECT fc.model_db_id, fc.priority, fc.enabled,
-           m.platform, m.model_id, m.display_name, m.intelligence_rank,
-           m.size_label, m.monthly_token_budget,
-           m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
-    FROM fallback_config fc
-    JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
-    ORDER BY fc.priority ASC
-  `).all() as ChainRow[];
+  chainCache = { db, profileId, rows, at: Date.now() };
+  return rows.slice();
 }
 
 function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
@@ -1411,6 +1443,20 @@ function orderKeysByRemainingQuota(entry: ChainRow, ordered: KeyRow[]): KeyRow[]
  * Request-level filters (vision/tools/context window) stay in the caller; this
  * only does key selection + accounting pre-checks.
  */
+// Key decryption cache: AES-GCM decrypt of every candidate key used to run on
+// each routing pass. Keyed by ciphertext — a rotated/updated key changes its
+// encrypted_key, so stale entries can never be served and there is no hook to
+// wire. ponytail: unbounded Map; a keys page refresh prunes nothing, but one
+// entry is ~64 bytes and key counts are human-scale.
+const decryptCache = new Map<number, { ct: string; plain: string }>();
+function cachedDecrypt(keyId: number, ct: string, iv: string, authTag: string): string {
+  const hit = decryptCache.get(keyId);
+  if (hit && hit.ct === ct) return hit.plain;
+  const plain = decrypt(ct, iv, authTag);
+  decryptCache.set(keyId, { ct, plain });
+  return plain;
+}
+
 function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>, diag?: string[]): RouteResult | null {
   const db = getDb();
   const label = `${entry.platform}/${entry.model_id}`;
@@ -1510,7 +1556,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
 
     let decryptedKey: string;
     try {
-      decryptedKey = decrypt(key.encrypted_key, key.iv, key.auth_tag);
+      decryptedKey = cachedDecrypt(key.id, key.encrypted_key, key.iv, key.auth_tag);
     } catch {
       db.prepare("UPDATE api_keys SET status = 'error', last_checked_at = datetime('now') WHERE id = ?")
         .run(key.id);
