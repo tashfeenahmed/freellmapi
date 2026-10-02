@@ -406,6 +406,34 @@ export function setHeadroomThresholds(rampStart?: number | null, floor?: number 
   apply(HEADROOM_FLOOR_KEY, floor);
 }
 
+// ── Minimum reliability floor (#filter) ─────────────────────────────────────
+// Operators who keep hitting models/keys with a high error rate can set a floor
+// (0..1 decimal, e.g. 0.8 = drop anything observed below 80% success). Only
+// models with enough live samples are judged; under-observed ones stay in the
+// exploration pool so cold-start models are never silently killed. Absent/invalid
+// values disable the filter (existing installs untouched).
+export const MIN_RELIABILITY_FLOOR_KEY = 'routing_min_reliability_floor';
+
+export function getMinReliabilityFloor(): number | undefined {
+  const raw = getSetting(MIN_RELIABILITY_FLOOR_KEY);
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+}
+
+// null clears the floor back to the default (disabled); undefined leaves it untouched.
+export function setMinReliabilityFloor(floor?: number | null): void {
+  if (floor === undefined) return;
+  if (floor === null) {
+    getDb().prepare('DELETE FROM settings WHERE key = ?').run(MIN_RELIABILITY_FLOOR_KEY);
+    return;
+  }
+  if (!Number.isFinite(floor) || floor < 0 || floor > 1) {
+    throw new Error(`Invalid value ${floor} for ${MIN_RELIABILITY_FLOOR_KEY} (must be 0..1)`);
+  }
+  setSetting(MIN_RELIABILITY_FLOOR_KEY, String(floor));
+}
+
 // ── Task-type weight share (persisted) ─────────────────────────────────────
 // #1127 follow-up: the bandit bias applied for a declared/derived task type
 // moves `share` of one axis onto the other (code: speed → intelligence; chat:
@@ -1059,6 +1087,37 @@ function scoreChainEntry(
 }
 
 /**
+ * Drop models whose observed success rate sits below the operator's reliability
+ * floor. Under-observed models (fewer than EXPLORE_MIN_SAMPLES live samples)
+ * are kept so cold-start models stay in the exploration pool. If the floor would
+ * empty the whole chain, the filter is skipped entirely — better a possibly-flaky
+ * model than no model at all. #filter.
+ */
+export function applyReliabilityFloor(chain: ChainRow[]): ChainRow[] {
+  const floor = getMinReliabilityFloor();
+  if (floor === undefined) return chain;
+
+  const kept: ChainRow[] = [];
+  const dropped: ChainRow[] = [];
+  for (const e of chain) {
+    const stats = statsCache?.get(modelStatsKey(e.platform, e.model_id, e.endpoint_scope));
+    const total = (stats?.successes ?? 0) + (stats?.failures ?? 0);
+    if (total < EXPLORE_MIN_SAMPLES) {
+      kept.push(e); // not enough signal yet — keep exploring
+      continue;
+    }
+    const rel = expectedReliability(
+      stats!.successes, stats!.failures,
+      activeCommunityPrior(e.platform, e.model_id, e.endpoint_scope),
+    );
+    if (rel < floor) dropped.push(e);
+    else kept.push(e);
+  }
+  // Safety valve: never leave routing with an empty candidate set.
+  return kept.length > 0 ? kept : chain;
+}
+
+/**
  * Order the enabled fallback chain for routing.
  *  - 'priority' strategy → legacy manual order + 429 penalty (unchanged).
  *  - bandit strategy      → convex score, manual priority as the deterministic
@@ -1123,6 +1182,9 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
     const adjusted = taskAdjustedWeights(weights, task, strategy, getTaskWeightShare());
     weights = adjusted.adjusted ? adjusted.weights : weights;
   }
+
+  // Reliability floor: drop chronically-failing models before scoring (#filter).
+  chain = applyReliabilityFloor(chain);
 
   const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   const intelMin = composites.length ? Math.min(...composites) : 0;

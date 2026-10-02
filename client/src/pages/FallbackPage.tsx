@@ -48,6 +48,7 @@ import { ModelsTabs } from '@/components/models-tabs'
 import { Tooltip } from '@/components/tooltip'
 import { PenaltyInspector } from '@/components/penalty-inspector'
 import { PeakHoursControls } from '@/components/peak-hours-controls'
+import { ReliabilityFloorControl } from '@/components/reliability-floor-control'
 import { ChainManager } from '@/components/chain-manager'
 
 // `tKey` is the i18n suffix under `strategies.*` (label) and `strategies.*Blurb`.
@@ -488,6 +489,12 @@ export default function FallbackPage() {
                   onSave={p => strategyMutation.mutate({ strategy, ...p })}
                 />
               )}
+
+              {/* Minimum reliability floor (#filter): independent of the strategy
+                  snapshot — lives in settings, so it owns its own query/mutation.
+                  Shown in every mode; the floor pre-filters the candidate chain
+                  regardless of how models are ranked. */}
+              <ReliabilityFloorControl />
             </div>
           )}
 
