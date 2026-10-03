@@ -1,4 +1,5 @@
 import http from 'http';
+import { assertZeroSpendRequest, strictZeroSpend, ZeroSpendError } from './zero-spend.js';
 import https from 'https';
 import { execFileSync } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -830,6 +831,10 @@ export async function proxyFetch(
   requestType: ProxyRequestType = 'unknown',
   timeoutMs?: number,
 ): Promise<Response> {
+  assertZeroSpendRequest(url, init, platform);
+  // A reviewed endpoint cannot delegate billing/credential handling to a
+  // different destination through an HTTP redirect.
+  if (strictZeroSpend()) init = { ...init, redirect: 'error' };
   try {
     // SSRF guard (#440): 'custom' is the only platform whose target URL is
     // user-supplied (base_url on the api_keys row), so it is re-assessed on
@@ -905,6 +910,7 @@ async function dispatchFetch(
   }
 
   if (_proxyMode === 'fetch-relay' && _proxyUrl) {
+    if (strictZeroSpend()) throw new ZeroSpendError('application-layer fetch relay is not reviewed');
     return fetchRelayFetch(_proxyUrl, url, init, _fetchRelayToken);
   }
 

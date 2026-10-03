@@ -4,6 +4,9 @@
 // without forming an import cycle (fusion ↔ proxy in particular).
 
 export function isRetryableError(err: any): boolean {
+  // A local policy denial is not an upstream failure. Do not fail over, apply
+  // a provider cooldown, or reinterpret its 403 as a model-tier rejection.
+  if (err?.code === 'zero_spend_blocked') return false;
   const msg = (err.message ?? '').toLowerCase();
   // Trust the upstream HTTP status the provider attached to the error first
   // (providerHttpError in providers/base.ts sets err.status on every adapter).
@@ -586,6 +589,7 @@ export function isAccountSuspendedError(err: any): boolean {
 // validateKey returns false on 401/403, so the health checker disables genuinely
 // forbidden keys; a 403 reaching here is model-not-on-this-tier. See issue #256.
 export function isModelAccessForbiddenError(err: any): boolean {
+  if (err?.code === 'zero_spend_blocked') return false;
   if (err?.status === 403) return true;
   const msg = (err?.message ?? '').toLowerCase();
   if (msg.includes('403') || msg.includes('forbidden')) return true;

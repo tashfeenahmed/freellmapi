@@ -1589,7 +1589,12 @@ responsesRouter.post('/responses', async (req: Request, res: Response) => {
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);
-      res.status(502).json({ error: { message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`, type: 'provider_error' } });
+      const policyBlocked = err?.code === 'zero_spend_blocked';
+      res.status(policyBlocked ? 403 : 502).json({ error: {
+        message: policyBlocked ? sanitizeProviderErrorMessage(err.message) : `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(err.message)}`,
+        type: policyBlocked ? 'permission_error' : 'provider_error',
+        ...(policyBlocked ? { code: 'zero_spend_blocked' } : {}),
+      } });
     },
     onRoutingExhausted: (lastError, routeErr, exhaustion, info) => {
       if (streamStarted) {
