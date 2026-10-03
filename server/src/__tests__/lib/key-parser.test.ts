@@ -188,6 +188,23 @@ describe('key parser', () => {
     ]);
   });
 
+  it('parses newlines inside quoted CSV fields', () => {
+    const csv = 'platform,key,label,base_url\n"groq","gsk-test","work\nprimary",""\n';
+    expect(parseCsv(csv)).toEqual([
+      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq', label: 'work\nprimary' },
+    ]);
+  });
+
+  it('parses multiline and normal CSV records with CRLF line endings', () => {
+    const csv = 'platform,key,label,base_url\r\n' +
+      '"groq","gsk-test","work\r\nprimary",""\r\n' +
+      '"google","AIza-test","Google Key",""\r\n';
+    expect(parseCsv(csv)).toEqual([
+      { key: 'GROQ_KEY', value: 'gsk-test', platform: 'groq', label: 'work\r\nprimary' },
+      { key: 'GOOGLE_KEY', value: 'AIza-test', platform: 'google', label: 'Google Key' },
+    ]);
+  });
+
   it('parses CSV format without header', () => {
     const csv = 'google,AIza-test,Google Key\n';
     expect(parseCsv(csv)).toEqual([
