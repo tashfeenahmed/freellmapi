@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatCompletionChunk } from '@freellmapi/shared/types.js';
+
+// Collapse the #1369 validation min-gap before the provider module loads.
+vi.hoisted(() => { process.env.LLMTR_VALIDATION_MIN_GAP_MS = '0'; });
+
 import { LlmtrProvider } from '../../providers/llmtr.js';
 import { getProvider } from '../../providers/index.js';
 import { AUTH_JSON_PROVIDER_MAP, detectPlatform, parseKeysFromFile } from '../../lib/key-parser.js';
