@@ -41,6 +41,20 @@ a deliberately nonexistent model without generating tokens. Live valid/invalid
 controls returned `404/model_not_found` and `401/auth_error`, respectively.
 Other errors remain inconclusive; quota exhaustion does not mark a key invalid.
 
+## Key-validation pacing
+
+LLMTR publishes no numeric rate limit for this endpoint, but a burst of the same
+nonexistent-model probe from one IP is the pattern their security system reads as
+automation, and an account flagged that way gets suspended — the report on #1369
+came from an account that was already locked out and learned of it from the
+provider's own email. Probes are therefore paced: they run one at a time, and
+concurrent checks of the same key share a single request. The gap between the
+start of two probes defaults to 2 seconds and is tunable with
+`LLMTR_VALIDATION_MIN_GAP_MS` (`0` disables it).
+This covers every caller of the probe — the 5-minute health pass, the dashboard's
+"check all" button, the post-wake re-probe, the cooldown-probe job and the
+401-triggered revalidation. Chat and streaming traffic is never paced.
+
 Chat and streaming use the shared OpenAI-compatible transport, preserve usage and
 backoff, and reject mismatched response model IDs rather than silently accepting
 substitutions. No automatic paid fallback is introduced by this adapter.
