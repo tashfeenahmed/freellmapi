@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Oke token ọnwa",
     "capUnlimitedPlaceholder": "Enweghị oke",
     "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
-    "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a"
+    "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

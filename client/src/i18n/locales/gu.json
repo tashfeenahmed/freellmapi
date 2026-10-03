@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "માસિક ટોકન મર્યાદા",
     "capUnlimitedPlaceholder": "અમર્યાદિત",
     "capEditHint": "મર્યાદા દર મહિને 1 તારીખે 00:00 UTC પર રીસેટ થાય છે. અમર્યાદિત માટે ખાલી રાખો.",
-    "monthlyUsageLine": "આ મહિને {requests} વિનંતીઓ, {tokens} ટોકન"
+    "monthlyUsageLine": "આ મહિને {requests} વિનંતીઓ, {tokens} ટોકન",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

@@ -257,10 +257,25 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
   const statusOf = (k: ApiKey) => healthKeyMap.get(k.id)?.status ?? k.status
 
-  const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
-    ...p,
-    keys: keys.filter(k => k.platform === p.value),
-  })).filter(p => p.keys.length > 0)
+  // #1176: custom endpoints split into one group per operator-set groupLabel
+  // (label ?? 'Custom' as the fallback header); every other platform stays one
+  // group. Group ids are prefixed so a groupLabel can't collide with a
+  // platform value in the expand/collapse overrides.
+  const grouped = [
+    ...PLATFORMS.map(p => ({ ...p, keys: keys.filter(k => k.platform === p.value) })),
+    ...keys
+      .filter(k => k.platform === 'custom')
+      .reduce<{ value: string; label: string; url: string; keys: ApiKey[] }[]>((groups, k) => {
+        const label = k.groupLabel?.trim() || CUSTOM_GROUP.label
+        let group = groups.find(g => g.label === label)
+        if (!group) {
+          group = { value: `custom|${label}`, label, url: CUSTOM_GROUP.url, keys: [] }
+          groups.push(group)
+        }
+        group.keys.push(k)
+        return groups
+      }, []),
+  ].filter(p => p.keys.length > 0)
 
   const totalProviders = grouped.length
   const totalKeys = grouped.reduce((n, g) => n + g.keys.length, 0)

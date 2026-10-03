@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "ಮಾಸಿಕ ಟೋಕನ್ ಮಿತಿ",
     "capUnlimitedPlaceholder": "ಅಪರಿಮಿತ",
     "capEditHint": "ಮಿತಿಗಳು ಪ್ರತಿ ತಿಂಗಳು 1 ರಂದು 00:00 UTC ನಲ್ಲಿ ಮರುಹೊಂದಿಸುತ್ತವೆ. ಅಪರಿಮಿತಕ್ಕೆ ಖಾಲಿ ಬಿಡಿ.",
-    "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು"
+    "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

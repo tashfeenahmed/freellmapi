@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Limită lunară de tokeni",
     "capUnlimitedPlaceholder": "Nelimitat",
     "capEditHint": "Limitele se resetează în ziua 1 la 00:00 UTC. Lasă gol pentru nelimitat.",
-    "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta"
+    "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

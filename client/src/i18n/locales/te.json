@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "నెలవారీ టోకెన్ పరిమితి",
     "capUnlimitedPlaceholder": "అపరిమితం",
     "capEditHint": "ప్రతి నెలా 1వ తేదీన 00:00 UTCకు పరిమితులు రీసెట్ అవుతాయి. అపరిమితంగా కావాలంటే ఖాళీగా వదిలండి.",
-    "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు"
+    "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

@@ -97,10 +97,13 @@ const updateKeySchema = z.object({
   // Monthly budget caps (#1158): 0 clears the cap (unlimited).
   monthlyRequestCap: z.number().int().min(0).max(1_000_000_000).optional(),
   monthlyTokenCap: z.number().int().min(0).max(1_000_000_000_000).optional(),
+  // Custom-endpoint group label (#1176): '' clears it back to the single
+  // "Custom" group; absent leaves it unchanged.
+  groupLabel: z.string().trim().max(80).optional(),
   // An absent credential leaves the encrypted key untouched.
   key: z.string().trim().min(1).optional(),
-}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined || data.monthlyRequestCap !== undefined || data.monthlyTokenCap !== undefined, {
-  message: 'At least one of enabled, label, modelScope, proxyUrl, key, monthlyRequestCap or monthlyTokenCap must be provided',
+}).refine(data => data.enabled !== undefined || data.label !== undefined || data.modelScope !== undefined || data.proxyUrl !== undefined || data.key !== undefined || data.monthlyRequestCap !== undefined || data.monthlyTokenCap !== undefined || data.groupLabel !== undefined, {
+  message: 'At least one of enabled, label, modelScope, proxyUrl, key, monthlyRequestCap, monthlyTokenCap or groupLabel must be provided',
 });
 
 const importKeySchema = z.object({
@@ -408,6 +411,9 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       label: row.label,
       maskedKey,
       baseUrl: row.base_url ?? null,
+      // Optional custom-endpoint group label (#1176); null = legacy single
+      // "Custom" group.
+      groupLabel: row.group_label ?? null,
       monthlyRequestCap: budgetCaps.requestCap,
       monthlyTokenCap: budgetCaps.tokenCap,
       monthlyUsage: {
@@ -1751,7 +1757,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { enabled, label, modelScope, proxyUrl, key, monthlyRequestCap, monthlyTokenCap } = parsed.data;
+  const { enabled, label, modelScope, proxyUrl, key, monthlyRequestCap, monthlyTokenCap, groupLabel } = parsed.data;
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
   let changedKey: string | undefined;
@@ -1811,6 +1817,12 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   if (monthlyTokenCap !== undefined) {
     updates.push('monthly_token_cap = ?');
     values.push(monthlyTokenCap);
+  }
+  // Custom-endpoint group label (#1176): '' clears it back to NULL (the single
+  // legacy "Custom" group).
+  if (groupLabel !== undefined) {
+    updates.push('group_label = ?');
+    values.push(groupLabel === '' ? null : groupLabel);
   }
   // Deduped; an empty result stores NULL, which the router reads as "unscoped".
   const scopeIds = modelScope == null ? [] : [...new Set(modelScope)];

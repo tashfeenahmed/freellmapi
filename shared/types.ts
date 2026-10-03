@@ -316,6 +316,9 @@ export interface ApiKey {
   label: string;
   maskedKey: string;
   baseUrl: string | null;
+  /** Optional custom-endpoint group label (#1176); null = legacy single
+   *  "Custom" group. Only set on platform='custom' rows. */
+  groupLabel?: string | null;
   status: KeyStatus;
   enabled: boolean;
   /** This row is the anonymous sentinel of a key-optional platform: there is

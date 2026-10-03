@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Месячный лимит токенов",
     "capUnlimitedPlaceholder": "Без ограничений",
     "capEditHint": "Лимиты сбрасываются 1-го числа в 00:00 UTC. Оставьте пустым для безлимита.",
-    "monthlyUsageLine": "{requests} запросов, {tokens} токенов в этом месяце"
+    "monthlyUsageLine": "{requests} запросов, {tokens} токенов в этом месяце",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

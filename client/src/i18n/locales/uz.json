@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Oylik token chegarasi",
     "capUnlimitedPlaceholder": "Cheksiz",
     "capEditHint": "Chegaralar har oyning 1-sana 00:00 UTC da tiklanadi. Cheksiz uchun bo‘sh qoldiring.",
-    "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token"
+    "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "මාසික ටෝකන් සීමාව",
     "capUnlimitedPlaceholder": "සීමා රහිත",
     "capEditHint": "සීමාවන් සෑම මාසයකම 1 වන දා 00:00 UTC ට යළි සකසයි. සීමා රහිතට හිස්ව තබන්න.",
-    "monthlyUsageLine": "මෙම මාසය ඉල්ලීම් {requests}, ටෝකන් {tokens}"
+    "monthlyUsageLine": "මෙම මාසය ඉල්ලීම් {requests}, ටෝකන් {tokens}",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

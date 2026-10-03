@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "ដែនកំណត់តូខិនប្រចាំខែ",
     "capUnlimitedPlaceholder": "គ្មានដែនកំណត់",
     "capEditHint": "ដែនកំណត់កំណត់ឡើងវិញនៅថ្ងៃទី 1 ម៉ោង 00:00 UTC ទុកទទេប្រសិនបើគ្មានដែនកំណត់។",
-    "monthlyUsageLine": "ខែនេះ {requests} ស្នើសុំ {tokens} តូខិន"
+    "monthlyUsageLine": "ខែនេះ {requests} ស្នើសុំ {tokens} តូខិន",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

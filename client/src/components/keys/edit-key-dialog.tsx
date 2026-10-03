@@ -16,6 +16,7 @@ type UpdateBody = {
   key?: string
   monthlyRequestCap?: number
   monthlyTokenCap?: number
+  groupLabel?: string
 }
 
 /** Parse a budget-cap input: blank or 0 means unlimited (0); otherwise a
@@ -49,6 +50,9 @@ export function EditKeyDialog({
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [accountId, setAccountId] = useState('')
   const [attempted, setAttempted] = useState(false)
+  // Custom-endpoint group label (#1176): '' = the single legacy Custom group.
+  const [groupLabel, setGroupLabel] = useState(apiKey.groupLabel ?? '')
+  const isCustom = apiKey.platform === 'custom'
   // Monthly budget caps (#1158): editable here so the cap is settable from
   // the dashboard at all; it shipped API-only. Empty = unlimited.
   const [requestCap, setRequestCap] = useState(capToInput(apiKey.monthlyRequestCap))
@@ -74,7 +78,8 @@ export function EditKeyDialog({
   const capError = requestCapValue === null || tokenCapValue === null
   const requestCapChanged = requestCapValue !== (apiKey.monthlyRequestCap || 0)
   const tokenCapChanged = tokenCapValue !== (apiKey.monthlyTokenCap || 0)
-  const hasChanges = label !== apiKey.label || Boolean(credential) || requestCapChanged || tokenCapChanged
+  const groupLabelChanged = isCustom && groupLabel.trim() !== (apiKey.groupLabel ?? '')
+  const hasChanges = label !== apiKey.label || Boolean(credential) || requestCapChanged || tokenCapChanged || groupLabelChanged
 
   const updateKey = useMutation({
     mutationFn: (body: UpdateBody) =>
@@ -97,6 +102,7 @@ export function EditKeyDialog({
     if (credential) body.key = credential
     if (requestCapChanged && requestCapValue !== null) body.monthlyRequestCap = requestCapValue
     if (tokenCapChanged && tokenCapValue !== null) body.monthlyTokenCap = tokenCapValue
+    if (groupLabelChanged) body.groupLabel = groupLabel.trim()
     if (Object.keys(body).length > 0) updateKey.mutate(body)
     else onOpenChange(false)
   }
@@ -136,6 +142,19 @@ export function EditKeyDialog({
             <div className="space-y-1.5">
               <Label className="text-xs">{t('keys.customBaseUrl')}</Label>
               <Input value={apiKey.baseUrl} readOnly className="bg-muted/30 font-mono text-xs" />
+            </div>
+          )}
+
+          {isCustom && (
+            <div className="space-y-1.5">
+              <Label className="text-xs" htmlFor="edit-key-group">{t('keys.groupLabel')}</Label>
+              <Input
+                id="edit-key-group"
+                value={groupLabel}
+                onChange={e => setGroupLabel(e.target.value)}
+                placeholder={t('keys.groupLabelPlaceholder')}
+              />
+              <p className="text-[11px] text-muted-foreground">{t('keys.groupLabelHint')}</p>
             </div>
           )}
 

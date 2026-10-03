@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Buwanang limit ng token",
     "capUnlimitedPlaceholder": "Walang limit",
     "capEditHint": "Nireset ang limit sa ika-1 ng buwan, 00:00 UTC. Iwanang blangko kung walang limit.",
-    "monthlyUsageLine": "{requests} kahilingan, {tokens} token ngayong buwan"
+    "monthlyUsageLine": "{requests} kahilingan, {tokens} token ngayong buwan",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

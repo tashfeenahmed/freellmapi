@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "ମାସିକ ଟୋକେନ୍ ସୀମା",
     "capUnlimitedPlaceholder": "ଅସୀମିତ",
     "capEditHint": "ସୀମା ପ୍ରତି ମାସର ୧ ତାରିଖରେ ୦୦:୦୦ UTC ରେ ରିସେଟ୍ ହୁଏ। ଅସୀମିତ ପାଇଁ ଖାଲି ରଖନ୍ତୁ।",
-    "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍"
+    "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

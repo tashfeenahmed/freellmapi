@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Aylık token sınırı",
     "capUnlimitedPlaceholder": "Sınırsız",
     "capEditHint": "Sınırlar her ayın 1'inde 00:00 UTC'de sıfırlanır. Sınırsız için boş bırakın.",
-    "monthlyUsageLine": "Bu ay {requests} istek, {tokens} token"
+    "monthlyUsageLine": "Bu ay {requests} istek, {tokens} token",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

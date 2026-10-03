@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Mesačný limit tokenov",
     "capUnlimitedPlaceholder": "Neobmedzene",
     "capEditHint": "Limity sa resetujú 1. dňa o 00:00 UTC. Pre neobmedzene nechajte prázdne.",
-    "monthlyUsageLine": "{requests} požiadaviek, {tokens} tokenov tento mesiac"
+    "monthlyUsageLine": "{requests} požiadaviek, {tokens} tokenov tento mesiac",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

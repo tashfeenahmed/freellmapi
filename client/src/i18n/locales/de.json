@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Monatliches Token-Limit",
     "capUnlimitedPlaceholder": "Unbegrenzt",
     "capEditHint": "Limits werden am 1. um 00:00 UTC zurückgesetzt. Leer lassen für unbegrenzt.",
-    "monthlyUsageLine": "{requests} Anfragen, {tokens} Tokens diesen Monat"
+    "monthlyUsageLine": "{requests} Anfragen, {tokens} Tokens diesen Monat",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

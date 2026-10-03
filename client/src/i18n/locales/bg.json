@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Месечен лимит на токени",
     "capUnlimitedPlaceholder": "Неограничен",
     "capEditHint": "Лимитите се нулират на 1-во число 00:00 UTC. Оставете празно за неограничен.",
-    "monthlyUsageLine": "{requests} заявки, {tokens} токени този месец"
+    "monthlyUsageLine": "{requests} заявки, {tokens} токени този месец",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",

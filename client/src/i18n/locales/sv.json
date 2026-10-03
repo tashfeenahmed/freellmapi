@@ -685,7 +685,10 @@
     "monthlyTokenCapLabel": "Månadslimit för tokens",
     "capUnlimitedPlaceholder": "Obegränsat",
     "capEditHint": "Gränserna nollställs den 1:a kl 00:00 UTC. Lämna tomt för obegränsat.",
-    "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad"
+    "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad",
+    "groupLabel": "Group",
+    "groupLabelPlaceholder": "e.g. Relays, Work…",
+    "groupLabelHint": "Optional: endpoints sharing a group label are listed together on the Keys page. Leave blank for the default Custom group."
   },
   "backups": {
     "title": "Backups",
