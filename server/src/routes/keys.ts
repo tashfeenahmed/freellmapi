@@ -45,6 +45,8 @@ const PLATFORMS = [
   'aclide',
   'speka',
   'llmtr',
+  'gizmo',
+  'blockrun',
   'moondream',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'github', 'cohere', 'cloudflare', 'zhipu', 'ollama',
