@@ -2,6 +2,7 @@ import './env.js';
 import { createApp } from './app.js';
 import { initDb, getDb } from './db/index.js';
 import { startHealthChecker, checkAllKeys } from './services/health.js';
+import { startModelPruning } from './services/model-pruning.js';
 import { restoreProxySettings, flushProxyCache } from './lib/proxy.js';
 import { startWakeDetect } from './lib/wake-detect.js';
 import { startCatalogSync } from './services/catalog-sync.js';
@@ -87,6 +88,7 @@ async function main() {
     startBackupScheduler(scheduler);
     startCustomModelSync(getDb(), scheduler);
     startBuiltinModelDiscovery(getDb(), scheduler);
+    startModelPruning(scheduler);
 
     // Post-sleep recovery: while the host was suspended (laptop lid, VM
     // pause) timers and keep-alive sockets froze, so the first requests after
