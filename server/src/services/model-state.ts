@@ -265,6 +265,7 @@ export function reinstateUpstreamRetiredCatalogModel(
     .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(platform, modelId) as { id: number } | undefined;
   if (row) {
+    db.prepare('UPDATE models SET enabled = 1 WHERE id = ?').run(row.id);
     db.prepare('UPDATE fallback_config SET enabled = 1 WHERE model_db_id = ?').run(row.id);
     db.prepare('UPDATE profile_models SET enabled = 1 WHERE model_db_id = ?').run(row.id);
   }
@@ -430,4 +431,47 @@ export function deleteTombstonedCatalogModels(db: Db): number {
   }
 
   return chatRows.length + mediaRows.length;
+}
+
+/**
+ * Prune models that have been retired upstream (source = 'upstream_eol').
+ * Sets models.enabled = 0 so they are excluded from routing chains.
+ * Returns the number of models pruned.
+ */
+export function pruneUpstreamRetiredModels(db: Db): number {
+  const chatRows = db.prepare(`
+    SELECT m.id, m.platform, m.model_id
+      FROM models m
+      JOIN catalog_model_tombstones t
+        ON t.kind = 'chat' AND t.platform = m.platform AND t.model_id = m.model_id
+     WHERE t.source = 'upstream_eol' AND m.enabled = 1
+  `).all() as { id: number; platform: string; model_id: string }[];
+  const mediaRows = db.prepare(`
+    SELECT mm.id, mm.platform, mm.model_id
+      FROM media_models mm
+      JOIN catalog_model_tombstones t
+        ON t.kind = 'media' AND t.platform = mm.platform AND t.model_id = mm.model_id
+     WHERE t.source = 'upstream_eol' AND mm.enabled = 1
+  `).all() as { id: number; platform: string; model_id: string }[];
+
+  const updateChat = db.prepare('UPDATE models SET enabled = 0 WHERE id = ?');
+  const updateMedia = db.prepare('UPDATE media_models SET enabled = 0 WHERE id = ?');
+  const updateFallback = db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?');
+  const updateProfile = db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?');
+
+  let pruned = 0;
+  for (const row of chatRows) {
+    updateChat.run(row.id);
+    updateFallback.run(row.id);
+    updateProfile.run(row.id);
+    console.log(`[ModelPruning] Disabled upstream-retired model: ${row.platform}/${row.model_id}`);
+    pruned++;
+  }
+  for (const row of mediaRows) {
+    updateMedia.run(row.id);
+    console.log(`[ModelPruning] Disabled upstream-retired media model: ${row.platform}/${row.model_id}`);
+    pruned++;
+  }
+
+  return pruned;
 }
