@@ -73,7 +73,8 @@ export function inBandCreditsError(text: string | null | undefined): string | nu
 /** A provider's key-info/quota endpoint (#1403): the GET URL and the JSON
  * field names carrying the limit and the remaining balance. Fields are looked
  * up first under a `data` wrapper (OpenRouter style), then at the top level.
- * `remaining` semantics follow `metric` (credits = USD, tokens = tokens). */
+ * `credits` are in the provider's own currency (OpenRouter USD, SiliconFlow
+ * CNY); `notes` names it. Only a reading with a limit feeds routing headroom. */
 export interface QuotaProbeSpec {
   url: string;
   metric: QuotaMetric;
