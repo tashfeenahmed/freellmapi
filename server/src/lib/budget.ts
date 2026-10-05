@@ -32,8 +32,9 @@ export function parseBudget(s: string): number {
   // "no budget info" (0), per this function's contract. Without the required
   // unit the old regex parsed "free · 40 RPM" as 40 tokens, which showed a
   // bogus budget and made the headroom guardrail penalize the model after one
-  // request.
-  const m = head.match(/~?([\d.]+)(?:-([\d.]+))?([mk])/);
+  // request. The unit must end the token ('5min', '1mo' are not 5M/1M): the
+  // lowercased scan would otherwise read a time unit as a magnitude.
+  const m = head.match(/~?([\d.]+)(?:-([\d.]+))?([mk])(?![a-z])/);
   if (!m) return 0;
   const high = parseFloat(m[2] ?? m[1]);
   if (Number.isNaN(high)) return 0;
@@ -44,8 +45,10 @@ export function parseBudget(s: string): number {
   if (/^\s*(?:rpd|rpm|rph|rps|req|requests?|calls?|messages?|prompts?|neurons?)\b/.test(tail)) return 0;
   const tokens = high * (m[3] === 'm' ? 1_000_000 : 1_000);
   // A per-day cap is a daily allowance; the column asks for the monthly one,
-  // and the pool renews every day (×30). Only a day/24h period qualifies.
-  const perDay = /\b(?:per\s*)?days?\b|\bdaily\b|\b24\s*h(?:rs?|ours?)?\b/.test(head);
+  // and the pool renews every day (×30). Only a day/24h period qualifies, and
+  // only when it qualifies THIS number ('~120M/mo, 1M/day max' is monthly).
+  const period = tail.split(/[,·;]/)[0];
+  const perDay = /\b(?:per\s*)?days?\b|\bdaily\b|\b24\s*h(?:rs?|ours?)?\b/.test(period);
   return perDay ? tokens * 30 : tokens;
 }
 

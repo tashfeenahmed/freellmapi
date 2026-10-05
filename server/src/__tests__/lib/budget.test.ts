@@ -48,10 +48,17 @@ describe('parseBudget', () => {
     expect(parseBudget('free · 20k tok/day')).toBe(600_000);
   });
 
+  it('never reads a time or month unit as a magnitude', () => {
+    expect(parseBudget('free 5min window')).toBe(0);
+    expect(parseBudget('1mo trial')).toBe(0);
+    expect(parseBudget('free · 20k tok/day')).toBe(600_000);
+  });
+
   it('keeps monthly labels unaffected by the daily scaling', () => {
     expect(parseBudget('~3M (1k credits)')).toBe(3_000_000);
     expect(parseBudget('free · $10/month shared API credits')).toBe(0);
     expect(parseBudget('$0.10/mo shared credit')).toBe(0);
+    expect(parseBudget('~120M/mo, 1M/day max')).toBe(120_000_000);
   });
 });
 
