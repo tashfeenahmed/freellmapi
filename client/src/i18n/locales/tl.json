@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Walang limit",
     "capEditHint": "Nireset ang limit sa ika-1 ng buwan, 00:00 UTC. Iwanang blangko kung walang limit.",
     "monthlyUsageLine": "{requests} kahilingan, {tokens} token ngayong buwan",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} sa {limit} {metric} ang natitira",
+    "quotaBalanceLeft": "{remaining} ang natitira"
   },
   "backups": {
     "title": "Backups",

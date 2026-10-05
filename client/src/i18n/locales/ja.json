@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "無制限",
     "capEditHint": "上限は毎月1日 00:00 UTC にリセットされます。無制限は空欄のままにしてください。",
     "monthlyUsageLine": "今月 {requests} リクエスト、{tokens} トークン",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric}中 残り {remaining}",
+    "quotaBalanceLeft": "残り {remaining}"
   },
   "backups": {
     "title": "Backups",

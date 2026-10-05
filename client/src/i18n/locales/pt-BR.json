@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Ilimitado",
     "capEditHint": "Os limites são redefinidos no dia 1 às 00:00 UTC. Deixe em branco para ilimitado.",
     "monthlyUsageLine": "{requests} solicitações, {tokens} tokens este mês",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Restam {remaining} de {limit} {metric}",
+    "quotaBalanceLeft": "Restam {remaining}"
   },
   "backups": {
     "title": "Backups",

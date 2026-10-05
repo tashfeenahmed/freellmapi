@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "ללא הגבלה",
     "capEditHint": "המכסות מתאפסות ב-1 בחודש ב-00:00 UTC. השאירו ריק כדי להישאר ללא הגבלה.",
     "monthlyUsageLine": "{requests} בקשות, {tokens} טוקנים החודש",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "נותרו {remaining} מתוך {limit} {metric}",
+    "quotaBalanceLeft": "נותרו {remaining}"
   },
   "backups": {
     "title": "Backups",

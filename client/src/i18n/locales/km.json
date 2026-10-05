@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "គ្មានដែនកំណត់",
     "capEditHint": "ដែនកំណត់កំណត់ឡើងវិញនៅថ្ងៃទី 1 ម៉ោង 00:00 UTC ទុកទទេប្រសិនបើគ្មានដែនកំណត់។",
     "monthlyUsageLine": "ខែនេះ {requests} ស្នើសុំ {tokens} តូខិន",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "នៅសល់ {remaining} ក្នុងចំណោម {limit} {metric}",
+    "quotaBalanceLeft": "នៅសល់ {remaining}"
   },
   "backups": {
     "title": "Backups",

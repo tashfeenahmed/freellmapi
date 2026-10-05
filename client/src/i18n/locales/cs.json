@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Neomezeno",
     "capEditHint": "Limity se resetují 1. dne v 00:00 UTC. Nechte prázdné pro neomezeno.",
     "monthlyUsageLine": "{requests} požadavků, {tokens} tokenů tento měsíc",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Zbývá {remaining} z {limit} {metric}",
+    "quotaBalanceLeft": "Zbývá {remaining}"
   },
   "backups": {
     "title": "Backups",

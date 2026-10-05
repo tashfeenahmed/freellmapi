@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Onbeperkt",
     "capEditHint": "Limieten worden op de 1e om 00:00 UTC gereset. Laat leeg voor onbeperkt.",
     "monthlyUsageLine": "{requests} verzoeken, {tokens} tokens deze maand",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} van {limit} {metric} over",
+    "quotaBalanceLeft": "{remaining} over"
   },
   "backups": {
     "title": "Backups",

@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Obegränsat",
     "capEditHint": "Gränserna nollställs den 1:a kl 00:00 UTC. Lämna tomt för obegränsat.",
     "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} av {limit} {metric} kvar",
+    "quotaBalanceLeft": "{remaining} kvar"
   },
   "backups": {
     "title": "Backups",

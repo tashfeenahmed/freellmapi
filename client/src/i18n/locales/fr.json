@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Illimité",
     "capEditHint": "Les plafonds sont réinitialisés le 1er à 00:00 UTC. Laissez vide pour illimité.",
     "monthlyUsageLine": "{requests} requêtes, {tokens} jetons ce mois",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} sur {limit} {metric} restants",
+    "quotaBalanceLeft": "{remaining} restants"
   },
   "backups": {
     "title": "Sauvegardes",

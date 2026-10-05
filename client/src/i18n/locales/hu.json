@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Korlátlan",
     "capEditHint": "A keretek havonta 1-jén 00:00 UTC-kor nullázódnak. Korlátlanhoz hagyja üresen.",
     "monthlyUsageLine": "{requests} kérés, {tokens} token ebben a hónapban",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} közül {remaining} maradt",
+    "quotaBalanceLeft": "{remaining} maradt"
   },
   "backups": {
     "title": "Backups",

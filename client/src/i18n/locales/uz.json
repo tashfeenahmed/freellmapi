@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Cheksiz",
     "capEditHint": "Chegaralar har oyning 1-sana 00:00 UTC da tiklanadi. Cheksiz uchun bo‘sh qoldiring.",
     "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} dan {remaining} qoldi",
+    "quotaBalanceLeft": "{remaining} qoldi"
   },
   "backups": {
     "title": "Backups",

@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "പരിധിയില്ല",
     "capEditHint": "പരിധികൾ ഓരോ മാസവും 1-ന് 00:00 UTC-ന് റീസെറ്റ് ചെയ്യും. പരിധിയില്ലാതെ വെച്ചാൽ മതി.",
     "monthlyUsageLine": "ഈ മാസം {requests} അഭ്യർത്ഥനകൾ, {tokens} ടോക്കണുകൾ",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric}-ൽ {remaining} ശേഷിക്കുന്നു",
+    "quotaBalanceLeft": "{remaining} ശേഷിക്കുന്നു"
   },
   "backups": {
     "title": "Backups",

@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Tanpa batas",
     "capEditHint": "Batas disetel ulang pada tanggal 1 pukul 00:00 UTC. Kosongkan untuk tanpa batas.",
     "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Tersisa {remaining} dari {limit} {metric}",
+    "quotaBalanceLeft": "Tersisa {remaining}"
   },
   "backups": {
     "title": "Backups",

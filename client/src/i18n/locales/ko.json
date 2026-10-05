@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "무제한",
     "capEditHint": "한도는 매월 1일 00:00 UTC에 초기화됩니다. 무제한이려면 비워 두세요.",
     "monthlyUsageLine": "이번 달 요청 {requests}회, 토큰 {tokens}",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} 중 {remaining} 남음",
+    "quotaBalanceLeft": "{remaining} 남음"
   },
   "backups": {
     "title": "Backups",

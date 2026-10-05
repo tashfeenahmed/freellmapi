@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "अमर्याद",
     "capEditHint": "मर्यादा दर महिन्याच्या 1 रोजी 00:00 UTC ला रीसेट होतात. अमर्यादसाठी रिकामे ठेवा.",
     "monthlyUsageLine": "या महिन्यात {requests} विनंत्या, {tokens} टोकन",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} पैकी {remaining} बाकी",
+    "quotaBalanceLeft": "{remaining} बाकी"
   },
   "backups": {
     "title": "Backups",

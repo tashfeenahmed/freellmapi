@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "အကန့်အသတ်မရှိ",
     "capEditHint": "အကန့်အသတ်များကို လ၏ ပထမရက် ၀၀:၀၀ UTC တွင် ပြန်ချမှတ်သည်။ မရှိလိုပါက ဗလာထားပါ။",
     "monthlyUsageLine": "ယခုလ တောင်းဆိုမှု {requests}၊ တိုကင် {tokens}",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} အနက် {remaining} ကျန်သည်",
+    "quotaBalanceLeft": "{remaining} ကျန်သည်"
   },
   "backups": {
     "title": "Backups",

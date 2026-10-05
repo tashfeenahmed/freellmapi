@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "અમર્યાદિત",
     "capEditHint": "મર્યાદા દર મહિને 1 તારીખે 00:00 UTC પર રીસેટ થાય છે. અમર્યાદિત માટે ખાલી રાખો.",
     "monthlyUsageLine": "આ મહિને {requests} વિનંતીઓ, {tokens} ટોકન",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric}માંથી {remaining} બાકી",
+    "quotaBalanceLeft": "{remaining} બાકી"
   },
   "backups": {
     "title": "Backups",

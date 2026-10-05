@@ -31,8 +31,8 @@ import {
   customModelDeletePath,
   statusDot,
   statusLabelKey,
-  balanceByKey,
 } from './shared'
+import { balanceByKey } from './quota-balance'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -47,6 +47,15 @@ type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 
 // #787: what the batch bar can do to the selected keys of one group.
 type BulkAction = 'enable' | 'disable' | 'delete'
+
+// #1403 phase 3: the balance badge names its unit with the Free tier page's
+// already-translated metric words.
+const METRIC_LABEL_KEY = {
+  requests: 'freeTier.metricRequests',
+  tokens: 'freeTier.metricTokens',
+  credits: 'freeTier.metricCredits',
+  neurons: 'freeTier.metricNeurons',
+} as const
 
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
@@ -593,7 +602,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                             {balance && (
                               <Tooltip
                                 text={balance.limit != null
-                                  ? t('keys.quotaBalanceHint', { remaining: new Intl.NumberFormat(locale).format(balance.remaining), limit: new Intl.NumberFormat(locale).format(balance.limit), metric: balance.metric })
+                                  ? t('keys.quotaBalanceHint', { remaining: new Intl.NumberFormat(locale).format(balance.remaining), limit: new Intl.NumberFormat(locale).format(balance.limit), metric: t(METRIC_LABEL_KEY[balance.metric]) })
                                   : t('keys.quotaBalanceLeft', { remaining: new Intl.NumberFormat(locale).format(balance.remaining) })}
                               >
                                 <Badge
@@ -604,8 +613,8 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     : 'text-muted-foreground'} ${k.enabled ? '' : 'opacity-50'}`}
                                 >
                                   {balance.limit != null && balance.fraction != null
-                                    ? `${Math.round(balance.fraction * 100)}% ${balance.metric}`
-                                    : `${new Intl.NumberFormat(locale).format(balance.remaining)} ${balance.metric}`}
+                                    ? `${Math.round(balance.fraction * 100)}% ${t(METRIC_LABEL_KEY[balance.metric])}`
+                                    : `${new Intl.NumberFormat(locale).format(balance.remaining)} ${t(METRIC_LABEL_KEY[balance.metric])}`}
                                 </Badge>
                               </Tooltip>
                             )}

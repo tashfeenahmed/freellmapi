@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nProvider } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import { ProviderList } from './provider-list'
-import { balanceByKey } from './shared'
+import { balanceByKey } from './quota-balance'
 import type { ApiKey, ProviderQuotaState } from '../../../../shared/types'
 
 vi.mock('@/lib/api', () => ({ apiFetch: vi.fn() }))
@@ -45,6 +45,21 @@ it('prefers a limited pool over an unlimited one for the same key', () => {
   ])
   expect(map.get(4)?.metric).toBe('requests')
   expect(map.get(4)?.fraction).toBeCloseTo(0.8)
+})
+
+it('skips windows that refill within the hour and windows already reset', () => {
+  const now = Date.parse('2026-10-04T10:00:00Z')
+  const map = balanceByKey([
+    // per-minute header window: resets in 30s → not a balance worth a badge
+    state({ keyId: 5, limit: 30, remaining: 1, resetAt: '2026-10-04T10:00:30Z' }),
+    // token bucket: refills continuously
+    state({ keyId: 6, limit: 100, remaining: 2, resetStrategy: 'token_bucket' }),
+    // already past its reset (sqlite format) → full again
+    state({ keyId: 7, limit: 100, remaining: 2, resetAt: '2026-10-04 09:00:00' }),
+    // daily window resetting tonight → shown
+    state({ keyId: 8, limit: 1000, remaining: 100, resetAt: '2026-10-05T00:00:00Z' }),
+  ], now)
+  expect([...map.keys()]).toEqual([8])
 })
 
 const apiKey = (over: Partial<ApiKey>): ApiKey => ({

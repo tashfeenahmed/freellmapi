@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Illimitato",
     "capEditHint": "I limiti si azzerano il 1 del mese alle 00:00 UTC. Lascia vuoto per illimitato.",
     "monthlyUsageLine": "{requests} richieste, {tokens} token questo mese",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Rimangono {remaining} di {limit} {metric}",
+    "quotaBalanceLeft": "Rimangono {remaining}"
   },
   "backups": {
     "title": "Backups",

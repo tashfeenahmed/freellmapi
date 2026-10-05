@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Neribota",
     "capEditHint": "Limitai atstatomi 1 d. 00:00 UTC. Palikite tuščią neribotam.",
     "monthlyUsageLine": "{requests} užklausos, {tokens} žetonai šį mėnesį",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Liko {remaining} iš {limit} {metric}",
+    "quotaBalanceLeft": "Liko {remaining}"
   },
   "backups": {
     "title": "Backups",

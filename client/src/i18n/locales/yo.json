@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Kò ní òpín",
     "capEditHint": "A tún òpín ṣe ní ọjọ́ kìíní ní 00:00 UTC. Fi sílẹ̀ ṣófo fún aláìlópin.",
     "monthlyUsageLine": "{requests} ìbéèrè, {tokens} token oṣù yìí",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} nínú {limit} {metric} ló kù",
+    "quotaBalanceLeft": "{remaining} ló kù"
   },
   "backups": {
     "title": "Backups",

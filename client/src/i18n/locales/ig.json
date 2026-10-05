@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Enweghị oke",
     "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
     "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{remaining} n'ime {limit} {metric} fọdụrụ",
+    "quotaBalanceLeft": "{remaining} fọdụrụ"
   },
   "backups": {
     "title": "Backups",

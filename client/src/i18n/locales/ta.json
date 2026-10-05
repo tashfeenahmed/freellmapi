@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "வரம்பற்றது",
     "capEditHint": "ஒவ்வொரு மாதம் 1ஆம் தேதி 00:00 UTC-ல் வரம்புகள் மீட்டமைக்கப்படும். வரம்பற்றதாக வெறியே விடவும்.",
     "monthlyUsageLine": "இந்த மாதம் {requests} கோரிக்கைகள், {tokens} டோக்கன்கள்",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric}-இல் {remaining} மீதம்",
+    "quotaBalanceLeft": "{remaining} மீதம்"
   },
   "backups": {
     "title": "Backups",

@@ -153,37 +153,3 @@ export interface HealthData {
   keys: { id: number; platform: string; status: string; lastCheckedAt: string | null; lastHealthError: string | null }[]
   quotaStates: ProviderQuotaState[]
 }
-
-// #1403 phase 3: the provider-reported balance to show on a key row. A key can
-// hold several quota pools (requests vs tokens, per account); the one with the
-// lowest remaining fraction is what runs dry first and starts sending traffic
-// around the key, so that's the pool the row should surface. States with no
-// numeric reading (null remaining/limit) carry no information a badge could
-// show, so they're skipped rather than rendered as 0%.
-export interface KeyBalance {
-  remaining: number
-  limit: number | null
-  metric: ProviderQuotaState['metric']
-  /** remaining/limit, or null when the provider never reported a limit. */
-  fraction: number | null
-}
-
-export function balanceByKey(states: ProviderQuotaState[]): Map<number, KeyBalance> {
-  const out = new Map<number, KeyBalance>()
-  for (const s of states) {
-    if (s.remaining == null) continue
-    const limit = s.limit ?? null
-    const fraction = limit != null && limit > 0 ? s.remaining / limit : null
-    const prev = out.get(s.keyId)
-    if (!prev) {
-      out.set(s.keyId, { remaining: s.remaining, limit, metric: s.metric, fraction })
-      continue
-    }
-    // Prefer the tighter fraction; when both lack a limit, the first reading
-    // stays (the poll returns them in stable platform/metric order).
-    if (fraction != null && (prev.fraction == null || fraction < prev.fraction)) {
-      out.set(s.keyId, { remaining: s.remaining, limit, metric: s.metric, fraction })
-    }
-  }
-  return out
-}

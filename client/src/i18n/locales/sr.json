@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Неограничено",
     "capEditHint": "Лимити се ресетују 1. у 00:00 UTC. Оставите празно за неограничено.",
     "monthlyUsageLine": "{requests} захтева, {tokens} токена овог месеца",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Преостало {remaining} од {limit} {metric}",
+    "quotaBalanceLeft": "Преостало {remaining}"
   },
   "backups": {
     "title": "Backups",

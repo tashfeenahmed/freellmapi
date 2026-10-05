@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "అపరిమితం",
     "capEditHint": "ప్రతి నెలా 1వ తేదీన 00:00 UTCకు పరిమితులు రీసెట్ అవుతాయి. అపరిమితంగా కావాలంటే ఖాళీగా వదిలండి.",
     "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric}లో {remaining} మిగిలింది",
+    "quotaBalanceLeft": "{remaining} మిగిలింది"
   },
   "backups": {
     "title": "Backups",

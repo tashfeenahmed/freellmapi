@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Nelimitat",
     "capEditHint": "Limitele se resetează în ziua 1 la 00:00 UTC. Lasă gol pentru nelimitat.",
     "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Au rămas {remaining} din {limit} {metric}",
+    "quotaBalanceLeft": "Au rămas {remaining}"
   },
   "backups": {
     "title": "Backups",

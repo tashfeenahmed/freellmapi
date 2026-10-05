@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Limitsiz",
     "capEditHint": "Limitlər hər ayın 1-i 00:00 UTC-də sıfırlanır. Limitsiz üçün boş buraxın.",
     "monthlyUsageLine": "Bu ay {requests} sorğu, {tokens} token",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} içindən {remaining} qalıb",
+    "quotaBalanceLeft": "{remaining} qalıb"
   },
   "backups": {
     "title": "Backups",

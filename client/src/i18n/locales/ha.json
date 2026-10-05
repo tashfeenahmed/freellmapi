@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Ba iyaka ba",
     "capEditHint": "Ana saita iyakoki a ranar 1 00:00 UTC. Bara komai don mara iyaka.",
     "monthlyUsageLine": "Buƙatotu {requests}, token {tokens} wannan wata",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Saura {remaining} daga {limit} {metric}",
+    "quotaBalanceLeft": "Saura {remaining}"
   },
   "backups": {
     "title": "Backups",

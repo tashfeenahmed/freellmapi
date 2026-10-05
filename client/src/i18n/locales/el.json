@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "Απεριόριστο",
     "capEditHint": "Τα όρια μηδενίζονται την 1η στις 00:00 UTC. Αφήστε κενό για απεριόριστο.",
     "monthlyUsageLine": "{requests} αιτήματα, {tokens} tokens αυτόν τον μήνα",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "Απομένουν {remaining} από {limit} {metric}",
+    "quotaBalanceLeft": "Απομένουν {remaining}"
   },
   "backups": {
     "title": "Backups",

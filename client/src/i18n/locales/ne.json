@@ -686,8 +686,8 @@
     "capUnlimitedPlaceholder": "असीमित",
     "capEditHint": "सीमा हरेक महिनाको १ गते ००:०० UTC मा रिसेट हुन्छ। असीमितका लागि खाली राख्नुहोस्।",
     "monthlyUsageLine": "यस महिना {requests} अनुरोध, {tokens} टोकन",
-    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceHint": "{limit} {metric} मध्ये {remaining} बाँकी",
+    "quotaBalanceLeft": "{remaining} बाँकी"
   },
   "backups": {
     "title": "Backups",
