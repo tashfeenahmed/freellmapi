@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Semakan kemas kini automatik",
     "autoUpdateCheckHelp": "Menyemak GitHub sekali sehari untuk keluaran baharu dan memaparkan peringatan. Dimatikan secara lalai.",
     "openReleases": "Buka Keluaran GitHub",
-    "restartAfterUpdate": "Mulakan semula FreeLLMAPI selepas binaan selesai."
+    "restartAfterUpdate": "Mulakan semula FreeLLMAPI selepas binaan selesai.",
+    "downloadUpdate": "Muat turun kemas kini",
+    "downloadingUpdate": "Memuat turun… {percent}%",
+    "restartToUpdate": "Mulakan semula untuk mengemas kini",
+    "updateReadyHint": "Selesai dimuat turun. FreeLLMAPI menyandarkan data anda, bermula semula dan membuka versi baharu.",
+    "updateInstallFailed": "Kemas kini tidak dapat dipasang."
   },
   "models": {
     "title": "Model",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Sebelum kemas kini"
   },
   "status": {
     "healthy": "sihat",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Versi FreeLLMAPI yang lebih baharu telah dipasang.",
+    "reload": "Muat semula"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

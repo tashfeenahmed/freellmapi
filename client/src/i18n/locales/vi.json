@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Tự động kiểm tra cập nhật",
     "autoUpdateCheckHelp": "Kiểm tra GitHub mỗi ngày một lần để tìm bản phát hành mới và hiển thị lời nhắc. Mặc định tắt.",
     "openReleases": "Mở GitHub Releases",
-    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng."
+    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng.",
+    "downloadUpdate": "Tải bản cập nhật",
+    "downloadingUpdate": "Đang tải… {percent}%",
+    "restartToUpdate": "Khởi động lại để cập nhật",
+    "updateReadyHint": "Đã tải xong. FreeLLMAPI sao lưu dữ liệu của bạn, khởi động lại và mở phiên bản mới.",
+    "updateInstallFailed": "Không thể cài đặt bản cập nhật."
   },
   "models": {
     "title": "Người mẫu",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Trước cập nhật"
   },
   "status": {
     "healthy": "khỏe mạnh",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Đã cài đặt phiên bản FreeLLMAPI mới hơn.",
+    "reload": "Tải lại"
   },
   "freeTier": {
     "poolsToggle": "Nhóm hạn mức miễn phí ({count})",

@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Comprobación automática de actualizaciones",
     "autoUpdateCheckHelp": "Consulta GitHub una vez al día para ver si hay una nueva versión y muestra un recordatorio. Desactivado de forma predeterminada.",
     "openReleases": "Abrir lanzamientos de GitHub",
-    "restartAfterUpdate": "Reinicia FreeLLMAPI cuando finalice la compilación."
+    "restartAfterUpdate": "Reinicia FreeLLMAPI cuando finalice la compilación.",
+    "downloadUpdate": "Descargar actualización",
+    "downloadingUpdate": "Descargando… {percent} %",
+    "restartToUpdate": "Reiniciar para actualizar",
+    "updateReadyHint": "Descargada. FreeLLMAPI hace una copia de seguridad de tus datos, se reinicia y abre la nueva versión.",
+    "updateInstallFailed": "No se pudo instalar la actualización."
   },
   "models": {
     "title": "Modelos",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Antes de actualizar"
   },
   "status": {
     "healthy": "correcto",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Hay una versión más reciente de FreeLLMAPI instalada.",
+    "reload": "Recargar"
   },
   "freeTier": {
     "poolsToggle": "Grupos del nivel gratuito ({count})",

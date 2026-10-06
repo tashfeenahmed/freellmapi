@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Awtomatikong pagsusuri ng update",
     "autoUpdateCheckHelp": "Sinusuri ang GitHub minsan sa isang araw para sa bagong release at nagpapakita ng paalala. Naka-off bilang default.",
     "openReleases": "Buksan ang GitHub Releases",
-    "restartAfterUpdate": "I-restart ang FreeLLMAPI kapag natapos ang build."
+    "restartAfterUpdate": "I-restart ang FreeLLMAPI kapag natapos ang build.",
+    "downloadUpdate": "I-download ang update",
+    "downloadingUpdate": "Nagda-download… {percent}%",
+    "restartToUpdate": "I-restart para mag-update",
+    "updateReadyHint": "Na-download na. Iba-backup ng FreeLLMAPI ang iyong data, magre-restart, at bubuksan ang bagong bersyon.",
+    "updateInstallFailed": "Hindi ma-install ang update."
   },
   "models": {
     "title": "Mga Modelo",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Bago ang update"
   },
   "status": {
     "healthy": "malusog",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "May mas bagong bersyon ng FreeLLMAPI na naka-install.",
+    "reload": "I-reload"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

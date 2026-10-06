@@ -166,7 +166,12 @@
     "autoUpdateCheck": "განახლებების ავტომატური შემოწმება",
     "autoUpdateCheckHelp": "დღეში ერთხელ ამოწმებს GitHub-ს ახალი გამოშვებისთვის და აჩვენებს შეხსენებას. ნაგულისხმევად გამორთულია.",
     "openReleases": "GitHub-ის რელიზების გახსნა",
-    "restartAfterUpdate": "ბილდის დასრულების შემდეგ გადატვირთეთ FreeLLMAPI."
+    "restartAfterUpdate": "ბილდის დასრულების შემდეგ გადატვირთეთ FreeLLMAPI.",
+    "downloadUpdate": "განახლების ჩამოტვირთვა",
+    "downloadingUpdate": "იტვირთება… {percent}%",
+    "restartToUpdate": "გადატვირთვა განახლებისთვის",
+    "updateReadyHint": "ჩამოიტვირთა. FreeLLMAPI ქმნის თქვენი მონაცემების სარეზერვო ასლს, გადაიტვირთება და გახსნის ახალ ვერსიას.",
+    "updateInstallFailed": "განახლების დაყენება ვერ მოხერხდა."
   },
   "models": {
     "title": "მოდელები",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "განახლებამდე"
   },
   "status": {
     "healthy": "ჯანსაღი",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "დაყენებულია FreeLLMAPI-ის უფრო ახალი ვერსია.",
+    "reload": "გადატვირთვა"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

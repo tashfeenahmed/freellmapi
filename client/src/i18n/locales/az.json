@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Avtomatik yeniləmə yoxlaması",
     "autoUpdateCheckHelp": "Gündə bir dəfə yeni buraxılış üçün GitHub-u yoxlayır və xatırlatma göstərir. Standart olaraq sönülüdür.",
     "openReleases": "GitHub buraxılışlarını aç",
-    "restartAfterUpdate": "Quruluş tamamlandıqdan sonra FreeLLMAPI-ni yenidən başladın."
+    "restartAfterUpdate": "Quruluş tamamlandıqdan sonra FreeLLMAPI-ni yenidən başladın.",
+    "downloadUpdate": "Yeniləməni endir",
+    "downloadingUpdate": "Endirilir… {percent}%",
+    "restartToUpdate": "Yeniləmək üçün yenidən başlat",
+    "updateReadyHint": "Endirildi. FreeLLMAPI məlumatlarınızın ehtiyat nüsxəsini çıxarır, yenidən başlayır və yeni versiyanı açır.",
+    "updateInstallFailed": "Yeniləmə quraşdırıla bilmədi."
   },
   "models": {
     "title": "Modellər",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Yeniləmədən əvvəl"
   },
   "status": {
     "healthy": "sağlam",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI-nin daha yeni versiyası quraşdırılıb.",
+    "reload": "Yenidən yüklə"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

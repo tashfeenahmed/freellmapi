@@ -21,6 +21,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { Toaster } from '@/components/toaster'
 import { UpdateReminder } from '@/components/update-reminder'
+import { NewBuildPrompt } from '@/components/new-build-prompt'
 import { usePremium } from '@/hooks/use-premium'
 import { I18nProvider, useI18n } from '@/i18n'
 import { logout } from '@/lib/api'
@@ -480,6 +481,7 @@ function App() {
                 <Toaster />
                 <CommandPalette />
                 <UpdateReminder />
+                <NewBuildPrompt />
               </AppShell>
             </AuthGate>
           </BrowserRouter>

@@ -282,6 +282,8 @@ request stats.
 
 **Mac downloads:** choose `arm64` for Apple Silicon or `x64` for Intel. Both require macOS 12 Monterey or later and include DMG and ZIP downloads.
 
+**Updating:** the installed app updates itself on macOS, on Windows (the `Setup` installer) and from the Linux AppImage. **⋯ → Settings → Check for updates** (or the tray's **Check for Updates…**) downloads the new release and offers **Restart to update**; a full database backup, listed as *Pre-update* on the Backups page, is written before it installs. With **Automatic update check** on, new releases download in the background and install on the next restart or quit; the app never restarts on its own. The Linux `.deb`/`.rpm`/`.tar.xz` and the portable Windows `.zip` update by downloading the new release.
+
 > **Note for Windows users building from source:** Building the desktop app requires compiling native SQLite modules for Electron. You must have [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) installed (specifically the "Desktop development with C++" workload) and Python installed before running `npm install`.
 
 ```bash
@@ -289,7 +291,7 @@ npm install
 npm install --prefix desktop  # install desktop dependencies
 npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
 npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI-Setup-….exe"
 ```
 
 > Locally built apps are unsigned, so Windows SmartScreen may warn on first run

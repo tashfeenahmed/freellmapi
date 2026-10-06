@@ -166,7 +166,12 @@
     "autoUpdateCheck": "स्वयंचलित अद्यतन तपासणी",
     "autoUpdateCheckHelp": "दिवसातून एकदा नवीन रिलीजसाठी GitHub तपासते आणि स्मरणपत्र दाखवते. डीफॉल्टनुसार बंद.",
     "openReleases": "GitHub रिलीजेस उघडा",
-    "restartAfterUpdate": "बिल्ड पूर्ण झाल्यानंतर FreeLLMAPI पुन्हा सुरू करा."
+    "restartAfterUpdate": "बिल्ड पूर्ण झाल्यानंतर FreeLLMAPI पुन्हा सुरू करा.",
+    "downloadUpdate": "अपडेट डाउनलोड करा",
+    "downloadingUpdate": "डाउनलोड होत आहे… {percent}%",
+    "restartToUpdate": "अपडेटसाठी रीस्टार्ट करा",
+    "updateReadyHint": "डाउनलोड झाले. FreeLLMAPI तुमच्या डेटाचा बॅकअप घेते, रीस्टार्ट होते आणि नवीन आवृत्ती उघडते.",
+    "updateInstallFailed": "अपडेट इंस्टॉल होऊ शकले नाही."
   },
   "models": {
     "title": "मॉडेल्स",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "अपडेटपूर्वी"
   },
   "status": {
     "healthy": "निरोगी",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ची नवीन आवृत्ती इंस्टॉल झाली आहे.",
+    "reload": "रीलोड करा"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

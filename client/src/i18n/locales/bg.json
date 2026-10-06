@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Автоматична проверка за актуализации",
     "autoUpdateCheckHelp": "Проверява GitHub веднъж дневно за ново издание и показва напомняне. По подразбиране е изключено.",
     "openReleases": "Отвори изданията в GitHub",
-    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията."
+    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията.",
+    "downloadUpdate": "Изтегли актуализацията",
+    "downloadingUpdate": "Изтегляне… {percent}%",
+    "restartToUpdate": "Рестартирай за актуализиране",
+    "updateReadyHint": "Изтеглено. FreeLLMAPI архивира данните ви, рестартира и отваря новата версия.",
+    "updateInstallFailed": "Актуализацията не можа да се инсталира."
   },
   "models": {
     "title": "Модели",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Преди актуализация"
   },
   "status": {
     "healthy": "здравословно",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Инсталирана е по-нова версия на FreeLLMAPI.",
+    "reload": "Презареди"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

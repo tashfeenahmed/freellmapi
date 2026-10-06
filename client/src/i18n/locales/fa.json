@@ -166,7 +166,12 @@
     "autoUpdateCheck": "بررسی خودکار به‌روزرسانی",
     "autoUpdateCheckHelp": "روزی یک بار GitHub را برای انتشار نسخهٔ جدید بررسی می‌کند و یادآوری نشان می‌دهد. به‌طور پیش‌فرض خاموش است.",
     "openReleases": "باز کردن نسخه‌های منتشرشده در GitHub",
-    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید."
+    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید.",
+    "downloadUpdate": "دانلود به‌روزرسانی",
+    "downloadingUpdate": "در حال دانلود… {percent}٪",
+    "restartToUpdate": "راه‌اندازی مجدد برای به‌روزرسانی",
+    "updateReadyHint": "دانلود شد. FreeLLMAPI از داده‌های شما پشتیبان می‌گیرد، دوباره راه‌اندازی می‌شود و نسخهٔ جدید را باز می‌کند.",
+    "updateInstallFailed": "به‌روزرسانی نصب نشد."
   },
   "models": {
     "title": "مدل ها",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "پیش از به‌روزرسانی"
   },
   "status": {
     "healthy": "سالم",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "نسخهٔ جدیدتری از FreeLLMAPI نصب شده است.",
+    "reload": "بارگذاری مجدد"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

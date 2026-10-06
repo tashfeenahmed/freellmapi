@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Automatická kontrola aktualizací",
     "autoUpdateCheckHelp": "Jednou denně zkontroluje na GitHubu novou verzi a zobrazí připomenutí. Ve výchozím nastavení vypnuto.",
     "openReleases": "Otevřít vydání na GitHubu",
-    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI."
+    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI.",
+    "downloadUpdate": "Stáhnout aktualizaci",
+    "downloadingUpdate": "Stahování… {percent} %",
+    "restartToUpdate": "Restartovat a aktualizovat",
+    "updateReadyHint": "Staženo. FreeLLMAPI zálohuje vaše data, restartuje se a otevře novou verzi.",
+    "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat."
   },
   "models": {
     "title": "Modely",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Před aktualizací"
   },
   "status": {
     "healthy": "zdravé",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Je nainstalována novější verze FreeLLMAPI.",
+    "reload": "Načíst znovu"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

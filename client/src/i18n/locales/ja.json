@@ -166,7 +166,12 @@
     "autoUpdateCheck": "自動アップデートチェック",
     "autoUpdateCheckHelp": "1日1回、新しいリリースがないかGitHubを確認し、通知を表示します。既定では無効です。",
     "openReleases": "GitHub Releasesを開く",
-    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。"
+    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。",
+    "downloadUpdate": "アップデートをダウンロード",
+    "downloadingUpdate": "ダウンロード中… {percent}%",
+    "restartToUpdate": "再起動してアップデート",
+    "updateReadyHint": "ダウンロード完了。FreeLLMAPI はデータをバックアップしてから再起動し、新しいバージョンを開きます。",
+    "updateInstallFailed": "アップデートをインストールできませんでした。"
   },
   "models": {
     "title": "モデル",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "アップデート前"
   },
   "status": {
     "healthy": "健康な",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "新しいバージョンの FreeLLMAPI がインストールされています。",
+    "reload": "再読み込み"
   },
   "freeTier": {
     "poolsToggle": "無料枠プール（{count}）",

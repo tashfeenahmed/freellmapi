@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Otomatik güncelleme denetimi",
     "autoUpdateCheckHelp": "Yeni bir sürüm için günde bir kez GitHub'ı denetler ve bir hatırlatma gösterir. Varsayılan olarak kapalıdır.",
     "openReleases": "GitHub sürümlerini aç",
-    "restartAfterUpdate": "Derleme tamamlandıktan sonra FreeLLMAPI'yi yeniden başlatın."
+    "restartAfterUpdate": "Derleme tamamlandıktan sonra FreeLLMAPI'yi yeniden başlatın.",
+    "downloadUpdate": "Güncellemeyi indir",
+    "downloadingUpdate": "İndiriliyor… %{percent}",
+    "restartToUpdate": "Güncellemek için yeniden başlat",
+    "updateReadyHint": "İndirildi. FreeLLMAPI verilerinizi yedekler, yeniden başlar ve yeni sürümü açar.",
+    "updateInstallFailed": "Güncelleme yüklenemedi."
   },
   "models": {
     "title": "Modeller",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Veritabanı dizinine göre göreli yol. Yedekler bu dizinin dışına yazılamaz.",
     "save": "Zamanlamayı kaydet",
-    "saved": "Kaydedildi"
+    "saved": "Kaydedildi",
+    "preUpdate": "Güncelleme öncesi"
   },
   "status": {
     "healthy": "sağlıklı",
@@ -1155,7 +1161,9 @@
     "noNotes": "Bu sürüm için sürüm notu yayımlanmadı.",
     "openRelease": "Sürüm sayfasını aç",
     "dismissVersion": "Bu sürümü yoksay",
-    "dismiss": "Yoksay"
+    "dismiss": "Yoksay",
+    "newBuild": "FreeLLMAPI'nin daha yeni bir sürümü yüklü.",
+    "reload": "Yeniden yükle"
   },
   "freeTier": {
     "poolsToggle": "Ücretsiz katman havuzları ({count})",

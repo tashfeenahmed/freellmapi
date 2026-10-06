@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Duba sabuntawa ta atomatik",
     "autoUpdateCheckHelp": "Yana duba GitHub sau ɗaya a rana don sabon fitowa kuma yana nuna tunatarwa. A kashe ta tsohuwa.",
     "openReleases": "Buɗe sakin GitHub",
-    "restartAfterUpdate": "Sake kunna FreeLLMAPI bayan an gama build ɗin."
+    "restartAfterUpdate": "Sake kunna FreeLLMAPI bayan an gama build ɗin.",
+    "downloadUpdate": "Sauke sabuntawa",
+    "downloadingUpdate": "Ana saukewa… {percent}%",
+    "restartToUpdate": "Sake farawa don sabuntawa",
+    "updateReadyHint": "An sauke. FreeLLMAPI yana adana bayananka, sai ya sake farawa ya buɗe sabon sigar.",
+    "updateInstallFailed": "Ba a iya shigar da sabuntawar ba."
   },
   "models": {
     "title": "Samfura",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Kafin sabuntawa"
   },
   "status": {
     "healthy": "lafiya",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "An shigar da sabon sigar FreeLLMAPI.",
+    "reload": "Sake lodawa"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

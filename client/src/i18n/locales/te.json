@@ -166,7 +166,12 @@
     "autoUpdateCheck": "స్వయంచాలక నవీకరణ తనిఖీ",
     "autoUpdateCheckHelp": "రోజుకు ఒకసారి కొత్త విడుదల కోసం GitHubను తనిఖీ చేసి రిమైండర్‌ను చూపుతుంది. అప్రమేయంగా ఆఫ్‌లో ఉంటుంది.",
     "openReleases": "GitHub విడుదలలను తెరవండి",
-    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి."
+    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి.",
+    "downloadUpdate": "అప్‌డేట్ డౌన్‌లోడ్ చేయండి",
+    "downloadingUpdate": "డౌన్‌లోడ్ అవుతోంది… {percent}%",
+    "restartToUpdate": "అప్‌డేట్ కోసం రీస్టార్ట్ చేయండి",
+    "updateReadyHint": "డౌన్‌లోడ్ అయింది. FreeLLMAPI మీ డేటాను బ్యాకప్ చేసి, రీస్టార్ట్ అయి కొత్త వెర్షన్‌ను తెరుస్తుంది.",
+    "updateInstallFailed": "అప్‌డేట్‌ను ఇన్‌స్టాల్ చేయలేకపోయాము."
   },
   "models": {
     "title": "మోడల్స్",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "అప్‌డేట్‌కు ముందు"
   },
   "status": {
     "healthy": "ఆరోగ్యకరమైన",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI యొక్క కొత్త వెర్షన్ ఇన్‌స్టాల్ అయింది.",
+    "reload": "రీలోడ్"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

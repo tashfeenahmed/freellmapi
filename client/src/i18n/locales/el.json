@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Αυτόματος έλεγχος ενημερώσεων",
     "autoUpdateCheckHelp": "Ελέγχει το GitHub μία φορά την ημέρα για νέα έκδοση και εμφανίζει υπενθύμιση. Απενεργοποιημένο από προεπιλογή.",
     "openReleases": "Άνοιγμα εκδόσεων GitHub",
-    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build."
+    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build.",
+    "downloadUpdate": "Λήψη ενημέρωσης",
+    "downloadingUpdate": "Λήψη… {percent}%",
+    "restartToUpdate": "Επανεκκίνηση για ενημέρωση",
+    "updateReadyHint": "Η λήψη ολοκληρώθηκε. Το FreeLLMAPI δημιουργεί αντίγραφο ασφαλείας των δεδομένων σας, επανεκκινείται και ανοίγει τη νέα έκδοση.",
+    "updateInstallFailed": "Η ενημέρωση δεν ήταν δυνατό να εγκατασταθεί."
   },
   "models": {
     "title": "Μοντέλα",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Πριν την ενημέρωση"
   },
   "status": {
     "healthy": "υγιής",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Έχει εγκατασταθεί νεότερη έκδοση του FreeLLMAPI.",
+    "reload": "Επαναφόρτωση"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

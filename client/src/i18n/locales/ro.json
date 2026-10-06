@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Verificare automată a actualizărilor",
     "autoUpdateCheckHelp": "Verifică GitHub o dată pe zi dacă există o versiune nouă și afișează o notificare. Dezactivat implicit.",
     "openReleases": "Deschide versiunile GitHub",
-    "restartAfterUpdate": "Repornește FreeLLMAPI după finalizarea compilării."
+    "restartAfterUpdate": "Repornește FreeLLMAPI după finalizarea compilării.",
+    "downloadUpdate": "Descarcă actualizarea",
+    "downloadingUpdate": "Se descarcă… {percent}%",
+    "restartToUpdate": "Repornește pentru actualizare",
+    "updateReadyHint": "Descărcat. FreeLLMAPI face o copie de rezervă a datelor, repornește și deschide noua versiune.",
+    "updateInstallFailed": "Actualizarea nu a putut fi instalată."
   },
   "models": {
     "title": "Modele",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Înainte de actualizare"
   },
   "status": {
     "healthy": "Sănătos",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Este instalată o versiune mai nouă de FreeLLMAPI.",
+    "reload": "Reîncarcă"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

@@ -18,7 +18,8 @@ import { startCatalogSync } from '../../server/src/services/catalog-sync.js';
 import { startCooldownProbe } from '../../server/src/services/cooldown-probe.js';
 import { startCustomModelSync } from '../../server/src/services/custom-model-sync.js';
 import { startBuiltinModelDiscovery } from '../../server/src/services/builtin-model-discovery.js';
-import { startBackupScheduler } from '../../server/src/services/backups.js';
+import { startBackupScheduler, createBackup } from '../../server/src/services/backups.js';
+import { isAutoUpdateCheckEnabled } from '../../server/src/routes/update.js';
 import { cleanupExpiredCooldowns } from '../../server/src/services/ratelimit.js';
 import { loadCacheFromDb } from '../../server/src/services/cache.js';
 import { startWakeDetect } from '../../server/src/lib/wake-detect.js';
@@ -27,7 +28,13 @@ import { installLogRedaction } from '../../server/src/lib/log-redaction.js';
 import { userCount, createUser, createSession } from '../../server/src/services/auth.js';
 import { NodeScheduler } from '../../server/src/lib/scheduler.js';
 
-export { getDb, getUnifiedApiKey };
+export { getDb, getUnifiedApiKey, isAutoUpdateCheckEnabled };
+
+// Desktop updater → a full dump before an update installs, listed on the
+// Backups page as "Pre-update". Returns the file it wrote.
+export function backupBeforeUpdate(): string {
+  return createBackup(getDb(), { source: 'pre-update' }).filename;
+}
 
 export interface StartOptions {
   dbPath: string;

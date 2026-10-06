@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, dialog, ipcMain, clipboard, nativeTheme, screen, shell, type Tray } from 'electron';
-import { startServer, ensureSessionToken, getUnifiedApiKey } from './server.mjs';
+import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale } from './tray.js';
@@ -10,6 +10,7 @@ import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
 import { openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
+import { initUpdater, getUpdateState, checkForUpdates, downloadUpdate, installUpdate, checkFromTray } from './updater.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = 31415;
@@ -153,6 +154,12 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('freeapi:copy-api-key', () => clipboard.writeText(getUnifiedApiKey()));
   ipcMain.handle('freeapi:set-login-item', (_e, open: boolean) => app.setLoginItemSettings({ openAtLogin: open }));
   ipcMain.handle('freeapi:quit', () => app.quit());
+  // Dashboard → the in-app updater (preload __FREEAPI_UPDATER__). Each call
+  // returns the new state; progress arrives as 'freeapi:update-state' events.
+  ipcMain.handle('freeapi:update-state', () => getUpdateState());
+  ipcMain.handle('freeapi:update-check', () => checkForUpdates());
+  ipcMain.handle('freeapi:update-download', () => downloadUpdate());
+  ipcMain.handle('freeapi:update-install', () => installUpdate());
   // Dashboard → a fresh session for the hidden machine account (preload
   // __FREEAPI_SESSION__). The window never shows a login form: its account has
   // a random password nobody knows, so when the boot-time session is gone the
@@ -269,6 +276,14 @@ if (!app.requestSingleInstanceLock()) {
     // the app the user actually launched (#703).
     process.env.FREEAPI_VERSION = app.getVersion();
 
+    initUpdater({
+      autoCheckEnabled: () => {
+        try { return isAutoUpdateCheckEnabled(); } catch { return false; }
+      },
+      backupBeforeUpdate,
+      getLocale: () => locale,
+    });
+
     try {
       const { port } = await startServer({
         dbPath,
@@ -291,6 +306,8 @@ if (!app.requestSingleInstanceLock()) {
           toggleLanAccess,
           () => loadConfig().showInDock ?? true,
           toggleShowInDock,
+          getUpdateState,
+          () => void checkFromTray(),
         );
       } catch (err) {
         console.warn('[desktop] could not create the tray icon:', err);

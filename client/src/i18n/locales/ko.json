@@ -166,7 +166,12 @@
     "autoUpdateCheck": "자동 업데이트 확인",
     "autoUpdateCheckHelp": "하루에 한 번 GitHub에서 새 릴리스를 확인하고 알림을 표시합니다. 기본값은 꺼짐입니다.",
     "openReleases": "GitHub 릴리스 열기",
-    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요."
+    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요.",
+    "downloadUpdate": "업데이트 다운로드",
+    "downloadingUpdate": "다운로드 중… {percent}%",
+    "restartToUpdate": "재시작하여 업데이트",
+    "updateReadyHint": "다운로드 완료. FreeLLMAPI가 데이터를 백업한 뒤 재시작하고 새 버전을 엽니다.",
+    "updateInstallFailed": "업데이트를 설치하지 못했습니다."
   },
   "models": {
     "title": "모델",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "업데이트 전"
   },
   "status": {
     "healthy": "건강한",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "더 새로운 버전의 FreeLLMAPI가 설치되었습니다.",
+    "reload": "새로고침"
   },
   "freeTier": {
     "poolsToggle": "무료 등급 풀 ({count})",

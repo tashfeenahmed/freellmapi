@@ -166,7 +166,12 @@
     "autoUpdateCheck": "ตรวจสอบการอัปเดตอัตโนมัติ",
     "autoUpdateCheckHelp": "ตรวจสอบ GitHub วันละครั้งว่ามีเวอร์ชันใหม่หรือไม่ และแสดงการแจ้งเตือน ปิดไว้ตามค่าเริ่มต้น",
     "openReleases": "เปิด GitHub Releases",
-    "restartAfterUpdate": "รีสตาร์ต FreeLLMAPI หลังจากบิลด์เสร็จสิ้น"
+    "restartAfterUpdate": "รีสตาร์ต FreeLLMAPI หลังจากบิลด์เสร็จสิ้น",
+    "downloadUpdate": "ดาวน์โหลดอัปเดต",
+    "downloadingUpdate": "กำลังดาวน์โหลด… {percent}%",
+    "restartToUpdate": "รีสตาร์ตเพื่ออัปเดต",
+    "updateReadyHint": "ดาวน์โหลดแล้ว FreeLLMAPI จะสำรองข้อมูลของคุณ รีสตาร์ต และเปิดเวอร์ชันใหม่",
+    "updateInstallFailed": "ไม่สามารถติดตั้งอัปเดตได้"
   },
   "models": {
     "title": "โมเดล",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "ก่อนอัปเดต"
   },
   "status": {
     "healthy": "มีสุขภาพดี",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "ติดตั้ง FreeLLMAPI เวอร์ชันใหม่กว่าแล้ว",
+    "reload": "โหลดใหม่"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

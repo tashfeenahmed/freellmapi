@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Автоматична перевірка оновлень",
     "autoUpdateCheckHelp": "Раз на день перевіряє GitHub на новий випуск і показує нагадування. Типово вимкнено.",
     "openReleases": "Відкрити релізи GitHub",
-    "restartAfterUpdate": "Перезапустіть FreeLLMAPI після завершення збірки."
+    "restartAfterUpdate": "Перезапустіть FreeLLMAPI після завершення збірки.",
+    "downloadUpdate": "Завантажити оновлення",
+    "downloadingUpdate": "Завантаження… {percent}%",
+    "restartToUpdate": "Перезапустити для оновлення",
+    "updateReadyHint": "Завантажено. FreeLLMAPI створює резервну копію даних, перезапускається й відкриває нову версію.",
+    "updateInstallFailed": "Не вдалося встановити оновлення."
   },
   "models": {
     "title": "Моделі",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Перед оновленням"
   },
   "status": {
     "healthy": "здоровий",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Встановлено новішу версію FreeLLMAPI.",
+    "reload": "Перезавантажити"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

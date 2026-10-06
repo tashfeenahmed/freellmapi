@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Avtomatik yangilanish tekshiruvi",
     "autoUpdateCheckHelp": "Kuniga bir marta yangi nashr uchun GitHub'ni tekshiradi va eslatma ko'rsatadi. Sukut bo'yicha o'chirilgan.",
     "openReleases": "GitHub relizlarini ochish",
-    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring."
+    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring.",
+    "downloadUpdate": "Yangilanishni yuklab olish",
+    "downloadingUpdate": "Yuklab olinmoqda… {percent}%",
+    "restartToUpdate": "Yangilash uchun qayta ishga tushirish",
+    "updateReadyHint": "Yuklab olindi. FreeLLMAPI maʼlumotlaringizning zaxira nusxasini oladi, qayta ishga tushadi va yangi versiyani ochadi.",
+    "updateInstallFailed": "Yangilanishni o‘rnatib bo‘lmadi."
   },
   "models": {
     "title": "Modellar",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Yangilanishdan oldin"
   },
   "status": {
     "healthy": "sog'lom",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ning yangiroq versiyasi o‘rnatilgan.",
+    "reload": "Qayta yuklash"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

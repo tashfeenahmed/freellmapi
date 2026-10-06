@@ -10,6 +10,8 @@ import {
 import { Markdown } from '@/components/markdown'
 import { apiFetch } from '@/lib/api'
 import { useI18n } from '@/i18n'
+import { DesktopUpdateActions } from '@/components/desktop-update'
+import { useDesktopUpdater } from '@/lib/desktop-updater'
 
 const RELEASES_URL = 'https://github.com/tashfeenahmed/freellmapi/releases'
 
@@ -104,6 +106,7 @@ export function UpdateReminder() {
   const [refresh, setRefresh] = useState(0)
   const version = shellVersion ?? serverVersion
   const openRef = useRef(false)
+  const desktopUpdater = useDesktopUpdater()
 
   // Read by the async check to decide whether it may replace what the operator
   // is currently reading. Synced in an effect, not during render.
@@ -250,6 +253,12 @@ export function UpdateReminder() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t('update.noNotes')}</p>
+          )}
+
+          {desktopUpdater && (
+            <div className="mt-5">
+              <DesktopUpdateActions updater={desktopUpdater} />
+            </div>
           )}
 
           <div className="mt-5 flex flex-wrap items-center gap-3">

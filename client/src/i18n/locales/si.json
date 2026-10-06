@@ -166,7 +166,12 @@
     "autoUpdateCheck": "ස්වයංක්‍රීය යාවත්කාලීන පරීක්ෂාව",
     "autoUpdateCheckHelp": "නව නිකුතුවක් සඳහා දිනකට වරක් GitHub පරීක්ෂා කර මතක් කිරීමක් පෙන්වයි. පෙරනිමියෙන් ක්‍රියාවිරහිතයි.",
     "openReleases": "GitHub Releases විවෘත කරන්න",
-    "restartAfterUpdate": "ගොඩනැගීම සම්පූර්ණ වූ පසු FreeLLMAPI නැවත ආරම්භ කරන්න."
+    "restartAfterUpdate": "ගොඩනැගීම සම්පූර්ණ වූ පසු FreeLLMAPI නැවත ආරම්භ කරන්න.",
+    "downloadUpdate": "යාවත්කාලීනය බාගන්න",
+    "downloadingUpdate": "බාගනිමින්… {percent}%",
+    "restartToUpdate": "යාවත්කාලීන කිරීමට නැවත අරඹන්න",
+    "updateReadyHint": "බාගත විය. FreeLLMAPI ඔබගේ දත්ත උපස්ථ කර, නැවත ආරම්භ වී නව අනුවාදය විවෘත කරයි.",
+    "updateInstallFailed": "යාවත්කාලීනය ස්ථාපනය කළ නොහැකි විය."
   },
   "models": {
     "title": "ආකෘති",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "යාවත්කාලීනයට පෙර"
   },
   "status": {
     "healthy": "සෞඛ්ය සම්පන්න",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI හි නවතම අනුවාදයක් ස්ථාපනය කර ඇත.",
+    "reload": "නැවත පූරණය"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

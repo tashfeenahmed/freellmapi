@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Automatinis atnaujinimų tikrinimas",
     "autoUpdateCheckHelp": "Kartą per dieną patikrina „GitHub“, ar yra nauja laida, ir parodo priminimą. Pagal numatytuosius nustatymus išjungta.",
     "openReleases": "Atverti GitHub leidimus",
-    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo."
+    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo.",
+    "downloadUpdate": "Atsisiųsti naujinimą",
+    "downloadingUpdate": "Atsisiunčiama… {percent} %",
+    "restartToUpdate": "Paleisti iš naujo ir atnaujinti",
+    "updateReadyHint": "Atsisiųsta. FreeLLMAPI padaro jūsų duomenų atsarginę kopiją, pasileidžia iš naujo ir atidaro naują versiją.",
+    "updateInstallFailed": "Naujinimo įdiegti nepavyko."
   },
   "models": {
     "title": "Modeliai",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Prieš naujinimą"
   },
   "status": {
     "healthy": "Sveika",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Įdiegta naujesnė FreeLLMAPI versija.",
+    "reload": "Įkelti iš naujo"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

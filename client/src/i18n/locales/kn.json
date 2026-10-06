@@ -166,7 +166,12 @@
     "autoUpdateCheck": "ಸ್ವಯಂಚಾಲಿತ ನವೀಕರಣ ಪರಿಶೀಲನೆ",
     "autoUpdateCheckHelp": "ದಿನಕ್ಕೊಮ್ಮೆ ಹೊಸ ಬಿಡುಗಡೆಗಾಗಿ GitHub ಅನ್ನು ಪರಿಶೀಲಿಸುತ್ತದೆ ಮತ್ತು ಜ್ಞಾಪನೆ ತೋರಿಸುತ್ತದೆ. ಪೂರ್ವನಿಯೋಜಿತವಾಗಿ ಆಫ್ ಆಗಿದೆ.",
     "openReleases": "GitHub ಬಿಡುಗಡೆಗಳನ್ನು ತೆರೆಯಿರಿ",
-    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ."
+    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ.",
+    "downloadUpdate": "ಅಪ್‌ಡೇಟ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+    "downloadingUpdate": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {percent}%",
+    "restartToUpdate": "ಅಪ್‌ಡೇಟ್ ಮಾಡಲು ಮರುಪ್ರಾರಂಭಿಸಿ",
+    "updateReadyHint": "ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ. FreeLLMAPI ನಿಮ್ಮ ಡೇಟಾದ ಬ್ಯಾಕಪ್ ತೆಗೆದು, ಮರುಪ್ರಾರಂಭಿಸಿ ಹೊಸ ಆವೃತ್ತಿಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
+    "updateInstallFailed": "ಅಪ್‌ಡೇಟ್ ಅನ್ನು ಸ್ಥಾಪಿಸಲಾಗಲಿಲ್ಲ."
   },
   "models": {
     "title": "ಮಾದರಿಗಳು",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "ಅಪ್‌ಡೇಟ್‌ಗೆ ಮುನ್ನ"
   },
   "status": {
     "healthy": "ಆರೋಗ್ಯಕರ",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ನ ಹೊಸ ಆವೃತ್ತಿ ಸ್ಥಾಪಿಸಲಾಗಿದೆ.",
+    "reload": "ಮರುಲೋಡ್"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

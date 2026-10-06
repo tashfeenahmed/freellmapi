@@ -166,7 +166,12 @@
     "autoUpdateCheck": "自动检查更新",
     "autoUpdateCheckHelp": "每天检查一次 GitHub 上是否有新版本，并显示提醒。默认关闭。",
     "openReleases": "打开 GitHub Releases",
-    "restartAfterUpdate": "构建完成后重启 FreeLLMAPI。"
+    "restartAfterUpdate": "构建完成后重启 FreeLLMAPI。",
+    "downloadUpdate": "下载更新",
+    "downloadingUpdate": "正在下载… {percent}%",
+    "restartToUpdate": "重启以更新",
+    "updateReadyHint": "已下载。FreeLLMAPI 会先备份你的数据，然后重启并打开新版本。",
+    "updateInstallFailed": "无法安装更新。"
   },
   "models": {
     "title": "模型",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "相对于数据库所在目录。备份不能写到该目录之外。",
     "save": "保存计划",
-    "saved": "已保存"
+    "saved": "已保存",
+    "preUpdate": "更新前"
   },
   "status": {
     "healthy": "健康",
@@ -1155,7 +1161,9 @@
     "noNotes": "此版本未发布更新说明。",
     "openRelease": "打开发布页",
     "dismissVersion": "忽略此版本",
-    "dismiss": "忽略"
+    "dismiss": "忽略",
+    "newBuild": "已安装更新版本的 FreeLLMAPI。",
+    "reload": "重新加载"
   },
   "freeTier": {
     "poolsToggle": "免费额度池（{count}）",

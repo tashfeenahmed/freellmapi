@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Ukaguzi wa masasisho otomatiki",
     "autoUpdateCheckHelp": "Hukagua GitHub mara moja kwa siku kwa toleo jipya na kuonyesha ukumbusho. Imezimwa kwa chaguo-msingi.",
     "openReleases": "Fungua Matoleo ya GitHub",
-    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika."
+    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika.",
+    "downloadUpdate": "Pakua sasisho",
+    "downloadingUpdate": "Inapakua… {percent}%",
+    "restartToUpdate": "Anzisha upya ili kusasisha",
+    "updateReadyHint": "Imepakuliwa. FreeLLMAPI huhifadhi nakala ya data yako, huanza upya na kufungua toleo jipya.",
+    "updateInstallFailed": "Sasisho halikuweza kusakinishwa."
   },
   "models": {
     "title": "Mifano",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Kabla ya sasisho"
   },
   "status": {
     "healthy": "afya",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Toleo jipya la FreeLLMAPI limesakinishwa.",
+    "reload": "Pakia upya"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

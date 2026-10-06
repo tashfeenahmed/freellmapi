@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Automaattinen päivitystarkistus",
     "autoUpdateCheckHelp": "Tarkistaa GitHubista kerran päivässä, onko uutta julkaisua, ja näyttää muistutuksen. Oletuksena pois päältä.",
     "openReleases": "Avaa GitHub-julkaisut",
-    "restartAfterUpdate": "Käynnistä FreeLLMAPI uudelleen koonnin valmistuttua."
+    "restartAfterUpdate": "Käynnistä FreeLLMAPI uudelleen koonnin valmistuttua.",
+    "downloadUpdate": "Lataa päivitys",
+    "downloadingUpdate": "Ladataan… {percent} %",
+    "restartToUpdate": "Käynnistä uudelleen päivittääksesi",
+    "updateReadyHint": "Ladattu. FreeLLMAPI varmuuskopioi tietosi, käynnistyy uudelleen ja avaa uuden version.",
+    "updateInstallFailed": "Päivitystä ei voitu asentaa."
   },
   "models": {
     "title": "Mallit",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Ennen päivitystä"
   },
   "status": {
     "healthy": "terve",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI:n uudempi versio on asennettu.",
+    "reload": "Lataa uudelleen"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

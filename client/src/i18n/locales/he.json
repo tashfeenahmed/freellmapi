@@ -166,7 +166,12 @@
     "autoUpdateCheck": "בדיקת עדכונים אוטומטית",
     "autoUpdateCheckHelp": "בודקת ב-GitHub פעם ביום אם יצאה גרסה חדשה ומציגה תזכורת. כבויה כברירת מחדל.",
     "openReleases": "פתיחת מהדורות GitHub",
-    "restartAfterUpdate": "הפעל מחדש את FreeLLMAPI לאחר השלמת הבנייה."
+    "restartAfterUpdate": "הפעל מחדש את FreeLLMAPI לאחר השלמת הבנייה.",
+    "downloadUpdate": "הורדת העדכון",
+    "downloadingUpdate": "מוריד… {percent}%",
+    "restartToUpdate": "הפעלה מחדש לעדכון",
+    "updateReadyHint": "ההורדה הושלמה. FreeLLMAPI מגבה את הנתונים שלך, מופעל מחדש ופותח את הגרסה החדשה.",
+    "updateInstallFailed": "לא ניתן היה להתקין את העדכון."
   },
   "models": {
     "title": "דגמים",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "לפני עדכון"
   },
   "status": {
     "healthy": "בריא",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "הותקנה גרסה חדשה יותר של FreeLLMAPI.",
+    "reload": "טעינה מחדש"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

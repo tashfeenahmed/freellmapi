@@ -13,7 +13,7 @@
   "main": "build/main.mjs",
   "scripts": {
     "bundle:server": "node scripts/bundle-server.mjs",
-    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --external:electron --external:./server.mjs --outfile=build/main.mjs",
+    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --external:electron --external:electron-updater --external:./server.mjs --outfile=build/main.mjs",
     "build:preload": "esbuild src/preload.ts src/preload-popover.ts --bundle --platform=node --format=cjs --external:electron --outdir=build --out-extension:.js=.cjs",
     "build:all": "npm run bundle:server && npm run build:main && npm run build:preload",
     "stage:client": "node scripts/stage-client.mjs",
@@ -26,7 +26,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0"
+    "better-sqlite3": "^12.10.0",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.0",

@@ -166,7 +166,12 @@
     "autoUpdateCheck": "အလိုအလျောက် အပ်ဒိတ်စစ်ဆေးမှု",
     "autoUpdateCheckHelp": "တစ်ရက်လျှင် တစ်ကြိမ် ဗားရှင်းအသစ်အတွက် GitHub ကို စစ်ဆေးပြီး သတိပေးချက် ပြသသည်။ မူရင်းအတိုင်း ပိတ်ထားသည်။",
     "openReleases": "GitHub Releases ကို ဖွင့်ရန်",
-    "restartAfterUpdate": "build ပြီးဆုံးပြီးနောက် FreeLLMAPI ကို ပြန်လည်စတင်ပါ။"
+    "restartAfterUpdate": "build ပြီးဆုံးပြီးနောက် FreeLLMAPI ကို ပြန်လည်စတင်ပါ။",
+    "downloadUpdate": "အပ်ဒိတ်ကို ဒေါင်းလုဒ်လုပ်ရန်",
+    "downloadingUpdate": "ဒေါင်းလုဒ်လုပ်နေသည်… {percent}%",
+    "restartToUpdate": "အပ်ဒိတ်လုပ်ရန် ပြန်စတင်ပါ",
+    "updateReadyHint": "ဒေါင်းလုဒ်ပြီးပါပြီ။ FreeLLMAPI သည် သင့်ဒေတာကို အရန်သိမ်းပြီး ပြန်စတင်ကာ ဗားရှင်းအသစ်ကို ဖွင့်ပါမည်။",
+    "updateInstallFailed": "အပ်ဒိတ်ကို ထည့်သွင်း၍ မရပါ။"
   },
   "models": {
     "title": "မော်ဒယ်များ",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "အပ်ဒိတ်မတိုင်မီ"
   },
   "status": {
     "healthy": "ကျန်းမာသော",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ဗားရှင်းအသစ် ထည့်သွင်းပြီးပါပြီ။",
+    "reload": "ပြန်ဖွင့်ရန်"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

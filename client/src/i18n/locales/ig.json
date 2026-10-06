@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Nyocha mmelite akpaaka",
     "autoUpdateCheckHelp": "Ọ na-enyocha GitHub otu ugboro n'ụbọchị maka ntọhapụ ọhụrụ ma gosi ncheta. A gbanyụrụ ya na ndabara.",
     "openReleases": "Mepee GitHub Releases",
-    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara."
+    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara.",
+    "downloadUpdate": "Budata mmelite",
+    "downloadingUpdate": "Na-ebudata… {percent}%",
+    "restartToUpdate": "Malitegharịa ka imelite",
+    "updateReadyHint": "Ebudatala. FreeLLMAPI na-echekwa data gị, malitegharịa ma mepee ụdị ọhụrụ.",
+    "updateInstallFailed": "Enweghị ike itinye mmelite ahụ."
   },
   "models": {
     "title": "Ụdị",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Tupu mmelite"
   },
   "status": {
     "healthy": "ahụike",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Etinyela ụdị FreeLLMAPI ọhụrụ.",
+    "reload": "Bugharịa"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

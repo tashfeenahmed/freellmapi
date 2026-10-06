@@ -231,6 +231,8 @@ FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 
 **Mac 下载：** Apple Silicon 请选择 `arm64`，Intel 请选择 `x64`。两者都要求 macOS 12 Monterey 或更高版本，并提供 DMG 和 ZIP 下载。
 
+**更新：** 已安装的应用在 macOS、Windows（`Setup` 安装版）和 Linux AppImage 上可以自动更新。**⋯ → 设置 → 检查更新**（或托盘菜单的 **检查更新…**）会下载新版本并提供 **重启以更新**；安装前会先写入一份完整的数据库备份，在备份页面中标记为「更新前」。开启 **自动检查更新** 后，新版本会在后台下载，并在下次重启或退出时安装；应用不会自行重启。Linux 的 `.deb`/`.rpm`/`.tar.xz` 和 Windows 便携版 `.zip` 请下载新版本来更新。
+
 > **Windows 用户从源码构建的注意事项：** 构建桌面应用需要为 Electron 编译原生 SQLite 模块。在执行 `npm install` 之前，你必须先装好 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（具体来说是「使用 C++ 的桌面开发」工作负载）以及 Python。
 
 ```bash
@@ -238,7 +240,7 @@ npm install
 npm install --prefix desktop  # 安装桌面端依赖
 npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
 npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI-Setup-….exe"
 ```
 
 > 本地构建出来的应用没有签名，所以 Windows SmartScreen 首次运行时可能会警告（点「更多信息」→「仍要运行」）；macOS 构建则不会触发 Gatekeeper 提示。

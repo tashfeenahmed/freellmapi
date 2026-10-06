@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Àyẹ̀wò ìmúdójúìwọ̀n aládàáṣe",
     "autoUpdateCheckHelp": "Ó ń ṣàyẹ̀wò GitHub lẹ́ẹ̀kan lóòjọ́ fún ìtújáde tuntun, ó sì ń fi ìránnilétí hàn. Ó pa ní àtìbẹ̀rẹ̀.",
     "openReleases": "Ṣí àwọn ìtújáde GitHub",
-    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí."
+    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí.",
+    "downloadUpdate": "Ṣe ìgbàsílẹ̀ ìmúdójúìwọ̀n",
+    "downloadingUpdate": "Ń ṣe ìgbàsílẹ̀… {percent}%",
+    "restartToUpdate": "Tún bẹ̀rẹ̀ láti mú dójúìwọ̀n",
+    "updateReadyHint": "Ìgbàsílẹ̀ ti parí. FreeLLMAPI yóò ṣe àfẹ̀yìntì dátà rẹ, tún bẹ̀rẹ̀, yóò sì ṣí ẹ̀yà tuntun.",
+    "updateInstallFailed": "A kò lè fi ìmúdójúìwọ̀n náà sí i."
   },
   "models": {
     "title": "Awọn awoṣe",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Ṣáájú ìmúdójúìwọ̀n"
   },
   "status": {
     "healthy": "ni ilera",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "A ti fi ẹ̀yà FreeLLMAPI tuntun sí i.",
+    "reload": "Tún gbé e"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",

@@ -166,7 +166,12 @@
     "autoUpdateCheck": "Automatikus frissítésellenőrzés",
     "autoUpdateCheckHelp": "Naponta egyszer ellenőrzi a GitHubon az új kiadást, és emlékeztetőt jelenít meg. Alapértelmezés szerint kikapcsolva.",
     "openReleases": "GitHub-kiadások megnyitása",
-    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t."
+    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t.",
+    "downloadUpdate": "Frissítés letöltése",
+    "downloadingUpdate": "Letöltés… {percent}%",
+    "restartToUpdate": "Újraindítás a frissítéshez",
+    "updateReadyHint": "Letöltve. A FreeLLMAPI biztonsági mentést készít az adatairól, újraindul, és megnyitja az új verziót.",
+    "updateInstallFailed": "A frissítést nem sikerült telepíteni."
   },
   "models": {
     "title": "Modellek",
@@ -721,7 +726,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Frissítés előtt"
   },
   "status": {
     "healthy": "egészséges",
@@ -1155,7 +1161,9 @@
     "noNotes": "No release notes were published for this version.",
     "openRelease": "Open release page",
     "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "A FreeLLMAPI újabb verziója van telepítve.",
+    "reload": "Újratöltés"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
