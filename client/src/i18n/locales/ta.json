@@ -152,20 +152,14 @@
     "compressionRunPreview": "முன்னோட்டத்தை இயக்கு",
     "updatesTitle": "புதுப்பிப்புகள்",
     "checkForUpdates": "புதுப்பிப்புகளைச் சரிபார்க்கவும்",
-    "lastChecked": "கடைசியாக சரிபார்க்கப்பட்டது: {when}",
-    "currentVersion": "தற்போதைய உருவாக்கம்:",
     "updateAvailable": "புதுப்பிப்பு கிடைக்கிறது",
-    "changelog": "என்ன மாற்றப்பட்டுள்ளது",
     "upToDate": "புதுப்பித்த நிலையில் உள்ளது",
     "buildAhead": "இந்த உருவாக்கம் அதிகாரப்பூர்வ main-ஐ விட முன்னிலையில் உள்ளது.",
     "buildDiverged": "இந்த உருவாக்கம் அதிகாரப்பூர்வ main-இலிருந்து வேறுபட்டுள்ளது.",
     "buildUnknown": "இந்தத் தனிப்பயன் உருவாக்கத்தை அதிகாரப்பூர்வ main உடன் ஒப்பிட முடியாது.",
     "notGitInstall": "இந்த நிறுவலில் commit தகவல் இல்லை.",
     "checkFailed": "புதுப்பிப்புகளைச் சரிபார்க்க முடியவில்லை.",
-    "contactsGithub": "சரிபார்ப்புகள் கைமுறையாகச் செய்யப்படுகின்றன மற்றும் GitHub-ஐத் தொடர்புகொள்கின்றன.",
     "autoUpdateCheck": "தானியங்கு புதுப்பிப்புச் சரிபார்ப்பு",
-    "autoUpdateCheckHelp": "நாளொன்றுக்கு ஒருமுறை புதிய வெளியீட்டிற்காக GitHub-ஐச் சரிபார்த்து நினைவூட்டலைக் காட்டும். இயல்பாக அணைக்கப்பட்டுள்ளது.",
-    "openReleases": "GitHub வெளியீடுகளைத் திற",
     "restartAfterUpdate": "உருவாக்கம் முடிந்ததும் FreeLLMAPI-ஐ மறுதொடக்கம் செய்யவும்.",
     "downloadUpdate": "புதுப்பிப்பைப் பதிவிறக்கு",
     "downloadingUpdate": "பதிவிறக்குகிறது… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI-இன் புதிய பதிப்பு நிறுவப்பட்டுள்ளது.",
     "reload": "மீண்டும் ஏற்று"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "\"{oldName}\" சங்கிலியை \"{name}\" என மறுபெயரிடவா? auto:{oldName} அழைக்கும் கிளையண்டுகள் auto:{name} க்கு மாற வேண்டும்.",
     "renamePlaceholder": "புதிய சங்கிலி பெயர்",
     "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை."
+  },
+  "updates": {
+    "versionAvailable": "பதிப்பு {version} கிடைக்கிறது",
+    "versionReady": "பதிப்பு {version} நிறுவத் தயாராக உள்ளது",
+    "releaseNotes": "வெளியீட்டுக் குறிப்புகள்",
+    "tryAgain": "மீண்டும் முயல்க",
+    "offline": "இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்."
   }
 }

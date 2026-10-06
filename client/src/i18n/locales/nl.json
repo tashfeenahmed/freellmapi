@@ -152,20 +152,14 @@
     "compressionRunPreview": "Voorbeeld uitvoeren",
     "updatesTitle": "Updates",
     "checkForUpdates": "Controleer op updates",
-    "lastChecked": "Laatst gecontroleerd: {when}",
-    "currentVersion": "Huidige build:",
     "updateAvailable": "Update beschikbaar",
-    "changelog": "Wat is er veranderd",
     "upToDate": "Up-to-date",
     "buildAhead": "Deze build loopt voor op de officiële main-branch.",
     "buildDiverged": "Deze build is afgeweken van de officiële main-branch.",
     "buildUnknown": "Deze aangepaste build kan niet worden vergeleken met de officiële main-branch.",
     "notGitInstall": "Deze installatie bevat geen commitinformatie.",
     "checkFailed": "Kan niet controleren op updates.",
-    "contactsGithub": "Controles worden handmatig uitgevoerd en maken contact met GitHub.",
     "autoUpdateCheck": "Automatische updatecontrole",
-    "autoUpdateCheckHelp": "Controleert GitHub eenmaal per dag op een nieuwe release en toont een herinnering. Standaard uitgeschakeld.",
-    "openReleases": "GitHub Releases openen",
     "restartAfterUpdate": "Start FreeLLMAPI opnieuw nadat de build is voltooid.",
     "downloadUpdate": "Update downloaden",
     "downloadingUpdate": "Downloaden… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Er is een nieuwere versie van FreeLLMAPI geïnstalleerd.",
     "reload": "Opnieuw laden"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Keten \"{oldName}\" hernoemen naar \"{name}\"? Clients die auto:{oldName} aanroepen moeten overstappen op auto:{name}.",
     "renamePlaceholder": "Nieuwe ketennaam",
     "renameFailed": "Kan de naam van die keten niet wijzigen."
+  },
+  "updates": {
+    "versionAvailable": "Versie {version} is beschikbaar",
+    "versionReady": "Versie {version} is klaar om te installeren",
+    "releaseNotes": "Release-opmerkingen",
+    "tryAgain": "Opnieuw proberen",
+    "offline": "Controleer je internetverbinding en probeer het opnieuw."
   }
 }

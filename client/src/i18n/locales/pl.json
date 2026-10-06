@@ -152,20 +152,14 @@
     "compressionRunPreview": "Uruchom podgląd",
     "updatesTitle": "Aktualizacje",
     "checkForUpdates": "Sprawdź aktualizacje",
-    "lastChecked": "Ostatnio sprawdzane: {when}",
-    "currentVersion": "Bieżąca kompilacja:",
     "updateAvailable": "Dostępna aktualizacja",
-    "changelog": "Co się zmieniło",
     "upToDate": "Aktualne",
     "buildAhead": "Ta kompilacja wyprzedza oficjalną gałąź main.",
     "buildDiverged": "Ta kompilacja odbiega od oficjalnej gałęzi main.",
     "buildUnknown": "Tej niestandardowej kompilacji nie można porównać z oficjalną gałęzią main.",
     "notGitInstall": "Ta instalacja nie zawiera informacji o commicie.",
     "checkFailed": "Nie udało się sprawdzić dostępności aktualizacji.",
-    "contactsGithub": "Sprawdzanie jest uruchamiane ręcznie i nawiązuje połączenie z GitHubem.",
     "autoUpdateCheck": "Automatyczne sprawdzanie aktualizacji",
-    "autoUpdateCheckHelp": "Raz dziennie sprawdza w serwisie GitHub, czy jest nowe wydanie, i wyświetla przypomnienie. Domyślnie wyłączone.",
-    "openReleases": "Otwórz wydania w GitHubie",
     "restartAfterUpdate": "Uruchom ponownie FreeLLMAPI po zakończeniu kompilacji.",
     "downloadUpdate": "Pobierz aktualizację",
     "downloadingUpdate": "Pobieranie… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Zainstalowano nowszą wersję FreeLLMAPI.",
     "reload": "Odśwież"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Zmienić nazwę łańcucha \"{oldName}\" na \"{name}\"? Klienci wywołujący auto:{oldName} muszą przejść na auto:{name}.",
     "renamePlaceholder": "Nowa nazwa łańcucha",
     "renameFailed": "Nie udało się zmienić nazwy łańcucha."
+  },
+  "updates": {
+    "versionAvailable": "Dostępna jest wersja {version}",
+    "versionReady": "Wersja {version} jest gotowa do instalacji",
+    "releaseNotes": "Informacje o wydaniu",
+    "tryAgain": "Spróbuj ponownie",
+    "offline": "Sprawdź połączenie z internetem i spróbuj ponownie."
   }
 }

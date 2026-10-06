@@ -152,20 +152,14 @@
     "compressionRunPreview": "Gudanar da samfoti",
     "updatesTitle": "Sabuntawa",
     "checkForUpdates": "Bincika don sabuntawa",
-    "lastChecked": "An duba ƙarshe: {when}",
-    "currentVersion": "Build na yanzu:",
     "updateAvailable": "Akwai sabuntawa",
-    "changelog": "Abin da ya canza",
     "upToDate": "An sabunta",
     "buildAhead": "Wannan build ɗin yana gaba da main na hukuma.",
     "buildDiverged": "Wannan build ɗin ya rabu da main na hukuma.",
     "buildUnknown": "Ba za a iya kwatanta wannan build na musamman da main na hukuma ba.",
     "notGitInstall": "Wannan shigarwar ba ta ƙunshi bayanan commit ba.",
     "checkFailed": "Ba a iya bincika sabuntawa ba.",
-    "contactsGithub": "Ana yin dubawa da hannu kuma ana tuntuɓar GitHub.",
     "autoUpdateCheck": "Duba sabuntawa ta atomatik",
-    "autoUpdateCheckHelp": "Yana duba GitHub sau ɗaya a rana don sabon fitowa kuma yana nuna tunatarwa. A kashe ta tsohuwa.",
-    "openReleases": "Buɗe sakin GitHub",
     "restartAfterUpdate": "Sake kunna FreeLLMAPI bayan an gama build ɗin.",
     "downloadUpdate": "Sauke sabuntawa",
     "downloadingUpdate": "Ana saukewa… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "An shigar da sabon sigar FreeLLMAPI.",
     "reload": "Sake lodawa"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Sauya sunan sarƙa \"{oldName}\" zuwa \"{name}\"? Abokan cinikin da ke kira auto:{oldName} dole su koma auto:{name}.",
     "renamePlaceholder": "Sabon sunan sarƙa",
     "renameFailed": "Ba a iya sauya sunan sarƙar ba."
+  },
+  "updates": {
+    "versionAvailable": "Sigar {version} tana nan",
+    "versionReady": "Sigar {version} a shirye take don shigarwa",
+    "releaseNotes": "Bayanan fitarwa",
+    "tryAgain": "Sake gwadawa",
+    "offline": "Duba haɗin intanet ɗinka sannan ka sake gwadawa."
   }
 }

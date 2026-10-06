@@ -42,6 +42,9 @@ let inFlight: Promise<UpdateState> | null = null;
 // Set while a check runs in the background, so a found update is downloaded
 // straight away instead of waiting for a click nobody is there to make.
 let backgroundCheck = false;
+// The step under way, so an 'error' event (which electron-updater emits for
+// checks and downloads alike) can say which one failed.
+let stage: 'check' | 'download' | 'install' = 'check';
 // Set once the pre-install backup for the downloaded update has been written,
 // so the Restart button and the quit that follows don't write it twice.
 let backedUp = false;
@@ -110,7 +113,7 @@ export function initUpdater(options: UpdaterHooks): void {
       }).show();
     }
   });
-  autoUpdater.on('error', (err) => setState({ phase: 'error', message: message(err) }));
+  autoUpdater.on('error', (err) => setState({ phase: 'error', during: stage, message: message(err) }));
 
   // A downloaded update also installs on an ordinary quit (autoInstallOnAppQuit);
   // that path must get the same backup the Restart button takes.
@@ -138,10 +141,11 @@ export function checkForUpdates(): Promise<UpdateState> {
   if (state.phase === 'unsupported' || state.phase === 'downloading' || state.phase === 'ready') {
     return Promise.resolve(state);
   }
+  if (!inFlight) stage = 'check';
   inFlight ??= autoUpdater.checkForUpdates()
     .then(() => state)
     .catch((err) => {
-      setState({ phase: 'error', message: message(err) });
+      setState({ phase: 'error', during: 'check', message: message(err) });
       return state;
     })
     .finally(() => { inFlight = null; });
@@ -150,11 +154,12 @@ export function checkForUpdates(): Promise<UpdateState> {
 
 export async function downloadUpdate(): Promise<UpdateState> {
   if (state.phase !== 'available') return state;
+  stage = 'download';
   setState({ phase: 'downloading', version: state.version, percent: 0 });
   try {
     await autoUpdater.downloadUpdate();
   } catch (err) {
-    setState({ phase: 'error', message: message(err) });
+    setState({ phase: 'error', during: 'download', message: message(err) });
   }
   return state;
 }
@@ -169,11 +174,12 @@ function backup(): void {
 /** Back the database up, then quit, install and relaunch. */
 export async function installUpdate(): Promise<UpdateState> {
   if (state.phase !== 'ready') return state;
+  stage = 'install';
   try {
     backup();
   } catch (err) {
     // A failed backup must not install over data it could not save.
-    setState({ phase: 'error', message: `Backup before update failed: ${message(err)}` });
+    setState({ phase: 'error', during: 'install', message: `Backup before update failed: ${message(err)}` });
     return state;
   }
   // Let the IPC reply reach the renderer before the process starts to quit.

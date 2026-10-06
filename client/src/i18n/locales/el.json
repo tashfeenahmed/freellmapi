@@ -152,20 +152,14 @@
     "compressionRunPreview": "Εκτέλεση προεπισκόπησης",
     "updatesTitle": "Ενημερώσεις",
     "checkForUpdates": "Έλεγχος για ενημερώσεις",
-    "lastChecked": "Τελευταίος έλεγχος: {when}",
-    "currentVersion": "Τρέχον build:",
     "updateAvailable": "Διαθέσιμη ενημέρωση",
-    "changelog": "Τι άλλαξε",
     "upToDate": "Ενημερωμένο",
     "buildAhead": "Αυτό το build είναι μπροστά από το επίσημο main.",
     "buildDiverged": "Αυτό το build έχει αποκλίνει από το επίσημο main.",
     "buildUnknown": "Αυτό το προσαρμοσμένο build δεν μπορεί να συγκριθεί με το επίσημο main.",
     "notGitInstall": "Αυτή η εγκατάσταση δεν περιλαμβάνει πληροφορίες commit.",
     "checkFailed": "Δεν ήταν δυνατός ο έλεγχος για ενημερώσεις.",
-    "contactsGithub": "Οι έλεγχοι γίνονται χειροκίνητα και επικοινωνούν με το GitHub.",
     "autoUpdateCheck": "Αυτόματος έλεγχος ενημερώσεων",
-    "autoUpdateCheckHelp": "Ελέγχει το GitHub μία φορά την ημέρα για νέα έκδοση και εμφανίζει υπενθύμιση. Απενεργοποιημένο από προεπιλογή.",
-    "openReleases": "Άνοιγμα εκδόσεων GitHub",
     "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build.",
     "downloadUpdate": "Λήψη ενημέρωσης",
     "downloadingUpdate": "Λήψη… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Έχει εγκατασταθεί νεότερη έκδοση του FreeLLMAPI.",
     "reload": "Επαναφόρτωση"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Μετονομασία της αλυσίδας \"{oldName}\" σε \"{name}\"; Οι πελάτες που καλούν auto:{oldName} πρέπει να μεταβούν σε auto:{name}.",
     "renamePlaceholder": "Νέο όνομα αλυσίδας",
     "renameFailed": "Δεν ήταν δυνατή η μετονομασία της αλυσίδας."
+  },
+  "updates": {
+    "versionAvailable": "Η έκδοση {version} είναι διαθέσιμη",
+    "versionReady": "Η έκδοση {version} είναι έτοιμη για εγκατάσταση",
+    "releaseNotes": "Σημειώσεις έκδοσης",
+    "tryAgain": "Δοκιμάστε ξανά",
+    "offline": "Ελέγξτε τη σύνδεσή σας στο διαδίκτυο και δοκιμάστε ξανά."
   }
 }

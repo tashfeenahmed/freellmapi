@@ -152,20 +152,14 @@
     "compressionRunPreview": "Előnézet futtatása",
     "updatesTitle": "Frissítések",
     "checkForUpdates": "Ellenőrizd a frissítéseket",
-    "lastChecked": "Utoljára ellenőrizve: {when}",
-    "currentVersion": "Jelenlegi build:",
     "updateAvailable": "Frissítés érhető el",
-    "changelog": "Mi változott",
     "upToDate": "Naprakész",
     "buildAhead": "Ez a build megelőzi a hivatalos main ágat.",
     "buildDiverged": "Ez a build eltért a hivatalos main ágtól.",
     "buildUnknown": "Ez az egyéni build nem hasonlítható össze a hivatalos main ággal.",
     "notGitInstall": "Ez a telepítés nem tartalmaz commitinformációkat.",
     "checkFailed": "Nem sikerült ellenőrizni a frissítéseket.",
-    "contactsGithub": "Az ellenőrzések manuálisak, és kapcsolatba lépnek a GitHubbal.",
     "autoUpdateCheck": "Automatikus frissítésellenőrzés",
-    "autoUpdateCheckHelp": "Naponta egyszer ellenőrzi a GitHubon az új kiadást, és emlékeztetőt jelenít meg. Alapértelmezés szerint kikapcsolva.",
-    "openReleases": "GitHub-kiadások megnyitása",
     "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t.",
     "downloadUpdate": "Frissítés letöltése",
     "downloadingUpdate": "Letöltés… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "A FreeLLMAPI újabb verziója van telepítve.",
     "reload": "Újratöltés"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Lánc \"{oldName}\" átnevezése \"{name}\"-re? A(z) auto:{oldName}-t hívó ügyfeleknek át kell térniük auto:{name}-re.",
     "renamePlaceholder": "Új láncnév",
     "renameFailed": "Nem sikerült átnevezni a láncot."
+  },
+  "updates": {
+    "versionAvailable": "Elérhető a(z) {version} verzió",
+    "versionReady": "A(z) {version} verzió telepítésre kész",
+    "releaseNotes": "Kiadási jegyzetek",
+    "tryAgain": "Próbálja újra",
+    "offline": "Ellenőrizze az internetkapcsolatot, és próbálja újra."
   }
 }

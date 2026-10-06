@@ -152,20 +152,14 @@
     "compressionRunPreview": "Önbaxışı işə sal",
     "updatesTitle": "Yeniləmələr",
     "checkForUpdates": "Yeniləmələri yoxlayın",
-    "lastChecked": "Son yoxlama: {when}",
-    "currentVersion": "Cari quruluş:",
     "updateAvailable": "Yeniləmə mövcuddur",
-    "changelog": "Nələr dəyişib",
     "upToDate": "Ən son versiyadır",
     "buildAhead": "Bu quruluş rəsmi main budağından irəlidədir.",
     "buildDiverged": "Bu quruluş rəsmi main budağından ayrılıb.",
     "buildUnknown": "Bu xüsusi quruluşu rəsmi main budağı ilə müqayisə etmək mümkün deyil.",
     "notGitInstall": "Bu quraşdırmada commit məlumatı yoxdur.",
     "checkFailed": "Yeniləmələri yoxlamaq mümkün olmadı.",
-    "contactsGithub": "Yoxlamalar əl ilə başladılır və GitHub-a qoşulur.",
     "autoUpdateCheck": "Avtomatik yeniləmə yoxlaması",
-    "autoUpdateCheckHelp": "Gündə bir dəfə yeni buraxılış üçün GitHub-u yoxlayır və xatırlatma göstərir. Standart olaraq sönülüdür.",
-    "openReleases": "GitHub buraxılışlarını aç",
     "restartAfterUpdate": "Quruluş tamamlandıqdan sonra FreeLLMAPI-ni yenidən başladın.",
     "downloadUpdate": "Yeniləməni endir",
     "downloadingUpdate": "Endirilir… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI-nin daha yeni versiyası quraşdırılıb.",
     "reload": "Yenidən yüklə"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "\"{oldName}\" zəncirinin adı \"{name}\" ilə dəyişilsin? auto:{oldName} səsləyən müştərilər auto:{name} keçməlidir.",
     "renamePlaceholder": "Yeni zəncir adı",
     "renameFailed": "Zəncirin adını dəyişmək alınmadı."
+  },
+  "updates": {
+    "versionAvailable": "{version} versiyası mövcuddur",
+    "versionReady": "{version} versiyası quraşdırmağa hazırdır",
+    "releaseNotes": "Buraxılış qeydləri",
+    "tryAgain": "Yenidən cəhd et",
+    "offline": "İnternet bağlantınızı yoxlayın və yenidən cəhd edin."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "အစမ်းကြည့်ရန်",
     "updatesTitle": "အပ်ဒိတ်များ",
     "checkForUpdates": "အပ်ဒိတ်များကို စစ်ဆေးပါ",
-    "lastChecked": "နောက်ဆုံးစစ်ဆေးသည့်နေ့: {when}",
-    "currentVersion": "လက်ရှိ build:",
     "updateAvailable": "အပ်ဒိတ် ရရှိနိုင်သည်",
-    "changelog": "ပြောင်းလဲထားသည့်အရာများ",
     "upToDate": "နောက်ဆုံးပေါ် ဖြစ်သည်",
     "buildAhead": "ဤ build သည် တရားဝင် main ထက် ရှေ့ရောက်နေသည်။",
     "buildDiverged": "ဤ build သည် တရားဝင် main မှ ကွဲထွက်သွားသည်။",
     "buildUnknown": "ဤစိတ်ကြိုက် build ကို တရားဝင် main နှင့် နှိုင်းယှဉ်၍ မရပါ။",
     "notGitInstall": "ဤထည့်သွင်းမှုတွင် commit အချက်အလက် မပါဝင်ပါ။",
     "checkFailed": "အပ်ဒိတ်များကို စစ်ဆေး၍ မရပါ။",
-    "contactsGithub": "စစ်ဆေးမှုများကို ကိုယ်တိုင်လုပ်ဆောင်ရပြီး GitHub သို့ ဆက်သွယ်သည်။",
     "autoUpdateCheck": "အလိုအလျောက် အပ်ဒိတ်စစ်ဆေးမှု",
-    "autoUpdateCheckHelp": "တစ်ရက်လျှင် တစ်ကြိမ် ဗားရှင်းအသစ်အတွက် GitHub ကို စစ်ဆေးပြီး သတိပေးချက် ပြသသည်။ မူရင်းအတိုင်း ပိတ်ထားသည်။",
-    "openReleases": "GitHub Releases ကို ဖွင့်ရန်",
     "restartAfterUpdate": "build ပြီးဆုံးပြီးနောက် FreeLLMAPI ကို ပြန်လည်စတင်ပါ။",
     "downloadUpdate": "အပ်ဒိတ်ကို ဒေါင်းလုဒ်လုပ်ရန်",
     "downloadingUpdate": "ဒေါင်းလုဒ်လုပ်နေသည်… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI ဗားရှင်းအသစ် ထည့်သွင်းပြီးပါပြီ။",
     "reload": "ပြန်ဖွင့်ရန်"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "ချိန်း \"{oldName}\" ကို \"{name}\" အမည်ပြောင်းမလား? auto:{oldName} ကိုခေါ်ဆိုသော client များသည် auto:{name} သို့ ပြောင်းရမည်။",
     "renamePlaceholder": "ချိန်းအမည်အသစ်",
     "renameFailed": "ချိန်းအမည်ကို မပြောင်းနိုင်ပါ။"
+  },
+  "updates": {
+    "versionAvailable": "ဗားရှင်း {version} ရရှိနိုင်ပါပြီ",
+    "versionReady": "ဗားရှင်း {version} ထည့်သွင်းရန် အသင့်ဖြစ်ပါပြီ",
+    "releaseNotes": "ထုတ်ဝေမှု မှတ်စုများ",
+    "tryAgain": "ထပ်ကြိုးစားပါ",
+    "offline": "အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။"
   }
 }

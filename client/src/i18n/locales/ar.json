@@ -152,20 +152,14 @@
     "compressionRunPreview": "تشغيل المعاينة",
     "updatesTitle": "التحديثات",
     "checkForUpdates": "التحقق من وجود تحديثات",
-    "lastChecked": "آخر فحص: {when}",
-    "currentVersion": "البنية الحالية:",
     "updateAvailable": "يتوفر تحديث",
-    "changelog": "ما الذي تغيّر",
     "upToDate": "محدّث",
     "buildAhead": "هذه البنية متقدمة على الفرع main الرسمي.",
     "buildDiverged": "تباعدت هذه البنية عن الفرع main الرسمي.",
     "buildUnknown": "لا يمكن مقارنة هذه البنية المخصصة بالفرع main الرسمي.",
     "notGitInstall": "لا يتضمن هذا التثبيت معلومات الالتزام.",
     "checkFailed": "تعذر التحقق من وجود تحديثات.",
-    "contactsGithub": "تُجرى عمليات التحقق يدويًا وتتصل بـ GitHub.",
     "autoUpdateCheck": "التحقق التلقائي من التحديثات",
-    "autoUpdateCheckHelp": "يتحقق من GitHub مرة واحدة يوميًا بحثًا عن إصدار جديد ويعرض تذكيرًا. مُعطَّل افتراضيًا.",
-    "openReleases": "فتح إصدارات GitHub",
     "restartAfterUpdate": "أعد تشغيل FreeLLMAPI بعد اكتمال البنية.",
     "downloadUpdate": "تنزيل التحديث",
     "downloadingUpdate": "جارٍ التنزيل… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "تم تثبيت إصدار أحدث من FreeLLMAPI.",
     "reload": "إعادة التحميل"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "إعادة تسمية السلسلة \"{oldName}\" إلى \"{name}\"؟ يجب على العملاء الذين يستدعون auto:{oldName} التحول إلى auto:{name}.",
     "renamePlaceholder": "الاسم الجديد للسلسلة",
     "renameFailed": "تعذّرت إعادة تسمية السلسلة."
+  },
+  "updates": {
+    "versionAvailable": "الإصدار {version} متاح",
+    "versionReady": "الإصدار {version} جاهز للتثبيت",
+    "releaseNotes": "ملاحظات الإصدار",
+    "tryAgain": "أعد المحاولة",
+    "offline": "تحقّق من اتصالك بالإنترنت ثم أعد المحاولة."
   }
 }

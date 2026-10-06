@@ -152,20 +152,14 @@
     "compressionRunPreview": "ପୂର୍ବାବଲୋକନ ଚଲାନ୍ତୁ",
     "updatesTitle": "ଅପଡେଟ୍‌ଗୁଡ଼ିକ",
     "checkForUpdates": "ଅପଡେଟସ୍ ପାଇଁ ଯାଞ୍ଚ କରନ୍ତୁ",
-    "lastChecked": "ଶେଷ ଥର ଯାଞ୍ଚ ହୋଇଛି: {when}",
-    "currentVersion": "ବର୍ତ୍ତମାନର ବିଲ୍ଡ:",
     "updateAvailable": "ଅପଡେଟ୍ ଉପଲବ୍ଧ",
-    "changelog": "କ’ଣ ପରିବର୍ତ୍ତନ ହୋଇଛି",
     "upToDate": "ଅଦ୍ୟତନ ଅଛି",
     "buildAhead": "ଏହି ବିଲ୍ଡଟି ଅଧିକାରିକ main ଶାଖାଠାରୁ ଆଗରେ ଅଛି।",
     "buildDiverged": "ଏହି ବିଲ୍ଡଟି ଅଧିକାରିକ main ଶାଖାଠାରୁ ଅଲଗା ହୋଇଯାଇଛି।",
     "buildUnknown": "ଏହି କଷ୍ଟମ୍ ବିଲ୍ଡକୁ ଅଧିକାରିକ main ଶାଖା ସହିତ ତୁଳନା କରାଯାଇପାରିବ ନାହିଁ।",
     "notGitInstall": "ଏହି ଇନ୍‌ଷ୍ଟଲେସନ୍‌ରେ commit ସୂଚନା ନାହିଁ।",
     "checkFailed": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଇପାରିଲା ନାହିଁ।",
-    "contactsGithub": "ଯାଞ୍ଚଗୁଡ଼ିକ ମାନୁଆଲ୍ ଭାବେ କରାଯାଏ ଏବଂ GitHub ସହିତ ସଂଯୋଗ କରେ।",
     "autoUpdateCheck": "ସ୍ୱୟଂଚାଳିତ ଅପଡେଟ୍ ଯାଞ୍ଚ",
-    "autoUpdateCheckHelp": "ଦିନକୁ ଥରେ ନୂଆ ରିଲିଜ୍ ପାଇଁ GitHub ଯାଞ୍ଚ କରେ ଏବଂ ଏକ ସ୍ମାରକ ଦେଖାଏ। ଡିଫଲ୍ଟ ଭାବେ ବନ୍ଦ।",
-    "openReleases": "GitHub Releases ଖୋଲନ୍ତୁ",
     "restartAfterUpdate": "ବିଲ୍ଡ ସମ୍ପୂର୍ଣ୍ଣ ହେବା ପରେ FreeLLMAPI ପୁନଃ ଚାଲୁ କରନ୍ତୁ।",
     "downloadUpdate": "ଅପଡେଟ୍ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
     "downloadingUpdate": "ଡାଉନଲୋଡ୍ ହେଉଛି… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI ର ନୂଆ ସଂସ୍କରଣ ଇନଷ୍ଟଲ୍ ହୋଇଛି।",
     "reload": "ପୁନଃ ଲୋଡ୍"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "ଚେନ୍ \"{oldName}\" ର ନାମ \"{name}\" କରନ୍ତୁ? auto:{oldName} କଲ୍ କରୁଥିବା କ୍ଲାଏଣ୍ଟମାନେ auto:{name} କୁ ଯିବା ଉଚିତ୍‌।",
     "renamePlaceholder": "ନୂଆ ଚେନ୍ ନାମ",
     "renameFailed": "ଚେନ୍‌ର ନାମ ବଦଳାଯାଇପାରିଲା ନାହିଁ।"
+  },
+  "updates": {
+    "versionAvailable": "ସଂସ୍କରଣ {version} ଉପଲବ୍ଧ",
+    "versionReady": "ସଂସ୍କରଣ {version} ଇନଷ୍ଟଲ୍ ପାଇଁ ପ୍ରସ୍ତୁତ",
+    "releaseNotes": "ରିଲିଜ୍ ନୋଟ୍",
+    "tryAgain": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+    "offline": "ଆପଣଙ୍କ ଇଣ୍ଟରନେଟ୍ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   }
 }

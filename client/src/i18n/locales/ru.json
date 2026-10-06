@@ -152,20 +152,14 @@
     "compressionRunPreview": "Запустить предпросмотр",
     "updatesTitle": "Обновления",
     "checkForUpdates": "Проверьте наличие обновлений",
-    "lastChecked": "Последняя проверка: {when}",
-    "currentVersion": "Текущая сборка:",
     "updateAvailable": "Доступно обновление",
-    "changelog": "Что изменилось",
     "upToDate": "Установлена актуальная версия",
     "buildAhead": "Эта сборка опережает официальную ветку main.",
     "buildDiverged": "История этой сборки разошлась с официальной веткой main.",
     "buildUnknown": "Эту пользовательскую сборку невозможно сравнить с официальной веткой main.",
     "notGitInstall": "Эта установка не содержит сведений о коммите.",
     "checkFailed": "Не удалось проверить наличие обновлений.",
-    "contactsGithub": "Проверка запускается вручную и обращается к GitHub.",
     "autoUpdateCheck": "Автоматическая проверка обновлений",
-    "autoUpdateCheckHelp": "Раз в день проверяет на GitHub наличие нового выпуска и показывает напоминание. По умолчанию выключено.",
-    "openReleases": "Открыть релизы на GitHub",
     "restartAfterUpdate": "Перезапустите FreeLLMAPI после завершения сборки.",
     "downloadUpdate": "Скачать обновление",
     "downloadingUpdate": "Загрузка… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Установлена более новая версия FreeLLMAPI.",
     "reload": "Перезагрузить"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Переименовать цепочку \"{oldName}\" в \"{name}\"? Клиенты, обращающиеся к auto:{oldName}, должны перейти на auto:{name}.",
     "renamePlaceholder": "Новое имя цепочки",
     "renameFailed": "Не удалось переименовать цепочку."
+  },
+  "updates": {
+    "versionAvailable": "Доступна версия {version}",
+    "versionReady": "Версия {version} готова к установке",
+    "releaseNotes": "Примечания к выпуску",
+    "tryAgain": "Повторить",
+    "offline": "Проверьте подключение к интернету и повторите попытку."
   }
 }

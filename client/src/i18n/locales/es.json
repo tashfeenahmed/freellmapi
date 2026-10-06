@@ -152,20 +152,14 @@
     "compressionRunPreview": "Ejecutar vista previa",
     "updatesTitle": "Actualizaciones",
     "checkForUpdates": "Buscar actualizaciones",
-    "lastChecked": "Última comprobación: {when}",
-    "currentVersion": "Compilación actual:",
     "updateAvailable": "Actualización disponible",
-    "changelog": "Qué ha cambiado",
     "upToDate": "Al día",
     "buildAhead": "Esta compilación está por delante de la rama main oficial.",
     "buildDiverged": "Esta compilación ha divergido de la rama main oficial.",
     "buildUnknown": "Esta compilación personalizada no se puede comparar con la rama main oficial.",
     "notGitInstall": "Esta instalación no incluye información de commits.",
     "checkFailed": "No se pudo comprobar si hay actualizaciones.",
-    "contactsGithub": "Las comprobaciones se realizan manualmente y contactan con GitHub.",
     "autoUpdateCheck": "Comprobación automática de actualizaciones",
-    "autoUpdateCheckHelp": "Consulta GitHub una vez al día para ver si hay una nueva versión y muestra un recordatorio. Desactivado de forma predeterminada.",
-    "openReleases": "Abrir lanzamientos de GitHub",
     "restartAfterUpdate": "Reinicia FreeLLMAPI cuando finalice la compilación.",
     "downloadUpdate": "Descargar actualización",
     "downloadingUpdate": "Descargando… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Hay una versión más reciente de FreeLLMAPI instalada.",
     "reload": "Recargar"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "¿Cambiar el nombre de la cadena \"{oldName}\" a \"{name}\"? Los clientes que llamen a auto:{oldName} deben pasar a auto:{name}.",
     "renamePlaceholder": "Nuevo nombre de la cadena",
     "renameFailed": "No se pudo cambiar el nombre de la cadena."
+  },
+  "updates": {
+    "versionAvailable": "La versión {version} está disponible",
+    "versionReady": "La versión {version} está lista para instalar",
+    "releaseNotes": "Notas de la versión",
+    "tryAgain": "Reintentar",
+    "offline": "Comprueba tu conexión a internet y vuelve a intentarlo."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "Endesha hakikisho",
     "updatesTitle": "Masasisho",
     "checkForUpdates": "Angalia masasisho",
-    "lastChecked": "Mara ya mwisho kuangaliwa: {when}",
-    "currentVersion": "Toleo la sasa:",
     "updateAvailable": "Sasisho linapatikana",
-    "changelog": "Kilichobadilika",
     "upToDate": "Imesasishwa",
     "buildAhead": "Toleo hili liko mbele ya tawi rasmi la main.",
     "buildDiverged": "Toleo hili limejitenga na tawi rasmi la main.",
     "buildUnknown": "Toleo hili maalum haliwezi kulinganishwa na tawi rasmi la main.",
     "notGitInstall": "Usakinishaji huu hauna taarifa za commit.",
     "checkFailed": "Imeshindikana kuangalia masasisho.",
-    "contactsGithub": "Ukaguzi hufanywa mwenyewe na huwasiliana na GitHub.",
     "autoUpdateCheck": "Ukaguzi wa masasisho otomatiki",
-    "autoUpdateCheckHelp": "Hukagua GitHub mara moja kwa siku kwa toleo jipya na kuonyesha ukumbusho. Imezimwa kwa chaguo-msingi.",
-    "openReleases": "Fungua Matoleo ya GitHub",
     "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika.",
     "downloadUpdate": "Pakua sasisho",
     "downloadingUpdate": "Inapakua… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Toleo jipya la FreeLLMAPI limesakinishwa.",
     "reload": "Pakia upya"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Badilisha jina la mnyororo \"{oldName}\" kuwa \"{name}\"? Wateja wanaoitia auto:{oldName} lazima wabadilike kwa auto:{name}.",
     "renamePlaceholder": "Jina jipya la mnyororo",
     "renameFailed": "Imeshindwa kubadilisha jina la mnyororo."
+  },
+  "updates": {
+    "versionAvailable": "Toleo {version} linapatikana",
+    "versionReady": "Toleo {version} liko tayari kusakinishwa",
+    "releaseNotes": "Maelezo ya toleo",
+    "tryAgain": "Jaribu tena",
+    "offline": "Kagua muunganisho wako wa intaneti kisha ujaribu tena."
   }
 }

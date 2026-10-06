@@ -152,20 +152,14 @@
     "compressionRunPreview": "Chạy xem trước",
     "updatesTitle": "Bản cập nhật",
     "checkForUpdates": "Kiểm tra các bản cập nhật",
-    "lastChecked": "Kiểm tra lần cuối: {when}",
-    "currentVersion": "Bản dựng hiện tại:",
     "updateAvailable": "Có bản cập nhật",
-    "changelog": "Có gì thay đổi",
     "upToDate": "Đã cập nhật",
     "buildAhead": "Bản dựng này đi trước nhánh main chính thức.",
     "buildDiverged": "Bản dựng này đã phân kỳ khỏi nhánh main chính thức.",
     "buildUnknown": "Không thể so sánh bản dựng tùy chỉnh này với nhánh main chính thức.",
     "notGitInstall": "Bản cài đặt này không có thông tin commit.",
     "checkFailed": "Không thể kiểm tra bản cập nhật.",
-    "contactsGithub": "Việc kiểm tra được thực hiện thủ công và có kết nối với GitHub.",
     "autoUpdateCheck": "Tự động kiểm tra cập nhật",
-    "autoUpdateCheckHelp": "Kiểm tra GitHub mỗi ngày một lần để tìm bản phát hành mới và hiển thị lời nhắc. Mặc định tắt.",
-    "openReleases": "Mở GitHub Releases",
     "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng.",
     "downloadUpdate": "Tải bản cập nhật",
     "downloadingUpdate": "Đang tải… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Đã cài đặt phiên bản FreeLLMAPI mới hơn.",
     "reload": "Tải lại"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Đổi tên chuỗi \"{oldName}\" thành \"{name}\"? Các client gọi auto:{oldName} phải chuyển sang auto:{name}.",
     "renamePlaceholder": "Tên chuỗi mới",
     "renameFailed": "Không thể đổi tên chuỗi."
+  },
+  "updates": {
+    "versionAvailable": "Đã có phiên bản {version}",
+    "versionReady": "Phiên bản {version} đã sẵn sàng để cài đặt",
+    "releaseNotes": "Ghi chú phát hành",
+    "tryAgain": "Thử lại",
+    "offline": "Kiểm tra kết nối internet rồi thử lại."
   }
 }

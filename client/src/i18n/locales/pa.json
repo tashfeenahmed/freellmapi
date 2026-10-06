@@ -152,20 +152,14 @@
     "compressionRunPreview": "ਝਲਕ ਚਲਾਓ",
     "updatesTitle": "ਅੱਪਡੇਟ",
     "checkForUpdates": "ਅੱਪਡੇਟ ਲਈ ਚੈੱਕ ਕਰੋ",
-    "lastChecked": "ਪਿਛਲੀ ਵਾਰ ਜਾਂਚ ਕੀਤੀ ਗਈ: {when}",
-    "currentVersion": "ਮੌਜੂਦਾ ਬਿਲਡ:",
     "updateAvailable": "ਅੱਪਡੇਟ ਉਪਲਬਧ ਹੈ",
-    "changelog": "ਕੀ ਬਦਲਿਆ ਹੈ",
     "upToDate": "ਨਵੀਨਤਮ ਹੈ",
     "buildAhead": "ਇਹ ਬਿਲਡ ਅਧਿਕਾਰਤ main ਸ਼ਾਖਾ ਤੋਂ ਅੱਗੇ ਹੈ।",
     "buildDiverged": "ਇਹ ਬਿਲਡ ਅਧਿਕਾਰਤ main ਸ਼ਾਖਾ ਤੋਂ ਵੱਖ ਹੋ ਗਿਆ ਹੈ।",
     "buildUnknown": "ਇਸ ਕਸਟਮ ਬਿਲਡ ਦੀ ਤੁਲਨਾ ਅਧਿਕਾਰਤ main ਸ਼ਾਖਾ ਨਾਲ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
     "notGitInstall": "ਇਸ ਇੰਸਟਾਲੇਸ਼ਨ ਵਿੱਚ commit ਜਾਣਕਾਰੀ ਸ਼ਾਮਲ ਨਹੀਂ ਹੈ।",
     "checkFailed": "ਅੱਪਡੇਟਾਂ ਦੀ ਜਾਂਚ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
-    "contactsGithub": "ਜਾਂਚਾਂ ਹੱਥੀਂ ਚਲਾਈਆਂ ਜਾਂਦੀਆਂ ਹਨ ਅਤੇ GitHub ਨਾਲ ਸੰਪਰਕ ਕਰਦੀਆਂ ਹਨ।",
     "autoUpdateCheck": "ਆਪਣੇ-ਆਪ ਅੱਪਡੇਟ ਜਾਂਚ",
-    "autoUpdateCheckHelp": "ਦਿਨ ਵਿੱਚ ਇੱਕ ਵਾਰ ਨਵੀਂ ਰਿਲੀਜ਼ ਲਈ GitHub ਦੀ ਜਾਂਚ ਕਰਦਾ ਹੈ ਅਤੇ ਯਾਦ-ਦਹਾਨੀ ਦਿਖਾਉਂਦਾ ਹੈ। ਮੂਲ ਰੂਪ ਵਿੱਚ ਬੰਦ।",
-    "openReleases": "GitHub Releases ਖੋਲ੍ਹੋ",
     "restartAfterUpdate": "ਬਿਲਡ ਪੂਰਾ ਹੋਣ ਤੋਂ ਬਾਅਦ FreeLLMAPI ਨੂੰ ਮੁੜ ਚਾਲੂ ਕਰੋ।",
     "downloadUpdate": "ਅੱਪਡੇਟ ਡਾਊਨਲੋਡ ਕਰੋ",
     "downloadingUpdate": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI ਦਾ ਨਵਾਂ ਸੰਸਕਰਣ ਇੰਸਟਾਲ ਹੈ।",
     "reload": "ਮੁੜ ਲੋਡ ਕਰੋ"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "ਚੇਨ \"{oldName}\" ਦਾ ਨਾਂ \"{name}\" ਕਰਨਾ? auto:{oldName} ਕਾਲ ਕਰਦੇ ਕਲਾਇੰਟਾਂ ਨੂੰ auto:{name} 'ਤੇ ਜਾਣਾ ਪਵੇਗਾ।",
     "renamePlaceholder": "ਨਵਾਂ ਚੇਨ ਨਾਂ",
     "renameFailed": "ਚੇਨ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।"
+  },
+  "updates": {
+    "versionAvailable": "ਸੰਸਕਰਣ {version} ਉਪਲਬਧ ਹੈ",
+    "versionReady": "ਸੰਸਕਰਣ {version} ਇੰਸਟਾਲ ਲਈ ਤਿਆਰ ਹੈ",
+    "releaseNotes": "ਰਿਲੀਜ਼ ਨੋਟਸ",
+    "tryAgain": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "offline": "ਆਪਣਾ ਇੰਟਰਨੈੱਟ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   }
 }

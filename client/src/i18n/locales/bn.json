@@ -152,20 +152,14 @@
     "compressionRunPreview": "প্রিভিউ চালান",
     "updatesTitle": "আপডেটসমূহ",
     "checkForUpdates": "আপডেটের জন্য চেক করুন",
-    "lastChecked": "সর্বশেষ চেক করা হয়েছে: {when}",
-    "currentVersion": "বর্তমান বিল্ড:",
     "updateAvailable": "আপডেট উপলব্ধ",
-    "changelog": "কী পরিবর্তন হয়েছে",
     "upToDate": "হালনাগাদ আছে",
     "buildAhead": "এই বিল্ডটি অফিসিয়াল main-এর চেয়ে এগিয়ে আছে।",
     "buildDiverged": "এই বিল্ডটি অফিসিয়াল main থেকে বিচ্যুত হয়েছে।",
     "buildUnknown": "এই কাস্টম বিল্ডটির সঙ্গে অফিসিয়াল main-এর তুলনা করা যায় না।",
     "notGitInstall": "এই ইনস্টলেশনে কমিটের তথ্য নেই।",
     "checkFailed": "আপডেট পরীক্ষা করা যায়নি।",
-    "contactsGithub": "পরীক্ষাগুলি ম্যানুয়ালি করা হয় এবং GitHub-এর সঙ্গে যোগাযোগ করে।",
     "autoUpdateCheck": "স্বয়ংক্রিয় আপডেট পরীক্ষা",
-    "autoUpdateCheckHelp": "দিনে একবার নতুন রিলিজের জন্য GitHub পরীক্ষা করে এবং একটি অনুস্মারক দেখায়। ডিফল্টভাবে বন্ধ।",
-    "openReleases": "GitHub রিলিজ খুলুন",
     "restartAfterUpdate": "বিল্ড সম্পূর্ণ হওয়ার পর FreeLLMAPI পুনরায় চালু করুন।",
     "downloadUpdate": "আপডেট ডাউনলোড করুন",
     "downloadingUpdate": "ডাউনলোড হচ্ছে… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI-এর একটি নতুন সংস্করণ ইনস্টল হয়েছে।",
     "reload": "রিলোড"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "চেইন \"{oldName}\" এর নাম \"{name}\" করবেন? auto:{oldName} কল করা ক্লায়েন্টদের auto:{name} এ যেতে হবে।",
     "renamePlaceholder": "নতুন চেইন নাম",
     "renameFailed": "চেইনের নাম পরিবর্তন করা যায়নি।"
+  },
+  "updates": {
+    "versionAvailable": "সংস্করণ {version} উপলব্ধ",
+    "versionReady": "সংস্করণ {version} ইনস্টলের জন্য প্রস্তুত",
+    "releaseNotes": "রিলিজ নোট",
+    "tryAgain": "আবার চেষ্টা করুন",
+    "offline": "আপনার ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"
   }
 }

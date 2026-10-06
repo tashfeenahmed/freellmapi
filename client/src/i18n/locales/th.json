@@ -152,20 +152,14 @@
     "compressionRunPreview": "รันตัวอย่าง",
     "updatesTitle": "การอัปเดต",
     "checkForUpdates": "ตรวจสอบการอัปเดต",
-    "lastChecked": "ตรวจสอบล่าสุด: {when}",
-    "currentVersion": "บิลด์ปัจจุบัน:",
     "updateAvailable": "มีการอัปเดต",
-    "changelog": "มีอะไรเปลี่ยนแปลง",
     "upToDate": "เป็นเวอร์ชันล่าสุด",
     "buildAhead": "บิลด์นี้ล้ำหน้า main อย่างเป็นทางการ",
     "buildDiverged": "บิลด์นี้แยกออกจาก main อย่างเป็นทางการ",
     "buildUnknown": "ไม่สามารถเปรียบเทียบบิลด์ที่ปรับแต่งนี้กับ main อย่างเป็นทางการได้",
     "notGitInstall": "การติดตั้งนี้ไม่มีข้อมูล commit",
     "checkFailed": "ไม่สามารถตรวจสอบการอัปเดตได้",
-    "contactsGithub": "การตรวจสอบเป็นแบบดำเนินการเองและมีการติดต่อ GitHub",
     "autoUpdateCheck": "ตรวจสอบการอัปเดตอัตโนมัติ",
-    "autoUpdateCheckHelp": "ตรวจสอบ GitHub วันละครั้งว่ามีเวอร์ชันใหม่หรือไม่ และแสดงการแจ้งเตือน ปิดไว้ตามค่าเริ่มต้น",
-    "openReleases": "เปิด GitHub Releases",
     "restartAfterUpdate": "รีสตาร์ต FreeLLMAPI หลังจากบิลด์เสร็จสิ้น",
     "downloadUpdate": "ดาวน์โหลดอัปเดต",
     "downloadingUpdate": "กำลังดาวน์โหลด… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "ติดตั้ง FreeLLMAPI เวอร์ชันใหม่กว่าแล้ว",
     "reload": "โหลดใหม่"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "เปลี่ยนชื่อเชน \"{oldName}\" เป็น \"{name}\"? ไคลเอนต์ที่เรียก auto:{oldName} ต้องเปลี่ยนไปใช้ auto:{name} แทน",
     "renamePlaceholder": "ชื่อเชนใหม่",
     "renameFailed": "ไม่สามารถเปลี่ยนชื่อเชนได้"
+  },
+  "updates": {
+    "versionAvailable": "มีเวอร์ชัน {version} แล้ว",
+    "versionReady": "เวอร์ชัน {version} พร้อมติดตั้งแล้ว",
+    "releaseNotes": "บันทึกประจำรุ่น",
+    "tryAgain": "ลองอีกครั้ง",
+    "offline": "ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง"
   }
 }

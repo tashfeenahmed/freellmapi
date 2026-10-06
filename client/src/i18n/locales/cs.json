@@ -152,20 +152,14 @@
     "compressionRunPreview": "Spustit náhled",
     "updatesTitle": "Aktualizace",
     "checkForUpdates": "Sledujte aktualizace",
-    "lastChecked": "Naposledy kontrolováno: {when}",
-    "currentVersion": "Aktuální sestavení:",
     "updateAvailable": "Je dostupná aktualizace",
-    "changelog": "Co se změnilo",
     "upToDate": "Vše je aktuální",
     "buildAhead": "Toto sestavení je před oficiální větví main.",
     "buildDiverged": "Toto sestavení se odchýlilo od oficiální větve main.",
     "buildUnknown": "Toto vlastní sestavení nelze porovnat s oficiální větví main.",
     "notGitInstall": "Tato instalace neobsahuje informace o commitu.",
     "checkFailed": "Aktualizace se nepodařilo zkontrolovat.",
-    "contactsGithub": "Kontroly se spouštějí ručně a kontaktují GitHub.",
     "autoUpdateCheck": "Automatická kontrola aktualizací",
-    "autoUpdateCheckHelp": "Jednou denně zkontroluje na GitHubu novou verzi a zobrazí připomenutí. Ve výchozím nastavení vypnuto.",
-    "openReleases": "Otevřít vydání na GitHubu",
     "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI.",
     "downloadUpdate": "Stáhnout aktualizaci",
     "downloadingUpdate": "Stahování… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Je nainstalována novější verze FreeLLMAPI.",
     "reload": "Načíst znovu"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Přejmenovat řetězec \"{oldName}\" na \"{name}\"? Klienti volající auto:{oldName} musí přejít na auto:{name}.",
     "renamePlaceholder": "Nový název řetězce",
     "renameFailed": "Řetězec se nepodařilo přejmenovat."
+  },
+  "updates": {
+    "versionAvailable": "Je k dispozici verze {version}",
+    "versionReady": "Verze {version} je připravena k instalaci",
+    "releaseNotes": "Poznámky k vydání",
+    "tryAgain": "Zkusit znovu",
+    "offline": "Zkontrolujte připojení k internetu a zkuste to znovu."
   }
 }

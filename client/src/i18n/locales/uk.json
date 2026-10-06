@@ -152,20 +152,14 @@
     "compressionRunPreview": "Запустити перегляд",
     "updatesTitle": "Оновлення",
     "checkForUpdates": "Перевірте наявність оновлень",
-    "lastChecked": "Востаннє перевірено: {when}",
-    "currentVersion": "Поточна збірка:",
     "updateAvailable": "Доступне оновлення",
-    "changelog": "Що змінилося",
     "upToDate": "Актуальна версія",
     "buildAhead": "Ця збірка випереджає офіційну гілку main.",
     "buildDiverged": "Ця збірка розійшлася з офіційною гілкою main.",
     "buildUnknown": "Цю користувацьку збірку неможливо порівняти з офіційною гілкою main.",
     "notGitInstall": "Ця інсталяція не містить інформації про commit.",
     "checkFailed": "Не вдалося перевірити наявність оновлень.",
-    "contactsGithub": "Перевірки запускаються вручну та звертаються до GitHub.",
     "autoUpdateCheck": "Автоматична перевірка оновлень",
-    "autoUpdateCheckHelp": "Раз на день перевіряє GitHub на новий випуск і показує нагадування. Типово вимкнено.",
-    "openReleases": "Відкрити релізи GitHub",
     "restartAfterUpdate": "Перезапустіть FreeLLMAPI після завершення збірки.",
     "downloadUpdate": "Завантажити оновлення",
     "downloadingUpdate": "Завантаження… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Встановлено новішу версію FreeLLMAPI.",
     "reload": "Перезавантажити"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Перейменувати ланцюг \"{oldName}\" на \"{name}\"? Клієнти, що викликають auto:{oldName}, мають перейти на auto:{name}.",
     "renamePlaceholder": "Нова назва ланцюга",
     "renameFailed": "Не вдалося перейменувати ланцюг."
+  },
+  "updates": {
+    "versionAvailable": "Доступна версія {version}",
+    "versionReady": "Версія {version} готова до встановлення",
+    "releaseNotes": "Примітки до випуску",
+    "tryAgain": "Спробувати ще раз",
+    "offline": "Перевірте підключення до інтернету й спробуйте ще раз."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "Ṣiṣe awotẹlẹ",
     "updatesTitle": "Àwọn ìmúdójúìwọ̀n",
     "checkForUpdates": "Ṣayẹwo fun awọn imudojuiwọn",
-    "lastChecked": "Ayẹwo ikẹhin: {when}",
-    "currentVersion": "Ẹ̀yà ìkọ́lé lọ́wọ́lọ́wọ́:",
     "updateAvailable": "Ìmúdójúìwọ̀n wà",
-    "changelog": "Ohun tí ó yí padà",
     "upToDate": "Ó ti mú dójú ìwọ̀n",
     "buildAhead": "Ẹ̀yà ìkọ́lé yìí ti lọ síwájú main àṣẹ.",
     "buildDiverged": "Ẹ̀yà ìkọ́lé yìí ti yà kúrò ní main àṣẹ.",
     "buildUnknown": "A kò lè fi ẹ̀yà ìkọ́lé àkànṣe yìí wé main àṣẹ.",
     "notGitInstall": "Fífìmọ́lẹ̀ yìí kò ní àlàyé commit.",
     "checkFailed": "A kò lè ṣàyẹ̀wò àwọn ìmúdójúìwọ̀n.",
-    "contactsGithub": "Ọwọ́ ni a fi ń ṣe àwọn àyẹ̀wò, wọ́n sì ń kan sí GitHub.",
     "autoUpdateCheck": "Àyẹ̀wò ìmúdójúìwọ̀n aládàáṣe",
-    "autoUpdateCheckHelp": "Ó ń ṣàyẹ̀wò GitHub lẹ́ẹ̀kan lóòjọ́ fún ìtújáde tuntun, ó sì ń fi ìránnilétí hàn. Ó pa ní àtìbẹ̀rẹ̀.",
-    "openReleases": "Ṣí àwọn ìtújáde GitHub",
     "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí.",
     "downloadUpdate": "Ṣe ìgbàsílẹ̀ ìmúdójúìwọ̀n",
     "downloadingUpdate": "Ń ṣe ìgbàsílẹ̀… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "A ti fi ẹ̀yà FreeLLMAPI tuntun sí i.",
     "reload": "Tún gbé e"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Tún orúkọ ẹwẹ̀ \"{oldName}\" sí \"{name}\"? Àwọn oníbàárà̀ tó ̀ pè auto:{oldName} gbọ́dọ̀ yí padà sí auto:{name}.",
     "renamePlaceholder": "Orúkọ ẹwẹ̀ tuntun",
     "renameFailed": "A kò lè tún orúkọ ẹwẹ̀ yẹn sọ."
+  },
+  "updates": {
+    "versionAvailable": "Ẹ̀yà {version} wà",
+    "versionReady": "Ẹ̀yà {version} ti ṣetán láti fi sí i",
+    "releaseNotes": "Àkọsílẹ̀ ìtújáde",
+    "tryAgain": "Gbìyànjú lẹ́ẹ̀kan sí i",
+    "offline": "Ṣàyẹ̀wò ìsopọ̀ íńtánẹ́ẹ̀tì rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   }
 }

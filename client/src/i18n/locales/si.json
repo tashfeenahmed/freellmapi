@@ -152,20 +152,14 @@
     "compressionRunPreview": "පෙරදසුන ධාවනය කරන්න",
     "updatesTitle": "යාවත්කාලීන",
     "checkForUpdates": "යාවත්කාලීන සඳහා පරීක්ෂා කරන්න",
-    "lastChecked": "අවසන් වරට පරීක්ෂා කළේ: {when}",
-    "currentVersion": "වත්මන් ගොඩනැගීම:",
     "updateAvailable": "යාවත්කාලීනයක් තිබේ",
-    "changelog": "වෙනස් වූ දේ",
     "upToDate": "යාවත්කාලීනයි",
     "buildAhead": "මෙම ගොඩනැගීම නිල main ශාඛාවට වඩා ඉදිරියෙන් ඇත.",
     "buildDiverged": "මෙම ගොඩනැගීම නිල main ශාඛාවෙන් අපගමනය වී ඇත.",
     "buildUnknown": "මෙම අභිරුචි ගොඩනැගීම නිල main ශාඛාව සමඟ සැසඳිය නොහැක.",
     "notGitInstall": "මෙම ස්ථාපනයේ commit තොරතුරු ඇතුළත් නොවේ.",
     "checkFailed": "යාවත්කාලීන පරීක්ෂා කිරීමට නොහැකි විය.",
-    "contactsGithub": "පරීක්ෂා කිරීම් අතින් ක්‍රියාත්මක කරන අතර GitHub සමඟ සම්බන්ධ වේ.",
     "autoUpdateCheck": "ස්වයංක්‍රීය යාවත්කාලීන පරීක්ෂාව",
-    "autoUpdateCheckHelp": "නව නිකුතුවක් සඳහා දිනකට වරක් GitHub පරීක්ෂා කර මතක් කිරීමක් පෙන්වයි. පෙරනිමියෙන් ක්‍රියාවිරහිතයි.",
-    "openReleases": "GitHub Releases විවෘත කරන්න",
     "restartAfterUpdate": "ගොඩනැගීම සම්පූර්ණ වූ පසු FreeLLMAPI නැවත ආරම්භ කරන්න.",
     "downloadUpdate": "යාවත්කාලීනය බාගන්න",
     "downloadingUpdate": "බාගනිමින්… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI හි නවතම අනුවාදයක් ස්ථාපනය කර ඇත.",
     "reload": "නැවත පූරණය"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "දාමය \"{oldName}\" හි නම \"{name}\" ලෙස වෙනස් කරන්නද? auto:{oldName} අමතන සේවාදායකයින් auto:{name} වෙත යා යුතුය.",
     "renamePlaceholder": "නව දාම නම",
     "renameFailed": "එම දාමයේ නම වෙනස් කළ නොහැකි විය."
+  },
+  "updates": {
+    "versionAvailable": "අනුවාදය {version} ලබා ගත හැක",
+    "versionReady": "අනුවාදය {version} ස්ථාපනයට සූදානම්",
+    "releaseNotes": "නිකුතු සටහන්",
+    "tryAgain": "නැවත උත්සාහ කරන්න",
+    "offline": "ඔබගේ අන්තර්ජාල සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "Lancer l'aperçu",
     "updatesTitle": "Mises à jour",
     "checkForUpdates": "Vérifier les mises à jour",
-    "lastChecked": "Dernière vérification : {when}",
-    "currentVersion": "Build actuel :",
     "updateAvailable": "Une mise à jour est disponible",
-    "changelog": "Nouveautés",
     "upToDate": "À jour",
     "buildAhead": "Ce build est en avance sur la branche main officielle.",
     "buildDiverged": "Ce build a divergé de la branche main officielle.",
     "buildUnknown": "Ce build personnalisé ne peut pas être comparé à la branche main officielle.",
     "notGitInstall": "Cette installation ne contient aucune information de commit.",
     "checkFailed": "Impossible de rechercher les mises à jour.",
-    "contactsGithub": "Les vérifications sont effectuées manuellement et contactent GitHub.",
     "autoUpdateCheck": "Vérification automatique des mises à jour",
-    "autoUpdateCheckHelp": "Consulte GitHub une fois par jour pour détecter une nouvelle version et affiche un rappel. Désactivé par défaut.",
-    "openReleases": "Ouvrir les versions GitHub",
     "restartAfterUpdate": "Redémarrez FreeLLMAPI une fois le build terminé.",
     "downloadUpdate": "Télécharger la mise à jour",
     "downloadingUpdate": "Téléchargement… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "Nouvelle version disponible",
-    "whatsNew": "Nouveautés de la v{version}",
-    "publishedOn": "Publié le {date}",
-    "noNotes": "Aucune note de version n'a été publiée pour cette version.",
-    "openRelease": "Ouvrir la page de la version",
-    "dismissVersion": "Ignorer cette version",
     "dismiss": "Ignorer",
     "newBuild": "Une version plus récente de FreeLLMAPI est installée.",
     "reload": "Recharger"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Renommer la chaîne « {oldName} » en « {name} » ? Les clients appelant auto:{oldName} doivent passer à auto:{name}.",
     "renamePlaceholder": "Nouveau nom de la chaîne",
     "renameFailed": "Impossible de renommer cette chaîne."
+  },
+  "updates": {
+    "versionAvailable": "La version {version} est disponible",
+    "versionReady": "La version {version} est prête à être installée",
+    "releaseNotes": "Notes de version",
+    "tryAgain": "Réessayer",
+    "offline": "Vérifiez votre connexion internet et réessayez."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "Run preview",
     "updatesTitle": "Updates",
     "checkForUpdates": "Check for updates",
-    "lastChecked": "Last checked: {when}",
-    "currentVersion": "Current build:",
     "updateAvailable": "Update available",
-    "changelog": "What's changed",
     "upToDate": "Up to date",
     "buildAhead": "This build is ahead of official main.",
     "buildDiverged": "This build has diverged from official main.",
     "buildUnknown": "This custom build cannot be compared with official main.",
     "notGitInstall": "This installation does not include commit information.",
     "checkFailed": "Could not check for updates.",
-    "contactsGithub": "Checks are manual and contact GitHub.",
     "autoUpdateCheck": "Automatic update check",
-    "autoUpdateCheckHelp": "Checks GitHub once a day for a new release and shows a reminder. Off by default.",
-    "openReleases": "Open GitHub Releases",
     "restartAfterUpdate": "Restart FreeLLMAPI after the build completes.",
     "downloadUpdate": "Download update",
     "downloadingUpdate": "Downloading… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "A newer version of FreeLLMAPI is installed.",
     "reload": "Reload"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Rename chain \"{oldName}\" to \"{name}\"? Clients calling auto:{oldName} must switch to auto:{name}.",
     "renamePlaceholder": "New chain name",
     "renameFailed": "Couldn't rename the chain."
+  },
+  "updates": {
+    "versionAvailable": "Version {version} is available",
+    "versionReady": "Version {version} is ready to install",
+    "releaseNotes": "Release notes",
+    "tryAgain": "Try again",
+    "offline": "Check your internet connection and try again."
   }
 }

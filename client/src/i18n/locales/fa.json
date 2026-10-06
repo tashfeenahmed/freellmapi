@@ -152,20 +152,14 @@
     "compressionRunPreview": "اجرای پیش‌نمایش",
     "updatesTitle": "به‌روزرسانی‌ها",
     "checkForUpdates": "به روز رسانی را بررسی کنید",
-    "lastChecked": "آخرین بررسی: {when}",
-    "currentVersion": "بیلد فعلی:",
     "updateAvailable": "به‌روزرسانی در دسترس است",
-    "changelog": "چه چیزهایی تغییر کرده است",
     "upToDate": "به‌روز است",
     "buildAhead": "این بیلد از شاخهٔ رسمی main جلوتر است.",
     "buildDiverged": "این بیلد از شاخهٔ رسمی main واگرا شده است.",
     "buildUnknown": "این بیلد سفارشی را نمی‌توان با شاخهٔ رسمی main مقایسه کرد.",
     "notGitInstall": "این نصب شامل اطلاعات commit نیست.",
     "checkFailed": "بررسی به‌روزرسانی‌ها ممکن نبود.",
-    "contactsGithub": "بررسی‌ها دستی هستند و با GitHub ارتباط برقرار می‌کنند.",
     "autoUpdateCheck": "بررسی خودکار به‌روزرسانی",
-    "autoUpdateCheckHelp": "روزی یک بار GitHub را برای انتشار نسخهٔ جدید بررسی می‌کند و یادآوری نشان می‌دهد. به‌طور پیش‌فرض خاموش است.",
-    "openReleases": "باز کردن نسخه‌های منتشرشده در GitHub",
     "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید.",
     "downloadUpdate": "دانلود به‌روزرسانی",
     "downloadingUpdate": "در حال دانلود… {percent}٪",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "نسخهٔ جدیدتری از FreeLLMAPI نصب شده است.",
     "reload": "بارگذاری مجدد"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "نام زنجیره \"{oldName}\" به \"{name}\" تغییر کند؟ کلاینت‌هایی که auto:{oldName} را صدا می‌زنند باید به auto:{name} بروند.",
     "renamePlaceholder": "نام جدید زنجیره",
     "renameFailed": "تغییر نام زنجیره انجام نشد."
+  },
+  "updates": {
+    "versionAvailable": "نسخهٔ {version} در دسترس است",
+    "versionReady": "نسخهٔ {version} آمادهٔ نصب است",
+    "releaseNotes": "یادداشت‌های انتشار",
+    "tryAgain": "دوباره تلاش کنید",
+    "offline": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید."
   }
 }

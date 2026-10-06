@@ -152,20 +152,14 @@
     "compressionRunPreview": "Mee nlele",
     "updatesTitle": "Mmelite",
     "checkForUpdates": "Lelee maka mmelite",
-    "lastChecked": "Nyocha ikpeazụ: {when}",
-    "currentVersion": "Build dị ugbu a:",
     "updateAvailable": "Mmelite dị",
-    "changelog": "Ihe gbanwere",
     "upToDate": "Ọ dị ọhụrụ",
     "buildAhead": "Build a dị n'ihu alaka main nke iwu kwadoro.",
     "buildDiverged": "Build a esiwo na alaka main nke iwu kwadoro kewapụ.",
     "buildUnknown": "Enweghị ike iji build omenala a tụnyere alaka main nke iwu kwadoro.",
     "notGitInstall": "Nwụnye a enweghị ozi commit.",
     "checkFailed": "Enweghị ike ịlele mmelite.",
-    "contactsGithub": "A na-eji aka eme nyocha ndị a, ha na-akpọtụrụ GitHub.",
     "autoUpdateCheck": "Nyocha mmelite akpaaka",
-    "autoUpdateCheckHelp": "Ọ na-enyocha GitHub otu ugboro n'ụbọchị maka ntọhapụ ọhụrụ ma gosi ncheta. A gbanyụrụ ya na ndabara.",
-    "openReleases": "Mepee GitHub Releases",
     "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara.",
     "downloadUpdate": "Budata mmelite",
     "downloadingUpdate": "Na-ebudata… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Etinyela ụdị FreeLLMAPI ọhụrụ.",
     "reload": "Bugharịa"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Gbanwee aha chain \"{oldName}\" ka ọ bụrụ \"{name}\"? Ndị ahịa na-akpọ auto:{oldName} ga-agbanwe gaa auto:{name}.",
     "renamePlaceholder": "Aha chain ọhụrụ",
     "renameFailed": "Enweghị ike ịgbanwe aha chain ahụ."
+  },
+  "updates": {
+    "versionAvailable": "Ụdị {version} dị",
+    "versionReady": "Ụdị {version} dị njikere maka itinye",
+    "releaseNotes": "Ndetu mwepụta",
+    "tryAgain": "Nwaa ọzọ",
+    "offline": "Lelee njikọ ịntanetị gị ma nwaa ọzọ."
   }
 }

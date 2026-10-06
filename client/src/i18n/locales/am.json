@@ -152,20 +152,14 @@
     "compressionRunPreview": "ቅድመ-እይታ አሂድ",
     "updatesTitle": "ዝማኔዎች",
     "checkForUpdates": "ዝማኔዎችን ያረጋግጡ",
-    "lastChecked": "ለመጨረሻ ጊዜ የተፈተሸው {when}",
-    "currentVersion": "የአሁኑ ግንባታ:",
     "updateAvailable": "ዝማኔ አለ",
-    "changelog": "ምን ተለውጧል",
     "upToDate": "ወቅታዊ ነው",
     "buildAhead": "ይህ ግንባታ ከይፋዊው main ቀድሟል።",
     "buildDiverged": "ይህ ግንባታ ከይፋዊው main ተለይቷል።",
     "buildUnknown": "ይህ ብጁ ግንባታ ከይፋዊው main ጋር ሊነጻጸር አይችልም።",
     "notGitInstall": "ይህ ጭነት የcommit መረጃን አያካትትም።",
     "checkFailed": "ዝማኔዎችን መፈተሽ አልተቻለም።",
-    "contactsGithub": "ፍተሻዎች በእጅ የሚከናወኑ ሲሆን GitHubን ያገናኛሉ።",
     "autoUpdateCheck": "ራስ-ሰር የዝማኔ ፍተሻ",
-    "autoUpdateCheckHelp": "በቀን አንድ ጊዜ ለአዲስ ልቀት GitHubን ይፈትሻል እና ማስታወሻ ያሳያል። በነባሪነት ጠፍቷል።",
-    "openReleases": "የGitHub ልቀቶችን ክፈት",
     "restartAfterUpdate": "ግንባታው ከተጠናቀቀ በኋላ FreeLLMAPIን እንደገና ያስጀምሩ።",
     "downloadUpdate": "ዝማኔ አውርድ",
     "downloadingUpdate": "በማውረድ ላይ… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "አዲስ የFreeLLMAPI ስሪት ተጭኗል።",
     "reload": "እንደገና ጫን"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "ሰንሰለት \"{oldName}\" ስሙን ወደ \"{name}\" ቀይር? auto:{oldName} የሚጠሩ ደንበኞች ወደ auto:{name} ማለፍ አለባቸው።",
     "renamePlaceholder": "አዲስ የሰንሰለት ስም",
     "renameFailed": "የሰንሰለቱን ስም መቀየር አልተቻለም።"
+  },
+  "updates": {
+    "versionAvailable": "ስሪት {version} ይገኛል",
+    "versionReady": "ስሪት {version} ለመጫን ዝግጁ ነው",
+    "releaseNotes": "የልቀት ማስታወሻዎች",
+    "tryAgain": "እንደገና ሞክር",
+    "offline": "የበይነመረብ ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።"
   }
 }

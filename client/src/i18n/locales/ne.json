@@ -152,20 +152,14 @@
     "compressionRunPreview": "पूर्वावलोकन चलाउनुहोस्",
     "updatesTitle": "अद्यावधिकहरू",
     "checkForUpdates": "अद्यावधिकका लागि जाँच गर्नुहोस्",
-    "lastChecked": "अन्त्यमा जाँच गरिएको: {when}",
-    "currentVersion": "हालको बिल्ड:",
     "updateAvailable": "अद्यावधिक उपलब्ध छ",
-    "changelog": "के परिवर्तन भयो",
     "upToDate": "अद्यावधिक छ",
     "buildAhead": "यो बिल्ड आधिकारिक main शाखाभन्दा अगाडि छ।",
     "buildDiverged": "यो बिल्ड आधिकारिक main शाखाबाट अलग भएको छ।",
     "buildUnknown": "यो अनुकूलित बिल्डलाई आधिकारिक main शाखासँग तुलना गर्न सकिँदैन।",
     "notGitInstall": "यो स्थापनामा commit जानकारी समावेश छैन।",
     "checkFailed": "अद्यावधिकहरू जाँच गर्न सकिएन।",
-    "contactsGithub": "जाँचहरू म्यानुअल रूपमा गरिन्छन् र GitHub सँग सम्पर्क गर्छन्।",
     "autoUpdateCheck": "स्वचालित अद्यावधिक जाँच",
-    "autoUpdateCheckHelp": "दिनमा एक पटक नयाँ रिलिजका लागि GitHub जाँच गर्छ र सम्झना देखाउँछ। पूर्वनिर्धारित रूपमा बन्द।",
-    "openReleases": "GitHub रिलीजहरू खोल्नुहोस्",
     "restartAfterUpdate": "बिल्ड पूरा भएपछि FreeLLMAPI पुनः सुरु गर्नुहोस्।",
     "downloadUpdate": "अपडेट डाउनलोड गर्नुहोस्",
     "downloadingUpdate": "डाउनलोड हुँदैछ… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI को नयाँ संस्करण इन्स्टल भएको छ।",
     "reload": "पुनः लोड"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "चेन \"{oldName}\" को नाम \"{name}\" मा बदल्ने? auto:{oldName} बोलाउने क्लाइन्टहरूले auto:{name} मा जानुपर्छ।",
     "renamePlaceholder": "नयाँ चेन नाम",
     "renameFailed": "चेनको नाम बदल्न सकिएन।"
+  },
+  "updates": {
+    "versionAvailable": "संस्करण {version} उपलब्ध छ",
+    "versionReady": "संस्करण {version} इन्स्टल गर्न तयार छ",
+    "releaseNotes": "रिलिज नोटहरू",
+    "tryAgain": "फेरि प्रयास गर्नुहोस्",
+    "offline": "आफ्नो इन्टरनेट जडान जाँच गरी फेरि प्रयास गर्नुहोस्।"
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "გადახედვის გაშვება",
     "updatesTitle": "განახლებები",
     "checkForUpdates": "შეამოწმეთ განახლებები",
-    "lastChecked": "ბოლო შემოწმება: {when}",
-    "currentVersion": "მიმდინარე ბილდი:",
     "updateAvailable": "განახლება ხელმისაწვდომია",
-    "changelog": "რა შეიცვალა",
     "upToDate": "განახლებულია",
     "buildAhead": "ეს ბილდი ოფიციალურ main შტოს უსწრებს.",
     "buildDiverged": "ეს ბილდი ოფიციალურ main შტოს ასცდა.",
     "buildUnknown": "ამ მორგებული ბილდის შედარება ოფიციალურ main შტოსთან შეუძლებელია.",
     "notGitInstall": "ეს ინსტალაცია კომიტების შესახებ ინფორმაციას არ შეიცავს.",
     "checkFailed": "განახლებების შემოწმება ვერ მოხერხდა.",
-    "contactsGithub": "შემოწმება ხელით სრულდება და GitHub-ს უკავშირდება.",
     "autoUpdateCheck": "განახლებების ავტომატური შემოწმება",
-    "autoUpdateCheckHelp": "დღეში ერთხელ ამოწმებს GitHub-ს ახალი გამოშვებისთვის და აჩვენებს შეხსენებას. ნაგულისხმევად გამორთულია.",
-    "openReleases": "GitHub-ის რელიზების გახსნა",
     "restartAfterUpdate": "ბილდის დასრულების შემდეგ გადატვირთეთ FreeLLMAPI.",
     "downloadUpdate": "განახლების ჩამოტვირთვა",
     "downloadingUpdate": "იტვირთება… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "დაყენებულია FreeLLMAPI-ის უფრო ახალი ვერსია.",
     "reload": "გადატვირთვა"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "გადარქვათ ჯაჭვს \"{oldName}\" სახელი \"{name}\"? კლიენტებმა, რომლებიც იძახიან auto:{oldName}, უნდა გადავიდნენ auto:{name}-ზე.",
     "renamePlaceholder": "ახალი ჯაჭვის სახელი",
     "renameFailed": "ამ ჯაჭვის გადარქმევა ვერ მოხერხდა."
+  },
+  "updates": {
+    "versionAvailable": "ხელმისაწვდომია ვერსია {version}",
+    "versionReady": "ვერსია {version} მზადაა დასაყენებლად",
+    "releaseNotes": "გამოშვების შენიშვნები",
+    "tryAgain": "ხელახლა ცდა",
+    "offline": "შეამოწმეთ ინტერნეტკავშირი და სცადეთ ხელახლა."
   }
 }

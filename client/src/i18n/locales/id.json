@@ -152,20 +152,14 @@
     "compressionRunPreview": "Jalankan pratinjau",
     "updatesTitle": "Pembaruan",
     "checkForUpdates": "Periksa pembaruan",
-    "lastChecked": "Terakhir diperiksa: {when}",
-    "currentVersion": "Build saat ini:",
     "updateAvailable": "Pembaruan tersedia",
-    "changelog": "Yang berubah",
     "upToDate": "Sudah terbaru",
     "buildAhead": "Build ini lebih maju dari cabang main resmi.",
     "buildDiverged": "Build ini telah menyimpang dari cabang main resmi.",
     "buildUnknown": "Build khusus ini tidak dapat dibandingkan dengan cabang main resmi.",
     "notGitInstall": "Instalasi ini tidak menyertakan informasi commit.",
     "checkFailed": "Tidak dapat memeriksa pembaruan.",
-    "contactsGithub": "Pemeriksaan dilakukan secara manual dan menghubungi GitHub.",
     "autoUpdateCheck": "Pemeriksaan pembaruan otomatis",
-    "autoUpdateCheckHelp": "Memeriksa GitHub sekali sehari untuk rilis baru dan menampilkan pengingat. Nonaktif secara bawaan.",
-    "openReleases": "Buka Rilis GitHub",
     "restartAfterUpdate": "Mulai ulang FreeLLMAPI setelah proses build selesai.",
     "downloadUpdate": "Unduh pembaruan",
     "downloadingUpdate": "Mengunduh… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Versi FreeLLMAPI yang lebih baru telah terpasang.",
     "reload": "Muat ulang"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Ganti nama rantai \"{oldName}\" menjadi \"{name}\"? Klien yang memanggil auto:{oldName} harus beralih ke auto:{name}.",
     "renamePlaceholder": "Nama rantai baru",
     "renameFailed": "Tidak dapat mengganti nama rantai."
+  },
+  "updates": {
+    "versionAvailable": "Versi {version} tersedia",
+    "versionReady": "Versi {version} siap dipasang",
+    "releaseNotes": "Catatan rilis",
+    "tryAgain": "Coba lagi",
+    "offline": "Periksa koneksi internet Anda lalu coba lagi."
   }
 }

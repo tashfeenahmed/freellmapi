@@ -152,20 +152,14 @@
     "compressionRunPreview": "पूर्वावलोकन चलाएँ",
     "updatesTitle": "अपडेट",
     "checkForUpdates": "अपडेट के लिए जांचें",
-    "lastChecked": "अंतिम बार जाँच की गई: {when}",
-    "currentVersion": "वर्तमान बिल्ड:",
     "updateAvailable": "अपडेट उपलब्ध है",
-    "changelog": "क्या बदला है",
     "upToDate": "नवीनतम संस्करण",
     "buildAhead": "यह बिल्ड आधिकारिक main शाखा से आगे है।",
     "buildDiverged": "यह बिल्ड आधिकारिक main शाखा से अलग हो गया है।",
     "buildUnknown": "इस कस्टम बिल्ड की तुलना आधिकारिक main शाखा से नहीं की जा सकती।",
     "notGitInstall": "इस इंस्टॉलेशन में कमिट की जानकारी शामिल नहीं है।",
     "checkFailed": "अपडेट की जाँच नहीं की जा सकी।",
-    "contactsGithub": "जाँच मैन्युअल रूप से होती है और GitHub से संपर्क करती है।",
     "autoUpdateCheck": "स्वचालित अपडेट जाँच",
-    "autoUpdateCheckHelp": "दिन में एक बार नई रिलीज़ के लिए GitHub की जाँच करता है और अनुस्मारक दिखाता है। डिफ़ॉल्ट रूप से बंद।",
-    "openReleases": "GitHub रिलीज़ खोलें",
     "restartAfterUpdate": "बिल्ड पूरा होने के बाद FreeLLMAPI को पुनः आरंभ करें।",
     "downloadUpdate": "अपडेट डाउनलोड करें",
     "downloadingUpdate": "डाउनलोड हो रहा है… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI का नया संस्करण इंस्टॉल है।",
     "reload": "रीलोड करें"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "चेन \"{oldName}\" का नाम \"{name}\" करें? auto:{oldName} कॉल करने वाले क्लाइंट्स को auto:{name} पर जाना होगा।",
     "renamePlaceholder": "नया चेन नाम",
     "renameFailed": "चेन का नाम नहीं बदला जा सका।"
+  },
+  "updates": {
+    "versionAvailable": "संस्करण {version} उपलब्ध है",
+    "versionReady": "संस्करण {version} इंस्टॉल के लिए तैयार है",
+    "releaseNotes": "रिलीज़ नोट्स",
+    "tryAgain": "फिर से कोशिश करें",
+    "offline": "अपना इंटरनेट कनेक्शन जाँचें और फिर से कोशिश करें।"
   }
 }

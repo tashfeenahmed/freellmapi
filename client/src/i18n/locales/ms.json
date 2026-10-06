@@ -152,20 +152,14 @@
     "compressionRunPreview": "Jalankan pratonton",
     "updatesTitle": "Kemas kini",
     "checkForUpdates": "Semak kemas kini",
-    "lastChecked": "Terakhir diperiksa: {when}",
-    "currentVersion": "Binaan semasa:",
     "updateAvailable": "Kemas kini tersedia",
-    "changelog": "Perubahan",
     "upToDate": "Sudah dikemas kini",
     "buildAhead": "Binaan ini mendahului cabang main rasmi.",
     "buildDiverged": "Binaan ini telah menyimpang daripada cabang main rasmi.",
     "buildUnknown": "Binaan tersuai ini tidak dapat dibandingkan dengan cabang main rasmi.",
     "notGitInstall": "Pemasangan ini tidak menyertakan maklumat komit.",
     "checkFailed": "Tidak dapat menyemak kemas kini.",
-    "contactsGithub": "Semakan dijalankan secara manual dan menghubungi GitHub.",
     "autoUpdateCheck": "Semakan kemas kini automatik",
-    "autoUpdateCheckHelp": "Menyemak GitHub sekali sehari untuk keluaran baharu dan memaparkan peringatan. Dimatikan secara lalai.",
-    "openReleases": "Buka Keluaran GitHub",
     "restartAfterUpdate": "Mulakan semula FreeLLMAPI selepas binaan selesai.",
     "downloadUpdate": "Muat turun kemas kini",
     "downloadingUpdate": "Memuat turun… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Versi FreeLLMAPI yang lebih baharu telah dipasang.",
     "reload": "Muat semula"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Tukar nama rantaian \"{oldName}\" kepada \"{name}\"? Klien yang memanggil auto:{oldName} perlu bertukar ke auto:{name}.",
     "renamePlaceholder": "Nama rantaian baharu",
     "renameFailed": "Tidak dapat menukar nama rantaian."
+  },
+  "updates": {
+    "versionAvailable": "Versi {version} tersedia",
+    "versionReady": "Versi {version} sedia untuk dipasang",
+    "releaseNotes": "Nota keluaran",
+    "tryAgain": "Cuba lagi",
+    "offline": "Semak sambungan internet anda dan cuba lagi."
   }
 }

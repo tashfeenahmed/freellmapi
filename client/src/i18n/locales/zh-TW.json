@@ -152,20 +152,14 @@
     "compressionRunPreview": "執行預覽",
     "updatesTitle": "更新",
     "checkForUpdates": "檢查更新",
-    "lastChecked": "上次檢查：{when}",
-    "currentVersion": "目前建置：",
     "updateAvailable": "有可用更新",
-    "changelog": "更新內容",
     "upToDate": "已是最新版本",
     "buildAhead": "此建置領先官方 main 分支。",
     "buildDiverged": "此建置已偏離官方 main 分支。",
     "buildUnknown": "無法將此自訂建置與官方 main 分支進行比較。",
     "notGitInstall": "此安裝不包含 commit 資訊。",
     "checkFailed": "無法檢查更新。",
-    "contactsGithub": "檢查需手動執行，並會連線至 GitHub。",
     "autoUpdateCheck": "自動檢查更新",
-    "autoUpdateCheckHelp": "每天檢查一次 GitHub 上是否有新版本，並顯示提醒。預設關閉。",
-    "openReleases": "開啟 GitHub Releases",
     "restartAfterUpdate": "建置完成後重新啟動 FreeLLMAPI。",
     "downloadUpdate": "下載更新",
     "downloadingUpdate": "正在下載… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "发现新版本",
-    "whatsNew": "v{version} 更新内容",
-    "publishedOn": "发布于 {date}",
-    "noNotes": "此版本未发布更新说明。",
-    "openRelease": "打开发布页",
-    "dismissVersion": "忽略此版本",
     "dismiss": "忽略",
     "newBuild": "已安裝較新版本的 FreeLLMAPI。",
     "reload": "重新載入"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "將鏈「{oldName}」重新命名為「{name}」？呼叫 auto:{oldName} 的客戶端必須改用 auto:{name}。",
     "renamePlaceholder": "新鏈名稱",
     "renameFailed": "無法重新命名該鏈。"
+  },
+  "updates": {
+    "versionAvailable": "版本 {version} 可用",
+    "versionReady": "版本 {version} 已可安裝",
+    "releaseNotes": "版本資訊",
+    "tryAgain": "重試",
+    "offline": "請檢查網路連線後再試一次。"
   }
 }

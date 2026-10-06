@@ -152,20 +152,14 @@
     "compressionRunPreview": "Vorschau ausführen",
     "updatesTitle": "Aktualisierungen",
     "checkForUpdates": "Suchen Sie nach Updates",
-    "lastChecked": "Zuletzt überprüft: {when}",
-    "currentVersion": "Aktueller Build:",
     "updateAvailable": "Aktualisierung verfügbar",
-    "changelog": "Was ist neu",
     "upToDate": "Auf dem neuesten Stand",
     "buildAhead": "Dieser Build ist dem offiziellen main-Branch voraus.",
     "buildDiverged": "Dieser Build ist vom offiziellen main-Branch abgewichen.",
     "buildUnknown": "Dieser benutzerdefinierte Build kann nicht mit dem offiziellen main-Branch verglichen werden.",
     "notGitInstall": "Diese Installation enthält keine Commit-Informationen.",
     "checkFailed": "Aktualisierungen konnten nicht geprüft werden.",
-    "contactsGithub": "Prüfungen erfolgen manuell und stellen eine Verbindung zu GitHub her.",
     "autoUpdateCheck": "Automatische Updateprüfung",
-    "autoUpdateCheckHelp": "Prüft einmal täglich auf GitHub, ob es eine neue Version gibt, und zeigt eine Erinnerung an. Standardmäßig deaktiviert.",
-    "openReleases": "GitHub-Releases öffnen",
     "restartAfterUpdate": "FreeLLMAPI nach Abschluss des Builds neu starten.",
     "downloadUpdate": "Update herunterladen",
     "downloadingUpdate": "Wird heruntergeladen… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Eine neuere Version von FreeLLMAPI ist installiert.",
     "reload": "Neu laden"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Kette \"{oldName}\" in \"{name}\" umbenennen? Clients, die auto:{oldName} aufrufen, müssen auf auto:{name} wechseln.",
     "renamePlaceholder": "Neuer Kettenname",
     "renameFailed": "Die Kette konnte nicht umbenannt werden."
+  },
+  "updates": {
+    "versionAvailable": "Version {version} ist verfügbar",
+    "versionReady": "Version {version} ist bereit zur Installation",
+    "releaseNotes": "Versionshinweise",
+    "tryAgain": "Erneut versuchen",
+    "offline": "Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
   }
 }

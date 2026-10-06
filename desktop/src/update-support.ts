@@ -11,7 +11,8 @@ export type UpdateState =
   | { phase: 'available'; version: string }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
-  | { phase: 'error'; message: string };
+  /** `during` says which step failed, so the UI can word it ("could not check" vs "could not install"). */
+  | { phase: 'error'; during: 'check' | 'download' | 'install'; message: string };
 
 /**
  * Whether this copy of the app can replace itself. Only an installed build

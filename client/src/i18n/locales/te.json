@@ -152,20 +152,14 @@
     "compressionRunPreview": "ప్రివ్యూ అమలు చేయండి",
     "updatesTitle": "నవీకరణలు",
     "checkForUpdates": "నవీకరణల కోసం తనిఖీ చేయండి",
-    "lastChecked": "చివరిగా తనిఖీ చేసినది: {when}",
-    "currentVersion": "ప్రస్తుత బిల్డ్:",
     "updateAvailable": "నవీకరణ అందుబాటులో ఉంది",
-    "changelog": "ఏమి మారింది",
     "upToDate": "తాజా స్థితిలో ఉంది",
     "buildAhead": "ఈ బిల్డ్ అధికారిక main కంటే ముందుంది.",
     "buildDiverged": "ఈ బిల్డ్ అధికారిక main నుండి వేరుగా మారింది.",
     "buildUnknown": "ఈ అనుకూల బిల్డ్‌ను అధికారిక mainతో పోల్చడం సాధ్యం కాదు.",
     "notGitInstall": "ఈ ఇన్‌స్టాలేషన్‌లో commit సమాచారం లేదు.",
     "checkFailed": "నవీకరణల కోసం తనిఖీ చేయడం సాధ్యం కాలేదు.",
-    "contactsGithub": "తనిఖీలు మాన్యువల్‌గా జరుగుతాయి మరియు GitHubను సంప్రదిస్తాయి.",
     "autoUpdateCheck": "స్వయంచాలక నవీకరణ తనిఖీ",
-    "autoUpdateCheckHelp": "రోజుకు ఒకసారి కొత్త విడుదల కోసం GitHubను తనిఖీ చేసి రిమైండర్‌ను చూపుతుంది. అప్రమేయంగా ఆఫ్‌లో ఉంటుంది.",
-    "openReleases": "GitHub విడుదలలను తెరవండి",
     "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి.",
     "downloadUpdate": "అప్‌డేట్ డౌన్‌లోడ్ చేయండి",
     "downloadingUpdate": "డౌన్‌లోడ్ అవుతోంది… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI యొక్క కొత్త వెర్షన్ ఇన్‌స్టాల్ అయింది.",
     "reload": "రీలోడ్"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "చైన్ \"{oldName}\" పేరును \"{name}\" గా మార్చాలా? auto:{oldName} ని కాల్ చేసే క్లయింట్లు auto:{name} కి మారాలి.",
     "renamePlaceholder": "కొత్త చైన్ పేరు",
     "renameFailed": "చైన్ పేరును మార్చడం సాధ్యం కాలేదు."
+  },
+  "updates": {
+    "versionAvailable": "వెర్షన్ {version} అందుబాటులో ఉంది",
+    "versionReady": "వెర్షన్ {version} ఇన్‌స్టాల్‌కు సిద్ధంగా ఉంది",
+    "releaseNotes": "విడుదల గమనికలు",
+    "tryAgain": "మళ్లీ ప్రయత్నించండి",
+    "offline": "మీ ఇంటర్నెట్ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
   }
 }

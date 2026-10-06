@@ -152,20 +152,14 @@
     "compressionRunPreview": "Vykdyti peržiūrą",
     "updatesTitle": "Naujiniai",
     "checkForUpdates": "Patikrinkite naujienas",
-    "lastChecked": "Paskutinį kartą tikrinta: {when}",
-    "currentVersion": "Dabartinė komponavimo versija:",
     "updateAvailable": "Yra naujinys",
-    "changelog": "Kas pasikeitė",
     "upToDate": "Atnaujinta",
     "buildAhead": "Ši komponavimo versija yra priekyje oficialios main šakos.",
     "buildDiverged": "Ši komponavimo versija nukrypo nuo oficialios main šakos.",
     "buildUnknown": "Šios tinkintos komponavimo versijos negalima palyginti su oficialia main šaka.",
     "notGitInstall": "Šiame diegime nėra informacijos apie Git įrašus.",
     "checkFailed": "Nepavyko patikrinti, ar yra naujinių.",
-    "contactsGithub": "Tikrinimas atliekamas rankiniu būdu ir susisiekiama su GitHub.",
     "autoUpdateCheck": "Automatinis atnaujinimų tikrinimas",
-    "autoUpdateCheckHelp": "Kartą per dieną patikrina „GitHub“, ar yra nauja laida, ir parodo priminimą. Pagal numatytuosius nustatymus išjungta.",
-    "openReleases": "Atverti GitHub leidimus",
     "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo.",
     "downloadUpdate": "Atsisiųsti naujinimą",
     "downloadingUpdate": "Atsisiunčiama… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "Įdiegta naujesnė FreeLLMAPI versija.",
     "reload": "Įkelti iš naujo"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Pervadinti grandinę „{oldName}“ į „{name}“? Klientai, kviečianti auto:{oldName}, turi pereiti prie auto:{name}.",
     "renamePlaceholder": "Naujas grandinės pavadinimas",
     "renameFailed": "Nepavyko pervadinti šios grandinės."
+  },
+  "updates": {
+    "versionAvailable": "Galima versija {version}",
+    "versionReady": "Versija {version} paruošta įdiegti",
+    "releaseNotes": "Leidimo pastabos",
+    "tryAgain": "Bandyti dar kartą",
+    "offline": "Patikrinkite interneto ryšį ir bandykite dar kartą."
   }
 }

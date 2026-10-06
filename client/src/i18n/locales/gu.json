@@ -152,20 +152,14 @@
     "compressionRunPreview": "પ્રીવ્યૂ ચલાવો",
     "updatesTitle": "અપડેટ્સ",
     "checkForUpdates": "અપડેટ્સ માટે તપાસો",
-    "lastChecked": "છેલ્લે તપાસ્યું: {when}",
-    "currentVersion": "વર્તમાન બિલ્ડ:",
     "updateAvailable": "અપડેટ ઉપલબ્ધ છે",
-    "changelog": "શું બદલાયું છે",
     "upToDate": "અદ્યતન છે",
     "buildAhead": "આ બિલ્ડ અધિકૃત main કરતાં આગળ છે.",
     "buildDiverged": "આ બિલ્ડ અધિકૃત mainથી વિખૂટું પડ્યું છે.",
     "buildUnknown": "આ કસ્ટમ બિલ્ડની અધિકૃત main સાથે સરખામણી કરી શકાતી નથી.",
     "notGitInstall": "આ ઇન્સ્ટોલેશનમાં કમિટની માહિતી શામેલ નથી.",
     "checkFailed": "અપડેટ્સ તપાસી શકાયા નથી.",
-    "contactsGithub": "તપાસો મેન્યુઅલી કરવામાં આવે છે અને GitHubનો સંપર્ક કરે છે.",
     "autoUpdateCheck": "આપમેળે અપડેટ તપાસ",
-    "autoUpdateCheckHelp": "દિવસમાં એક વાર નવા રિલીઝ માટે GitHub તપાસે છે અને રિમાઇન્ડર બતાવે છે. મૂળભૂત રીતે બંધ.",
-    "openReleases": "GitHub રિલીઝ ખોલો",
     "restartAfterUpdate": "બિલ્ડ પૂર્ણ થયા પછી FreeLLMAPI ફરી શરૂ કરો.",
     "downloadUpdate": "અપડેટ ડાઉનલોડ કરો",
     "downloadingUpdate": "ડાઉનલોડ થઈ રહ્યું છે… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI નું નવું સંસ્કરણ ઇન્સ્ટોલ થયું છે.",
     "reload": "ફરી લોડ કરો"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "ચેન \"{oldName}\" નું નામ \"{name}\" કરવું? auto:{oldName} કૉલ કરતા ક્લાયન્ટ્સે auto:{name} પર જવું પડશે.",
     "renamePlaceholder": "નવું ચેન નામ",
     "renameFailed": "ચેનનું નામ બદલી શકાયું નહીં."
+  },
+  "updates": {
+    "versionAvailable": "સંસ્કરણ {version} ઉપલબ્ધ છે",
+    "versionReady": "સંસ્કરણ {version} ઇન્સ્ટોલ માટે તૈયાર છે",
+    "releaseNotes": "રિલીઝ નોંધો",
+    "tryAgain": "ફરી પ્રયાસ કરો",
+    "offline": "તમારું ઇન્ટરનેટ કનેક્શન તપાસો અને ફરી પ્રયાસ કરો."
   }
 }

@@ -152,20 +152,14 @@
     "compressionRunPreview": "הרץ תצוגה מקדימה",
     "updatesTitle": "עדכונים",
     "checkForUpdates": "בדוק עדכונים",
-    "lastChecked": "נבדק לאחרונה: {when}",
-    "currentVersion": "גרסה נוכחית:",
     "updateAvailable": "עדכון זמין",
-    "changelog": "מה השתנה",
     "upToDate": "מעודכן",
     "buildAhead": "גרסה זו מקדימה את ענף main הרשמי.",
     "buildDiverged": "גרסה זו התפצלה מענף main הרשמי.",
     "buildUnknown": "לא ניתן להשוות גרסה מותאמת אישית זו לענף main הרשמי.",
     "notGitInstall": "התקנה זו אינה כוללת מידע על קומיטים.",
     "checkFailed": "לא ניתן היה לבדוק אם קיימים עדכונים.",
-    "contactsGithub": "הבדיקות מתבצעות ידנית ויוצרות קשר עם GitHub.",
     "autoUpdateCheck": "בדיקת עדכונים אוטומטית",
-    "autoUpdateCheckHelp": "בודקת ב-GitHub פעם ביום אם יצאה גרסה חדשה ומציגה תזכורת. כבויה כברירת מחדל.",
-    "openReleases": "פתיחת מהדורות GitHub",
     "restartAfterUpdate": "הפעל מחדש את FreeLLMAPI לאחר השלמת הבנייה.",
     "downloadUpdate": "הורדת העדכון",
     "downloadingUpdate": "מוריד… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "הותקנה גרסה חדשה יותר של FreeLLMAPI.",
     "reload": "טעינה מחדש"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "לשנות שם השרשרת \"{oldName}\" ל‑\"{name}\"? לקוחות שקוראים ל‑auto:{oldName} יצטרכו לעבור ל‑auto:{name}.",
     "renamePlaceholder": "שם שרשרת חדש",
     "renameFailed": "לא ניתן לשנות את שם השרשרת."
+  },
+  "updates": {
+    "versionAvailable": "גרסה {version} זמינה",
+    "versionReady": "גרסה {version} מוכנה להתקנה",
+    "releaseNotes": "הערות גרסה",
+    "tryAgain": "נסו שוב",
+    "offline": "בדקו את החיבור לאינטרנט ונסו שוב."
   }
 }

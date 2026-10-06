@@ -152,20 +152,14 @@
     "compressionRunPreview": "运行预览",
     "updatesTitle": "更新",
     "checkForUpdates": "检查更新",
-    "lastChecked": "上次检查：{when}",
-    "currentVersion": "当前构建：",
     "updateAvailable": "有可用更新",
-    "changelog": "更新内容",
     "upToDate": "已是最新版本",
     "buildAhead": "此构建领先于官方 main 分支。",
     "buildDiverged": "此构建已偏离官方 main 分支。",
     "buildUnknown": "无法将此自定义构建与官方 main 分支进行比较。",
     "notGitInstall": "此安装不包含 commit 信息。",
     "checkFailed": "无法检查更新。",
-    "contactsGithub": "检查需手动执行，并会连接 GitHub。",
     "autoUpdateCheck": "自动检查更新",
-    "autoUpdateCheckHelp": "每天检查一次 GitHub 上是否有新版本，并显示提醒。默认关闭。",
-    "openReleases": "打开 GitHub Releases",
     "restartAfterUpdate": "构建完成后重启 FreeLLMAPI。",
     "downloadUpdate": "下载更新",
     "downloadingUpdate": "正在下载… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "发现新版本",
-    "whatsNew": "v{version} 更新内容",
-    "publishedOn": "发布于 {date}",
-    "noNotes": "此版本未发布更新说明。",
-    "openRelease": "打开发布页",
-    "dismissVersion": "忽略此版本",
     "dismiss": "忽略",
     "newBuild": "已安装更新版本的 FreeLLMAPI。",
     "reload": "重新加载"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "将链“{oldName}”重命名为“{name}”？调用 auto:{oldName} 的客户端必须改用 auto:{name}。",
     "renamePlaceholder": "新链名称",
     "renameFailed": "无法重命名该链。"
+  },
+  "updates": {
+    "versionAvailable": "版本 {version} 可用",
+    "versionReady": "版本 {version} 已可安装",
+    "releaseNotes": "发行说明",
+    "tryAgain": "重试",
+    "offline": "请检查网络连接后重试。"
   }
 }

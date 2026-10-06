@@ -152,20 +152,14 @@
     "compressionRunPreview": "Esegui anteprima",
     "updatesTitle": "Aggiornamenti",
     "checkForUpdates": "Controlla aggiornamenti",
-    "lastChecked": "Ultimo controllo: {when}",
-    "currentVersion": "Build corrente:",
     "updateAvailable": "Aggiornamento disponibile",
-    "changelog": "Novità",
     "upToDate": "Aggiornato",
     "buildAhead": "Questa build è più avanti del ramo main ufficiale.",
     "buildDiverged": "Questa build si è discostata dal ramo main ufficiale.",
     "buildUnknown": "Questa build personalizzata non può essere confrontata con il ramo main ufficiale.",
     "notGitInstall": "Questa installazione non include informazioni sui commit.",
     "checkFailed": "Impossibile verificare la disponibilità di aggiornamenti.",
-    "contactsGithub": "I controlli sono manuali e contattano GitHub.",
     "autoUpdateCheck": "Controllo automatico degli aggiornamenti",
-    "autoUpdateCheckHelp": "Controlla GitHub una volta al giorno per una nuova versione e mostra un promemoria. Disattivato per impostazione predefinita.",
-    "openReleases": "Apri le release di GitHub",
     "restartAfterUpdate": "Riavvia FreeLLMAPI al termine della build.",
     "downloadUpdate": "Scarica aggiornamento",
     "downloadingUpdate": "Download in corso… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "È installata una versione più recente di FreeLLMAPI.",
     "reload": "Ricarica"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Rinominare la catena \"{oldName}\" in \"{name}\"? I client che chiamano auto:{oldName} devono passare a auto:{name}.",
     "renamePlaceholder": "Nuovo nome della catena",
     "renameFailed": "Impossibile rinominare la catena."
+  },
+  "updates": {
+    "versionAvailable": "È disponibile la versione {version}",
+    "versionReady": "La versione {version} è pronta per l’installazione",
+    "releaseNotes": "Note di rilascio",
+    "tryAgain": "Riprova",
+    "offline": "Controlla la connessione a internet e riprova."
   }
 }

@@ -9,7 +9,7 @@ export type DesktopUpdateState =
   | { phase: 'available'; version: string }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
-  | { phase: 'error'; message: string }
+  | { phase: 'error'; during?: 'check' | 'download' | 'install'; message: string }
 
 interface DesktopUpdaterBridge {
   state: () => Promise<DesktopUpdateState>
@@ -22,6 +22,16 @@ interface DesktopUpdaterBridge {
 function bridge(): DesktopUpdaterBridge | null {
   if (typeof window === 'undefined') return null
   return (window as { __FREEAPI_UPDATER__?: DesktopUpdaterBridge }).__FREEAPI_UPDATER__ ?? null
+}
+
+/** True when this page runs in a desktop build with the updater bridge. */
+export function hasDesktopUpdater(): boolean {
+  return bridge() !== null
+}
+
+/** Starts a desktop update check; the new state arrives through the hook. */
+export function checkDesktopUpdates(): Promise<DesktopUpdateState> | null {
+  return bridge()?.check() ?? null
 }
 
 /**

@@ -152,20 +152,14 @@
     "compressionRunPreview": "Patakbuhin ang preview",
     "updatesTitle": "Mga Update",
     "checkForUpdates": "Suriin ang mga update",
-    "lastChecked": "Huling na-check: {when}",
-    "currentVersion": "Kasalukuyang build:",
     "updateAvailable": "May available na update",
-    "changelog": "Ano ang nagbago",
     "upToDate": "Napapanahon",
     "buildAhead": "Nauuna ang build na ito sa opisyal na main.",
     "buildDiverged": "Lumihis ang build na ito sa opisyal na main.",
     "buildUnknown": "Hindi maihahambing ang custom build na ito sa opisyal na main.",
     "notGitInstall": "Walang impormasyon ng commit ang installation na ito.",
     "checkFailed": "Hindi masuri kung may mga update.",
-    "contactsGithub": "Manu-mano ang mga pagsusuri at kumokonekta ang mga ito sa GitHub.",
     "autoUpdateCheck": "Awtomatikong pagsusuri ng update",
-    "autoUpdateCheckHelp": "Sinusuri ang GitHub minsan sa isang araw para sa bagong release at nagpapakita ng paalala. Naka-off bilang default.",
-    "openReleases": "Buksan ang GitHub Releases",
     "restartAfterUpdate": "I-restart ang FreeLLMAPI kapag natapos ang build.",
     "downloadUpdate": "I-download ang update",
     "downloadingUpdate": "Nagda-download… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "May mas bagong bersyon ng FreeLLMAPI na naka-install.",
     "reload": "I-reload"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Palitan ang pangalan ng chain \"{oldName}\" sa \"{name}\"? Ang mga client na tumatawag ng auto:{oldName} ay dapat lumipat sa auto:{name}.",
     "renamePlaceholder": "Bagong pangalan ng chain",
     "renameFailed": "Hindi mapalitan ang pangalan ng chain."
+  },
+  "updates": {
+    "versionAvailable": "Available na ang bersyon {version}",
+    "versionReady": "Handa nang i-install ang bersyon {version}",
+    "releaseNotes": "Mga release note",
+    "tryAgain": "Subukang muli",
+    "offline": "Tingnan ang iyong koneksyon sa internet at subukang muli."
   }
 }

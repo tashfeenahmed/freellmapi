@@ -152,20 +152,14 @@
     "compressionRunPreview": "Kjør forhåndsvisning",
     "updatesTitle": "Oppdateringer",
     "checkForUpdates": "Sjekk etter oppdateringer",
-    "lastChecked": "Sist sjekket: {when}",
-    "currentVersion": "Nåværende bygg:",
     "updateAvailable": "Oppdatering tilgjengelig",
-    "changelog": "Hva er endret",
     "upToDate": "Oppdatert",
     "buildAhead": "Dette bygget ligger foran den offisielle main-grenen.",
     "buildDiverged": "Dette bygget har skilt lag med den offisielle main-grenen.",
     "buildUnknown": "Dette egendefinerte bygget kan ikke sammenlignes med den offisielle main-grenen.",
     "notGitInstall": "Denne installasjonen inneholder ikke commit-informasjon.",
     "checkFailed": "Kunne ikke se etter oppdateringer.",
-    "contactsGithub": "Oppdateringssjekker kjøres manuelt og kontakter GitHub.",
     "autoUpdateCheck": "Automatisk oppdateringssjekk",
-    "autoUpdateCheckHelp": "Sjekker GitHub én gang om dagen for en ny utgivelse og viser en påminnelse. Av som standard.",
-    "openReleases": "Åpne GitHub Releases",
     "restartAfterUpdate": "Start FreeLLMAPI på nytt etter at byggingen er fullført.",
     "downloadUpdate": "Last ned oppdatering",
     "downloadingUpdate": "Laster ned… {percent} %",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "En nyere versjon av FreeLLMAPI er installert.",
     "reload": "Last inn på nytt"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "Gi kjeden \"{oldName}\" navnet \"{name}\"? Klienter som kaller auto:{oldName} må bytte til auto:{name}.",
     "renamePlaceholder": "Nytt kjedenavn",
     "renameFailed": "Kunne ikke gi den kjeden nytt navn."
+  },
+  "updates": {
+    "versionAvailable": "Versjon {version} er tilgjengelig",
+    "versionReady": "Versjon {version} er klar til installering",
+    "releaseNotes": "Versjonsnotater",
+    "tryAgain": "Prøv igjen",
+    "offline": "Sjekk internettforbindelsen og prøv igjen."
   }
 }

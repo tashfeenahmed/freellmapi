@@ -152,20 +152,14 @@
     "compressionRunPreview": "पूर्वावलोकन चालवा",
     "updatesTitle": "अपडेट्स",
     "checkForUpdates": "अद्यतनांसाठी तपासा",
-    "lastChecked": "शेवटचे तपासले: {when}",
-    "currentVersion": "सध्याचा बिल्ड:",
     "updateAvailable": "अपडेट उपलब्ध आहे",
-    "changelog": "काय बदलले",
     "upToDate": "अद्ययावत",
     "buildAhead": "हा बिल्ड अधिकृत main शाखेच्या पुढे आहे.",
     "buildDiverged": "हा बिल्ड अधिकृत main शाखेपासून वेगळा झाला आहे.",
     "buildUnknown": "या कस्टम बिल्डची अधिकृत main शाखेशी तुलना करता येत नाही.",
     "notGitInstall": "या इंस्टॉलेशनमध्ये कमिटची माहिती समाविष्ट नाही.",
     "checkFailed": "अपडेट्स तपासता आले नाहीत.",
-    "contactsGithub": "तपासणी स्वतः सुरू करावी लागते आणि ती GitHub शी संपर्क साधते.",
     "autoUpdateCheck": "स्वयंचलित अद्यतन तपासणी",
-    "autoUpdateCheckHelp": "दिवसातून एकदा नवीन रिलीजसाठी GitHub तपासते आणि स्मरणपत्र दाखवते. डीफॉल्टनुसार बंद.",
-    "openReleases": "GitHub रिलीजेस उघडा",
     "restartAfterUpdate": "बिल्ड पूर्ण झाल्यानंतर FreeLLMAPI पुन्हा सुरू करा.",
     "downloadUpdate": "अपडेट डाउनलोड करा",
     "downloadingUpdate": "डाउनलोड होत आहे… {percent}%",
@@ -1160,11 +1154,6 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
     "dismiss": "Dismiss",
     "newBuild": "FreeLLMAPI ची नवीन आवृत्ती इंस्टॉल झाली आहे.",
     "reload": "रीलोड करा"
@@ -1220,5 +1209,12 @@
     "renameConfirm": "साखळी \"{oldName}\" चे नाव \"{name}\" करावे? auto:{oldName} हा कॉल करणारे क्लायंट्स auto:{name} वर जावे लागेल.",
     "renamePlaceholder": "नवीन साखळी नाव",
     "renameFailed": "साखळीचे नाव बदलता आले नाही."
+  },
+  "updates": {
+    "versionAvailable": "आवृत्ती {version} उपलब्ध आहे",
+    "versionReady": "आवृत्ती {version} इंस्टॉलसाठी तयार आहे",
+    "releaseNotes": "रिलीझ नोट्स",
+    "tryAgain": "पुन्हा प्रयत्न करा",
+    "offline": "तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
   }
 }
