@@ -171,7 +171,11 @@
     "downloadingUpdate": "Se descarcă… {percent}%",
     "restartToUpdate": "Repornește pentru actualizare",
     "updateReadyHint": "Descărcat. FreeLLMAPI face o copie de rezervă a datelor, repornește și deschide noua versiune.",
-    "updateInstallFailed": "Actualizarea nu a putut fi instalată."
+    "updateInstallFailed": "Actualizarea nu a putut fi instalată.",
+    "updateNow": "Actualizează acum",
+    "updatingContainer": "Se descarcă noua imagine și se repornește. Pagina se reîncarcă când FreeLLMAPI revine.",
+    "updateNowFailed": "Actualizatorul nu a acceptat cererea. Verifică dacă containerul watchtower rulează.",
+    "updateNowTimeout": "FreeLLMAPI nu a repornit după 5 minute. Verifică jurnalele containerului watchtower."
   },
   "models": {
     "title": "Modele",

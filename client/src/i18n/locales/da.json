@@ -171,7 +171,11 @@
     "downloadingUpdate": "Henter… {percent} %",
     "restartToUpdate": "Genstart for at opdatere",
     "updateReadyHint": "Hentet. FreeLLMAPI tager backup af dine data, genstarter og åbner den nye version.",
-    "updateInstallFailed": "Opdateringen kunne ikke installeres."
+    "updateInstallFailed": "Opdateringen kunne ikke installeres.",
+    "updateNow": "Opdater nu",
+    "updatingContainer": "Henter det nye image og genstarter. Siden genindlæses, når FreeLLMAPI er tilbage.",
+    "updateNowFailed": "Opdateringstjenesten afviste anmodningen. Tjek at watchtower-containeren kører.",
+    "updateNowTimeout": "FreeLLMAPI er ikke genstartet efter 5 minutter. Tjek logfilerne for watchtower-containeren."
   },
   "models": {
     "title": "Modeller",

@@ -171,7 +171,11 @@
     "downloadingUpdate": "正在下载… {percent}%",
     "restartToUpdate": "重启以更新",
     "updateReadyHint": "已下载。FreeLLMAPI 会先备份你的数据，然后重启并打开新版本。",
-    "updateInstallFailed": "无法安装更新。"
+    "updateInstallFailed": "无法安装更新。",
+    "updateNow": "立即更新",
+    "updatingContainer": "正在拉取新镜像并重启。FreeLLMAPI 恢复后此页面会自动重新加载。",
+    "updateNowFailed": "更新器未接受请求。请确认 watchtower 容器正在运行。",
+    "updateNowTimeout": "5 分钟后 FreeLLMAPI 仍未重启。请查看 watchtower 容器的日志。"
   },
   "models": {
     "title": "模型",

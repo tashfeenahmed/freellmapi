@@ -171,7 +171,11 @@
     "downloadingUpdate": "Preuzimanje… {percent} %",
     "restartToUpdate": "Ponovno pokreni za ažuriranje",
     "updateReadyHint": "Preuzeto. FreeLLMAPI sigurnosno kopira vaše podatke, ponovno se pokreće i otvara novu verziju.",
-    "updateInstallFailed": "Ažuriranje se nije moglo instalirati."
+    "updateInstallFailed": "Ažuriranje se nije moglo instalirati.",
+    "updateNow": "Ažuriraj sada",
+    "updatingContainer": "Preuzimanje nove slike i ponovno pokretanje. Stranica će se ponovno učitati kad se FreeLLMAPI vrati.",
+    "updateNowFailed": "Ažurirač nije prihvatio zahtjev. Provjerite radi li kontejner watchtower.",
+    "updateNowTimeout": "FreeLLMAPI se nije ponovno pokrenuo nakon 5 minuta. Provjerite zapise kontejnera watchtower."
   },
   "models": {
     "title": "Modeli",

@@ -31,6 +31,25 @@ function httpGet(app: Express, path: string): Promise<{ status: number; body: an
   });
 }
 
+function httpPost(app: Express, path: string): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') return reject(new Error('No test server address'));
+      const req = http.request({ hostname: '127.0.0.1', port: address.port, path, method: 'POST' }, (res) => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          server.close();
+          resolve({ status: res.statusCode!, body: JSON.parse(data) });
+        });
+      });
+      req.on('error', (error) => { server.close(); reject(error); });
+      req.end();
+    });
+  });
+}
+
 function response(body: unknown, status = 200): Response {
   return new Response(body === undefined ? undefined : JSON.stringify(body), {
     status,
@@ -71,7 +90,7 @@ function createTestApp(overrides: Parameters<typeof createUpdateRouter>[0] = {})
   const app = express();
   const fetchMock = overrides.fetch ?? vi.fn(async () => response(compareBody('identical')));
   const execMock = overrides.execFile ?? vi.fn(async () => ({ stdout: `${LOCAL_SHA}\n` }));
-  const logger = overrides.logger ?? { error: vi.fn() };
+  const logger = overrides.logger ?? { error: vi.fn(), log: vi.fn() };
   app.use('/api/update', createUpdateRouter({
     env: {},
     cwd: '/worktree/server',
@@ -116,7 +135,9 @@ describe('Update API', () => {
 
     it('prefers a validated packaged-build identity and truncates commit messages', async () => {
       const longMessage = 'x'.repeat(250);
-      const fetchMock = vi.fn(async () => response(compareBody('ahead', longMessage)));
+      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => (String(url).includes('/releases/latest')
+        ? response({ tag_name: 'v0.12.0', html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.12.0' })
+        : response(compareBody('ahead', longMessage))));
       const execMock = vi.fn(async () => ({ stdout: `${REMOTE_SHA}\n` }));
       const { app } = createTestApp({
         env: {
@@ -161,90 +182,95 @@ describe('Update API', () => {
       expect(request?.headers).not.toHaveProperty('Authorization');
     });
 
-    it('compares desktop installs against the latest release tag, not main', async () => {
-      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
-        if (String(url).includes('/releases/latest')) {
-          return response({
-            tag_name: 'v0.11.0',
-            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
-          });
-        }
-        return response(compareBody('identical'));
-      });
-      const { app } = createTestApp({
-        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
-        fetch: fetchMock,
-      });
+    // Both install a published release — an installer or the :latest image —
+    // so both compare against the newest tag; untagged main commits have
+    // nothing to install.
+    describe.each(['desktop', 'docker'] as const)('%s installs', (installation) => {
+      it('compares against the latest release tag, not main', async () => {
+        const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+          if (String(url).includes('/releases/latest')) {
+            return response({
+              tag_name: 'v0.11.0',
+              html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+            });
+          }
+          return response(compareBody('identical'));
+        });
+        const { app } = createTestApp({
+          env: { FREELLMAPI_INSTALL_METHOD: installation, FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+          fetch: fetchMock,
+        });
 
-      const result = await httpGet(app, '/api/update/check');
+        const result = await httpGet(app, '/api/update/check');
 
-      expect(result.body).toMatchObject({ status: 'current', installation: 'desktop' });
-      expect(fetchMock).toHaveBeenCalledWith(
-        `https://api.github.com/repos/tashfeenahmed/freellmapi/compare/${LOCAL_SHA}...v0.11.0`,
-        expect.any(Object),
-      );
-      // 'identical' against the tag: no update offered for untagged main commits.
-      expect(result.body.remoteSha).toBe(LOCAL_SHA.slice(0, 7));
-    });
-
-    it('reports an update when a desktop install trails the latest tag', async () => {
-      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
-        if (String(url).includes('/releases/latest')) {
-          return response({
-            tag_name: 'v0.12.0',
-            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.12.0',
-          });
-        }
-        return response(compareBody('ahead'));
-      });
-      const { app } = createTestApp({
-        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
-        fetch: fetchMock,
+        expect(result.body).toMatchObject({ status: 'current', installation });
+        expect(fetchMock).toHaveBeenCalledWith(
+          `https://api.github.com/repos/tashfeenahmed/freellmapi/compare/${LOCAL_SHA}...v0.11.0`,
+          expect.any(Object),
+        );
+        // 'identical' against the tag: no update offered for untagged main commits.
+        expect(result.body.remoteSha).toBe(LOCAL_SHA.slice(0, 7));
       });
 
-      const result = await httpGet(app, '/api/update/check');
+      it('reports an update when the install trails the latest tag', async () => {
+        const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+          if (String(url).includes('/releases/latest')) {
+            return response({
+              tag_name: 'v0.12.0',
+              html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.12.0',
+            });
+          }
+          return response(compareBody('ahead'));
+        });
+        const { app } = createTestApp({
+          env: { FREELLMAPI_INSTALL_METHOD: installation, FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+          fetch: fetchMock,
+        });
 
-      expect(result.body).toMatchObject({ status: 'available', installation: 'desktop' });
-    });
+        const result = await httpGet(app, '/api/update/check');
 
-    it('reports unknown for a desktop install when no release tag can be resolved', async () => {
-      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
-        if (String(url).includes('/releases/latest')) return response({ message: 'no releases' }, 404);
-        return response(compareBody('ahead'));
-      });
-      const { app } = createTestApp({
-        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
-        fetch: fetchMock,
-      });
-
-      const result = await httpGet(app, '/api/update/check');
-
-      expect(result.body).toMatchObject({ status: 'unknown', installation: 'desktop' });
-      // Without a tag to compare against, main must not be dialed at all.
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('never falls back to the main-branch Atom feed for a desktop install', async () => {
-      const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
-        if (String(url).includes('/releases/latest')) {
-          return response({
-            tag_name: 'v0.11.0',
-            html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
-          });
-        }
-        return response({ message: 'rate limited' }, 403);
-      });
-      const { app } = createTestApp({
-        env: { FREELLMAPI_INSTALL_METHOD: 'desktop', FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
-        fetch: fetchMock,
+        expect(result.body).toMatchObject({ status: 'available', installation });
       });
 
-      const result = await httpGet(app, '/api/update/check');
+      it('reports unknown when no release tag can be resolved', async () => {
+        const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+          if (String(url).includes('/releases/latest')) return response({ message: 'no releases' }, 404);
+          return response(compareBody('ahead'));
+        });
+        const { app } = createTestApp({
+          env: { FREELLMAPI_INSTALL_METHOD: installation, FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+          fetch: fetchMock,
+        });
 
-      // The Atom feed only tracks main; falling back to it would re-offer
-      // untagged commits, so the request must surface as an upstream error.
-      expect(result.status).toBe(502);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+        const result = await httpGet(app, '/api/update/check');
+
+        expect(result.body).toMatchObject({ status: 'unknown', installation });
+        // Without a tag to compare against, main must not be dialed at all.
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('never falls back to the main-branch Atom feed', async () => {
+        const fetchMock = vi.fn(async (url: string | URL | RequestInfo) => {
+          if (String(url).includes('/releases/latest')) {
+            return response({
+              tag_name: 'v0.11.0',
+              html_url: 'https://github.com/tashfeenahmed/freellmapi/releases/tag/v0.11.0',
+            });
+          }
+          return response({ message: 'rate limited' }, 403);
+        });
+        const { app } = createTestApp({
+          env: { FREELLMAPI_INSTALL_METHOD: installation, FREELLMAPI_COMMIT_SHA: LOCAL_SHA },
+          fetch: fetchMock,
+        });
+
+        const result = await httpGet(app, '/api/update/check');
+
+        // The Atom feed only tracks main; falling back to it would re-offer
+        // untagged commits, so the request must surface as an upstream error.
+        expect(result.status).toBe(502);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('reports disabled without resolving Git identity or making a network request', async () => {
@@ -683,6 +709,61 @@ describe('Update API', () => {
       const { app } = createTestApp({ fetch: fetchMock });
 
       expect((await httpGet(app, '/api/update/check')).status).toBe(502);
+    });
+  });
+
+  describe('POST /api/update/apply (Docker self-update)', () => {
+    const sidecar = {
+      FREELLMAPI_INSTALL_METHOD: 'docker',
+      FREELLMAPI_COMMIT_SHA: LOCAL_SHA,
+      FREELLMAPI_SELF_UPDATE_URL: 'http://watchtower:8080/',
+      FREELLMAPI_SELF_UPDATE_TOKEN: 'wt-token',
+    };
+
+    it.each([
+      ['a source install', { FREELLMAPI_SELF_UPDATE_URL: 'http://watchtower:8080', FREELLMAPI_SELF_UPDATE_TOKEN: 'wt-token' }],
+      ['a container without the sidecar', { FREELLMAPI_INSTALL_METHOD: 'docker', FREELLMAPI_COMMIT_SHA: LOCAL_SHA }],
+      ['a container with a URL but no token', { FREELLMAPI_INSTALL_METHOD: 'docker', FREELLMAPI_SELF_UPDATE_URL: 'http://watchtower:8080' }],
+    ])('refuses %s without calling anything', async (_label, env) => {
+      const fetchMock = vi.fn(async () => response({}, 202));
+      const { app } = createTestApp({ env, fetch: fetchMock });
+
+      const result = await httpPost(app, '/api/update/apply');
+
+      expect(result.status).toBe(409);
+      expect(result.body.error.type).toBe('not_configured');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('asks the sidecar for an async update with its token', async () => {
+      const fetchMock = vi.fn(async () => new Response(null, { status: 202 }));
+      const { app } = createTestApp({ env: sidecar, fetch: fetchMock });
+
+      const result = await httpPost(app, '/api/update/apply');
+
+      expect(result).toEqual({ status: 202, body: { started: true } });
+      expect(fetchMock).toHaveBeenCalledWith('http://watchtower:8080/v1/update?async=true', expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer wt-token' },
+      }));
+    });
+
+    it('reports a sidecar that refuses the request', async () => {
+      const fetchMock = vi.fn(async () => response({ error: 'unauthorized' }, 401));
+      const { app, logger } = createTestApp({ env: sidecar, fetch: fetchMock });
+
+      const result = await httpPost(app, '/api/update/apply');
+
+      expect(result.status).toBe(502);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('HTTP 401'));
+    });
+
+    it('tells the dashboard the install can update itself', async () => {
+      const { app } = createTestApp({ env: sidecar });
+      expect((await httpGet(app, '/api/update/status')).body.selfUpdate).toBe(true);
+
+      const { app: plain } = createTestApp({ env: { FREELLMAPI_INSTALL_METHOD: 'docker', FREELLMAPI_COMMIT_SHA: LOCAL_SHA } });
+      expect((await httpGet(plain, '/api/update/status')).body).not.toHaveProperty('selfUpdate');
     });
   });
 });

@@ -171,7 +171,11 @@
     "downloadingUpdate": "Изтегляне… {percent}%",
     "restartToUpdate": "Рестартирай за актуализиране",
     "updateReadyHint": "Изтеглено. FreeLLMAPI архивира данните ви, рестартира и отваря новата версия.",
-    "updateInstallFailed": "Актуализацията не можа да се инсталира."
+    "updateInstallFailed": "Актуализацията не можа да се инсталира.",
+    "updateNow": "Актуализирай сега",
+    "updatingContainer": "Изтегля се новият образ и се рестартира. Страницата ще се презареди, когато FreeLLMAPI се върне.",
+    "updateNowFailed": "Актуализаторът не прие заявката. Проверете дали контейнерът watchtower работи.",
+    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower."
   },
   "models": {
     "title": "Модели",

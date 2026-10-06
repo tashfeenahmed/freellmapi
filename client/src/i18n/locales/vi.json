@@ -171,7 +171,11 @@
     "downloadingUpdate": "Đang tải… {percent}%",
     "restartToUpdate": "Khởi động lại để cập nhật",
     "updateReadyHint": "Đã tải xong. FreeLLMAPI sao lưu dữ liệu của bạn, khởi động lại và mở phiên bản mới.",
-    "updateInstallFailed": "Không thể cài đặt bản cập nhật."
+    "updateInstallFailed": "Không thể cài đặt bản cập nhật.",
+    "updateNow": "Cập nhật ngay",
+    "updatingContainer": "Đang kéo image mới và khởi động lại. Trang này sẽ tải lại khi FreeLLMAPI hoạt động trở lại.",
+    "updateNowFailed": "Trình cập nhật không chấp nhận yêu cầu. Hãy kiểm tra container watchtower đang chạy.",
+    "updateNowTimeout": "FreeLLMAPI chưa khởi động lại sau 5 phút. Hãy xem nhật ký của container watchtower."
   },
   "models": {
     "title": "Người mẫu",

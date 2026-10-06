@@ -171,7 +171,11 @@
     "downloadingUpdate": "බාගනිමින්… {percent}%",
     "restartToUpdate": "යාවත්කාලීන කිරීමට නැවත අරඹන්න",
     "updateReadyHint": "බාගත විය. FreeLLMAPI ඔබගේ දත්ත උපස්ථ කර, නැවත ආරම්භ වී නව අනුවාදය විවෘත කරයි.",
-    "updateInstallFailed": "යාවත්කාලීනය ස්ථාපනය කළ නොහැකි විය."
+    "updateInstallFailed": "යාවත්කාලීනය ස්ථාපනය කළ නොහැකි විය.",
+    "updateNow": "දැන් යාවත්කාලීන කරන්න",
+    "updatingContainer": "නව image එක ලබාගෙන නැවත ආරම්භ කරමින්. FreeLLMAPI නැවත පැමිණි විට මෙම පිටුව නැවත පූරණය වේ.",
+    "updateNowFailed": "යාවත්කාලීනකරු ඉල්ලීම පිළිගත්තේ නැත. watchtower container එක ධාවනය වන්නේදැයි පරීක්ෂා කරන්න.",
+    "updateNowTimeout": "මිනිත්තු 5කට පසුවත් FreeLLMAPI නැවත ආරම්භ වී නැත. watchtower container හි ලොග් පරීක්ෂා කරන්න."
   },
   "models": {
     "title": "ආකෘති",

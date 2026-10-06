@@ -171,7 +171,11 @@
     "downloadingUpdate": "Pobieranie… {percent}%",
     "restartToUpdate": "Uruchom ponownie, aby zaktualizować",
     "updateReadyHint": "Pobrano. FreeLLMAPI tworzy kopię zapasową danych, uruchamia się ponownie i otwiera nową wersję.",
-    "updateInstallFailed": "Nie udało się zainstalować aktualizacji."
+    "updateInstallFailed": "Nie udało się zainstalować aktualizacji.",
+    "updateNow": "Aktualizuj teraz",
+    "updatingContainer": "Pobieranie nowego obrazu i ponowne uruchamianie. Strona odświeży się, gdy FreeLLMAPI wróci.",
+    "updateNowFailed": "Aktualizator nie przyjął żądania. Sprawdź, czy kontener watchtower działa.",
+    "updateNowTimeout": "FreeLLMAPI nie uruchomił się ponownie po 5 minutach. Sprawdź logi kontenera watchtower."
   },
   "models": {
     "title": "Modele",

@@ -171,7 +171,11 @@
     "downloadingUpdate": "Download in corso… {percent}%",
     "restartToUpdate": "Riavvia per aggiornare",
     "updateReadyHint": "Scaricato. FreeLLMAPI esegue il backup dei tuoi dati, si riavvia e apre la nuova versione.",
-    "updateInstallFailed": "Impossibile installare l’aggiornamento."
+    "updateInstallFailed": "Impossibile installare l’aggiornamento.",
+    "updateNow": "Aggiorna ora",
+    "updatingContainer": "Download della nuova immagine e riavvio in corso. La pagina si ricarica quando FreeLLMAPI torna disponibile.",
+    "updateNowFailed": "Il servizio di aggiornamento non ha accettato la richiesta. Verifica che il container watchtower sia in esecuzione.",
+    "updateNowTimeout": "FreeLLMAPI non si è riavviato dopo 5 minuti. Controlla i log del container watchtower."
   },
   "models": {
     "title": "Modelli",

@@ -171,7 +171,11 @@
     "downloadingUpdate": "ဒေါင်းလုဒ်လုပ်နေသည်… {percent}%",
     "restartToUpdate": "အပ်ဒိတ်လုပ်ရန် ပြန်စတင်ပါ",
     "updateReadyHint": "ဒေါင်းလုဒ်ပြီးပါပြီ။ FreeLLMAPI သည် သင့်ဒေတာကို အရန်သိမ်းပြီး ပြန်စတင်ကာ ဗားရှင်းအသစ်ကို ဖွင့်ပါမည်။",
-    "updateInstallFailed": "အပ်ဒိတ်ကို ထည့်သွင်း၍ မရပါ။"
+    "updateInstallFailed": "အပ်ဒိတ်ကို ထည့်သွင်း၍ မရပါ။",
+    "updateNow": "ယခု အပ်ဒိတ်လုပ်ရန်",
+    "updatingContainer": "image အသစ်ကို ဆွဲယူပြီး ပြန်စတင်နေသည်။ FreeLLMAPI ပြန်လာသောအခါ ဤစာမျက်နှာ ပြန်ဖွင့်ပါမည်။",
+    "updateNowFailed": "အပ်ဒိတ်လုပ်သူက တောင်းဆိုမှုကို မလက်ခံပါ။ watchtower container လည်ပတ်နေကြောင်း စစ်ဆေးပါ။",
+    "updateNowTimeout": "၅ မိနစ်ကြာသော်လည်း FreeLLMAPI ပြန်မစတင်သေးပါ။ watchtower container ၏ မှတ်တမ်းများကို စစ်ဆေးပါ။"
   },
   "models": {
     "title": "မော်ဒယ်များ",

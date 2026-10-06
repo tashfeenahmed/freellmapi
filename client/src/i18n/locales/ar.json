@@ -171,7 +171,11 @@
     "downloadingUpdate": "جارٍ التنزيل… {percent}%",
     "restartToUpdate": "أعد التشغيل للتحديث",
     "updateReadyHint": "اكتمل التنزيل. يحفظ FreeLLMAPI نسخة احتياطية من بياناتك ثم يعيد التشغيل ويفتح الإصدار الجديد.",
-    "updateInstallFailed": "تعذّر تثبيت التحديث."
+    "updateInstallFailed": "تعذّر تثبيت التحديث.",
+    "updateNow": "حدّث الآن",
+    "updatingContainer": "جارٍ سحب الصورة الجديدة وإعادة التشغيل. ستُعاد تحميل هذه الصفحة عند عودة FreeLLMAPI.",
+    "updateNowFailed": "لم يقبل المحدِّث الطلب. تحقّق من أن حاوية watchtower تعمل.",
+    "updateNowTimeout": "لم يُعد FreeLLMAPI التشغيل بعد 5 دقائق. راجع سجلات حاوية watchtower."
   },
   "models": {
     "title": "نماذج",

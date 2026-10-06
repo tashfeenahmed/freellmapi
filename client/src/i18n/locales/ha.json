@@ -171,7 +171,11 @@
     "downloadingUpdate": "Ana saukewa… {percent}%",
     "restartToUpdate": "Sake farawa don sabuntawa",
     "updateReadyHint": "An sauke. FreeLLMAPI yana adana bayananka, sai ya sake farawa ya buɗe sabon sigar.",
-    "updateInstallFailed": "Ba a iya shigar da sabuntawar ba."
+    "updateInstallFailed": "Ba a iya shigar da sabuntawar ba.",
+    "updateNow": "Sabunta yanzu",
+    "updatingContainer": "Ana jan sabon hoto ana sake farawa. Wannan shafin zai sake lodawa idan FreeLLMAPI ya dawo.",
+    "updateNowFailed": "Mai sabuntawa bai karɓi buƙatar ba. Duba ko kwantena watchtower yana aiki.",
+    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower."
   },
   "models": {
     "title": "Samfura",

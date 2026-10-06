@@ -171,7 +171,11 @@
     "downloadingUpdate": "Yuklab olinmoqda… {percent}%",
     "restartToUpdate": "Yangilash uchun qayta ishga tushirish",
     "updateReadyHint": "Yuklab olindi. FreeLLMAPI maʼlumotlaringizning zaxira nusxasini oladi, qayta ishga tushadi va yangi versiyani ochadi.",
-    "updateInstallFailed": "Yangilanishni o‘rnatib bo‘lmadi."
+    "updateInstallFailed": "Yangilanishni o‘rnatib bo‘lmadi.",
+    "updateNow": "Hozir yangilash",
+    "updatingContainer": "Yangi obraz yuklab olinmoqda va qayta ishga tushirilmoqda. FreeLLMAPI qaytganda bu sahifa qayta yuklanadi.",
+    "updateNowFailed": "Yangilovchi so‘rovni qabul qilmadi. watchtower konteyneri ishlayotganini tekshiring.",
+    "updateNowTimeout": "FreeLLMAPI 5 daqiqadan keyin ham qayta ishga tushmadi. watchtower konteyneri jurnallarini tekshiring."
   },
   "models": {
     "title": "Modellar",

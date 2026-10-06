@@ -171,7 +171,11 @@
     "downloadingUpdate": "ダウンロード中… {percent}%",
     "restartToUpdate": "再起動してアップデート",
     "updateReadyHint": "ダウンロード完了。FreeLLMAPI はデータをバックアップしてから再起動し、新しいバージョンを開きます。",
-    "updateInstallFailed": "アップデートをインストールできませんでした。"
+    "updateInstallFailed": "アップデートをインストールできませんでした。",
+    "updateNow": "今すぐアップデート",
+    "updatingContainer": "新しいイメージを取得して再起動しています。FreeLLMAPI が戻るとこのページは再読み込みされます。",
+    "updateNowFailed": "アップデーターがリクエストを受け付けませんでした。watchtower コンテナが動いているか確認してください。",
+    "updateNowTimeout": "5 分経っても FreeLLMAPI が再起動していません。watchtower コンテナのログを確認してください。"
   },
   "models": {
     "title": "モデル",

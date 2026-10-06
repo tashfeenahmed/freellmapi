@@ -171,7 +171,11 @@
     "downloadingUpdate": "កំពុងទាញយក… {percent}%",
     "restartToUpdate": "ចាប់ផ្ដើមឡើងវិញដើម្បីធ្វើបច្ចុប្បន្នភាព",
     "updateReadyHint": "បានទាញយករួច។ FreeLLMAPI បម្រុងទុកទិន្នន័យរបស់អ្នក ចាប់ផ្ដើមឡើងវិញ ហើយបើកកំណែថ្មី។",
-    "updateInstallFailed": "មិនអាចដំឡើងបច្ចុប្បន្នភាពបានទេ។"
+    "updateInstallFailed": "មិនអាចដំឡើងបច្ចុប្បន្នភាពបានទេ។",
+    "updateNow": "ធ្វើបច្ចុប្បន្នភាពឥឡូវនេះ",
+    "updatingContainer": "កំពុងទាញរូបភាពថ្មី ហើយចាប់ផ្ដើមឡើងវិញ។ ទំព័រនេះនឹងផ្ទុកឡើងវិញពេល FreeLLMAPI ត្រឡប់មកវិញ។",
+    "updateNowFailed": "កម្មវិធីធ្វើបច្ចុប្បន្នភាពមិនបានទទួលសំណើទេ។ ពិនិត្យថា container watchtower កំពុងដំណើរការ។",
+    "updateNowTimeout": "FreeLLMAPI មិនទាន់ចាប់ផ្ដើមឡើងវិញក្រោយ ៥ នាទី។ ពិនិត្យកំណត់ហេតុរបស់ container watchtower។"
   },
   "models": {
     "title": "ម៉ូដែល",

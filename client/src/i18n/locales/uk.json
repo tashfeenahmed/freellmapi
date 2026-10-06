@@ -171,7 +171,11 @@
     "downloadingUpdate": "Завантаження… {percent}%",
     "restartToUpdate": "Перезапустити для оновлення",
     "updateReadyHint": "Завантажено. FreeLLMAPI створює резервну копію даних, перезапускається й відкриває нову версію.",
-    "updateInstallFailed": "Не вдалося встановити оновлення."
+    "updateInstallFailed": "Не вдалося встановити оновлення.",
+    "updateNow": "Оновити зараз",
+    "updatingContainer": "Завантажується новий образ і виконується перезапуск. Сторінка перезавантажиться, коли FreeLLMAPI повернеться.",
+    "updateNowFailed": "Служба оновлення не прийняла запит. Перевірте, що контейнер watchtower запущено.",
+    "updateNowTimeout": "FreeLLMAPI не перезапустився за 5 хвилин. Перегляньте журнали контейнера watchtower."
   },
   "models": {
     "title": "Моделі",

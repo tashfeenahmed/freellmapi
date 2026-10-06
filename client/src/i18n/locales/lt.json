@@ -171,7 +171,11 @@
     "downloadingUpdate": "Atsisiunčiama… {percent} %",
     "restartToUpdate": "Paleisti iš naujo ir atnaujinti",
     "updateReadyHint": "Atsisiųsta. FreeLLMAPI padaro jūsų duomenų atsarginę kopiją, pasileidžia iš naujo ir atidaro naują versiją.",
-    "updateInstallFailed": "Naujinimo įdiegti nepavyko."
+    "updateInstallFailed": "Naujinimo įdiegti nepavyko.",
+    "updateNow": "Atnaujinti dabar",
+    "updatingContainer": "Atsisiunčiamas naujas atvaizdas ir paleidžiama iš naujo. Puslapis įsikels iš naujo, kai FreeLLMAPI grįš.",
+    "updateNowFailed": "Atnaujintuvas nepriėmė užklausos. Patikrinkite, ar veikia watchtower konteineris.",
+    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus."
   },
   "models": {
     "title": "Modeliai",

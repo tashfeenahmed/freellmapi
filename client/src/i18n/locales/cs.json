@@ -171,7 +171,11 @@
     "downloadingUpdate": "Stahování… {percent} %",
     "restartToUpdate": "Restartovat a aktualizovat",
     "updateReadyHint": "Staženo. FreeLLMAPI zálohuje vaše data, restartuje se a otevře novou verzi.",
-    "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat."
+    "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat.",
+    "updateNow": "Aktualizovat nyní",
+    "updatingContainer": "Stahuje se nový obraz a probíhá restart. Stránka se znovu načte, až bude FreeLLMAPI zpět.",
+    "updateNowFailed": "Aktualizátor požadavek nepřijal. Zkontrolujte, že kontejner watchtower běží.",
+    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower."
   },
   "models": {
     "title": "Modely",

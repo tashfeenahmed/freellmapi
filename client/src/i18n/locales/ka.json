@@ -171,7 +171,11 @@
     "downloadingUpdate": "იტვირთება… {percent}%",
     "restartToUpdate": "გადატვირთვა განახლებისთვის",
     "updateReadyHint": "ჩამოიტვირთა. FreeLLMAPI ქმნის თქვენი მონაცემების სარეზერვო ასლს, გადაიტვირთება და გახსნის ახალ ვერსიას.",
-    "updateInstallFailed": "განახლების დაყენება ვერ მოხერხდა."
+    "updateInstallFailed": "განახლების დაყენება ვერ მოხერხდა.",
+    "updateNow": "ახლავე განახლება",
+    "updatingContainer": "ახალი იმიჯის ჩამოტვირთვა და გადატვირთვა. გვერდი გადაიტვირთება, როცა FreeLLMAPI დაბრუნდება.",
+    "updateNowFailed": "განახლების სერვისმა მოთხოვნა არ მიიღო. შეამოწმეთ, მუშაობს თუ არა watchtower კონტეინერი.",
+    "updateNowTimeout": "FreeLLMAPI 5 წუთის შემდეგაც არ გადაიტვირთა. შეამოწმეთ watchtower კონტეინერის ჟურნალები."
   },
   "models": {
     "title": "მოდელები",

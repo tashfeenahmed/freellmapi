@@ -171,7 +171,11 @@
     "downloadingUpdate": "Ń ṣe ìgbàsílẹ̀… {percent}%",
     "restartToUpdate": "Tún bẹ̀rẹ̀ láti mú dójúìwọ̀n",
     "updateReadyHint": "Ìgbàsílẹ̀ ti parí. FreeLLMAPI yóò ṣe àfẹ̀yìntì dátà rẹ, tún bẹ̀rẹ̀, yóò sì ṣí ẹ̀yà tuntun.",
-    "updateInstallFailed": "A kò lè fi ìmúdójúìwọ̀n náà sí i."
+    "updateInstallFailed": "A kò lè fi ìmúdójúìwọ̀n náà sí i.",
+    "updateNow": "Ṣe ìmúdójúìwọ̀n báyìí",
+    "updatingContainer": "Ń fa àwòrán tuntun ó sì ń tún bẹ̀rẹ̀. Ojú-ìwé yìí yóò tún gbé nígbà tí FreeLLMAPI bá padà.",
+    "updateNowFailed": "Olùmúdójúìwọ̀n kò gba ìbéèrè náà. Ṣàyẹ̀wò pé àpótí watchtower ń ṣiṣẹ́.",
+    "updateNowTimeout": "FreeLLMAPI kò tíì tún bẹ̀rẹ̀ lẹ́yìn ìṣẹ́jú 5. Ṣàyẹ̀wò àkọsílẹ̀ àpótí watchtower."
   },
   "models": {
     "title": "Awọn awoṣe",

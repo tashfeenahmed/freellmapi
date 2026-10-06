@@ -234,7 +234,7 @@ FreeLLMAPI publishes a single production image that contains the Express server 
 docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # or pin a release, e.g. :v1.2.3
 ```
 
-The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
+The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (the newest release), `main` (the default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
 
 The included `docker-compose.yml` is the recommended install path:
 
@@ -242,6 +242,14 @@ The included `docker-compose.yml` is the recommended install path:
 docker compose up -d
 docker compose logs -f freellmapi
 ```
+
+**Updating:** `docker compose pull && docker compose up -d` (your volume and `.env` carry over). To update from the dashboard instead, set `WATCHTOWER_TOKEN` in `.env` (e.g. `openssl rand -hex 32`) and start with the opt-in profile:
+
+```bash
+docker compose --profile autoupdate up -d
+```
+
+Settings → **Check for updates** then shows **Update now** when a newer release exists: a [Watchtower](https://github.com/nicholas-fedor/watchtower) sidecar pulls the image and recreates the `freellmapi` container, and the dashboard reloads when it is back. Watchtower runs with only its token-protected update endpoint, never updates on a schedule, publishes no port and only touches the `freellmapi` container — but it mounts the Docker socket, which is root-equivalent on the host, so the profile stays off unless you start it.
 
 By default the container's port is bound to `127.0.0.1` (localhost only). To reach the dashboard/API from another machine on your network, publish it on all interfaces with `HOST_BIND=0.0.0.0 docker compose up -d` — only on a trusted LAN, since the proxy is single-user.
 

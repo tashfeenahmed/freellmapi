@@ -171,7 +171,11 @@
     "downloadingUpdate": "מוריד… {percent}%",
     "restartToUpdate": "הפעלה מחדש לעדכון",
     "updateReadyHint": "ההורדה הושלמה. FreeLLMAPI מגבה את הנתונים שלך, מופעל מחדש ופותח את הגרסה החדשה.",
-    "updateInstallFailed": "לא ניתן היה להתקין את העדכון."
+    "updateInstallFailed": "לא ניתן היה להתקין את העדכון.",
+    "updateNow": "עדכן עכשיו",
+    "updatingContainer": "מושך את האימג׳ החדש ומפעיל מחדש. הדף ייטען מחדש כש-FreeLLMAPI יחזור.",
+    "updateNowFailed": "המעדכן לא קיבל את הבקשה. ודאו שמכולת watchtower פועלת.",
+    "updateNowTimeout": "FreeLLMAPI לא הופעל מחדש אחרי 5 דקות. בדקו את היומנים של מכולת watchtower."
   },
   "models": {
     "title": "דגמים",

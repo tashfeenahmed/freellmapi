@@ -171,7 +171,11 @@
     "downloadingUpdate": "Endirilir… {percent}%",
     "restartToUpdate": "Yeniləmək üçün yenidən başlat",
     "updateReadyHint": "Endirildi. FreeLLMAPI məlumatlarınızın ehtiyat nüsxəsini çıxarır, yenidən başlayır və yeni versiyanı açır.",
-    "updateInstallFailed": "Yeniləmə quraşdırıla bilmədi."
+    "updateInstallFailed": "Yeniləmə quraşdırıla bilmədi.",
+    "updateNow": "İndi yenilə",
+    "updatingContainer": "Yeni şəkil endirilir və yenidən başladılır. FreeLLMAPI qayıdanda bu səhifə yenilənəcək.",
+    "updateNowFailed": "Yeniləyici sorğunu qəbul etmədi. watchtower konteynerinin işlədiyini yoxlayın.",
+    "updateNowTimeout": "FreeLLMAPI 5 dəqiqədən sonra da yenidən başlamayıb. watchtower konteynerinin jurnallarına baxın."
   },
   "models": {
     "title": "Modellər",

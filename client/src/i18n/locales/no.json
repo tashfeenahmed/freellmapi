@@ -171,7 +171,11 @@
     "downloadingUpdate": "Laster ned… {percent} %",
     "restartToUpdate": "Start på nytt for å oppdatere",
     "updateReadyHint": "Lastet ned. FreeLLMAPI tar sikkerhetskopi av dataene dine, starter på nytt og åpner den nye versjonen.",
-    "updateInstallFailed": "Oppdateringen kunne ikke installeres."
+    "updateInstallFailed": "Oppdateringen kunne ikke installeres.",
+    "updateNow": "Oppdater nå",
+    "updatingContainer": "Henter det nye imaget og starter på nytt. Siden lastes inn på nytt når FreeLLMAPI er tilbake.",
+    "updateNowFailed": "Oppdateringstjenesten godtok ikke forespørselen. Sjekk at watchtower-containeren kjører.",
+    "updateNowTimeout": "FreeLLMAPI har ikke startet på nytt etter 5 minutter. Sjekk loggene til watchtower-containeren."
   },
   "models": {
     "title": "Modeller",

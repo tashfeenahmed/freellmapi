@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
 import { RotateCw } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { isNewBuild } from '@/lib/new-build'
+import { fetchLatestIndex, isNewBuild, loadedEntryScript } from '@/lib/new-build'
 
 /** At most one same-origin index.html fetch per minute, however often the tab
  *  regains focus; a tab left in the foreground re-checks every five. */
 const MIN_GAP_MS = 60 * 1000
 const POLL_MS = 5 * 60 * 1000
-
-function loadedEntry(): string | null {
-  const script = document.querySelector<HTMLScriptElement>('script[type="module"][src]')
-  return script?.src ?? null
-}
 
 /**
  * "A newer dashboard is installed — Reload." The server can be replaced under
@@ -25,7 +20,7 @@ export function NewBuildPrompt() {
   const [stale, setStale] = useState(false)
 
   useEffect(() => {
-    const loaded = loadedEntry()
+    const loaded = loadedEntryScript()
     if (!loaded || !loaded.includes('/assets/')) return // dev server
     let lastCheck = Date.now()
     let cancelled = false
@@ -35,9 +30,8 @@ export function NewBuildPrompt() {
       if (Date.now() - lastCheck < MIN_GAP_MS) return
       lastCheck = Date.now()
       try {
-        const response = await fetch(import.meta.env.BASE_URL, { cache: 'no-store', headers: { Accept: 'text/html' } })
-        if (!response.ok) return
-        if (!cancelled && isNewBuild(loaded, await response.text())) setStale(true)
+        const html = await fetchLatestIndex()
+        if (!cancelled && isNewBuild(loaded, html)) setStale(true)
       } catch { /* server restarting — try again on the next focus */ }
     }
 

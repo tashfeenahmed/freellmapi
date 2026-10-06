@@ -171,7 +171,11 @@
     "downloadingUpdate": "Wird heruntergeladen… {percent} %",
     "restartToUpdate": "Neu starten und aktualisieren",
     "updateReadyHint": "Heruntergeladen. FreeLLMAPI sichert Ihre Daten, startet neu und öffnet die neue Version.",
-    "updateInstallFailed": "Das Update konnte nicht installiert werden."
+    "updateInstallFailed": "Das Update konnte nicht installiert werden.",
+    "updateNow": "Jetzt aktualisieren",
+    "updatingContainer": "Das neue Image wird geladen und neu gestartet. Die Seite lädt neu, sobald FreeLLMAPI wieder da ist.",
+    "updateNowFailed": "Der Updater hat die Anfrage nicht angenommen. Prüfen Sie, ob der watchtower-Container läuft.",
+    "updateNowTimeout": "FreeLLMAPI ist nach 5 Minuten nicht neu gestartet. Prüfen Sie die Logs des watchtower-Containers."
   },
   "models": {
     "title": "Modelle",

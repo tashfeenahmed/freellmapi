@@ -171,7 +171,11 @@
     "downloadingUpdate": "Letöltés… {percent}%",
     "restartToUpdate": "Újraindítás a frissítéshez",
     "updateReadyHint": "Letöltve. A FreeLLMAPI biztonsági mentést készít az adatairól, újraindul, és megnyitja az új verziót.",
-    "updateInstallFailed": "A frissítést nem sikerült telepíteni."
+    "updateInstallFailed": "A frissítést nem sikerült telepíteni.",
+    "updateNow": "Frissítés most",
+    "updatingContainer": "Az új image letöltése és újraindítás. Az oldal újratöltődik, amikor a FreeLLMAPI visszatér.",
+    "updateNowFailed": "A frissítő nem fogadta el a kérést. Ellenőrizze, hogy fut-e a watchtower konténer.",
+    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit."
   },
   "models": {
     "title": "Modellek",

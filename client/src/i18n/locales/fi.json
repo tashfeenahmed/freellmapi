@@ -171,7 +171,11 @@
     "downloadingUpdate": "Ladataan… {percent} %",
     "restartToUpdate": "Käynnistä uudelleen päivittääksesi",
     "updateReadyHint": "Ladattu. FreeLLMAPI varmuuskopioi tietosi, käynnistyy uudelleen ja avaa uuden version.",
-    "updateInstallFailed": "Päivitystä ei voitu asentaa."
+    "updateInstallFailed": "Päivitystä ei voitu asentaa.",
+    "updateNow": "Päivitä nyt",
+    "updatingContainer": "Ladataan uutta imagea ja käynnistetään uudelleen. Sivu latautuu uudelleen, kun FreeLLMAPI palaa.",
+    "updateNowFailed": "Päivittäjä ei hyväksynyt pyyntöä. Tarkista, että watchtower-kontti on käynnissä.",
+    "updateNowTimeout": "FreeLLMAPI ei ole käynnistynyt uudelleen 5 minuutissa. Tarkista watchtower-kontin lokit."
   },
   "models": {
     "title": "Mallit",

@@ -171,7 +171,11 @@
     "downloadingUpdate": "डाउनलोड होत आहे… {percent}%",
     "restartToUpdate": "अपडेटसाठी रीस्टार्ट करा",
     "updateReadyHint": "डाउनलोड झाले. FreeLLMAPI तुमच्या डेटाचा बॅकअप घेते, रीस्टार्ट होते आणि नवीन आवृत्ती उघडते.",
-    "updateInstallFailed": "अपडेट इंस्टॉल होऊ शकले नाही."
+    "updateInstallFailed": "अपडेट इंस्टॉल होऊ शकले नाही.",
+    "updateNow": "आता अपडेट करा",
+    "updatingContainer": "नवीन इमेज ओढली जात आहे आणि रीस्टार्ट होत आहे. FreeLLMAPI परत आल्यावर हे पेज रीलोड होईल.",
+    "updateNowFailed": "अपडेटरने विनंती स्वीकारली नाही. watchtower कंटेनर चालू आहे का ते तपासा.",
+    "updateNowTimeout": "५ मिनिटांनंतरही FreeLLMAPI रीस्टार्ट झाले नाही. watchtower कंटेनरचे लॉग तपासा."
   },
   "models": {
     "title": "मॉडेल्स",
