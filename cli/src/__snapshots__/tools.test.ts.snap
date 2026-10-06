@@ -780,6 +780,42 @@ exports[`tool generators > setup-qwen has stable golden output 1`] = `
 }
 `;
 
+exports[`tool generators > setup-reasonix has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "content": "default_model = "freellmapi/fast-coder"
+
+[[providers]]
+name = "freellmapi"
+display_name = "FreeLLMAPI"
+kind = "openai"
+base_url = "http://localhost:3000/v1"
+models = ["fast-coder", "reasoning-model"]
+default = "fast-coder"
+api_key_env = "FREELLMAPI_API_KEY"
+context_window = 131072
+price = { cache_hit = 0, input = 0, output = 0, currency = "$" }",
+      "format": "toml",
+      "path": "/home/tester/.reasonix/config.toml",
+    },
+    {
+      "content": "FREELLMAPI_API_KEY=freellmapi-test-key
+",
+      "format": "env",
+      "path": "/home/tester/.reasonix/.env",
+      "sensitive": true,
+    },
+  ],
+  "notes": [
+    "Install Reasonix with: npm install -g reasonix (or brew install esengine/reasonix/reasonix)",
+    "Try it with: reasonix -p "Say hello" — freellmapi/fast-coder is the default model.",
+    "Every catalog model is in /model as freellmapi/<id>; other [[providers]] entries in config.toml are kept.",
+    "Reasonix Studio lists only the providers in [desktop].provider_access when that list is set; add "freellmapi" there, or under Settings → Model → Access.",
+  ],
+}
+`;
+
 exports[`tool generators > setup-roo has stable golden output 1`] = `
 {
   "files": [

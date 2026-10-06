@@ -86,6 +86,16 @@ describe('client agent classification', () => {
     }))).not.toBe('pi');
   });
 
+  it('recognizes Reasonix by the UA it sends to every endpoint', () => {
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'Reasonix/2.29.0',
+    }))).toBe('reasonix');
+    // Its web_fetch tool is not a model request from the agent loop.
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'reasonix-web-fetch/1.0',
+    }))).not.toBe('reasonix');
+  });
+
   it('separates MiMo Code from the OpenCode it derives from', () => {
     expect(classifyClientAgent(request('/v1/chat/completions', {
       'user-agent': 'mimo/0.4.0',

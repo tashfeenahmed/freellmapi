@@ -52,11 +52,12 @@ npx freellmapi setup-dsh --url http://localhost:3001 --api-key <统一密钥>
 | **OpenClaw** | `setup-openclaw` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
 | **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat（`provider: custom`） |
 | **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
+| **Reasonix** | `setup-reasonix` | `http://localhost:3001/v1` | OpenAI Chat（`kind = "openai"`） |
 | **QwenPaw** | 手动配置 | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` 打印指引 | 公共 `https://…/v1` | OpenAI Chat |
 | **其他** | `setup-generic` 打印现成配置块 | `http://localhost:3001/v1` | OpenAI Chat |
 
-根路径与 `/v1` 的区别很重要：Claude Code 期望服务器根路径，因为它会追加 Anthropic Messages 路径。本表中兼容 OpenAI 的客户端——包括 Cline、Aider、Goose、Codex、Continue、OpenCode、Qwen、Roo、Kilo、Crush、QwenPaw 和 DeepSeek Harness——期望它们配置的 base URL 包含 `/v1`。
+根路径与 `/v1` 的区别很重要：Claude Code 期望服务器根路径，因为它会追加 Anthropic Messages 路径。本表中兼容 OpenAI 的客户端——包括 Cline、Aider、Goose、Codex、Continue、OpenCode、Qwen、Roo、Kilo、Crush、Pi、Reasonix、QwenPaw 和 DeepSeek Harness——期望它们配置的 base URL 包含 `/v1`。
 
 ### DeepSeek Harness (`dsh`)
 
@@ -106,6 +107,18 @@ pi -p "Say hello"
 ```
 
 正在运行的会话在打开 `/model` 时会重新加载 `models.json`。`--profile <name>` 改为添加 `freellmapi-<name>` provider——用 `pi --model freellmapi-<name>/<model>` 或在 `/model` 中选择——不改动默认模型；`--model <id>` 固定默认模型。模型声明为纯文本、`reasoning: false`；要给视觉模型发送图片，在其 `input` 中加上 `"image"`。Pi 对自定义端点只发送 SDK 的通用 User-Agent，所以该 provider 带有 `headers: { "User-Agent": "pi-coding-agent" }`，Agents 页面的"最近出现"徽章据此识别。设置了 `PI_CODING_AGENT_DIR` 时会被尊重。
+
+### Reasonix（`reasonix`）
+
+[Reasonix](https://github.com/esengine/DeepSeek-Reasonix) 是为 DeepSeek 原生打造、围绕前缀缓存稳定性设计的终端编程智能体。每个端点都是 `~/.reasonix/config.toml`（Windows 上为 `%APPDATA%\reasonix`，设置了 `$REASONIX_HOME` 时以其为准）中的一个 `[[providers]]` 条目。`setup-reasonix` 添加一个名为 `freellmapi` 的条目——`kind = "openai"`、网关的 `/v1` 作为 `base_url`，并列出实时目录中的全部模型（所选模型排在最前）——并把 `default_model` 指向 `freellmapi/<model>`。条目用 `api_key_env = "FREELLMAPI_API_KEY"` 引用密钥，密钥值写入 Reasonix 自行加载的 `~/.reasonix/.env`（0600），无需 export。其他 `[[providers]]` 条目和设置保持原样，重复运行只替换 `freellmapi` 条目。
+
+```bash
+npx freellmapi setup-reasonix --url http://localhost:3001 --api-key <统一密钥>
+npm install -g reasonix
+reasonix -p "Say hello"
+```
+
+目录中的每个模型都会以 `freellmapi/<id>` 出现在 `/model` 中。`--profile <name>` 改为添加 `freellmapi-<name>` 条目——用 `reasonix --model freellmapi-<name>/<model>` 选择——不改动默认模型；`--model <id>` 固定默认模型。设置了 `[desktop].provider_access` 时，Reasonix Studio 只列出其中的 provider，请把 `"freellmapi"` 加进去（或在 设置 → 模型 → 访问 中添加）。Reasonix 的 User-Agent 为 `Reasonix/<version>`，Agents 页面的"最近出现"徽章据此识别。
 
 ### QwenPaw
 

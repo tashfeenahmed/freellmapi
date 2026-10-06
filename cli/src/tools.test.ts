@@ -16,6 +16,7 @@ beforeEach(() => {
   vi.stubEnv('OPENCLAW_CONFIG_PATH', '');
   vi.stubEnv('HERMES_HOME', '');
   vi.stubEnv('PI_CODING_AGENT_DIR', '');
+  vi.stubEnv('REASONIX_HOME', '');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -517,6 +518,54 @@ describe('tool generators', () => {
     const providers = (files[0].value as { providers: Record<string, { name: string }> }).providers;
     expect(Object.keys(providers)).toEqual(['freellmapi-work-box']);
     expect(providers['freellmapi-work-box'].name).toBe('FreeLLMAPI (Work Box)');
+  });
+
+  it('writes Reasonix as a [[providers]] entry plus its key in the Reasonix .env', () => {
+    // Reasonix names the key variable in config.toml and keeps the value in the
+    // .env beside it, which it loads itself. `default_model` is provider/model
+    // and must sit in the root region, above the array entry.
+    const [config, env] = tools.find(tool => tool.id === 'reasonix')!.generate(context).files;
+    expect(config.path).toBe('/home/tester/.reasonix/config.toml');
+    expect(config.format).toBe('toml');
+    expect(config.sensitive).toBeUndefined();
+    const lines = (config.content ?? '').split('\n');
+    expect(lines[0]).toBe('default_model = "freellmapi/fast-coder"');
+    expect(lines.indexOf('[[providers]]')).toBeGreaterThan(0);
+    expect(lines).toContain('name = "freellmapi"');
+    expect(lines).toContain('kind = "openai"');
+    expect(lines).toContain('base_url = "http://localhost:3000/v1"');
+    expect(lines).toContain('models = ["fast-coder", "reasoning-model"]');
+    expect(lines).toContain('default = "fast-coder"');
+    expect(lines).toContain('api_key_env = "FREELLMAPI_API_KEY"');
+    expect(lines).toContain('context_window = 131072');
+    expect(config.content).not.toContain('freellmapi-test-key');
+    expect(env).toEqual({
+      path: '/home/tester/.reasonix/.env',
+      format: 'env',
+      sensitive: true,
+      content: 'FREELLMAPI_API_KEY=freellmapi-test-key\n',
+    });
+  });
+
+  it('keeps `auto` first in the Reasonix roster when it is the default', () => {
+    const liveContext: GenerateContext = {
+      ...context,
+      models: [{ id: 'auto', name: 'Auto', available: true, context_window: 200_000 }, ...context.models],
+    };
+    const [config] = tools.find(tool => tool.id === 'reasonix')!.generate(liveContext).files;
+    expect(config.content).toContain('default_model = "freellmapi/auto"');
+    expect(config.content).toContain('models = ["auto", "fast-coder", "reasoning-model"]');
+  });
+
+  it('gives a named Reasonix profile its own provider and leaves the default model alone', () => {
+    vi.stubEnv('REASONIX_HOME', '/srv/reasonix');
+    const [config, env] = tools.find(tool => tool.id === 'reasonix')!.generate({ ...context, profile: 'Work Box' }).files;
+    expect(config.path).toBe('/srv/reasonix/config.toml');
+    expect(env.path).toBe('/srv/reasonix/.env');
+    expect(config.content).not.toContain('default_model');
+    expect(config.content!.split('\n')[0]).toBe('[[providers]]');
+    expect(config.content).toContain('name = "freellmapi-work-box"');
+    expect(config.content).toContain('display_name = "FreeLLMAPI (Work Box)"');
   });
 
   it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {

@@ -14,6 +14,7 @@ feature for mid-conversation model switches.
 
 | File | Description |
 | --- | --- |
+| [02-supported-agents.md](02-supported-agents.md) | Every supported agent at a glance: logo grid, one-line setup command and base URL for each. |
 | [01-agent-clients.md](01-agent-clients.md) | Complete reference for coding-agent generators (`setup-claude`, `setup-codex`, `setup-dsh`, etc.), manual base URLs, Ollama clients, headerless URL tokens, MCP server, VS Code autocomplete, and Context Handoff. |
 
 ## Related

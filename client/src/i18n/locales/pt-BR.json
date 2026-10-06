@@ -1144,7 +1144,8 @@
       "atomcode": "O agente de terminal da AtomGit, escrito em Rust, que aceita qualquer endpoint compatível com OpenAI.",
       "openclaw": "Um assistente pessoal sempre ativo que responde no WhatsApp, Telegram, Discord e outros a partir da sua própria máquina.",
       "hermes": "O agente autoaperfeiçoável da Nous Research, com memória persistente e habilidades, no terminal ou em apps de chat.",
-      "pi": "Um agente de terminal minimalista que você molda com suas próprias extensões, habilidades e modelos de prompt."
+      "pi": "Um agente de terminal minimalista que você molda com suas próprias extensões, habilidades e modelos de prompt.",
+      "reasonix": "Um agente de programação para o terminal nativo do DeepSeek, construído em torno do cache de prefixo para que sessões longas continuem baratas."
     }
   },
   "update": {

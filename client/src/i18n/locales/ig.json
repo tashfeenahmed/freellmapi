@@ -1144,7 +1144,8 @@
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Onye enyemaka nkeonwe na-arụ ọrụ mgbe niile, nke na-aza na WhatsApp, Telegram, Discord na ndị ọzọ site na igwe nke gị.",
       "hermes": "Onye ọrụ Nous Research na-emeziwanye onwe ya, nwere ebe nchekwa na-adịgide na nkà, na terminal ma ọ bụ na ngwa mkparịta ụka.",
-      "pi": "Obere onye ọrụ terminal ị na-akpụ site na ndọtị, nkà na ndebiri ajụjụ nke gị."
+      "pi": "Obere onye ọrụ terminal ị na-akpụ site na ndọtị, nkà na ndebiri ajụjụ nke gị.",
+      "reasonix": "Onye nnọchite ide koodu na terminal emere maka DeepSeek, wuru gburugburu prefix caching ka ogologo nnọkọ wee dị ọnụ ala."
     }
   },
   "update": {

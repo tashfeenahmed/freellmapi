@@ -19,8 +19,9 @@ import { cn } from '@/lib/utils'
 //      the tile it has to sit on, that value is moved in OKLCH lightness only:
 //      hue is held exactly, chroma is held and clamped to the sRGB gamut, and
 //      lightness stops at the first step that clears 3:1. The mark still reads
-//      as that brand's colour. Only claude, aider and kilo need this, and only
-//      on one tile each; the untouched brand hex is kept on the other tile.
+//      as that brand's colour. Only claude, aider, kilo and reasonix need this,
+//      and only on one tile each; the untouched brand hex is kept on the other
+//      tile.
 //   3. `generic` is not a brand — it stays `currentColor`.
 //
 // Contrast is measured against the tile itself, `bg-muted`, which resolves to
@@ -59,6 +60,8 @@ import { cn } from '@/lib/utils'
 //                          favicon is a text glyph, so neither fits the 24px grid
 //   pi        Pi           pi.dev/favicon.svg (the monochrome mark; the press kit's       Earendil TM, nominative use
 //                          three-colour logo is the same geometry)
+//   reasonix  Reasonix     esengine/DeepSeek-Reasonix `docs/logo.svg` (the ◈ brand mark:     MIT
+//                          three concentric diamonds, without the wordmark)
 //
 //   id        light tile        ratio  dark tile         ratio  dark-mode treatment
 //   claude    #D37152            3.08  #D97757            5.52  brand #D97757 on dark; light tile is
@@ -97,6 +100,10 @@ import { cn } from '@/lib/utils'
 //                                                               on white, so it inverts on the dark tile)
 //   pi        #111111           17.32  #F6F6F6           15.94  published pair (the favicon's own light and
 //                                                               dark-scheme fills)
+//   reasonix  #6191C6            3.02  #93C5FD            9.55  the mark's gradient midpoint #93C5FD on dark;
+//                                                               light tile is the same hue tuned down (rule 2,
+//                                                               1.65→3.02): oklch(0.809 0.096 251.8) →
+//                                                               oklch(0.645 0.096 251.8)
 //   generic   currentColor         —   currentColor         —   not a brand mark
 //
 // Cursor also publishes a 2.5D cube in five warm greys (#43413c #55544f #72716d
@@ -283,6 +290,22 @@ const brands: Record<string, Brand> = {
         <path d="M420 280H280V140H0V0H420V280Z" />
         <path d="M560 560H420V280H560V560Z" />
         <path d="M140 560H0V140H140V280H280V420H140V560Z" />
+      </g>
+    ),
+  },
+  // esengine/DeepSeek-Reasonix docs/logo.svg: the ◈ mark is three concentric
+  // diamonds on a 92-unit box — two stroked, the inner one filled. Scaled
+  // 0.21 about the centre, so it spans 19.3 units. The published artwork
+  // pulses the strokes between 3.5 and 5.5; the peak width is used so the
+  // outlines survive at 20px. The cyan-to-violet gradient becomes one flat
+  // colour, its midpoint stop.
+  reasonix: {
+    tint: '[--mk:#6191C6] dark:[--mk:#93C5FD]',
+    art: (
+      <g transform="translate(12 12) scale(0.21)" stroke="var(--mk, currentColor)" strokeLinejoin="round">
+        <path d="M0-46 46 0 0 46-46 0Z" fill="none" strokeWidth={5.5} />
+        <path d="M0-26 26 0 0 26-26 0Z" fill="none" strokeWidth={3.5} />
+        <path d="M0-11 11 0 0 11-11 0Z" strokeWidth={0} />
       </g>
     ),
   },

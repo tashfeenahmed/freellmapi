@@ -1144,7 +1144,8 @@
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "一個常駐運作的個人助理，從你自己的機器上透過 WhatsApp、Telegram、Discord 等回應。",
       "hermes": "Nous Research 的自我改進代理，具備持久記憶與技能，可在終端機或聊天應用程式中使用。",
-      "pi": "一個極簡的終端機代理，用你自己的擴充功能、技能與提示詞範本來塑造它。"
+      "pi": "一個極簡的終端機代理，用你自己的擴充功能、技能與提示詞範本來塑造它。",
+      "reasonix": "為 DeepSeek 原生打造的終端程式設計代理，圍繞前綴快取設計，長時間工作階段也能維持低成本。"
     }
   },
   "update": {

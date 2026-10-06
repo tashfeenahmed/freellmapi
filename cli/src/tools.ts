@@ -910,6 +910,72 @@ function pi(ctx: GenerateContext): Generation {
   };
 }
 
+// Reasonix (reasonix.io, esengine/DeepSeek-Reasonix) reads one global TOML
+// document, <Reasonix home>/config.toml — ~/.reasonix, %APPDATA%\reasonix on
+// Windows, or $REASONIX_HOME when set. Every endpoint is a `[[providers]]`
+// entry; `kind = "openai"` posts to `<base_url>/chat/completions`, and a
+// `models` list exposes the whole catalog under one connection. The entry only
+// names its key variable (`api_key_env`); Reasonix keeps the value in the .env
+// beside config.toml (0600) and reads it on its own, so nothing needs
+// exporting. `default_model` is `provider/model`. Reasonix already sends
+// `User-Agent: Reasonix/<version>` to every endpoint, so no header is needed.
+function reasonixHome(homeDir: string): string {
+  if (process.env.REASONIX_HOME?.trim()) return process.env.REASONIX_HOME.trim();
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA?.trim() || path.join(homeDir, 'AppData', 'Roaming'), 'reasonix');
+  }
+  return path.join(homeDir, '.reasonix');
+}
+
+function reasonix(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const home = reasonixHome(ctx.homeDir);
+  // A provider name is what every `provider/model` ref and saved session points
+  // at, so a named profile becomes a second entry rather than replacing it.
+  const provider = ctx.profile === 'default'
+    ? 'freellmapi'
+    : `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const roster = catalogModels(ctx.models);
+  const models = [model, ...roster.filter(entry => entry.id !== model.id)].map(entry => entry.id);
+  return {
+    files: [
+      {
+        path: path.join(home, 'config.toml'),
+        format: 'toml',
+        content: [
+          ...(ctx.profile === 'default' ? [`default_model = ${JSON.stringify(`${provider}/${model.id}`)}`, ''] : []),
+          '[[providers]]',
+          `name = ${JSON.stringify(provider)}`,
+          `display_name = ${JSON.stringify(ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`)}`,
+          'kind = "openai"',
+          `base_url = ${JSON.stringify(v1Url(ctx.url))}`,
+          `models = [${models.map(id => JSON.stringify(id)).join(', ')}]`,
+          `default = ${JSON.stringify(model.id)}`,
+          'api_key_env = "FREELLMAPI_API_KEY"',
+          `context_window = ${contextWindow(model)}`,
+          // Without a price Reasonix bills unknown models at a guessed rate;
+          // the gateway's models are free.
+          'price = { cache_hit = 0, input = 0, output = 0, currency = "$" }',
+        ].join('\n'),
+      },
+      {
+        path: path.join(home, '.env'),
+        format: 'env',
+        sensitive: true,
+        content: `FREELLMAPI_API_KEY=${ctx.apiKey}\n`,
+      },
+    ],
+    notes: [
+      'Install Reasonix with: npm install -g reasonix (or brew install esengine/reasonix/reasonix)',
+      ctx.profile === 'default'
+        ? `Try it with: reasonix -p "Say hello" — ${provider}/${model.id} is the default model.`
+        : `Try it with: reasonix --model ${provider}/${model.id} -p "Say hello" — the default model is unchanged.`,
+      `Every catalog model is in /model as ${provider}/<id>; other [[providers]] entries in config.toml are kept.`,
+      `Reasonix Studio lists only the providers in [desktop].provider_access when that list is set; add "${provider}" there, or under Settings → Model → Access.`,
+    ],
+  };
+}
+
 function cursor(_ctx: GenerateContext): Generation {
   return {
     files: [],
@@ -986,6 +1052,7 @@ const metadata = [
   ['openclaw', 'OpenClaw', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-openclaw', 'https://docs.openclaw.ai/gateway/config-tools/custom-providers', openclaw],
   ['hermes', 'Hermes Agent', 'agent', 'file', 'OpenAI Chat', '/v1', 'setup-hermes', 'https://hermes-agent.nousresearch.com/docs/', hermes],
   ['pi', 'Pi', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-pi', 'https://pi.dev/docs/latest/models', pi],
+  ['reasonix', 'Reasonix', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-reasonix', 'https://github.com/esengine/DeepSeek-Reasonix/blob/studio/docs/CLI.md#configure-providers', reasonix],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;
