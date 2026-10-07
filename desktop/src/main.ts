@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, dialog, ipcMain, clipboard, nativeTheme, screen, shell, type Tray } from 'electron';
-import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate } from './server.mjs';
+import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale } from './tray.js';
@@ -281,6 +281,9 @@ if (!app.requestSingleInstanceLock()) {
         try { return isAutoUpdateCheckEnabled(); } catch { return false; }
       },
       backupBeforeUpdate,
+      outboundProxyUrl: () => {
+        try { return outboundProxyUrl(); } catch { return ''; }
+      },
       getLocale: () => locale,
     });
 

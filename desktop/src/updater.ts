@@ -15,7 +15,7 @@
 import { app, BrowserWindow, dialog, Notification, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { dt, type NativeLocale } from './i18n.js';
-import { updateSupport, type UpdateState } from './update-support.js';
+import { updateSupport, updaterProxy, type UpdateState } from './update-support.js';
 
 export type { UpdateState };
 
@@ -32,6 +32,9 @@ export interface UpdaterHooks {
    *  install. Synchronous so it can also run inside 'before-quit'. */
   backupBeforeUpdate: () => string | null;
   getLocale: () => NativeLocale;
+  /** The proxy URL the app's own requests use ('' for none); applied to the
+   *  updater's session before every check and download (#1432). */
+  outboundProxyUrl: () => string;
   /** Called on every state change, e.g. so the tray can relabel itself. */
   onChange?: (state: UpdateState) => void;
 }
@@ -48,6 +51,10 @@ let stage: 'check' | 'download' | 'install' = 'check';
 // Set once the pre-install backup for the downloaded update has been written,
 // so the Restart button and the quit that follows don't write it twice.
 let backedUp = false;
+// What useAppProxy last handed the session, so an unchanged setting is not
+// re-applied (setProxy also drops the session's open connections).
+let appliedProxy: string | null = null;
+let proxyCredentials = { username: '', password: '' };
 
 export function getUpdateState(): UpdateState {
   return state;
@@ -59,6 +66,21 @@ function setState(next: UpdateState): void {
     if (!window.isDestroyed()) window.webContents.send('freeapi:update-state', state);
   }
   hooks?.onChange?.(state);
+}
+
+/** Route the updater through the dashboard / env proxy when one is set, and
+ *  back to the system settings when it is cleared. */
+async function useAppProxy(): Promise<void> {
+  const url = hooks?.outboundProxyUrl() ?? '';
+  if (url === appliedProxy) return;
+  const proxy = updaterProxy(url);
+  try {
+    await autoUpdater.netSession.setProxy(proxy ? { proxyRules: proxy.rules } : { mode: 'system' });
+    proxyCredentials = { username: proxy?.username ?? '', password: proxy?.password ?? '' };
+    appliedProxy = url;
+  } catch (err) {
+    console.warn('[updater] could not apply the proxy to the update session:', err);
+  }
 }
 
 function message(err: unknown): string {
@@ -113,6 +135,13 @@ export function initUpdater(options: UpdaterHooks): void {
       }).show();
     }
   });
+  // Chromium asks for proxy credentials here rather than reading them from
+  // the proxy rules.
+  autoUpdater.on('login', (authInfo, callback) => {
+    if (authInfo.isProxy && proxyCredentials.username) callback(proxyCredentials.username, proxyCredentials.password);
+    // No arguments cancels the challenge, which Chromium reports as a 407.
+    else (callback as () => void)();
+  });
   autoUpdater.on('error', (err) => setState({ phase: 'error', during: stage, message: message(err) }));
 
   // A downloaded update also installs on an ordinary quit (autoInstallOnAppQuit);
@@ -142,7 +171,8 @@ export function checkForUpdates(): Promise<UpdateState> {
     return Promise.resolve(state);
   }
   if (!inFlight) stage = 'check';
-  inFlight ??= autoUpdater.checkForUpdates()
+  inFlight ??= useAppProxy()
+    .then(() => autoUpdater.checkForUpdates())
     .then(() => state)
     .catch((err) => {
       setState({ phase: 'error', during: 'check', message: message(err) });
@@ -157,6 +187,7 @@ export async function downloadUpdate(): Promise<UpdateState> {
   stage = 'download';
   setState({ phase: 'downloading', version: state.version, percent: 0 });
   try {
+    await useAppProxy();
     await autoUpdater.downloadUpdate();
   } catch (err) {
     setState({ phase: 'error', during: 'download', message: message(err) });

@@ -39,3 +39,34 @@ export function updateSupport(
   return { phase: 'unsupported', reason: 'package' };
 }
 
+
+/**
+ * Turn the app's outbound proxy URL into what Electron's session.setProxy
+ * takes (#1432). The updater runs on Chromium's network stack, which never
+ * reads the dashboard proxy or HTTPS_PROXY, so on a network that only lets
+ * traffic out through that proxy every check died with net::ERR_ABORTED while
+ * curl (and the rest of the app) went through fine. Chromium takes the
+ * credentials separately, through the updater's 'login' event, so they are
+ * split off here. Returns null for an empty or unparseable URL, which leaves
+ * the session on the system proxy settings.
+ */
+export function updaterProxy(url: string): { rules: string; username: string; password: string } | null {
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  // Chromium knows socks4/socks5 and always resolves names through a SOCKS
+  // proxy, so the "a"/"h" (remote DNS) spellings map onto the plain ones.
+  const scheme = ({ 'socks5h:': 'socks5', 'socks:': 'socks5', 'socks4a:': 'socks4' } as Record<string, string>)[parsed.protocol]
+    ?? parsed.protocol.slice(0, -1);
+  if (!['http', 'https', 'socks4', 'socks5'].includes(scheme) || !parsed.hostname) return null;
+  const port = parsed.port || (scheme === 'https' ? '443' : scheme === 'http' ? '80' : '1080');
+  return {
+    rules: `${scheme}://${parsed.host.replace(/:\d+$/, '')}:${port}`,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+  };
+}

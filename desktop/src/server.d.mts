@@ -22,3 +22,4 @@ export function getDb(): Database.Database;
 export function getUnifiedApiKey(): string;
 export function isAutoUpdateCheckEnabled(): boolean;
 export function backupBeforeUpdate(): string;
+export function outboundProxyUrl(): string;
