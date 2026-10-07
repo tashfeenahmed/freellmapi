@@ -72,6 +72,8 @@ export type Platform =
   | 'aclide'
   // OpenAI-compatible chat and embeddings; one shared $1 monthly allowance.
   | 'speka'
+  // Ongoing free research API for chat and speech recognition; catalog only.
+  | 'typhoon'
   // Selected zero-priced routes have daily/rolling quotas without a top-up;
   // signed catalog only. The public roster also includes paid/promotional IDs.
   | 'llmtr'

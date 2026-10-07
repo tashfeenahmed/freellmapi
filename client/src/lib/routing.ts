@@ -405,6 +405,7 @@ export const platformColors: Record<string, string> = {
   sail:        '#0ea5e9',
   aclide:      '#6366f1',
   speka:       '#0d9488',
+  typhoon:     '#e11d48',
   llmtr:       '#0f766e',
   gizmo:       '#7c3aed',
   blockrun:    '#2563eb',

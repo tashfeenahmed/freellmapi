@@ -29,6 +29,7 @@ export function GetKeyLink({ url }: { url: string }) {
 export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean }[] = [
   { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys' },
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
+  { value: 'typhoon', label: 'Typhoon (free research API)', url: 'https://playground.opentyphoon.ai' },
   { value: 'llmtr', label: 'LLMTR (daily free-model quotas)', url: 'https://llmtr.com' },
   { value: 'gizmo', label: 'Gizmo (monthly free-model requests)', url: 'https://gizmoplatforms.com/developers' },
   { value: 'blockrun', label: 'BlockRun (zero-priced models)', url: 'https://user.blockrun.ai/dashboard/keys' },

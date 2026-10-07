@@ -18,6 +18,7 @@ import { bearerAuthHeader } from '../lib/credential.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
+import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
@@ -34,7 +35,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -985,6 +986,22 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'typhoon': {
+      // The tested API accepts file + model and returns {text, usage}.
+      // Do not forward Whisper-only options or claim native subtitle support.
+      // The route derives text/JSON response formats from this normalized result.
+      const form = new FormData();
+      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('model', m.modelId);
+      const r = await mediaFetch(`${TYPHOON_BASE_URL}/audio/transcriptions`, 'typhoon', 'transcription', {
+        method: 'POST',
+        headers: { ...bearerAuthHeader(key) },
+        body: form,
+      });
+      const j = (await r.json()) as { text?: unknown } | null;
+      if (!j || typeof j.text !== 'string') throw new MediaError('typhoon returned no transcription text', 502);
+      return { text: j.text };
+    }
     case 'custom': {
       // Any OpenAI-compatible STT server (faster-whisper-server, LocalAI,
       // whisper.cpp's server, vLLM…). Same multipart shape as groq below;
