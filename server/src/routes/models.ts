@@ -485,7 +485,9 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     // existing vocabulary for user-added rows is 'custom', so map 1:1 here —
     // this now also flags user models on native platforms (declarative
     // config / admin adds), which the old platform/key_id heuristic missed.
-    source: m.source === 'user' ? 'custom' : 'catalog',
+    // 'discovered' (#1348) marks rows fetched from a built-in provider's own
+    // /models because the catalog carries none for it.
+    source: m.source === 'user' ? 'custom' : m.source === 'discovered' ? 'discovered' : 'catalog',
     keyId: m.key_id ?? null,
     keyLabel: m.key_label ?? null,
     // Endpoint identity for custom rows (#651); null for catalog models and for

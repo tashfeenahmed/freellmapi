@@ -11,7 +11,8 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveModelGroupCandidates, resolveRoutingChain, resolveStickyPreference, routingReserveTokens, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
-import { contentToString } from '../lib/content.js';
+import { contentToString, estimateInputTokens } from '../lib/content.js';
+import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
@@ -374,10 +375,6 @@ function convertRequest(input: AnthropicRequest): ConvertedRequest {
   };
 }
 
-function estimateTokens(messages: ChatMessage[]): number {
-  return messages.reduce((sum, m) => sum + Math.ceil(contentToString(m.content).length / 4), 0);
-}
-
 // Model resolution (Claude family → auto | pinned catalog model) lives in
 // services/anthropic-map.ts so the dashboard mapping editor and this route
 // share one source of truth. Claude Code keeps its built-in `claude-*` names;
@@ -505,7 +502,7 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
 
-  const estimatedInputTokens = estimateTokens(messages);
+  const estimatedInputTokens = estimateInputTokens(messages, tools);
   const imageCount = messages.reduce((n, m) =>
     n + (Array.isArray(m.content) ? m.content.filter(b => (b as any)?.type === 'image_url').length : 0), 0);
 
@@ -660,9 +657,11 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
       return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, false, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
     },
     dispatch: async (route, attempt, dispatchCtx) => {
+      const contextBudget = routeOutputBudget(route, estimatedInputTokens);
+      const routeOptions = { ...dispatchOptions, contextBudget };
       if (stream) {
         try {
-          await streamCompletion(res, route, messages, dispatchOptions, {
+          await streamCompletion(res, route, messages, routeOptions, {
             start, attempt, attemptLog, clientGone: () => clientGone, requestedModel, estimatedInputTokens, tools, pinnedModelId,
             sessionId, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, state,
           });
@@ -675,7 +674,7 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         }
       }
 
-      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, dispatchOptions);
+      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, routeOptions);
       const respMsg = result.choices?.[0]?.message;
       const respText = contentToString(respMsg?.content ?? '');
       let respToolCalls = respMsg?.tool_calls ?? [];
@@ -1107,7 +1106,7 @@ anthropicRouter.post('/messages/count_tokens', (req: Request, res: Response) => 
     recordStats: false,
   });
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
-  res.json({ input_tokens: estimateTokens(compressionResult.messages) });
+  res.json({ input_tokens: estimateInputTokens(compressionResult.messages, tools) });
 });
 
 // Anthropic-compatible GET /v1/models. Content-negotiated: only answers when

@@ -152,21 +152,24 @@
     "compressionRunPreview": "اجرای پیش‌نمایش",
     "updatesTitle": "به‌روزرسانی‌ها",
     "checkForUpdates": "به روز رسانی را بررسی کنید",
-    "lastChecked": "آخرین بررسی: {when}",
-    "currentVersion": "بیلد فعلی:",
     "updateAvailable": "به‌روزرسانی در دسترس است",
-    "changelog": "چه چیزهایی تغییر کرده است",
     "upToDate": "به‌روز است",
     "buildAhead": "این بیلد از شاخهٔ رسمی main جلوتر است.",
     "buildDiverged": "این بیلد از شاخهٔ رسمی main واگرا شده است.",
     "buildUnknown": "این بیلد سفارشی را نمی‌توان با شاخهٔ رسمی main مقایسه کرد.",
     "notGitInstall": "این نصب شامل اطلاعات commit نیست.",
     "checkFailed": "بررسی به‌روزرسانی‌ها ممکن نبود.",
-    "contactsGithub": "بررسی‌ها دستی هستند و با GitHub ارتباط برقرار می‌کنند.",
     "autoUpdateCheck": "بررسی خودکار به‌روزرسانی",
-    "autoUpdateCheckHelp": "روزی یک بار GitHub را برای انتشار نسخهٔ جدید بررسی می‌کند و یادآوری نشان می‌دهد. به‌طور پیش‌فرض خاموش است.",
-    "openReleases": "باز کردن نسخه‌های منتشرشده در GitHub",
-    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید."
+    "restartAfterUpdate": "پس از تکمیل بیلد، FreeLLMAPI را راه‌اندازی مجدد کنید.",
+    "downloadUpdate": "دانلود به‌روزرسانی",
+    "downloadingUpdate": "در حال دانلود… {percent}٪",
+    "restartToUpdate": "راه‌اندازی مجدد برای به‌روزرسانی",
+    "updateReadyHint": "دانلود شد. FreeLLMAPI از داده‌های شما پشتیبان می‌گیرد، دوباره راه‌اندازی می‌شود و نسخهٔ جدید را باز می‌کند.",
+    "updateInstallFailed": "به‌روزرسانی نصب نشد.",
+    "updateNow": "اکنون به‌روزرسانی کن",
+    "updatingContainer": "در حال دریافت ایمیج جدید و راه‌اندازی مجدد. وقتی FreeLLMAPI برگردد این صفحه دوباره بارگذاری می‌شود.",
+    "updateNowFailed": "به‌روزرسان درخواست را نپذیرفت. بررسی کنید کانتینر watchtower در حال اجراست.",
+    "updateNowTimeout": "FreeLLMAPI پس از ۵ دقیقه دوباره راه‌اندازی نشده است. گزارش‌های کانتینر watchtower را بررسی کنید."
   },
   "models": {
     "title": "مدل ها",
@@ -209,6 +212,7 @@
     "noKey": "بدون کلید",
     "dragToReorder": "برای سفارش مجدد بکشید",
     "dragToReorderGroup": "برای سفارش مجدد مدل بکشید",
+    "moveToRank": "پرش به رتبه",
     "providerCount": "ارائه دهندگان {count}",
     "servedBy": "ارائه شده توسط {providers}",
     "viewProviders": "ارائه دهندگان را مشاهده کنید",
@@ -223,6 +227,7 @@
     "settingsHint": "ویرایش‌های محلی مدل‌های کاتالوگ در همگام‌سازی کاتالوگ نگهداری می‌شوند. مدل‌های کاتالوگ حذف‌شده تا زمانی که دوباره آنها را از طریق پیکربندی اضافه نکنید، حذف می‌شوند.",
     "catalogModel": "کاتالوگ",
     "customModel": "سفارشی",
+    "discoveredModel": "کشف‌شده",
     "localOverride": "نادیده گرفتن محلی",
     "displayName": "نام نمایشی",
     "sizeLabel": "رده توانایی",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} از {total} ارائه‌دهنده پیکربندی شده است",
     "checklistKeyless": "بدون نیاز به کلید",
     "checklistNoKeyTip": "هنوز کلیدی اضافه نشده است. برای افزودن کلیک کنید.",
+    "checklistSignupLink": "{provider} را باز کنید تا حساب بسازید و کلید بگیرید",
     "checklistKeylessTip": "بدون کلید کار می‌کند.",
     "tabQuotaSignals": "سیگنال های سهمیه ای",
     "tabApiKey": "کلید یکپارچه API",
@@ -495,11 +501,11 @@
     "platform": "پلت فرم",
     "hideAdded": "پنهان کردن ارائه‌دهندگان افزوده‌شده",
     "apiToken": "رمز API",
-    "noKeyNeededPlaceholder": "کلید API مورد نیاز نیست",
+    "keyOptionalPlaceholder": "اختیاری",
     "bearerTokenPlaceholder": "نشان حامل",
     "pasteKeyPlaceholder": "کلید را اینجا بچسبانید",
     "pasteSeveral": "چند تا را جای‌گذاری کنید",
-    "keylessHint": "کلید API مورد نیاز نیست: ردیف رایگان این ارائه دهنده ناشناس است (محدود به نرخ برای هر IP).",
+    "keyOptionalHint": "اختیاری: برای استفاده از سطح رایگان ناشناس (محدودیت نرخ برای هر IP) خالی بگذارید، یا کلید خود را برای استفاده از حسابتان وارد کنید.",
     "enable": "فعال کردن",
     "noProviderKeys": "هنوز کلید ارائه دهنده وجود ندارد. برای شروع مسیریابی یکی از بالا را اضافه کنید.",
     "filterPlaceholder": "ارائه دهندگان یا کلیدها را فیلتر کنید",
@@ -677,7 +683,14 @@
     "testFailed": "آزمایش مدل با شکست مواجه شد",
     "testThrottled": "لطفاً قبل از آزمایش مجدد این مدل {seconds} ثانیه صبر کنید.",
     "noModelsForProvider": "هیچ مدلی برای این ارائه‌دهنده تنظیم نشده است.",
-    "testModels": "آزمایش مدل‌ها"
+    "testModels": "آزمایش مدل‌ها",
+    "monthlyRequestCapLabel": "سقف ماهانه درخواست‌ها",
+    "monthlyTokenCapLabel": "سقف ماهانه توکن‌ها",
+    "capUnlimitedPlaceholder": "نامحدود",
+    "capEditHint": "سقف‌ها در اول هر ماه ساعت ۰۰:۰۰ UTC بازنشانی می‌شوند. برای نامحدود خالی بگذارید.",
+    "monthlyUsageLine": "{requests} درخواست، {tokens} توکن در این ماه",
+    "quotaBalanceHint": "{remaining} از {limit} {metric} باقی مانده",
+    "quotaBalanceLeft": "{remaining} باقی مانده"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "پیش از به‌روزرسانی"
   },
   "status": {
     "healthy": "سالم",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "دستیار شخصی همیشه‌فعالی که از روی دستگاه خودتان در WhatsApp، Telegram، Discord و موارد دیگر پاسخ می‌دهد.",
-      "hermes": "عامل خودبهبود Nous Research با حافظهٔ ماندگار و مهارت‌ها، در ترمینال یا در اپ‌های چت."
+      "hermes": "عامل خودبهبود Nous Research با حافظهٔ ماندگار و مهارت‌ها، در ترمینال یا در اپ‌های چت.",
+      "pi": "یک عامل مینیمال ترمینال که با افزونه‌ها، مهارت‌ها و قالب‌های پرامپت خودتان شکلش می‌دهید.",
+      "reasonix": "عامل کدنویسی ترمینال که برای DeepSeek ساخته شده و حول کش پیشوند طراحی شده تا جلسه‌های طولانی ارزان بمانند."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "نسخهٔ جدیدتری از FreeLLMAPI نصب شده است.",
+    "reload": "بارگذاری مجدد"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "تغییر نام این زنجیره",
+    "renameConfirm": "نام زنجیره \"{oldName}\" به \"{name}\" تغییر کند؟ کلاینت‌هایی که auto:{oldName} را صدا می‌زنند باید به auto:{name} بروند.",
+    "renamePlaceholder": "نام جدید زنجیره",
+    "renameFailed": "تغییر نام زنجیره انجام نشد."
+  },
+  "updates": {
+    "versionAvailable": "نسخهٔ {version} در دسترس است",
+    "versionReady": "نسخهٔ {version} آمادهٔ نصب است",
+    "releaseNotes": "یادداشت‌های انتشار",
+    "tryAgain": "دوباره تلاش کنید",
+    "offline": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید."
   }
 }

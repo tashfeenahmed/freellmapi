@@ -152,21 +152,24 @@
     "compressionRunPreview": "Előnézet futtatása",
     "updatesTitle": "Frissítések",
     "checkForUpdates": "Ellenőrizd a frissítéseket",
-    "lastChecked": "Utoljára ellenőrizve: {when}",
-    "currentVersion": "Jelenlegi build:",
     "updateAvailable": "Frissítés érhető el",
-    "changelog": "Mi változott",
     "upToDate": "Naprakész",
     "buildAhead": "Ez a build megelőzi a hivatalos main ágat.",
     "buildDiverged": "Ez a build eltért a hivatalos main ágtól.",
     "buildUnknown": "Ez az egyéni build nem hasonlítható össze a hivatalos main ággal.",
     "notGitInstall": "Ez a telepítés nem tartalmaz commitinformációkat.",
     "checkFailed": "Nem sikerült ellenőrizni a frissítéseket.",
-    "contactsGithub": "Az ellenőrzések manuálisak, és kapcsolatba lépnek a GitHubbal.",
     "autoUpdateCheck": "Automatikus frissítésellenőrzés",
-    "autoUpdateCheckHelp": "Naponta egyszer ellenőrzi a GitHubon az új kiadást, és emlékeztetőt jelenít meg. Alapértelmezés szerint kikapcsolva.",
-    "openReleases": "GitHub-kiadások megnyitása",
-    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t."
+    "restartAfterUpdate": "A build befejezése után indítsa újra a FreeLLMAPI-t.",
+    "downloadUpdate": "Frissítés letöltése",
+    "downloadingUpdate": "Letöltés… {percent}%",
+    "restartToUpdate": "Újraindítás a frissítéshez",
+    "updateReadyHint": "Letöltve. A FreeLLMAPI biztonsági mentést készít az adatairól, újraindul, és megnyitja az új verziót.",
+    "updateInstallFailed": "A frissítést nem sikerült telepíteni.",
+    "updateNow": "Frissítés most",
+    "updatingContainer": "Az új image letöltése és újraindítás. Az oldal újratöltődik, amikor a FreeLLMAPI visszatér.",
+    "updateNowFailed": "A frissítő nem fogadta el a kérést. Ellenőrizze, hogy fut-e a watchtower konténer.",
+    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit."
   },
   "models": {
     "title": "Modellek",
@@ -209,6 +212,7 @@
     "noKey": "Nincs kulcs",
     "dragToReorder": "Drag újrarendezéshez",
     "dragToReorderGroup": "Drag a modell újrarendezéséhez",
+    "moveToRank": "Ugrás rangszámra",
     "providerCount": "{count} szolgáltatók",
     "servedBy": "A {providers} által szolgálva",
     "viewProviders": "Szolgáltatók megtekintése",
@@ -223,6 +227,7 @@
     "settingsHint": "A helyi szerkesztések a katalógusmodelleken a katalógus szinkronizációin keresztül maradnak fenn. A törölt katalógusmodellek törölve maradnak, amíg újra hozzá nem adod őket a konfiguráción keresztül.",
     "catalogModel": "Katalógus",
     "customModel": "Egyedi",
+    "discoveredModel": "felfedezett",
     "localOverride": "Helyi felülbírálás",
     "displayName": "Bemutató név",
     "sizeLabel": "Képességi szint",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} szolgáltatóból {configured} beállítva",
     "checklistKeyless": "nem kell kulcs",
     "checklistNoKeyTip": "Még nincs hozzáadva kulcs. Kattintson a hozzáadáshoz.",
+    "checklistSignupLink": "Nyissa meg a {provider} oldalt fiók létrehozásához és kulcs szerzéséhez",
     "checklistKeylessTip": "Kulcs nélkül működik.",
     "tabQuotaSignals": "Kvótajelzések",
     "tabApiKey": "Egységes API kulcs",
@@ -495,11 +501,11 @@
     "platform": "Platform",
     "hideAdded": "Hozzáadott szolgáltatók elrejtése",
     "apiToken": "API token",
-    "noKeyNeededPlaceholder": "Nem kell API kulcs",
+    "keyOptionalPlaceholder": "Opcionális",
     "bearerTokenPlaceholder": "Viselő zsetont",
     "pasteKeyPlaceholder": "Itt illesztő kulcs",
     "pasteSeveral": "Több beillesztése",
-    "keylessHint": "Nem kell API kulcs: ennek a szolgáltatónak az ingyenes szintje anonim (IP-re korlátozott díj).",
+    "keyOptionalHint": "Opcionális: hagyja üresen az anonim ingyenes szinthez (IP-nként korlátozott), vagy illessze be saját kulcsát a fiókja használatához.",
     "enable": "Engedélyezd",
     "noProviderKeys": "Még nincs szolgáltató kulcs. Teszünk hozzá egyet fentebb, hogy elkezdd az útvonaltervezést.",
     "filterPlaceholder": "Szűrőszolgáltatók vagy kulcsok",
@@ -677,7 +683,14 @@
     "testFailed": "A modellteszt sikertelen",
     "testThrottled": "Kérjük, várjon {seconds} másodpercet a modell újratesztelése előtt.",
     "noModelsForProvider": "Nincsenek konfigurált modellek ennél a szolgáltatónál.",
-    "testModels": "Modellek tesztelése"
+    "testModels": "Modellek tesztelése",
+    "monthlyRequestCapLabel": "Havi kérési keret",
+    "monthlyTokenCapLabel": "Havi token keret",
+    "capUnlimitedPlaceholder": "Korlátlan",
+    "capEditHint": "A keretek havonta 1-jén 00:00 UTC-kor nullázódnak. Korlátlanhoz hagyja üresen.",
+    "monthlyUsageLine": "{requests} kérés, {tokens} token ebben a hónapban",
+    "quotaBalanceHint": "{limit} {metric} közül {remaining} maradt",
+    "quotaBalanceLeft": "{remaining} maradt"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Frissítés előtt"
   },
   "status": {
     "healthy": "egészséges",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Egy mindig elérhető személyes asszisztens, amely a saját gépedről válaszol a WhatsApp, a Telegram, a Discord és más alkalmazások üzeneteire.",
-      "hermes": "A Nous Research önfejlesztő ügynöke tartós memóriával és készségekkel, terminálban vagy csevegőalkalmazásokban."
+      "hermes": "A Nous Research önfejlesztő ügynöke tartós memóriával és készségekkel, terminálban vagy csevegőalkalmazásokban.",
+      "pi": "Minimalista terminálügynök, amelyet saját bővítményekkel, készségekkel és promptsablonokkal alakíthat.",
+      "reasonix": "DeepSeekre szabott terminálos kódolóügynök, amely a prefix-gyorsítótárra épül, így a hosszú munkamenetek is olcsók maradnak."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "A FreeLLMAPI újabb verziója van telepítve.",
+    "reload": "Újratöltés"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Lánc átnevezése",
+    "renameConfirm": "Lánc \"{oldName}\" átnevezése \"{name}\"-re? A(z) auto:{oldName}-t hívó ügyfeleknek át kell térniük auto:{name}-re.",
+    "renamePlaceholder": "Új láncnév",
+    "renameFailed": "Nem sikerült átnevezni a láncot."
+  },
+  "updates": {
+    "versionAvailable": "Elérhető a(z) {version} verzió",
+    "versionReady": "A(z) {version} verzió telepítésre kész",
+    "releaseNotes": "Kiadási jegyzetek",
+    "tryAgain": "Próbálja újra",
+    "offline": "Ellenőrizze az internetkapcsolatot, és próbálja újra."
   }
 }

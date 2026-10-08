@@ -152,21 +152,24 @@
     "compressionRunPreview": "ପୂର୍ବାବଲୋକନ ଚଲାନ୍ତୁ",
     "updatesTitle": "ଅପଡେଟ୍‌ଗୁଡ଼ିକ",
     "checkForUpdates": "ଅପଡେଟସ୍ ପାଇଁ ଯାଞ୍ଚ କରନ୍ତୁ",
-    "lastChecked": "ଶେଷ ଥର ଯାଞ୍ଚ ହୋଇଛି: {when}",
-    "currentVersion": "ବର୍ତ୍ତମାନର ବିଲ୍ଡ:",
     "updateAvailable": "ଅପଡେଟ୍ ଉପଲବ୍ଧ",
-    "changelog": "କ’ଣ ପରିବର୍ତ୍ତନ ହୋଇଛି",
     "upToDate": "ଅଦ୍ୟତନ ଅଛି",
     "buildAhead": "ଏହି ବିଲ୍ଡଟି ଅଧିକାରିକ main ଶାଖାଠାରୁ ଆଗରେ ଅଛି।",
     "buildDiverged": "ଏହି ବିଲ୍ଡଟି ଅଧିକାରିକ main ଶାଖାଠାରୁ ଅଲଗା ହୋଇଯାଇଛି।",
     "buildUnknown": "ଏହି କଷ୍ଟମ୍ ବିଲ୍ଡକୁ ଅଧିକାରିକ main ଶାଖା ସହିତ ତୁଳନା କରାଯାଇପାରିବ ନାହିଁ।",
     "notGitInstall": "ଏହି ଇନ୍‌ଷ୍ଟଲେସନ୍‌ରେ commit ସୂଚନା ନାହିଁ।",
     "checkFailed": "ଅପଡେଟ୍ ଯାଞ୍ଚ କରାଯାଇପାରିଲା ନାହିଁ।",
-    "contactsGithub": "ଯାଞ୍ଚଗୁଡ଼ିକ ମାନୁଆଲ୍ ଭାବେ କରାଯାଏ ଏବଂ GitHub ସହିତ ସଂଯୋଗ କରେ।",
     "autoUpdateCheck": "ସ୍ୱୟଂଚାଳିତ ଅପଡେଟ୍ ଯାଞ୍ଚ",
-    "autoUpdateCheckHelp": "ଦିନକୁ ଥରେ ନୂଆ ରିଲିଜ୍ ପାଇଁ GitHub ଯାଞ୍ଚ କରେ ଏବଂ ଏକ ସ୍ମାରକ ଦେଖାଏ। ଡିଫଲ୍ଟ ଭାବେ ବନ୍ଦ।",
-    "openReleases": "GitHub Releases ଖୋଲନ୍ତୁ",
-    "restartAfterUpdate": "ବିଲ୍ଡ ସମ୍ପୂର୍ଣ୍ଣ ହେବା ପରେ FreeLLMAPI ପୁନଃ ଚାଲୁ କରନ୍ତୁ।"
+    "restartAfterUpdate": "ବିଲ୍ଡ ସମ୍ପୂର୍ଣ୍ଣ ହେବା ପରେ FreeLLMAPI ପୁନଃ ଚାଲୁ କରନ୍ତୁ।",
+    "downloadUpdate": "ଅପଡେଟ୍ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+    "downloadingUpdate": "ଡାଉନଲୋଡ୍ ହେଉଛି… {percent}%",
+    "restartToUpdate": "ଅପଡେଟ୍ ପାଇଁ ପୁନଃ ଆରମ୍ଭ କରନ୍ତୁ",
+    "updateReadyHint": "ଡାଉନଲୋଡ୍ ହୋଇଗଲା। FreeLLMAPI ଆପଣଙ୍କ ଡାଟାର ବ୍ୟାକଅପ୍ ନେଇ, ପୁନଃ ଆରମ୍ଭ ହୋଇ ନୂଆ ସଂସ୍କରଣ ଖୋଲେ।",
+    "updateInstallFailed": "ଅପଡେଟ୍ ଇନଷ୍ଟଲ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "updateNow": "ବର୍ତ୍ତମାନ ଅପଡେଟ୍ କରନ୍ତୁ",
+    "updatingContainer": "ନୂଆ ଇମେଜ୍ ଟାଣାଯାଉଛି ଏବଂ ପୁନଃ ଆରମ୍ଭ ହେଉଛି। FreeLLMAPI ଫେରିଲେ ଏହି ପୃଷ୍ଠା ପୁନଃ ଲୋଡ୍ ହେବ।",
+    "updateNowFailed": "ଅପଡେଟର ଅନୁରୋଧ ଗ୍ରହଣ କଲା ନାହିଁ। watchtower କଣ୍ଟେନର ଚାଲୁଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ।",
+    "updateNowTimeout": "୫ ମିନିଟ ପରେ ମଧ୍ୟ FreeLLMAPI ପୁନଃ ଆରମ୍ଭ ହୋଇନାହିଁ। watchtower କଣ୍ଟେନରର ଲଗ୍ ଦେଖନ୍ତୁ।"
   },
   "models": {
     "title": "ମଡେଲଗୁଡିକ",
@@ -209,6 +212,7 @@
     "noKey": "କୌଣସି ଚାବି ନାହିଁ",
     "dragToReorder": "ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ",
     "dragToReorderGroup": "ମଡେଲ୍ ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ",
+    "moveToRank": "ର୍ୟାଙ୍କକୁ ଯାଆନ୍ତୁ",
     "providerCount": "{count} ପ୍ରଦାନକାରୀ",
     "servedBy": "{providers} ଦ୍ୱାରା ପରିବେଷଣ କରାଯାଇଥିଲା",
     "viewProviders": "ପ୍ରଦାନକାରୀ ଦର୍ଶନ କରନ୍ତୁ",
@@ -223,6 +227,7 @@
     "settingsHint": "କାଟାଲଗ୍ ମଡେଲଗୁଡିକ ପାଇଁ ସ୍ଥାନୀୟ ସମ୍ପାଦନାଗୁଡିକ କାଟାଲଗ୍ ସିଙ୍କ୍ରୋନାଇଜ୍ ରେ ରଖାଯାଇଛି । ବିଲୋପିତ କ୍ୟାଟଲଗ୍ ମଡେଲଗୁଡିକ ବିଲୋପିତ ରହିବ ଯେପର୍ଯ୍ୟନ୍ତ ଆପଣ ସେଗୁଡିକୁ ପୁନଃ କନଫିଗର୍ ମାଧ୍ୟମରେ ଯୋଡିବେ।",
     "catalogModel": "କାଟାଲଗ୍",
     "customModel": "କଷ୍ଟମ୍",
+    "discoveredModel": "ଆବିଷ୍କୃତ",
     "localOverride": "ସ୍ଥାନୀୟ ଓଭରରାଇଡ୍",
     "displayName": "ପ୍ରଦର୍ଶନ ନାମ",
     "sizeLabel": "ସାମର୍ଥ୍ୟ ସ୍ତର",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} ମଧ୍ୟରୁ {configured} ପ୍ରଦାନକାରୀ ବିନ୍ୟାସ ହୋଇଛି",
     "checklistKeyless": "କି ଆବଶ୍ୟକ ନାହିଁ",
     "checklistNoKeyTip": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି କି ଯୋଡାଯାଇ ନାହିଁ। ଯୋଡିବା ପାଇଁ କ୍ଲିକ୍ କରନ୍ତୁ।",
+    "checklistSignupLink": "ଆକାଉଣ୍ଟ ତିଆରି କରି କି ପାଇବା ପାଇଁ {provider} ଖୋଲନ୍ତୁ",
     "checklistKeylessTip": "କି ବିନା କାମ କରେ।",
     "tabQuotaSignals": "କୋଟା ସଙ୍କେତ",
     "tabApiKey": "ଏକୀକୃତ API କୀ",
@@ -495,11 +501,11 @@
     "platform": "ପ୍ଲାଟଫର୍ମ",
     "hideAdded": "ଯୋଡ଼ାଯାଇଥିବା ପ୍ରଦାନକାରୀଙ୍କୁ ଲୁଚାନ୍ତୁ",
     "apiToken": "API ଟୋକେନ୍",
-    "noKeyNeededPlaceholder": "କୌଣସି API କୀ ଆବଶ୍ୟକ ନାହିଁ",
+    "keyOptionalPlaceholder": "ବୈକଳ୍ପିକ",
     "bearerTokenPlaceholder": "ବିୟରର୍ ଟୋକେନ୍",
     "pasteKeyPlaceholder": "ଏଠାରେ କୀ ଲେପନ କରନ୍ତୁ",
     "pasteSeveral": "ଏକାଧିକ ପେଷ୍ଟ କରନ୍ତୁ",
-    "keylessHint": "କୌଣସି API ଚାବି ଆବଶ୍ୟକ ନାହିଁ: ଏହି ପ୍ରଦାନକାରୀଙ୍କ ମାଗଣା ସ୍ତର ବେନାମୀ (ଆଇପି ପ୍ରତି ହାର-ସୀମିତ) ।",
+    "keyOptionalHint": "ବୈକଳ୍ପିକ: ଅଜ୍ଞାତ ମାଗଣା ସ୍ତର ପାଇଁ ଖାଲି ଛାଡନ୍ତୁ (ପ୍ରତି IP ହାର-ସୀମିତ), କିମ୍ବା ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ବ୍ୟବହାର କରିବାକୁ ନିଜ କି ପେଷ୍ଟ କରନ୍ତୁ।",
     "enable": "ସକ୍ଷମ କରନ୍ତୁ",
     "noProviderKeys": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରଦାନକାରୀ କୀ ନାହିଁ। ରାଉଟିଂ ଆରମ୍ଭ କରିବାକୁ ଉପରୋକ୍ତ ଏକ ଯୋଡନ୍ତୁ।",
     "filterPlaceholder": "ଫିଲ୍ଟର୍ ପ୍ରଦାନକାରୀ କିମ୍ୱା କୀଗୁଡିକ",
@@ -677,7 +683,14 @@
     "testFailed": "ମଡେଲ୍ ପରୀକ୍ଷା ବିଫଳ ହେଲା",
     "testThrottled": "ଦୟାକରି ଏହି ମଡେଲ୍ ପୁନର୍ବାର ପରୀକ୍ଷା କରିବା ପୂର୍ବରୁ {seconds}s ଅପେକ୍ଷା କରନ୍ତୁ।",
     "noModelsForProvider": "ଏହି ପ୍ରଦାନକାରୀ ପାଇଁ କୌଣସି ମଡେଲ୍ କନଫିଗର୍ ହୋଇନାହିଁ।",
-    "testModels": "ମଡେଲ ପରୀକ୍ଷା କରନ୍ତୁ"
+    "testModels": "ମଡେଲ ପରୀକ୍ଷା କରନ୍ତୁ",
+    "monthlyRequestCapLabel": "ମାସିକ ଅନୁରୋଧ ସୀମା",
+    "monthlyTokenCapLabel": "ମାସିକ ଟୋକେନ୍ ସୀମା",
+    "capUnlimitedPlaceholder": "ଅସୀମିତ",
+    "capEditHint": "ସୀମା ପ୍ରତି ମାସର ୧ ତାରିଖରେ ୦୦:୦୦ UTC ରେ ରିସେଟ୍ ହୁଏ। ଅସୀମିତ ପାଇଁ ଖାଲି ରଖନ୍ତୁ।",
+    "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍",
+    "quotaBalanceHint": "{limit} {metric} ମଧ୍ୟରୁ {remaining} ବାକି",
+    "quotaBalanceLeft": "{remaining} ବାକି"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "ଅପଡେଟ୍ ପୂର୍ବରୁ"
   },
   "status": {
     "healthy": "ସୁସ୍ଥ",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "ଆପଣଙ୍କ ନିଜ ମେସିନରୁ WhatsApp, Telegram, Discord ଓ ଆହୁରି ଅନେକ ସ୍ଥାନରେ ଉତ୍ତର ଦେଉଥିବା, ସବୁବେଳେ ଚାଲୁ ରହୁଥିବା ବ୍ୟକ୍ତିଗତ ସହାୟକ।",
-      "hermes": "Nous Research ର ନିଜକୁ ଉନ୍ନତ କରୁଥିବା ଏଜେଣ୍ଟ, ସ୍ଥାୟୀ ମେମୋରୀ ଓ ଦକ୍ଷତା ସହିତ, ଟର୍ମିନାଲରେ କିମ୍ବା ଚାଟ୍ ଆପ୍‌ରେ।"
+      "hermes": "Nous Research ର ନିଜକୁ ଉନ୍ନତ କରୁଥିବା ଏଜେଣ୍ଟ, ସ୍ଥାୟୀ ମେମୋରୀ ଓ ଦକ୍ଷତା ସହିତ, ଟର୍ମିନାଲରେ କିମ୍ବା ଚାଟ୍ ଆପ୍‌ରେ।",
+      "pi": "ଏକ ସର୍ବନିମ୍ନ ଟର୍ମିନାଲ ଏଜେଣ୍ଟ, ଯାହାକୁ ଆପଣ ନିଜର ଏକ୍ସଟେନସନ, ଦକ୍ଷତା ଓ ପ୍ରମ୍ପ୍ଟ ଟେମ୍ପଲେଟରେ ଗଢ଼ନ୍ତି।",
+      "reasonix": "DeepSeek ପାଇଁ ତିଆରି ଟର୍ମିନାଲ କୋଡିଂ ଏଜେଣ୍ଟ, ଲମ୍ବା ସେସନ ଶସ୍ତା ରହିବା ପାଇଁ ପ୍ରିଫିକ୍ସ କ୍ୟାଶିଂ ଉପରେ ଗଢ଼ାଯାଇଛି।"
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ର ନୂଆ ସଂସ୍କରଣ ଇନଷ୍ଟଲ୍ ହୋଇଛି।",
+    "reload": "ପୁନଃ ଲୋଡ୍"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "ଏହି ଚେନ୍‌ର ନାମ ବଦଳାନ୍ତୁ",
+    "renameConfirm": "ଚେନ୍ \"{oldName}\" ର ନାମ \"{name}\" କରନ୍ତୁ? auto:{oldName} କଲ୍ କରୁଥିବା କ୍ଲାଏଣ୍ଟମାନେ auto:{name} କୁ ଯିବା ଉଚିତ୍‌।",
+    "renamePlaceholder": "ନୂଆ ଚେନ୍ ନାମ",
+    "renameFailed": "ଚେନ୍‌ର ନାମ ବଦଳାଯାଇପାରିଲା ନାହିଁ।"
+  },
+  "updates": {
+    "versionAvailable": "ସଂସ୍କରଣ {version} ଉପଲବ୍ଧ",
+    "versionReady": "ସଂସ୍କରଣ {version} ଇନଷ୍ଟଲ୍ ପାଇଁ ପ୍ରସ୍ତୁତ",
+    "releaseNotes": "ରିଲିଜ୍ ନୋଟ୍",
+    "tryAgain": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+    "offline": "ଆପଣଙ୍କ ଇଣ୍ଟରନେଟ୍ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   }
 }

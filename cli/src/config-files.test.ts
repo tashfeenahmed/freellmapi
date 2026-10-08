@@ -20,6 +20,14 @@ describe('safe config writes', () => {
     expect(renderFile({ path: '/unused', format: 'env', content: 'FREELLMAPI_API_KEY=k\n' }, rendered)).toBe(rendered);
   });
 
+  it('appends a new env key without leaving a blank line before it', () => {
+    const merged = renderFile(
+      { path: '/unused/.env', format: 'env', content: 'FREELLMAPI_API_KEY=k\n' },
+      'DEEPSEEK_API_KEY=sk-keep\n',
+    );
+    expect(merged).toBe('DEEPSEEK_API_KEY=sk-keep\nFREELLMAPI_API_KEY=k\n');
+  });
+
   it('renders a fresh Continue config idempotently', () => {
     const generated = [
       '# freellmapi:start',
@@ -438,6 +446,58 @@ describe('safe config writes', () => {
     expect(merged.match(/^\[providers\.freellmapi\]$/gm)).toHaveLength(1);
     expect(merged).not.toContain('stale-model');
     expect(merged).toContain('context_window = 131072');
+    expect(renderFile({ path: '/unused', format: 'toml', content: generated }, merged)).toBe(merged);
+  });
+
+  it('merges a Reasonix config: replaces only the [[providers]] entry with the same name', () => {
+    // Reasonix keeps every endpoint as a `[[providers]]` array entry. A rerun
+    // must swap the stale freellmapi entry (and its sub-table) for the new one
+    // and leave the deepseek entry, the [desktop] table and root keys alone.
+    const existing = [
+      'config_version = 1',
+      'default_model = "deepseek/deepseek-flash"',
+      '',
+      '[desktop]',
+      'provider_access = ["deepseek"]',
+      '',
+      '[[providers]]',
+      'name        = "deepseek"',
+      'kind        = "openai"',
+      'api_key_env = "DEEPSEEK_API_KEY"',
+      '',
+      '[[providers]]',
+      "name = 'freellmapi'",
+      'base_url = "http://stale:9/v1"',
+      '',
+      '[providers.model_overrides]',
+      'stale = { context_window = 1 }',
+      '',
+      '[[plugins]]',
+      'name = "freellmapi"',
+      'command = "keep-me"',
+      '',
+    ].join('\n');
+    const generated = [
+      'default_model = "freellmapi/auto"',
+      '',
+      '[[providers]]',
+      'name = "freellmapi"',
+      'kind = "openai"',
+      'base_url = "http://localhost:3001/v1"',
+      'models = ["auto"]',
+    ].join('\n');
+    const merged = renderFile({ path: '/unused', format: 'toml', content: generated }, existing);
+    const lines = merged.split('\n');
+    const firstTable = lines.findIndex(line => line.startsWith('['));
+    expect(lines.slice(0, firstTable)).toContain('default_model = "freellmapi/auto"');
+    expect(lines.slice(0, firstTable)).toContain('config_version = 1');
+    expect(merged.match(/^default_model =/gm)).toHaveLength(1);
+    expect(merged).toContain('[desktop]\nprovider_access = ["deepseek"]');
+    expect(merged).toContain('name        = "deepseek"\nkind        = "openai"');
+    expect(merged).toContain('[[plugins]]\nname = "freellmapi"\ncommand = "keep-me"');
+    expect(merged.match(/^\[\[providers\]\]$/gm)).toHaveLength(2);
+    expect(merged).not.toContain('stale');
+    expect(merged).toContain('base_url = "http://localhost:3001/v1"');
     expect(renderFile({ path: '/unused', format: 'toml', content: generated }, merged)).toBe(merged);
   });
 

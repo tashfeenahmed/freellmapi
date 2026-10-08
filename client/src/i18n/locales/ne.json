@@ -152,21 +152,24 @@
     "compressionRunPreview": "पूर्वावलोकन चलाउनुहोस्",
     "updatesTitle": "अद्यावधिकहरू",
     "checkForUpdates": "अद्यावधिकका लागि जाँच गर्नुहोस्",
-    "lastChecked": "अन्त्यमा जाँच गरिएको: {when}",
-    "currentVersion": "हालको बिल्ड:",
     "updateAvailable": "अद्यावधिक उपलब्ध छ",
-    "changelog": "के परिवर्तन भयो",
     "upToDate": "अद्यावधिक छ",
     "buildAhead": "यो बिल्ड आधिकारिक main शाखाभन्दा अगाडि छ।",
     "buildDiverged": "यो बिल्ड आधिकारिक main शाखाबाट अलग भएको छ।",
     "buildUnknown": "यो अनुकूलित बिल्डलाई आधिकारिक main शाखासँग तुलना गर्न सकिँदैन।",
     "notGitInstall": "यो स्थापनामा commit जानकारी समावेश छैन।",
     "checkFailed": "अद्यावधिकहरू जाँच गर्न सकिएन।",
-    "contactsGithub": "जाँचहरू म्यानुअल रूपमा गरिन्छन् र GitHub सँग सम्पर्क गर्छन्।",
     "autoUpdateCheck": "स्वचालित अद्यावधिक जाँच",
-    "autoUpdateCheckHelp": "दिनमा एक पटक नयाँ रिलिजका लागि GitHub जाँच गर्छ र सम्झना देखाउँछ। पूर्वनिर्धारित रूपमा बन्द।",
-    "openReleases": "GitHub रिलीजहरू खोल्नुहोस्",
-    "restartAfterUpdate": "बिल्ड पूरा भएपछि FreeLLMAPI पुनः सुरु गर्नुहोस्।"
+    "restartAfterUpdate": "बिल्ड पूरा भएपछि FreeLLMAPI पुनः सुरु गर्नुहोस्।",
+    "downloadUpdate": "अपडेट डाउनलोड गर्नुहोस्",
+    "downloadingUpdate": "डाउनलोड हुँदैछ… {percent}%",
+    "restartToUpdate": "अपडेट गर्न पुनः सुरु गर्नुहोस्",
+    "updateReadyHint": "डाउनलोड भयो। FreeLLMAPI ले तपाईंको डेटाको ब्याकअप लिन्छ, पुनः सुरु हुन्छ र नयाँ संस्करण खोल्छ।",
+    "updateInstallFailed": "अपडेट इन्स्टल हुन सकेन।",
+    "updateNow": "अहिले अपडेट गर्नुहोस्",
+    "updatingContainer": "नयाँ इमेज तानिँदै र पुनः सुरु हुँदैछ। FreeLLMAPI फर्केपछि यो पेज पुनः लोड हुन्छ।",
+    "updateNowFailed": "अपडेटरले अनुरोध स्वीकार गरेन। watchtower कन्टेनर चलिरहेको छ कि छैन जाँच गर्नुहोस्।",
+    "updateNowTimeout": "५ मिनेटपछि पनि FreeLLMAPI पुनः सुरु भएको छैन। watchtower कन्टेनरका लगहरू हेर्नुहोस्।"
   },
   "models": {
     "title": "नमूनाहरू",
@@ -209,6 +212,7 @@
     "noKey": "कुञ्जी छैन",
     "dragToReorder": "पुन: क्रमबद्ध गर्न तान्नुहोस्",
     "dragToReorderGroup": "नमूना पुन: क्रमबद्ध गर्न तान्नुहोस्",
+    "moveToRank": "र्याङ्कमा जानुहोस्",
     "providerCount": "प्रदायकहरू {count} गर्नुहोस्",
     "servedBy": "{providers} द्वारा सेवा गरिएको",
     "viewProviders": "प्रदायक हेर्नुहोस्",
@@ -223,6 +227,7 @@
     "settingsHint": "क्याटलग मोडेलहरूमा स्थानीय सम्पादनहरू क्याटलग समक्रमणहरूमा राखिन्छ। मेटाइएको क्याटलग मोडेलहरू मेटिन्छन् जबसम्म तपाईं तिनीहरूलाई कन्फिगरेसन मार्फत फेरि थप्नुहुन्न।",
     "catalogModel": "विवरणिका",
     "customModel": "अनुकूल",
+    "discoveredModel": "पत्ता लागेको",
     "localOverride": "स्थानीय अधिरोहण",
     "displayName": "नाम प्रदर्शन गर्नुहोस्",
     "sizeLabel": "क्षमता तह",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} मध्ये {configured} प्रदायकहरू कन्फिगर गरिएको",
     "checklistKeyless": "कुञ्जी आवश्यक छैन",
     "checklistNoKeyTip": "अहिलेसम्म कुनै कुञ्जी थपिएको छैन। थप्न क्लिक गर्नुहोस्।",
+    "checklistSignupLink": "खाता बनाउन र कुञ्जी प्राप्त गर्न {provider} खोल्नुहोस्",
     "checklistKeylessTip": "कुञ्जी बिना काम गर्छ।",
     "tabQuotaSignals": "कोटा सङ्केतहरू",
     "tabApiKey": "एकीकृत API कुञ्जी",
@@ -495,11 +501,11 @@
     "platform": "प्लेटफर्म",
     "hideAdded": "थपिएका प्रदायकहरू लुकाउनुहोस्",
     "apiToken": "API टोकन",
-    "noKeyNeededPlaceholder": "कुनै API कुञ्जी आवश्यक पर्दैन",
+    "keyOptionalPlaceholder": "वैकल्पिक",
     "bearerTokenPlaceholder": "वाहक टोकन",
     "pasteKeyPlaceholder": "यहाँ कुञ्जी टाँस्नुहोस्",
     "pasteSeveral": "धेरै टाँस्नुहोस्",
-    "keylessHint": "कुनै API कुञ्जी आवश्यक छैन: यस प्रदायकको नि: शुल्क स्तर अज्ञात छ (प्रति आईपी दर-सीमित)।",
+    "keyOptionalHint": "वैकल्पिक: अज्ञात निःशुल्क तहका लागि खाली छोड्नुहोस् (प्रति IP दर-सीमित), वा आफ्नो खाता प्रयोग गर्न आफ्नै कुञ्जी टाँस्नुहोस्।",
     "enable": "सक्षम पार्नुहोस्",
     "noProviderKeys": "अहिले सम्म प्रदायक कुञ्जी छैन । मार्ग सुरु गर्न माथि एउटा थप्नुहोस्।",
     "filterPlaceholder": "प्रदायक वा कुञ्जीहरू फिल्टर गर्नुहोस्",
@@ -677,7 +683,14 @@
     "testFailed": "मोडेल परीक्षण असफल भयो",
     "testThrottled": "कृपया यो मोडेल पुन: परीक्षण गर्नु अघि {seconds} सेकेन्ड पर्खनुहोस्।",
     "noModelsForProvider": "यस प्रदायकको लागि कुनै मोडेल कन्फिगर गरिएको छैन।",
-    "testModels": "मोडेलहरू परीक्षण गर्नुहोस्"
+    "testModels": "मोडेलहरू परीक्षण गर्नुहोस्",
+    "monthlyRequestCapLabel": "मासिक अनुरोध सीमा",
+    "monthlyTokenCapLabel": "मासिक टोकन सीमा",
+    "capUnlimitedPlaceholder": "असीमित",
+    "capEditHint": "सीमा हरेक महिनाको १ गते ००:०० UTC मा रिसेट हुन्छ। असीमितका लागि खाली राख्नुहोस्।",
+    "monthlyUsageLine": "यस महिना {requests} अनुरोध, {tokens} टोकन",
+    "quotaBalanceHint": "{limit} {metric} मध्ये {remaining} बाँकी",
+    "quotaBalanceLeft": "{remaining} बाँकी"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "अपडेटअघि"
   },
   "status": {
     "healthy": "स्वस्थ छ",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "तपाईंको आफ्नै मेसिनबाट WhatsApp, Telegram, Discord र अन्यमा जवाफ दिने, सधैं चालु रहने व्यक्तिगत सहायक।",
-      "hermes": "Nous Research को आफैं सुधारिने एजेन्ट, स्थायी मेमोरी र सीपहरूसहित, टर्मिनलमा वा च्याट एपहरूमा।"
+      "hermes": "Nous Research को आफैं सुधारिने एजेन्ट, स्थायी मेमोरी र सीपहरूसहित, टर्मिनलमा वा च्याट एपहरूमा।",
+      "pi": "एक न्यूनतम टर्मिनल एजेन्ट, जसलाई तपाईं आफ्नै एक्सटेन्सन, सीप र प्रम्प्ट टेम्प्लेटले आकार दिनुहुन्छ।",
+      "reasonix": "DeepSeek का लागि बनाइएको टर्मिनल कोडिङ एजेन्ट, लामा सत्रहरू सस्तो रहून् भनेर प्रिफिक्स क्यासिङको वरिपरि निर्माण गरिएको।"
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI को नयाँ संस्करण इन्स्टल भएको छ।",
+    "reload": "पुनः लोड"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "यो चेनको नाम बदल्नुहोस्",
+    "renameConfirm": "चेन \"{oldName}\" को नाम \"{name}\" मा बदल्ने? auto:{oldName} बोलाउने क्लाइन्टहरूले auto:{name} मा जानुपर्छ।",
+    "renamePlaceholder": "नयाँ चेन नाम",
+    "renameFailed": "चेनको नाम बदल्न सकिएन।"
+  },
+  "updates": {
+    "versionAvailable": "संस्करण {version} उपलब्ध छ",
+    "versionReady": "संस्करण {version} इन्स्टल गर्न तयार छ",
+    "releaseNotes": "रिलिज नोटहरू",
+    "tryAgain": "फेरि प्रयास गर्नुहोस्",
+    "offline": "आफ्नो इन्टरनेट जडान जाँच गरी फेरि प्रयास गर्नुहोस्।"
   }
 }

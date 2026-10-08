@@ -17,7 +17,11 @@ function sha256(s: string): string {
   return crypto.createHash('sha256').update(s).digest('hex');
 }
 
-function normalizeEmail(email: string): string {
+/** The one spelling of an address the DB is keyed on. Exported so callers that
+ *  bucket by email (the login throttle in routes/auth.ts) key on exactly what
+ *  verifyCredentials will look up — keying on anything else lets a padded
+ *  address authenticate against the real row while landing in its own bucket. */
+export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 

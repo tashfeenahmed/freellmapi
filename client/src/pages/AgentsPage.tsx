@@ -45,6 +45,8 @@ const analyticsIds: Record<string, string> = {
   atomcode: 'atomcode',
   openclaw: 'openclaw',
   hermes: 'hermes-agent',
+  pi: 'pi',
+  reasonix: 'reasonix',
   cursor: 'cursor',
 }
 

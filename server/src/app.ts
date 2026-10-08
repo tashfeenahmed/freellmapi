@@ -215,17 +215,24 @@ export function createApp(config?: Config) {
   );
   app.use(ollamaRouter);
 
-  // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
-  // session; everything else under /api/* requires a logged-in dashboard user.
-  // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
-  app.use('/api/auth', authRouter);
-
   // Admin API — all routes share an IP-based rate limiter to throttle
   // brute-force attempts (auth, key export, etc). The limiter is mounted
   // broadly on /api; requireAuth gates each sub-path individually so that
   // unauthenticated endpoints under /api (like /api/ping) are not blocked.
+  //
+  // This MUST stay above the /api/auth mount below. Express runs middleware in
+  // registration order, so while the limiter was registered after authRouter,
+  // authRouter answered and ended /api/auth/login before the limiter was ever
+  // entered — leaving the password endpoint this comment names as the reason
+  // for the limiter as the one /api path it did not cover. It still sits below
+  // the Ollama /api/* mount above, which carries its own proxy limiter.
   const adminRateLimiter = createAdminRateLimiter();
   app.use('/api', adminRateLimiter);
+
+  // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
+  // session; everything else under /api/* requires a logged-in dashboard user.
+  // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
+  app.use('/api/auth', authRouter);
 
   // Key export re-verifies the dashboard password, which makes it the one admin
   // endpoint a guesser can attack. The broad limiter above is sized for normal

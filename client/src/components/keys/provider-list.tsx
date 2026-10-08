@@ -22,6 +22,7 @@ import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import { keyMatchesQuery } from '@/lib/key-search'
 import {
   PLATFORMS,
   CUSTOM_GROUP,
@@ -31,6 +32,7 @@ import {
   statusDot,
   statusLabelKey,
 } from './shared'
+import { balanceByKey } from './quota-balance'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -46,11 +48,20 @@ type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 // #787: what the batch bar can do to the selected keys of one group.
 type BulkAction = 'enable' | 'disable' | 'delete'
 
+// #1403 phase 3: the balance badge names its unit with the Free tier page's
+// already-translated metric words.
+const METRIC_LABEL_KEY = {
+  requests: 'freeTier.metricRequests',
+  tokens: 'freeTier.metricTokens',
+  credits: 'freeTier.metricCredits',
+  neurons: 'freeTier.metricNeurons',
+} as const
+
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
 // KeysPage stays a thin shell. `onAddKey` opens the shared Add key dialog.
 export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const queryClient = useQueryClient()
 
   const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
@@ -61,7 +72,9 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   // Custom endpoint whose model list is being fetched (#488) — relays change
   // what they serve constantly, so this is a repeat action, not a one-off.
-  const [discoverKeyId, setDiscoverKeyId] = useState<number | null>(null)
+  // `builtin`: a built-in provider key the catalog has no models for (#1348),
+  // whose picks register as discovered rows instead of custom-endpoint models.
+  const [discoverTarget, setDiscoverTarget] = useState<{ keyId: number; builtin: boolean } | null>(null)
   // Custom endpoint taking another credential (#702). Keyed by base URL, since
   // a key joins the pool of an endpoint rather than of the row it was opened
   // from, and every key of that endpoint offers the same action.
@@ -254,6 +267,12 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   for (const k of healthData?.keys ?? []) healthKeyMap.set(k.id, k)
   const statusOf = (k: ApiKey) => healthKeyMap.get(k.id)?.status ?? k.status
 
+  // #1403 phase 3: the provider-reported balance for a key, from the same
+  // health poll the row's status already rides on. One badge per key: the
+  // lowest remaining fraction among that key's pools, since that pool is the
+  // one that runs dry first and starts routing around the key.
+  const balanceOf = balanceByKey(healthData?.quotaStates ?? [])
+
   const grouped = [...PLATFORMS, CUSTOM_GROUP].map(p => ({
     ...p,
     keys: keys.filter(k => k.platform === p.value),
@@ -276,15 +295,15 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   }
 
   // Search narrows either whole groups (label match) or the keys within them
-  // (label / masked-key match); the status filter then trims the result set.
+  // (label / masked-key / endpoint-URL match); the status filter then trims
+  // the result set. The baseUrl term is #1056's lesson applied here: a custom
+  // row renders "api.unorouter.com" on screen, so searching that host must
+  // find the row the same way the fallback table's search does.
   const visibleGroups = grouped
     .map(group => {
       if (!q) return group
       if (group.label.toLowerCase().includes(q)) return group
-      const matchingKeys = group.keys.filter(k =>
-        (k.label ?? '').toLowerCase().includes(q) ||
-        (k.maskedKey ?? '').toLowerCase().includes(q),
-      )
+      const matchingKeys = group.keys.filter(k => keyMatchesQuery(k, q))
       return { ...group, keys: matchingKeys }
     })
     .filter(group => group.keys.length > 0 && matchStatus(group))
@@ -493,6 +512,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                       const health = healthKeyMap.get(k.id)
                       const lastChecked = health?.lastCheckedAt ?? k.lastCheckedAt
                       const lastHealthError = health?.lastHealthError ?? k.lastHealthError
+                      const balance = balanceOf.get(k.id)
                       const customModels = k.models ?? []
                       const hasCustomModels = customModels.length > 0
                       const isExpanded = expandedKeyIds.has(k.id)
@@ -575,6 +595,29 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                 {t(k.modelScope!.length === 1 ? 'keys.modelScopeBadgeOne' : 'keys.modelScopeBadgeOther', { count: k.modelScope!.length })}
                               </Badge>
                             )}
+                            {/* #1403 phase 3: the provider-reported balance (#1403).
+                                Amber at ≤20% left — the same low-balance signal the
+                                Quota outlook panel gives, but visible where the operator
+                                actually scans keys instead of on a second tab. */}
+                            {balance && (
+                              <Tooltip
+                                text={balance.limit != null
+                                  ? t('keys.quotaBalanceHint', { remaining: new Intl.NumberFormat(locale).format(balance.remaining), limit: new Intl.NumberFormat(locale).format(balance.limit), metric: t(METRIC_LABEL_KEY[balance.metric]) })
+                                  : t('keys.quotaBalanceLeft', { remaining: new Intl.NumberFormat(locale).format(balance.remaining) })}
+                              >
+                                <Badge
+                                  variant="outline"
+                                  aria-label={t('keys.quotaBalanceLeft', { remaining: new Intl.NumberFormat(locale).format(balance.remaining) })}
+                                  className={`text-[10px] tabular-nums ${balance.fraction != null && balance.fraction <= 0.2
+                                    ? 'border-amber-600/30 text-amber-700 dark:text-amber-300'
+                                    : 'text-muted-foreground'} ${k.enabled ? '' : 'opacity-50'}`}
+                                >
+                                  {balance.limit != null && balance.fraction != null
+                                    ? `${Math.round(balance.fraction * 100)}% ${t(METRIC_LABEL_KEY[balance.metric])}`
+                                    : `${new Intl.NumberFormat(locale).format(balance.remaining)} ${t(METRIC_LABEL_KEY[balance.metric])}`}
+                                </Badge>
+                              </Tooltip>
+                            )}
                             <div className="flex-1" />
                             {lastChecked && (
                               <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -616,6 +659,18 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                   </Button>
                                 </Tooltip>
                               )}
+                              {k.platform !== 'custom' && k.modelDiscovery && (
+                                <Tooltip text={t('keys.discoverModels')}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => setDiscoverTarget({ keyId: k.id, builtin: true })}
+                                    aria-label={t('keys.discoverModels')}
+                                  >
+                                    <ListPlus className="size-3" />
+                                  </Button>
+                                </Tooltip>
+                              )}
                               {k.platform === 'custom' && k.baseUrl && (
                                 <>
                                   <Tooltip text={t('keys.addKey')}>
@@ -632,7 +687,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => setDiscoverKeyId(k.id)}
+                                      onClick={() => setDiscoverTarget({ keyId: k.id, builtin: false })}
                                       aria-label={t('keys.discoverModels')}
                                     >
                                       <ListPlus className="size-3" />
@@ -762,11 +817,12 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         </div>
       )}
 
-      {discoverKeyId !== null && (
+      {discoverTarget !== null && (
         <DiscoverModelsDialog
           open
-          onOpenChange={(open) => { if (!open) setDiscoverKeyId(null) }}
-          endpoint={{ keyId: discoverKeyId }}
+          onOpenChange={(open) => { if (!open) setDiscoverTarget(null) }}
+          endpoint={{ keyId: discoverTarget.keyId }}
+          builtin={discoverTarget.builtin}
         />
       )}
 

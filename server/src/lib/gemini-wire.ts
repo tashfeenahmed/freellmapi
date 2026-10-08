@@ -188,7 +188,53 @@ function sanitizeSchema(schema: unknown, insidePropertiesMap: boolean, ctx: Sani
   if (nullable) out.nullable = true;
   // Keywords written alongside a `$ref` (description, overrides) win over the
   // definition they point at.
-  return inlined ? { ...inlined, ...out } : out;
+  const merged = inlined ? { ...inlined, ...out } : out;
+  // A `properties` map is keyed by parameter names, not keywords; a tool
+  // param literally named `items` or `type` must not be read as a schema.
+  if (insidePropertiesMap) return merged;
+  return normalizeArrayItems(merged, schema as Record<string, unknown>, ctx);
+}
+
+// Gemini's Schema proto models `items` as a single Schema message and requires
+// it on every ARRAY: an array without `items` 400s with "…items: missing
+// field" (#1334 — Claude Code's nested tuple params lose their element schema
+// once `prefixItems` is stripped), and a JSON Schema tuple (`items: [...]`)
+// 400s with "Proto field is not repeating". Tuples become an `anyOf` over their
+// members, and an array with no usable element schema gets `items: {}`, which
+// Gemini accepts as "any element" (both verified against the live API).
+function normalizeArrayItems(
+  merged: Record<string, unknown>,
+  source: Record<string, unknown>,
+  ctx: SanitizeContext,
+): Record<string, unknown> {
+  const members: unknown[] = [];
+  if (Array.isArray(source.prefixItems)) {
+    members.push(...(sanitizeSchema(source.prefixItems, false, ctx) as unknown[]));
+  }
+  let single: Record<string, unknown> | undefined;
+  if (Array.isArray(merged.items)) members.push(...merged.items);
+  else if (isSchemaObject(merged.items)) single = merged.items;
+
+  if (members.length > 0) {
+    const branches = [...members, ...(single ? [single] : [])];
+    if (branches.every(isSchemaObject) && branches.every(b => Object.keys(b).length > 0)) {
+      merged.items = branches.length === 1 ? branches[0] : { anyOf: branches };
+    } else {
+      // A boolean/empty member accepts anything, so the union does too.
+      merged.items = {};
+    }
+  } else if (single === undefined && ('items' in merged || isArrayType(merged.type))) {
+    merged.items = {};
+  }
+  return merged;
+}
+
+function isSchemaObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isArrayType(type: unknown): boolean {
+  return typeof type === 'string' && type.toLowerCase() === 'array';
 }
 
 function serializeResponse(value: unknown): string {

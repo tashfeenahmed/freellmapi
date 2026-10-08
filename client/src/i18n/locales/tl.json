@@ -152,21 +152,24 @@
     "compressionRunPreview": "Patakbuhin ang preview",
     "updatesTitle": "Mga Update",
     "checkForUpdates": "Suriin ang mga update",
-    "lastChecked": "Huling na-check: {when}",
-    "currentVersion": "Kasalukuyang build:",
     "updateAvailable": "May available na update",
-    "changelog": "Ano ang nagbago",
     "upToDate": "Napapanahon",
     "buildAhead": "Nauuna ang build na ito sa opisyal na main.",
     "buildDiverged": "Lumihis ang build na ito sa opisyal na main.",
     "buildUnknown": "Hindi maihahambing ang custom build na ito sa opisyal na main.",
     "notGitInstall": "Walang impormasyon ng commit ang installation na ito.",
     "checkFailed": "Hindi masuri kung may mga update.",
-    "contactsGithub": "Manu-mano ang mga pagsusuri at kumokonekta ang mga ito sa GitHub.",
     "autoUpdateCheck": "Awtomatikong pagsusuri ng update",
-    "autoUpdateCheckHelp": "Sinusuri ang GitHub minsan sa isang araw para sa bagong release at nagpapakita ng paalala. Naka-off bilang default.",
-    "openReleases": "Buksan ang GitHub Releases",
-    "restartAfterUpdate": "I-restart ang FreeLLMAPI kapag natapos ang build."
+    "restartAfterUpdate": "I-restart ang FreeLLMAPI kapag natapos ang build.",
+    "downloadUpdate": "I-download ang update",
+    "downloadingUpdate": "Nagda-download… {percent}%",
+    "restartToUpdate": "I-restart para mag-update",
+    "updateReadyHint": "Na-download na. Iba-backup ng FreeLLMAPI ang iyong data, magre-restart, at bubuksan ang bagong bersyon.",
+    "updateInstallFailed": "Hindi ma-install ang update.",
+    "updateNow": "I-update ngayon",
+    "updatingContainer": "Kinukuha ang bagong image at nagre-restart. Magre-reload ang page na ito kapag bumalik ang FreeLLMAPI.",
+    "updateNowFailed": "Hindi tinanggap ng updater ang request. Tingnan kung tumatakbo ang watchtower container.",
+    "updateNowTimeout": "Hindi pa nagre-restart ang FreeLLMAPI pagkalipas ng 5 minuto. Tingnan ang logs ng watchtower container."
   },
   "models": {
     "title": "Mga Modelo",
@@ -209,6 +212,7 @@
     "noKey": "walang susi",
     "dragToReorder": "I-drag para mag-ayos muli",
     "dragToReorderGroup": "I-drag upang ayusin muli ang modelo",
+    "moveToRank": "Tumalon sa ranggo",
     "providerCount": "{count} mga tagapagbigay",
     "servedBy": "Pinagsilbihan ni {providers}",
     "viewProviders": "Tingnan ang mga provider",
@@ -223,6 +227,7 @@
     "settingsHint": "Ang mga lokal na edit sa mga modelo ng katalogo ay pinananatili sa mga sync ng katalogo. Ang mga tinanggal na catalog model ay mananatiling nabubura hanggang sa idagdag mo ito muli sa pamamagitan ng config.",
     "catalogModel": "katalogo",
     "customModel": "kaugalian",
+    "discoveredModel": "natuklasan",
     "localOverride": "lokal na pag-override",
     "displayName": "Display name",
     "sizeLabel": "Antas ng kakayahan",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} sa {total} tagapagbigay ang naka-configure",
     "checklistKeyless": "hindi kailangan ng key",
     "checklistNoKeyTip": "Wala pang key na naidagdag. I-click para magdagdag.",
+    "checklistSignupLink": "Buksan ang {provider} upang gumawa ng account at kumuha ng key",
     "checklistKeylessTip": "Gumagana nang walang key.",
     "tabQuotaSignals": "Mga senyales ng quota",
     "tabApiKey": "Pinag-isang API key",
@@ -495,11 +501,11 @@
     "platform": "Platform",
     "hideAdded": "Itago ang mga naidagdag na provider",
     "apiToken": "token ng API",
-    "noKeyNeededPlaceholder": "Hindi kailangan ng API key",
+    "keyOptionalPlaceholder": "Opsyonal",
     "bearerTokenPlaceholder": "Token ng tagapagdala",
     "pasteKeyPlaceholder": "I-paste ang key dito",
     "pasteSeveral": "I-paste ang marami",
-    "keylessHint": "Hindi kailangan ng API key: ang libreng tier ng provider na ito ay anonymous (rate-limited kada IP).",
+    "keyOptionalHint": "Opsyonal: iwanang blangko para sa anonymous na libreng tier (may rate limit bawat IP), o i-paste ang sarili mong key para gamitin ang iyong account.",
     "enable": "paganahin",
     "noProviderKeys": "Wala pang provider keys. Magdagdag ng isa sa itaas para simulan ang routing.",
     "filterPlaceholder": "I-filter ang mga provider o key",
@@ -677,7 +683,14 @@
     "testFailed": "Bumagsak ang pagsusuri ng modelo",
     "testThrottled": "Mangyaring maghintay ng {seconds}s bago subukang muli ang modelong ito.",
     "noModelsForProvider": "Walang naka-configure na modelo para sa provider na ito.",
-    "testModels": "Subukan ang mga modelo"
+    "testModels": "Subukan ang mga modelo",
+    "monthlyRequestCapLabel": "Buwanang limit ng kahilingan",
+    "monthlyTokenCapLabel": "Buwanang limit ng token",
+    "capUnlimitedPlaceholder": "Walang limit",
+    "capEditHint": "Nireset ang limit sa ika-1 ng buwan, 00:00 UTC. Iwanang blangko kung walang limit.",
+    "monthlyUsageLine": "{requests} kahilingan, {tokens} token ngayong buwan",
+    "quotaBalanceHint": "{remaining} sa {limit} {metric} ang natitira",
+    "quotaBalanceLeft": "{remaining} ang natitira"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Bago ang update"
   },
   "status": {
     "healthy": "malusog",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Isang personal assistant na laging naka-on at sumasagot sa WhatsApp, Telegram, Discord at iba pa mula sa sarili mong makina.",
-      "hermes": "Ang self-improving na agent ng Nous Research na may persistent na memorya at mga skill, sa terminal o sa mga chat app."
+      "hermes": "Ang self-improving na agent ng Nous Research na may persistent na memorya at mga skill, sa terminal o sa mga chat app.",
+      "pi": "Isang minimal na terminal agent na hinuhubog mo gamit ang sarili mong mga extension, skill at prompt template.",
+      "reasonix": "Isang terminal coding agent na ginawa para sa DeepSeek, nakabatay sa prefix caching para manatiling mura ang mahahabang session."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "May mas bagong bersyon ng FreeLLMAPI na naka-install.",
+    "reload": "I-reload"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Palitan ang pangalan ng chain na ito",
+    "renameConfirm": "Palitan ang pangalan ng chain \"{oldName}\" sa \"{name}\"? Ang mga client na tumatawag ng auto:{oldName} ay dapat lumipat sa auto:{name}.",
+    "renamePlaceholder": "Bagong pangalan ng chain",
+    "renameFailed": "Hindi mapalitan ang pangalan ng chain."
+  },
+  "updates": {
+    "versionAvailable": "Available na ang bersyon {version}",
+    "versionReady": "Handa nang i-install ang bersyon {version}",
+    "releaseNotes": "Mga release note",
+    "tryAgain": "Subukang muli",
+    "offline": "Tingnan ang iyong koneksyon sa internet at subukang muli."
   }
 }

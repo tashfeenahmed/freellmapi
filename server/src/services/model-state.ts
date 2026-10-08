@@ -143,7 +143,10 @@ export function overriddenFieldNames(overridesJson: string | null | undefined): 
 }
 
 export function isCatalogManagedModel(row: { platform: string; key_id?: number | null; source?: string }): boolean {
-  // `source` is the authoritative provenance (models.source, 'catalog'|'user');
+  // `source` is the authoritative provenance (models.source: 'catalog', 'user'
+  // or 'discovered'). Discovered rows on built-in platforms (#1348) count as
+  // catalog-managed: deleting one records a catalog tombstone, which both
+  // discovery and a later catalog honor;
   // callers that select it get an exact answer. The platform/key_id fallback
   // covers callers that don't have the column in hand.
   if (row.source === 'user') return false;

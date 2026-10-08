@@ -5,16 +5,19 @@ import { togglePopover } from './popover.js';
 import { openDashboard } from './window.js';
 import { openLogsFolder, openBackupsFolder } from './logger.js';
 import { dt, type NativeLocale } from './i18n.js';
+import { trayPlatform } from './tray-platform.js';
+import type { UpdateState } from './update-support.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let tray: Tray | null = null;
 
-// Left-click opens the glass popover; right-click keeps a minimal native
-// menu as an escape hatch (quit even if the popover renderer breaks). The menu
-// is rebuilt on every right-click, so reading the live locale via getLocale()
-// keeps its labels current after a language switch; the static tooltip is
-// refreshed separately (refreshTrayLocale).
+// Left-click opens the glass popover (the dashboard itself on Windows, see
+// tray-platform.ts); right-click keeps a minimal native menu as an escape
+// hatch (quit even if the popover renderer breaks). The menu is rebuilt on
+// every right-click, so reading the live locale via getLocale() keeps its
+// labels current after a language switch; the static tooltip is refreshed
+// separately (refreshTrayLocale).
 export function buildTray(
   port: number,
   token: string,
@@ -23,15 +26,25 @@ export function buildTray(
   onToggleLanAccess: () => void,
   getShowInDock: () => boolean,
   onToggleShowInDock: () => void,
+  getUpdateState: () => UpdateState,
+  onUpdateClick: () => void,
 ): Tray {
-  const iconPath = path.join(__dirname, '../assets/trayTemplate.png');
+  const platform = trayPlatform(process.platform);
+  const iconPath = path.join(__dirname, '../assets', platform.iconFile);
   const icon = nativeImage.createFromPath(iconPath);
-  icon.setTemplateImage(true); // auto light/dark tint in the macOS menu bar
+  if (icon.isEmpty()) console.warn(`[desktop] tray icon did not load from ${iconPath}`);
+  // Auto light/dark tint in the macOS menu bar. Elsewhere it is meaningless,
+  // and Windows rejected the image it produced (#1353).
+  if (platform.templateImage) icon.setTemplateImage(true);
 
   tray = new Tray(icon);
   tray.setToolTip(dt(getLocale(), 'tooltip'));
 
-  tray.on('click', () => togglePopover(tray!));
+  if (platform.leftClick === 'dashboard') {
+    tray.on('click', () => openDashboard(port, token));
+  } else {
+    tray.on('click', () => togglePopover(tray!));
+  }
   tray.on('right-click', () => {
     const locale = getLocale();
     const lanOn = getLanAccess();
@@ -52,11 +65,18 @@ export function buildTray(
       // only shows relative paths, so the tray is the discovery point.
       { label: dt(locale, 'openBackups'), click: () => openBackupsFolder() },
       { type: 'separator' },
+      { label: updateLabel(locale, getUpdateState()), click: () => onUpdateClick() },
       { label: dt(locale, 'quitApp'), click: () => app.quit() },
     ]));
   });
 
   return tray;
+}
+
+function updateLabel(locale: NativeLocale, state: UpdateState): string {
+  return state.phase === 'ready'
+    ? dt(locale, 'restartToUpdateTray', { version: state.version })
+    : dt(locale, 'checkForUpdates');
 }
 
 // Update the static tooltip after a locale change (the menu reads the locale

@@ -11,6 +11,11 @@ import { formatContext } from '@/lib/routing'
 // list current by hand means re-running `curl .../v1/models | jq` every so
 // often. Ask the endpoint instead, tick the ones to keep, register them in one
 // call. Reads only the user's OWN endpoint with the user's OWN key.
+//
+// #1348: the same dialog serves built-in provider keys whose platform the
+// catalog carries no models for. The list comes from that provider's own
+// /models, picks register as discovered rows, and only chat models can be
+// picked (the catalog owns media and embedding rows for built-in platforms).
 
 export interface DiscoveredModel {
   id: string
@@ -51,11 +56,14 @@ export function DiscoverModelsDialog({
   onOpenChange,
   endpoint,
   onRegistered,
+  builtin = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   endpoint: EndpointRef
   onRegistered?: () => void
+  /** A built-in provider key rather than a custom endpoint (#1348). */
+  builtin?: boolean
 }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -67,7 +75,7 @@ export function DiscoverModelsDialog({
   // A query, not a mutation: the dialog is mounted only while open, so the
   // fetch fires on mount and the component needs no reset effect.
   const discover = useQuery<DiscoverResponse>({
-    queryKey: ['custom-endpoint-models', endpoint.keyId ?? null, endpoint.baseUrl ?? null],
+    queryKey: ['custom-endpoint-models', builtin, endpoint.keyId ?? null, endpoint.baseUrl ?? null],
     queryFn: () => apiFetch('/api/keys/custom/discover-models', {
       method: 'POST',
       body: JSON.stringify(endpoint),
@@ -80,14 +88,19 @@ export function DiscoverModelsDialog({
 
   const register = useMutation<{ created: number }>({
     meta: { silenceToast: true },
-    mutationFn: () => apiFetch('/api/keys/custom', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...(endpoint.keyId === undefined ? { baseUrl: endpoint.baseUrl } : { keyId: endpoint.keyId }),
-        ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
-        models: [...selected],
+    mutationFn: () => builtin
+      ? apiFetch('/api/keys/discovered-models', {
+        method: 'POST',
+        body: JSON.stringify({ keyId: endpoint.keyId, models: [...selected] }),
+      })
+      : apiFetch('/api/keys/custom', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...(endpoint.keyId === undefined ? { baseUrl: endpoint.baseUrl } : { keyId: endpoint.keyId }),
+          ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
+          models: [...selected],
+        }),
       }),
-    }),
     onSuccess: (data) => {
       for (const key of ['keys', 'health', 'fallback', 'models']) {
         queryClient.invalidateQueries({ queryKey: [key] })
@@ -107,7 +120,9 @@ export function DiscoverModelsDialog({
     })
   }
 
-  const selectable = models.filter(m => !m.registered)
+  // Built-in picks are chat-only, so a media or embedding row stays locked.
+  const locked = (m: DiscoveredModel) => m.registered || (builtin && m.kind !== undefined)
+  const selectable = models.filter(m => !locked(m))
   const allSelected = selectable.length > 0 && selectable.every(m => selected.has(m.id))
   const toggleAll = () => {
     setSelected(prev => {
@@ -156,12 +171,12 @@ export function DiscoverModelsDialog({
               {models.map(model => (
                 <label
                   key={model.id}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs ${model.registered ? 'bg-muted/40' : 'cursor-pointer hover:bg-muted/30'}`}
+                  className={`flex items-center gap-2 px-3 py-2 text-xs ${locked(model) ? 'bg-muted/40' : 'cursor-pointer hover:bg-muted/30'}`}
                 >
                   <input
                     type="checkbox"
                     checked={model.registered || selected.has(model.id)}
-                    disabled={model.registered}
+                    disabled={locked(model)}
                     onChange={() => toggle(model.id)}
                     className="size-4 accent-primary"
                   />

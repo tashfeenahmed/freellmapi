@@ -152,21 +152,24 @@
     "compressionRunPreview": "Endesha hakikisho",
     "updatesTitle": "Masasisho",
     "checkForUpdates": "Angalia masasisho",
-    "lastChecked": "Mara ya mwisho kuangaliwa: {when}",
-    "currentVersion": "Toleo la sasa:",
     "updateAvailable": "Sasisho linapatikana",
-    "changelog": "Kilichobadilika",
     "upToDate": "Imesasishwa",
     "buildAhead": "Toleo hili liko mbele ya tawi rasmi la main.",
     "buildDiverged": "Toleo hili limejitenga na tawi rasmi la main.",
     "buildUnknown": "Toleo hili maalum haliwezi kulinganishwa na tawi rasmi la main.",
     "notGitInstall": "Usakinishaji huu hauna taarifa za commit.",
     "checkFailed": "Imeshindikana kuangalia masasisho.",
-    "contactsGithub": "Ukaguzi hufanywa mwenyewe na huwasiliana na GitHub.",
     "autoUpdateCheck": "Ukaguzi wa masasisho otomatiki",
-    "autoUpdateCheckHelp": "Hukagua GitHub mara moja kwa siku kwa toleo jipya na kuonyesha ukumbusho. Imezimwa kwa chaguo-msingi.",
-    "openReleases": "Fungua Matoleo ya GitHub",
-    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika."
+    "restartAfterUpdate": "Anzisha upya FreeLLMAPI baada ya ujenzi kukamilika.",
+    "downloadUpdate": "Pakua sasisho",
+    "downloadingUpdate": "Inapakua… {percent}%",
+    "restartToUpdate": "Anzisha upya ili kusasisha",
+    "updateReadyHint": "Imepakuliwa. FreeLLMAPI huhifadhi nakala ya data yako, huanza upya na kufungua toleo jipya.",
+    "updateInstallFailed": "Sasisho halikuweza kusakinishwa.",
+    "updateNow": "Sasisha sasa",
+    "updatingContainer": "Inavuta picha mpya na kuanza upya. Ukurasa huu utapakia upya FreeLLMAPI itakaporudi.",
+    "updateNowFailed": "Kisasishaji hakikukubali ombi. Hakikisha kontena la watchtower linafanya kazi.",
+    "updateNowTimeout": "FreeLLMAPI haijaanza upya baada ya dakika 5. Angalia kumbukumbu za kontena la watchtower."
   },
   "models": {
     "title": "Mifano",
@@ -209,6 +212,7 @@
     "noKey": "hakuna ufunguo",
     "dragToReorder": "Buruta ili kupanga upya",
     "dragToReorderGroup": "Buruta ili kupanga upya muundo",
+    "moveToRank": "Ruka hadi nafasi",
     "providerCount": "Mtoaji wa {count}",
     "servedBy": "Imetolewa na {providers}",
     "viewProviders": "Tazama watoa huduma",
@@ -223,6 +227,7 @@
     "settingsHint": "Uhariri wa ndani kwa miundo ya katalogi huwekwa katika usawazishaji wa katalogi. Miundo ya katalogi iliyofutwa husalia kufutwa hadi uiongeze tena kupitia usanidi.",
     "catalogModel": "katalogi",
     "customModel": "desturi",
+    "discoveredModel": "imegunduliwa",
     "localOverride": "ubatilishaji wa ndani",
     "displayName": "Jina la kuonyesha",
     "sizeLabel": "Kiwango cha uwezo",
@@ -369,6 +374,7 @@
     "checklistSummary": "Watoa huduma {configured} kati ya {total} wamesanidiwa",
     "checklistKeyless": "hakuna ufunguo unaohitajika",
     "checklistNoKeyTip": "Bado hakuna ufunguo ulioongezwa. Bofya ili kuongeza.",
+    "checklistSignupLink": "Fungua {provider} kuunda akaunti na upate ufunguo",
     "checklistKeylessTip": "Hufanya kazi bila ufunguo.",
     "tabQuotaSignals": "Ishara za quota",
     "tabApiKey": "Kitufe cha umoja cha API",
@@ -495,11 +501,11 @@
     "platform": "Jukwaa",
     "hideAdded": "Ficha watoa huduma walioongezwa",
     "apiToken": "Ishara ya API",
-    "noKeyNeededPlaceholder": "Hakuna ufunguo wa API unaohitajika",
+    "keyOptionalPlaceholder": "Si lazima",
     "bearerTokenPlaceholder": "Ishara ya mbebaji",
     "pasteKeyPlaceholder": "bandika ufunguo hapa",
     "pasteSeveral": "Bandika kadhaa",
-    "keylessHint": "Hakuna ufunguo wa API unaohitajika: kiwango cha bure cha mtoa huduma huyu hakijulikani (kidogo-kidogo kwa IP).",
+    "keyOptionalHint": "Si lazima: acha wazi kutumia kiwango cha bure bila kujitambulisha (kikomo kwa kila IP), au bandika ufunguo wako kutumia akaunti yako.",
     "enable": "Wezesha",
     "noProviderKeys": "Bado hakuna funguo za mtoa huduma. Ongeza moja hapo juu ili kuanza kuelekeza.",
     "filterPlaceholder": "Chuja watoa huduma au funguo",
@@ -677,7 +683,14 @@
     "testFailed": "Jaribio la muundo limeshindwa",
     "testThrottled": "Tafadhali subiri sekunde {seconds} kabla ya kujaribu muundo huu tena.",
     "noModelsForProvider": "Hakuna miundo iliyowekwa kwa mtoa huduma huyu.",
-    "testModels": "Jaribu miundo"
+    "testModels": "Jaribu miundo",
+    "monthlyRequestCapLabel": "Kikomo cha kila mwezi cha maombi",
+    "monthlyTokenCapLabel": "Kikomo cha kila mwezi cha tokeni",
+    "capUnlimitedPlaceholder": "Bila kikomo",
+    "capEditHint": "Vikomo huwekwa upya tarehe 1 saa 00:00 UTC. Acha wazi bila kikomo.",
+    "monthlyUsageLine": "Maombi {requests}, tokeni {tokens} mwezi huu",
+    "quotaBalanceHint": "Zimebaki {remaining} kati ya {limit} {metric}",
+    "quotaBalanceLeft": "Zimebaki {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Kabla ya sasisho"
   },
   "status": {
     "healthy": "afya",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Msaidizi binafsi anayefanya kazi muda wote na kujibu kwenye WhatsApp, Telegram, Discord na zaidi kutoka kwenye mashine yako mwenyewe.",
-      "hermes": "Wakala wa Nous Research anayejiboresha mwenyewe, mwenye kumbukumbu ya kudumu na ujuzi, kwenye terminal au kwenye programu za gumzo."
+      "hermes": "Wakala wa Nous Research anayejiboresha mwenyewe, mwenye kumbukumbu ya kudumu na ujuzi, kwenye terminal au kwenye programu za gumzo.",
+      "pi": "Wakala mdogo wa terminal unaomuunda kwa viendelezi, ujuzi na violezo vya maagizo vyako mwenyewe.",
+      "reasonix": "Wakala wa kuandika msimbo kwenye terminal aliyejengwa kwa ajili ya DeepSeek, kwa msingi wa prefix caching ili vipindi virefu vibaki nafuu."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Toleo jipya la FreeLLMAPI limesakinishwa.",
+    "reload": "Pakia upya"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Badilisha jina la mnyororo huu",
+    "renameConfirm": "Badilisha jina la mnyororo \"{oldName}\" kuwa \"{name}\"? Wateja wanaoitia auto:{oldName} lazima wabadilike kwa auto:{name}.",
+    "renamePlaceholder": "Jina jipya la mnyororo",
+    "renameFailed": "Imeshindwa kubadilisha jina la mnyororo."
+  },
+  "updates": {
+    "versionAvailable": "Toleo {version} linapatikana",
+    "versionReady": "Toleo {version} liko tayari kusakinishwa",
+    "releaseNotes": "Maelezo ya toleo",
+    "tryAgain": "Jaribu tena",
+    "offline": "Kagua muunganisho wako wa intaneti kisha ujaribu tena."
   }
 }

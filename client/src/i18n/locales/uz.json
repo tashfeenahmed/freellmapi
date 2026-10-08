@@ -152,21 +152,24 @@
     "compressionRunPreview": "Oldindan ko'rishni ishga tushirish",
     "updatesTitle": "Yangilanishlar",
     "checkForUpdates": "Yangilanishlarni tekshiring",
-    "lastChecked": "Oxirgi tekshirilgan: {when}",
-    "currentVersion": "Joriy build:",
     "updateAvailable": "Yangilanish mavjud",
-    "changelog": "Nimalar o'zgardi",
     "upToDate": "Eng so'nggi versiya",
     "buildAhead": "Bu build rasmiy main tarmog'idan oldinda.",
     "buildDiverged": "Bu build rasmiy main tarmog'idan ajralib ketgan.",
     "buildUnknown": "Bu maxsus buildni rasmiy main tarmog'i bilan taqqoslab bo'lmaydi.",
     "notGitInstall": "Bu o'rnatishda commit ma'lumoti mavjud emas.",
     "checkFailed": "Yangilanishlarni tekshirib bo'lmadi.",
-    "contactsGithub": "Tekshiruvlar qo'lda bajariladi va GitHub bilan bog'lanadi.",
     "autoUpdateCheck": "Avtomatik yangilanish tekshiruvi",
-    "autoUpdateCheckHelp": "Kuniga bir marta yangi nashr uchun GitHub'ni tekshiradi va eslatma ko'rsatadi. Sukut bo'yicha o'chirilgan.",
-    "openReleases": "GitHub relizlarini ochish",
-    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring."
+    "restartAfterUpdate": "Build tugagach, FreeLLMAPI'ni qayta ishga tushiring.",
+    "downloadUpdate": "Yangilanishni yuklab olish",
+    "downloadingUpdate": "Yuklab olinmoqda… {percent}%",
+    "restartToUpdate": "Yangilash uchun qayta ishga tushirish",
+    "updateReadyHint": "Yuklab olindi. FreeLLMAPI maʼlumotlaringizning zaxira nusxasini oladi, qayta ishga tushadi va yangi versiyani ochadi.",
+    "updateInstallFailed": "Yangilanishni o‘rnatib bo‘lmadi.",
+    "updateNow": "Hozir yangilash",
+    "updatingContainer": "Yangi obraz yuklab olinmoqda va qayta ishga tushirilmoqda. FreeLLMAPI qaytganda bu sahifa qayta yuklanadi.",
+    "updateNowFailed": "Yangilovchi so‘rovni qabul qilmadi. watchtower konteyneri ishlayotganini tekshiring.",
+    "updateNowTimeout": "FreeLLMAPI 5 daqiqadan keyin ham qayta ishga tushmadi. watchtower konteyneri jurnallarini tekshiring."
   },
   "models": {
     "title": "Modellar",
@@ -209,6 +212,7 @@
     "noKey": "kalit yo'q",
     "dragToReorder": "Qayta tartiblash uchun torting",
     "dragToReorderGroup": "Modelni qayta tartiblash uchun torting",
+    "moveToRank": "Rangga o‘tish",
     "providerCount": "{count} provayderlari",
     "servedBy": "{providers} tomonidan xizmat qiladi",
     "viewProviders": "Provayderlarni ko'rish",
@@ -223,6 +227,7 @@
     "settingsHint": "Katalog modellariga mahalliy tahrirlar katalog sinxronlashlarida saqlanadi. O'chirilgan katalog modellari konfiguratsiya orqali ularni qayta qo'shmaguningizcha o'chiriladi.",
     "catalogModel": "katalog",
     "customModel": "odatiy",
+    "discoveredModel": "aniqlangan",
     "localOverride": "mahalliy bekor qilish",
     "displayName": "Ko'rsatilgan nom",
     "sizeLabel": "Qobiliyat darajasi",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} ta provayderdan {configured} tasi sozlangan",
     "checklistKeyless": "kalit kerak emas",
     "checklistNoKeyTip": "Hali kalit qo'shilmagan. Qo'shish uchun bosing.",
+    "checklistSignupLink": "Hisob yaratish va kalit olish uchun {provider} ni oching",
     "checklistKeylessTip": "Kalitsiz ishlaydi.",
     "tabQuotaSignals": "Kvota signallari",
     "tabApiKey": "Birlashtirilgan API kaliti",
@@ -495,11 +501,11 @@
     "platform": "Platforma",
     "hideAdded": "Qo'shilgan provayderlarni yashirish",
     "apiToken": "API tokeni",
-    "noKeyNeededPlaceholder": "API kaliti kerak emas",
+    "keyOptionalPlaceholder": "Ixtiyoriy",
     "bearerTokenPlaceholder": "Tashuvchi belgisi",
     "pasteKeyPlaceholder": "kalitni shu yerga qo'ying",
     "pasteSeveral": "Bir nechtasini joylang",
-    "keylessHint": "API kaliti kerak emas: bu provayderning bepul darajasi anonimdir (har bir IP uchun tarif cheklangan).",
+    "keyOptionalHint": "Ixtiyoriy: anonim bepul daraja uchun bo'sh qoldiring (har bir IP uchun cheklangan) yoki hisobingizdan foydalanish uchun o'z kalitingizni joylang.",
     "enable": "Yoqish",
     "noProviderKeys": "Hozircha provayder kalitlari yo'q. Marshrutlashni boshlash uchun yuqoridagi birini qo'shing.",
     "filterPlaceholder": "Provayderlar yoki kalitlarni filtrlang",
@@ -677,7 +683,14 @@
     "testFailed": "Model sinovi muvaffaqiyatsiz tugadi",
     "testThrottled": "Ushbu modelni qayta sinashdan oldin {seconds} soniya kuting.",
     "noModelsForProvider": "Ushbu taʼminotchi uchun modellar sozlanmagan.",
-    "testModels": "Modellarni sinab ko‘rish"
+    "testModels": "Modellarni sinab ko‘rish",
+    "monthlyRequestCapLabel": "Oylik so‘rov chegarasi",
+    "monthlyTokenCapLabel": "Oylik token chegarasi",
+    "capUnlimitedPlaceholder": "Cheksiz",
+    "capEditHint": "Chegaralar har oyning 1-sana 00:00 UTC da tiklanadi. Cheksiz uchun bo‘sh qoldiring.",
+    "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token",
+    "quotaBalanceHint": "{limit} {metric} dan {remaining} qoldi",
+    "quotaBalanceLeft": "{remaining} qoldi"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Yangilanishdan oldin"
   },
   "status": {
     "healthy": "sog'lom",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "O'z kompyuteringizdan WhatsApp, Telegram, Discord va boshqalarda javob beradigan, doim ishlab turadigan shaxsiy yordamchi.",
-      "hermes": "Nous Research'ning o'zini takomillashtiradigan agenti; doimiy xotira va ko'nikmalar bilan, terminalda yoki chat ilovalarida."
+      "hermes": "Nous Research'ning o'zini takomillashtiradigan agenti; doimiy xotira va ko'nikmalar bilan, terminalda yoki chat ilovalarida.",
+      "pi": "O'z kengaytmalaringiz, ko'nikmalaringiz va so'rov shablonlaringiz bilan shakllantiradigan minimal terminal agenti.",
+      "reasonix": "DeepSeek uchun yaratilgan terminal kodlash agenti; uzoq sessiyalar arzon qolishi uchun prefiks keshlash asosida qurilgan."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ning yangiroq versiyasi o‘rnatilgan.",
+    "reload": "Qayta yuklash"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Ushbu zanjir nomini o'zgartirish",
+    "renameConfirm": "\"{oldName}\" zanjir nomini \"{name}\" ga o'zgartirilsinmi? auto:{oldName} ga murojaat qiladigan mijozlar auto:{name} ga o'tishi kerak.",
+    "renamePlaceholder": "Yangi zanjir nomi",
+    "renameFailed": "Zanjir nomini o'zgartirib bo'lmadi."
+  },
+  "updates": {
+    "versionAvailable": "{version} versiyasi mavjud",
+    "versionReady": "{version} versiyasi o‘rnatishga tayyor",
+    "releaseNotes": "Reliz eslatmalari",
+    "tryAgain": "Qayta urinish",
+    "offline": "Internet aloqangizni tekshirib, qayta urinib ko‘ring."
   }
 }

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { claudeLaunchEnv, codexArgs, main, parseArgs, resolvePinnedModel } from './index.js';
+import { claudeLaunchEnv, codexArgs, main, parseArgs, resolvePinnedModel, unsupportedNodeVersion } from './index.js';
 import { UnknownModelError } from './models.js';
 import type { CatalogModel } from './types.js';
 
@@ -194,5 +194,35 @@ describe('CLI arguments and launchers', () => {
       'model_providers.freellmapi.base_url="http://localhost:3001/v1"',
     );
     expect(args).toContain('model_providers.freellmapi.wire_api="responses"');
+  });
+
+  // #1283: on Node <17.4 the CLI died at module-load time with
+  // ERR_UNKNOWN_BUILTIN_MODULE because `node:readline/promises` was imported
+  // statically, so no command — not even --help — could run, let alone print
+  // a readable reason. Two layers fix it: the readline import is now lazy
+  // (only the interactive key prompt needs it), and this pure check turns an
+  // old runtime into one clear sentence before main() runs.
+  describe('unsupportedNodeVersion (#1283)', () => {
+    it('accepts Node 20 and newer', () => {
+      expect(unsupportedNodeVersion('20.18.0')).toBeNull();
+      expect(unsupportedNodeVersion('22.5.1')).toBeNull();
+      expect(unsupportedNodeVersion('26.9.0')).toBeNull();
+    });
+
+    it('rejects the older runtimes from the issue reports', () => {
+      for (const version of ['12.22.12', '14.21.3', '16.20.2', '18.19.0', '19.9.0']) {
+        const message = unsupportedNodeVersion(version);
+        expect(message).toContain('Node.js 20 or newer');
+        expect(message).toContain(version);
+      }
+    });
+
+    it('says nothing when the runtime is unrecognised', () => {
+      // A non-Node runtime (or a mocked process) must not be told it is
+      // "old"; the failure, if any, should come from the code itself.
+      expect(unsupportedNodeVersion(undefined)).toBeNull();
+      expect(unsupportedNodeVersion('')).toBeNull();
+      expect(unsupportedNodeVersion('nightly')).toBeNull();
+    });
   });
 });

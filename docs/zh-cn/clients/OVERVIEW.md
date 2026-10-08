@@ -8,6 +8,7 @@
 
 | 文件 | 范围 |
 |------|-------|
+| [`02-supported-agents.md`](02-supported-agents.md) | 所有支持的智能体一览：图标、一行配置命令和各自的 base URL。 |
 | [`01-agent-clients.md`](01-agent-clients.md) | 编程智能体生成器（`setup-claude`、`setup-codex`、`setup-dsh` 等）、手工 base URL、Ollama 客户端、无头 URL 令牌、MCP 服务、VS Code 补全与 Context Handoff 的完整参考。 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 本域文档修订历史 |
 

@@ -152,21 +152,24 @@
     "compressionRunPreview": "미리보기 실행",
     "updatesTitle": "업데이트",
     "checkForUpdates": "업데이트 확인",
-    "lastChecked": "마지막 확인: {when}",
-    "currentVersion": "현재 빌드:",
     "updateAvailable": "업데이트 사용 가능",
-    "changelog": "변경 사항",
     "upToDate": "최신 상태",
     "buildAhead": "이 빌드는 공식 main 브랜치보다 앞서 있습니다.",
     "buildDiverged": "이 빌드는 공식 main 브랜치에서 분기되었습니다.",
     "buildUnknown": "이 사용자 지정 빌드는 공식 main 브랜치와 비교할 수 없습니다.",
     "notGitInstall": "이 설치에는 커밋 정보가 포함되어 있지 않습니다.",
     "checkFailed": "업데이트를 확인할 수 없습니다.",
-    "contactsGithub": "확인은 수동으로 진행되며 GitHub에 연결합니다.",
     "autoUpdateCheck": "자동 업데이트 확인",
-    "autoUpdateCheckHelp": "하루에 한 번 GitHub에서 새 릴리스를 확인하고 알림을 표시합니다. 기본값은 꺼짐입니다.",
-    "openReleases": "GitHub 릴리스 열기",
-    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요."
+    "restartAfterUpdate": "빌드가 완료되면 FreeLLMAPI를 다시 시작하세요.",
+    "downloadUpdate": "업데이트 다운로드",
+    "downloadingUpdate": "다운로드 중… {percent}%",
+    "restartToUpdate": "재시작하여 업데이트",
+    "updateReadyHint": "다운로드 완료. FreeLLMAPI가 데이터를 백업한 뒤 재시작하고 새 버전을 엽니다.",
+    "updateInstallFailed": "업데이트를 설치하지 못했습니다.",
+    "updateNow": "지금 업데이트",
+    "updatingContainer": "새 이미지를 받아 재시작하는 중입니다. FreeLLMAPI가 돌아오면 이 페이지가 새로고침됩니다.",
+    "updateNowFailed": "업데이터가 요청을 받지 않았습니다. watchtower 컨테이너가 실행 중인지 확인하세요.",
+    "updateNowTimeout": "5분이 지나도 FreeLLMAPI가 재시작되지 않았습니다. watchtower 컨테이너 로그를 확인하세요."
   },
   "models": {
     "title": "모델",
@@ -209,6 +212,7 @@
     "noKey": "열쇠 없음",
     "dragToReorder": "드래그하여 재정렬하세요.",
     "dragToReorderGroup": "드래그하여 모델 재정렬",
+    "moveToRank": "순위이동",
     "providerCount": "{count} 제공업체",
     "servedBy": "{providers} 제공",
     "viewProviders": "공급자 보기",
@@ -223,6 +227,7 @@
     "settingsHint": "카탈로그 모델에 대한 로컬 편집 내용은 카탈로그 동기화 전반에 걸쳐 유지됩니다. 삭제된 카탈로그 모델은 구성을 통해 다시 추가할 때까지 삭제된 상태로 유지됩니다.",
     "catalogModel": "카탈로그",
     "customModel": "관습",
+    "discoveredModel": "검색됨",
     "localOverride": "로컬 재정의",
     "displayName": "표시 이름",
     "sizeLabel": "역량 티어",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total}개 공급자 중 {configured}개 설정됨",
     "checklistKeyless": "키 필요 없음",
     "checklistNoKeyTip": "아직 키를 추가하지 않았습니다. 클릭하여 추가하세요.",
+    "checklistSignupLink": "{provider}를(를) 열어 계정을 만들고 키를 받으세요",
     "checklistKeylessTip": "키 없이 작동합니다.",
     "tabQuotaSignals": "할당량 신호",
     "tabApiKey": "통합 API 키",
@@ -495,11 +501,11 @@
     "platform": "플랫폼",
     "hideAdded": "추가된 제공업체 숨기기",
     "apiToken": "API 토큰",
-    "noKeyNeededPlaceholder": "API 키가 필요하지 않습니다.",
+    "keyOptionalPlaceholder": "선택 사항",
     "bearerTokenPlaceholder": "무기명 토큰",
     "pasteKeyPlaceholder": "여기에 키를 붙여넣으세요",
     "pasteSeveral": "여러 개 붙여넣기",
-    "keylessHint": "API 키가 필요하지 않습니다. 이 공급자의 무료 등급은 익명입니다(IP당 속도 제한).",
+    "keyOptionalHint": "선택 사항: 비워 두면 익명 무료 등급(IP별 속도 제한)을 사용합니다. 본인 계정을 사용하려면 키를 붙여넣으세요.",
     "enable": "활성화",
     "noProviderKeys": "아직 제공업체 키가 없습니다. 라우팅을 시작하려면 위에 하나를 추가하세요.",
     "filterPlaceholder": "필터 공급자 또는 키",
@@ -677,7 +683,14 @@
     "testFailed": "모델 테스트에 실패했습니다",
     "testThrottled": "이 모델을 다시 테스트하기 전에 {seconds}초 동안 기다려 주세요.",
     "noModelsForProvider": "이 제공자에 구성된 모델이 없습니다.",
-    "testModels": "모델 테스트"
+    "testModels": "모델 테스트",
+    "monthlyRequestCapLabel": "월 요청 한도",
+    "monthlyTokenCapLabel": "월 토큰 한도",
+    "capUnlimitedPlaceholder": "무제한",
+    "capEditHint": "한도는 매월 1일 00:00 UTC에 초기화됩니다. 무제한이려면 비워 두세요.",
+    "monthlyUsageLine": "이번 달 요청 {requests}회, 토큰 {tokens}",
+    "quotaBalanceHint": "{limit} {metric} 중 {remaining} 남음",
+    "quotaBalanceLeft": "{remaining} 남음"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "업데이트 전"
   },
   "status": {
     "healthy": "건강한",
@@ -1133,17 +1147,16 @@
       "generic": "OpenAI API를 쓰는 다른 모든 도구. 기본 URL과 키로 직접 설정합니다.",
       "atomcode": "AtomGit의 터미널 에이전트. Rust로 작성되었으며 OpenAI 호환 엔드포인트를 모두 받습니다.",
       "openclaw": "내 컴퓨터에서 WhatsApp, Telegram, Discord 등으로 응답하는 상시 가동 개인 비서입니다.",
-      "hermes": "Nous Research의 자기 개선형 에이전트. 지속되는 메모리와 스킬을 갖추고 터미널이나 채팅 앱에서 사용할 수 있습니다."
+      "hermes": "Nous Research의 자기 개선형 에이전트. 지속되는 메모리와 스킬을 갖추고 터미널이나 채팅 앱에서 사용할 수 있습니다.",
+      "pi": "직접 만든 확장, 스킬, 프롬프트 템플릿으로 다듬어 쓰는 미니멀한 터미널 에이전트.",
+      "reasonix": "DeepSeek 네이티브 터미널 코딩 에이전트로, 프리픽스 캐싱을 중심으로 설계되어 긴 세션도 저렴하게 유지됩니다."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "더 새로운 버전의 FreeLLMAPI가 설치되었습니다.",
+    "reload": "새로고침"
   },
   "freeTier": {
     "poolsToggle": "무료 등급 풀 ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "비어 있는 상태로 만들기",
     "startEmptyHint": "모델 없이 체인을 만들고, 새로 추가되는 카탈로그 모델도 넣지 않습니다. 해제하면 기본 체인의 복사본으로 시작합니다.",
     "curated": "직접 관리",
-    "curatedHint": "새 카탈로그 모델이 이 체인에 자동으로 추가되지 않습니다."
+    "curatedHint": "새 카탈로그 모델이 이 체인에 자동으로 추가되지 않습니다.",
+    "renameHint": "이 체인의 이름 변경",
+    "renameConfirm": "체인 \"{oldName}\"의 이름을 \"{name}\"(으)로 변경하시겠습니까? auto:{oldName}을(를) 호출하는 클라이언트는 auto:{name}(으)로 전환해야 합니다.",
+    "renamePlaceholder": "새 체인 이름",
+    "renameFailed": "체인 이름을 변경하지 못했습니다."
+  },
+  "updates": {
+    "versionAvailable": "버전 {version}을(를) 사용할 수 있습니다",
+    "versionReady": "버전 {version}을(를) 설치할 준비가 되었습니다",
+    "releaseNotes": "릴리스 노트",
+    "tryAgain": "다시 시도",
+    "offline": "인터넷 연결을 확인한 후 다시 시도하세요."
   }
 }

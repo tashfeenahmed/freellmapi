@@ -483,19 +483,24 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
   const since = getSinceTimestamp(range);
   const db = getDb();
 
-  // Group errors by category (extract the key part of the error message)
+  // Group errors by category (extract the key part of the error message).
+  // LOWER() first: LIKE is case-sensitive in SQLite, and the error strings we
+  // persist are dominated by capitalized upstream messages ("Invalid API key",
+  // "Too Many Requests", "Timeout"), which all landed in 'Other' before. The
+  // old '%invalid.*key%' pattern was regex syntax pasted into LIKE, where '.'
+  // and '*' are literal characters, so it matched nothing real.
   const rows = db.prepare(`
     SELECT
       platform,
       model_id,
       CASE
-        WHEN error LIKE '%429%' OR error LIKE '%rate limit%' OR error LIKE '%too many%' OR error LIKE '%quota%' THEN 'Rate Limited (429)'
-        WHEN error LIKE '%401%' OR error LIKE '%unauthorized%' OR error LIKE '%invalid.*key%' THEN 'Auth Error (401)'
-        WHEN error LIKE '%403%' OR error LIKE '%forbidden%' THEN 'Forbidden (403)'
-        WHEN error LIKE '%404%' OR error LIKE '%not found%' THEN 'Not Found (404)'
-        WHEN error LIKE '%timeout%' OR error LIKE '%ETIMEDOUT%' OR error LIKE '%ECONNREFUSED%' THEN 'Timeout/Connection'
-        WHEN error LIKE '%500%' OR error LIKE '%internal server%' THEN 'Server Error (500)'
-        WHEN error LIKE '%503%' OR error LIKE '%unavailable%' THEN 'Unavailable (503)'
+        WHEN lower(error) LIKE '%429%' OR lower(error) LIKE '%rate limit%' OR lower(error) LIKE '%too many%' OR lower(error) LIKE '%quota%' THEN 'Rate Limited (429)'
+        WHEN lower(error) LIKE '%401%' OR lower(error) LIKE '%unauthorized%' OR lower(error) LIKE '%invalid api key%' OR lower(error) LIKE '%invalid_api_key%' OR lower(error) LIKE '%incorrect api key%' THEN 'Auth Error (401)'
+        WHEN lower(error) LIKE '%403%' OR lower(error) LIKE '%forbidden%' THEN 'Forbidden (403)'
+        WHEN lower(error) LIKE '%404%' OR lower(error) LIKE '%not found%' THEN 'Not Found (404)'
+        WHEN lower(error) LIKE '%timeout%' OR lower(error) LIKE '%timed out%' OR lower(error) LIKE '%etimedout%' OR lower(error) LIKE '%econnrefused%' THEN 'Timeout/Connection'
+        WHEN lower(error) LIKE '%500%' OR lower(error) LIKE '%internal server%' THEN 'Server Error (500)'
+        WHEN lower(error) LIKE '%503%' OR lower(error) LIKE '%unavailable%' THEN 'Unavailable (503)'
         ELSE 'Other'
       END as error_category,
       COUNT(*) as count
@@ -509,13 +514,13 @@ analyticsRouter.get('/error-distribution', (req: Request, res: Response) => {
   const byCategory = db.prepare(`
     SELECT
       CASE
-        WHEN error LIKE '%429%' OR error LIKE '%rate limit%' OR error LIKE '%too many%' OR error LIKE '%quota%' THEN 'Rate Limited (429)'
-        WHEN error LIKE '%401%' OR error LIKE '%unauthorized%' OR error LIKE '%invalid.*key%' THEN 'Auth Error (401)'
-        WHEN error LIKE '%403%' OR error LIKE '%forbidden%' THEN 'Forbidden (403)'
-        WHEN error LIKE '%404%' OR error LIKE '%not found%' THEN 'Not Found (404)'
-        WHEN error LIKE '%timeout%' OR error LIKE '%ETIMEDOUT%' OR error LIKE '%ECONNREFUSED%' THEN 'Timeout/Connection'
-        WHEN error LIKE '%500%' OR error LIKE '%internal server%' THEN 'Server Error (500)'
-        WHEN error LIKE '%503%' OR error LIKE '%unavailable%' THEN 'Unavailable (503)'
+        WHEN lower(error) LIKE '%429%' OR lower(error) LIKE '%rate limit%' OR lower(error) LIKE '%too many%' OR lower(error) LIKE '%quota%' THEN 'Rate Limited (429)'
+        WHEN lower(error) LIKE '%401%' OR lower(error) LIKE '%unauthorized%' OR lower(error) LIKE '%invalid api key%' OR lower(error) LIKE '%invalid_api_key%' OR lower(error) LIKE '%incorrect api key%' THEN 'Auth Error (401)'
+        WHEN lower(error) LIKE '%403%' OR lower(error) LIKE '%forbidden%' THEN 'Forbidden (403)'
+        WHEN lower(error) LIKE '%404%' OR lower(error) LIKE '%not found%' THEN 'Not Found (404)'
+        WHEN lower(error) LIKE '%timeout%' OR lower(error) LIKE '%timed out%' OR lower(error) LIKE '%etimedout%' OR lower(error) LIKE '%econnrefused%' THEN 'Timeout/Connection'
+        WHEN lower(error) LIKE '%500%' OR lower(error) LIKE '%internal server%' THEN 'Server Error (500)'
+        WHEN lower(error) LIKE '%503%' OR lower(error) LIKE '%unavailable%' THEN 'Unavailable (503)'
         ELSE 'Other'
       END as category,
       COUNT(*) as count

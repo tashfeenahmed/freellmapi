@@ -152,21 +152,24 @@
     "compressionRunPreview": "Покрени преглед",
     "updatesTitle": "Ажурирања",
     "checkForUpdates": "Проверите ажурирања",
-    "lastChecked": "Последња провера: {when}",
-    "currentVersion": "Тренутна верзија:",
     "updateAvailable": "Доступно је ажурирање",
-    "changelog": "Шта је промењено",
     "upToDate": "Ажурно",
     "buildAhead": "Ова верзија је испред званичне гране main.",
     "buildDiverged": "Ова верзија се разишла са званичном граном main.",
     "buildUnknown": "Ова прилагођена верзија се не може упоредити са званичном граном main.",
     "notGitInstall": "Ова инсталација не садржи информације о комиту.",
     "checkFailed": "Провера ажурирања није успела.",
-    "contactsGithub": "Провере се покрећу ручно и повезују се са GitHub-ом.",
     "autoUpdateCheck": "Аутоматска провера ажурирања",
-    "autoUpdateCheckHelp": "Једном дневно проверава GitHub за ново издање и приказује подсетник. Подразумевано искључено.",
-    "openReleases": "Отвори GitHub издања",
-    "restartAfterUpdate": "Поново покрените FreeLLMAPI након завршетка израде."
+    "restartAfterUpdate": "Поново покрените FreeLLMAPI након завршетка израде.",
+    "downloadUpdate": "Преузми ажурирање",
+    "downloadingUpdate": "Преузимање… {percent}%",
+    "restartToUpdate": "Поново покрени ради ажурирања",
+    "updateReadyHint": "Преузето. FreeLLMAPI прави резервну копију ваших података, поново се покреће и отвара нову верзију.",
+    "updateInstallFailed": "Ажурирање није могло да се инсталира.",
+    "updateNow": "Ажурирај сада",
+    "updatingContainer": "Преузима се нова слика и поново се покреће. Страница ће се поново учитати када се FreeLLMAPI врати.",
+    "updateNowFailed": "Ажурирач није прихватио захтев. Проверите да ли контејнер watchtower ради.",
+    "updateNowTimeout": "FreeLLMAPI се није поново покренуо након 5 минута. Проверите логове контејнера watchtower."
   },
   "models": {
     "title": "Модели",
@@ -209,6 +212,7 @@
     "noKey": "без кључа",
     "dragToReorder": "Превуците да бисте променили редослед",
     "dragToReorderGroup": "Превуците да бисте променили редослед модела",
+    "moveToRank": "Скочи на ранг",
     "providerCount": "{count} провајдери",
     "servedBy": "Служи {providers}",
     "viewProviders": "Погледајте добављаче",
@@ -223,6 +227,7 @@
     "settingsHint": "Локалне измене модела каталога се чувају током синхронизације каталога. Избрисани каталошки модели остају избрисани док их поново не додате преко конфигурације.",
     "catalogModel": "каталог",
     "customModel": "обичај",
+    "discoveredModel": "откривен",
     "localOverride": "локално надјачавање",
     "displayName": "Име за приказ",
     "sizeLabel": "Ниво способности",
@@ -369,6 +374,7 @@
     "checklistSummary": "Подешено {configured} од {total} провајдера",
     "checklistKeyless": "кључ није потребан",
     "checklistNoKeyTip": "Кључ још није додат. Кликните да бисте га додали.",
+    "checklistSignupLink": "Отворите {provider} да бисте направили налог и добили кључ",
     "checklistKeylessTip": "Ради без кључа.",
     "tabQuotaSignals": "Квотни сигнали",
     "tabApiKey": "Обједињени кључ API",
@@ -495,11 +501,11 @@
     "platform": "Платформа",
     "hideAdded": "Сакриј додате добављаче",
     "apiToken": "API токен",
-    "noKeyNeededPlaceholder": "Није потребан кључ API",
+    "keyOptionalPlaceholder": "Опционо",
     "bearerTokenPlaceholder": "Токен носиоца",
     "pasteKeyPlaceholder": "налепите кључ овде",
     "pasteSeveral": "Налепи више",
-    "keylessHint": "Није потребан API кључ: бесплатни ниво овог провајдера је анониман (ограничено на стопу по ИП-у).",
+    "keyOptionalHint": "Опционо: оставите празно за анонимни бесплатни ниво (ограничење по IP адреси) или налепите сопствени кључ да бисте користили свој налог.",
     "enable": "Омогући",
     "noProviderKeys": "Још нема кључева добављача. Додајте један изнад да бисте започели рутирање.",
     "filterPlaceholder": "Филтрирајте добављаче или кључеве",
@@ -677,7 +683,14 @@
     "testFailed": "Тест модела није успео",
     "testThrottled": "Сачекајте {seconds}с пре поновног тестирања овог модела.",
     "noModelsForProvider": "Нема конфигурисаних модела за овог пружаоца.",
-    "testModels": "Testiraj modele"
+    "testModels": "Testiraj modele",
+    "monthlyRequestCapLabel": "Месечни лимит захтева",
+    "monthlyTokenCapLabel": "Месечни лимит токена",
+    "capUnlimitedPlaceholder": "Неограничено",
+    "capEditHint": "Лимити се ресетују 1. у 00:00 UTC. Оставите празно за неограничено.",
+    "monthlyUsageLine": "{requests} захтева, {tokens} токена овог месеца",
+    "quotaBalanceHint": "Преостало {remaining} од {limit} {metric}",
+    "quotaBalanceLeft": "Преостало {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Пре ажурирања"
   },
   "status": {
     "healthy": "здраво",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Увек доступан лични асистент који са вашег рачунара одговара у апликацијама WhatsApp, Telegram, Discord и другим.",
-      "hermes": "Агент компаније Nous Research који сам себе усавршава, са трајном меморијом и вештинама, у терминалу или у чет апликацијама."
+      "hermes": "Агент компаније Nous Research који сам себе усавршава, са трајном меморијом и вештинама, у терминалу или у чет апликацијама.",
+      "pi": "Минималистички терминалски агент који обликујете сопственим проширењима, вештинама и шаблонима упита.",
+      "reasonix": "Терминалски агент за програмирање направљен за DeepSeek, око кеширања префикса, како би дуге сесије остале јефтине."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Инсталирана је новија верзија FreeLLMAPI-ја.",
+    "reload": "Поново учитај"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Преименуј овај ланац",
+    "renameConfirm": "Преименовати ланац „{oldName}“ у „{name}“? Клијенти који зову auto:{oldName} морају прећи на auto:{name}.",
+    "renamePlaceholder": "Нови назив ланца",
+    "renameFailed": "Није могуће преименовати тај ланац."
+  },
+  "updates": {
+    "versionAvailable": "Доступна је верзија {version}",
+    "versionReady": "Верзија {version} је спремна за инсталацију",
+    "releaseNotes": "Белешке о издању",
+    "tryAgain": "Покушај поново",
+    "offline": "Проверите интернет везу и покушајте поново."
   }
 }

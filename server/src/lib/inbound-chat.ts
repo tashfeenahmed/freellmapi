@@ -31,7 +31,8 @@ import {
 } from './fallback-loop.js';
 import { routedViaValue } from './header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from './guardrails.js';
-import { contentToString } from './content.js';
+import { contentToString, estimateInputTokens } from './content.js';
+import { routeOutputBudget } from './output-cap.js';
 import { normalizeMessageImages } from './image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from './tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from './tool-validate.js';
@@ -84,15 +85,6 @@ export interface InboundChatWire {
   sendToolCalls?(res: Response, route: RouteResult, calls: ChatToolCall[]): void;
   finishStream(res: Response, result: InboundChatResult): void;
   sendStreamError?(res: Response, message: string): void;
-}
-
-function estimateTokens(messages: ChatMessage[]): number {
-  return messages.reduce((sum, message) => {
-    const text = contentToString(message.content);
-    const calls = (message.tool_calls ?? [])
-      .reduce((n, call) => n + call.function.name.length + call.function.arguments.length, 0);
-    return sum + Math.ceil((text.length + calls) / 4);
-  }, 0);
 }
 
 function hasImages(messages: ChatMessage[]): boolean {
@@ -181,7 +173,7 @@ export async function runInboundChat(
   // token budgets, payload limits, and upstream transfers all see the shrunk
   // bytes (see lib/image-normalize.ts). Mutates the image blocks in place.
   await normalizeMessageImages(input.messages);
-  const estimatedInputTokens = estimateTokens(input.messages);
+  const estimatedInputTokens = estimateInputTokens(input.messages, input.tools);
   const budget = applyTokenBudget(estimatedInputTokens, input.maxTokens);
   if (budget.rejection) {
     wire.sendError(res, 413, tokenBudgetMessage(budget.rejection), 'request_token_budget');
@@ -263,7 +255,7 @@ export async function runInboundChat(
           route.apiKey,
           input.messages,
           route.modelId,
-          options,
+          { ...options, contextBudget: routeOutputBudget(route, estimatedInputTokens) },
         );
         const message = result.choices?.[0]?.message;
         let text = contentToString(message?.content ?? '');
@@ -390,7 +382,7 @@ export async function runInboundChat(
           route.apiKey,
           input.messages,
           route.modelId,
-          options,
+          { ...options, contextBudget: routeOutputBudget(route, estimatedInputTokens) },
         );
         for await (const chunk of stream) {
           if (clientGone) break;

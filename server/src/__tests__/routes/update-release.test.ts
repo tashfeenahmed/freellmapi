@@ -54,7 +54,7 @@ function releaseBody(overrides: Record<string, unknown> = {}) {
 function createTestApp(overrides: Parameters<typeof createUpdateRouter>[0] = {}) {
   const app = express();
   const fetchMock = overrides.fetch ?? vi.fn(async () => response(releaseBody()));
-  const logger = overrides.logger ?? { error: vi.fn() };
+  const logger = overrides.logger ?? { error: vi.fn(), log: vi.fn() };
   app.use('/api/update', createUpdateRouter({
     env: {},
     cwd: '/worktree/server',

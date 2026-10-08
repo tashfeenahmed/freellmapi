@@ -152,21 +152,24 @@
     "compressionRunPreview": "ಪೂರ್ವವೀಕ್ಷಣೆ ರನ್ ಮಾಡಿ",
     "updatesTitle": "ನವೀಕರಣಗಳು",
     "checkForUpdates": "ನವೀಕರಣಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಿ",
-    "lastChecked": "ಕೊನೆಯದಾಗಿ ಪರಿಶೀಲಿಸಲಾಗಿದೆ: {when}",
-    "currentVersion": "ಪ್ರಸ್ತುತ ಬಿಲ್ಡ್:",
     "updateAvailable": "ನವೀಕರಣ ಲಭ್ಯವಿದೆ",
-    "changelog": "ಏನು ಬದಲಾಗಿದೆ",
     "upToDate": "ನವೀಕೃತವಾಗಿದೆ",
     "buildAhead": "ಈ ಬಿಲ್ಡ್ ಅಧಿಕೃತ main ಶಾಖೆಗಿಂತ ಮುಂದಿದೆ.",
     "buildDiverged": "ಈ ಬಿಲ್ಡ್ ಅಧಿಕೃತ main ಶಾಖೆಯಿಂದ ಬೇರೆಯಾಗಿದೆ.",
     "buildUnknown": "ಈ ಕಸ್ಟಮ್ ಬಿಲ್ಡ್ ಅನ್ನು ಅಧಿಕೃತ main ಶಾಖೆಯೊಂದಿಗೆ ಹೋಲಿಸಲಾಗುವುದಿಲ್ಲ.",
     "notGitInstall": "ಈ ಸ್ಥಾಪನೆಯು ಕಮಿಟ್ ಮಾಹಿತಿಯನ್ನು ಒಳಗೊಂಡಿಲ್ಲ.",
     "checkFailed": "ನವೀಕರಣಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-    "contactsGithub": "ಪರಿಶೀಲನೆಗಳನ್ನು ಹಸ್ತಚಾಲಿತವಾಗಿ ಮಾಡಲಾಗುತ್ತದೆ ಮತ್ತು ಅವು GitHub ಅನ್ನು ಸಂಪರ್ಕಿಸುತ್ತವೆ.",
     "autoUpdateCheck": "ಸ್ವಯಂಚಾಲಿತ ನವೀಕರಣ ಪರಿಶೀಲನೆ",
-    "autoUpdateCheckHelp": "ದಿನಕ್ಕೊಮ್ಮೆ ಹೊಸ ಬಿಡುಗಡೆಗಾಗಿ GitHub ಅನ್ನು ಪರಿಶೀಲಿಸುತ್ತದೆ ಮತ್ತು ಜ್ಞಾಪನೆ ತೋರಿಸುತ್ತದೆ. ಪೂರ್ವನಿಯೋಜಿತವಾಗಿ ಆಫ್ ಆಗಿದೆ.",
-    "openReleases": "GitHub ಬಿಡುಗಡೆಗಳನ್ನು ತೆರೆಯಿರಿ",
-    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ."
+    "restartAfterUpdate": "ಬಿಲ್ಡ್ ಪೂರ್ಣಗೊಂಡ ನಂತರ FreeLLMAPI ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ.",
+    "downloadUpdate": "ಅಪ್‌ಡೇಟ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+    "downloadingUpdate": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {percent}%",
+    "restartToUpdate": "ಅಪ್‌ಡೇಟ್ ಮಾಡಲು ಮರುಪ್ರಾರಂಭಿಸಿ",
+    "updateReadyHint": "ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ. FreeLLMAPI ನಿಮ್ಮ ಡೇಟಾದ ಬ್ಯಾಕಪ್ ತೆಗೆದು, ಮರುಪ್ರಾರಂಭಿಸಿ ಹೊಸ ಆವೃತ್ತಿಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
+    "updateInstallFailed": "ಅಪ್‌ಡೇಟ್ ಅನ್ನು ಸ್ಥಾಪಿಸಲಾಗಲಿಲ್ಲ.",
+    "updateNow": "ಈಗಲೇ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
+    "updatingContainer": "ಹೊಸ ಇಮೇಜ್ ಎಳೆಯಲಾಗುತ್ತಿದೆ ಮತ್ತು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ. FreeLLMAPI ಮರಳಿದಾಗ ಈ ಪುಟ ಮರುಲೋಡ್ ಆಗುತ್ತದೆ.",
+    "updateNowFailed": "ಅಪ್‌ಡೇಟರ್ ವಿನಂತಿಯನ್ನು ಸ್ವೀಕರಿಸಲಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.",
+    "updateNowTimeout": "5 ನಿಮಿಷಗಳ ನಂತರವೂ FreeLLMAPI ಮರುಪ್ರಾರಂಭವಾಗಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಲಾಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
   },
   "models": {
     "title": "ಮಾದರಿಗಳು",
@@ -209,6 +212,7 @@
     "noKey": "ಕೀ ಇಲ್ಲ",
     "dragToReorder": "ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ",
     "dragToReorderGroup": "ಮಾದರಿಯನ್ನು ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ",
+    "moveToRank": "ರೆಂಕ್‌ಗೆ ಹೋಗಿ",
     "providerCount": "{count} ಪೂರೈಕೆದಾರರು",
     "servedBy": "{providers} ಮೂಲಕ ಸೇವೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
     "viewProviders": "ಪೂರೈಕೆದಾರರನ್ನು ವೀಕ್ಷಿಸಿ",
@@ -223,6 +227,7 @@
     "settingsHint": "ಕ್ಯಾಟಲಾಗ್ ಮಾದರಿಗಳಿಗೆ ಸ್ಥಳೀಯ ಸಂಪಾದನೆಗಳನ್ನು ಕ್ಯಾಟಲಾಗ್ ಸಿಂಕ್‌ಗಳಾದ್ಯಂತ ಇರಿಸಲಾಗುತ್ತದೆ. ಅಳಿಸಲಾದ ಕ್ಯಾಟಲಾಗ್ ಮಾದರಿಗಳನ್ನು ನೀವು ಕಾನ್ಫಿಗರ್ ಮೂಲಕ ಮತ್ತೆ ಸೇರಿಸುವವರೆಗೆ ಅಳಿಸಲಾಗುತ್ತದೆ.",
     "catalogModel": "ಕ್ಯಾಟಲಾಗ್",
     "customModel": "ಪದ್ಧತಿ",
+    "discoveredModel": "ಪತ್ತೆಯಾದ",
     "localOverride": "ಸ್ಥಳೀಯ ಅತಿಕ್ರಮಣ",
     "displayName": "ಪ್ರದರ್ಶನ ಹೆಸರು",
     "sizeLabel": "ಸಾಮರ್ಥ್ಯ ಹಂತ",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} ರಲ್ಲಿ {configured} ಪೂರೈಕೆದಾರರನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಲಾಗಿದೆ",
     "checklistKeyless": "ಕೀ ಅಗತ್ಯವಿಲ್ಲ",
     "checklistNoKeyTip": "ಇನ್ನೂ ಯಾವುದೇ ಕೀ ಸೇರಿಸಿಲ್ಲ. ಸೇರಿಸಲು ಕ್ಲಿಕ್ ಮಾಡಿ.",
+    "checklistSignupLink": "ಖಾತೆ ರಚಿಸಿ ಕೀ ಪಡೆಯಲು {provider} ತೆರೆಯಿರಿ",
     "checklistKeylessTip": "ಕೀ ಇಲ್ಲದೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
     "tabQuotaSignals": "ಕೋಟಾ ಸಂಕೇತಗಳು",
     "tabApiKey": "ಏಕೀಕೃತ API ಕೀ",
@@ -495,11 +501,11 @@
     "platform": "ವೇದಿಕೆ",
     "hideAdded": "ಸೇರಿಸಿದ ಪೂರೈಕೆದಾರರನ್ನು ಮರೆಮಾಡಿ",
     "apiToken": "API ಟೋಕನ್",
-    "noKeyNeededPlaceholder": "ಯಾವುದೇ API ಕೀ ಅಗತ್ಯವಿಲ್ಲ",
+    "keyOptionalPlaceholder": "ಐಚ್ಛಿಕ",
     "bearerTokenPlaceholder": "ಬೇರರ್ ಟೋಕನ್",
     "pasteKeyPlaceholder": "ಕೀಲಿಯನ್ನು ಇಲ್ಲಿ ಅಂಟಿಸಿ",
     "pasteSeveral": "ಹಲವನ್ನು ಅಂಟಿಸಿ",
-    "keylessHint": "API ಕೀ ಅಗತ್ಯವಿಲ್ಲ: ಈ ಪೂರೈಕೆದಾರರ ಉಚಿತ ಶ್ರೇಣಿಯು ಅನಾಮಧೇಯವಾಗಿದೆ (ಪ್ರತಿ IP ಗೆ ದರ-ಸೀಮಿತವಾಗಿದೆ).",
+    "keyOptionalHint": "ಐಚ್ಛಿಕ: ಅನಾಮಧೇಯ ಉಚಿತ ಶ್ರೇಣಿಗಾಗಿ (ಪ್ರತಿ IP ದರ-ಮಿತಿ) ಖಾಲಿ ಬಿಡಿ, ಅಥವಾ ನಿಮ್ಮ ಖಾತೆಯನ್ನು ಬಳಸಲು ನಿಮ್ಮ ಸ್ವಂತ ಕೀಯನ್ನು ಅಂಟಿಸಿ.",
     "enable": "ಸಕ್ರಿಯಗೊಳಿಸಿ",
     "noProviderKeys": "ಇನ್ನೂ ಯಾವುದೇ ಪೂರೈಕೆದಾರರ ಕೀಗಳಿಲ್ಲ. ರೂಟಿಂಗ್ ಪ್ರಾರಂಭಿಸಲು ಮೇಲಿನ ಒಂದನ್ನು ಸೇರಿಸಿ.",
     "filterPlaceholder": "ಫಿಲ್ಟರ್ ಪೂರೈಕೆದಾರರು ಅಥವಾ ಕೀಲಿಗಳು",
@@ -677,7 +683,14 @@
     "testFailed": "ಮಾದರಿ ಪರೀಕ್ಷೆ ವಿಫಲವಾಗಿದೆ",
     "testThrottled": "ದಯವಿಟ್ಟು ಈ ಮಾದರಿಯನ್ನು ಮತ್ತೆ ಪರೀಕ್ಷಿಸುವ ಮೊದಲು {seconds} ಸೆಕೆಂಡುಗಳು ಕಾಯಿರಿ.",
     "noModelsForProvider": "ಈ ಒದಗಿಸುವವರಿಗಾಗಿ ಯಾವುದೇ ಮಾದರಿಗಳನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಲಾಗಿಲ್ಲ.",
-    "testModels": "ಮಾದರಿಗಳನ್ನು ಪರೀಕ್ಷಿಸಿ"
+    "testModels": "ಮಾದರಿಗಳನ್ನು ಪರೀಕ್ಷಿಸಿ",
+    "monthlyRequestCapLabel": "ಮಾಸಿಕ ವಿನಂತಿ ಮಿತಿ",
+    "monthlyTokenCapLabel": "ಮಾಸಿಕ ಟೋಕನ್ ಮಿತಿ",
+    "capUnlimitedPlaceholder": "ಅಪರಿಮಿತ",
+    "capEditHint": "ಮಿತಿಗಳು ಪ್ರತಿ ತಿಂಗಳು 1 ರಂದು 00:00 UTC ನಲ್ಲಿ ಮರುಹೊಂದಿಸುತ್ತವೆ. ಅಪರಿಮಿತಕ್ಕೆ ಖಾಲಿ ಬಿಡಿ.",
+    "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು",
+    "quotaBalanceHint": "{limit} {metric} ಪೈಕಿ {remaining} ಉಳಿದಿದೆ",
+    "quotaBalanceLeft": "{remaining} ಉಳಿದಿದೆ"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "ಅಪ್‌ಡೇಟ್‌ಗೆ ಮುನ್ನ"
   },
   "status": {
     "healthy": "ಆರೋಗ್ಯಕರ",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "ನಿಮ್ಮ ಸ್ವಂತ ಯಂತ್ರದಿಂದ WhatsApp, Telegram, Discord ಮತ್ತು ಇನ್ನಷ್ಟು ಕಡೆ ಉತ್ತರಿಸುವ, ಸದಾ ಚಾಲ್ತಿಯಲ್ಲಿರುವ ವೈಯಕ್ತಿಕ ಸಹಾಯಕ.",
-      "hermes": "Nous Research ನ ಸ್ವಯಂ-ಸುಧಾರಣಾ ಏಜೆಂಟ್, ಶಾಶ್ವತ ಮೆಮೊರಿ ಮತ್ತು ಕೌಶಲ್ಯಗಳೊಂದಿಗೆ, ಟರ್ಮಿನಲ್‌ನಲ್ಲಿ ಅಥವಾ ಚಾಟ್ ಆ್ಯಪ್‌ಗಳಲ್ಲಿ."
+      "hermes": "Nous Research ನ ಸ್ವಯಂ-ಸುಧಾರಣಾ ಏಜೆಂಟ್, ಶಾಶ್ವತ ಮೆಮೊರಿ ಮತ್ತು ಕೌಶಲ್ಯಗಳೊಂದಿಗೆ, ಟರ್ಮಿನಲ್‌ನಲ್ಲಿ ಅಥವಾ ಚಾಟ್ ಆ್ಯಪ್‌ಗಳಲ್ಲಿ.",
+      "pi": "ನಿಮ್ಮದೇ ಎಕ್ಸ್‌ಟೆನ್ಶನ್‌ಗಳು, ಕೌಶಲ್ಯಗಳು ಮತ್ತು ಪ್ರಾಂಪ್ಟ್ ಟೆಂಪ್ಲೇಟ್‌ಗಳಿಂದ ರೂಪಿಸುವ ಕನಿಷ್ಠ ಟರ್ಮಿನಲ್ ಏಜೆಂಟ್.",
+      "reasonix": "DeepSeekಗಾಗಿ ನಿರ್ಮಿಸಿದ ಟರ್ಮಿನಲ್ ಕೋಡಿಂಗ್ ಏಜೆಂಟ್, ದೀರ್ಘ ಸೆಷನ್‌ಗಳೂ ಅಗ್ಗವಾಗಿರಲು ಪ್ರಿಫಿಕ್ಸ್ ಕ್ಯಾಶಿಂಗ್ ಸುತ್ತ ರೂಪಿಸಲಾಗಿದೆ."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI ನ ಹೊಸ ಆವೃತ್ತಿ ಸ್ಥಾಪಿಸಲಾಗಿದೆ.",
+    "reload": "ಮರುಲೋಡ್"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "ಈ ಚೈನ್ ಹೆಸರನ್ನು ಮಾರ್ಪಡಿಸಿ",
+    "renameConfirm": "ಚೈನ್ \"{oldName}\" ಹೆಸರನ್ನು \"{name}\" ಗೆ ಬದಲಾಯಿಸುವುದೇ? auto:{oldName} ಕರೆ ಮಾಡುವ ಕ್ಲೈಂಟ್‌ಗಳು auto:{name} ಗೆ ಬದಲಾಗಬೇಕು.",
+    "renamePlaceholder": "ಹೊಸ ಚೈನ್ ಹೆಸರು",
+    "renameFailed": "ಚೈನ್ ಹೆಸರನ್ನು ಮರುಹೆಸರಿಸಲಾಗಲಿಲ್ಲ."
+  },
+  "updates": {
+    "versionAvailable": "ಆವೃತ್ತಿ {version} ಲಭ್ಯವಿದೆ",
+    "versionReady": "ಆವೃತ್ತಿ {version} ಸ್ಥಾಪನೆಗೆ ಸಿದ್ಧವಾಗಿದೆ",
+    "releaseNotes": "ಬಿಡುಗಡೆ ಟಿಪ್ಪಣಿಗಳು",
+    "tryAgain": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+    "offline": "ನಿಮ್ಮ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   }
 }

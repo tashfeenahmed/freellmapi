@@ -15,6 +15,8 @@
   {"id":"atomcode","name":"AtomCode","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-atomcode","docsUrl":"https://atomcode.atomgit.com/docs/en/"},
   {"id":"openclaw","name":"OpenClaw","category":"agent","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-openclaw","docsUrl":"https://docs.openclaw.ai/gateway/config-tools/custom-providers"},
   {"id":"hermes","name":"Hermes Agent","category":"agent","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-hermes","docsUrl":"https://hermes-agent.nousresearch.com/docs/"},
+  {"id":"pi","name":"Pi","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-pi","docsUrl":"https://pi.dev/docs/latest/models"},
+  {"id":"reasonix","name":"Reasonix","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-reasonix","docsUrl":"https://github.com/esengine/DeepSeek-Reasonix/blob/studio/docs/CLI.md#configure-providers"},
   {"id":"cursor","name":"Cursor","category":"code","configType":"guide","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-cursor","docsUrl":"https://docs.cursor.com"},
   {"id":"generic","name":"Generic OpenAI client","category":"agent","configType":"guide","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-generic","docsUrl":"https://github.com/tashfeenahmed/freellmapi"}
 ]

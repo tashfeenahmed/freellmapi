@@ -178,6 +178,13 @@ interface Catalog {
   /** Text-to-video registry. Kept out of `models` so pre-video binaries ignore
    *  it rather than routing unknown-modality rows through chat. */
   videoModels?: CatalogVideoModel[];
+  /** Platforms the catalog service manages even when this tier ships no rows
+   *  for them (#1348): a provider still inside its Premium window, or one the
+   *  audit deliberately keeps at zero rows. Names only, never model rows, so
+   *  the monthly snapshot can carry it without leaking Premium models. Any
+   *  platform listed here is off limits to built-in model discovery. Optional:
+   *  older catalogs omit it and older binaries ignore it. */
+  managedPlatforms?: string[];
   quirks: CatalogQuirk[];
 }
 
@@ -247,6 +254,8 @@ function isCatalog(value: unknown): value is Catalog {
         !!m?.limits &&
         typeof m.limits === 'object',
     ) &&
+    (c.managedPlatforms === undefined ||
+      (Array.isArray(c.managedPlatforms) && c.managedPlatforms.every((p) => typeof p === 'string'))) &&
     c.quirks.every((q) => typeof q?.slug === 'string' && Array.isArray(q?.targets))
   );
 }
@@ -267,8 +276,52 @@ function isCatalog(value: unknown): value is Catalog {
  *    auto-retired from an upstream 410/end-of-life response (#634) are only
  *    disabled — a catalog that still lists them lifts the retirement;
  *  - models that vanished from the catalog are deleted, exactly like the
- *    dead-model migrations do (fallback_config row first, FK order).
+ *    dead-model migrations do (fallback_config row first, FK order);
+ *  - rows found by built-in model discovery (models.source = 'discovered',
+ *    #1348) are a stopgap for platforms the catalog does not manage. The
+ *    catalog outranks them: a listed platform:model_id adopts the discovered
+ *    row as a catalog row, and once the catalog manages a platform at all,
+ *    every other discovered row on it is retired.
  */
+/** models.source for rows written by built-in model discovery (#1348). */
+export const DISCOVERED_MODEL_SOURCE = 'discovered';
+
+/** Every platform a catalog document manages: any row in any registry, plus
+ *  the names-only managedPlatforms list. */
+function catalogPlatforms(catalog: Catalog): Set<string> {
+  const platforms = new Set<string>();
+  for (const m of catalog.models) platforms.add(m.platform);
+  for (const m of catalog.embeddings ?? []) platforms.add(m.platform);
+  for (const m of catalog.transcriptionModels ?? []) platforms.add(m.platform);
+  for (const m of catalog.videoModels ?? []) platforms.add(m.platform);
+  for (const p of catalog.managedPlatforms ?? []) platforms.add(p);
+  return platforms;
+}
+
+let appliedPlatformsCache: { raw: string; platforms: Set<string> } | null = null;
+
+/**
+ * Platforms the catalog applied on this install manages (see catalogPlatforms),
+ * read from the cached verified document. Empty when no catalog has been
+ * applied yet. Built-in model discovery treats every platform in here as off
+ * limits, so the audited catalog, not an upstream /models list, decides what
+ * those providers serve.
+ */
+export function appliedCatalogPlatforms(db: Db): Set<string> {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(SETTING_APPLIED_JSON) as { value: string } | undefined;
+  const raw = row?.value ?? '';
+  if (appliedPlatformsCache && appliedPlatformsCache.raw === raw) return appliedPlatformsCache.platforms;
+  let platforms = new Set<string>();
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (isCatalog(parsed)) platforms = catalogPlatforms(parsed);
+    } catch { /* an unreadable cache manages nothing; the DB checks still apply */ }
+  }
+  appliedPlatformsCache = { raw, platforms };
+  return platforms;
+}
+
 export function applyCatalog(db: Db, catalog: Catalog): NonNullable<SyncResult['counts']> {
   // One transaction for the whole apply (#1047): the body runs hundreds of
   // individual statements, and under WAL each one outside a transaction is its
@@ -291,6 +344,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
       enabled = @enabled
     WHERE id = @id
   `);
+  const adoptModel = db.prepare("UPDATE models SET source = 'catalog' WHERE id = ?");
   const insertModel = db.prepare(`
     INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
                         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
@@ -406,6 +460,12 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
       // never-touch rule for custom-provider models). The row also survives
       // the prune below because the delete pass only considers source='catalog'.
       if (row && row.source === 'user') continue;
+      // #1348: a DISCOVERED row is the opposite case. Discovery only fills a
+      // gap the catalog left, so once the catalog lists the model it takes the
+      // row over: the metadata below replaces discovery's guesses and the row
+      // becomes catalog-owned (pruned with the catalog from then on). Local
+      // disables survive, like on any catalog row.
+      if (row && row.source === DISCOVERED_MODEL_SOURCE) adoptModel.run(row.id);
       const fields = {
         displayName: m.displayName,
         intelligenceRank: m.intelligenceRank,
@@ -580,6 +640,24 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
       }
     }
 
+    // #1348: retire discovered rows on every platform the catalog now
+    // manages. A platform counts as managed when this catalog carries ANY row
+    // for it (chat, media, embedding, STT or video; enabled or disabled, since
+    // a disabled row is still an audit verdict) or names it in
+    // managedPlatforms. Rows the catalog listed were adopted above and are
+    // source='catalog' by now, so what is left is exactly the discovered
+    // stopgap the catalog has superseded.
+    const managed = catalogPlatforms(catalog);
+    const discoveredRows = db
+      .prepare('SELECT id, platform FROM models WHERE source = ?')
+      .all(DISCOVERED_MODEL_SOURCE) as { id: number; platform: string }[];
+    for (const d of discoveredRows) {
+      if (!managed.has(d.platform)) continue;
+      deleteFb.run(d.id);
+      deleteModel.run(d.id);
+      counts.removed++;
+    }
+
     // Remove media models the catalog no longer lists (own table, no
     // fallback_config). Deliberately an ALLOWLIST of the two modalities that
     // `models[]` maintains, not "everything except transcription": video and
@@ -746,6 +824,35 @@ export async function syncCatalog(force = false): Promise<SyncResult> {
     console.warn(`[catalog-sync] ${message}`);
     setSetting(SETTING_LAST_ERROR, message);
     return { ok: false, action: 'error', detail: message };
+  }
+}
+
+/** Raw response from the catalog service's license activation endpoint. */
+export interface LicenseActivation {
+  valid: boolean;
+  plan: string | null;
+  status: string | null;
+  expiresAt: string | null;
+  reason?: string;
+}
+
+/**
+ * Validate a key with the license service. Returns null when the service is
+ * unreachable — distinguishable from a rejected key, so a transient outage can
+ * be warned about instead of reported as a bad key. Shared by the dashboard's
+ * POST /api/premium/key and declarative `license` config.
+ */
+export async function validateLicenseKey(key: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<LicenseActivation | null> {
+  try {
+    const res = await fetch(`${catalogBaseUrl()}/v1/license/activate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return (await res.json()) as LicenseActivation;
+  } catch {
+    return null;
   }
 }
 

@@ -41,7 +41,7 @@
 | `bazaarlink` | BazaarLink | 带密钥 | OpenAI 兼容 | 只有 `auto:free` 路由进了目录——直接指定模型 id 是付费的（#385）。 |
 | `ainative` | AINative Studio | 带密钥 | OpenAI 兼容 | 宣称每月循环约 1000 万词元的免费配额；在真实账号确认之前按未核实处理。 |
 | `aion` | Aion Labs | 带密钥 | OpenAI 兼容 | 无需信用卡的免费密钥；可用性在 30 天观察期之后交由目录管理。 |
-| `requesty` | Requesty | 带密钥 | OpenAI 兼容 | 路由端点位于 `router.requesty.ai/v1`；免费行随月度目录逐步纳入。 |
+| `requesty` | Requesty | 带密钥 | OpenAI 兼容 | 路由端点位于 `router.requesty.ai/v1`；免费行随月度目录逐步纳入；免费档为所有免费模型共享每天 200 次请求。 |
 | `navy` | NavyAI | 带密钥 | OpenAI 兼容 | 免费计划：每日 15 万词元、20 RPM；线上冒烟测试需要显式 User-Agent 头。 |
 | `nara` | NaraRouter | 带密钥 | OpenAI 兼容 | 免费计划额外要求 Telegram 频道/链接验证；2026 年 7 月 9 日做过线上探测。 |
 | `sealion` | SEA-LION (AI Singapore) | 带密钥 | OpenAI 兼容 | 第一方 API；Google 登录、无需信用卡、没有地区墙；免费档每月循环 10 RPM。 |

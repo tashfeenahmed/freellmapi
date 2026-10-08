@@ -152,21 +152,24 @@
     "compressionRunPreview": "Jalankan pratonton",
     "updatesTitle": "Kemas kini",
     "checkForUpdates": "Semak kemas kini",
-    "lastChecked": "Terakhir diperiksa: {when}",
-    "currentVersion": "Binaan semasa:",
     "updateAvailable": "Kemas kini tersedia",
-    "changelog": "Perubahan",
     "upToDate": "Sudah dikemas kini",
     "buildAhead": "Binaan ini mendahului cabang main rasmi.",
     "buildDiverged": "Binaan ini telah menyimpang daripada cabang main rasmi.",
     "buildUnknown": "Binaan tersuai ini tidak dapat dibandingkan dengan cabang main rasmi.",
     "notGitInstall": "Pemasangan ini tidak menyertakan maklumat komit.",
     "checkFailed": "Tidak dapat menyemak kemas kini.",
-    "contactsGithub": "Semakan dijalankan secara manual dan menghubungi GitHub.",
     "autoUpdateCheck": "Semakan kemas kini automatik",
-    "autoUpdateCheckHelp": "Menyemak GitHub sekali sehari untuk keluaran baharu dan memaparkan peringatan. Dimatikan secara lalai.",
-    "openReleases": "Buka Keluaran GitHub",
-    "restartAfterUpdate": "Mulakan semula FreeLLMAPI selepas binaan selesai."
+    "restartAfterUpdate": "Mulakan semula FreeLLMAPI selepas binaan selesai.",
+    "downloadUpdate": "Muat turun kemas kini",
+    "downloadingUpdate": "Memuat turun… {percent}%",
+    "restartToUpdate": "Mulakan semula untuk mengemas kini",
+    "updateReadyHint": "Selesai dimuat turun. FreeLLMAPI menyandarkan data anda, bermula semula dan membuka versi baharu.",
+    "updateInstallFailed": "Kemas kini tidak dapat dipasang.",
+    "updateNow": "Kemas kini sekarang",
+    "updatingContainer": "Menarik imej baharu dan memulakan semula. Halaman ini dimuat semula apabila FreeLLMAPI kembali.",
+    "updateNowFailed": "Pengemas kini tidak menerima permintaan. Semak bahawa kontena watchtower sedang berjalan.",
+    "updateNowTimeout": "FreeLLMAPI belum bermula semula selepas 5 minit. Semak log kontena watchtower."
   },
   "models": {
     "title": "Model",
@@ -209,6 +212,7 @@
     "noKey": "tiada kunci",
     "dragToReorder": "Seret untuk menyusun semula",
     "dragToReorderGroup": "Seret untuk menyusun semula model",
+    "moveToRank": "Lompat ke pangkat",
     "providerCount": "{count} penyedia",
     "servedBy": "Dihidangkan oleh {providers}",
     "viewProviders": "Lihat penyedia",
@@ -223,6 +227,7 @@
     "settingsHint": "Suntingan tempatan pada model katalog dikekalkan merentasi penyelarasan katalog. Model katalog yang dipadam akan kekal dipadam sehingga anda menambahnya semula melalui konfigurasi.",
     "catalogModel": "katalog",
     "customModel": "adat",
+    "discoveredModel": "ditemui",
     "localOverride": "penggantian tempatan",
     "displayName": "Nama paparan",
     "sizeLabel": "Tahap keupayaan",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} daripada {total} penyedia telah dikonfigurasi",
     "checklistKeyless": "tiada kunci diperlukan",
     "checklistNoKeyTip": "Belum ada kunci ditambah. Klik untuk menambah.",
+    "checklistSignupLink": "Buka {provider} untuk membuat akaun dan mendapatkan kunci",
     "checklistKeylessTip": "Berfungsi tanpa kunci.",
     "tabQuotaSignals": "Isyarat kuota",
     "tabApiKey": "Kunci API bersatu",
@@ -495,11 +501,11 @@
     "platform": "Platform",
     "hideAdded": "Sembunyikan penyedia yang ditambah",
     "apiToken": "token API",
-    "noKeyNeededPlaceholder": "Tiada kunci API diperlukan",
+    "keyOptionalPlaceholder": "Pilihan",
     "bearerTokenPlaceholder": "Token pembawa",
     "pasteKeyPlaceholder": "tampal kekunci di sini",
     "pasteSeveral": "Tampal beberapa",
-    "keylessHint": "Tiada kunci API diperlukan: tahap percuma penyedia ini adalah tanpa nama (kadar terhad mengikut IP).",
+    "keyOptionalHint": "Pilihan: biarkan kosong untuk peringkat percuma tanpa nama (had kadar setiap IP), atau tampal kunci anda sendiri untuk menggunakan akaun anda.",
     "enable": "Aktifkan",
     "noProviderKeys": "Tiada kunci penyedia lagi. Tambah satu di atas untuk mula penghalaan.",
     "filterPlaceholder": "Tapis penyedia atau kunci",
@@ -677,7 +683,14 @@
     "testFailed": "Ujian model gagal",
     "testThrottled": "Sila tunggu {seconds}s sebelum menguji model ini semula.",
     "noModelsForProvider": "Tiada model dikonfigurasikan untuk pembekal ini.",
-    "testModels": "Uji model"
+    "testModels": "Uji model",
+    "monthlyRequestCapLabel": "Had permintaan bulanan",
+    "monthlyTokenCapLabel": "Had token bulanan",
+    "capUnlimitedPlaceholder": "Tanpa had",
+    "capEditHint": "Had diset semula pada 1 haribulan 00:00 UTC. Biarkan kosong untuk tanpa had.",
+    "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini",
+    "quotaBalanceHint": "Baki {remaining} daripada {limit} {metric}",
+    "quotaBalanceLeft": "Baki {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Sebelum kemas kini"
   },
   "status": {
     "healthy": "sihat",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Pembantu peribadi yang sentiasa aktif dan menjawab di WhatsApp, Telegram, Discord dan banyak lagi dari mesin anda sendiri.",
-      "hermes": "Ejen Nous Research yang menambah baik dirinya sendiri, dengan memori kekal dan kemahiran, di terminal atau di aplikasi sembang."
+      "hermes": "Ejen Nous Research yang menambah baik dirinya sendiri, dengan memori kekal dan kemahiran, di terminal atau di aplikasi sembang.",
+      "pi": "Ejen terminal minimalis yang anda bentuk dengan sambungan, kemahiran dan templat prompt anda sendiri.",
+      "reasonix": "Ejen pengekodan terminal yang dibina untuk DeepSeek, berasaskan cache awalan supaya sesi panjang kekal murah."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Versi FreeLLMAPI yang lebih baharu telah dipasang.",
+    "reload": "Muat semula"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Tukar nama rantaian ini",
+    "renameConfirm": "Tukar nama rantaian \"{oldName}\" kepada \"{name}\"? Klien yang memanggil auto:{oldName} perlu bertukar ke auto:{name}.",
+    "renamePlaceholder": "Nama rantaian baharu",
+    "renameFailed": "Tidak dapat menukar nama rantaian."
+  },
+  "updates": {
+    "versionAvailable": "Versi {version} tersedia",
+    "versionReady": "Versi {version} sedia untuk dipasang",
+    "releaseNotes": "Nota keluaran",
+    "tryAgain": "Cuba lagi",
+    "offline": "Semak sambungan internet anda dan cuba lagi."
   }
 }

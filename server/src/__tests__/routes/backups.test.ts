@@ -137,6 +137,14 @@ describe('Backups API', () => {
     expect(scheduled.filename).toMatch(/^auto-backup-.*\.sql$/);
   });
 
+  it('names and lists the desktop updater\'s backup as pre-update', async () => {
+    const backup = createBackup(getDb(), { tables: [], source: 'pre-update', backupPath: '' });
+    expect(backup.filename).toMatch(/^pre-update-.*\.sql$/);
+    const listed = await request(app, 'GET', '/api/backups');
+    const items = listed.body.items as Array<{ id: number; source: string }>;
+    expect(items.find(item => item.id === backup.id)?.source).toBe('pre-update');
+  });
+
   it('never dumps the accounts, sessions or URL-token tables', async () => {
     const tables = await request(app, 'GET', '/api/backups/tables');
     for (const excluded of ['users', 'sessions', 'url_tokens']) {

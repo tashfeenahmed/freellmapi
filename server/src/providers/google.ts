@@ -19,6 +19,22 @@ export { sanitizeForGemini } from '../lib/gemini-wire.js';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
+function googleHttpError(res: Response, body: any) {
+  const err = providerHttpError(res, `Google API error ${res.status}: ${body?.error?.message ?? res.statusText}`, body);
+  // Gemini's human-readable message can omit the quota window. Keep only the
+  // daily signal from QuotaFailure, not the complete upstream payload (#1339).
+  const details = body?.error?.details;
+  if (res.status === 429 && Array.isArray(details)) {
+    err.dailyQuotaExhausted = details.some(detail =>
+      detail?.['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure'
+      && Array.isArray(detail.violations)
+      && detail.violations.some((violation: any) =>
+        typeof violation?.quotaId === 'string' && /PerDay/.test(violation.quotaId)),
+    );
+  }
+  return err;
+}
+
 // Gemini 3 REQUIRES the `thoughtSignature` that accompanied a function call to
 // be echoed back whenever that call appears in conversation history, or it
 // rejects the request with 400 "Function call is missing a thought_sig". But
@@ -560,7 +576,7 @@ export class GoogleProvider extends BaseProvider {
       contents: request.contents,
       generationConfig: {
         temperature: options?.temperature,
-        maxOutputTokens: resolveMaxTokens(this.platform, options?.max_tokens),
+        maxOutputTokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
         topP: options?.top_p,
         stopSequences: toGeminiStopSequences(options?.stop),
         ...toGeminiExtendedConfig(options),
@@ -592,7 +608,7 @@ export class GoogleProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw providerHttpError(res, `Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`, err);
+      throw googleHttpError(res, err);
     }
 
     const data = await res.json() as GeminiResponse;
@@ -643,7 +659,7 @@ export class GoogleProvider extends BaseProvider {
       contents: request.contents,
       generationConfig: {
         temperature: options?.temperature,
-        maxOutputTokens: resolveMaxTokens(this.platform, options?.max_tokens),
+        maxOutputTokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
         topP: options?.top_p,
         stopSequences: toGeminiStopSequences(options?.stop),
         ...toGeminiExtendedConfig(options),
@@ -673,7 +689,7 @@ export class GoogleProvider extends BaseProvider {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw providerHttpError(res, `Google API error ${res.status}: ${(err as any).error?.message ?? res.statusText}`, err);
+      throw googleHttpError(res, err);
     }
 
     const reader = res.body?.getReader();
@@ -798,18 +814,24 @@ export class GoogleProvider extends BaseProvider {
       reader.cancel().catch(() => { /* upstream already gone */ });
     }
 
+    // Reaching here means the body ended with neither `[DONE]` nor any
+    // `finishReason` — both legitimate terminators `return` from inside the
+    // loop above, so the only way out to this point is the `if (done) break`
+    // on an abrupt EOF (an h2 END_STREAM from an edge, or the backend cutting
+    // the generation mid-answer).
+    //
+    // This used to synthesize `finish_reason: 'stop'`, which told the client a
+    // half-written answer had completed normally: no failover, the request row
+    // logged 'success', and the route never benched. base.ts:392-397 states the
+    // opposite contract for every adapter that goes through readSseStream —
+    // "a stream that ends without [DONE] AND without any finish_reason is a
+    // truncated generation, not a completion" — and throws (base.ts:471). This
+    // adapter parses Gemini's own frame format and reads the body itself, so it
+    // never inherited that. Throw the same message: isStreamTruncatedError
+    // (lib/error-classify.ts:685) matches on it, and the fallback loop already
+    // fails over and bench-counts the streak (lib/fallback-loop.ts:485).
     if (!emittedFinish) {
-      yield {
-        id,
-        object: 'chat.completion.chunk',
-        created: Math.floor(Date.now() / 1000),
-        model: modelId,
-        choices: [{
-          index: 0,
-          delta: {},
-          finish_reason: sawToolCalls ? 'tool_calls' : 'stop',
-        }],
-      };
+      throw new Error(`${this.name} stream ended unexpectedly (no [DONE], no finish_reason) — connection reset or truncated upstream`);
     }
   }
 

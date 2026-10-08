@@ -152,21 +152,24 @@
     "compressionRunPreview": "Vorschau ausführen",
     "updatesTitle": "Aktualisierungen",
     "checkForUpdates": "Suchen Sie nach Updates",
-    "lastChecked": "Zuletzt überprüft: {when}",
-    "currentVersion": "Aktueller Build:",
     "updateAvailable": "Aktualisierung verfügbar",
-    "changelog": "Was ist neu",
     "upToDate": "Auf dem neuesten Stand",
     "buildAhead": "Dieser Build ist dem offiziellen main-Branch voraus.",
     "buildDiverged": "Dieser Build ist vom offiziellen main-Branch abgewichen.",
     "buildUnknown": "Dieser benutzerdefinierte Build kann nicht mit dem offiziellen main-Branch verglichen werden.",
     "notGitInstall": "Diese Installation enthält keine Commit-Informationen.",
     "checkFailed": "Aktualisierungen konnten nicht geprüft werden.",
-    "contactsGithub": "Prüfungen erfolgen manuell und stellen eine Verbindung zu GitHub her.",
     "autoUpdateCheck": "Automatische Updateprüfung",
-    "autoUpdateCheckHelp": "Prüft einmal täglich auf GitHub, ob es eine neue Version gibt, und zeigt eine Erinnerung an. Standardmäßig deaktiviert.",
-    "openReleases": "GitHub-Releases öffnen",
-    "restartAfterUpdate": "FreeLLMAPI nach Abschluss des Builds neu starten."
+    "restartAfterUpdate": "FreeLLMAPI nach Abschluss des Builds neu starten.",
+    "downloadUpdate": "Update herunterladen",
+    "downloadingUpdate": "Wird heruntergeladen… {percent} %",
+    "restartToUpdate": "Neu starten und aktualisieren",
+    "updateReadyHint": "Heruntergeladen. FreeLLMAPI sichert Ihre Daten, startet neu und öffnet die neue Version.",
+    "updateInstallFailed": "Das Update konnte nicht installiert werden.",
+    "updateNow": "Jetzt aktualisieren",
+    "updatingContainer": "Das neue Image wird geladen und neu gestartet. Die Seite lädt neu, sobald FreeLLMAPI wieder da ist.",
+    "updateNowFailed": "Der Updater hat die Anfrage nicht angenommen. Prüfen Sie, ob der watchtower-Container läuft.",
+    "updateNowTimeout": "FreeLLMAPI ist nach 5 Minuten nicht neu gestartet. Prüfen Sie die Logs des watchtower-Containers."
   },
   "models": {
     "title": "Modelle",
@@ -209,6 +212,7 @@
     "noKey": "kein Schlüssel",
     "dragToReorder": "Zum Neuanordnen ziehen",
     "dragToReorderGroup": "Ziehen Sie, um das Modell neu anzuordnen",
+    "moveToRank": "Zu Rang springen",
     "providerCount": "{count}-Anbieter",
     "servedBy": "Bereitgestellt von {providers}",
     "viewProviders": "Anbieter anzeigen",
@@ -223,6 +227,7 @@
     "settingsHint": "Lokale Änderungen an Katalogmodellen bleiben bei allen Katalogsynchronisierungen erhalten. Gelöschte Katalogmodelle bleiben gelöscht, bis Sie sie über die Konfiguration erneut hinzufügen.",
     "catalogModel": "Katalog",
     "customModel": "Brauch",
+    "discoveredModel": "entdeckt",
     "localOverride": "lokale Überschreibung",
     "displayName": "Anzeigename",
     "sizeLabel": "Fähigkeitsstufe",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} von {total} Anbietern eingerichtet",
     "checklistKeyless": "kein Schlüssel nötig",
     "checklistNoKeyTip": "Noch kein Schlüssel hinzugefügt. Zum Hinzufügen klicken.",
+    "checklistSignupLink": "{provider} öffnen, um ein Konto zu erstellen und einen Schlüssel zu erhalten",
     "checklistKeylessTip": "Funktioniert ohne Schlüssel.",
     "tabQuotaSignals": "Quotensignale",
     "tabApiKey": "Einheitlicher API-Schlüssel",
@@ -495,11 +501,11 @@
     "platform": "Plattform",
     "hideAdded": "Hinzugefügte Anbieter ausblenden",
     "apiToken": "API-Token",
-    "noKeyNeededPlaceholder": "Kein API-Schlüssel erforderlich",
+    "keyOptionalPlaceholder": "Optional",
     "bearerTokenPlaceholder": "Inhabertoken",
     "pasteKeyPlaceholder": "Schlüssel hier einfügen",
     "pasteSeveral": "Mehrere einfügen",
-    "keylessHint": "Kein API-Schlüssel erforderlich: Das kostenlose Kontingent dieses Anbieters ist anonym (Ratenbegrenzung pro IP).",
+    "keyOptionalHint": "Optional: Leer lassen für das anonyme Gratiskontingent (Ratenbegrenzung pro IP) oder eigenen Schlüssel einfügen, um Ihr Konto zu nutzen.",
     "enable": "Aktivieren",
     "noProviderKeys": "Noch keine Anbieterschlüssel. Fügen Sie oben eines hinzu, um mit dem Routing zu beginnen.",
     "filterPlaceholder": "Filtern Sie Anbieter oder Schlüssel",
@@ -677,7 +683,14 @@
     "testFailed": "Modelltest fehlgeschlagen",
     "testThrottled": "Bitte warten Sie {seconds}s, bevor Sie dieses Modell erneut testen.",
     "noModelsForProvider": "Keine Modelle für diesen Anbieter konfiguriert.",
-    "testModels": "Modelle testen"
+    "testModels": "Modelle testen",
+    "monthlyRequestCapLabel": "Monatliches Anfrage-Limit",
+    "monthlyTokenCapLabel": "Monatliches Token-Limit",
+    "capUnlimitedPlaceholder": "Unbegrenzt",
+    "capEditHint": "Limits werden am 1. um 00:00 UTC zurückgesetzt. Leer lassen für unbegrenzt.",
+    "monthlyUsageLine": "{requests} Anfragen, {tokens} Tokens diesen Monat",
+    "quotaBalanceHint": "{remaining} von {limit} {metric} übrig",
+    "quotaBalanceLeft": "{remaining} übrig"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Vor Update"
   },
   "status": {
     "healthy": "gesund",
@@ -1133,17 +1147,16 @@
       "generic": "Alles andere, was die OpenAI-API spricht — von Hand mit Basis-URL und Schlüssel eingerichtet.",
       "atomcode": "AtomGits Terminal-Agent, in Rust geschrieben, für jeden OpenAI-kompatiblen Endpunkt.",
       "openclaw": "Ein ständig verfügbarer persönlicher Assistent, der von deinem eigenen Rechner aus auf WhatsApp, Telegram, Discord und mehr antwortet.",
-      "hermes": "Der selbstverbessernde Agent von Nous Research mit dauerhaftem Gedächtnis und Skills, im Terminal oder in Chat-Apps."
+      "hermes": "Der selbstverbessernde Agent von Nous Research mit dauerhaftem Gedächtnis und Skills, im Terminal oder in Chat-Apps.",
+      "pi": "Ein minimaler Terminal-Agent, den du mit eigenen Erweiterungen, Skills und Prompt-Vorlagen formst.",
+      "reasonix": "Ein für DeepSeek gebauter Coding-Agent fürs Terminal, ausgelegt auf Prefix-Caching, damit lange Sitzungen günstig bleiben."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Eine neuere Version von FreeLLMAPI ist installiert.",
+    "reload": "Neu laden"
   },
   "freeTier": {
     "poolsToggle": "Free-Tier-Pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Leer beginnen",
     "startEmptyHint": "Legt die Kette ohne Modelle an und hält neue Katalogmodelle heraus. Ohne Haken startet sie als Kopie der Standardkette.",
     "curated": "Kuratiert",
-    "curatedHint": "Neue Katalogmodelle werden dieser Kette nicht automatisch hinzugefügt."
+    "curatedHint": "Neue Katalogmodelle werden dieser Kette nicht automatisch hinzugefügt.",
+    "renameHint": "Diese Kette umbenennen",
+    "renameConfirm": "Kette \"{oldName}\" in \"{name}\" umbenennen? Clients, die auto:{oldName} aufrufen, müssen auf auto:{name} wechseln.",
+    "renamePlaceholder": "Neuer Kettenname",
+    "renameFailed": "Die Kette konnte nicht umbenannt werden."
+  },
+  "updates": {
+    "versionAvailable": "Version {version} ist verfügbar",
+    "versionReady": "Version {version} ist bereit zur Installation",
+    "releaseNotes": "Versionshinweise",
+    "tryAgain": "Erneut versuchen",
+    "offline": "Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
   }
 }

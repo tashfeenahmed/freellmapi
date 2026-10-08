@@ -40,6 +40,22 @@ contextBridge.exposeInMainWorld(
   versionArg ? versionArg.slice('--freeapi-version='.length) : null,
 );
 
+// The in-app updater (the Settings update dialog and the update reminder). Like the session bridge above, deliberately
+// narrow: it can only check for, download and install the release published at
+// tashfeenahmed/freellmapi — the feed URL and signature checks live in the main
+// process and nothing here can point them anywhere else.
+contextBridge.exposeInMainWorld('__FREEAPI_UPDATER__', {
+  state: () => ipcRenderer.invoke('freeapi:update-state'),
+  check: () => ipcRenderer.invoke('freeapi:update-check'),
+  download: () => ipcRenderer.invoke('freeapi:update-download'),
+  install: () => ipcRenderer.invoke('freeapi:update-install'),
+  subscribe: (listener: (state: unknown) => void) => {
+    const handler = (_event: unknown, state: unknown) => listener(state);
+    ipcRenderer.on('freeapi:update-state', handler);
+    return () => { ipcRenderer.removeListener('freeapi:update-state', handler); };
+  },
+});
+
 // `desktop` class on <html> identifies the desktop shell. On macOS, `desktop-mac`
 // activates the translucent glass backdrop that pairs with native vibrancy;
 // on Windows and Linux, the solid theme background is preserved so contrast and

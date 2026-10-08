@@ -20,3 +20,6 @@ export function startServer(opts: StartOptions): Promise<ServerHandle>;
 export function ensureSessionToken(): string;
 export function getDb(): Database.Database;
 export function getUnifiedApiKey(): string;
+export function isAutoUpdateCheckEnabled(): boolean;
+export function backupBeforeUpdate(): string;
+export function outboundProxyUrl(): string;

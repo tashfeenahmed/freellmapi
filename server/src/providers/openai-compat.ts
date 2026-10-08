@@ -11,10 +11,16 @@ import { rescueInlineToolCalls } from '../lib/tool-call-rescue.js';
 import { extractThinkFromMessage } from '../lib/think-tags.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
+import { recordQuotaObservation, recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
+import type { QuotaMetric } from '@freellmapi/shared/types.js';
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
 import { isAbortLikeError } from '../lib/error-classify.js';
 import { contentToString } from '../lib/content.js';
+import { bearerAuthHeader } from '../lib/credential.js';
+
+// Shared with the media/embeddings custom-endpoint paths; re-exported so
+// existing imports keep working (#1331).
+export { isAnonymousCredential } from '../lib/credential.js';
 
 /** Hosts that ARE Moonshot's OpenAI-compatible API (api.moonshot.ai,
  * api.moonshot.cn, api.kimi.com and their subdomains). */
@@ -64,6 +70,19 @@ export function inBandCreditsError(text: string | null | undefined): string | nu
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
  * GitHub Models, Fireworks AI.
  */
+/** A provider's key-info/quota endpoint (#1403): the GET URL and the JSON
+ * field names carrying the limit and the remaining balance. Fields are looked
+ * up first under a `data` wrapper (OpenRouter style), then at the top level.
+ * `credits` are in the provider's own currency (OpenRouter USD, SiliconFlow
+ * CNY); `notes` names it. Only a reading with a limit feeds routing headroom. */
+export interface QuotaProbeSpec {
+  url: string;
+  metric: QuotaMetric;
+  limitFields: string[];
+  remainingFields: string[];
+  notes?: string;
+}
+
 export class OpenAICompatProvider extends BaseProvider {
   readonly platform: Platform;
   readonly name: string;
@@ -81,6 +100,8 @@ export class OpenAICompatProvider extends BaseProvider {
   /** True only for a custom endpoint whose host is Moonshot's own API; see
    * isMoonshotEndpoint(). Gates the assistant `partial` prefill flag (#1038). */
   private readonly forwardsPartial: boolean;
+  /** Optional provider-reported quota endpoint (#1403). */
+  private readonly quotaProbe?: QuotaProbeSpec;
 
   constructor(opts: {
     platform: Platform;
@@ -91,6 +112,7 @@ export class OpenAICompatProvider extends BaseProvider {
     timeoutMs?: number;
     keyless?: boolean;
     forceSingleToolCall?: boolean;
+    quotaProbe?: QuotaProbeSpec;
   }) {
     super();
     this.platform = opts.platform;
@@ -103,6 +125,7 @@ export class OpenAICompatProvider extends BaseProvider {
     this.keyless = opts.keyless ?? false;
     this.forceSingleToolCall = opts.forceSingleToolCall ?? false;
     this.forwardsPartial = opts.platform === 'custom' && isMoonshotEndpoint(opts.baseUrl);
+    this.quotaProbe = opts.quotaProbe;
   }
 
   /** Resolve the parallel_tool_calls flag to send upstream. For providers that
@@ -162,11 +185,16 @@ export class OpenAICompatProvider extends BaseProvider {
     return res.statusText;
   }
 
-  /** Keyless providers (Kilo's anonymous free tier) must send NO Authorization
-   * header — a stored sentinel like `Bearer no-key` could be treated as an
-   * invalid key. Everyone else sends the bearer as usual. */
+  /** Anonymous access sends NO Authorization header: keyless providers
+   * (Kilo's anonymous free tier) holding the stored `no-key` sentinel, and
+   * custom endpoints whose stored credential is the same sentinel with auth
+   * off. Sending `Bearer no-key` upstream is never right — upstreams read it
+   * as an invalid key. A REAL key saved on a keyless platform is used instead
+   * of the anonymous path, and a real key on a custom endpoint still gets its
+   * bearer (#1331): the presence of a credential decides at request time —
+   * Kilo, OVH and AI Horde all accept both modes per their docs. */
   private authHeader(apiKey: string): Record<string, string> {
-    return this.keyless ? {} : { 'Authorization': `Bearer ${apiKey}` };
+    return bearerAuthHeader(apiKey);
   }
 
   /** Requesty's Leanstral route rejects greedy sampling when temperature=0.
@@ -284,7 +312,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens),
+        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -413,7 +441,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens),
+        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -542,6 +570,75 @@ export class OpenAICompatProvider extends BaseProvider {
   async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {
     const res = await this.fetchCatalogEndpoint(this.validateUrl ?? this.modelsUrl, apiKey, quotaContext);
     return this.validationResult(res);
+  }
+
+  /**
+   * Provider-reported balance via the registered quotaProbe endpoint (#1403).
+   * GETs the key-info URL (e.g. OpenRouter's `GET /api/v1/key`), pulls the
+   * limit/remaining numbers out of the JSON (checking the `data` wrapper and
+   * the top level), and records them as a `source: 'quota_api'` observation.
+   * Never throws: a quota probe that fails says nothing about the key, and
+   * the caller's health verdict must stay about the key.
+   */
+  get hasQuotaProbe(): boolean {
+    return this.quotaProbe !== undefined;
+  }
+
+  async fetchQuota(apiKey: string, quotaContext?: QuotaObservationContext): Promise<boolean> {
+    const spec = this.quotaProbe;
+    if (!spec) return false;
+    try {
+      const res = await this.fetchWithTimeout(spec.url, {
+        method: 'GET',
+        headers: {
+          ...this.authHeader(apiKey),
+          ...this.extraHeaders,
+        },
+      }, 10_000, { timeoutBounds: 'request' });
+      if (!res.ok) return false;
+      const body: any = await res.json().catch(() => null);
+      const scope = (body && typeof body === 'object' && body.data && typeof body.data === 'object')
+        ? [body.data, body]
+        : [body];
+      const pick = (fields: string[]): number | null => {
+        for (const obj of scope) {
+          if (!obj || typeof obj !== 'object') continue;
+          for (const f of fields) {
+            const v = (obj as Record<string, unknown>)[f];
+            if (typeof v === 'number' && Number.isFinite(v)) return v;
+            // Some providers serialize balances as strings ("88.88", SiliconFlow
+            // /v1/user/info). Accept a numeric string; "", null and prose never
+            // parse to a finite number.
+            if (typeof v === 'string' && v.trim() !== '') {
+              const n = Number(v);
+              if (Number.isFinite(n)) return n;
+            }
+          }
+        }
+        return null;
+      };
+      const limit = pick(spec.limitFields);
+      const remaining = pick(spec.remainingFields);
+      if (limit === null && remaining === null) return false;
+      const record = recordQuotaObservation({
+        platform: this.platform,
+        keyId: quotaContext?.keyId,
+        providerAccountId: quotaContext?.providerAccountId,
+        quotaPoolKey: quotaContext?.quotaPoolKey,
+        endpoint: 'quota_api',
+        metric: spec.metric,
+        limit,
+        remaining,
+        resetStrategy: 'provider_reported',
+        source: 'quota_api',
+        statusCode: res.status,
+        notes: spec.notes ?? null,
+      });
+      return record !== null;
+    } catch {
+      // Transport/parse failure: inconclusive, never a key verdict (#1403).
+      return false;
+    }
   }
 }
 

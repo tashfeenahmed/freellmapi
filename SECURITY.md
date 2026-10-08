@@ -8,12 +8,12 @@ any of those are taken seriously. Thanks for reporting them responsibly.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.6.x (current) | Yes — security fixes land here |
-| 0.5.x | Best effort; please upgrade |
-| 0.4.x and older | No |
+| 0.13.x (current) | Yes — security fixes land here |
+| 0.12.x | Best effort; please upgrade |
+| 0.11.x and older | No |
 
 Fixes ship on the latest release line. There are no backported patch releases for
-older lines, so the fastest way to stay patched is to track `0.6.x` (Docker users:
+older lines, so the fastest way to stay patched is to track `0.13.x` (Docker users:
 re-pull `:latest`).
 
 ## Reporting a vulnerability

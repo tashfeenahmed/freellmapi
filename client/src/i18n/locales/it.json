@@ -152,21 +152,24 @@
     "compressionRunPreview": "Esegui anteprima",
     "updatesTitle": "Aggiornamenti",
     "checkForUpdates": "Controlla aggiornamenti",
-    "lastChecked": "Ultimo controllo: {when}",
-    "currentVersion": "Build corrente:",
     "updateAvailable": "Aggiornamento disponibile",
-    "changelog": "Novità",
     "upToDate": "Aggiornato",
     "buildAhead": "Questa build è più avanti del ramo main ufficiale.",
     "buildDiverged": "Questa build si è discostata dal ramo main ufficiale.",
     "buildUnknown": "Questa build personalizzata non può essere confrontata con il ramo main ufficiale.",
     "notGitInstall": "Questa installazione non include informazioni sui commit.",
     "checkFailed": "Impossibile verificare la disponibilità di aggiornamenti.",
-    "contactsGithub": "I controlli sono manuali e contattano GitHub.",
     "autoUpdateCheck": "Controllo automatico degli aggiornamenti",
-    "autoUpdateCheckHelp": "Controlla GitHub una volta al giorno per una nuova versione e mostra un promemoria. Disattivato per impostazione predefinita.",
-    "openReleases": "Apri le release di GitHub",
-    "restartAfterUpdate": "Riavvia FreeLLMAPI al termine della build."
+    "restartAfterUpdate": "Riavvia FreeLLMAPI al termine della build.",
+    "downloadUpdate": "Scarica aggiornamento",
+    "downloadingUpdate": "Download in corso… {percent}%",
+    "restartToUpdate": "Riavvia per aggiornare",
+    "updateReadyHint": "Scaricato. FreeLLMAPI esegue il backup dei tuoi dati, si riavvia e apre la nuova versione.",
+    "updateInstallFailed": "Impossibile installare l’aggiornamento.",
+    "updateNow": "Aggiorna ora",
+    "updatingContainer": "Download della nuova immagine e riavvio in corso. La pagina si ricarica quando FreeLLMAPI torna disponibile.",
+    "updateNowFailed": "Il servizio di aggiornamento non ha accettato la richiesta. Verifica che il container watchtower sia in esecuzione.",
+    "updateNowTimeout": "FreeLLMAPI non si è riavviato dopo 5 minuti. Controlla i log del container watchtower."
   },
   "models": {
     "title": "Modelli",
@@ -209,6 +212,7 @@
     "noKey": "nessuna chiave",
     "dragToReorder": "Trascina per riordinare",
     "dragToReorderGroup": "Trascina per riordinare il modello",
+    "moveToRank": "Vai alla posizione",
     "providerCount": "{count} fornitori",
     "servedBy": "Servito da {providers}",
     "viewProviders": "Vedi fornitori",
@@ -223,6 +227,7 @@
     "settingsHint": "Le modifiche locali ai modelli del catalogo vengono mantenute tra le sincronizzazioni del catalogo. I modelli del catalogo eliminati restano eliminati finché non li aggiungi di nuovo tramite la configurazione.",
     "catalogModel": "catalogo",
     "customModel": "personalizzato",
+    "discoveredModel": "rilevato",
     "localOverride": "override locale",
     "displayName": "Nome visualizzato",
     "sizeLabel": "Livello di capacità",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} fornitori su {total} configurati",
     "checklistKeyless": "nessuna chiave richiesta",
     "checklistNoKeyTip": "Nessuna chiave aggiunta. Clicca per aggiungerne una.",
+    "checklistSignupLink": "Apri {provider} per creare un account e ottenere una chiave",
     "checklistKeylessTip": "Funziona senza chiave.",
     "tabQuotaSignals": "Segnali quota",
     "tabApiKey": "Chiave API unificata",
@@ -495,11 +501,11 @@
     "platform": "Piattaforma",
     "hideAdded": "Nascondi i fornitori aggiunti",
     "apiToken": "Token API",
-    "noKeyNeededPlaceholder": "Nessuna chiave API necessaria",
+    "keyOptionalPlaceholder": "Facoltativa",
     "bearerTokenPlaceholder": "Bearer token",
     "pasteKeyPlaceholder": "incolla la chiave qui",
     "pasteSeveral": "Incolla diverse",
-    "keylessHint": "Nessuna chiave API necessaria: il livello gratuito di questo fornitore è anonimo (limitato per IP).",
+    "keyOptionalHint": "Facoltativa: lascia vuoto per usare il livello gratuito anonimo (limitato per IP) oppure incolla la tua chiave per usare il tuo account.",
     "enable": "Abilita",
     "noProviderKeys": "Nessuna chiave fornitore ancora. Aggiungine una sopra per iniziare il routing.",
     "filterPlaceholder": "Filtra fornitori o chiavi",
@@ -677,7 +683,14 @@
     "testFailed": "Test del modello non riuscito",
     "testThrottled": "Attendi {seconds}s prima di testare nuovamente questo modello.",
     "noModelsForProvider": "Nessun modello configurato per questo provider.",
-    "testModels": "Testa i modelli"
+    "testModels": "Testa i modelli",
+    "monthlyRequestCapLabel": "Limite mensile di richieste",
+    "monthlyTokenCapLabel": "Limite mensile di token",
+    "capUnlimitedPlaceholder": "Illimitato",
+    "capEditHint": "I limiti si azzerano il 1 del mese alle 00:00 UTC. Lascia vuoto per illimitato.",
+    "monthlyUsageLine": "{requests} richieste, {tokens} token questo mese",
+    "quotaBalanceHint": "Rimangono {remaining} di {limit} {metric}",
+    "quotaBalanceLeft": "Rimangono {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Pre-aggiornamento"
   },
   "status": {
     "healthy": "funzionante",
@@ -1133,17 +1147,16 @@
       "generic": "Qualsiasi altro strumento che parli l'API di OpenAI, configurato a mano con URL base e chiave.",
       "atomcode": "L'agente da terminale di AtomGit, scritto in Rust, che accetta qualsiasi endpoint compatibile OpenAI.",
       "openclaw": "Un assistente personale sempre attivo che risponde su WhatsApp, Telegram, Discord e altro dalla tua macchina.",
-      "hermes": "L'agente auto-migliorante di Nous Research, con memoria persistente e skill, nel terminale o nelle app di chat."
+      "hermes": "L'agente auto-migliorante di Nous Research, con memoria persistente e skill, nel terminale o nelle app di chat.",
+      "pi": "Un agente da terminale minimale che modelli con le tue estensioni, skill e modelli di prompt.",
+      "reasonix": "Un agente di programmazione da terminale nativo per DeepSeek, costruito attorno alla cache dei prefissi perché le sessioni lunghe restino economiche."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "È installata una versione più recente di FreeLLMAPI.",
+    "reload": "Ricarica"
   },
   "freeTier": {
     "poolsToggle": "Pool del piano gratuito ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Inizia vuota",
     "startEmptyHint": "Crea la catena senza modelli e tiene fuori i nuovi modelli del catalogo. Se non selezionato, parte come copia della catena predefinita.",
     "curated": "Curata",
-    "curatedHint": "I nuovi modelli del catalogo non vengono aggiunti automaticamente a questa catena."
+    "curatedHint": "I nuovi modelli del catalogo non vengono aggiunti automaticamente a questa catena.",
+    "renameHint": "Rinomina questa catena",
+    "renameConfirm": "Rinominare la catena \"{oldName}\" in \"{name}\"? I client che chiamano auto:{oldName} devono passare a auto:{name}.",
+    "renamePlaceholder": "Nuovo nome della catena",
+    "renameFailed": "Impossibile rinominare la catena."
+  },
+  "updates": {
+    "versionAvailable": "È disponibile la versione {version}",
+    "versionReady": "La versione {version} è pronta per l’installazione",
+    "releaseNotes": "Note di rilascio",
+    "tryAgain": "Riprova",
+    "offline": "Controlla la connessione a internet e riprova."
   }
 }

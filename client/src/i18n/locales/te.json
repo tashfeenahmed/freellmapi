@@ -152,21 +152,24 @@
     "compressionRunPreview": "ప్రివ్యూ అమలు చేయండి",
     "updatesTitle": "నవీకరణలు",
     "checkForUpdates": "నవీకరణల కోసం తనిఖీ చేయండి",
-    "lastChecked": "చివరిగా తనిఖీ చేసినది: {when}",
-    "currentVersion": "ప్రస్తుత బిల్డ్:",
     "updateAvailable": "నవీకరణ అందుబాటులో ఉంది",
-    "changelog": "ఏమి మారింది",
     "upToDate": "తాజా స్థితిలో ఉంది",
     "buildAhead": "ఈ బిల్డ్ అధికారిక main కంటే ముందుంది.",
     "buildDiverged": "ఈ బిల్డ్ అధికారిక main నుండి వేరుగా మారింది.",
     "buildUnknown": "ఈ అనుకూల బిల్డ్‌ను అధికారిక mainతో పోల్చడం సాధ్యం కాదు.",
     "notGitInstall": "ఈ ఇన్‌స్టాలేషన్‌లో commit సమాచారం లేదు.",
     "checkFailed": "నవీకరణల కోసం తనిఖీ చేయడం సాధ్యం కాలేదు.",
-    "contactsGithub": "తనిఖీలు మాన్యువల్‌గా జరుగుతాయి మరియు GitHubను సంప్రదిస్తాయి.",
     "autoUpdateCheck": "స్వయంచాలక నవీకరణ తనిఖీ",
-    "autoUpdateCheckHelp": "రోజుకు ఒకసారి కొత్త విడుదల కోసం GitHubను తనిఖీ చేసి రిమైండర్‌ను చూపుతుంది. అప్రమేయంగా ఆఫ్‌లో ఉంటుంది.",
-    "openReleases": "GitHub విడుదలలను తెరవండి",
-    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి."
+    "restartAfterUpdate": "బిల్డ్ పూర్తయిన తర్వాత FreeLLMAPIని పునఃప్రారంభించండి.",
+    "downloadUpdate": "అప్‌డేట్ డౌన్‌లోడ్ చేయండి",
+    "downloadingUpdate": "డౌన్‌లోడ్ అవుతోంది… {percent}%",
+    "restartToUpdate": "అప్‌డేట్ కోసం రీస్టార్ట్ చేయండి",
+    "updateReadyHint": "డౌన్‌లోడ్ అయింది. FreeLLMAPI మీ డేటాను బ్యాకప్ చేసి, రీస్టార్ట్ అయి కొత్త వెర్షన్‌ను తెరుస్తుంది.",
+    "updateInstallFailed": "అప్‌డేట్‌ను ఇన్‌స్టాల్ చేయలేకపోయాము.",
+    "updateNow": "ఇప్పుడే అప్‌డేట్ చేయండి",
+    "updatingContainer": "కొత్త ఇమేజ్‌ను తెచ్చి రీస్టార్ట్ అవుతోంది. FreeLLMAPI తిరిగి వచ్చాక ఈ పేజీ రీలోడ్ అవుతుంది.",
+    "updateNowFailed": "అప్‌డేటర్ అభ్యర్థనను అంగీకరించలేదు. watchtower కంటైనర్ నడుస్తోందో లేదో చూడండి.",
+    "updateNowTimeout": "5 నిమిషాల తర్వాత కూడా FreeLLMAPI రీస్టార్ట్ కాలేదు. watchtower కంటైనర్ లాగ్‌లను చూడండి."
   },
   "models": {
     "title": "మోడల్స్",
@@ -209,6 +212,7 @@
     "noKey": "కీ లేదు",
     "dragToReorder": "క్రమాన్ని మార్చడానికి లాగండి",
     "dragToReorderGroup": "మోడల్ క్రమాన్ని మార్చడానికి లాగండి",
+    "moveToRank": "ర్్యాంక్‌కు వెళ్లండి",
     "providerCount": "{count} ప్రొవైడర్లు",
     "servedBy": "{providers} ద్వారా అందించబడింది",
     "viewProviders": "ప్రొవైడర్లను వీక్షించండి",
@@ -223,6 +227,7 @@
     "settingsHint": "కేటలాగ్ మోడల్‌లకు స్థానిక సవరణలు కేటలాగ్ సింక్‌లలో ఉంచబడతాయి. మీరు వాటిని కాన్ఫిగరేషన్ ద్వారా మళ్లీ జోడించే వరకు తొలగించబడిన కేటలాగ్ మోడల్‌లు తొలగించబడతాయి.",
     "catalogModel": "కేటలాగ్",
     "customModel": "ఆచారం",
+    "discoveredModel": "కనుగొనబడింది",
     "localOverride": "స్థానిక ఓవర్‌రైడ్",
     "displayName": "ప్రదర్శన పేరు",
     "sizeLabel": "సామర్థ్య స్థాయి",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total}లో {configured} ప్రొవైడర్లు కాన్ఫిగర్ చేయబడ్డాయి",
     "checklistKeyless": "కీ అవసరం లేదు",
     "checklistNoKeyTip": "ఇంకా కీ జోడించలేదు. జోడించడానికి క్లిక్ చేయండి.",
+    "checklistSignupLink": "ఖాతా సృష్టించి కీ పొందడానికి {provider} తెరవండి",
     "checklistKeylessTip": "కీ లేకుండా పనిచేస్తుంది.",
     "tabQuotaSignals": "కోటా సంకేతాలు",
     "tabApiKey": "ఏకీకృత API కీ",
@@ -495,11 +501,11 @@
     "platform": "వేదిక",
     "hideAdded": "జోడించిన ప్రొవైడర్‌లను దాచు",
     "apiToken": "API టోకెన్",
-    "noKeyNeededPlaceholder": "API కీ అవసరం లేదు",
+    "keyOptionalPlaceholder": "ఐచ్ఛికం",
     "bearerTokenPlaceholder": "బేరర్ టోకెన్",
     "pasteKeyPlaceholder": "కీని ఇక్కడ అతికించండి",
     "pasteSeveral": "అనేకం అతికించండి",
-    "keylessHint": "API కీ అవసరం లేదు: ఈ ప్రొవైడర్ యొక్క ఉచిత శ్రేణి అనామకం (ప్రతి IPకి రేటు-పరిమితం).",
+    "keyOptionalHint": "ఐచ్ఛికం: అనామక ఉచిత శ్రేణి కోసం (ప్రతి IPకి రేట్ పరిమితి) ఖాళీగా ఉంచండి, లేదా మీ ఖాతాను ఉపయోగించడానికి మీ స్వంత కీని అతికించండి.",
     "enable": "ప్రారంభించు",
     "noProviderKeys": "ఇంకా ప్రొవైడర్ కీలు లేవు. రూటింగ్ ప్రారంభించడానికి పైన ఒకదాన్ని జోడించండి.",
     "filterPlaceholder": "ఫిల్టర్ ప్రొవైడర్లు లేదా కీలు",
@@ -677,7 +683,14 @@
     "testFailed": "మోడల్ పరీక్ష విఫలమైంది",
     "testThrottled": "ఈ మోడల్‌ని మళ్లీ పరీక్షించే ముందు దయచేసి {seconds}సె వేచి ఉండండి.",
     "noModelsForProvider": "ఈ ప్రొవైడర్ కోసం మోడల్స్ ఏవీ కాన్ఫిగర్ చేయబడలేదు.",
-    "testModels": "మోడల్‌లను పరీక్షించండి"
+    "testModels": "మోడల్‌లను పరీక్షించండి",
+    "monthlyRequestCapLabel": "నెలవారీ అభ్యర్థన పరిమితి",
+    "monthlyTokenCapLabel": "నెలవారీ టోకెన్ పరిమితి",
+    "capUnlimitedPlaceholder": "అపరిమితం",
+    "capEditHint": "ప్రతి నెలా 1వ తేదీన 00:00 UTCకు పరిమితులు రీసెట్ అవుతాయి. అపరిమితంగా కావాలంటే ఖాళీగా వదిలండి.",
+    "monthlyUsageLine": "ఈ నెల {requests} అభ్యర్థనలు, {tokens} టోకెన్లు",
+    "quotaBalanceHint": "{limit} {metric}లో {remaining} మిగిలింది",
+    "quotaBalanceLeft": "{remaining} మిగిలింది"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "అప్‌డేట్‌కు ముందు"
   },
   "status": {
     "healthy": "ఆరోగ్యకరమైన",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "మీ సొంత మెషీన్ నుండి WhatsApp, Telegram, Discord మరియు మరిన్నింటిలో సమాధానం ఇచ్చే, ఎప్పుడూ పనిచేసే వ్యక్తిగత సహాయకుడు.",
-      "hermes": "Nous Research యొక్క స్వీయ-మెరుగుదల ఏజెంట్, శాశ్వత మెమరీ మరియు నైపుణ్యాలతో, టెర్మినల్‌లో లేదా చాట్ యాప్‌లలో."
+      "hermes": "Nous Research యొక్క స్వీయ-మెరుగుదల ఏజెంట్, శాశ్వత మెమరీ మరియు నైపుణ్యాలతో, టెర్మినల్‌లో లేదా చాట్ యాప్‌లలో.",
+      "pi": "మీ సొంత ఎక్స్‌టెన్షన్‌లు, నైపుణ్యాలు, ప్రాంప్ట్ టెంప్లేట్‌లతో మీరు తీర్చిదిద్దే కనీస టెర్మినల్ ఏజెంట్.",
+      "reasonix": "DeepSeek కోసం రూపొందించిన టెర్మినల్ కోడింగ్ ఏజెంట్; దీర్ఘ సెషన్లు కూడా చౌకగా ఉండేలా ప్రిఫిక్స్ క్యాషింగ్ చుట్టూ నిర్మించబడింది."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI యొక్క కొత్త వెర్షన్ ఇన్‌స్టాల్ అయింది.",
+    "reload": "రీలోడ్"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "ఈ చైన్ పేరును మార్చండి",
+    "renameConfirm": "చైన్ \"{oldName}\" పేరును \"{name}\" గా మార్చాలా? auto:{oldName} ని కాల్ చేసే క్లయింట్లు auto:{name} కి మారాలి.",
+    "renamePlaceholder": "కొత్త చైన్ పేరు",
+    "renameFailed": "చైన్ పేరును మార్చడం సాధ్యం కాలేదు."
+  },
+  "updates": {
+    "versionAvailable": "వెర్షన్ {version} అందుబాటులో ఉంది",
+    "versionReady": "వెర్షన్ {version} ఇన్‌స్టాల్‌కు సిద్ధంగా ఉంది",
+    "releaseNotes": "విడుదల గమనికలు",
+    "tryAgain": "మళ్లీ ప్రయత్నించండి",
+    "offline": "మీ ఇంటర్నెట్ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
   }
 }

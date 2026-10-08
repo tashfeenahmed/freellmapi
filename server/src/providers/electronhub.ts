@@ -4,6 +4,8 @@ import type { QuotaObservationContext } from '../services/provider-quota.js';
 import { contentToString } from '../lib/content.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 
+export const ELECTRONHUB_BASE_URL = 'https://api.electronhub.ai/v1';
+
 // Observed on two broken upstream routes despite HTTP 200. Keep the match
 // anchored and narrow: ordinary answers discussing proxy errors are valid.
 const PROXY_ERROR_PREFIX = '### **Proxy error (HTTP ';
@@ -18,10 +20,10 @@ export class ElectronHubProvider extends OpenAICompatProvider {
     super({
       platform: 'electronhub',
       name: 'ElectronHub',
-      baseUrl: 'https://api.electronhub.ai/v1',
+      baseUrl: ELECTRONHUB_BASE_URL,
       // /models is public and would accept an invalid key. This read-only
       // endpoint authenticates without spending an inference request.
-      validateUrl: 'https://api.electronhub.ai/v1/user/me',
+      validateUrl: `${ELECTRONHUB_BASE_URL}/user/me`,
       timeoutMs: 90_000,
     });
   }

@@ -61,6 +61,7 @@ import { getRequestTrace, newRequestTrace, runWithRequestTrace, type AttemptOutc
 import { logRequest, persistRequestAttempts } from './request-log.js';
 import { withKeyProxy } from './proxy.js';
 import { getEndpointTimeBudgetMs } from './ttfb-budget.js';
+import { learnOutputCapFromError, learnedOutputCap } from './output-cap.js';
 
 // Every surface caps failover hops at the same number.
 export const FALLBACK_MAX_RETRIES = 20;
@@ -257,6 +258,25 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
   return Math.max(next - now, 60_000);
 }
 
+const pacificDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric',
+});
+const pacificHour = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', hour: 'numeric', hourCycle: 'h23',
+});
+
+/** Gemini daily quotas reset at midnight Pacific, including DST transitions.
+ * https://ai.google.dev/gemini-api/docs/rate-limits */
+export function msUntilNextPacificMidnight(now = Date.now()): number {
+  const parts = pacificDate.formatToParts(now);
+  const part = (name: string) => Number(parts.find(p => p.type === name)!.value);
+  // 08:00 UTC on the next Pacific date is either midnight (PST) or 01:00
+  // (PDT). Read the offset on that date, not now: DST days have 23/25 hours.
+  const candidate = Date.UTC(part('year'), part('month') - 1, part('day') + 1, 8);
+  const midnight = candidate - Number(pacificHour.format(candidate)) * 3_600_000;
+  return Math.max(midnight - now, 60_000);
+}
+
 /**
  * The one true cooldown-duration selection after a retryable upstream failure:
  *   - 402 out-of-credits  → a full day (PAYMENT_REQUIRED_COOLDOWN_MS)
@@ -271,6 +291,8 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
  *     provider Retry-After wins over the midnight heuristic: rolling daily
  *     windows (Groq RPD "try again in 7m12s" with a Retry-After header) reset
  *     well before midnight, and the provider knows its own reset time best.
+ *     Gemini daily violations instead wait until midnight Pacific; a shorter
+ *     RetryInfo can refer to a simultaneous per-minute violation.
  *   - anything else → the transient/daily escalation ladder, honoring the
  *     provider's Retry-After as a floor (getCooldownDurationForLimit).
  */
@@ -296,6 +318,11 @@ export function cooldownDecisionForError(route: RouteResult, err: any): Cooldown
   if (isAccountSuspendedError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
   if (isModelAccessForbiddenError(err)) return { durationMs: getModelForbiddenCooldownMs(), source: 'tier' };
   if (isDailyQuotaExhaustedError(err)) {
+    if (route.platform === 'google') {
+      // RetryInfo can describe a simultaneous per-minute violation. It cannot
+      // reopen a daily allowance before the Pacific reset (#1339).
+      return { durationMs: Math.max(msUntilNextPacificMidnight(), err?.retryAfterMs ?? 0), source: 'authoritative' };
+    }
     return { durationMs: err?.retryAfterMs ?? msUntilNextUtcMidnight(), source: 'authoritative' };
   }
   return getCooldownDecisionForLimit(
@@ -472,6 +499,33 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // that outlives the request.
   if (isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
+  }
+  // Too big for this model is a fact about the REQUEST, not the model's
+  // health: it still serves every smaller request. Skip it for this request
+  // (above) and learn the reported ceiling so the router sizes it out next
+  // time, but no cooldown and no penalty. Benching it let one oversized agent
+  // turn (Claude Code ships ~16k tokens of tool schemas) sink every small-TPM
+  // model it touched, so later ordinary requests found the pool rate limited.
+  if (isContextTooLargeError(err)) {
+    learnLimitFromError(route.modelDbId, err);
+    return false;
+  }
+  // A max_tokens above this model's output ceiling (Claude Code asks for
+  // 128000; Groq gpt-oss and Ollama Cloud's Nemotron stop at 65536) is the
+  // request's shape, not the model's health and not missing tool support, so
+  // it stays off the cooldown, penalty and tool-rejection books. A ceiling
+  // learned just now makes the same route usable again at once (the next
+  // attempt is clamped to it); one that was already applied and still got
+  // rejected rules the model out for this request.
+  const capBefore = learnedOutputCap(route.platform, route.modelId);
+  const ceiling = learnOutputCapFromError(route, err);
+  if (ceiling != null) {
+    if (capBefore == null || ceiling < capBefore) {
+      state.skipKeys.delete(`${route.platform}:${route.modelId}:${route.keyId}`);
+    } else {
+      state.skipModels.add(route.modelDbId);
+    }
+    return false;
   }
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
@@ -1520,6 +1574,25 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       }
       if (isRetryableError(err)) {
         const exempt = recordRetryableFailure(route, err, hooks.state);
+        // An in-band provider error that arrives only after the attempt has
+        // silently consumed most of the operator's whole budget (#1218 Gap 3:
+        // nvidia ran 140.7s before surfacing "Service temporarily overloaded",
+        // leaving scraps for the next hop) behaved like a stall for its entire
+        // window — the hedge-abort bench would have fired had the abort landed
+        // first. Give the late error the same treatment the hedge abort gets:
+        // bench the route so the ladder's next hop keeps a usable budget,
+        // instead of re-stalling on this route every request. Errors that
+        // arrive EARLY (the common Groq tool_use_failed shape) stay unbenced —
+        // a fast verdict costs the ladder nothing.
+        const errStr = err?.message ?? '';
+        if (
+          budgetMs > 0
+          && typeof errStr === 'string' && errStr.includes('in-band provider error')
+          && Date.now() - attemptStartedAt >= budgetMs * HEDGE_BENCH_MIN_SILENT_FRACTION
+        ) {
+          setCooldown(route.platform, route.modelId, route.keyId, TRUNCATION_BENCH_MS, 'heuristic');
+          console.warn(`[FallbackLoop] ${route.platform}/${route.modelId}: in-band provider error after ${((Date.now() - attemptStartedAt) / 1000).toFixed(1)}s silent — benching the route ${Math.round(TRUNCATION_BENCH_MS / 1000)}s (#1218 Gap 3)`);
+        }
         const errorClass = classifyAttemptError(err);
         attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass });
         traceAttempt(errorClass, err);

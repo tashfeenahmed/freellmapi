@@ -13,6 +13,7 @@ import {
   tightestRateLimit,
   type RateLimitUsageRow,
   type Row,
+  clampRankToIndex,
 } from './routing'
 
 // Per-endpoint identity must be INVISIBLE until two endpoints actually serve the
@@ -399,5 +400,26 @@ describe('depleted rows (#1015)', () => {
     ]
     const groups = buildGroups(rows, false)
     expect(groups.map(g => g.members[0].modelDbId)).toEqual([2, 1])
+  })
+})
+
+describe('clampRankToIndex (#1317)', () => {
+  const N = 10
+  it('maps a typed 1-based rank to the 0-based index', () => {
+    expect(clampRankToIndex(1, N)).toBe(0)
+    expect(clampRankToIndex(5, N)).toBe(4)
+    expect(clampRankToIndex(N, N)).toBe(N - 1)
+  })
+  it('clamps instead of erroring: below 1 goes to the front, past the end goes last', () => {
+    expect(clampRankToIndex(-3, N)).toBe(0)
+    expect(clampRankToIndex(0, N)).toBe(0)
+    expect(clampRankToIndex(999, N)).toBe(N - 1)
+  })
+  it('truncates fractional ranks', () => {
+    expect(clampRankToIndex(3.9, N)).toBe(2)
+  })
+  it('rejects unparseable values so the row stays put', () => {
+    expect(clampRankToIndex(Number.NaN, N)).toBe(-1)
+    expect(clampRankToIndex(Infinity, N)).toBe(-1)
   })
 })

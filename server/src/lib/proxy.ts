@@ -122,6 +122,24 @@ function readEnv(name: string): string {
  * user deliberately typed into the UI must not be silently overridden by them.
  */
 function resolveProxySource(dbValue: string): { url: string; source: string } {
+  const { url, source } = pickProxySource(dbValue);
+  return { url: normalizeProxyUrl(url), source };
+}
+
+/**
+ * Give a scheme-less `host:port` proxy an `http://` scheme. Windows Internet
+ * Options and macOS `scutil --proxy` both store the proxy that way, and so do
+ * plenty of hand-written HTTPS_PROXY values; `new URL('127.0.0.1:7890')`
+ * throws, so without this the proxy was logged as invalid and every request
+ * silently went direct (#1373).
+ */
+export function normalizeProxyUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `http://${trimmed}`;
+}
+
+function pickProxySource(dbValue: string): { url: string; source: string } {
   const explicit = readEnv('PROXY_URL');
   if (explicit) return { url: explicit, source: 'PROXY_URL' };
 
@@ -201,9 +219,20 @@ export function parseRegProxy(enableOut: string, serverOut: string): { url: stri
   const m = serverOut.match(/ProxyServer\s+REG_SZ\s+(.+)$/m);
   if (!m) return { url: '', source: 'none' };
   const raw = m[1].trim();
-  const http = raw.split(';').find(p => p.startsWith('http='))?.slice('http='.length) ?? raw;
-  if (!http) return { url: '', source: 'none' };
-  return { url: http, source: 'system(Windows)' };
+  if (!raw.includes('=')) return { url: raw, source: 'system(Windows)' };
+  // Per-scheme form: prefer the http entry, then https, then socks (which
+  // Internet Options means as SOCKS, so it must not become an HTTP proxy).
+  const entries = new Map(
+    raw.split(';').map(p => p.trim()).filter(Boolean).map(p => {
+      const eq = p.indexOf('=');
+      return [p.slice(0, eq).trim().toLowerCase(), p.slice(eq + 1).trim()] as const;
+    }),
+  );
+  const http = entries.get('http') || entries.get('https');
+  if (http) return { url: http, source: 'system(Windows)' };
+  const socks = entries.get('socks');
+  if (socks) return { url: `socks5://${socks}`, source: 'system(Windows)' };
+  return { url: '', source: 'none' };
 }
 
 /** GNOME desktop proxy in manual mode (gsettings). */
@@ -577,6 +606,33 @@ export function describeAbort(
 }
 
 /**
+ * undici reports every connection that never opened as a bare "fetch failed"
+ * and keeps the reason (ENOTFOUND, ECONNREFUSED, a certificate error) in
+ * `err.cause`, which never reached the attempt trail, the logs or the client.
+ * A DNS failure, a dead proxy and TLS-intercepting antivirus all looked the
+ * same (#1373). Append the cause code and the upstream host so the message
+ * says which it was. "fetch failed" stays as the prefix, which the
+ * retry classifier matches on.
+ */
+export function describeFetchFailure(err: unknown, url: string, platform?: string): void {
+  if (!(err instanceof TypeError) || err.message !== 'fetch failed') return;
+  let code = '';
+  const seen = new Set<unknown>();
+  let cur: any = err.cause;
+  for (let depth = 0; cur && typeof cur === 'object' && !seen.has(cur) && depth < 5; depth++) {
+    seen.add(cur);
+    if (typeof cur.code === 'string' && cur.code) { code = cur.code; break; }
+    cur = cur.cause;
+  }
+  if (!code) return;
+  let host = '';
+  try { host = new URL(url).hostname; } catch { /* leave it out */ }
+  const proxied = _proxyEnabled && !!(perKeyProxyStore.getStore() || _proxyUrl) && !shouldBypassProxy(url, platform);
+  const parts = [code, host, proxied ? 'via proxy' : ''].filter(Boolean);
+  err.message = `fetch failed (${parts.join(' ')})`;
+}
+
+/**
  * Rewrite an AbortError rejection so its `.message` carries the compact
  * triage tag `<platform>, <type>, <timeout>s`. Preserves `name: 'AbortError'`
  * so `isRetryableError()` (which matches on the substring "aborted") keeps
@@ -803,6 +859,7 @@ export async function proxyFetch(
     }
     return response;
   } catch (err) {
+    describeFetchFailure(err, url, platform);
     // Rewrite bare "The operation was aborted" rejections so they carry the
     // compact triage tag. Preserves the AbortError name so
     // `isRetryableError()` still classifies the failure as retryable.

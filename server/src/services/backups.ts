@@ -14,7 +14,8 @@ const LAST_RUN_SETTING = 'backup_last_run_day';
  *  path would misread. Restore refuses anything it does not know. */
 const DUMP_FORMAT = 1;
 
-export type BackupSource = 'manual' | 'scheduled' | 'pre-restore';
+export const BACKUP_SOURCES = ['manual', 'scheduled', 'pre-restore', 'pre-update'] as const;
+export type BackupSource = (typeof BACKUP_SOURCES)[number];
 
 export interface BackupSchedule {
   enabled: boolean;
@@ -289,7 +290,7 @@ export function createBackup(
   const now = new Date();
   const createdAt = now.toISOString();
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
-  const prefix = source === 'scheduled' ? 'auto-backup' : source === 'pre-restore' ? 'pre-restore' : 'backup';
+  const prefix = source === 'scheduled' ? 'auto-backup' : source === 'manual' ? 'backup' : source;
   const filename = `${prefix}-${stamp}-${crypto.randomBytes(3).toString('hex')}.sql`;
 
   const dir = resolveBackupDir(db, opts.backupPath ?? readBackupSchedule().backupPath);
@@ -331,8 +332,9 @@ function toMeta(row: BackupRow): BackupMeta {
   } catch {
     tables = [];
   }
-  const source: BackupSource =
-    row.source === 'scheduled' ? 'scheduled' : row.source === 'pre-restore' ? 'pre-restore' : 'manual';
+  const source: BackupSource = (BACKUP_SOURCES as readonly string[]).includes(row.source)
+    ? row.source as BackupSource
+    : 'manual';
   return {
     id: row.id,
     filename: row.filename,

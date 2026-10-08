@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GITHUB_MAX_INPUT_TOKENS, contentToString, flattenMessageContent, messageHasImage, normalizeOutboundContent, sanitizeResponse, stripImagesFromMessages, truncateMessagesForGithub } from '../../lib/content.js';
+import { GITHUB_MAX_INPUT_TOKENS, contentToString, estimateInputTokens, flattenMessageContent, messageHasImage, normalizeOutboundContent, sanitizeResponse, stripImagesFromMessages, truncateMessagesForGithub } from '../../lib/content.js';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 
 describe('contentToString', () => {
@@ -268,5 +268,31 @@ describe('truncateMessagesForGithub', () => {
     const image: ChatMessage = { role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:x' } }] } as ChatMessage;
     const out = truncateMessagesForGithub([msg('user', big('a')), image], 1);
     expect(out).toEqual([image]);
+  });
+});
+
+describe('estimateInputTokens', () => {
+  const messages: ChatMessage[] = [{ role: 'user', content: 'x'.repeat(400) }];
+
+  it('counts message text at ~4 chars per token', () => {
+    expect(estimateInputTokens(messages)).toBe(100);
+  });
+
+  it('counts the tool schemas the request carries', () => {
+    // Claude Code ships ~65 KB of tool schemas next to a few KB of messages;
+    // an estimate without them routed its turns to models they could not fit.
+    const tools = [{ type: 'function', function: { name: 'Read', description: 'd'.repeat(4000), parameters: { type: 'object' } } }];
+    const withTools = estimateInputTokens(messages, tools);
+    expect(withTools).toBeGreaterThan(100 + 1000);
+    expect(estimateInputTokens(messages, [])).toBe(100);
+  });
+
+  it('counts assistant tool-call arguments', () => {
+    const withCall: ChatMessage[] = [...messages, {
+      role: 'assistant',
+      content: null,
+      tool_calls: [{ id: 'c1', type: 'function', function: { name: 'Write', arguments: 'a'.repeat(795) } }],
+    } as ChatMessage];
+    expect(estimateInputTokens(withCall)).toBe(100 + 200);
   });
 });

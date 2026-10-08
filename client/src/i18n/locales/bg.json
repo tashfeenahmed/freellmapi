@@ -152,21 +152,24 @@
     "compressionRunPreview": "Изпълни преглед",
     "updatesTitle": "Актуализации",
     "checkForUpdates": "Проверете за актуализации",
-    "lastChecked": "Последна проверка: {when}",
-    "currentVersion": "Текуща компилация:",
     "updateAvailable": "Налична е актуализация",
-    "changelog": "Какво се промени",
     "upToDate": "Актуална версия",
     "buildAhead": "Тази компилация е пред официалния клон main.",
     "buildDiverged": "Тази компилация се е отклонила от официалния клон main.",
     "buildUnknown": "Тази персонализирана компилация не може да бъде сравнена с официалния клон main.",
     "notGitInstall": "Тази инсталация не съдържа информация за commit.",
     "checkFailed": "Актуализациите не можаха да бъдат проверени.",
-    "contactsGithub": "Проверките се стартират ръчно и се свързват с GitHub.",
     "autoUpdateCheck": "Автоматична проверка за актуализации",
-    "autoUpdateCheckHelp": "Проверява GitHub веднъж дневно за ново издание и показва напомняне. По подразбиране е изключено.",
-    "openReleases": "Отвори изданията в GitHub",
-    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията."
+    "restartAfterUpdate": "Рестартирайте FreeLLMAPI след завършване на компилацията.",
+    "downloadUpdate": "Изтегли актуализацията",
+    "downloadingUpdate": "Изтегляне… {percent}%",
+    "restartToUpdate": "Рестартирай за актуализиране",
+    "updateReadyHint": "Изтеглено. FreeLLMAPI архивира данните ви, рестартира и отваря новата версия.",
+    "updateInstallFailed": "Актуализацията не можа да се инсталира.",
+    "updateNow": "Актуализирай сега",
+    "updatingContainer": "Изтегля се новият образ и се рестартира. Страницата ще се презареди, когато FreeLLMAPI се върне.",
+    "updateNowFailed": "Актуализаторът не прие заявката. Проверете дали контейнерът watchtower работи.",
+    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower."
   },
   "models": {
     "title": "Модели",
@@ -209,6 +212,7 @@
     "noKey": "Без ключ",
     "dragToReorder": "Съпротивление за пренареждане",
     "dragToReorderGroup": "Модел за пренареждане на влачене",
+    "moveToRank": "Към позиция",
     "providerCount": "{count} доставчици",
     "servedBy": "Обслужван от {providers}",
     "viewProviders": "Вижте доставчиците",
@@ -223,6 +227,7 @@
     "settingsHint": "Локалните редакции на каталожните модели се запазват между синхронизациите на каталога. Изтритите каталожни модели остават изтрити, докато не ги добавиш отново чрез конфигурация.",
     "catalogModel": "Каталог",
     "customModel": "Custom",
+    "discoveredModel": "открит",
     "localOverride": "Местно преодоляване",
     "displayName": "Показно име",
     "sizeLabel": "Клас на способностите",
@@ -369,6 +374,7 @@
     "checklistSummary": "Настроени са {configured} от {total} доставчици",
     "checklistKeyless": "не е нужен ключ",
     "checklistNoKeyTip": "Все още не е добавен ключ. Щракнете, за да добавите.",
+    "checklistSignupLink": "Отворете {provider}, за да създадете акаунт и да получите ключ",
     "checklistKeylessTip": "Работи без ключ.",
     "tabQuotaSignals": "Квотни сигнали",
     "tabApiKey": "Унифициран API ключ",
@@ -495,11 +501,11 @@
     "platform": "Платформа",
     "hideAdded": "Скриване на добавените доставчици",
     "apiToken": "API токен",
-    "noKeyNeededPlaceholder": "Не е нужен API ключ",
+    "keyOptionalPlaceholder": "По избор",
     "bearerTokenPlaceholder": "Жетон на носителя",
     "pasteKeyPlaceholder": "Постави ключа тук",
     "pasteSeveral": "Поставяне на няколко",
-    "keylessHint": "Не е необходим API ключ: безплатният слой на този доставчик е анонимен (с ограничена цена за IP адрес).",
+    "keyOptionalHint": "По избор: оставете празно за анонимното безплатно ниво (ограничение по IP) или поставете собствен ключ, за да използвате акаунта си.",
     "enable": "Включи",
     "noProviderKeys": "Все още няма ключове за доставчика. Добавете една по-горе, за да започнете маршрутизирането.",
     "filterPlaceholder": "Доставчици на филтри или ключове",
@@ -677,7 +683,14 @@
     "testFailed": "Тестът на модела е неуспешен",
     "testThrottled": "Моля, изчакайте {seconds} сек преди повторен тест на този модел.",
     "noModelsForProvider": "Няма конфигурирани модели за този доставчик.",
-    "testModels": "Тествай моделите"
+    "testModels": "Тествай моделите",
+    "monthlyRequestCapLabel": "Месечен лимит на заявки",
+    "monthlyTokenCapLabel": "Месечен лимит на токени",
+    "capUnlimitedPlaceholder": "Неограничен",
+    "capEditHint": "Лимитите се нулират на 1-во число 00:00 UTC. Оставете празно за неограничен.",
+    "monthlyUsageLine": "{requests} заявки, {tokens} токени този месец",
+    "quotaBalanceHint": "Остават {remaining} от {limit} {metric}",
+    "quotaBalanceLeft": "Остават {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Преди актуализация"
   },
   "status": {
     "healthy": "здравословно",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Винаги активен личен асистент, който отговаря в WhatsApp, Telegram, Discord и други направо от вашата машина.",
-      "hermes": "Самоусъвършенстващият се агент на Nous Research с постоянна памет и умения — в терминала или в чат приложенията."
+      "hermes": "Самоусъвършенстващият се агент на Nous Research с постоянна памет и умения — в терминала или в чат приложенията.",
+      "pi": "Минималистичен агент за терминала, който оформяте със собствени разширения, умения и шаблони за подкани.",
+      "reasonix": "Терминален агент за програмиране, създаден за DeepSeek и изграден около кеширането на префикси, така че дългите сесии да остават евтини."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Инсталирана е по-нова версия на FreeLLMAPI.",
+    "reload": "Презареди"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Преименувай тази верига",
+    "renameConfirm": "Преименуване на верига \"{oldName}\" на \"{name}\"? Клиенти, извикващи auto:{oldName}, трябва да преминат към auto:{name}.",
+    "renamePlaceholder": "Ново име на веригата",
+    "renameFailed": "Веригата не можа да бъде преименувана."
+  },
+  "updates": {
+    "versionAvailable": "Версия {version} е налична",
+    "versionReady": "Версия {version} е готова за инсталиране",
+    "releaseNotes": "Бележки по изданието",
+    "tryAgain": "Опитай отново",
+    "offline": "Проверете интернет връзката си и опитайте отново."
   }
 }

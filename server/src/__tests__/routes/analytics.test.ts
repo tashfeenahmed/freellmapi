@@ -769,6 +769,30 @@ describe('Analytics API', () => {
       expect(body.byCategory.find((c: any) => c.category === 'Rate Limited (429)').count).toBe(2);
     });
 
+    it('classifies capitalized upstream auth and timeout messages out of Other', async () => {
+      // The messages upstream providers actually send. LIKE is case-sensitive
+      // in SQLite and the old '%invalid.*key%' pattern was regex syntax inside
+      // a LIKE (where '.' and '*' are literals), so "Invalid API key" and
+      // "Timeout" both fell into 'Other' and the dashboard hid auth failures.
+      insertRaw({ status: 'error', error: 'Invalid API key: sk-broken', createdAt: '2026-05-29 11:00:00' });
+      insertRaw({ status: 'error', error: 'Unauthorized: token expired', createdAt: '2026-05-29 11:01:00' });
+      insertRaw({ status: 'error', error: 'Too Many Requests', createdAt: '2026-05-29 11:02:00' });
+      insertRaw({ status: 'error', error: 'Timeout awaiting response headers', createdAt: '2026-05-29 11:03:00' });
+      insertRaw({ status: 'error', error: 'ETIMEDOUT after 30000ms', createdAt: '2026-05-29 11:04:00' });
+      // "timed out" is how our own abort paths word it; the '%500%' rule used to
+      // claim this one via the "5000ms" in the message.
+      insertRaw({ status: 'error', error: 'fusion tool call timed out after 5000ms', createdAt: '2026-05-29 11:05:00' });
+
+      const { status, body } = await request(app, '/api/analytics/error-distribution?range=24h');
+      expect(status).toBe(200);
+
+      const cat = (name: string) => body.byCategory.find((c: any) => c.category === name)?.count ?? 0;
+      expect(cat('Auth Error (401)')).toBe(2);
+      expect(cat('Rate Limited (429)')).toBe(1);
+      expect(cat('Timeout/Connection')).toBe(3);
+      expect(cat('Other')).toBe(0);
+    });
+
     it('filters recent calls by the bare "custom" id to the orphaned rows only', async () => {
       // The bare id is what /by-platform emits for rows whose endpoint is
       // unknown. Selecting it must return exactly the rows that row counted —

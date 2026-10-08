@@ -417,7 +417,10 @@ function ProviderSettingsRow({
 
   const { patch, invalid, dirty } = reviewModelSettings(source, form)
   const canSave = dirty && patch !== null && !saving && !deleting
-  const sourceLabel = model.source === 'custom' ? t('models.customModel') : t('models.catalogModel')
+  const sourceLabel = model.source === 'custom'
+    ? t('models.customModel')
+    // #1348: fetched from the provider's own model list, not the catalog.
+    : model.source === 'discovered' ? t('models.discoveredModel') : t('models.catalogModel')
   // Fields whose effective value comes from a local override instead of the
   // catalog. Custom models are never catalog-managed, so this stays empty.
   const overridden = new Set(model.overrideFields ?? [])

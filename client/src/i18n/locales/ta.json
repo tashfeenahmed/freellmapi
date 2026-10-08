@@ -152,21 +152,24 @@
     "compressionRunPreview": "முன்னோட்டத்தை இயக்கு",
     "updatesTitle": "புதுப்பிப்புகள்",
     "checkForUpdates": "புதுப்பிப்புகளைச் சரிபார்க்கவும்",
-    "lastChecked": "கடைசியாக சரிபார்க்கப்பட்டது: {when}",
-    "currentVersion": "தற்போதைய உருவாக்கம்:",
     "updateAvailable": "புதுப்பிப்பு கிடைக்கிறது",
-    "changelog": "என்ன மாற்றப்பட்டுள்ளது",
     "upToDate": "புதுப்பித்த நிலையில் உள்ளது",
     "buildAhead": "இந்த உருவாக்கம் அதிகாரப்பூர்வ main-ஐ விட முன்னிலையில் உள்ளது.",
     "buildDiverged": "இந்த உருவாக்கம் அதிகாரப்பூர்வ main-இலிருந்து வேறுபட்டுள்ளது.",
     "buildUnknown": "இந்தத் தனிப்பயன் உருவாக்கத்தை அதிகாரப்பூர்வ main உடன் ஒப்பிட முடியாது.",
     "notGitInstall": "இந்த நிறுவலில் commit தகவல் இல்லை.",
     "checkFailed": "புதுப்பிப்புகளைச் சரிபார்க்க முடியவில்லை.",
-    "contactsGithub": "சரிபார்ப்புகள் கைமுறையாகச் செய்யப்படுகின்றன மற்றும் GitHub-ஐத் தொடர்புகொள்கின்றன.",
     "autoUpdateCheck": "தானியங்கு புதுப்பிப்புச் சரிபார்ப்பு",
-    "autoUpdateCheckHelp": "நாளொன்றுக்கு ஒருமுறை புதிய வெளியீட்டிற்காக GitHub-ஐச் சரிபார்த்து நினைவூட்டலைக் காட்டும். இயல்பாக அணைக்கப்பட்டுள்ளது.",
-    "openReleases": "GitHub வெளியீடுகளைத் திற",
-    "restartAfterUpdate": "உருவாக்கம் முடிந்ததும் FreeLLMAPI-ஐ மறுதொடக்கம் செய்யவும்."
+    "restartAfterUpdate": "உருவாக்கம் முடிந்ததும் FreeLLMAPI-ஐ மறுதொடக்கம் செய்யவும்.",
+    "downloadUpdate": "புதுப்பிப்பைப் பதிவிறக்கு",
+    "downloadingUpdate": "பதிவிறக்குகிறது… {percent}%",
+    "restartToUpdate": "புதுப்பிக்க மறுதொடக்கம் செய்",
+    "updateReadyHint": "பதிவிறக்கப்பட்டது. FreeLLMAPI உங்கள் தரவைக் காப்புப்பிரதி எடுத்து, மறுதொடக்கம் செய்து புதிய பதிப்பைத் திறக்கும்.",
+    "updateInstallFailed": "புதுப்பிப்பை நிறுவ முடியவில்லை.",
+    "updateNow": "இப்போது புதுப்பி",
+    "updatingContainer": "புதிய image-ஐப் பெற்று மறுதொடக்கம் செய்கிறது. FreeLLMAPI திரும்பியதும் இந்தப் பக்கம் மீண்டும் ஏற்றப்படும்.",
+    "updateNowFailed": "புதுப்பிப்பான் கோரிக்கையை ஏற்கவில்லை. watchtower கொள்கலன் இயங்குகிறதா எனச் சரிபார்க்கவும்.",
+    "updateNowTimeout": "5 நிமிடங்களுக்குப் பிறகும் FreeLLMAPI மறுதொடக்கம் ஆகவில்லை. watchtower கொள்கலனின் பதிவுகளைப் பார்க்கவும்."
   },
   "models": {
     "title": "மாதிரிகள்",
@@ -209,6 +212,7 @@
     "noKey": "சாவி இல்லை",
     "dragToReorder": "மறுவரிசைப்படுத்த இழுக்கவும்",
     "dragToReorderGroup": "மாதிரியை மறுவரிசைப்படுத்த இழுக்கவும்",
+    "moveToRank": "வரிசைக்குச் செல்",
     "providerCount": "{count} வழங்குநர்கள்",
     "servedBy": "{providers} ஆல் வழங்கப்பட்டது",
     "viewProviders": "வழங்குநர்களைக் காண்க",
@@ -223,6 +227,7 @@
     "settingsHint": "பட்டியல் மாதிரிகளுக்கான உள்ளூர் திருத்தங்கள் அட்டவணை ஒத்திசைவு முழுவதும் வைக்கப்படும். நீக்கப்பட்ட கேட்லாக் மாடல்களை config மூலம் மீண்டும் சேர்க்கும் வரை நீக்கப்பட்டிருக்கும்.",
     "catalogModel": "பட்டியல்",
     "customModel": "வழக்கம்",
+    "discoveredModel": "கண்டறியப்பட்டது",
     "localOverride": "உள்ளூர் மேலெழுதல்",
     "displayName": "காட்சி பெயர்",
     "sizeLabel": "திறன் நிலை",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total} இல் {configured} வழங்குபவர்கள் உள்ளமைக்கப்பட்டுள்ளனர்",
     "checklistKeyless": "விசை தேவையில்லை",
     "checklistNoKeyTip": "இன்னும் விசை எதுவும் சேர்க்கப்படவில்லை. சேர்க்க கிளிக் செய்யவும்.",
+    "checklistSignupLink": "கணக்கை உருவாக்கி விசை பெற {provider} ஐத் திறக்கவும்",
     "checklistKeylessTip": "விசை இல்லாமல் செயல்படும்.",
     "tabQuotaSignals": "ஒதுக்கீடு சமிக்ஞைகள்",
     "tabApiKey": "ஒருங்கிணைந்த API விசை",
@@ -495,11 +501,11 @@
     "platform": "மேடை",
     "hideAdded": "சேர்க்கப்பட்ட வழங்குநர்களை மறை",
     "apiToken": "API டோக்கன்",
-    "noKeyNeededPlaceholder": "API விசை தேவையில்லை",
+    "keyOptionalPlaceholder": "விருப்பத்தேர்வு",
     "bearerTokenPlaceholder": "தாங்கி டோக்கன்",
     "pasteKeyPlaceholder": "இங்கே விசையை ஒட்டவும்",
     "pasteSeveral": "பலவற்றை ஒட்டவும்",
-    "keylessHint": "API விசை தேவையில்லை: இந்த வழங்குநரின் இலவச அடுக்கு அநாமதேயமானது (ஒவ்வொரு IPக்கும் வீதம் வரையறுக்கப்பட்டுள்ளது).",
+    "keyOptionalHint": "விருப்பத்தேர்வு: அநாமதேய இலவச அடுக்கிற்கு (ஒரு IP-க்கு வீத வரம்பு) காலியாக விடவும், அல்லது உங்கள் கணக்கைப் பயன்படுத்த உங்கள் சொந்த விசையை ஒட்டவும்.",
     "enable": "இயக்கு",
     "noProviderKeys": "இதுவரை வழங்குநர் விசைகள் இல்லை. ரூட்டிங் தொடங்க மேலே ஒன்றைச் சேர்க்கவும்.",
     "filterPlaceholder": "வடிகட்டி வழங்குநர்கள் அல்லது விசைகள்",
@@ -677,7 +683,14 @@
     "testFailed": "மாதிரி சோதனை தோல்வியடைந்தது",
     "testThrottled": "இந்த மாதிரியை மீண்டும் சோதிக்கும் முன் {seconds} வினாடிகள் காத்திருக்கவும்.",
     "noModelsForProvider": "இந்த வழங்குநருக்கு மாதிரிகள் எதுவும் கட்டமைக்கப்படவில்லை.",
-    "testModels": "மாதிரிகளைச் சோதிக்கவும்"
+    "testModels": "மாதிரிகளைச் சோதிக்கவும்",
+    "monthlyRequestCapLabel": "மாத கோரிக்கை வரம்பு",
+    "monthlyTokenCapLabel": "மாத டோக்கன் வரம்பு",
+    "capUnlimitedPlaceholder": "வரம்பற்றது",
+    "capEditHint": "ஒவ்வொரு மாதம் 1ஆம் தேதி 00:00 UTC-ல் வரம்புகள் மீட்டமைக்கப்படும். வரம்பற்றதாக வெறியே விடவும்.",
+    "monthlyUsageLine": "இந்த மாதம் {requests} கோரிக்கைகள், {tokens} டோக்கன்கள்",
+    "quotaBalanceHint": "{limit} {metric}-இல் {remaining} மீதம்",
+    "quotaBalanceLeft": "{remaining} மீதம்"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "புதுப்பிப்புக்கு முன்"
   },
   "status": {
     "healthy": "ஆரோக்கியமான",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "உங்கள் சொந்த கணினியிலிருந்து WhatsApp, Telegram, Discord மற்றும் பலவற்றில் பதிலளிக்கும், எப்போதும் இயங்கும் தனிப்பட்ட உதவியாளர்.",
-      "hermes": "Nous Research-இன் தன்னை மேம்படுத்திக்கொள்ளும் ஏஜென்ட், நிலையான நினைவகம் மற்றும் திறன்களுடன், டெர்மினலில் அல்லது சாட் ஆப்ஸில்."
+      "hermes": "Nous Research-இன் தன்னை மேம்படுத்திக்கொள்ளும் ஏஜென்ட், நிலையான நினைவகம் மற்றும் திறன்களுடன், டெர்மினலில் அல்லது சாட் ஆப்ஸில்.",
+      "pi": "உங்கள் சொந்த நீட்டிப்புகள், திறன்கள் மற்றும் ப்ராம்ப்ட் வார்ப்புருக்களால் வடிவமைக்கும் எளிய டெர்மினல் ஏஜென்ட்.",
+      "reasonix": "DeepSeek-க்காக உருவாக்கப்பட்ட டெர்மினல் கோடிங் ஏஜென்ட்; நீண்ட அமர்வுகளும் மலிவாக இருக்க prefix caching-ஐ மையமாகக் கொண்டு கட்டப்பட்டது."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "FreeLLMAPI-இன் புதிய பதிப்பு நிறுவப்பட்டுள்ளது.",
+    "reload": "மீண்டும் ஏற்று"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "இந்த சங்கிலியின் பெயரிடவும்",
+    "renameConfirm": "\"{oldName}\" சங்கிலியை \"{name}\" என மறுபெயரிடவா? auto:{oldName} அழைக்கும் கிளையண்டுகள் auto:{name} க்கு மாற வேண்டும்.",
+    "renamePlaceholder": "புதிய சங்கிலி பெயர்",
+    "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை."
+  },
+  "updates": {
+    "versionAvailable": "பதிப்பு {version} கிடைக்கிறது",
+    "versionReady": "பதிப்பு {version} நிறுவத் தயாராக உள்ளது",
+    "releaseNotes": "வெளியீட்டுக் குறிப்புகள்",
+    "tryAgain": "மீண்டும் முயல்க",
+    "offline": "இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்."
   }
 }

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import { initDb, getDb } from '../../db/index.js';
-import { applyDeclarativeConfig, applyDeclarativeConfigFromEnv } from '../../services/declarative-config.js';
+import { initDb, getDb, getSetting, setSetting } from '../../db/index.js';
+import { applyDeclarativeConfig, applyDeclarativeConfigFromEnv, activateConfiguredLicense } from '../../services/declarative-config.js';
 import { getRoutingStrategy } from '../../services/router.js';
+import { userCount, verifyCredentials } from '../../services/auth.js';
+import { SETTING_LICENSE_KEY } from '../../services/catalog-sync.js';
 
 const ORIGINAL_CONFIG_JSON = process.env.FREEAPI_CONFIG_JSON;
 const ORIGINAL_CONFIG_PATH = process.env.FREEAPI_CONFIG_PATH;
@@ -278,5 +280,115 @@ describe('declarative config with two relays serving one model id', () => {
       models: [{ platform: 'custom', modelId: 'shared-model', displayName: 'Solo' }],
     });
     expect(rowOn(RELAY_A).display_name).toBe('Solo');
+  });
+});
+
+// admin + license: the two declarative fields that touch the dashboard account
+// and the Premium catalog feed. The admin entry must only ever create the
+// FIRST account — once a user exists it degrades to a warning so a config
+// file can never take over a claimed install. The license entry goes through
+// the same validate-then-store contract as POST /api/premium/key.
+describe('declarative config admin', () => {
+  beforeEach(() => {
+    getDb().prepare('DELETE FROM users').run();
+    getDb().prepare('DELETE FROM sessions').run();
+  });
+
+  it('creates the first dashboard account only while no user exists', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const first = applyDeclarativeConfig({
+      admin: { email: 'Ops@Example.com', password: 'correct horse battery' },
+    });
+    expect(first.admin).toBe(true);
+    expect(userCount()).toBe(1);
+    // Email is normalized on write, password verifies via the same helpers
+    // the /api/auth routes use.
+    expect(verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
+
+    const second = applyDeclarativeConfig({
+      admin: { email: 'attacker@example.com', password: 'totally different' },
+    });
+    expect(second.admin).toBe(false);
+    expect(second.warnings.some(w => w.startsWith('admin:'))).toBe(true);
+    expect(userCount()).toBe(1);
+    // The original account is untouched — the second entry changed nothing.
+    expect(verifyCredentials('ops@example.com', 'correct horse battery')).toBeTruthy();
+    expect(verifyCredentials('attacker@example.com', 'totally different')).toBeNull();
+    warn.mockRestore();
+  });
+
+  it('rejects malformed admin entries at schema validation', () => {
+    expect(() => applyDeclarativeConfig({
+      admin: { email: 'not-an-email', password: 'long-enough-password' },
+    })).toThrow(/invalid declarative config/);
+    expect(() => applyDeclarativeConfig({
+      admin: { email: 'a@b.co', password: 'short' },
+    })).toThrow(/invalid declarative config/);
+    expect(userCount()).toBe(0);
+  });
+});
+
+describe('declarative config license', () => {
+  function mockLicenseService(over: Record<string, unknown> = {}) {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith('/v1/license/activate')) {
+        return new Response(JSON.stringify({
+          valid: true, plan: 'premium', status: 'active', expiresAt: null, ...over,
+        }));
+      }
+      if (url.endsWith('/v1/license/check')) {
+        return new Response(JSON.stringify({ plan: 'premium', status: 'active', expiresAt: null }));
+      }
+      // /v1/latest catalog fetch from the kicked sync — fail it on purpose;
+      // syncCatalog catches, logs, and records the error without throwing.
+      return new Response('no catalog in tests', { status: 500 });
+    });
+  }
+
+  beforeEach(() => {
+    getDb().prepare("DELETE FROM settings WHERE key IN ('premium_license_key', 'premium_license_status')").run();
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('validates and stores a configured license key, then kicks a live sync', async () => {
+    const fetchMock = mockLicenseService();
+    const result = applyDeclarativeConfig({ license: 'flk_valid_test_key' });
+    expect(result.license).toBe(true);
+    await vi.waitFor(() => expect(getSetting(SETTING_LICENSE_KEY)).toBe('flk_valid_test_key'));
+    const called = fetchMock.mock.calls.map(c => String(c[0] instanceof Request ? c[0].url : c[0]));
+    expect(called.some(u => u.endsWith('/v1/license/activate'))).toBe(true);
+  });
+
+  it('does not store a rejected license key', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockLicenseService({ valid: false, reason: 'unknown_key' });
+    await activateConfiguredLicense('flk_rejected_key');
+    expect(getSetting(SETTING_LICENSE_KEY)).toBeUndefined();
+    expect(warn.mock.calls.some(c => String(c[0]).includes('rejected'))).toBe(true);
+  });
+
+  it('leaves settings untouched when the license service is unreachable', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
+    await activateConfiguredLicense('flk_offline_key');
+    expect(getSetting(SETTING_LICENSE_KEY)).toBeUndefined();
+    expect(warn.mock.calls.some(c => String(c[0]).includes('could not reach'))).toBe(true);
+  });
+
+  it('skips activation entirely when the stored key already matches', async () => {
+    setSetting(SETTING_LICENSE_KEY, 'flk_already_stored');
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    await activateConfiguredLicense('flk_already_stored');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('re-activates when the configured key differs from the stored one (rotation)', async () => {
+    setSetting(SETTING_LICENSE_KEY, 'flk_old_key_1');
+    mockLicenseService();
+    await activateConfiguredLicense('flk_new_key_2');
+    expect(getSetting(SETTING_LICENSE_KEY)).toBe('flk_new_key_2');
   });
 });

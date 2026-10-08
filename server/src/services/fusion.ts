@@ -18,6 +18,7 @@ import { contentToString, stripImagesFromMessages } from '../lib/content.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { getSetting, setSetting } from '../db/index.js';
 import type { CompletionOptions } from '../providers/base.js';
+import { routeOutputBudget } from '../lib/output-cap.js';
 
 // The virtual model id that triggers multi-model synthesis. Mirrors how
 // `auto` is a virtual id the router intercepts (see routes/proxy.ts).
@@ -275,8 +276,9 @@ async function runModelCall(
     if (!route) break;
 
     const startedAt = Date.now();
+    const routeOpts = { ...options, contextBudget: routeOutputBudget(route, estimatedTokens) };
     try {
-      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, options);
+      const result = await route.provider.chatCompletion(route.apiKey, messages, route.modelId, routeOpts);
       const choice = result.choices?.[0];
       const text = contentToString(choice?.message?.content ?? '');
       const toolCalls = choice?.message?.tool_calls;
@@ -363,10 +365,11 @@ async function runJudgeStreaming(
     if (!route) break;
 
     const startedAt = Date.now();
+    const routeOpts = { ...options, contextBudget: routeOutputBudget(route, estimatedTokens) };
     let text = '';
     let started = false;
     try {
-      for await (const chunk of route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, options)) {
+      for await (const chunk of route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, routeOpts)) {
         const delta = (chunk as any)?.choices?.[0]?.delta?.content;
         if (typeof delta === 'string' && delta.length > 0) {
           if (!started) { started = true; cb.onStart?.({ platform: route.platform, model: route.modelId }); }

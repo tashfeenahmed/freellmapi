@@ -167,6 +167,8 @@ instead of duplicated.
 
 ```json
 {
+  "admin": { "email": "ops@example.com", "password": "change-me-min-8-chars" },
+  "license": "premium license key from freellmapi.co",
   "keys": [
     { "platform": "groq", "key": "gsk_...", "label": "main" },
     { "platform": "google", "key": "AIza...", "enabled": true }
@@ -193,6 +195,24 @@ instead of duplicated.
 }
 ```
 
+Two optional top-level fields cover first-run provisioning:
+
+- **`admin`** creates the first dashboard account, but only while no account
+  exists — a claimed install ignores the entry with a warning, so the config
+  can never take it over. Because the config is applied before the HTTP
+  listener starts, an `admin` entry also closes the unauthenticated
+  first-run setup window entirely: no setup code is minted and
+  `POST /api/auth/setup` answers 409 from the first request on.
+- **`license`** is a Premium key from freellmapi.co. It is validated against
+  the license service before being stored — the same contract as the
+  dashboard's Premium page — then a live-tier catalog sync starts right away.
+  Activation runs in the background so an unreachable license service never
+  delays boot; a stored key identical to the configured one short-circuits
+  before any network call, and a changed key re-activates (rotation).
+
+The config carries plaintext secrets (provider keys, the admin password, the
+license key), so protect the file or env value exactly like `ENCRYPTION_KEY`.
+
 If two custom endpoints serve the same model id, add `"endpoint"` to a `models`
 or `fallback` entry to say which one you mean — the endpoint's URL, or the short
 handle the dashboard shows next to it. Without it, an entry that matches more
@@ -214,7 +234,7 @@ FreeLLMAPI publishes a single production image that contains the Express server 
 docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # or pin a release, e.g. :v1.2.3
 ```
 
-The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
+The image is multi-arch (`linux/amd64` + `linux/arm64`, so it runs on a Raspberry Pi). Published tags: `latest` (the newest release), `main` (the default branch), `v*.*.*` (git release tags), and `sha-<commit>`.
 
 The included `docker-compose.yml` is the recommended install path:
 
@@ -222,6 +242,14 @@ The included `docker-compose.yml` is the recommended install path:
 docker compose up -d
 docker compose logs -f freellmapi
 ```
+
+**Updating:** `docker compose pull && docker compose up -d` (your volume and `.env` carry over). To update from the dashboard instead, set `WATCHTOWER_TOKEN` in `.env` (e.g. `openssl rand -hex 32`) and start with the opt-in profile:
+
+```bash
+docker compose --profile autoupdate up -d
+```
+
+Settings → **Check for updates** then shows **Update now** when a newer release exists: a [Watchtower](https://github.com/nicholas-fedor/watchtower) sidecar pulls the image and recreates the `freellmapi` container, and the dashboard reloads when it is back. Watchtower runs with only its token-protected update endpoint, never updates on a schedule, publishes no port and only touches the `freellmapi` container — but it mounts the Docker socket, which is root-equivalent on the host, so the profile stays off unless you start it.
 
 By default the container's port is bound to `127.0.0.1` (localhost only). To reach the dashboard/API from another machine on your network, publish it on all interfaces with `HOST_BIND=0.0.0.0 docker compose up -d` — only on a trusted LAN, since the proxy is single-user.
 
@@ -262,6 +290,8 @@ request stats.
 
 **Mac downloads:** choose `arm64` for Apple Silicon or `x64` for Intel. Both require macOS 12 Monterey or later and include DMG and ZIP downloads.
 
+**Updating:** the installed app updates itself on macOS, on Windows (the `Setup` installer) and from the Linux AppImage. **⋯ → Settings → Check for updates** (or the tray's **Check for Updates…**) downloads the new release and offers **Restart to update**; a full database backup, listed as *Pre-update* on the Backups page, is written before it installs. With **Automatic update check** on, new releases download in the background and install on the next restart or quit; the app never restarts on its own. The Linux `.deb`/`.rpm`/`.tar.xz` and the portable Windows `.zip` update by downloading the new release.
+
 > **Note for Windows users building from source:** Building the desktop app requires compiling native SQLite modules for Electron. You must have [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) installed (specifically the "Desktop development with C++" workload) and Python installed before running `npm install`.
 
 ```bash
@@ -269,7 +299,7 @@ npm install
 npm install --prefix desktop  # install desktop dependencies
 npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
 npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI-Setup-….exe"
 ```
 
 > Locally built apps are unsigned, so Windows SmartScreen may warn on first run

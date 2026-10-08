@@ -9,6 +9,7 @@ import {
   getSyncState,
   refreshLicenseStatus,
   syncCatalog,
+  validateLicenseKey,
 } from '../services/catalog-sync.js';
 
 export const premiumRouter = Router();
@@ -48,16 +49,8 @@ premiumRouter.post('/key', async (req: Request, res: Response) => {
     return;
   }
 
-  let result: { valid: boolean; plan: string | null; status: string | null; expiresAt: string | null; reason?: string };
-  try {
-    const r = await fetch(`${catalogBaseUrl()}/v1/license/activate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-      signal: AbortSignal.timeout(15000),
-    });
-    result = (await r.json()) as typeof result;
-  } catch {
+  const result = await validateLicenseKey(key, 15000);
+  if (!result) {
     res.status(502).json({ error: 'Could not reach the license service. Check your connection and try again.' });
     return;
   }

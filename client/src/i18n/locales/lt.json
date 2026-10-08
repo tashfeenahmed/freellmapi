@@ -152,21 +152,24 @@
     "compressionRunPreview": "Vykdyti peržiūrą",
     "updatesTitle": "Naujiniai",
     "checkForUpdates": "Patikrinkite naujienas",
-    "lastChecked": "Paskutinį kartą tikrinta: {when}",
-    "currentVersion": "Dabartinė komponavimo versija:",
     "updateAvailable": "Yra naujinys",
-    "changelog": "Kas pasikeitė",
     "upToDate": "Atnaujinta",
     "buildAhead": "Ši komponavimo versija yra priekyje oficialios main šakos.",
     "buildDiverged": "Ši komponavimo versija nukrypo nuo oficialios main šakos.",
     "buildUnknown": "Šios tinkintos komponavimo versijos negalima palyginti su oficialia main šaka.",
     "notGitInstall": "Šiame diegime nėra informacijos apie Git įrašus.",
     "checkFailed": "Nepavyko patikrinti, ar yra naujinių.",
-    "contactsGithub": "Tikrinimas atliekamas rankiniu būdu ir susisiekiama su GitHub.",
     "autoUpdateCheck": "Automatinis atnaujinimų tikrinimas",
-    "autoUpdateCheckHelp": "Kartą per dieną patikrina „GitHub“, ar yra nauja laida, ir parodo priminimą. Pagal numatytuosius nustatymus išjungta.",
-    "openReleases": "Atverti GitHub leidimus",
-    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo."
+    "restartAfterUpdate": "Baigę komponuoti paleiskite FreeLLMAPI iš naujo.",
+    "downloadUpdate": "Atsisiųsti naujinimą",
+    "downloadingUpdate": "Atsisiunčiama… {percent} %",
+    "restartToUpdate": "Paleisti iš naujo ir atnaujinti",
+    "updateReadyHint": "Atsisiųsta. FreeLLMAPI padaro jūsų duomenų atsarginę kopiją, pasileidžia iš naujo ir atidaro naują versiją.",
+    "updateInstallFailed": "Naujinimo įdiegti nepavyko.",
+    "updateNow": "Atnaujinti dabar",
+    "updatingContainer": "Atsisiunčiamas naujas atvaizdas ir paleidžiama iš naujo. Puslapis įsikels iš naujo, kai FreeLLMAPI grįš.",
+    "updateNowFailed": "Atnaujintuvas nepriėmė užklausos. Patikrinkite, ar veikia watchtower konteineris.",
+    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus."
   },
   "models": {
     "title": "Modeliai",
@@ -209,6 +212,7 @@
     "noKey": "Be rakto",
     "dragToReorder": "Vilkimas į pertvarką",
     "dragToReorderGroup": "Vilkimas į pertvarkos modelį",
+    "moveToRank": "Peršokti į poziciją",
     "providerCount": "{count} teikėjai",
     "servedBy": "Aptarnavo {providers}",
     "viewProviders": "Peržiūrėti tiekėjai",
@@ -223,6 +227,7 @@
     "settingsHint": "Vietiniai katalogo modelių redagavimai saugomi tarp katalogo sinchronizacijų. Ištrinti katalogo modeliai lieka ištrinti, kol juos vėl nepridedate per konfigūraciją.",
     "catalogModel": "Katalogas",
     "customModel": "Paprotys",
+    "discoveredModel": "aptiktas",
     "localOverride": "Vietinis perrašymas",
     "displayName": "Rodymo pavadinimas",
     "sizeLabel": "Gebėjimų lygis",
@@ -369,6 +374,7 @@
     "checklistSummary": "Sukonfigūruota {configured} iš {total} tiekėjų",
     "checklistKeyless": "rakto nereikia",
     "checklistNoKeyTip": "Raktas dar nepridėtas. Spustelėkite, kad pridėtumėte.",
+    "checklistSignupLink": "Atidarykite {provider}, kad sukurtumėte paskyrą ir gautumėte raktą",
     "checklistKeylessTip": "Veikia be rakto.",
     "tabQuotaSignals": "Kvotų signalai",
     "tabApiKey": "Vieningas API raktas",
@@ -495,11 +501,11 @@
     "platform": "Platforma",
     "hideAdded": "Slėpti pridėtus tiekėjus",
     "apiToken": "API žetonas",
-    "noKeyNeededPlaceholder": "Nereikia API rakto",
+    "keyOptionalPlaceholder": "Neprivaloma",
     "bearerTokenPlaceholder": "Nešiotojo žetonas",
     "pasteKeyPlaceholder": "Įklijavimo raktas čia",
     "pasteSeveral": "Įklijuoti kelis",
-    "keylessHint": "Nereikia API rakto: šio tiekėjo nemokamas lygis yra anonimiškas (ribojamas pagal IP adresą).",
+    "keyOptionalHint": "Neprivaloma: palikite tuščią anoniminei nemokamai pakopai (ribojama pagal IP) arba įklijuokite savo raktą, kad naudotumėte savo paskyrą.",
     "enable": "Įjungti",
     "noProviderKeys": "Kol kas nėra tiekėjų raktų. Pridėkite vieną aukščiau, kad pradėtumėte maršrutizavimą.",
     "filterPlaceholder": "Filtrų tiekėjai arba raktai",
@@ -677,7 +683,14 @@
     "testFailed": "Modelio testas nepavyko",
     "testThrottled": "Palaukite {seconds}s prieš pakartotinai tikrindami šį modelį.",
     "noModelsForProvider": "Šiam teikėjui nėra sukonfigūruotų modelių.",
-    "testModels": "Testuoti modelius"
+    "testModels": "Testuoti modelius",
+    "monthlyRequestCapLabel": "Mėnesinis užklausų limitas",
+    "monthlyTokenCapLabel": "Mėnesinis žetonų limitas",
+    "capUnlimitedPlaceholder": "Neribota",
+    "capEditHint": "Limitai atstatomi 1 d. 00:00 UTC. Palikite tuščią neribotam.",
+    "monthlyUsageLine": "{requests} užklausos, {tokens} žetonai šį mėnesį",
+    "quotaBalanceHint": "Liko {remaining} iš {limit} {metric}",
+    "quotaBalanceLeft": "Liko {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Prieš naujinimą"
   },
   "status": {
     "healthy": "Sveika",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Visada veikiantis asmeninis asistentas, kuris iš jūsų kompiuterio atsako per WhatsApp, Telegram, Discord ir kitas programas.",
-      "hermes": "Save tobulinantis Nous Research agentas su nuolatine atmintimi ir įgūdžiais, terminale arba pokalbių programose."
+      "hermes": "Save tobulinantis Nous Research agentas su nuolatine atmintimi ir įgūdžiais, terminale arba pokalbių programose.",
+      "pi": "Minimalistinis terminalo agentas, kurį pritaikote savais plėtiniais, įgūdžiais ir užklausų šablonais.",
+      "reasonix": "DeepSeek sukurtas terminalo programavimo agentas, paremtas prefiksų talpykla, kad ilgos sesijos liktų pigios."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Įdiegta naujesnė FreeLLMAPI versija.",
+    "reload": "Įkelti iš naujo"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Pervadinti šią grandinę",
+    "renameConfirm": "Pervadinti grandinę „{oldName}“ į „{name}“? Klientai, kviečianti auto:{oldName}, turi pereiti prie auto:{name}.",
+    "renamePlaceholder": "Naujas grandinės pavadinimas",
+    "renameFailed": "Nepavyko pervadinti šios grandinės."
+  },
+  "updates": {
+    "versionAvailable": "Galima versija {version}",
+    "versionReady": "Versija {version} paruošta įdiegti",
+    "releaseNotes": "Leidimo pastabos",
+    "tryAgain": "Bandyti dar kartą",
+    "offline": "Patikrinkite interneto ryšį ir bandykite dar kartą."
   }
 }

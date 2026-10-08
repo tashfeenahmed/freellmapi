@@ -152,21 +152,24 @@
     "compressionRunPreview": "Spustit náhled",
     "updatesTitle": "Aktualizace",
     "checkForUpdates": "Sledujte aktualizace",
-    "lastChecked": "Naposledy kontrolováno: {when}",
-    "currentVersion": "Aktuální sestavení:",
     "updateAvailable": "Je dostupná aktualizace",
-    "changelog": "Co se změnilo",
     "upToDate": "Vše je aktuální",
     "buildAhead": "Toto sestavení je před oficiální větví main.",
     "buildDiverged": "Toto sestavení se odchýlilo od oficiální větve main.",
     "buildUnknown": "Toto vlastní sestavení nelze porovnat s oficiální větví main.",
     "notGitInstall": "Tato instalace neobsahuje informace o commitu.",
     "checkFailed": "Aktualizace se nepodařilo zkontrolovat.",
-    "contactsGithub": "Kontroly se spouštějí ručně a kontaktují GitHub.",
     "autoUpdateCheck": "Automatická kontrola aktualizací",
-    "autoUpdateCheckHelp": "Jednou denně zkontroluje na GitHubu novou verzi a zobrazí připomenutí. Ve výchozím nastavení vypnuto.",
-    "openReleases": "Otevřít vydání na GitHubu",
-    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI."
+    "restartAfterUpdate": "Po dokončení sestavení restartujte FreeLLMAPI.",
+    "downloadUpdate": "Stáhnout aktualizaci",
+    "downloadingUpdate": "Stahování… {percent} %",
+    "restartToUpdate": "Restartovat a aktualizovat",
+    "updateReadyHint": "Staženo. FreeLLMAPI zálohuje vaše data, restartuje se a otevře novou verzi.",
+    "updateInstallFailed": "Aktualizaci se nepodařilo nainstalovat.",
+    "updateNow": "Aktualizovat nyní",
+    "updatingContainer": "Stahuje se nový obraz a probíhá restart. Stránka se znovu načte, až bude FreeLLMAPI zpět.",
+    "updateNowFailed": "Aktualizátor požadavek nepřijal. Zkontrolujte, že kontejner watchtower běží.",
+    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower."
   },
   "models": {
     "title": "Modely",
@@ -209,6 +212,7 @@
     "noKey": "Bez klíče",
     "dragToReorder": "Tah pro přeuspořádání",
     "dragToReorderGroup": "Tah pro přeuspořádání modelu",
+    "moveToRank": "Přejít na pozici",
     "providerCount": "{count} poskytovatelé",
     "servedBy": "Obsluhováno {providers}",
     "viewProviders": "Zobrazit poskytovatele",
@@ -223,6 +227,7 @@
     "settingsHint": "Lokální úpravy katalogových modelů jsou uchovávány napříč synchronizacemi katalogu. Smazané katalogové modely zůstávají smazané, dokud je znovu nepřidáte přes konfiguraci.",
     "catalogModel": "Katalog",
     "customModel": "Zvyk",
+    "discoveredModel": "nalezený",
     "localOverride": "Místní přepsání",
     "displayName": "Zobrazovací název",
     "sizeLabel": "Úroveň schopností",
@@ -369,6 +374,7 @@
     "checklistSummary": "Nastaveno {configured} z {total} poskytovatelů",
     "checklistKeyless": "klíč není potřeba",
     "checklistNoKeyTip": "Zatím nebyl přidán žádný klíč. Kliknutím jej přidáte.",
+    "checklistSignupLink": "Otevřete {provider} pro vytvoření účtu a získání klíče",
     "checklistKeylessTip": "Funguje bez klíče.",
     "tabQuotaSignals": "Kvótové signály",
     "tabApiKey": "Sjednocený API klíč",
@@ -495,11 +501,11 @@
     "platform": "Platforma",
     "hideAdded": "Skrýt přidané poskytovatele",
     "apiToken": "API žeton",
-    "noKeyNeededPlaceholder": "Klíč API není potřeba",
+    "keyOptionalPlaceholder": "Volitelné",
     "bearerTokenPlaceholder": "Token na doručitele",
     "pasteKeyPlaceholder": "Vložte zde klíč",
     "pasteSeveral": "Vložit více",
-    "keylessHint": "Není potřeba API klíč: bezplatná úroveň tohoto poskytovatele je anonymní (omezená rychlostí na IP adresu).",
+    "keyOptionalHint": "Volitelné: nechte prázdné pro anonymní bezplatnou úroveň (omezení na IP), nebo vložte vlastní klíč a použijte svůj účet.",
     "enable": "Povolit",
     "noProviderKeys": "Klíče od poskytovatele zatím neexistují. Přidejte jeden výše, abyste mohli začít směrovat.",
     "filterPlaceholder": "Poskytovatelé filtrů nebo klíče",
@@ -677,7 +683,14 @@
     "testFailed": "Test modelu selhal",
     "testThrottled": "Před dalším testem tohoto modelu počkejte {seconds} s.",
     "noModelsForProvider": "Pro tohoto poskytovatele nejsou nakonfigurovány žádné modely.",
-    "testModels": "Otestovat modely"
+    "testModels": "Otestovat modely",
+    "monthlyRequestCapLabel": "Měsíční limit požadavků",
+    "monthlyTokenCapLabel": "Měsíční limit tokenů",
+    "capUnlimitedPlaceholder": "Neomezeno",
+    "capEditHint": "Limity se resetují 1. dne v 00:00 UTC. Nechte prázdné pro neomezeno.",
+    "monthlyUsageLine": "{requests} požadavků, {tokens} tokenů tento měsíc",
+    "quotaBalanceHint": "Zbývá {remaining} z {limit} {metric}",
+    "quotaBalanceLeft": "Zbývá {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Před aktualizací"
   },
   "status": {
     "healthy": "zdravé",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Osobní asistent, který je neustále k dispozici a z vašeho vlastního počítače odpovídá v aplikacích WhatsApp, Telegram, Discord a dalších.",
-      "hermes": "Samozdokonalující se agent od Nous Research s trvalou pamětí a dovednostmi, v terminálu nebo v chatovacích aplikacích."
+      "hermes": "Samozdokonalující se agent od Nous Research s trvalou pamětí a dovednostmi, v terminálu nebo v chatovacích aplikacích.",
+      "pi": "Minimalistický terminálový agent, který si přizpůsobíte vlastními rozšířeními, dovednostmi a šablonami promptů.",
+      "reasonix": "Terminálový agent pro programování stavěný pro DeepSeek, postavený na cachování prefixů, aby dlouhé relace zůstaly levné."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Je nainstalována novější verze FreeLLMAPI.",
+    "reload": "Načíst znovu"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Přejmenovat tento řetězec",
+    "renameConfirm": "Přejmenovat řetězec \"{oldName}\" na \"{name}\"? Klienti volající auto:{oldName} musí přejít na auto:{name}.",
+    "renamePlaceholder": "Nový název řetězce",
+    "renameFailed": "Řetězec se nepodařilo přejmenovat."
+  },
+  "updates": {
+    "versionAvailable": "Je k dispozici verze {version}",
+    "versionReady": "Verze {version} je připravena k instalaci",
+    "releaseNotes": "Poznámky k vydání",
+    "tryAgain": "Zkusit znovu",
+    "offline": "Zkontrolujte připojení k internetu a zkuste to znovu."
   }
 }

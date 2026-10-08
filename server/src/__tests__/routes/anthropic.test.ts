@@ -390,6 +390,17 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(body.input_tokens).toBeGreaterThan(0);
   });
 
+  it('counts tool schemas in /v1/messages/count_tokens', async () => {
+    const messages = [{ role: 'user', content: 'count these tokens please' }];
+    const bare = await request(app, '/v1/messages/count_tokens', { model: 'claude-sonnet-4-5', messages }, anthropicHeaders());
+    const withTools = await request(app, '/v1/messages/count_tokens', {
+      model: 'claude-sonnet-4-5',
+      messages,
+      tools: [{ name: 'Read', description: 'r'.repeat(4000), input_schema: { type: 'object', properties: {} } }],
+    }, anthropicHeaders());
+    expect(withTools.body.input_tokens).toBeGreaterThan(bare.body.input_tokens + 1000);
+  });
+
   it('returns an Anthropic invalid_request_error on a malformed body', async () => {
     const { status, body } = await request(app, '/v1/messages', {
       model: 'claude-sonnet-4-5', messages: [],

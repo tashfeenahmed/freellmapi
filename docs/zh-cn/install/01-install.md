@@ -191,7 +191,7 @@ FreeLLMAPI 发布一个生产镜像，里面包含 Express 服务和构建好的
 docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # 也可以固定到某个版本，例如 :v1.2.3
 ```
 
-镜像是多架构的（`linux/amd64` 和 `linux/arm64`，所以树莓派上也能跑）。发布的标签有：`latest`（默认分支）、`v*.*.*`（git 发布标签）和 `sha-<commit>`。
+镜像是多架构的（`linux/amd64` 和 `linux/arm64`，所以树莓派上也能跑）。发布的标签有：`latest`（最新发布版本）、`main`（默认分支）、`v*.*.*`（git 发布标签）和 `sha-<commit>`。
 
 仓库里自带的 `docker-compose.yml` 是推荐的安装方式：
 
@@ -199,6 +199,14 @@ docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # 也可以固定到某个
 docker compose up -d
 docker compose logs -f freellmapi
 ```
+
+**更新：** 运行 `docker compose pull && docker compose up -d`（数据卷和 `.env` 会保留）。如果想直接在仪表盘里更新，请在 `.env` 中设置 `WATCHTOWER_TOKEN`（例如 `openssl rand -hex 32`），并用可选的 profile 启动：
+
+```bash
+docker compose --profile autoupdate up -d
+```
+
+之后在 设置 → **检查更新** 中，有新版本时会出现 **立即更新**：一个 [Watchtower](https://github.com/nicholas-fedor/watchtower) 辅助容器会拉取镜像并重建 `freellmapi` 容器，仪表盘在服务恢复后自动重新加载。Watchtower 只开启受令牌保护的更新接口，不会定时更新，不对外暴露端口，也只处理 `freellmapi` 容器；但它需要挂载 Docker socket，这相当于宿主机的 root 权限，所以除非你主动启动该 profile，否则它不会运行。
 
 容器端口默认绑定在 `127.0.0.1`（仅本机）。想从网络里的另一台机器访问仪表盘或 API，用 `HOST_BIND=0.0.0.0 docker compose up -d` 把它发布到所有网卡上。只在可信的局域网里这么做，因为这个代理是单用户的。
 
@@ -231,6 +239,8 @@ FREEAPI_DB_BACKUP_INTERVAL_MS=300000
 
 **Mac 下载：** Apple Silicon 请选择 `arm64`，Intel 请选择 `x64`。两者都要求 macOS 12 Monterey 或更高版本，并提供 DMG 和 ZIP 下载。
 
+**更新：** 已安装的应用在 macOS、Windows（`Setup` 安装版）和 Linux AppImage 上可以自动更新。**⋯ → 设置 → 检查更新**（或托盘菜单的 **检查更新…**）会下载新版本并提供 **重启以更新**；安装前会先写入一份完整的数据库备份，在备份页面中标记为「更新前」。开启 **自动检查更新** 后，新版本会在后台下载，并在下次重启或退出时安装；应用不会自行重启。Linux 的 `.deb`/`.rpm`/`.tar.xz` 和 Windows 便携版 `.zip` 请下载新版本来更新。
+
 > **Windows 用户从源码构建的注意事项：** 构建桌面应用需要为 Electron 编译原生 SQLite 模块。在执行 `npm install` 之前，你必须先装好 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（具体来说是「使用 C++ 的桌面开发」工作负载）以及 Python。
 
 ```bash
@@ -238,7 +248,7 @@ npm install
 npm install --prefix desktop  # 安装桌面端依赖
 npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
 npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
-npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI Setup ….exe"
+npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI-Setup-….exe"
 ```
 
 > 本地构建出来的应用没有签名，所以 Windows SmartScreen 首次运行时可能会警告（点「更多信息」→「仍要运行」）；macOS 构建则不会触发 Gatekeeper 提示。

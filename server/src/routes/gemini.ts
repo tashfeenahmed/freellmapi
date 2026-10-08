@@ -217,13 +217,16 @@ async function handleGenerate(req: Request, res: Response, stream: boolean): Pro
   }, streamWire(String(req.query.alt ?? '').toLowerCase() === 'sse'));
 }
 
-geminiRouter.post(/^\/models\/(.+):generateContent$/, (req, res) => {
-  void handleGenerate(req, res, false);
-});
+// The handler promise is RETURNED, not voided, so Express 5 forwards a
+// rejection to errorHandler like it already does for the OpenAI (/v1) and
+// Anthropic (/v1/messages) surfaces, whose handlers are `async` and so hand
+// Express their promise. A voided promise escapes the router entirely and
+// resurfaces as an `unhandledRejection`, which the process safety net
+// classifies as fatal for anything that is not a transport error — so one
+// failing request exited the whole gateway instead of answering 500.
+geminiRouter.post(/^\/models\/(.+):generateContent$/, (req, res) => handleGenerate(req, res, false));
 
-geminiRouter.post(/^\/models\/(.+):streamGenerateContent$/, (req, res) => {
-  void handleGenerate(req, res, true);
-});
+geminiRouter.post(/^\/models\/(.+):streamGenerateContent$/, (req, res) => handleGenerate(req, res, true));
 
 geminiRouter.post(/^\/models\/(.+):countTokens$/, (req, res) => {
   if (!authenticate(req, res)) return;

@@ -152,21 +152,24 @@
     "compressionRunPreview": "プレビューを実行",
     "updatesTitle": "アップデート",
     "checkForUpdates": "アップデートをチェックする",
-    "lastChecked": "最終チェック日: {when}",
-    "currentVersion": "現在のビルド:",
     "updateAvailable": "アップデートがあります",
-    "changelog": "変更内容",
     "upToDate": "最新版です",
     "buildAhead": "このビルドは公式のmainより先行しています。",
     "buildDiverged": "このビルドは公式のmainから分岐しています。",
     "buildUnknown": "このカスタムビルドは公式のmainと比較できません。",
     "notGitInstall": "このインストールにはコミット情報が含まれていません。",
     "checkFailed": "アップデートを確認できませんでした。",
-    "contactsGithub": "確認は手動で行われ、GitHubに接続します。",
     "autoUpdateCheck": "自動アップデートチェック",
-    "autoUpdateCheckHelp": "1日1回、新しいリリースがないかGitHubを確認し、通知を表示します。既定では無効です。",
-    "openReleases": "GitHub Releasesを開く",
-    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。"
+    "restartAfterUpdate": "ビルド完了後にFreeLLMAPIを再起動してください。",
+    "downloadUpdate": "アップデートをダウンロード",
+    "downloadingUpdate": "ダウンロード中… {percent}%",
+    "restartToUpdate": "再起動してアップデート",
+    "updateReadyHint": "ダウンロード完了。FreeLLMAPI はデータをバックアップしてから再起動し、新しいバージョンを開きます。",
+    "updateInstallFailed": "アップデートをインストールできませんでした。",
+    "updateNow": "今すぐアップデート",
+    "updatingContainer": "新しいイメージを取得して再起動しています。FreeLLMAPI が戻るとこのページは再読み込みされます。",
+    "updateNowFailed": "アップデーターがリクエストを受け付けませんでした。watchtower コンテナが動いているか確認してください。",
+    "updateNowTimeout": "5 分経っても FreeLLMAPI が再起動していません。watchtower コンテナのログを確認してください。"
   },
   "models": {
     "title": "モデル",
@@ -209,6 +212,7 @@
     "noKey": "鍵がありません",
     "dragToReorder": "ドラッグして並べ替えます",
     "dragToReorderGroup": "ドラッグしてモデルを並べ替えます",
+    "moveToRank": "ランクへ移動",
     "providerCount": "{count}プロバイダー",
     "servedBy": "{providers}が提供",
     "viewProviders": "プロバイダーを表示する",
@@ -223,6 +227,7 @@
     "settingsHint": "カタログ モデルに対するローカル編集は、カタログ同期全体で保持されます。削除されたカタログ モデルは、構成を通じて再度追加するまで削除されたままになります。",
     "catalogModel": "カタログ",
     "customModel": "カスタム",
+    "discoveredModel": "検出",
     "localOverride": "ローカルオーバーライド",
     "displayName": "表示名",
     "sizeLabel": "能力ティア",
@@ -369,6 +374,7 @@
     "checklistSummary": "{total}件中{configured}件のプロバイダーを設定済み",
     "checklistKeyless": "キー不要",
     "checklistNoKeyTip": "キーがまだ追加されていません。クリックして追加します。",
+    "checklistSignupLink": "アカウントを作成してキーを取得するには {provider} を開きます",
     "checklistKeylessTip": "キーなしで利用できます。",
     "tabQuotaSignals": "クォータ信号",
     "tabApiKey": "統一されたAPIキー",
@@ -495,11 +501,11 @@
     "platform": "プラットフォーム",
     "hideAdded": "追加済みのプロバイダーを非表示",
     "apiToken": "APIトークン",
-    "noKeyNeededPlaceholder": "API キーは必要ありません",
+    "keyOptionalPlaceholder": "任意",
     "bearerTokenPlaceholder": "無記名トークン",
     "pasteKeyPlaceholder": "ここにキーを貼り付けます",
     "pasteSeveral": "複数を貼り付け",
-    "keylessHint": "API キーは必要ありません。このプロバイダーの無料利用枠は匿名です (IP ごとにレートが制限されています)。",
+    "keyOptionalHint": "任意: 空欄のままにすると匿名の無料枠（IP ごとにレート制限）を使用します。自分のアカウントを使うにはキーを貼り付けてください。",
     "enable": "有効にする",
     "noProviderKeys": "プロバイダーキーはまだありません。上に 1 つ追加してルーティングを開始します。",
     "filterPlaceholder": "フィルタープロバイダーまたはキー",
@@ -677,7 +683,14 @@
     "testFailed": "モデルテストに失敗しました",
     "testThrottled": "再テストまで {seconds} 秒お待ちください。",
     "noModelsForProvider": "このプロバイダーにはモデルが設定されていません。",
-    "testModels": "モデルをテスト"
+    "testModels": "モデルをテスト",
+    "monthlyRequestCapLabel": "月間リクエスト上限",
+    "monthlyTokenCapLabel": "月間トークン上限",
+    "capUnlimitedPlaceholder": "無制限",
+    "capEditHint": "上限は毎月1日 00:00 UTC にリセットされます。無制限は空欄のままにしてください。",
+    "monthlyUsageLine": "今月 {requests} リクエスト、{tokens} トークン",
+    "quotaBalanceHint": "{limit} {metric}中 残り {remaining}",
+    "quotaBalanceLeft": "残り {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "アップデート前"
   },
   "status": {
     "healthy": "健康な",
@@ -1133,17 +1147,16 @@
       "generic": "OpenAI API を話すその他のツール。ベース URL とキーを手動で設定します。",
       "atomcode": "AtomGit のターミナルエージェント。Rust 製で、OpenAI 互換のエンドポイントなら何でも使えます。",
       "openclaw": "自分のマシンから WhatsApp、Telegram、Discord などで応答する、常時稼働のパーソナルアシスタントです。",
-      "hermes": "Nous Research の自己改善型エージェント。永続的なメモリとスキルを備え、ターミナルでもチャットアプリでも使えます。"
+      "hermes": "Nous Research の自己改善型エージェント。永続的なメモリとスキルを備え、ターミナルでもチャットアプリでも使えます。",
+      "pi": "自分の拡張機能、スキル、プロンプトテンプレートで形づくる、ミニマルなターミナルエージェント。",
+      "reasonix": "DeepSeek ネイティブのターミナル向けコーディングエージェント。プレフィックスキャッシュを軸に設計され、長いセッションでも安く済みます。"
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "新しいバージョンの FreeLLMAPI がインストールされています。",
+    "reload": "再読み込み"
   },
   "freeTier": {
     "poolsToggle": "無料枠プール（{count}）",
@@ -1191,6 +1204,17 @@
     "startEmpty": "空の状態で作成",
     "startEmptyHint": "モデルを入れずにチェーンを作り、新しいカタログモデルも自動では追加しません。チェックを外すと既定のチェーンの複製になります。",
     "curated": "手動管理",
-    "curatedHint": "新しいカタログモデルはこのチェーンに自動追加されません。"
+    "curatedHint": "新しいカタログモデルはこのチェーンに自動追加されません。",
+    "renameHint": "このチェーンの名前を変更",
+    "renameConfirm": "チェーン「{oldName}」を「{name}」に名前を変更しますか？ auto:{oldName} を呼び出しているクライアントは auto:{name} に切り替える必要があります。",
+    "renamePlaceholder": "新しいチェーン名",
+    "renameFailed": "チェーンの名前を変更できませんでした。"
+  },
+  "updates": {
+    "versionAvailable": "バージョン {version} が利用可能です",
+    "versionReady": "バージョン {version} をインストールする準備ができました",
+    "releaseNotes": "リリースノート",
+    "tryAgain": "再試行",
+    "offline": "インターネット接続を確認して、もう一度お試しください。"
   }
 }

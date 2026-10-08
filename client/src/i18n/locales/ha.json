@@ -152,21 +152,24 @@
     "compressionRunPreview": "Gudanar da samfoti",
     "updatesTitle": "Sabuntawa",
     "checkForUpdates": "Bincika don sabuntawa",
-    "lastChecked": "An duba ƙarshe: {when}",
-    "currentVersion": "Build na yanzu:",
     "updateAvailable": "Akwai sabuntawa",
-    "changelog": "Abin da ya canza",
     "upToDate": "An sabunta",
     "buildAhead": "Wannan build ɗin yana gaba da main na hukuma.",
     "buildDiverged": "Wannan build ɗin ya rabu da main na hukuma.",
     "buildUnknown": "Ba za a iya kwatanta wannan build na musamman da main na hukuma ba.",
     "notGitInstall": "Wannan shigarwar ba ta ƙunshi bayanan commit ba.",
     "checkFailed": "Ba a iya bincika sabuntawa ba.",
-    "contactsGithub": "Ana yin dubawa da hannu kuma ana tuntuɓar GitHub.",
     "autoUpdateCheck": "Duba sabuntawa ta atomatik",
-    "autoUpdateCheckHelp": "Yana duba GitHub sau ɗaya a rana don sabon fitowa kuma yana nuna tunatarwa. A kashe ta tsohuwa.",
-    "openReleases": "Buɗe sakin GitHub",
-    "restartAfterUpdate": "Sake kunna FreeLLMAPI bayan an gama build ɗin."
+    "restartAfterUpdate": "Sake kunna FreeLLMAPI bayan an gama build ɗin.",
+    "downloadUpdate": "Sauke sabuntawa",
+    "downloadingUpdate": "Ana saukewa… {percent}%",
+    "restartToUpdate": "Sake farawa don sabuntawa",
+    "updateReadyHint": "An sauke. FreeLLMAPI yana adana bayananka, sai ya sake farawa ya buɗe sabon sigar.",
+    "updateInstallFailed": "Ba a iya shigar da sabuntawar ba.",
+    "updateNow": "Sabunta yanzu",
+    "updatingContainer": "Ana jan sabon hoto ana sake farawa. Wannan shafin zai sake lodawa idan FreeLLMAPI ya dawo.",
+    "updateNowFailed": "Mai sabuntawa bai karɓi buƙatar ba. Duba ko kwantena watchtower yana aiki.",
+    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower."
   },
   "models": {
     "title": "Samfura",
@@ -209,6 +212,7 @@
     "noKey": "babu makulli",
     "dragToReorder": "Ja don sake yin oda",
     "dragToReorderGroup": "Ja don sake yin tsari",
+    "moveToRank": "Tsallawa zu matsayi",
     "providerCount": "{count} masu samarwa",
     "servedBy": "{providers} ya yi aiki",
     "viewProviders": "Duba masu samarwa",
@@ -223,6 +227,7 @@
     "settingsHint": "gyare-gyare na gida zuwa ƙirar kasida ana kiyaye su a cikin daidaitawar kasida. Samfurin kasidar da aka goge suna kasancewa a goge har sai kun sake ƙara su ta hanyar daidaitawa.",
     "catalogModel": "kasida",
     "customModel": "al'ada",
+    "discoveredModel": "an gano",
     "localOverride": "wuce gona da iri",
     "displayName": "Sunan nuni",
     "sizeLabel": "Matakin iyawa",
@@ -369,6 +374,7 @@
     "checklistSummary": "An saita {configured} daga cikin {total} masu bayarwa",
     "checklistKeyless": "ba a buƙatar maɓalli",
     "checklistNoKeyTip": "Ba a ƙara maɓalli ba tukuna. Danna don ƙarawa.",
+    "checklistSignupLink": "Buɗe {provider} don ƙirƙirar asusua da samun mabuɗi",
     "checklistKeylessTip": "Yana aiki ba tare da maɓalli ba.",
     "tabQuotaSignals": "Alamun ƙididdiga",
     "tabApiKey": "Maɓallin API haɗe",
@@ -495,11 +501,11 @@
     "platform": "Dandalin",
     "hideAdded": "Ɓoye masu bayarwa da aka ƙara",
     "apiToken": "Farashin API",
-    "noKeyNeededPlaceholder": "Babu maɓallin API da ake buƙata",
+    "keyOptionalPlaceholder": "Na zaɓi",
     "bearerTokenPlaceholder": "Alamar mai ɗaukar nauyi",
     "pasteKeyPlaceholder": "manna makullin nan",
     "pasteSeveral": "Liƙa da yawa",
-    "keylessHint": "Babu maɓallin API da ake buƙata: wannan matakin kyauta na mai bayarwa ba a san shi ba (mai-iyakantaccen ƙimar kowane IP).",
+    "keyOptionalHint": "Na zaɓi: bar shi babu komai don amfani da matakin kyauta na ɓoye (iyakar ƙima ga kowane IP), ko liƙa maɓallinka don amfani da asusunka.",
     "enable": "Kunna",
     "noProviderKeys": "Babu maɓallan mai bayarwa tukuna. Ƙara ɗaya a sama don fara kewayawa.",
     "filterPlaceholder": "Tace masu samarwa ko maɓalli",
@@ -677,7 +683,14 @@
     "testFailed": "Gwajin samfurin ya fadi",
     "testThrottled": "Da fatan za a jira {seconds}s kafin sake gwada wannan samfurin.",
     "noModelsForProvider": "Babu samfuran da aka saita don wannan mai ba da sabis.",
-    "testModels": "Gwada samfura"
+    "testModels": "Gwada samfura",
+    "monthlyRequestCapLabel": "Iyakar buƙatota ta wata",
+    "monthlyTokenCapLabel": "Iyakar token ta wata",
+    "capUnlimitedPlaceholder": "Ba iyaka ba",
+    "capEditHint": "Ana saita iyakoki a ranar 1 00:00 UTC. Bara komai don mara iyaka.",
+    "monthlyUsageLine": "Buƙatotu {requests}, token {tokens} wannan wata",
+    "quotaBalanceHint": "Saura {remaining} daga {limit} {metric}",
+    "quotaBalanceLeft": "Saura {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Kafin sabuntawa"
   },
   "status": {
     "healthy": "lafiya",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Mataimaki na kai da ke aiki koyaushe, yana amsawa a WhatsApp, Telegram, Discord da sauransu daga na'urarka.",
-      "hermes": "Wakilin Nous Research mai inganta kansa, da ƙwaƙwalwa mai dorewa da ƙwarewa, a cikin terminal ko a manhajojin hira."
+      "hermes": "Wakilin Nous Research mai inganta kansa, da ƙwaƙwalwa mai dorewa da ƙwarewa, a cikin terminal ko a manhajojin hira.",
+      "pi": "Ƙaramin wakilin terminal da kuke tsara shi da naku ƙarin abubuwa, ƙwarewa da samfuran umarni.",
+      "reasonix": "Wakilin rubuta lamba a tasha da aka gina don DeepSeek, bisa ajiyar prefix domin dogayen zama su kasance masu arha."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "An shigar da sabon sigar FreeLLMAPI.",
+    "reload": "Sake lodawa"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Sauya sunan wannan sarƙa",
+    "renameConfirm": "Sauya sunan sarƙa \"{oldName}\" zuwa \"{name}\"? Abokan cinikin da ke kira auto:{oldName} dole su koma auto:{name}.",
+    "renamePlaceholder": "Sabon sunan sarƙa",
+    "renameFailed": "Ba a iya sauya sunan sarƙar ba."
+  },
+  "updates": {
+    "versionAvailable": "Sigar {version} tana nan",
+    "versionReady": "Sigar {version} a shirye take don shigarwa",
+    "releaseNotes": "Bayanan fitarwa",
+    "tryAgain": "Sake gwadawa",
+    "offline": "Duba haɗin intanet ɗinka sannan ka sake gwadawa."
   }
 }

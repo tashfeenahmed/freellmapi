@@ -4,6 +4,7 @@ import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 import { ensureAllModelsInProfiles, ensureModelInProfiles } from '../../services/profile-models.js';
+import { resolveRoutingChain } from '../../services/router.js';
 
 // Named fallback chains you build by hand (#895). Two things have to hold for
 // a curated chain to survive: creating one must not dump the whole catalog
@@ -238,5 +239,60 @@ describe('named fallback chains', () => {
     // The seeded Default chain keeps the old behaviour.
     const fallbackDefault = body.find((p: { type: string }) => p.type === 'default');
     expect(fallbackDefault.auto_include_new_models).toBe(1);
+  });
+
+  // Renaming a chain (#1179). The name IS the client-facing address — a
+  // request picks the chain with model="auto:<name>" — so rename has to
+  // enforce exactly the creation rules and never silently no-op.
+  it('renames a custom chain and moves the auto:<name> address with it', async () => {
+    // Non-empty: an empty chain has nothing to route, and resolve would
+    // correctly throw "no enabled models" rather than prove the name moved.
+    const chain = (await request('POST', '/api/profiles', { name: 'old-name' })).body;
+
+    const renamed = await request('PUT', `/api/profiles/${chain.id}`, { name: 'new-name' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('new-name');
+
+    // The routing side resolves the new name and not the old one.
+    expect(() => resolveRoutingChain('auto:new-name')).not.toThrow();
+    expect(() => resolveRoutingChain('auto:old-name')).toThrow(/not found/i);
+  });
+
+  it('rejects a rename that collides with another chain, case-insensitively', async () => {
+    await request('POST', '/api/profiles', { name: 'taken', empty: true });
+    const mine = (await request('POST', '/api/profiles', { name: 'mine', empty: true })).body;
+
+    const clash = await request('PUT', `/api/profiles/${mine.id}`, { name: 'TAKEN' });
+    expect(clash.status).toBe(409);
+  });
+
+  it('lets a rename change only the case of the same name', async () => {
+    const chain = (await request('POST', '/api/profiles', { name: 'casey', empty: true })).body;
+    const renamed = await request('PUT', `/api/profiles/${chain.id}`, { name: 'Casey' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('Casey');
+  });
+
+  it('refuses reserved and invalid names on rename, same as on create', async () => {
+    const chain = (await request('POST', '/api/profiles', { name: 'resizable', empty: true })).body;
+
+    const reserved = await request('PUT', `/api/profiles/${chain.id}`, { name: 'auto' });
+    expect(reserved.status).toBe(400);
+    expect(reserved.body.error.message).toMatch(/reserved/i);
+
+    const invalid = await request('PUT', `/api/profiles/${chain.id}`, { name: 'has spaces!' });
+    expect(invalid.status).toBe(400);
+
+    const long = await request('PUT', `/api/profiles/${chain.id}`, { name: 'x'.repeat(21) });
+    expect(long.status).toBe(400);
+  });
+
+  it('refuses to rename built-in chains with a clear 403', async () => {
+    const db = getDb();
+    const builtin = db.prepare("SELECT id FROM profiles WHERE type != 'custom'").get() as { id: number };
+
+    const denied = await request('PUT', `/api/profiles/${builtin.id}`, { name: 'clever' });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.message).toMatch(/built-in/i);
   });
 });

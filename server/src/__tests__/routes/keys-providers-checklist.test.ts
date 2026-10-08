@@ -53,6 +53,18 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
     expect(groq).toMatchObject({ platform: 'groq', configured: false, keyCount: 0 });
     expect(typeof groq.name).toBe('string');
     expect(typeof groq.keyless).toBe('boolean');
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'moondream'))
+      .toMatchObject({ platform: 'moondream', name: 'Moondream', configured: false, keyless: false });
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'llmtr'))
+      .toMatchObject({ platform: 'llmtr', name: 'LLMTR', configured: false, keyless: false });
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'typhoon'))
+      .toMatchObject({ platform: 'typhoon', name: 'Typhoon', configured: false, keyless: false });
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'plugsky'))
+      .toMatchObject({ platform: 'plugsky', name: 'Plugsky', configured: false, keyless: false });
+    for (const [platform, name] of [['gizmo', 'Gizmo'], ['blockrun', 'BlockRun']]) {
+      expect(body.providers.find((p: { platform: string }) => p.platform === platform))
+        .toMatchObject({ platform, name, configured: false, keyless: false });
+    }
     expect(body.summary).toEqual({
       total: body.providers.length,
       configured: 0,

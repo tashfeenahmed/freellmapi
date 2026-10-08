@@ -24,6 +24,7 @@ import {
   DEFAULT_PROXY_PROBE_TARGET,
   parseScutilProxy,
   parseRegProxy,
+  normalizeProxyUrl,
 } from '../../lib/proxy.js';
 
 // #838 reads the OS-wide proxy (scutil/reg/gsettings) as a last-resort
@@ -1097,5 +1098,81 @@ describe('system proxy detection parsers (#353)', () => {
     const enable = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\n    ProxyEnable    REG_DWORD    0x0\n';
     const server = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\n    ProxyServer    REG_SZ    127.0.0.1:7890\n';
     expect(parseRegProxy(enable, server)).toEqual({ url: '', source: 'none' });
+  });
+});
+
+describe('scheme-less proxy values (#1373)', () => {
+  const REG_ENABLED = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\n    ProxyEnable    REG_DWORD    0x1\n';
+  const regServer = (value: string) =>
+    `HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\n    ProxyServer    REG_SZ    ${value}\n`;
+
+  it('gives a bare host:port an http:// scheme', () => {
+    expect(normalizeProxyUrl('127.0.0.1:7890')).toBe('http://127.0.0.1:7890');
+    expect(normalizeProxyUrl(' proxy.corp:8080 ')).toBe('http://proxy.corp:8080');
+  });
+
+  it('leaves a value that already has a scheme alone', () => {
+    expect(normalizeProxyUrl('http://proxy:8080')).toBe('http://proxy:8080');
+    expect(normalizeProxyUrl('socks5h://127.0.0.1:1080')).toBe('socks5h://127.0.0.1:1080');
+    expect(normalizeProxyUrl('')).toBe('');
+  });
+
+  it('uses a scheme-less HTTPS_PROXY instead of dropping it as invalid', () => {
+    process.env.HTTPS_PROXY = '127.0.0.1:7890';
+    applyProxyUrl('');
+    expect(getProxyUrl()).toBe('http://127.0.0.1:7890');
+    expect(isProxyActive()).toBe(true);
+  });
+
+  it('routes through the dispatcher for a scheme-less dashboard value', async () => {
+    applyProxyUrl('proxy:8080');
+    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    await proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq');
+    const [, init] = spy.mock.calls[0];
+    expect((init as any)?.dispatcher).toBeDefined();
+  });
+
+  it('falls back to the https= entry of a per-scheme Windows ProxyServer', () => {
+    expect(parseRegProxy(REG_ENABLED, regServer('https=proxy.corp:8443;ftp=proxy.corp:21')))
+      .toEqual({ url: 'proxy.corp:8443', source: 'system(Windows)' });
+  });
+
+  it('reads a socks-only Windows ProxyServer as SOCKS, not HTTP', () => {
+    expect(parseRegProxy(REG_ENABLED, regServer('socks=127.0.0.1:1080')))
+      .toEqual({ url: 'socks5://127.0.0.1:1080', source: 'system(Windows)' });
+  });
+});
+
+describe('fetch failed carries its cause (#1373)', () => {
+  const fetchFailed = (cause: unknown) => Object.assign(new TypeError('fetch failed'), { cause });
+
+  it('names a DNS failure and the host', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(Object.assign(new Error('getaddrinfo ENOTFOUND router.huggingface.co'), { code: 'ENOTFOUND' })));
+    await expect(proxyFetch('https://router.huggingface.co/v1/chat/completions', undefined, 'huggingface'))
+      .rejects.toThrow('fetch failed (ENOTFOUND router.huggingface.co)');
+  });
+
+  it('names a certificate error', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(Object.assign(new Error('self signed certificate in certificate chain'), { code: 'SELF_SIGNED_CERT_IN_CHAIN' })));
+    await expect(proxyFetch('https://api.groq.com/openai/v1/chat/completions', undefined, 'groq'))
+      .rejects.toThrow('fetch failed (SELF_SIGNED_CERT_IN_CHAIN api.groq.com)');
+  });
+
+  it('says when the request went through the proxy', async () => {
+    applyProxyUrl('http://127.0.0.1:7890');
+    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:7890'), { code: 'ECONNREFUSED' })));
+    await expect(proxyFetch('https://api.groq.com/v1', undefined, 'groq'))
+      .rejects.toThrow('fetch failed (ECONNREFUSED api.groq.com via proxy)');
+  });
+
+  it('finds a code nested deeper in the cause chain', async () => {
+    const inner = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(new Error('wrapper', { cause: inner })));
+    await expect(proxyFetch('https://api.example.com/v1')).rejects.toThrow('fetch failed (ETIMEDOUT api.example.com)');
+  });
+
+  it('keeps a bare fetch failed when there is no cause code', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(new Error('something odd')));
+    await expect(proxyFetch('https://api.example.com/v1')).rejects.toThrow(/^fetch failed$/);
   });
 });

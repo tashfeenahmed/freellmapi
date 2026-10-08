@@ -28,7 +28,7 @@ export interface FallbackEntry {
   contextWindow?: number | null
   supportsVision: boolean
   supportsTools: boolean
-  source?: 'catalog' | 'custom'
+  source?: 'catalog' | 'custom' | 'discovered'
   keyId?: number | null
   keyLabel?: string | null
   // Which custom endpoint this row belongs to (its base URL), and the model id
@@ -124,7 +124,7 @@ export interface TokenUsageData {
 // user's key label ("Ollama box") instead so the models list names the actual
 // provider. Falls back to the platform for catalog models (and unlabeled custom
 // keys, whose label defaults to "Custom"). (#469)
-export function providerLabel(row: { platform: string; source?: 'catalog' | 'custom'; keyLabel?: string | null }): string {
+export function providerLabel(row: { platform: string; source?: 'catalog' | 'custom' | 'discovered'; keyLabel?: string | null }): string {
   if (row.source === 'custom' && row.keyLabel && row.keyLabel.trim()) return row.keyLabel
   return row.platform
 }
@@ -145,7 +145,7 @@ export function endpointShortLabel(scope: string): string {
  * so there is nothing new to notice until a real collision exists.
  */
 export function memberProviderLabel<T extends {
-  platform: string; modelId: string; source?: 'catalog' | 'custom'
+  platform: string; modelId: string; source?: 'catalog' | 'custom' | 'discovered'
   keyLabel?: string | null; endpointScope?: string | null
 }>(row: T, siblings: readonly T[]): string {
   const base = providerLabel(row)
@@ -164,7 +164,7 @@ export function memberProviderLabel<T extends {
  * when it is needed (#651).
  */
 function hasEndpointCollision<T extends {
-  platform: string; modelId: string; source?: 'catalog' | 'custom'; endpointScope?: string | null
+  platform: string; modelId: string; source?: 'catalog' | 'custom' | 'discovered'; endpointScope?: string | null
 }>(row: T, siblings: readonly T[]): boolean {
   if (row.source !== 'custom' || !row.endpointScope) return false
   const endpoints = new Set(siblings
@@ -182,7 +182,7 @@ function hasEndpointCollision<T extends {
  * single-endpoint install, which is exactly what #651 must not do.
  */
 export function memberEndpointTitle<T extends {
-  platform: string; modelId: string; source?: 'catalog' | 'custom'
+  platform: string; modelId: string; source?: 'catalog' | 'custom' | 'discovered'
   keyLabel?: string | null; endpointScope?: string | null
 }>(row: T, siblings: readonly T[]): string | undefined {
   if (memberProviderLabel(row, siblings) === providerLabel(row)) return undefined
@@ -195,7 +195,7 @@ export function memberEndpointTitle<T extends {
  * the endpoint-qualified id the server computed names one of them.
  */
 export function providerPinId<T extends {
-  platform: string; modelId: string; source?: 'catalog' | 'custom'
+  platform: string; modelId: string; source?: 'catalog' | 'custom' | 'discovered'
   endpointScope?: string | null; qualifiedModelId?: string | null
 }>(row: T, siblings: readonly T[]): string {
   if (!row.qualifiedModelId) return row.modelId
@@ -404,6 +404,13 @@ export const platformColors: Record<string, string> = {
   cerebras:    '#8b5cf6',
   sail:        '#0ea5e9',
   aclide:      '#6366f1',
+  speka:       '#0d9488',
+  typhoon:     '#e11d48',
+  plugsky:     '#0284c7',
+  llmtr:       '#0f766e',
+  gizmo:       '#7c3aed',
+  blockrun:    '#2563eb',
+  moondream:   '#6d5dfc',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
   router9:      '#8b5cf6',
@@ -499,6 +506,16 @@ export function buildGroups(
   return groups
 }
 
+// Clamp a typed 1-based rank (#1317) to a valid 0-based index into the visible
+// chain. Jump-to-rank edits clamp instead of erroring: 1 means "front", a
+// number past the end means "last", and garbage falls back to staying put.
+export function clampRankToIndex(toRank: number, length: number): number {
+  if (!Number.isFinite(toRank)) return -1
+  const i = Math.trunc(toRank) - 1
+  if (i < 0) return 0
+  return i > length - 1 ? length - 1 : i
+}
+
 /**
  * Whether a search query matches a logical-model group (#1056). The hay covers
  * everything the table can DISPLAY for the group: its label, canonical id, and
@@ -513,7 +530,7 @@ export function groupMatchesQuery(
     label: string
     members: Array<{
       platform: string; modelId: string; displayName: string
-      canonicalId?: string; source?: 'catalog' | 'custom'
+      canonicalId?: string; source?: 'catalog' | 'custom' | 'discovered'
       keyLabel?: string | null; endpointScope?: string | null
     }>
   },

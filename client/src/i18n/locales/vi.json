@@ -152,21 +152,24 @@
     "compressionRunPreview": "Chạy xem trước",
     "updatesTitle": "Bản cập nhật",
     "checkForUpdates": "Kiểm tra các bản cập nhật",
-    "lastChecked": "Kiểm tra lần cuối: {when}",
-    "currentVersion": "Bản dựng hiện tại:",
     "updateAvailable": "Có bản cập nhật",
-    "changelog": "Có gì thay đổi",
     "upToDate": "Đã cập nhật",
     "buildAhead": "Bản dựng này đi trước nhánh main chính thức.",
     "buildDiverged": "Bản dựng này đã phân kỳ khỏi nhánh main chính thức.",
     "buildUnknown": "Không thể so sánh bản dựng tùy chỉnh này với nhánh main chính thức.",
     "notGitInstall": "Bản cài đặt này không có thông tin commit.",
     "checkFailed": "Không thể kiểm tra bản cập nhật.",
-    "contactsGithub": "Việc kiểm tra được thực hiện thủ công và có kết nối với GitHub.",
     "autoUpdateCheck": "Tự động kiểm tra cập nhật",
-    "autoUpdateCheckHelp": "Kiểm tra GitHub mỗi ngày một lần để tìm bản phát hành mới và hiển thị lời nhắc. Mặc định tắt.",
-    "openReleases": "Mở GitHub Releases",
-    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng."
+    "restartAfterUpdate": "Khởi động lại FreeLLMAPI sau khi hoàn tất bản dựng.",
+    "downloadUpdate": "Tải bản cập nhật",
+    "downloadingUpdate": "Đang tải… {percent}%",
+    "restartToUpdate": "Khởi động lại để cập nhật",
+    "updateReadyHint": "Đã tải xong. FreeLLMAPI sao lưu dữ liệu của bạn, khởi động lại và mở phiên bản mới.",
+    "updateInstallFailed": "Không thể cài đặt bản cập nhật.",
+    "updateNow": "Cập nhật ngay",
+    "updatingContainer": "Đang kéo image mới và khởi động lại. Trang này sẽ tải lại khi FreeLLMAPI hoạt động trở lại.",
+    "updateNowFailed": "Trình cập nhật không chấp nhận yêu cầu. Hãy kiểm tra container watchtower đang chạy.",
+    "updateNowTimeout": "FreeLLMAPI chưa khởi động lại sau 5 phút. Hãy xem nhật ký của container watchtower."
   },
   "models": {
     "title": "Người mẫu",
@@ -209,6 +212,7 @@
     "noKey": "không có chìa khóa",
     "dragToReorder": "Kéo để sắp xếp lại",
     "dragToReorderGroup": "Kéo để sắp xếp lại mô hình",
+    "moveToRank": "Nhảy đến hạng",
     "providerCount": "Nhà cung cấp {count}",
     "servedBy": "Được phục vụ bởi {providers}",
     "viewProviders": "Xem nhà cung cấp",
@@ -223,6 +227,7 @@
     "settingsHint": "Các chỉnh sửa cục bộ đối với mô hình danh mục được lưu giữ trong quá trình đồng bộ hóa danh mục. Các mô hình danh mục đã xóa vẫn bị xóa cho đến khi bạn thêm lại chúng thông qua config.",
     "catalogModel": "danh mục",
     "customModel": "tùy chỉnh",
+    "discoveredModel": "đã phát hiện",
     "localOverride": "ghi đè cục bộ",
     "displayName": "Tên hiển thị",
     "sizeLabel": "Bậc năng lực",
@@ -369,6 +374,7 @@
     "checklistSummary": "Đã cấu hình {configured} trong {total} nhà cung cấp",
     "checklistKeyless": "không cần khóa",
     "checklistNoKeyTip": "Chưa thêm khóa nào. Nhấp để thêm.",
+    "checklistSignupLink": "Mở {provider} để tạo tài khoản và lấy khóa",
     "checklistKeylessTip": "Hoạt động mà không cần khóa.",
     "tabQuotaSignals": "tín hiệu hạn ngạch",
     "tabApiKey": "Khóa API hợp nhất",
@@ -495,11 +501,11 @@
     "platform": "Nền tảng",
     "hideAdded": "Ẩn nhà cung cấp đã thêm",
     "apiToken": "Mã thông báo API",
-    "noKeyNeededPlaceholder": "Không cần khóa API",
+    "keyOptionalPlaceholder": "Tùy chọn",
     "bearerTokenPlaceholder": "Mã thông báo mang",
     "pasteKeyPlaceholder": "dán chìa khóa vào đây",
     "pasteSeveral": "Dán nhiều khóa",
-    "keylessHint": "Không cần khóa API: cấp miễn phí của nhà cung cấp này là ẩn danh (giới hạn tỷ lệ trên mỗi IP).",
+    "keyOptionalHint": "Tùy chọn: để trống để dùng gói miễn phí ẩn danh (giới hạn theo IP), hoặc dán khóa của bạn để dùng tài khoản của bạn.",
     "enable": "Kích hoạt",
     "noProviderKeys": "Chưa có khóa nhà cung cấp nào. Thêm một ở trên để bắt đầu định tuyến.",
     "filterPlaceholder": "Lọc nhà cung cấp hoặc khóa",
@@ -677,7 +683,14 @@
     "testFailed": "Kiểm tra mô hình thất bại",
     "testThrottled": "Vui lòng đợi {seconds}s trước khi kiểm tra lại mô hình này.",
     "noModelsForProvider": "Chưa có mô hình nào được cấu hình cho nhà cung cấp này.",
-    "testModels": "Kiểm tra mô hình"
+    "testModels": "Kiểm tra mô hình",
+    "monthlyRequestCapLabel": "Giới hạn yêu cầu hàng tháng",
+    "monthlyTokenCapLabel": "Giới hạn token hàng tháng",
+    "capUnlimitedPlaceholder": "Không giới hạn",
+    "capEditHint": "Giới hạn đặt lại vào ngày 1 lúc 00:00 UTC. Để trống để không giới hạn.",
+    "monthlyUsageLine": "{requests} yêu cầu, {tokens} token tháng này",
+    "quotaBalanceHint": "Còn {remaining}/{limit} {metric}",
+    "quotaBalanceLeft": "Còn {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Trước cập nhật"
   },
   "status": {
     "healthy": "khỏe mạnh",
@@ -1133,17 +1147,16 @@
       "generic": "Mọi công cụ khác nói API OpenAI, thiết lập thủ công bằng URL cơ sở và khóa.",
       "atomcode": "Tác nhân dòng lệnh của AtomGit, viết bằng Rust, nhận mọi điểm cuối tương thích OpenAI.",
       "openclaw": "Trợ lý cá nhân luôn sẵn sàng, trả lời trên WhatsApp, Telegram, Discord và nhiều nền tảng khác ngay từ máy của bạn.",
-      "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat."
+      "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat.",
+      "pi": "Một tác nhân dòng lệnh tối giản mà bạn định hình bằng tiện ích mở rộng, kỹ năng và mẫu prompt của riêng mình.",
+      "reasonix": "Tác tử lập trình trên terminal dành riêng cho DeepSeek, xây dựng quanh bộ nhớ đệm tiền tố để các phiên dài vẫn rẻ."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Đã cài đặt phiên bản FreeLLMAPI mới hơn.",
+    "reload": "Tải lại"
   },
   "freeTier": {
     "poolsToggle": "Nhóm hạn mức miễn phí ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Bắt đầu rỗng",
     "startEmptyHint": "Tạo chuỗi không có mô hình nào và không tự thêm mô hình mới từ danh mục. Bỏ chọn thì chuỗi bắt đầu như bản sao của chuỗi mặc định.",
     "curated": "Tự chọn",
-    "curatedHint": "Mô hình mới trong danh mục không được thêm tự động vào chuỗi này."
+    "curatedHint": "Mô hình mới trong danh mục không được thêm tự động vào chuỗi này.",
+    "renameHint": "Đổi tên chuỗi này",
+    "renameConfirm": "Đổi tên chuỗi \"{oldName}\" thành \"{name}\"? Các client gọi auto:{oldName} phải chuyển sang auto:{name}.",
+    "renamePlaceholder": "Tên chuỗi mới",
+    "renameFailed": "Không thể đổi tên chuỗi."
+  },
+  "updates": {
+    "versionAvailable": "Đã có phiên bản {version}",
+    "versionReady": "Phiên bản {version} đã sẵn sàng để cài đặt",
+    "releaseNotes": "Ghi chú phát hành",
+    "tryAgain": "Thử lại",
+    "offline": "Kiểm tra kết nối internet rồi thử lại."
   }
 }

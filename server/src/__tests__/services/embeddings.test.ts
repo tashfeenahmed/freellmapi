@@ -121,6 +121,33 @@ describe('embeddings service', () => {
   });
 
   describe('runEmbeddings', () => {
+    it('routes catalog-managed Speka embeddings with bearer auth, sorted vectors and usage', async () => {
+      addKey('speka');
+      getDb().prepare(`INSERT INTO embedding_models
+        (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+        VALUES ('speka-test-embed', 'speka', 'nvidia/nemotron-3-embed-1b', 'Speka embedding', 2, 1, 1, '$1/month shared')`).run();
+      const fetchMock = mockFetch(async () => new Response(JSON.stringify({
+        data: [{ index: 1, embedding: [0.3, 0.4] }, { index: 0, embedding: [0.1, 0.2] }], usage: { prompt_tokens: 7 },
+      })));
+      const result = await runEmbeddings('speka-test-embed', ['first', 'second']);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://speka.me/v1/embeddings');
+      expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('authorization')).toBe('Bearer speka-test-key');
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+        model: 'nvidia/nemotron-3-embed-1b', input: ['first', 'second'], encoding_format: 'float',
+      });
+      expect(result).toMatchObject({ platform: 'speka', modelId: 'nvidia/nemotron-3-embed-1b', dimensions: 2,
+        inputTokens: 7, vectors: [[0.1, 0.2], [0.3, 0.4]] });
+    });
+
+    it('retains Speka embedding rate-limit backoff', async () => {
+      addKey('speka');
+      getDb().prepare(`INSERT INTO embedding_models
+        (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+        VALUES ('speka-test-embed', 'speka', 'nvidia/nemotron-3-embed-1b', 'Speka embedding', 2, 1, 1, '$1/month shared')`).run();
+      mockFetch(async () => new Response('rate limited', { status: 429, headers: { 'Retry-After': '20' } }));
+      await expect(runEmbeddings('speka-test-embed', ['hello'])).rejects.toMatchObject({ status: 429, retryAfterMs: 20_000 });
+    });
+
     it('rejects unknown models with a 400', async () => {
       await expect(runEmbeddings('no-such-model', ['hi'])).rejects.toMatchObject({ status: 400 });
     });
@@ -166,6 +193,86 @@ describe('embeddings service', () => {
       mockFetch(async () => new Response('slow down', { status: 429 }));
 
       await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello'])).rejects.toMatchObject({ status: 429 });
+    });
+
+    it('surfaces the upstream Retry-After on a fully-exhausted chain', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      mockFetch(async () => new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '17' },
+      }));
+
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 17_000 });
+    });
+
+    it('surfaces the SOONEST back-off, not the last one, when every provider rate-limits', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '60' },
+      }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '5' },
+      }));
+      // nvidia comes back in 5s, openrouter in 60s: the client may retry in 5s.
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 5_000 });
+    });
+
+    it('parses an HTTP-date Retry-After', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const when = new Date(Date.now() + 42_000).toUTCString();
+      mockFetch(async () => new Response('slow down', { status: 429, headers: { 'Retry-After': when } }));
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeGreaterThan(35_000);
+      expect(err.retryAfterMs).toBeLessThanOrEqual(42_000);
+    });
+
+    it('clamps an absurd Retry-After to a day', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      mockFetch(async () => new Response('slow down', { status: 429, headers: { 'Retry-After': '99999999999' } }));
+      await expect(runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']))
+        .rejects.toMatchObject({ status: 429, retryAfterMs: 24 * 60 * 60 * 1000 });
+    });
+
+    it('drops the hint when a sibling failed for a non-rate-limit reason', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('boom', { status: 500 }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      // nvidia 429s with a hint, openrouter 500s: waiting 30s is no promise.
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(502);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('drops the hint when another rate-limited provider stated no delay', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => new Response('slow down', { status: 429 }));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      const err = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeUndefined();
+    });
+
+    it('does not surface a 429 hint when a later provider succeeds', async () => {
+      addKey('nvidia');
+      addKey('openrouter');
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(2048));
+      fetchMock.mockResolvedValueOnce(new Response('slow down', {
+        status: 429, headers: { 'Retry-After': '30' },
+      }));
+      const out = await runEmbeddings('llama-nemotron-embed-vl-1b-v2', ['hello']);
+      expect(out.platform).toBe('openrouter');
     });
 
     it('throws 503 when the family has no enabled providers', async () => {
@@ -268,6 +375,22 @@ describe('embeddings service', () => {
       expect(body.model).toBe('local-embed-v1');
       const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'embedding' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
       expect(log.key_id).toBe(keyId);
+    });
+
+    it('sends no Authorization header to a custom endpoint holding the no-key sentinel (#1331)', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8182/v1', 'no-key');
+      getDb().prepare(`
+        INSERT INTO embedding_models
+          (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
+        VALUES ('anon-embed', 'custom', 'anon-embed-v1', 'Anon Embed', 3, NULL, 1, 1, '', ?)
+      `).run(keyId);
+      const fetchMock = mockFetch(async () => okEmbeddingResponse(3));
+
+      await runEmbeddings('anon-embed', ['hello']);
+
+      const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+      expect(headers.Authorization).toBeUndefined();
+      expect(headers['Content-Type']).toBe('application/json');
     });
 
     describe('dimensions parameter (MRL truncation)', () => {

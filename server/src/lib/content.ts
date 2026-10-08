@@ -33,6 +33,23 @@ export function contentToString(content: unknown): string {
   return '';
 }
 
+// Rough input-token count (~4 chars per token) used for routing and budget
+// checks: message text, assistant tool-call arguments, and the tool schemas
+// the request carries. Tool schemas go upstream on every turn and count
+// against the provider's context window and TPM ceiling. An agent client like
+// Claude Code sends ~16k tokens of them next to ~4k of messages, so leaving
+// them out routed its requests to models they could never fit (a Groq 8k-TPM
+// model answered 413 to an "estimated" 4k request that was really 17.7k).
+export function estimateInputTokens(messages: ChatMessage[], tools?: readonly unknown[]): number {
+  const messageTokens = messages.reduce((sum, m) => {
+    const calls = (m.tool_calls ?? [])
+      .reduce((n, call) => n + call.function.name.length + call.function.arguments.length, 0);
+    return sum + Math.ceil((contentToString(m.content).length + calls) / 4);
+  }, 0);
+  const toolTokens = tools && tools.length > 0 ? Math.ceil(JSON.stringify(tools).length / 4) : 0;
+  return messageTokens + toolTokens;
+}
+
 export function flattenMessageContent(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((m) => ({
     ...m,

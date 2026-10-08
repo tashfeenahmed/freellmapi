@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
+import { encrypt } from '../../lib/crypto.js';
 
 let app: Express;
 
@@ -127,14 +128,32 @@ describe('MCP server (/mcp, stateless Streamable HTTP)', () => {
     expect(data.top_models.some((m: any) => m.model_id === 'test-model')).toBe(true);
   });
 
-  it('lists the seven gateway tools with schemas', async () => {
+  it('lists the ChatGPT inference and gateway tools with complete metadata', async () => {
     const { body } = await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
     const names = body.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual(['cache_stats', 'compression_stats', 'list_models', 'provider_health', 'routing_info', 'set_routing_strategy', 'usage_summary']);
+    expect(names).toEqual([
+      'ask_freellmapi',
+      'cache_stats',
+      'compression_stats',
+      'healthcheck',
+      'list_models',
+      'provider_health',
+      'routing_info',
+      'set_routing_strategy',
+      'usage_summary',
+    ]);
     for (const tool of body.result.tools) {
+      expect(tool.title.length).toBeGreaterThan(5);
       expect(tool.description.length).toBeGreaterThan(20);
       expect(tool.inputSchema.type).toBe('object');
+      expect(tool.annotations.destructiveHint).toBe(false);
+      expect(typeof tool.annotations.readOnlyHint).toBe('boolean');
+      expect(typeof tool.annotations.openWorldHint).toBe('boolean');
     }
+    const ask = body.result.tools.find((tool: any) => tool.name === 'ask_freellmapi');
+    expect(ask.inputSchema.required).toEqual(['prompt']);
+    expect(ask.outputSchema.required).toContain('usage');
+    expect(ask.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, openWorldHint: true });
   });
 
   it('list_models returns catalog entries with supported_parameters', async () => {
@@ -172,10 +191,92 @@ describe('MCP server (/mcp, stateless Streamable HTTP)', () => {
   });
 
   it('usage, health, cache, and compression stats answer on an empty install', async () => {
-    for (const name of ['usage_summary', 'provider_health', 'cache_stats', 'compression_stats']) {
+    for (const name of ['healthcheck', 'usage_summary', 'provider_health', 'cache_stats', 'compression_stats']) {
       const { body } = await rpc({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name } });
       expect(body.result.content[0].type).toBe('text');
+      expect(body.result.structuredContent).toEqual(toolResultJson(body));
       expect(body.result.isError).toBeUndefined();
+    }
+  });
+
+  it('validates ask_freellmapi arguments as a tool-level error', async () => {
+    const { body } = await rpc({
+      jsonrpc: '2.0', id: 70, method: 'tools/call',
+      params: { name: 'ask_freellmapi', arguments: { prompt: '', timeout_ms: 10 } },
+    });
+    expect(body.error).toBeUndefined();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toContain('Invalid ask_freellmapi arguments');
+  });
+
+  it('returns model errors as sanitized tool-level failures', async () => {
+    const { body } = await rpc({
+      jsonrpc: '2.0', id: 72, method: 'tools/call',
+      params: {
+        name: 'ask_freellmapi',
+        arguments: { prompt: 'This request must not reach a provider.', model: 'definitely-not-a-real-model' },
+      },
+    });
+    expect(body.error).toBeUndefined();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toContain('FreeLLMAPI inference failed (404)');
+    expect(body.result.content[0].text).toContain('definitely-not-a-real-model');
+    expect(body.result.content[0].text).toContain('is not in the catalog');
+  });
+
+  it('runs ask_freellmapi through the OpenAI-compatible route and returns routing/token metadata', async () => {
+    const db = getDb();
+    const encrypted = encrypt('test-provider-key');
+    const inserted = db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('groq', 'mcp-chatgpt-test', ?, ?, ?, 'healthy', 1)
+    `).run(encrypted.encrypted, encrypted.iv, encrypted.authTag);
+
+    const originalFetch = global.fetch;
+    vi.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('api.groq.com/openai/v1/chat/completions')) {
+        return new Response(JSON.stringify({
+          id: 'chatcmpl-mcp-test',
+          object: 'chat.completion',
+          created: 123,
+          model: 'openai/gpt-oss-120b',
+          choices: [{
+            index: 0,
+            message: { role: 'assistant', content: 'FreeLLMAPI answered from ChatGPT.' },
+            finish_reason: 'stop',
+          }],
+          usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(input, init);
+    });
+
+    try {
+      const { body } = await rpc({
+        jsonrpc: '2.0', id: 71, method: 'tools/call',
+        params: {
+          name: 'ask_freellmapi',
+          arguments: { prompt: 'Answer this through FreeLLMAPI.', temperature: 0, max_tokens: 64 },
+        },
+      });
+
+      expect(body.result.isError).toBeUndefined();
+      const data = toolResultJson(body);
+      expect(body.result.structuredContent).toEqual(data);
+      expect(data).toMatchObject({
+        answer: 'FreeLLMAPI answered from ChatGPT.',
+        requested_model: 'auto',
+        finish_reason: 'stop',
+        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
+        cache: 'OFF',
+      });
+      expect(data.model).toBeTruthy();
+      expect(data.routed_via).toContain('groq');
+      expect(data.execution_id).toBeTruthy();
+    } finally {
+      vi.restoreAllMocks();
+      db.prepare('DELETE FROM api_keys WHERE id = ?').run(inserted.lastInsertRowid);
     }
   });
 

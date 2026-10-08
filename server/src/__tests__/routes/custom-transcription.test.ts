@@ -163,7 +163,7 @@ describe('custom speech-to-text endpoint, end to end', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe(`${BASE_URL}/audio/transcriptions`);
   });
 
-  it('keyless endpoint (auth off) still reaches the box with the placeholder bearer', async () => {
+  it('keyless endpoint (auth off) reaches the box with no Authorization header (#1331)', async () => {
     expect((await registerStt(app, { apiKey: undefined })).status).toBe(201);
     const fetchMock = vi.fn(async () => jsonResponse({ text: 'no auth needed' }));
     globalThis.fetch = fetchMock as any;
@@ -171,7 +171,7 @@ describe('custom speech-to-text endpoint, end to end', () => {
     const r = await postTranscription(app, { model: 'whisper-1' });
     expect(r.status).toBe(200);
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
-    expect(headers.Authorization).toBe('Bearer no-key');
+    expect(headers.Authorization).toBeUndefined();
   });
 
   it('an upstream failure surfaces as a transcription error, not a silent skip', async () => {

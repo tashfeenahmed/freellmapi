@@ -8,6 +8,8 @@ import { getRoutingScores, getRoutingStrategy, setRoutingStrategy } from '../ser
 import type { RoutingStrategy } from '../services/scoring.js';
 import { getCacheStats } from '../services/cache.js';
 import { getCompressionStats } from '../services/compression/stats.js';
+import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
+import { z } from 'zod';
 
 // ─────────────────────────────────────────────────────────────────────────
 // MCP server for the gateway (POST /mcp) — Model Context Protocol over
@@ -17,8 +19,9 @@ import { getCompressionStats } from '../services/compression/stats.js';
 // questions mid-session: which free models are usable right now and with
 // which parameters, how healthy the provider pool is, what the routing
 // strategy is, and how much quota the cache has saved — plus one control
-// knob (switching the routing strategy). Inference itself stays on the
-// OpenAI/Anthropic surfaces; these tools are the gateway's introspection.
+// knob (switching the routing strategy). The ask_freellmapi tool also lets
+// ChatGPT and other MCP clients run a non-streaming inference through the same
+// /v1/chat/completions path as every OpenAI-compatible client.
 //
 // Hand-rolled JSON-RPC instead of the MCP SDK for the same reason the
 // OpenAPI viewer is dependency-free (#482): the desktop bundle and the
@@ -56,7 +59,13 @@ function rpcError(id: number | string | null, code: number, message: string) {
 // One text block carrying pretty-printed JSON — the standard shape for
 // machine-readable MCP tool output.
 function toolJson(data: unknown) {
-  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+  const structuredContent = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : { result: data };
+  return {
+    content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    structuredContent,
+  };
 }
 
 function toolError(message: string) {
@@ -184,16 +193,231 @@ function setStrategy(args: Record<string, unknown>): unknown {
   return { strategy: getRoutingStrategy() };
 }
 
+const DEFAULT_MCP_INFERENCE_TIMEOUT_MS = 120_000;
+const MAX_MCP_INFERENCE_TIMEOUT_MS = 300_000;
+
+const askFreeLlmApiSchema = z.object({
+  prompt: z.string().min(1).max(400_000),
+  system: z.string().min(1).max(50_000).optional(),
+  model: z.string().min(1).max(256).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  max_tokens: z.number().int().min(1).max(32_768).optional(),
+  timeout_ms: z.number().int().min(1_000).max(MAX_MCP_INFERENCE_TIMEOUT_MS).optional(),
+}).strict();
+
+function mcpDefaultModel(): string {
+  const configured = process.env.MCP_INFERENCE_DEFAULT_MODEL?.trim();
+  if (!configured) return 'auto';
+  if (configured.length > 256) {
+    throw new Error('MCP_INFERENCE_DEFAULT_MODEL must be at most 256 characters');
+  }
+  return configured;
+}
+
+function mcpInferenceTimeoutMs(): number {
+  const raw = process.env.MCP_INFERENCE_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_MCP_INFERENCE_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1_000 || parsed > MAX_MCP_INFERENCE_TIMEOUT_MS) {
+    return DEFAULT_MCP_INFERENCE_TIMEOUT_MS;
+  }
+  return parsed;
+}
+
+function loopbackChatCompletionsUrl(req: Request): string {
+  const port = req.socket.localPort;
+  if (!port) throw new Error('Cannot determine the local FreeLLMAPI port for inference');
+
+  let address = (req.socket.localAddress || '127.0.0.1').split('%')[0];
+  if (address === '0.0.0.0') address = '127.0.0.1';
+  if (address === '::') address = '::1';
+  if (address.startsWith('::ffff:')) address = address.slice('::ffff:'.length);
+  const host = address.includes(':') ? `[${address}]` : address;
+  return `http://${host}:${port}/v1/chat/completions`;
+}
+
+function assistantText(payload: any): string {
+  const content = payload?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((part: any) => typeof part === 'string' ? part : (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
+}
+
+async function askFreeLlmApi(args: Record<string, unknown>, req: Request, res: Response): Promise<unknown> {
+  const parsed = askFreeLlmApiSchema.safeParse(args);
+  if (!parsed.success) {
+    const detail = parsed.error.errors
+      .map(error => `${error.path.join('.') || 'arguments'}: ${error.message}`)
+      .slice(0, 5)
+      .join(', ');
+    throw new Error(`Invalid ask_freellmapi arguments: ${detail}`);
+  }
+
+  const input = parsed.data;
+  const model = input.model?.trim() || mcpDefaultModel();
+  const timeoutMs = input.timeout_ms ?? mcpInferenceTimeoutMs();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const abortOnDisconnect = () => controller.abort();
+  req.once('aborted', abortOnDisconnect);
+  res.once('close', abortOnDisconnect);
+
+  try {
+    const messages = [
+      ...(input.system ? [{ role: 'system', content: input.system }] : []),
+      { role: 'user', content: input.prompt },
+    ];
+    const response = await fetch(loopbackChatCompletionsUrl(req), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${getUnifiedApiKey()}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
+        ...(input.max_tokens === undefined ? {} : { max_tokens: input.max_tokens }),
+      }),
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+    let payload: any;
+    try {
+      payload = raw ? JSON.parse(raw) : null;
+    } catch {
+      throw new Error(`FreeLLMAPI inference returned non-JSON data (HTTP ${response.status})`);
+    }
+
+    if (!response.ok) {
+      const upstreamMessage = payload?.error?.message ?? payload?.message ?? `HTTP ${response.status}`;
+      throw new Error(`FreeLLMAPI inference failed (${response.status}): ${sanitizeProviderErrorMessage(upstreamMessage)}`);
+    }
+
+    const answer = assistantText(payload);
+    if (!answer) {
+      throw new Error(`FreeLLMAPI inference returned no assistant text (finish_reason: ${payload?.choices?.[0]?.finish_reason ?? 'unknown'})`);
+    }
+
+    return {
+      answer,
+      requested_model: model,
+      model: typeof payload?.model === 'string' ? payload.model : null,
+      finish_reason: typeof payload?.choices?.[0]?.finish_reason === 'string'
+        ? payload.choices[0].finish_reason
+        : null,
+      usage: payload?.usage && typeof payload.usage === 'object' ? payload.usage : null,
+      routed_via: response.headers.get('x-routed-via'),
+      fallback_trail: response.headers.get('x-fallback-trail'),
+      cache: response.headers.get('x-freellm-cache'),
+      compression: response.headers.get('x-freellm-compress'),
+      execution_id: typeof payload?.execution_id === 'string'
+        ? payload.execution_id
+        : response.headers.get('x-request-id'),
+    };
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`FreeLLMAPI inference timed out or was cancelled after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    req.off('aborted', abortOnDisconnect);
+    res.off('close', abortOnDisconnect);
+  }
+}
+
+function healthcheck(): unknown {
+  const { models } = buildModelListing();
+  const availableModels = models.filter(model => model.available === 1).length;
+  const providers = providerHealth() as Record<string, {
+    keys: Record<string, number>;
+    active_cooldowns: number;
+    available_models: number;
+  }>;
+  const providerRows = Object.values(providers);
+  const healthyProviders = providerRows.filter(provider =>
+    (provider.keys.healthy ?? 0) > 0 && provider.available_models > 0,
+  ).length;
+  return {
+    status: availableModels > 0 ? 'ready' : 'needs_configuration',
+    mcp_enabled: isMcpServerEnabled(),
+    default_model: mcpDefaultModel(),
+    available_models: availableModels,
+    configured_providers: providerRows.length,
+    healthy_providers: healthyProviders,
+    checked_at: new Date().toISOString(),
+  };
+}
+
 // ── Tool registry ────────────────────────────────────────────────────────
 
 interface McpTool {
+  title: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  run: (args: Record<string, unknown>) => unknown;
+  outputSchema?: Record<string, unknown>;
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    openWorldHint: boolean;
+  };
+  run: (args: Record<string, unknown>, req: Request, res: Response) => unknown | Promise<unknown>;
 }
 
+const READ_ONLY_LOCAL = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+
 const TOOLS: Record<string, McpTool> = {
+  ask_freellmapi: {
+    title: 'Ask FreeLLMAPI',
+    description: 'Use this when the user explicitly wants a FreeLLMAPI model to answer, analyze, rewrite, summarize, or generate text. Routes through the configured free-provider pool. Defaults to the server\'s MCP_INFERENCE_DEFAULT_MODEL (auto when unset). Returns the answer plus model, routing, cache, execution, and token-usage metadata.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        prompt: { type: 'string', minLength: 1, maxLength: 400_000, description: 'The complete task or question for the selected FreeLLMAPI model.' },
+        system: { type: 'string', minLength: 1, maxLength: 50_000, description: 'Optional system instructions for the FreeLLMAPI model.' },
+        model: { type: 'string', minLength: 1, maxLength: 256, description: 'Model id, named chain, or auto. Omit to use MCP_INFERENCE_DEFAULT_MODEL.' },
+        temperature: { type: 'number', minimum: 0, maximum: 2 },
+        max_tokens: { type: 'integer', minimum: 1, maximum: 32_768 },
+        timeout_ms: { type: 'integer', minimum: 1_000, maximum: MAX_MCP_INFERENCE_TIMEOUT_MS, description: 'Optional request timeout. Defaults to MCP_INFERENCE_TIMEOUT_MS or 120000.' },
+      },
+      required: ['prompt'],
+    },
+    outputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        answer: { type: 'string' },
+        requested_model: { type: 'string' },
+        model: { type: ['string', 'null'] },
+        finish_reason: { type: ['string', 'null'] },
+        usage: { type: ['object', 'null'], additionalProperties: true },
+        routed_via: { type: ['string', 'null'] },
+        fallback_trail: { type: ['string', 'null'] },
+        cache: { type: ['string', 'null'] },
+        compression: { type: ['string', 'null'] },
+        execution_id: { type: ['string', 'null'] },
+      },
+      required: ['answer', 'requested_model', 'model', 'finish_reason', 'usage', 'routed_via', 'fallback_trail', 'cache', 'compression', 'execution_id'],
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    run: (args, req, res) => askFreeLlmApi(args, req, res),
+  },
+  healthcheck: {
+    title: 'Check FreeLLMAPI readiness',
+    description: 'Check whether FreeLLMAPI is ready for ChatGPT calls, including MCP state, configured/healthy providers, available models, and the default MCP inference model. This does not spend provider quota.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: READ_ONLY_LOCAL,
+    run: () => healthcheck(),
+  },
   list_models: {
+    title: 'List FreeLLMAPI models',
     description: 'List the models this FreeLLMAPI router can serve, with context windows, tool support, and the parameters each model honors (supported_parameters). Defaults to only models that are usable right now.',
     inputSchema: {
       type: 'object',
@@ -201,14 +425,18 @@ const TOOLS: Record<string, McpTool> = {
         available_only: { type: 'boolean', description: 'false to include models that are configured but not currently usable (no key, disabled)', default: true },
       },
     },
+    annotations: READ_ONLY_LOCAL,
     run: listModels,
   },
   provider_health: {
+    title: 'Inspect provider health',
     description: 'Per-provider key statuses (healthy/rate_limited/invalid/error/unknown), active cooldowns, and how many models each provider can serve right now.',
     inputSchema: { type: 'object', properties: {} },
+    annotations: READ_ONLY_LOCAL,
     run: () => providerHealth(),
   },
   usage_summary: {
+    title: 'Summarize FreeLLMAPI usage',
     description: 'Request/token totals, success rate, and the top models by traffic for a recent window.',
     inputSchema: {
       type: 'object',
@@ -216,14 +444,18 @@ const TOOLS: Record<string, McpTool> = {
         range: { type: 'string', enum: ['24h', '7d', '30d'], default: '24h' },
       },
     },
+    annotations: READ_ONLY_LOCAL,
     run: usageSummary,
   },
   routing_info: {
+    title: 'Inspect model routing',
     description: 'The active routing strategy and the current top-scored models in the fallback chain.',
     inputSchema: { type: 'object', properties: {} },
+    annotations: READ_ONLY_LOCAL,
     run: () => routingInfo(),
   },
   set_routing_strategy: {
+    title: 'Set model routing strategy',
     description: 'Switch the routing strategy (priority = manual chain order; balanced / smartest / fastest / reliable are scored presets; custom uses the saved weight vector).',
     inputSchema: {
       type: 'object',
@@ -232,16 +464,21 @@ const TOOLS: Record<string, McpTool> = {
       },
       required: ['strategy'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     run: setStrategy,
   },
   cache_stats: {
+    title: 'Inspect response-cache savings',
     description: 'Response-cache statistics: entries, total hits, and the prompt/completion tokens the cache has saved.',
     inputSchema: { type: 'object', properties: {} },
+    annotations: READ_ONLY_LOCAL,
     run: () => getCacheStats(),
   },
   compression_stats: {
+    title: 'Inspect prompt-compression savings',
     description: 'Prompt-compression statistics: requests compressed, estimated tokens saved, fidelity-gate discards, and per-engine savings.',
     inputSchema: { type: 'object', properties: {} },
+    annotations: READ_ONLY_LOCAL,
     run: () => getCompressionStats(),
   },
 };
@@ -253,21 +490,21 @@ const TOOLS: Record<string, McpTool> = {
 // `id` member (id:null is a — discouraged — request and gets a response);
 // detecting notifications by the `notifications/` method prefix answered
 // no-id requests and 202'd id-carrying notifications.
-function handleRpc(msg: JsonRpcRequest): unknown | undefined {
+async function handleRpc(msg: JsonRpcRequest, req: Request, res: Response): Promise<unknown | undefined> {
   const isNotification = msg.id === undefined;
   const respond = (response: unknown) => (isNotification ? undefined : response);
   const id = msg.id ?? null;
-  return respond(dispatchRpc(msg, id));
+  return respond(await dispatchRpc(msg, id, req, res));
 }
 
-function dispatchRpc(msg: JsonRpcRequest, id: number | string | null): unknown {
+async function dispatchRpc(msg: JsonRpcRequest, id: number | string | null, req: Request, res: Response): Promise<unknown> {
   switch (msg.method) {
     case 'initialize': {
       return rpcResult(id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: 'freellmapi', version: '1.0.0' },
-        instructions: 'FreeLLMAPI gateway introspection: list usable free models (with per-model supported_parameters), check provider/key health, read usage/cache/compression stats, and switch the routing strategy. Inference goes through the OpenAI-compatible /v1 endpoints, not MCP.',
+        instructions: 'Use ask_freellmapi when the user explicitly asks FreeLLMAPI or one of its models to perform a text task. Use healthcheck before troubleshooting availability; list_models for model choice; provider_health, usage_summary, cache_stats, compression_stats, and routing_info for diagnostics. set_routing_strategy changes server state.',
       });
     }
     case 'ping':
@@ -276,8 +513,11 @@ function dispatchRpc(msg: JsonRpcRequest, id: number | string | null): unknown {
       return rpcResult(id, {
         tools: Object.entries(TOOLS).map(([name, t]) => ({
           name,
+          title: t.title,
           description: t.description,
           inputSchema: t.inputSchema,
+          ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}),
+          annotations: t.annotations,
         })),
       });
     case 'tools/call': {
@@ -289,7 +529,7 @@ function dispatchRpc(msg: JsonRpcRequest, id: number | string | null): unknown {
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${name}`);
       try {
         const args = (msg.params?.arguments as Record<string, unknown>) ?? {};
-        return rpcResult(id, toolJson(tool.run(args)));
+        return rpcResult(id, toolJson(await tool.run(args, req, res)));
       } catch (err: any) {
         // Tool-level failures are results with isError, not protocol errors.
         return rpcResult(id, toolError(err?.message ?? 'tool failed'));
@@ -344,7 +584,7 @@ mcpRouter.use((req: Request, res: Response, next: NextFunction) => {
   res.status(403).json(rpcError(id, -32000, 'MCP server is disabled. Turn it on from the dashboard (Keys -> Agent compatibility) or with PUT /api/settings/enable-mcp {"enabled":true}.'));
 });
 
-mcpRouter.post('/', (req: Request, res: Response) => {
+mcpRouter.post('/', async (req: Request, res: Response) => {
   if (!authenticate(req, res)) return;
 
   const body = req.body;
@@ -359,7 +599,7 @@ mcpRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  const response = handleRpc(body as JsonRpcRequest);
+  const response = await handleRpc(body as JsonRpcRequest, req, res);
   if (response === undefined) {
     res.status(202).end(); // notification — accepted, nothing to say
     return;

@@ -387,6 +387,49 @@ describe('Fallback API', () => {
     }
   });
 
+  it('budget sort does not rank a rate-limit label above a real monthly budget', async () => {
+    // "free · 40 RPM" is a rate limit, not a 40M-token budget: the old
+    // per-route parser saw the 'M' in "RPM" and multiplied by 1e6, sorting
+    // the model to the top of the chain ahead of genuine ~25M budgets.
+    const { body: chain } = await request(app, 'GET', '/api/fallback');
+    const [rpmModel, bigModel, smallModel] = chain;
+    const db = getDb();
+    const orig = [rpmModel, bigModel, smallModel].map((m: any) =>
+      db.prepare('SELECT monthly_token_budget, tpd_limit FROM models WHERE id = ?').get(m.modelDbId) as any);
+
+    try {
+      db.prepare('UPDATE models SET tpd_limit = NULL, monthly_token_budget = ? WHERE id = ?')
+        .run('free · 40 RPM', rpmModel.modelDbId);
+      db.prepare('UPDATE models SET tpd_limit = NULL, monthly_token_budget = ? WHERE id = ?')
+        .run('~25M', bigModel.modelDbId);
+      db.prepare('UPDATE models SET tpd_limit = NULL, monthly_token_budget = ? WHERE id = ?')
+        .run('~500K', smallModel.modelDbId);
+
+      const { status } = await request(app, 'POST', '/api/fallback/sort/budget');
+      expect(status).toBe(200);
+
+      // Read priorities from the table the route writes for the active
+      // profile (the seeded DB has a default profile; fallback_config is the
+      // no-profile path). GET /api/fallback re-orders by intelligence rank,
+      // so it can't verify the priority the sort wrote.
+      const profileId = (db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as any)?.value;
+      const prio = (id: number) => Number(((profileId
+        ? db.prepare('SELECT priority FROM profile_models WHERE profile_id = ? AND model_db_id = ?').get(profileId, id)
+        : db.prepare('SELECT priority FROM fallback_config WHERE model_db_id = ?').get(id)
+      ) as any).priority);
+      // A rate-limit label is "no budget info" (0): the real ~25M budget must
+      // sort first, and even a small ~500K budget beats the inflated label.
+      // With the old parser the RPM label scored 40M and took priority 1.
+      expect(prio(bigModel.modelDbId)).toBeLessThan(prio(rpmModel.modelDbId));
+      expect(prio(smallModel.modelDbId)).toBeLessThan(prio(rpmModel.modelDbId));
+      expect(prio(bigModel.modelDbId)).toBeLessThan(prio(smallModel.modelDbId));
+    } finally {
+      const restore = db.prepare('UPDATE models SET monthly_token_budget = ?, tpd_limit = ? WHERE id = ?');
+      [rpmModel, bigModel, smallModel].forEach((m: any, i: number) =>
+        restore.run(orig[i].monthly_token_budget, orig[i].tpd_limit, m.modelDbId));
+    }
+  });
+
   it('intelligence sort never places a weaker tier above a Frontier model (#135)', async () => {
     await request(app, 'POST', '/api/fallback/sort/intelligence');
     const { body } = await request(app, 'GET', '/api/fallback');

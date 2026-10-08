@@ -45,7 +45,7 @@ Of the 43 built-in platforms, **10 use dedicated adapters** and **33 ride `OpenA
 | `bazaarlink` | BazaarLink | Keyed | OpenAI-compat | Only the `auto:free` route is cataloged — direct model ids are paid (#385). |
 | `ainative` | AINative Studio | Keyed | OpenAI-compat | Advertises recurring ~10M tokens/month free allocation; quota treated as unverified until confirmed by a real account. |
 | `aion` | Aion Labs | Keyed | OpenAI-compat | No-card free key; availability catalog-managed behind the 30-day age gate. |
-| `requesty` | Requesty | Keyed | OpenAI-compat | Router endpoint at `router.requesty.ai/v1`; free rows age into the monthly catalog. |
+| `requesty` | Requesty | Keyed | OpenAI-compat | Router endpoint at `router.requesty.ai/v1`; free rows age into the monthly catalog; the free tier is 200 requests/day shared across all free models. |
 | `navy` | NavyAI | Keyed | OpenAI-compat | Free plan: 150K tokens/day and 20 RPM; live smoke tests require an explicit User-Agent header. |
 | `nara` | NaraRouter | Keyed | OpenAI-compat | Free plan additionally requires Telegram channel/link verification; live-probed 2026-07-09. |
 | `sealion` | SEA-LION (AI Singapore) | Keyed | OpenAI-compat | First-party API; Google sign-in, no card, no region wall; 10 RPM recurring free tier. |

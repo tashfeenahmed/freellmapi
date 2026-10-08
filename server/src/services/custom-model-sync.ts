@@ -79,7 +79,8 @@ export async function runCustomModelSync(db: Db): Promise<CustomModelSyncResult>
     try {
       // A submitted key wins on the manual route; a scheduled pass can only use
       // what the endpoint already has on record. Keyless local servers keep the
-      // 'no-key' sentinel, which the bearer header carries harmlessly.
+      // 'no-key' sentinel, which the provider turns into an anonymous call
+      // with no Authorization header (#1331).
       const discovered = await discoverEndpointModels(endpoint.baseUrl, endpoint.apiKey ?? 'no-key');
 
       const scope = endpointScopeForBaseUrl(endpoint.baseUrl);

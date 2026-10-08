@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
-import { parseBudget } from '../lib/budget.js';
+import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
 import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
@@ -152,7 +152,7 @@ const MODEL_COLUMNS = `
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
            m.tpm_limit, m.tpd_limit, m.context_window,
            m.monthly_token_budget, m.supports_vision, m.supports_tools,
-           m.key_id, m.endpoint_scope, ak.label AS key_label,
+           m.key_id, m.endpoint_scope, m.source AS model_source, ak.label AS key_label,
            mo.overrides_json IS NOT NULL AS has_overrides,
            mo.overrides_json,
            ts.source AS tombstone_source, ts.reason AS tombstone_reason`;
@@ -298,7 +298,11 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget) * Math.max(1, keyCountMap.get(r.platform) ?? 1),
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
-      source: r.platform === 'custom' || r.key_id != null ? 'custom' : 'catalog',
+      // 'discovered' (#1348): fetched from a built-in provider's /models because
+      // the catalog carries none for it. Routes like a catalog row.
+      source: r.platform === 'custom' || r.key_id != null
+        ? 'custom'
+        : r.model_source === 'discovered' ? 'discovered' : 'catalog',
       keyId: r.key_id ?? null,
       keyLabel: r.key_label ?? null,
       // Which relay endpoint a custom row belongs to, and the id that names it
@@ -397,29 +401,6 @@ const SORT_PRESETS: Record<string, string> = {
   speed: 'm.speed_rank ASC',
 };
 
-function getBudgetScore(m: { monthly_token_budget: string; tpd_limit: number | null }): number {
-  if (m.tpd_limit != null) return m.tpd_limit * 30;
-  
-  const str = m.monthly_token_budget;
-  if (!str) return 0;
-  if (str.toLowerCase().includes('unlimited') || str.includes('∞')) return Infinity;
-  
-  const cleanStr = str.split('(')[0];
-  const matches = cleanStr.match(/[\d.]+/g);
-  let maxNum = 0;
-  if (matches) {
-    maxNum = Math.max(...matches.map(mStr => parseFloat(mStr)));
-  }
-  
-  let mult = 1;
-  const upper = cleanStr.toUpperCase();
-  if (upper.includes('B')) mult = 1_000_000_000;
-  else if (upper.includes('M')) mult = 1_000_000;
-  else if (upper.includes('K')) mult = 1_000;
-
-  return maxNum * mult;
-}
-
 fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   const preset = String(req.params.preset);
   const db = getDb();
@@ -428,7 +409,7 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
 
   if (preset === 'budget') {
     const allModels = db.prepare(`SELECT id, monthly_token_budget, tpd_limit FROM models`).all() as any[];
-    allModels.sort((a, b) => getBudgetScore(b) - getBudgetScore(a));
+    allModels.sort((a, b) => monthlyBudgetScore(b) - monthlyBudgetScore(a));
     models = allModels.map(m => ({ id: m.id }));
   } else {
     const orderBy = SORT_PRESETS[preset];

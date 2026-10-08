@@ -242,6 +242,15 @@ export const GITHUB_MAX_OUTPUT_TOKENS = 400;
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  // Gizmo rejects all unlisted fields; reflect its text-only API in discovery
+  // as well as the adapter. This is the upstream ceiling, not a new quota.
+  gizmo: { drop: [...EXTENDED_SAMPLING_KEYS], defaultMaxTokens: 1024, maxTokensCap: 32768 },
+  // Moondream maps reasoning effort to a boolean and max_tokens to
+  // max_completion_tokens. 4096 is the documented upstream output ceiling.
+  moondream: {
+    drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs', 'response_format'],
+    maxTokensCap: 4096,
+  },
   // ACLIDE uses Responses; these Chat Completions parameters have no mapping.
   aclide: {
     drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
@@ -380,13 +389,13 @@ export function maxTokensCapFor(platform: string): number | undefined {
  * openai-compat (and its subclasses), cloudflare, cohere, google and aihorde
  * all do.
  */
-export function resolveMaxTokens(platform: string, requested: number | undefined): number | undefined {
+export function resolveMaxTokens(platform: string, requested: number | undefined, contextBudget?: number): number | undefined {
   const resolved = requested ?? defaultMaxTokensFor(platform);
   if (resolved == null) return resolved;
   // The tighter ceiling wins: a platform's hard reject applies even with the
   // operator cap off, and an operator cap below it applies everywhere.
-  const caps = [unifiedMaxTokensCap(), maxTokensCapFor(platform)].filter((c): c is number => c != null);
-  return caps.length === 0 ? resolved : Math.min(resolved, ...caps);
+  const caps = [unifiedMaxTokensCap(), maxTokensCapFor(platform), contextBudget].filter((c): c is number => c != null && c > 0);
+  return caps.length === 0 ? resolved : Math.max(1, Math.min(resolved, ...caps));
 }
 
 // ── Unified output-token cap ─────────────────────────────────────────────────
@@ -434,6 +443,8 @@ export function platformDropsResponseFormat(platform: string): boolean {
  *  every surface supports, plus tools when the model does, minus the
  *  platform's droplist. */
 export function supportedParametersFor(platform: string, caps: { tools?: boolean } = {}): string[] {
+  // Unlike the generic base set, Moondream has neither stop nor tools.
+  if (platform === 'moondream') return ['temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stream', 'reasoning_effort'];
   const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
   const dropped = new Set<string>(policy?.drop ?? []);
   const params = [

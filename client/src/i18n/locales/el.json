@@ -152,21 +152,24 @@
     "compressionRunPreview": "Εκτέλεση προεπισκόπησης",
     "updatesTitle": "Ενημερώσεις",
     "checkForUpdates": "Έλεγχος για ενημερώσεις",
-    "lastChecked": "Τελευταίος έλεγχος: {when}",
-    "currentVersion": "Τρέχον build:",
     "updateAvailable": "Διαθέσιμη ενημέρωση",
-    "changelog": "Τι άλλαξε",
     "upToDate": "Ενημερωμένο",
     "buildAhead": "Αυτό το build είναι μπροστά από το επίσημο main.",
     "buildDiverged": "Αυτό το build έχει αποκλίνει από το επίσημο main.",
     "buildUnknown": "Αυτό το προσαρμοσμένο build δεν μπορεί να συγκριθεί με το επίσημο main.",
     "notGitInstall": "Αυτή η εγκατάσταση δεν περιλαμβάνει πληροφορίες commit.",
     "checkFailed": "Δεν ήταν δυνατός ο έλεγχος για ενημερώσεις.",
-    "contactsGithub": "Οι έλεγχοι γίνονται χειροκίνητα και επικοινωνούν με το GitHub.",
     "autoUpdateCheck": "Αυτόματος έλεγχος ενημερώσεων",
-    "autoUpdateCheckHelp": "Ελέγχει το GitHub μία φορά την ημέρα για νέα έκδοση και εμφανίζει υπενθύμιση. Απενεργοποιημένο από προεπιλογή.",
-    "openReleases": "Άνοιγμα εκδόσεων GitHub",
-    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build."
+    "restartAfterUpdate": "Επανεκκινήστε το FreeLLMAPI μετά την ολοκλήρωση του build.",
+    "downloadUpdate": "Λήψη ενημέρωσης",
+    "downloadingUpdate": "Λήψη… {percent}%",
+    "restartToUpdate": "Επανεκκίνηση για ενημέρωση",
+    "updateReadyHint": "Η λήψη ολοκληρώθηκε. Το FreeLLMAPI δημιουργεί αντίγραφο ασφαλείας των δεδομένων σας, επανεκκινείται και ανοίγει τη νέα έκδοση.",
+    "updateInstallFailed": "Η ενημέρωση δεν ήταν δυνατό να εγκατασταθεί.",
+    "updateNow": "Ενημέρωση τώρα",
+    "updatingContainer": "Λήψη της νέας εικόνας και επανεκκίνηση. Η σελίδα θα φορτωθεί ξανά όταν επιστρέψει το FreeLLMAPI.",
+    "updateNowFailed": "Το πρόγραμμα ενημέρωσης δεν δέχτηκε το αίτημα. Ελέγξτε ότι εκτελείται το κοντέινερ watchtower.",
+    "updateNowTimeout": "Το FreeLLMAPI δεν έχει επανεκκινηθεί μετά από 5 λεπτά. Ελέγξτε τα αρχεία καταγραφής του κοντέινερ watchtower."
   },
   "models": {
     "title": "Μοντέλα",
@@ -209,6 +212,7 @@
     "noKey": "χωρίς κλειδί",
     "dragToReorder": "Σύρετε για αναδιάταξη",
     "dragToReorderGroup": "Σύρετε για να αλλάξετε τη σειρά του μοντέλου",
+    "moveToRank": "Μετάβαση στην κατάταξη",
     "providerCount": "{count} παρόχων",
     "servedBy": "Σερβίρεται από {providers}",
     "viewProviders": "Προβολή παρόχων",
@@ -223,6 +227,7 @@
     "settingsHint": "Οι τοπικές αλλαγές σε μοντέλα καταλόγων διατηρούνται σε όλους τους συγχρονισμούς καταλόγων. Τα διαγραμμένα μοντέλα καταλόγου παραμένουν διαγραμμένα μέχρι να τα προσθέσετε ξανά μέσω της διαμόρφωσης.",
     "catalogModel": "Κατάλογος",
     "customModel": "έθιμο",
+    "discoveredModel": "εντοπισμένο",
     "localOverride": "τοπική παράκαμψη",
     "displayName": "Εμφανιζόμενο όνομα",
     "sizeLabel": "Βαθμίδα ικανοτήτων",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} από {total} παρόχους έχουν ρυθμιστεί",
     "checklistKeyless": "δεν απαιτείται κλειδί",
     "checklistNoKeyTip": "Δεν έχει προστεθεί κλειδί ακόμη. Κάντε κλικ για να προσθέσετε ένα.",
+    "checklistSignupLink": "Ανοίξτε το {provider} για να δημιουργήσετε λογαριασμό και να λάβετε κλειδί",
     "checklistKeylessTip": "Λειτουργεί χωρίς κλειδί.",
     "tabQuotaSignals": "Σήματα ποσοστώσεων",
     "tabApiKey": "Ενοποιημένο κλειδί API",
@@ -495,11 +501,11 @@
     "platform": "Πλατφόρμα",
     "hideAdded": "Απόκρυψη προστιθέμενων παρόχων",
     "apiToken": "API διακριτικό",
-    "noKeyNeededPlaceholder": "Δεν χρειάζεται API κλειδί",
+    "keyOptionalPlaceholder": "Προαιρετικό",
     "bearerTokenPlaceholder": "Διακριτικό κομιστή",
     "pasteKeyPlaceholder": "Επικόλληση κλειδιού εδώ",
     "pasteSeveral": "Επικόλληση πολλών",
-    "keylessHint": "Δεν απαιτείται API κλειδί: η δωρεάν βαθμίδα αυτού του παρόχου είναι ανώνυμη (περιορισμένη τιμή ανά IP).",
+    "keyOptionalHint": "Προαιρετικό: αφήστε το κενό για το ανώνυμο δωρεάν επίπεδο (όριο ανά IP) ή επικολλήστε το δικό σας κλειδί για να χρησιμοποιήσετε τον λογαριασμό σας.",
     "enable": "Ενεργοποίηση",
     "noProviderKeys": "Δεν υπάρχουν ακόμη κλειδιά παρόχου. Προσθέστε ένα παραπάνω για να ξεκινήσετε τη δρομολόγηση.",
     "filterPlaceholder": "Πάροχοι ή κλειδιά φίλτρων",
@@ -677,7 +683,14 @@
     "testFailed": "Η δοκιμή μοντέλου απέτυχε",
     "testThrottled": "Περιμένετε {seconds}δ πριν δοκιμάσετε ξανά αυτό το μοντέλο.",
     "noModelsForProvider": "Δεν έχουν διαμορφωθεί μοντέλα για αυτόν τον πάροχο.",
-    "testModels": "Δοκιμή μοντέλων"
+    "testModels": "Δοκιμή μοντέλων",
+    "monthlyRequestCapLabel": "Μηνιαίο όριο αιτημάτων",
+    "monthlyTokenCapLabel": "Μηνιαίο όριο tokens",
+    "capUnlimitedPlaceholder": "Απεριόριστο",
+    "capEditHint": "Τα όρια μηδενίζονται την 1η στις 00:00 UTC. Αφήστε κενό για απεριόριστο.",
+    "monthlyUsageLine": "{requests} αιτήματα, {tokens} tokens αυτόν τον μήνα",
+    "quotaBalanceHint": "Απομένουν {remaining} από {limit} {metric}",
+    "quotaBalanceLeft": "Απομένουν {remaining}"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Πριν την ενημέρωση"
   },
   "status": {
     "healthy": "υγιής",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Ένας πάντα διαθέσιμος προσωπικός βοηθός που απαντά σε WhatsApp, Telegram, Discord και άλλα από το δικό σας μηχάνημα.",
-      "hermes": "Ο αυτοβελτιούμενος πράκτορας της Nous Research με μόνιμη μνήμη και δεξιότητες, στο τερματικό ή σε εφαρμογές συνομιλίας."
+      "hermes": "Ο αυτοβελτιούμενος πράκτορας της Nous Research με μόνιμη μνήμη και δεξιότητες, στο τερματικό ή σε εφαρμογές συνομιλίας.",
+      "pi": "Ένας μινιμαλιστικός πράκτορας τερματικού που διαμορφώνετε με δικές σας επεκτάσεις, δεξιότητες και πρότυπα προτροπών.",
+      "reasonix": "Πράκτορας προγραμματισμού για το τερματικό, φτιαγμένος για το DeepSeek γύρω από την προσωρινή αποθήκευση προθεμάτων, ώστε οι μεγάλες συνεδρίες να μένουν φθηνές."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Έχει εγκατασταθεί νεότερη έκδοση του FreeLLMAPI.",
+    "reload": "Επαναφόρτωση"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Μετονομασία αυτής της αλυσίδας",
+    "renameConfirm": "Μετονομασία της αλυσίδας \"{oldName}\" σε \"{name}\"; Οι πελάτες που καλούν auto:{oldName} πρέπει να μεταβούν σε auto:{name}.",
+    "renamePlaceholder": "Νέο όνομα αλυσίδας",
+    "renameFailed": "Δεν ήταν δυνατή η μετονομασία της αλυσίδας."
+  },
+  "updates": {
+    "versionAvailable": "Η έκδοση {version} είναι διαθέσιμη",
+    "versionReady": "Η έκδοση {version} είναι έτοιμη για εγκατάσταση",
+    "releaseNotes": "Σημειώσεις έκδοσης",
+    "tryAgain": "Δοκιμάστε ξανά",
+    "offline": "Ελέγξτε τη σύνδεσή σας στο διαδίκτυο και δοκιμάστε ξανά."
   }
 }

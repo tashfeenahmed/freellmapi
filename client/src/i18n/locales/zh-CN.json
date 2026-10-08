@@ -152,21 +152,24 @@
     "compressionRunPreview": "运行预览",
     "updatesTitle": "更新",
     "checkForUpdates": "检查更新",
-    "lastChecked": "上次检查：{when}",
-    "currentVersion": "当前构建：",
     "updateAvailable": "有可用更新",
-    "changelog": "更新内容",
     "upToDate": "已是最新版本",
     "buildAhead": "此构建领先于官方 main 分支。",
     "buildDiverged": "此构建已偏离官方 main 分支。",
     "buildUnknown": "无法将此自定义构建与官方 main 分支进行比较。",
     "notGitInstall": "此安装不包含 commit 信息。",
     "checkFailed": "无法检查更新。",
-    "contactsGithub": "检查需手动执行，并会连接 GitHub。",
     "autoUpdateCheck": "自动检查更新",
-    "autoUpdateCheckHelp": "每天检查一次 GitHub 上是否有新版本，并显示提醒。默认关闭。",
-    "openReleases": "打开 GitHub Releases",
-    "restartAfterUpdate": "构建完成后重启 FreeLLMAPI。"
+    "restartAfterUpdate": "构建完成后重启 FreeLLMAPI。",
+    "downloadUpdate": "下载更新",
+    "downloadingUpdate": "正在下载… {percent}%",
+    "restartToUpdate": "重启以更新",
+    "updateReadyHint": "已下载。FreeLLMAPI 会先备份你的数据，然后重启并打开新版本。",
+    "updateInstallFailed": "无法安装更新。",
+    "updateNow": "立即更新",
+    "updatingContainer": "正在拉取新镜像并重启。FreeLLMAPI 恢复后此页面会自动重新加载。",
+    "updateNowFailed": "更新器未接受请求。请确认 watchtower 容器正在运行。",
+    "updateNowTimeout": "5 分钟后 FreeLLMAPI 仍未重启。请查看 watchtower 容器的日志。"
   },
   "models": {
     "title": "模型",
@@ -209,6 +212,7 @@
     "noKey": "无密钥",
     "dragToReorder": "拖动以重新排序",
     "dragToReorderGroup": "拖动以重新排序模型",
+    "moveToRank": "跳转到排名",
     "providerCount": "{count} 个提供方",
     "servedBy": "由 {providers} 提供",
     "viewProviders": "查看提供方",
@@ -223,6 +227,7 @@
     "settingsHint": "对目录模型的本地修改会在目录同步后保留。已删除的目录模型会保持删除状态，直到您通过配置重新添加。",
     "catalogModel": "目录",
     "customModel": "自定义",
+    "discoveredModel": "已发现",
     "localOverride": "本地覆盖",
     "displayName": "显示名称",
     "sizeLabel": "能力档位",
@@ -369,6 +374,7 @@
     "checklistSummary": "已配置 {configured}/{total} 个提供方",
     "checklistKeyless": "无需密钥",
     "checklistNoKeyTip": "尚未添加密钥。点击添加一个。",
+    "checklistSignupLink": "打开 {provider} 注册账户并获取密钥",
     "checklistKeylessTip": "无需密钥即可使用。",
     "tabQuotaSignals": "配额信号",
     "tabApiKey": "统一 API 密钥",
@@ -509,11 +515,11 @@
     "platform": "平台",
     "hideAdded": "隐藏已添加的提供方",
     "apiToken": "API 令牌",
-    "noKeyNeededPlaceholder": "无需 API 密钥",
+    "keyOptionalPlaceholder": "可选",
     "bearerTokenPlaceholder": "Bearer 令牌",
     "pasteKeyPlaceholder": "在此粘贴密钥",
     "pasteSeveral": "粘贴多个",
-    "keylessHint": "无需 API 密钥：该提供方的免费层是匿名的（按 IP 限流）。",
+    "keyOptionalHint": "可选：留空则使用匿名免费层级（按 IP 限速），或粘贴您自己的密钥以使用您的账户。",
     "enable": "启用",
     "noProviderKeys": "尚无提供方密钥。在上方添加一个即可开始路由。",
     "filterPlaceholder": "筛选提供方或密钥",
@@ -677,7 +683,14 @@
     "testFailed": "模型测试失败",
     "testThrottled": "请等待 {seconds} 秒后再测试此模型。",
     "noModelsForProvider": "此提供方尚未配置任何模型。",
-    "testModels": "测试模型"
+    "testModels": "测试模型",
+    "monthlyRequestCapLabel": "每月请求上限",
+    "monthlyTokenCapLabel": "每月 Token 上限",
+    "capUnlimitedPlaceholder": "无限制",
+    "capEditHint": "配额在每月 1 日 00:00 UTC 重置。留空表示无限制。",
+    "monthlyUsageLine": "本月 {requests} 次请求，{tokens} tokens",
+    "quotaBalanceHint": "剩余 {remaining} / {limit} {metric}",
+    "quotaBalanceLeft": "剩余 {remaining}"
   },
   "backups": {
     "title": "备份",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "相对于数据库所在目录。备份不能写到该目录之外。",
     "save": "保存计划",
-    "saved": "已保存"
+    "saved": "已保存",
+    "preUpdate": "更新前"
   },
   "status": {
     "healthy": "健康",
@@ -1133,17 +1147,16 @@
       "generic": "其他任何说 OpenAI 接口的工具，用基础 URL 和密钥手动配置。",
       "atomcode": "AtomGit 的终端智能体，用 Rust 编写，可接任意 OpenAI 兼容端点。",
       "openclaw": "一个常驻运行的个人助理，在你自己的机器上通过 WhatsApp、Telegram、Discord 等应答。",
-      "hermes": "Nous Research 的自我改进智能体，拥有持久记忆和技能，可在终端或聊天应用中使用。"
+      "hermes": "Nous Research 的自我改进智能体，拥有持久记忆和技能，可在终端或聊天应用中使用。",
+      "pi": "一个极简的终端智能体，用你自己的扩展、技能和提示词模板来塑造它。",
+      "reasonix": "为 DeepSeek 原生打造的终端编程智能体，围绕前缀缓存设计，长会话也能保持低成本。"
     }
   },
   "update": {
     "available": "发现新版本",
-    "whatsNew": "v{version} 更新内容",
-    "publishedOn": "发布于 {date}",
-    "noNotes": "此版本未发布更新说明。",
-    "openRelease": "打开发布页",
-    "dismissVersion": "忽略此版本",
-    "dismiss": "忽略"
+    "dismiss": "忽略",
+    "newBuild": "已安装更新版本的 FreeLLMAPI。",
+    "reload": "重新加载"
   },
   "freeTier": {
     "poolsToggle": "免费额度池（{count}）",
@@ -1191,6 +1204,17 @@
     "startEmpty": "从空链开始",
     "startEmptyHint": "创建时不放入任何模型，之后新增的目录模型也不会自动加入。不勾选则复制默认链。",
     "curated": "手动维护",
-    "curatedHint": "新的目录模型不会自动加入这条链。"
+    "curatedHint": "新的目录模型不会自动加入这条链。",
+    "renameHint": "重命名此链",
+    "renameConfirm": "将链“{oldName}”重命名为“{name}”？调用 auto:{oldName} 的客户端必须改用 auto:{name}。",
+    "renamePlaceholder": "新链名称",
+    "renameFailed": "无法重命名该链。"
+  },
+  "updates": {
+    "versionAvailable": "版本 {version} 可用",
+    "versionReady": "版本 {version} 已可安装",
+    "releaseNotes": "发行说明",
+    "tryAgain": "重试",
+    "offline": "请检查网络连接后重试。"
   }
 }

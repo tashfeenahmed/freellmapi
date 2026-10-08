@@ -76,12 +76,13 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
   // Whether the key that just landed is worth offering the picker for, and the
   // rows to offer. Anything missing — no id back, a keyless sentinel, a catalog
   // too small or not loaded — returns undefined, and the add stays silent.
-  function scopeOffer(keyId: number | undefined, added: string): AddedKeyScopeOffer | undefined {
+  function scopeOffer(keyId: number | undefined, added: string, key: string): AddedKeyScopeOffer | undefined {
     if (typeof keyId !== 'number') return undefined
     const provider = PLATFORMS.find(p => p.value === added)
-    // Keyless gateways are excluded from scope editing on the key row too — no
-    // credential means nothing was bought per model group.
-    if (!provider || provider.keyless) return undefined
+    // An anonymous row on a key-optional gateway is excluded from scope editing
+    // on the key row too: no credential means nothing was bought per model
+    // group. A real key saved there is an ordinary key (#1331).
+    if (!provider || (provider.keyless && !key.trim())) return undefined
     const candidates = scopeCandidates(catalog, added)
     if (!shouldOfferModelPicker(candidates)) return undefined
     return { keyId, platformLabel: provider.label, candidates }
@@ -114,7 +115,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
       // current catalog tier yet (#438) — surfaced as a toast now that the
       // dialog closes on success.
       if (data?.notice) toast.info(data.notice)
-      onSuccess(scopeOffer(data?.id, variables.platform))
+      onSuccess(scopeOffer(data?.id, variables.platform, variables.key))
     },
   })
 
@@ -136,9 +137,11 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
   })
 
   const needsAccountId = platform === 'cloudflare'
+  // Key-optional providers (Kilo, OVH, AI Horde) work anonymously, but accept a
+  // real key too (#1331): the field stays editable and may be left blank.
   const isKeyless = PLATFORMS.find(p => p.value === platform)?.keyless ?? false
-  // Cloudflare pairs each token with an account id, and keyless providers have
-  // nothing to paste, so neither can take a list.
+  // Cloudflare pairs each token with an account id, and a key-optional
+  // provider keeps a single anonymous row, so neither takes a list.
   const canPasteSeveral = !isKeyless && !needsAccountId
   const severalMode = several && canPasteSeveral
   // One per line or comma-separated, deduped, blanks dropped.
@@ -168,8 +171,9 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
       })
       return
     }
-    // Keyless providers submit an empty key; the backend stores a sentinel.
-    const key = isKeyless ? '' : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
+    // A blank key on a key-optional provider enables its anonymous tier; the
+    // backend stores a sentinel and sends no Authorization header.
+    const key = isKeyless ? apiKey.trim() : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
     addKey.mutate({ platform, key, label: label || undefined })
   }
 
@@ -248,18 +252,17 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
           ) : (
             <Input
               type="password"
-              value={isKeyless ? '' : apiKey}
+              value={apiKey}
               onChange={e => setApiKey(e.target.value)}
-              placeholder={isKeyless ? t('keys.noKeyNeededPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
+              placeholder={isKeyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
               className="font-mono text-xs"
-              disabled={isKeyless}
               aria-invalid={addAttempted && !!keyError}
             />
           )}
           {addAttempted && <FieldError error={keyError} />}
           {isKeyless && (
             <p className="text-[11px] text-muted-foreground">
-              {t('keys.keylessHint')}
+              {t('keys.keyOptionalHint')}
             </p>
           )}
         </div>
@@ -277,7 +280,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
                 ? t('keys.adding')
                 : severalMode && keyList.length > 1
                   ? t('keys.importSelected', { count: keyList.length })
-                  : isKeyless ? t('keys.enable') : t('keys.addKey')}
+                  : isKeyless && !apiKey.trim() ? t('keys.enable') : t('keys.addKey')}
             </Button>
           </div>
         </div>

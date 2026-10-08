@@ -152,21 +152,24 @@
     "compressionRunPreview": "Mee nlele",
     "updatesTitle": "Mmelite",
     "checkForUpdates": "Lelee maka mmelite",
-    "lastChecked": "Nyocha ikpeazụ: {when}",
-    "currentVersion": "Build dị ugbu a:",
     "updateAvailable": "Mmelite dị",
-    "changelog": "Ihe gbanwere",
     "upToDate": "Ọ dị ọhụrụ",
     "buildAhead": "Build a dị n'ihu alaka main nke iwu kwadoro.",
     "buildDiverged": "Build a esiwo na alaka main nke iwu kwadoro kewapụ.",
     "buildUnknown": "Enweghị ike iji build omenala a tụnyere alaka main nke iwu kwadoro.",
     "notGitInstall": "Nwụnye a enweghị ozi commit.",
     "checkFailed": "Enweghị ike ịlele mmelite.",
-    "contactsGithub": "A na-eji aka eme nyocha ndị a, ha na-akpọtụrụ GitHub.",
     "autoUpdateCheck": "Nyocha mmelite akpaaka",
-    "autoUpdateCheckHelp": "Ọ na-enyocha GitHub otu ugboro n'ụbọchị maka ntọhapụ ọhụrụ ma gosi ncheta. A gbanyụrụ ya na ndabara.",
-    "openReleases": "Mepee GitHub Releases",
-    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara."
+    "restartAfterUpdate": "Malitegharịa FreeLLMAPI mgbe build ahụ gwụchara.",
+    "downloadUpdate": "Budata mmelite",
+    "downloadingUpdate": "Na-ebudata… {percent}%",
+    "restartToUpdate": "Malitegharịa ka imelite",
+    "updateReadyHint": "Ebudatala. FreeLLMAPI na-echekwa data gị, malitegharịa ma mepee ụdị ọhụrụ.",
+    "updateInstallFailed": "Enweghị ike itinye mmelite ahụ.",
+    "updateNow": "Melite ugbu a",
+    "updatingContainer": "Na-adọta onyonyo ọhụrụ ma na-amalitegharị. Ibe a ga-ebugharị mgbe FreeLLMAPI lọghachiri.",
+    "updateNowFailed": "Onye mmelite anabataghị arịrịọ ahụ. Lelee ma akpa watchtower na-arụ ọrụ.",
+    "updateNowTimeout": "FreeLLMAPI amalitegharịbeghị mgbe nkeji 5 gachara. Lelee ndekọ akpa watchtower."
   },
   "models": {
     "title": "Ụdị",
@@ -209,6 +212,7 @@
     "noKey": "enweghị igodo",
     "dragToReorder": "Dọrọ ka ị hazie",
     "dragToReorderGroup": "Dọrọ ka ị hazie ihe nlereanya",
+    "moveToRank": "Gaa na ọkwa",
     "providerCount": "Ndị na-eweta {count}",
     "servedBy": "{providers} na-ejere ya ozi",
     "viewProviders": "Lelee ndị na-eweta ya",
@@ -223,6 +227,7 @@
     "settingsHint": "A na-edowe ndezi mpaghara na ụdị katalọgụ n'ofe mmekọrịta katalọgụ. Ụdị katalọgụ ehichapụrụ na-anọ na-ehichapụ ruo mgbe ị gbakwunyere ha ọzọ site na nhazi.",
     "catalogModel": "katalọgụ",
     "customModel": "omenala",
+    "discoveredModel": "achọpụtara",
     "localOverride": "mkpochapụ mpaghara",
     "displayName": "Aha ngosi",
     "sizeLabel": "Ọkwa ikike",
@@ -369,6 +374,7 @@
     "checklistSummary": "Ahaziela {configured} n'ime {total} ndị na-enye ihe",
     "checklistKeyless": "achọghị igodo",
     "checklistNoKeyTip": "Etinyebeghị igodo. Pịa iji tinye otu.",
+    "checklistSignupLink": "Meghe {provider} iji mepụta akaụntụ ma nweta igodo",
     "checklistKeylessTip": "Ọ na-arụ ọrụ na-enweghị igodo.",
     "tabQuotaSignals": "Ngosipụta oke",
     "tabApiKey": "Igodo API jikọtara ọnụ",
@@ -495,11 +501,11 @@
     "platform": "Platform",
     "hideAdded": "Zoo ndị na-eweta agbakwunyere",
     "apiToken": "API akara ngosi",
-    "noKeyNeededPlaceholder": "Enweghị igodo API achọrọ",
+    "keyOptionalPlaceholder": "Nhọrọ",
     "bearerTokenPlaceholder": "Ihe nrịbama ebu",
     "pasteKeyPlaceholder": "mado igodo ebe a",
     "pasteSeveral": "Mado ọtụtụ",
-    "keylessHint": "Enweghị igodo API achọrọ: ọkwa n'efu nke onye na-eweta nke a bụ nke amaghị aha (oke-oke IP ọ bụla).",
+    "keyOptionalHint": "Nhọrọ: hapụ ya efu maka ọkwa efu na-enweghị aha (oke ọnụego kwa IP), ma ọ bụ mado igodo nke gị iji jiri akaụntụ gị.",
     "enable": "Kwado",
     "noProviderKeys": "Enweghị igodo ndị na-eweta ya. Tinye otu n'elu ka ịmalite ịkwọgharị.",
     "filterPlaceholder": "Ndị na-eweta ma ọ bụ igodo",
@@ -677,7 +683,14 @@
     "testFailed": "Nnwale ụdị dara",
     "testThrottled": "Biko chere {seconds}s tupu ị nwalee ụdị a ọzọ.",
     "noModelsForProvider": "Enweghị ụdị ahaziri maka onye na-enye ọrụ a.",
-    "testModels": "Nwalee ụdị"
+    "testModels": "Nwalee ụdị",
+    "monthlyRequestCapLabel": "Oke arịrịọ ọnwa",
+    "monthlyTokenCapLabel": "Oke token ọnwa",
+    "capUnlimitedPlaceholder": "Enweghị oke",
+    "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
+    "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
+    "quotaBalanceHint": "{remaining} n'ime {limit} {metric} fọdụrụ",
+    "quotaBalanceLeft": "{remaining} fọdụrụ"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Tupu mmelite"
   },
   "status": {
     "healthy": "ahụike",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Onye enyemaka nkeonwe na-arụ ọrụ mgbe niile, nke na-aza na WhatsApp, Telegram, Discord na ndị ọzọ site na igwe nke gị.",
-      "hermes": "Onye ọrụ Nous Research na-emeziwanye onwe ya, nwere ebe nchekwa na-adịgide na nkà, na terminal ma ọ bụ na ngwa mkparịta ụka."
+      "hermes": "Onye ọrụ Nous Research na-emeziwanye onwe ya, nwere ebe nchekwa na-adịgide na nkà, na terminal ma ọ bụ na ngwa mkparịta ụka.",
+      "pi": "Obere onye ọrụ terminal ị na-akpụ site na ndọtị, nkà na ndebiri ajụjụ nke gị.",
+      "reasonix": "Onye nnọchite ide koodu na terminal emere maka DeepSeek, wuru gburugburu prefix caching ka ogologo nnọkọ wee dị ọnụ ala."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "Etinyela ụdị FreeLLMAPI ọhụrụ.",
+    "reload": "Bugharịa"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Gbanwee aha chain a",
+    "renameConfirm": "Gbanwee aha chain \"{oldName}\" ka ọ bụrụ \"{name}\"? Ndị ahịa na-akpọ auto:{oldName} ga-agbanwe gaa auto:{name}.",
+    "renamePlaceholder": "Aha chain ọhụrụ",
+    "renameFailed": "Enweghị ike ịgbanwe aha chain ahụ."
+  },
+  "updates": {
+    "versionAvailable": "Ụdị {version} dị",
+    "versionReady": "Ụdị {version} dị njikere maka itinye",
+    "releaseNotes": "Ndetu mwepụta",
+    "tryAgain": "Nwaa ọzọ",
+    "offline": "Lelee njikọ ịntanetị gị ma nwaa ọzọ."
   }
 }

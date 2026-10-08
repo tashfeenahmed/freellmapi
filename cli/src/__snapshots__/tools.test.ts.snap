@@ -651,6 +651,79 @@ exports[`tool generators > setup-opencode has stable golden output 1`] = `
 }
 `;
 
+exports[`tool generators > setup-pi has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "format": "json",
+      "path": "/home/tester/.pi/agent/models.json",
+      "sensitive": true,
+      "value": {
+        "providers": {
+          "freellmapi": {
+            "api": "openai-completions",
+            "apiKey": "freellmapi-test-key",
+            "baseUrl": "http://localhost:3000/v1",
+            "headers": {
+              "User-Agent": "pi-coding-agent",
+            },
+            "models": [
+              {
+                "contextWindow": 131072,
+                "cost": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "input": 0,
+                  "output": 0,
+                },
+                "id": "fast-coder",
+                "input": [
+                  "text",
+                ],
+                "maxTokens": 8192,
+                "name": "Fast Coder",
+                "reasoning": false,
+              },
+              {
+                "contextWindow": 262144,
+                "cost": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "input": 0,
+                  "output": 0,
+                },
+                "id": "reasoning-model",
+                "input": [
+                  "text",
+                ],
+                "maxTokens": 8192,
+                "name": "Reasoning Model",
+                "reasoning": false,
+              },
+            ],
+            "name": "FreeLLMAPI",
+          },
+        },
+      },
+    },
+    {
+      "format": "json",
+      "path": "/home/tester/.pi/agent/settings.json",
+      "value": {
+        "defaultModel": "fast-coder",
+        "defaultProvider": "freellmapi",
+      },
+    },
+  ],
+  "notes": [
+    "Install Pi with: npm install -g @earendil-works/pi-coding-agent (or curl -fsSL https://pi.dev/install.sh | sh)",
+    "Try it with: pi -p "Say hello" — freellmapi/fast-coder is the default model.",
+    "Every catalog model is in /model; a running Pi session picks the change up when /model is opened.",
+    "Models are declared text-only; give a vision model \`input: ["text", "image"]\` under providers.freellmapi in models.json to send it images.",
+  ],
+}
+`;
+
 exports[`tool generators > setup-qwen has stable golden output 1`] = `
 {
   "files": [
@@ -703,6 +776,42 @@ exports[`tool generators > setup-qwen has stable golden output 1`] = `
   ],
   "notes": [
     "Native Gemini mode is also available at http://localhost:3000/v1beta with GEMINI_API_KEY.",
+  ],
+}
+`;
+
+exports[`tool generators > setup-reasonix has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "content": "default_model = "freellmapi/fast-coder"
+
+[[providers]]
+name = "freellmapi"
+display_name = "FreeLLMAPI"
+kind = "openai"
+base_url = "http://localhost:3000/v1"
+models = ["fast-coder", "reasoning-model"]
+default = "fast-coder"
+api_key_env = "FREELLMAPI_API_KEY"
+context_window = 131072
+price = { cache_hit = 0, input = 0, output = 0, currency = "$" }",
+      "format": "toml",
+      "path": "/home/tester/.reasonix/config.toml",
+    },
+    {
+      "content": "FREELLMAPI_API_KEY=freellmapi-test-key
+",
+      "format": "env",
+      "path": "/home/tester/.reasonix/.env",
+      "sensitive": true,
+    },
+  ],
+  "notes": [
+    "Install Reasonix with: npm install -g reasonix (or brew install esengine/reasonix/reasonix)",
+    "Try it with: reasonix -p "Say hello" — freellmapi/fast-coder is the default model.",
+    "Every catalog model is in /model as freellmapi/<id>; other [[providers]] entries in config.toml are kept.",
+    "Reasonix Studio lists only the providers in [desktop].provider_access when that list is set; add "freellmapi" there, or under Settings → Model → Access.",
   ],
 }
 `;

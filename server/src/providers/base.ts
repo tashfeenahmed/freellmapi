@@ -19,6 +19,8 @@ import { extractThinkTagsFromStream } from '../lib/think-tags.js';
 export interface ProviderHttpError extends Error {
   status?: number;
   retryAfterMs?: number;
+  /** Explicit daily-window violation from structured upstream quota details. */
+  dailyQuotaExhausted?: boolean;
 }
 
 /** Upper bound on a provider-supplied back-off. A malformed or hostile
@@ -163,6 +165,9 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
   stream_options?: {
     include_usage?: boolean;
   };
+  /** Remaining context budget (context_window − estimated_input_tokens) for
+   *  this route. resolveMaxTokens clamps max_tokens to fit. */
+  contextBudget?: number;
   /** Per-call HTTP timeout override. Not part of the OpenAI wire format (it is
    * stripped before the request body is built); used by the probe script so
    * NVIDIA's 15-60s serverless cold starts don't read as failures. */
@@ -242,6 +247,28 @@ export abstract class BaseProvider {
   abstract validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult>;
 
   /**
+   * Optional quota/balance probe (#1403). Providers whose API exposes a
+   * key-info/quota endpoint override this to fetch the provider-reported
+   * limit/remaining and persist them as a `source: 'quota_api'` observation,
+   * so the dashboard shows a real balance instead of a text-label guess.
+   * Must never throw into the caller: the default implementation does no
+   * network at all and returns false; implementations catch transport errors
+   * and return false so a quota probe can never change a health verdict.
+   * Returns true when an observation was recorded.
+   */
+  async fetchQuota(_apiKey: string, _quotaContext?: QuotaObservationContext): Promise<boolean> {
+    return false;
+  }
+
+  /** Whether this provider actually has a quota endpoint to probe (#1403).
+   * fetchQuota alone can't answer it: OpenAICompatProvider overrides the
+   * method for every instance, spec or not. Routes that owe the operator a
+   * "this platform has no quota endpoint" answer must use this instead. */
+  get hasQuotaProbe(): boolean {
+    return false;
+  }
+
+  /**
    * Turn a conventional 401/403 validation response into a diagnostic result.
    * Providers still return a simple boolean when no useful error body exists,
    * but preserving the upstream message here lets the health service persist
@@ -249,6 +276,12 @@ export abstract class BaseProvider {
    */
   protected async validationResult(res: Response): Promise<KeyValidationResult> {
     if (res.status !== 401 && res.status !== 403) return true;
+    // A Cloudflare bot challenge ("Just a moment...") is a 403 about the
+    // caller's IP and User-Agent, not about the key. Surface it as
+    // inconclusive so health never auto-disables a good key behind it (#1298).
+    if (res.headers?.get('cf-mitigated') === 'challenge') {
+      throw providerHttpError(res, `${this.name} key validation blocked by a Cloudflare challenge (HTTP ${res.status}); the key was not checked`);
+    }
 
     let body: any = null;
     try {

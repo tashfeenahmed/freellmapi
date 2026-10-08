@@ -152,21 +152,24 @@
     "compressionRunPreview": "Ṣiṣe awotẹlẹ",
     "updatesTitle": "Àwọn ìmúdójúìwọ̀n",
     "checkForUpdates": "Ṣayẹwo fun awọn imudojuiwọn",
-    "lastChecked": "Ayẹwo ikẹhin: {when}",
-    "currentVersion": "Ẹ̀yà ìkọ́lé lọ́wọ́lọ́wọ́:",
     "updateAvailable": "Ìmúdójúìwọ̀n wà",
-    "changelog": "Ohun tí ó yí padà",
     "upToDate": "Ó ti mú dójú ìwọ̀n",
     "buildAhead": "Ẹ̀yà ìkọ́lé yìí ti lọ síwájú main àṣẹ.",
     "buildDiverged": "Ẹ̀yà ìkọ́lé yìí ti yà kúrò ní main àṣẹ.",
     "buildUnknown": "A kò lè fi ẹ̀yà ìkọ́lé àkànṣe yìí wé main àṣẹ.",
     "notGitInstall": "Fífìmọ́lẹ̀ yìí kò ní àlàyé commit.",
     "checkFailed": "A kò lè ṣàyẹ̀wò àwọn ìmúdójúìwọ̀n.",
-    "contactsGithub": "Ọwọ́ ni a fi ń ṣe àwọn àyẹ̀wò, wọ́n sì ń kan sí GitHub.",
     "autoUpdateCheck": "Àyẹ̀wò ìmúdójúìwọ̀n aládàáṣe",
-    "autoUpdateCheckHelp": "Ó ń ṣàyẹ̀wò GitHub lẹ́ẹ̀kan lóòjọ́ fún ìtújáde tuntun, ó sì ń fi ìránnilétí hàn. Ó pa ní àtìbẹ̀rẹ̀.",
-    "openReleases": "Ṣí àwọn ìtújáde GitHub",
-    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí."
+    "restartAfterUpdate": "Tun FreeLLMAPI bẹ̀rẹ̀ lẹ́yìn tí ìkọ́lé bá parí.",
+    "downloadUpdate": "Ṣe ìgbàsílẹ̀ ìmúdójúìwọ̀n",
+    "downloadingUpdate": "Ń ṣe ìgbàsílẹ̀… {percent}%",
+    "restartToUpdate": "Tún bẹ̀rẹ̀ láti mú dójúìwọ̀n",
+    "updateReadyHint": "Ìgbàsílẹ̀ ti parí. FreeLLMAPI yóò ṣe àfẹ̀yìntì dátà rẹ, tún bẹ̀rẹ̀, yóò sì ṣí ẹ̀yà tuntun.",
+    "updateInstallFailed": "A kò lè fi ìmúdójúìwọ̀n náà sí i.",
+    "updateNow": "Ṣe ìmúdójúìwọ̀n báyìí",
+    "updatingContainer": "Ń fa àwòrán tuntun ó sì ń tún bẹ̀rẹ̀. Ojú-ìwé yìí yóò tún gbé nígbà tí FreeLLMAPI bá padà.",
+    "updateNowFailed": "Olùmúdójúìwọ̀n kò gba ìbéèrè náà. Ṣàyẹ̀wò pé àpótí watchtower ń ṣiṣẹ́.",
+    "updateNowTimeout": "FreeLLMAPI kò tíì tún bẹ̀rẹ̀ lẹ́yìn ìṣẹ́jú 5. Ṣàyẹ̀wò àkọsílẹ̀ àpótí watchtower."
   },
   "models": {
     "title": "Awọn awoṣe",
@@ -209,6 +212,7 @@
     "noKey": "ko si bọtini",
     "dragToReorder": "Fa lati tunto",
     "dragToReorderGroup": "Fa lati tunto awoṣe",
+    "moveToRank": "Fò sí ipò",
     "providerCount": "{count} olupese",
     "servedBy": "Yoo wa nipasẹ {providers}",
     "viewProviders": "Wo awọn olupese",
@@ -223,6 +227,7 @@
     "settingsHint": "Awọn atunṣe agbegbe si awọn awoṣe katalogi ti wa ni ipamọ kọja awọn amuṣiṣẹpọ katalogi. Awọn awoṣe katalogi ti paarẹ wa ni paarẹ titi ti o fi ṣafikun wọn lẹẹkansi nipasẹ atunto.",
     "catalogModel": "katalogi",
     "customModel": "aṣa",
+    "discoveredModel": "tí a rí",
     "localOverride": "idojuk agbegbe",
     "displayName": "Orukọ ifihan",
     "sizeLabel": "Ipele agbára",
@@ -369,6 +374,7 @@
     "checklistSummary": "A ti ṣètò {configured} nínú {total} olùpèsè",
     "checklistKeyless": "kò nílò kọ́kọ́rọ́",
     "checklistNoKeyTip": "Kò sí kọ́kọ́rọ́ tí a ti fi kún un. Tẹ̀ láti fi kọ́kọ́rọ́ kún un.",
+    "checklistSignupLink": "Ṣí {provider} láti ṣẹ́ àkàwo àti láti gba kọ́kọ́rọ́",
     "checklistKeylessTip": "Ó ń ṣiṣẹ́ láìsí kọ́kọ́rọ́.",
     "tabQuotaSignals": "Quota awọn ifihan agbara",
     "tabApiKey": "Bọtini API ti iṣọkan",
@@ -495,11 +501,11 @@
     "platform": "Platform",
     "hideAdded": "Fi awọn olupese ti a fikun pamọ",
     "apiToken": "API àmi",
-    "noKeyNeededPlaceholder": "Ko si bọtini API nilo",
+    "keyOptionalPlaceholder": "Àṣàyàn",
     "bearerTokenPlaceholder": "Aami oniduro",
     "pasteKeyPlaceholder": "lẹẹ bọtini nibi",
     "pasteSeveral": "Lẹ̀ ọ̀pọ̀lọpọ̀ mọ́",
-    "keylessHint": "Ko si bọtini API nilo: ipele ọfẹ ti olupese yii jẹ ailorukọ (opin-opin fun IP).",
+    "keyOptionalHint": "Àṣàyàn: fi sílẹ̀ ní òfo fún ìpele ọ̀fẹ́ aláìlórúkọ (ìwọ̀n ààlà fún IP kọ̀ọ̀kan), tàbí lẹ̀ kọ́kọ́rọ́ tìrẹ láti lo àkọọ́lẹ̀ rẹ.",
     "enable": "Mu ṣiṣẹ",
     "noProviderKeys": "Ko si awọn bọtini olupese sibẹsibẹ. Ṣafikun ọkan loke lati bẹrẹ ipa-ọna.",
     "filterPlaceholder": "Ajọ awọn olupese tabi awọn bọtini",
@@ -677,7 +683,14 @@
     "testFailed": "Idanwo awoṣe kuna",
     "testThrottled": "Jọwọ duro fun iṣẹju-aaya {seconds} ki o to tun awoṣe yii ṣe idanwo.",
     "noModelsForProvider": "Ko si awọn awoṣe ti a tunto fun olupese yii.",
-    "testModels": "Ṣàdánwò àwọn àwòṣe"
+    "testModels": "Ṣàdánwò àwọn àwòṣe",
+    "monthlyRequestCapLabel": "Òpín ìbéèrè oṣooṣù",
+    "monthlyTokenCapLabel": "Òpín token oṣooṣù",
+    "capUnlimitedPlaceholder": "Kò ní òpín",
+    "capEditHint": "A tún òpín ṣe ní ọjọ́ kìíní ní 00:00 UTC. Fi sílẹ̀ ṣófo fún aláìlópin.",
+    "monthlyUsageLine": "{requests} ìbéèrè, {tokens} token oṣù yìí",
+    "quotaBalanceHint": "{remaining} nínú {limit} {metric} ló kù",
+    "quotaBalanceLeft": "{remaining} ló kù"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Ṣáájú ìmúdójúìwọ̀n"
   },
   "status": {
     "healthy": "ni ilera",
@@ -1133,17 +1147,16 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "Olùrànlọ́wọ́ ara ẹni tí ó wà ní ìmúrasílẹ̀ nígbà gbogbo, tí ó ń dáhùn lórí WhatsApp, Telegram, Discord àti bẹ́ẹ̀ bẹ́ẹ̀ lọ láti orí ẹ̀rọ tìrẹ.",
-      "hermes": "Aṣojú Nous Research tí ó ń mú ara rẹ̀ dára síi, pẹ̀lú ìrántí tí ó wà pẹ́ àti àwọn ọgbọ́n, nínú terminal tàbí lórí àwọn ìṣàfilọ́lẹ̀ ìfọ̀rọ̀wérọ̀."
+      "hermes": "Aṣojú Nous Research tí ó ń mú ara rẹ̀ dára síi, pẹ̀lú ìrántí tí ó wà pẹ́ àti àwọn ọgbọ́n, nínú terminal tàbí lórí àwọn ìṣàfilọ́lẹ̀ ìfọ̀rọ̀wérọ̀.",
+      "pi": "Aṣojú terminal kékeré tí o ń ṣe àtúnṣe rẹ̀ pẹ̀lú àwọn àfikún, ọgbọ́n àti àwọn àpẹẹrẹ ìtọ́sọ́nà tìrẹ.",
+      "reasonix": "Aṣojú kíkọ kóòdù lórí terminal tí a kọ́ fún DeepSeek, tí a gbé ka prefix caching kí àwọn ìgbà pípẹ́ lè máa jẹ́ olówó pọ́ọ́kú."
     }
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "A ti fi ẹ̀yà FreeLLMAPI tuntun sí i.",
+    "reload": "Tún gbé e"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Tún orúkọ ẹwẹ̀ yìí sí i",
+    "renameConfirm": "Tún orúkọ ẹwẹ̀ \"{oldName}\" sí \"{name}\"? Àwọn oníbàárà̀ tó ̀ pè auto:{oldName} gbọ́dọ̀ yí padà sí auto:{name}.",
+    "renamePlaceholder": "Orúkọ ẹwẹ̀ tuntun",
+    "renameFailed": "A kò lè tún orúkọ ẹwẹ̀ yẹn sọ."
+  },
+  "updates": {
+    "versionAvailable": "Ẹ̀yà {version} wà",
+    "versionReady": "Ẹ̀yà {version} ti ṣetán láti fi sí i",
+    "releaseNotes": "Àkọsílẹ̀ ìtújáde",
+    "tryAgain": "Gbìyànjú lẹ́ẹ̀kan sí i",
+    "offline": "Ṣàyẹ̀wò ìsopọ̀ íńtánẹ́ẹ̀tì rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   }
 }

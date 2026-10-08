@@ -85,11 +85,20 @@ describe('Router9 and Septor adapters', () => {
     await expect(getProvider('septor')!.validateKey('test-key')).resolves.toBe(true);
     expect(fetch.mock.calls[0][0]).toBe('https://api.septorlabs.com/v1/models');
     expect(fetch.mock.calls[0][1]?.method).toBe('GET');
+    // Cloudflare challenges Node's default UA from datacenter IPs (#1298).
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).get('user-agent')).toBe('FreeLLMAPI/1.0');
   });
 
   it.each([401, 403])('Septor rejects invalid credentials (%s)', async status => {
     vi.spyOn(global, 'fetch').mockResolvedValue(json({ error: { message: 'Invalid key' } }, status));
     await expect(getProvider('septor')!.validateKey('bad-test-key')).resolves.toMatchObject({ valid: false });
+  });
+
+  it('Septor treats a Cloudflare challenge page as inconclusive, not a bad key', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response('<!DOCTYPE html><title>Just a moment...</title>', {
+      status: 403, headers: { 'Content-Type': 'text/html', 'cf-mitigated': 'challenge' },
+    }));
+    await expect(getProvider('septor')!.validateKey('test-key')).rejects.toThrow('Cloudflare challenge');
   });
 
   it('Router9 reuses inline-reasoning normalization for non-streaming answers', async () => {

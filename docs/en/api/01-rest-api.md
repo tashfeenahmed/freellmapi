@@ -476,3 +476,10 @@ pointing to the next UTC month. OpenAI-compatible endpoints also return
 `error.code: "quota_exceeded"`; other protocol adapters preserve their native
 error format. Fusion subcalls obey the caps but retain Fusion's aggregate error
 format. If another key has capacity, normal fallback can use it.
+
+Embeddings additionally relay the upstream providers' own back-off. A provider
+that answers `429` is simply skipped for the next one in the family; only when
+every provider in the family was rate limited and each stated a `Retry-After`
+does the gateway's `429` carry one: the soonest of them, in whole seconds
+(clamped to 24h). A chain that also hit a non-rate-limit failure returns `502`
+without `Retry-After`, since waiting would not be a promise.

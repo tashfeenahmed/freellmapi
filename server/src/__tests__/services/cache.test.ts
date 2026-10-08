@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, setSetting, getDb } from '../../db/index.js';
 import {
   computeCacheKey,
@@ -680,6 +680,70 @@ describe('response cache', () => {
       expect(getCachedResponse(key, t0 + 120_000)).toBeNull();
       __flushPersistenceForTests();
       expect(rowCount()).toBe(0);
+    });
+
+    describe('batched hit-count flush', () => {
+      const hitRow = (key: string) => getDb()
+        .prepare('SELECT hit_count, last_hit_at_ms FROM response_cache WHERE cache_key = ?')
+        .get(key) as { hit_count: number; last_hit_at_ms: number | null } | undefined;
+
+      beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
+      afterEach(() => { vi.useRealTimers(); });
+
+      it('writes many hits in one debounced pass', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'batched')] });
+        const t0 = 5_000_000;
+        store(key, 'answer', t0);
+        __flushPersistenceForTests();
+        getCachedResponse(key, t0 + 1);
+        getCachedResponse(key, t0 + 2);
+        getCachedResponse(key, t0 + 3);
+        __flushPersistenceForTests();
+        // Nothing written per hit: the row still holds the stored value.
+        expect(hitRow(key)!.hit_count).toBe(0);
+
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)).toEqual({ hit_count: 3, last_hit_at_ms: t0 + 3 });
+      });
+
+      it('clearCache() drops pending counts so they never land on a re-stored entry', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'cleared-pending')] });
+        store(key, 'old answer');
+        __flushPersistenceForTests();
+        getCachedResponse(key);
+        getCachedResponse(key);
+
+        clearCache();
+        store(key, 'fresh answer');
+        __flushPersistenceForTests();
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+
+        expect(hitRow(key)!.hit_count).toBe(0);
+        expect(getCacheStats().totalHits).toBe(0);
+      });
+
+      it('a re-store drops the old entry\'s pending count', () => {
+        const key = computeCacheKey({ model: 'auto', messages: [msg('user', 'restored-pending')] });
+        store(key, 'old answer');
+        __flushPersistenceForTests();
+        getCachedResponse(key);
+        getCachedResponse(key);
+
+        // Overwrite before the flush timer fires: the fresh row starts at 0.
+        store(key, 'new answer');
+        __flushPersistenceForTests();
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)!.hit_count).toBe(0);
+
+        // Hits on the new entry still flush normally.
+        getCachedResponse(key);
+        vi.advanceTimersByTime(2_000);
+        __flushPersistenceForTests();
+        expect(hitRow(key)!.hit_count).toBe(1);
+      });
     });
 
     it('clearCache() purges SQLite too, so a restart does not resurrect entries', () => {

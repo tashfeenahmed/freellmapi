@@ -92,7 +92,7 @@ export class AIHordeProvider extends BaseProvider {
       // applies to it as well — it can only ever lower what we send.
       max_tokens: Math.max(
         MIN_MAX_TOKENS,
-        resolveMaxTokens(this.platform, options?.max_tokens ?? DEFAULT_MAX_TOKENS) ?? DEFAULT_MAX_TOKENS,
+        resolveMaxTokens(this.platform, options?.max_tokens ?? DEFAULT_MAX_TOKENS, options?.contextBudget) ?? DEFAULT_MAX_TOKENS,
       ),
     };
     if (options?.temperature != null) body.temperature = options.temperature;

@@ -152,21 +152,24 @@
     "compressionRunPreview": "Run preview",
     "updatesTitle": "Updates",
     "checkForUpdates": "Check for updates",
-    "lastChecked": "Last checked: {when}",
-    "currentVersion": "Current build:",
     "updateAvailable": "Update available",
-    "changelog": "What's changed",
     "upToDate": "Up to date",
     "buildAhead": "This build is ahead of official main.",
     "buildDiverged": "This build has diverged from official main.",
     "buildUnknown": "This custom build cannot be compared with official main.",
     "notGitInstall": "This installation does not include commit information.",
     "checkFailed": "Could not check for updates.",
-    "contactsGithub": "Checks are manual and contact GitHub.",
     "autoUpdateCheck": "Automatic update check",
-    "autoUpdateCheckHelp": "Checks GitHub once a day for a new release and shows a reminder. Off by default.",
-    "openReleases": "Open GitHub Releases",
-    "restartAfterUpdate": "Restart FreeLLMAPI after the build completes."
+    "restartAfterUpdate": "Restart FreeLLMAPI after the build completes.",
+    "downloadUpdate": "Download update",
+    "downloadingUpdate": "Downloading… {percent}%",
+    "restartToUpdate": "Restart to update",
+    "updateReadyHint": "Downloaded. FreeLLMAPI backs up your data, restarts and opens the new version.",
+    "updateInstallFailed": "The update could not be installed.",
+    "updateNow": "Update now",
+    "updatingContainer": "Pulling the new image and restarting. This page reloads when FreeLLMAPI is back.",
+    "updateNowFailed": "The updater did not accept the request. Check that the watchtower container is running.",
+    "updateNowTimeout": "FreeLLMAPI has not restarted after 5 minutes. Check the watchtower container's logs."
   },
   "models": {
     "title": "Models",
@@ -209,6 +212,7 @@
     "noKey": "no key",
     "dragToReorder": "Drag to reorder",
     "dragToReorderGroup": "Drag to reorder model",
+    "moveToRank": "Jump to rank",
     "providerCount": "{count} providers",
     "servedBy": "Served by {providers}",
     "viewProviders": "View providers",
@@ -223,6 +227,7 @@
     "settingsHint": "Local edits to catalog models are kept across catalog syncs. Deleted catalog models stay deleted until you add them again through config.",
     "catalogModel": "catalog",
     "customModel": "custom",
+    "discoveredModel": "discovered",
     "localOverride": "local override",
     "displayName": "Display name",
     "sizeLabel": "Capability tier",
@@ -369,6 +374,7 @@
     "checklistSummary": "{configured} of {total} providers configured",
     "checklistKeyless": "no key needed",
     "checklistNoKeyTip": "No key added yet. Click to add one.",
+    "checklistSignupLink": "Open {provider} to create an account and get a key",
     "checklistKeylessTip": "Works without a key.",
     "tabQuotaSignals": "Quota signals",
     "tabApiKey": "Unified API key",
@@ -533,11 +539,11 @@
     "platform": "Platform",
     "hideAdded": "Hide added providers",
     "apiToken": "API token",
-    "noKeyNeededPlaceholder": "No API key needed",
+    "keyOptionalPlaceholder": "Optional",
     "bearerTokenPlaceholder": "Bearer token",
     "pasteKeyPlaceholder": "paste key here",
     "pasteSeveral": "Paste several",
-    "keylessHint": "No API key needed: this provider's free tier is anonymous (rate-limited per IP).",
+    "keyOptionalHint": "Optional: leave blank for the anonymous free tier (rate-limited per IP), or paste your own key to use your account.",
     "enable": "Enable",
     "noProviderKeys": "No provider keys yet. Add one above to start routing.",
     "filterPlaceholder": "Filter providers or keys",
@@ -677,7 +683,14 @@
     "testFailed": "Model test failed",
     "testThrottled": "Please wait {seconds}s before testing this model again.",
     "noModelsForProvider": "No models configured for this provider.",
-    "testModels": "Test models"
+    "testModels": "Test models",
+    "monthlyRequestCapLabel": "Monthly request cap",
+    "monthlyTokenCapLabel": "Monthly token cap",
+    "capUnlimitedPlaceholder": "Unlimited",
+    "capEditHint": "Caps reset on the 1st, 00:00 UTC. Leave blank for unlimited.",
+    "monthlyUsageLine": "{requests} requests, {tokens} tokens this month",
+    "quotaBalanceHint": "{remaining} of {limit} {metric} left",
+    "quotaBalanceLeft": "{remaining} left"
   },
   "backups": {
     "title": "Backups",
@@ -711,7 +724,8 @@
     "pathPlaceholder": "backups",
     "pathHint": "Relative to the database directory. Backups cannot be written outside it.",
     "save": "Save schedule",
-    "saved": "Saved"
+    "saved": "Saved",
+    "preUpdate": "Pre-update"
   },
   "status": {
     "healthy": "healthy",
@@ -753,7 +767,9 @@
       "generic": "Anything else that speaks the OpenAI API, set up by hand from a base URL and key.",
       "atomcode": "AtomGit's terminal agent, written in Rust, that takes any OpenAI-compatible endpoint.",
       "openclaw": "An always-on personal assistant that answers on WhatsApp, Telegram, Discord and more from your own machine.",
-      "hermes": "Nous Research's self-improving agent with persistent memory and skills, in the terminal or on chat apps."
+      "hermes": "Nous Research's self-improving agent with persistent memory and skills, in the terminal or on chat apps.",
+      "pi": "A minimal terminal harness you shape with your own extensions, skills and prompt templates.",
+      "reasonix": "A DeepSeek-native terminal coding agent, built around prefix caching so long sessions stay cheap."
     }
   },
   "analytics": {
@@ -1138,12 +1154,9 @@
   },
   "update": {
     "available": "New version available",
-    "whatsNew": "What's new in v{version}",
-    "publishedOn": "Published {date}",
-    "noNotes": "No release notes were published for this version.",
-    "openRelease": "Open release page",
-    "dismissVersion": "Dismiss this version",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "newBuild": "A newer version of FreeLLMAPI is installed.",
+    "reload": "Reload"
   },
   "freeTier": {
     "poolsToggle": "Free-tier pools ({count})",
@@ -1191,6 +1204,17 @@
     "startEmpty": "Start empty",
     "startEmptyHint": "Create the chain with no models in it, and keep new catalog models out of it. Unchecked, it starts as a copy of the default chain.",
     "curated": "Curated",
-    "curatedHint": "New catalog models are not added to this chain automatically."
+    "curatedHint": "New catalog models are not added to this chain automatically.",
+    "renameHint": "Rename this chain",
+    "renameConfirm": "Rename chain \"{oldName}\" to \"{name}\"? Clients calling auto:{oldName} must switch to auto:{name}.",
+    "renamePlaceholder": "New chain name",
+    "renameFailed": "Couldn't rename the chain."
+  },
+  "updates": {
+    "versionAvailable": "Version {version} is available",
+    "versionReady": "Version {version} is ready to install",
+    "releaseNotes": "Release notes",
+    "tryAgain": "Try again",
+    "offline": "Check your internet connection and try again."
   }
 }

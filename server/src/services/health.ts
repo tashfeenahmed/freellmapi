@@ -1,5 +1,6 @@
 import { getDb } from '../db/index.js';
 import { resolveProvider } from '../providers/index.js';
+import { BaseProvider } from '../providers/base.js';
 import { decrypt } from '../lib/crypto.js';
 import { decryptProxyUrl } from '../lib/key-proxy.js';
 import { withKeyProxy } from '../lib/proxy.js';
@@ -9,6 +10,7 @@ import { updateDegradationState } from './degradation.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { providerLog } from '../lib/server-logs.js';
+import { triggerBuiltinModelDiscovery } from './builtin-model-discovery.js';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const CONSECUTIVE_FAILURES_TO_DISABLE = 3;
@@ -80,6 +82,76 @@ function recordInvalidFailure(keyId: number, platform?: string): void {
   }
 }
 
+/**
+ * Provider-reported quota polling (#1403 phase 1). Providers with a key-info
+ * endpoint (see BaseProvider.fetchQuota) get polled right after a health pass
+ * confirms the key works, so the dashboard shows the provider's own balance
+ * instead of a regex guess over catalog text. Throttled per key: a poll is
+ * only worth taking when the last quota_api observation is older than
+ * QUOTA_POLL_INTERVAL_MS (or none exists). Fire-and-forget and failure-silent:
+ * a quota probe says nothing about key validity and must never bend a health
+ * verdict or the pass budget.
+ */
+export const QUOTA_POLL_INTERVAL_MS = 15 * 60 * 1000;
+
+function quotaPollDue(keyId: number, now = Date.now()): boolean {
+  const row = getDb().prepare(`
+    SELECT created_at AS seenAt FROM provider_quota_observations
+     WHERE key_id = ? AND source = 'quota_api'
+     ORDER BY created_at DESC LIMIT 1
+  `).get(keyId) as { seenAt: string | null } | undefined;
+  if (!row?.seenAt) return true;
+  const seen = Date.parse(row.seenAt.includes('T') ? row.seenAt : row.seenAt.replace(' ', 'T') + 'Z');
+  if (!Number.isFinite(seen)) return true;
+  return now - seen >= QUOTA_POLL_INTERVAL_MS;
+}
+
+export async function pollKeyQuota(
+  keyId: number,
+  // The api_keys row as stored (encrypted key columns + the proxy columns
+  // decryptProxyUrl reads). `any` mirrors how checkKeyHealth carries it.
+  row: any,
+  provider: BaseProvider,
+): Promise<boolean> {
+  try {
+    const apiKey = decrypt(row.encrypted_key, row.iv, row.auth_tag);
+    return await withKeyProxy(decryptProxyUrl(row), () => provider.fetchQuota(apiKey, {
+      platform: row.platform as Platform,
+      keyId,
+      quotaPoolKey: inferQuotaPoolKey(row.platform as Platform, null),
+      endpoint: 'quota_api',
+      origin: 'health',
+    }));
+  } catch {
+    // Inconclusive by construction: never throws into the health pass.
+    return false;
+  }
+}
+
+/** True when this provider actually has a quota endpoint to probe (#1403).
+ *  Uses the provider's own hasQuotaProbe getter: OpenAICompatProvider
+ *  overrides fetchQuota for every instance, spec or not, so a method-identity
+ *  check would claim quota support for specless platforms. */
+export function supportsQuotaPolling(provider: BaseProvider): boolean {
+  return provider.hasQuotaProbe;
+}
+
+/** Throttled, self-contained quota poll for one key — the entry point other
+ *  services (or a future scheduler) can use without duplicating the gate. */
+export async function maybePollKeyQuota(keyId: number): Promise<boolean> {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM api_keys WHERE id = ? AND enabled = 1').get(keyId) as any;
+    if (!row) return false;
+    const provider = resolveProvider(row.platform as Platform, row.base_url);
+    if (!provider || !supportsQuotaPolling(provider)) return false;
+    if (!quotaPollDue(keyId)) return false;
+    return await pollKeyQuota(keyId, row, provider);
+  } catch {
+    return false;
+  }
+}
+
 export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
   const db = getDb();
   const row = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId) as any;
@@ -117,6 +189,16 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
 
     if (isValid) {
       failureCount.delete(keyId);
+      // #1348: a healthy key on a built-in platform the catalog does not carry
+      // serves nothing until its models are discovered. Fire-and-forget; the
+      // trigger is a no-op for every other platform, and throttled.
+      triggerBuiltinModelDiscovery(db, row.platform, 'healthy');
+      // #1403: piggyback provider-reported quota polling on the healthy
+      // verdict — but only for providers with a quota endpoint, and at most
+      // once per QUOTA_POLL_INTERVAL_MS per key. Fire-and-forget, silent.
+      if (supportsQuotaPolling(provider) && quotaPollDue(keyId)) {
+        void pollKeyQuota(keyId, row, provider).catch(() => {});
+      }
     } else {
       providerLog(
         'warn',
