@@ -19,10 +19,11 @@ import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
+import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -615,6 +616,30 @@ async function callSpeechProvider(
       }
       if (j.audio_format !== fmt) throw new MediaError('Speechify returned a different audio format', 502);
       return { audio: Buffer.from(b64, 'base64'), contentType: fmt === 'ogg' ? 'audio/ogg' : contentTypeFor(fmt) };
+    }
+    case 'electronhub': {
+      // Only the container formats exercised by this adapter are supported.
+      // Gemini TTS may return WAV even for response_format=mp3. Detect the
+      // actual bytes instead of labelling WAV as MP3 or accepting a JSON error.
+      const format = p.format ?? 'mp3';
+      if (!['mp3', 'wav'].includes(format)) {
+        throw new MediaError('ElectronHub speech supports mp3 and wav output through this adapter', 400);
+      }
+      const defaultVoice = row.model_id === 'humain-tts' ? 'sara'
+        : row.model_id.startsWith('gemini-') ? 'Kore' : 'alloy';
+      const voice = !p.voice || p.voice === 'alloy' ? defaultVoice : p.voice;
+      const r = await mediaFetch(`${ELECTRONHUB_BASE_URL}/audio/speech`, 'electronhub', 'audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice, response_format: format }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      const wav = audio.length > 44 && audio.toString('ascii', 0, 4) === 'RIFF'
+        && audio.toString('ascii', 8, 12) === 'WAVE';
+      const mp3 = audio.length > 10 && (audio.toString('ascii', 0, 3) === 'ID3'
+        || (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0 && (audio[1] & 0x06) !== 0));
+      if (!wav && !mp3) throw new MediaError('ElectronHub returned no recognized speech audio', 502);
+      return { audio, contentType: wav ? 'audio/wav' : 'audio/mpeg' };
     }
     case 'custom': {
       if (!credential.baseUrl) throw new MediaError('custom audio provider is missing base_url', 500);
