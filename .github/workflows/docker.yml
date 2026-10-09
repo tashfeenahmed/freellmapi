@@ -35,6 +35,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          # Shared runner IPs can exhaust Docker Hub's anonymous pull quota.
+          # Use Google's public cache for base images and the Dockerfile frontend;
+          # BuildKit retains Docker Hub as the fallback on cache misses.
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
 
       - name: Platform slug
         run: |
