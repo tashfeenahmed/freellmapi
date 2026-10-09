@@ -46,6 +46,8 @@ const PLATFORMS = [
   'speka',
   'typhoon',
   'plugsky',
+  'inferbase',
+  'simplellm',
   'llmtr',
   'gizmo',
   'blockrun',

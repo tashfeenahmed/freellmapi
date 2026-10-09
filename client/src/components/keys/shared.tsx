@@ -31,6 +31,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
   { value: 'typhoon', label: 'Typhoon (free research API)', url: 'https://playground.opentyphoon.ai' },
   { value: 'plugsky', label: 'Plugsky (free chat aliases)', url: 'https://plugsky.com/dashboard' },
+  { value: 'inferbase', label: 'Inferbase (shared monthly and daily allowance)', url: 'https://inferbase.ai' },
+  { value: 'simplellm', label: 'SimpleLLM (shared hourly and daily free quota)', url: 'https://app.simplellm.eu' },
   { value: 'llmtr', label: 'LLMTR (daily free-model quotas)', url: 'https://llmtr.com' },
   { value: 'gizmo', label: 'Gizmo (monthly free-model requests)', url: 'https://gizmoplatforms.com/developers' },
   { value: 'blockrun', label: 'BlockRun (zero-priced models)', url: 'https://user.blockrun.ai/dashboard/keys' },

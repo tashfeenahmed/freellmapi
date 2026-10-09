@@ -242,6 +242,9 @@ export const GITHUB_MAX_OUTPUT_TOKENS = 400;
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  // Inferbase Free managed inference rejects output budgets above 1,024.
+  // Match the documented upstream ceiling, not a new application quota.
+  inferbase: { defaultMaxTokens: 1024, maxTokensCap: 1024 },
   // Gizmo rejects all unlisted fields; reflect its text-only API in discovery
   // as well as the adapter. This is the upstream ceiling, not a new quota.
   gizmo: { drop: [...EXTENDED_SAMPLING_KEYS], defaultMaxTokens: 1024, maxTokensCap: 32768 },

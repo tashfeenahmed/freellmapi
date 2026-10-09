@@ -18,6 +18,7 @@ import { bearerAuthHeader } from '../lib/credential.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
 import type { Db } from '../db/types.js';
 import { SPEKA_BASE_URL } from '../providers/speka.js';
+import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -115,6 +116,7 @@ export const EMBEDDING_PLATFORMS = new Set([
   'cohere',
   'sealion',
   'speka',
+  'electronhub',
 ]);
 
 interface ProviderCallResult {
@@ -130,6 +132,7 @@ async function openAiStyleEmbed(
   inputs: string[],
   extra: Record<string, unknown> = {},
   dimensions?: number,
+  expectedDimensions?: number,
 ): Promise<ProviderCallResult> {
   const body: Record<string, unknown> = { model: modelId, input: inputs, ...extra };
   // Some providers (NVIDIA NeMo NIM, Google Gemini Embedding, OpenAI v3) support
@@ -151,10 +154,21 @@ async function openAiStyleEmbed(
     throw await upstreamEmbeddingsError(r);
   }
   const j = (await r.json()) as {
+    model?: string;
     data?: { index?: number; embedding: number[] }[];
     usage?: { prompt_tokens?: number; total_tokens?: number };
   };
   const data = [...(j.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  if (platform === 'electronhub' && (
+    j.model !== modelId || data.length !== inputs.length ||
+    data.some((d, i) => d.index !== i || !Array.isArray(d.embedding) ||
+      d.embedding.length !== (dimensions ?? expectedDimensions) ||
+      d.embedding.some(value => typeof value !== 'number' || !Number.isFinite(value)))
+  )) {
+    // A successful HTTP response is not enough: wrong model/dimension or
+    // malformed vectors would corrupt the caller's embedding family.
+    throw new EmbeddingsError('ElectronHub returned mismatched or malformed embeddings', 502);
+  }
   return {
     vectors: data.map(d => d.embedding),
     inputTokens: j.usage?.prompt_tokens ?? j.usage?.total_tokens ?? null,
@@ -267,6 +281,8 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed('https://api.sea-lion.ai/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'speka':
       return openAiStyleEmbed(`${SPEKA_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions);
+    case 'electronhub':
+      return openAiStyleEmbed(`${ELECTRONHUB_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
     case 'cloudflare': {
       // Key is stored as "account_id:token".
       const sep = key.indexOf(':');

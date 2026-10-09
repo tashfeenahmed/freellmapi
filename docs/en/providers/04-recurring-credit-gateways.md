@@ -44,3 +44,34 @@ Sources: [ElectronHub credits](https://docs.electronhub.ai/billing/credits),
 [Experiential pricing](https://www.experientiallabs.ai/pricing),
 [billing](https://platform.experientiallabs.ai/docs/billing),
 [API reference](https://platform.experientiallabs.ai/docs/reference).
+
+## Inferbase and SimpleLLM
+
+Added October 9, 2026. These adapters also receive model rows only through the
+signed catalog; adding a key does not discover or seed the wider paid roster.
+
+| Provider | API base | Read-only key validation | Shared free allowance |
+| --- | --- | --- | --- |
+| `inferbase` | `https://api.inferbase.ai/v1` | `GET https://api.inferbase.ai/api/v1/inference/credits` | 5,000 requests/month, also capped at 100 managed requests and $0.50 model usage/day; no card |
+| `simplellm` | `https://api.simplellm.eu/v1` | `GET /v1/rate-limit` | Free-model hourly/daily requests and tokens, reported by the account API; not a monthly dollar grant |
+
+Import `INFERBASE_API_KEY` or `SIMPLELLM_API_KEY`, or select the corresponding
+provider on the Keys page. A zero purchased balance is valid. Authentication
+failures are distinguished from temporary quota/server failures. Exact model
+identity is checked; SimpleLLM's two tested free aliases may report their known
+underlying names. Neither adapter enables billing, purchases credits or falls
+back to a paid model automatically. Provider-side spending controls still apply.
+
+Inferbase Free managed inference allows 8,192 input and 1,024 output tokens.
+The adapter respects that upstream output ceiling; it does not impose a new
+FreeLLMAPI request quota. SimpleLLM normalizes scalar stop strings to arrays.
+
+ElectronHub embeddings use `/v1/embeddings` with float encoding and share the
+same weekly wallet as chat. Returned model ID, dimensions, finite vector values
+and batch indices are checked before accepting the vectors. No embedding model
+rows are bundled into migrations.
+
+Sources: [Inferbase pricing](https://inferbase.ai/pricing),
+[SimpleLLM API](https://simplellm.eu/docs/),
+[SimpleLLM limits](https://simplellm.eu/docs/reference/getRateLimit.html),
+[ElectronHub embeddings](https://docs.electronhub.ai/api-reference/embeddings).
