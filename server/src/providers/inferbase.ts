@@ -48,8 +48,18 @@ export class InferbaseProvider extends OpenAICompatProvider {
     for await (const chunk of super.streamChatCompletion(apiKey, messages, modelId, options, quotaContext)) {
       // Inference failures may arrive as HTTP 200 SSE error events, including
       // after a valid role chunk. Never forward these as successful completions.
-      if ('error' in chunk || !Array.isArray(chunk.choices)) {
+      if ('error' in chunk) {
         throw Object.assign(new Error('Inferbase returned an upstream stream error or malformed event'), { status: 502 });
+      }
+      // Inferbase interleaves routing and billing receipts with OpenAI chunks.
+      // Validate their attribution but keep these provider-only frames out of
+      // the client stream. The standard usage-only chunk is preserved below.
+      if (['routing', 'usage'].includes(chunk.object)) {
+        checkModel(modelId, chunk.model);
+        continue;
+      }
+      if (!Array.isArray(chunk.choices)) {
+        throw Object.assign(new Error('Inferbase returned a malformed stream event'), { status: 502 });
       }
       if (chunk.model || chunk.choices?.length) {
         checkModel(modelId, chunk.model);

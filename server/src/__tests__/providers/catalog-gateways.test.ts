@@ -104,9 +104,25 @@ describe.each(configs)('$platform catalog-only adapter', config => {
   });
 });
 
-describe('Inferbase documented free output ceiling', () => {
+describe('Inferbase wire-format guards and documented free output ceiling', () => {
   beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); });
   afterEach(() => { vi.restoreAllMocks(); getDb().close(); });
+  it('filters provider routing/usage receipts while retaining standard completion and usage chunks', async () => {
+    const model = 'deepseek-v4-flash';
+    const body = `data: ${JSON.stringify({ object: 'routing', model })}\n\n` +
+      (await stream(model).text()).replace('data: [DONE]', `data: ${JSON.stringify({ object: 'usage', model, cost_micros: 0 })}\n\ndata: [DONE]`);
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(body));
+    const chunks = [];
+    for await (const chunk of new InferbaseProvider().streamChatCompletion('test-key', [], model)) chunks.push(chunk);
+    expect(chunks).toHaveLength(3);
+    expect(chunks.every(c => Array.isArray(c.choices))).toBe(true);
+    expect(chunks.at(-1)?.usage?.total_tokens).toBe(4);
+  });
+  it.each(['routing', 'usage'])('does not silently accept a substituted identity in a %s receipt', async object => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(`data: ${JSON.stringify({ object, model: 'another-model' })}\n\ndata: [DONE]\n\n`));
+    const collect = async () => { for await (const _ of new InferbaseProvider().streamChatCompletion('test-key', [], 'deepseek-v4-flash')) { /* drain */ } };
+    await expect(collect()).rejects.toMatchObject({ status: 502 });
+  });
   it.each([{ object: 'error', error: { message: 'Upstream unavailable' } }, { object: 'chat.completion.chunk' }])('rejects malformed and in-band error events after a valid chunk', async event => {
     const first = { id: 's', object: 'chat.completion.chunk', model: 'deepseek-v4-flash', choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
     vi.spyOn(global, 'fetch').mockResolvedValue(new Response([first, event].map(c => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n'));
