@@ -407,6 +407,7 @@ export const platformColors: Record<string, string> = {
   speka:       '#0d9488',
   typhoon:     '#e11d48',
   plugsky:     '#0284c7',
+  dahl:        '#b45309',
   llmtr:       '#0f766e',
   gizmo:       '#7c3aed',
   blockrun:    '#2563eb',

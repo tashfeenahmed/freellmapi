@@ -76,6 +76,9 @@ export type Platform =
   | 'typhoon'
   // Permanent free chat aliases, shared fair-use quota; signed catalog only.
   | 'plugsky'
+  // Gonka network chat; one-time 100M-token welcome grant in the account
+  // pool, allocated to keys by the user. Signed catalog only.
+  | 'dahl'
   // Selected zero-priced routes have daily/rolling quotas without a top-up;
   // signed catalog only. The public roster also includes paid/promotional IDs.
   | 'llmtr'
