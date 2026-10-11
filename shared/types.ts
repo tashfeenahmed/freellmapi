@@ -123,6 +123,9 @@ export type Platform =
   | 'openrouter'
   | 'github'
   | 'cohere'
+  // Tavily — search API (tavily.com), not a chat provider. Its key serves the
+  // /v1/search aggregation route (issue #1174); chat calls are rejected.
+  | 'tavily'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'

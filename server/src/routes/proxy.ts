@@ -7,6 +7,7 @@ import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, reso
 import { secondsUntilNextMonth } from '../services/key-budget.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { runRerank, RerankError, rerankRetryAfterSec } from '../services/rerank.js';
+import { runSearch, SearchError, searchRetryAfterSec } from '../services/search.js';
 import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
@@ -735,6 +736,46 @@ proxyRouter.post('/rerank', async (req: Request, res: Response) => {
     }
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
     res.status(status).json({ error: { message: `rerank error: ${err?.message ?? 'unknown'}`, type } });
+  }
+});
+
+// Search over the key pool (#1174), following the rerank slice (#1029): a
+// Tavily key or a custom endpoint exposing POST {base_url}/search (Tavily's
+// wire shape) is a provider; the first success wins, custom endpoints first.
+const SearchBody = z.object({
+  query: z.string().min(1),
+  max_results: z.number().int().positive().optional(),
+  topic: z.enum(['general', 'news']).optional(),
+  include_answer: z.boolean().optional(),
+});
+
+proxyRouter.post('/search', async (req: Request, res: Response) => {
+  if (!requireInferenceAuth(req, res)) return;
+  const parsed = SearchBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid request: `query` is required', type: 'invalid_request_error' } });
+    return;
+  }
+  try {
+    const result = await runSearch(parsed.data.query, {
+      maxResults: parsed.data.max_results,
+      topic: parsed.data.topic,
+      includeAnswer: parsed.data.include_answer,
+    });
+    res.json({
+      query: result.query,
+      ...(result.answer !== undefined ? { answer: result.answer } : {}),
+      results: result.results,
+      provider: result.provider,
+    });
+  } catch (err: any) {
+    const status = err instanceof SearchError ? err.status : 502;
+    if (err instanceof SearchError) {
+      const retryAfter = searchRetryAfterSec(err);
+      if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
+    }
+    const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
+    res.status(status).json({ error: { message: `search error: ${err?.message ?? 'unknown'}`, type } });
   }
 });
 

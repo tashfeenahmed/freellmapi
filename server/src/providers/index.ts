@@ -3,6 +3,7 @@ import type { BaseProvider } from './base.js';
 import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
+import { TavilyProvider } from './tavily.js';
 import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
 import { ModelScopeProvider } from './modelscope.js';
@@ -198,6 +199,9 @@ register(new OpenAICompatProvider({
 
 // Cohere - OpenAI-compatible via Cohere compatibility endpoint
 register(new CohereProvider());
+// Tavily serves the /v1/search route (issue #1174), not chat; the stub provider
+// exists so its key can be registered and health-checked like every platform.
+register(new TavilyProvider());
 
 // Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
 register(new CloudflareProvider());
