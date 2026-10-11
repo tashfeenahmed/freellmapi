@@ -275,6 +275,70 @@ describe('Router', () => {
   });
 });
 
+describe('Router explicit pin vs upstream retirement (#1394)', () => {
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  beforeEach(() => {
+    const db = getDb();
+    setRoutingStrategy('priority');
+    db.prepare('DELETE FROM api_keys').run();
+    db.prepare("DELETE FROM settings WHERE key = 'active_profile_id'").run();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('does not inject a pinned model carrying an upstream_eol tombstone into the chain', () => {
+    const db = getDb();
+    const { encrypted, iv, authTag } = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'test', encrypted, iv, authTag, 'healthy', 1);
+
+    // Retire a groq model upstream: chain off + tombstone, row stays enabled=1
+    // (the documented retirement contract).
+    const target = db.prepare(
+      "SELECT id, model_id FROM models WHERE platform = 'groq' AND enabled = 1 ORDER BY intelligence_rank ASC LIMIT 1",
+    ).get() as { id: number; model_id: string };
+    db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(target.id);
+    db.prepare(`
+      INSERT INTO catalog_model_tombstones (kind, platform, model_id, source, reason, created_at)
+      VALUES ('chat', 'groq', ?, 'upstream_eol', 'HTTP 410 end of life', datetime('now'))
+    `).run(target.model_id);
+
+    // The pin must not re-add it: the request routes to some OTHER groq model,
+    // never to the retired one.
+    const result = routeRequest(1000, undefined, target.id);
+    expect(result.modelDbId).not.toBe(target.id);
+  });
+
+  it('still pins a model whose tombstone is from the user, not upstream', () => {
+    const db = getDb();
+    const { encrypted, iv, authTag } = encrypt('test-groq-key');
+    db.prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('groq', 'test', encrypted, iv, authTag, 'healthy', 1);
+
+    const target = db.prepare(
+      "SELECT id, model_id FROM models WHERE platform = 'groq' AND enabled = 1 ORDER BY intelligence_rank DESC LIMIT 1",
+    ).get() as { id: number; model_id: string };
+    db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(target.id);
+    db.prepare(`
+      INSERT INTO catalog_model_tombstones (kind, platform, model_id, source, reason, created_at)
+      VALUES ('chat', 'groq', ?, 'user', 'removed in dashboard', datetime('now'))
+    `).run(target.model_id);
+
+    const result = routeRequest(1000, undefined, target.id);
+    expect(result.modelDbId).toBe(target.id);
+  });
+});
+
 describe('Router exhaustion diagnostics (issue _1)', () => {
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
