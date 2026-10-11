@@ -56,6 +56,7 @@ export function computeIdempotencyFingerprint(input: {
   max_tokens?: number | null;
   tools?: unknown;
   tool_choice?: unknown;
+  generationOptions?: Record<string, unknown>;
 }): string {
   const stable = JSON.stringify({
     model: input.model ?? null,
@@ -65,6 +66,7 @@ export function computeIdempotencyFingerprint(input: {
     max_tokens: input.max_tokens ?? null,
     tools: input.tools ?? null,
     tool_choice: input.tool_choice ?? null,
+    generationOptions: input.generationOptions,
   });
   return crypto.createHash('sha256').update(stable).digest('hex');
 }

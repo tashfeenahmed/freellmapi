@@ -126,6 +126,26 @@ describe('Response cache (proxy integration)', () => {
       ...extra,
     }, { ...authHeaders(), ...headers });
 
+  it.each([
+    { response_format: { type: 'json_object' } },
+    { seed: 42 },
+    { stop: 'END' },
+    { parallel_tool_calls: false },
+  ])('rejects idempotent retries with changed generation options: %j', async (extra) => {
+    getDb().prepare('DELETE FROM idempotency_claims').run();
+    const counter = mockGroq('plain text');
+    const headers = { 'Idempotency-Key': 'generation-options', 'X-FreeLLM-Cache': 'off' };
+    const first = await chat({}, headers);
+    expect(first.status).toBe(200);
+    const replay = await chat({}, headers);
+    expect(replay.status).toBe(200);
+    expect(replay.headers.get('x-routed-via')).toBe('idempotency');
+    const second = await chat(extra, headers);
+    expect(second.status).toBe(409);
+    expect(second.body.error.message).toBe('idempotency_key_conflict');
+    expect(counter.calls).toBe(1);
+  });
+
   it('serves an identical second request from cache without calling the provider', async () => {
     const counter = mockGroq('the answer is four');
 
