@@ -32,6 +32,7 @@ import { applyModelWeightOverride, getModelWeightOverrides } from './model-weigh
 import { modelsWithOverriddenField } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
 import { platformDropsResponseFormat } from '../lib/sampling-params.js';
+import { passesContextWindowFloor } from '../lib/min-context-window.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from './model-groups.js';
 import { getActiveProfileId } from './profile-models.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
@@ -1807,8 +1808,11 @@ const TRIM_GUARDED_PLATFORMS = new Set(['github']);
 
 /** True when `estimatedTokens` fits the RAW advertised window (null window =
  * unknown, never filtered — same convention as the auto-router). This is the
- * comparison /v1/models publishes and the soft-preference fallback tier. */
+ * comparison /v1/models publishes and the soft-preference fallback tier.
+ * The operator's min-context-window floor applies here too: the fallback tier
+ * must not reintroduce a model the floor excluded from the main chain. */
 export function fitsContextWindowStrict(contextWindow: number | null | undefined, estimatedTokens: number): boolean {
+  if (!passesContextWindowFloor(contextWindow)) return false;
   return contextWindow == null || estimatedTokens <= contextWindow;
 }
 
@@ -1816,8 +1820,12 @@ export function fitsContextWindowStrict(contextWindow: number | null | undefined
  * margin. The chars/4 heuristic portion is scaled by the factor; an explicit
  * output reserve derived from the client's max_tokens (`routingReserveTokens`)
  * is already an exact count and is added UNSCALED (#956 review). Trim-guarded
- * platforms compare strictly — their guard guarantees the fit. */
+ * platforms compare strictly — their guard guarantees the fit. Also enforces
+ * the operator's min-context-window floor (lib/min-context-window.ts): a model
+ * below the configured preset is excluded from every chain, while an unknown
+ * window (null) always passes. */
 export function fitsContextWindow(platform: string, contextWindow: number | null | undefined, estimatedTokens: number, exactOutputReserve = 0): boolean {
+  if (!passesContextWindowFloor(contextWindow)) return false;
   if (contextWindow == null) return true;
   // Raw advertised comparison first — the margin can only shrink eligibility.
   if (estimatedTokens > contextWindow) return false;

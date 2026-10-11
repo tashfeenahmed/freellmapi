@@ -10,6 +10,7 @@ import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, 
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
 import { getGeminiModelMap, setGeminiModelMap } from '../services/gemini-map.js';
 import { getOllamaEmulationMode } from './ollama.js';
+import { MIN_CONTEXT_WINDOW_SETTING, MIN_CONTEXT_WINDOW_PRESETS } from '../lib/min-context-window.js';
 import { UPDATE_CHECK_SETTING, isAutoUpdateCheckEnabled } from './update.js';
 import { listUrlTokens, mintUrlToken, revokeUrlToken } from '../services/url-tokens.js';
 import {
@@ -288,6 +289,38 @@ settingsRouter.put('/output-limit', (req: Request, res: Response) => {
   }
   setSetting(UNIFIED_MAX_TOKENS_SETTING, String(parsed.data.mode));
   res.json(outputLimitState());
+});
+
+// Get the min-context-window pool floor ('off' = disabled, or a preset key
+// like '128k'). See lib/min-context-window.ts minContextWindowFloor().
+settingsRouter.get('/min-context-window', (_req: Request, res: Response) => {
+  let value = 'off';
+  try {
+    value = getSetting(MIN_CONTEXT_WINDOW_SETTING) || 'off';
+  } catch {
+    // DB not ready — report the disabled default rather than failing.
+  }
+  res.json({ value, presets: MIN_CONTEXT_WINDOW_PRESETS });
+});
+
+const minContextWindowPutSchema = z.object({
+  value: z.union([
+    z.literal('off'),
+    z.string().regex(/^(32k|128k|512k|1m)$/i),
+  ]),
+});
+
+// Update the min-context-window pool floor. Upward-compatible by construction:
+// '128k' keeps every model at or above 128k (including 512k and 1M). Takes
+// effect on the next routed request — no restart.
+settingsRouter.put('/min-context-window', (req: Request, res: Response) => {
+  const parsed = minContextWindowPutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: "Invalid min context window: value must be 'off', '32k', '128k', '512k', or '1m'", type: 'invalid_request_error' } });
+    return;
+  }
+  setSetting(MIN_CONTEXT_WINDOW_SETTING, parsed.data.value.toLowerCase());
+  res.json({ value: parsed.data.value.toLowerCase(), presets: MIN_CONTEXT_WINDOW_PRESETS });
 });
 
 // Get the request guardrails (per-request token budget + failover circuit
