@@ -4,6 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tools } from './tools.js';
 import type { GenerateContext } from './types.js';
 
+// Pinning ctx.detectedClient is not enough: tools.ts falls back to a live
+// detectChatGptClient() when it is undefined, so a runner with `codex` on
+// PATH (or ChatGPT.app installed) would still shift the golden notes. Mock
+// the module outright — undefined keeps the snapshots host-independent.
+vi.mock('./detect.js', () => ({
+  detectChatGptClient: () => undefined,
+  clientNotes: () => [
+    'No ChatGPT (Codex) client detected on this machine.',
+    'Install the CLI with: npm install -g @openai/codex',
+  ],
+}));
+
 // CI runners export XDG_CONFIG_HOME (and could export MIMOCODE_HOME / DSH_HOME),
 // which the XDG-aware generators honour over ctx.homeDir. Pin them so golden
 // output is stable everywhere.
@@ -22,11 +34,15 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+// Golden snapshots must not depend on the host: pin the client detection the
+// same way the XDG env vars above are pinned (a machine with `codex` on PATH
+// or ChatGPT.app installed would otherwise produce different notes than CI).
 const context: GenerateContext = {
   url: 'http://localhost:3000',
   apiKey: 'freellmapi-test-key',
   profile: 'default',
   homeDir: '/home/tester',
+  detectedClient: undefined,
   models: [
     {
       id: 'fast-coder',

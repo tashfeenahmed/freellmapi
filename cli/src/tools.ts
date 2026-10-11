@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { clientNotes, detectChatGptClient } from './detect.js';
 import type {
   CatalogModel,
   GenerateContext,
@@ -125,6 +126,7 @@ function codex(ctx: GenerateContext): Generation {
       content: content.join('\n'),
     }],
     notes: [
+      ...clientNotes(ctx.detectedClient ?? detectChatGptClient()),
       'Export FREELLMAPI_API_KEY before running codex; the key is not written to config.toml.',
       ...(ctx.profile === 'default'
         ? []
@@ -1036,7 +1038,7 @@ function generic(ctx: GenerateContext): Generation {
 
 const metadata = [
   ['claude', 'Claude Code', 'code', 'file', 'Anthropic Messages', 'root', 'setup-claude', 'https://docs.anthropic.com/en/docs/claude-code', claude],
-  ['codex', 'Codex CLI', 'code', 'file', 'OpenAI Responses', '/v1', 'setup-codex', 'https://developers.openai.com/codex', codex],
+  ['codex', 'ChatGPT (Codex CLI)', 'code', 'file', 'OpenAI Responses', '/v1', 'setup-codex', 'https://developers.openai.com/codex', codex],
   ['cline', 'Cline', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-cline', 'https://docs.cline.bot', cline],
   ['continue', 'Continue', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-continue', 'https://docs.continue.dev', continueDev],
   ['aider', 'Aider', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-aider', 'https://aider.chat/docs', aider],

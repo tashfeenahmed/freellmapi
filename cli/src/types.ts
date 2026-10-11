@@ -1,3 +1,5 @@
+import type { DetectedClient } from './detect.js';
+
 export interface CatalogModel {
   id: string;
   name?: string;
@@ -25,6 +27,11 @@ export interface GenerateContext {
   /** An explicit `--model`. Overrides each generator's default-model
    *  heuristic; validated against the unfiltered catalog by the caller. */
   requestedModelId?: string;
+  /** Result of `detectChatGptClient()`. Injected by the CLI entry point;
+   *  when the property is absent generators probe the real machine, which
+   *  golden-output tests must avoid (the snapshot must not depend on the
+   *  host's installed clients). */
+  detectedClient?: DetectedClient;
 }
 
 export interface Generation {

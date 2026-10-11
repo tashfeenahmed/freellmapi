@@ -1,6 +1,6 @@
 [
   {"id":"claude","name":"Claude Code","category":"code","configType":"file","protocol":"Anthropic Messages","baseUrlSupport":"root","command":"setup-claude","docsUrl":"https://docs.anthropic.com/en/docs/claude-code"},
-  {"id":"codex","name":"Codex CLI","category":"code","configType":"file","protocol":"OpenAI Responses","baseUrlSupport":"/v1","command":"setup-codex","docsUrl":"https://developers.openai.com/codex"},
+  {"id":"codex","name":"ChatGPT (Codex CLI)","category":"code","configType":"file","protocol":"OpenAI Responses","baseUrlSupport":"/v1","command":"setup-codex","docsUrl":"https://developers.openai.com/codex"},
   {"id":"cline","name":"Cline","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-cline","docsUrl":"https://docs.cline.bot"},
   {"id":"continue","name":"Continue","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-continue","docsUrl":"https://docs.continue.dev"},
   {"id":"aider","name":"Aider","category":"code","configType":"file","protocol":"OpenAI Chat","baseUrlSupport":"/v1","command":"setup-aider","docsUrl":"https://aider.chat/docs"},
