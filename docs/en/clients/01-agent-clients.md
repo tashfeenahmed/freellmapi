@@ -293,6 +293,14 @@ unified key in a URL, screenshot, or issue report. See QwenPaw's
 [official model configuration guide](https://qwenpaw.agentscope.io/docs/models)
 for the current Console field names.
 
+### Optional web search in OpenCode
+
+The [Parallel Search MCP example](../../../examples/opencode/README.md) adds
+free web search and page fetching to OpenCode alongside your FreeLLMAPI
+inference configuration. Load it explicitly with `OPENCODE_CONFIG`; it leaves
+your selected model and other MCP servers unchanged. No Parallel account or
+API key is needed.
+
 ## Native Gemini clients
 
 Gemini CLI and Gemini-lineage clients can speak Google's wire format directly:
