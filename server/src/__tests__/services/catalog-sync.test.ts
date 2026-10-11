@@ -2,7 +2,12 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { initDb, getDb, setSetting, getSetting } from '../../db/index.js';
 import { applyCatalog, reapplyCachedCatalog, MIN_CATALOG_VERSION } from '../../services/catalog-sync.js';
 import { runMigrationsSync } from '../../db/migrate/runner.js';
-import { recordCatalogModelTombstone, upsertModelOverrides } from '../../services/model-state.js';
+import {
+  getCatalogModelTombstone,
+  recordCatalogModelTombstone,
+  retireCatalogModelUpstream,
+  upsertModelOverrides,
+} from '../../services/model-state.js';
 
 // applyCatalog is the write path between the published catalog and the live
 // router DB. These tests lock its contract: catalog metadata always wins, the
@@ -378,6 +383,42 @@ describe('reapplyCachedCatalog', () => {
     expect(
       getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(victim.platform, victim.modelId),
     ).toBeUndefined();
+  });
+
+  it('keeps an upstream retirement across a cached re-apply, and lifts it only for a newer catalog', () => {
+    // The re-apply replays the snapshot the retirement already post-dates, so
+    // it must not read that snapshot as a newer opinion — otherwise every 410
+    // (#634) is undone by the next restart. A genuinely newer catalog still
+    // wins, which is what the lift exists for.
+    const models = existingAsCatalogModels();
+    models.push(baseModel({ modelId: 'replay-retired', displayName: 'Replay Retired' }));
+    const catalog = catalogOf(models);
+    applyCatalog(getDb(), catalog);
+    cacheCatalog(catalog);
+
+    const row = getDb()
+      .prepare("SELECT id FROM models WHERE platform = 'groq' AND model_id = 'replay-retired'")
+      .get() as { id: number };
+    expect(retireCatalogModelUpstream(getDb(), row.id, 'groq', 'replay-retired', 'HTTP 410 gone')).toBe(true);
+    const chainOff = () =>
+      (getDb().prepare('SELECT enabled FROM fallback_config WHERE model_db_id = ?').get(row.id) as { enabled: number }).enabled;
+    expect(chainOff()).toBe(0);
+
+    expect(reapplyCachedCatalog().reapplied).toBe(true);
+    expect(getCatalogModelTombstone(getDb(), 'chat', 'groq', 'replay-retired')?.source).toBe('upstream_eol');
+    expect(chainOff()).toBe(0);
+    // Retirement disables the chain entries, never the row: the dashboard keeps
+    // showing it as retired upstream rather than losing it.
+    expect(
+      (getDb().prepare('SELECT enabled FROM models WHERE id = ?').get(row.id) as { enabled: number }).enabled,
+    ).toBe(1);
+
+    // Same model, still listed enabled, but a catalog the install has not seen.
+    const newer = catalogOf(existingAsCatalogModels());
+    newer.version = '2099.02.02';
+    applyCatalog(getDb(), newer);
+    expect(getCatalogModelTombstone(getDb(), 'chat', 'groq', 'replay-retired')).toBeUndefined();
+    expect(chainOff()).toBe(1);
   });
 
   it('clears the applied version when an older install has no cached document', () => {
