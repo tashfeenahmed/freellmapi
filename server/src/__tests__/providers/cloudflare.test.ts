@@ -48,6 +48,72 @@ describe('CloudflareProvider', () => {
     expect(result.choices[0].message.content).toBe('Hello from CF!');
   });
 
+
+  it('preserves multimodal user image_url blocks', async () => {
+    let capturedBody: any = null;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{
+            index: 0,
+            message: { role: 'assistant', content: 'Image received' },
+            finish_reason: 'stop',
+          }],
+        }),
+      } as any;
+    });
+
+    const content = [
+      { type: 'text', text: 'Describe this image' },
+      {
+        type: 'image_url',
+        image_url: { url: 'data:image/png;base64,AA==' },
+      },
+    ];
+
+    await provider.chatCompletion(
+      'test-account:test-token',
+      [{ role: 'user', content } as any],
+      '@cf/qwen/qwen3.8-27b',
+    );
+
+    expect(capturedBody.messages[0].content).toEqual(content);
+  });
+
+  it('preserves image_url in streaming requests', async () => {
+    let capturedBody: any = null;
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      capturedBody = JSON.parse((init as any).body);
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Mock stop',
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Mock stop' } }),
+      } as any;
+    });
+
+    const content = [
+      { type: 'text', text: 'Describe this image' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } },
+    ];
+
+    await expect(
+      provider.streamChatCompletion(
+        'test-account:test-token',
+        [{ role: 'user', content } as any],
+        '@cf/qwen/qwen3.8-27b',
+      ).next()
+    ).rejects.toThrow();
+
+    expect(capturedBody.stream).toBe(true);
+    expect(capturedBody.messages[0].content).toEqual(content);
+  });
+
   it('should throw if key format is wrong', async () => {
     await expect(
       provider.chatCompletion('no-colon-here', [{ role: 'user', content: 'Hi' }], 'model')
