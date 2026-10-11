@@ -50,6 +50,12 @@ function writeCodexConfig(home: string, toml: string): void {
 }
 
 describe('managed settings locations', () => {
+  // The reported paths are built with the TARGET platform's separator, but the
+  // test's own `path.join` uses the HOST's — on Windows the two disagree, so
+  // compare separator-normalized forms (#1392).
+  function asPosix(p: string): string {
+    return p.replaceAll('\\', '/');
+  }
   it('uses the documented system directory for each platform', () => {
     expect(managedSettingsDir('darwin')).toBe('/Library/Application Support/ClaudeCode');
     expect(managedSettingsDir('linux')).toBe('/etc/claude-code');
@@ -60,7 +66,7 @@ describe('managed settings locations', () => {
     // The usual case: an unreadable or absent managed-settings.d contributes
     // nothing rather than failing the whole report.
     const dir = tempHome();
-    expect(managedSettingsPaths('linux', dir)).toEqual([path.join(dir, 'managed-settings.json')]);
+    expect(managedSettingsPaths('linux', dir).map(asPosix)).toEqual([path.join(dir, 'managed-settings.json')]);
   });
 
   it('ranks managed-settings.d drop-ins above the base file, last one first', () => {
@@ -75,7 +81,7 @@ describe('managed settings locations', () => {
       fs.writeFileSync(path.join(dir, 'managed-settings.d', name), '{}');
     }
 
-    expect(managedSettingsPaths('linux', dir)).toEqual([
+    expect(managedSettingsPaths('linux', dir).map(asPosix)).toEqual([
       path.join(dir, 'managed-settings.d', '20-b.json'),
       path.join(dir, 'managed-settings.d', '10-a.json'),
       path.join(dir, 'managed-settings.json'),

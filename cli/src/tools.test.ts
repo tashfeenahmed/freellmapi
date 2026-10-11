@@ -43,6 +43,30 @@ const context: GenerateContext = {
   ],
 };
 
+// Generated file paths come from the host's path.join, so on Windows the
+// separator is '\\' while the golden strings here are POSIX (#1392). Normalize
+// before comparing.
+function asPosix(p: string): string {
+  return process.platform === 'win32' ? p.replaceAll('\\', '/') : p;
+}
+
+// Snapshots embed the generated file paths verbatim; normalize them so the
+// golden files stay POSIX on every host (#1392).
+interface GeneratedFile {
+  path: string;
+  [key: string]: unknown;
+}
+function normalizeGenerationPaths<T extends { files: GeneratedFile[]; notes?: string[] }>(generation: T): T {
+  return {
+    ...generation,
+    files: generation.files.map(f => ({ ...f, path: asPosix(f.path) })),
+    // Generators also interpolate host-joined paths into their note text — Roo's
+    // `autoImportSettingsPath` instructions quote the import file by full path —
+    // so the notes are golden input as well (#1392).
+    ...(generation.notes ? { notes: generation.notes.map(asPosix) } : {}),
+  };
+}
+
 describe('tool generators', () => {
   it('defaults to auto, never fusion, when the live catalog lists virtual models first', () => {
     const liveContext: GenerateContext = {
@@ -63,7 +87,7 @@ describe('tool generators', () => {
 
   for (const tool of tools) {
     it(`${tool.command} has stable golden output`, () => {
-      expect(tool.generate(context)).toMatchSnapshot();
+      expect(normalizeGenerationPaths(tool.generate(context))).toMatchSnapshot();
     });
   }
 
@@ -88,7 +112,7 @@ describe('tool generators', () => {
   it('setup-codex with a named profile has stable golden output', () => {
     const generation = tools.find(tool => tool.id === 'codex')!
       .generate({ ...context, profile: 'work' });
-    expect(generation).toMatchSnapshot();
+    expect(normalizeGenerationPaths(generation)).toMatchSnapshot();
   });
 
   it('writes named Codex profiles as [profiles.NAME] inside config.toml', () => {
@@ -97,7 +121,7 @@ describe('tool generators', () => {
     expect(generation.files).toHaveLength(1);
     const file = generation.files[0];
     // Codex only reads ~/.codex/config.toml; per-profile files are ignored.
-    expect(file.path).toBe('/home/tester/.codex/config.toml');
+    expect(asPosix(file.path)).toBe('/home/tester/.codex/config.toml');
     expect(file.content).toContain('[profiles.work]');
     expect(file.content).toContain('model = "fast-coder"');
     expect(file.content).toContain('model_provider = "freellmapi"');
@@ -111,7 +135,7 @@ describe('tool generators', () => {
   it('generates Cline current provider settings with repeatable selection', () => {
     const file = tools.find(tool => tool.id === 'cline')!.generate(context).files[0];
     const state = file.value as any;
-    expect(file.path).toBe('/home/tester/.cline/data/settings/providers.json');
+    expect(asPosix(file.path)).toBe('/home/tester/.cline/data/settings/providers.json');
     expect(state).toMatchObject({
       version: 1,
       lastUsedProvider: 'openai-compatible',
@@ -192,7 +216,7 @@ describe('tool generators', () => {
   it('writes Kilo trusted global config with every catalog model', () => {
     const file = tools.find(tool => tool.id === 'kilo')!.generate(context).files[0];
     const config = file.value as any;
-    expect(file.path).toBe('/home/tester/.config/kilo/kilo.jsonc');
+    expect(asPosix(file.path)).toBe('/home/tester/.config/kilo/kilo.jsonc');
     expect(config.$schema).toBe('https://app.kilo.ai/config.json');
     expect(config.model).toBe('openai-compatible/fast-coder');
     expect(config.provider['openai-compatible'].options).toEqual({
@@ -266,7 +290,7 @@ describe('tool generators', () => {
   it('delivers the Continue secret through ~/.continue/.env', () => {
     const generation = tools.find(tool => tool.id === 'continue')!.generate(context);
     const env = generation.files.find(file => file.path.endsWith('.env'))!;
-    expect(env.path).toBe('/home/tester/.continue/.env');
+    expect(asPosix(env.path)).toBe('/home/tester/.continue/.env');
     expect(env.sensitive).toBe(true);
     expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
     const config = generation.files.find(file => file.path.endsWith('config.yaml'))!.content!;
@@ -281,10 +305,10 @@ describe('tool generators', () => {
     // The CLI forces its provider onto the CURRENT profile of the file it
     // imports, so its file must make the openrouter-type profile current.
     const cli = files[1].value as any;
-    expect(files[1].path).toBe('/home/tester/.roo/freellmapi-cli.json');
+    expect(asPosix(files[1].path)).toBe('/home/tester/.roo/freellmapi-cli.json');
     expect(cli.providerProfiles.currentApiConfigName).toBe('freellmapi-cli');
     expect(cli.providerProfiles.apiConfigs['freellmapi-cli']).toEqual(configs['freellmapi-cli']);
-    expect(files[2].path).toBe('/home/tester/.roo/cli-settings.json');
+    expect(asPosix(files[2].path)).toBe('/home/tester/.roo/cli-settings.json');
     expect(files[2].value).toEqual({ provider: 'openrouter', model: 'fast-coder' });
     expect(configs.freellmapi).toMatchObject({
       apiProvider: 'openai',
@@ -304,7 +328,7 @@ describe('tool generators', () => {
     const dsh = tools.find(tool => tool.id === 'dsh')!;
     const generation = dsh.generate(context);
     const [settings, env] = generation.files;
-    expect(settings.path).toBe('/home/tester/.dsh/settings.yaml');
+    expect(asPosix(settings.path)).toBe('/home/tester/.dsh/settings.yaml');
     expect(settings.format).toBe('yaml');
     const value = settings.value as {
       'llm-pi-ai': { providers: Record<string, { api: string; baseURL: string; apiKeyEnv: string; models: { id: string }[] }> };
@@ -326,7 +350,7 @@ describe('tool generators', () => {
     // DSH loads $DSH_HOME/.env as its user environment layer, which is how
     // `apiKeyEnv` resolves without an export.
     expect(env).toMatchObject({
-      path: '/home/tester/.dsh/.env',
+      path: asPosix('/home/tester/.dsh/.env'),
       format: 'env',
       sensitive: true,
       content: 'FREELLMAPI_API_KEY=freellmapi-test-key\n',
@@ -347,7 +371,7 @@ describe('tool generators', () => {
     // The global config directory is XDG-based, and `config.json` is the
     // weakest of the three names it merges, so a hand-written
     // `mimocode.json` still wins.
-    expect(config.path).toBe('/home/tester/.config/mimocode/config.json');
+    expect(asPosix(config.path)).toBe('/home/tester/.config/mimocode/config.json');
     const value = config.value as {
       model: string;
       provider: {
@@ -396,7 +420,7 @@ describe('tool generators', () => {
     // exported. A custom origin gets no attribution header from OpenClaw, so
     // the provider carries a static User-Agent the gateway can classify.
     const [config, env] = tools.find(tool => tool.id === 'openclaw')!.generate(context).files;
-    expect(config.path).toBe('/home/tester/.openclaw/openclaw.json');
+    expect(asPosix(config.path)).toBe('/home/tester/.openclaw/openclaw.json');
     expect(config.format).toBe('json');
     const value = config.value as {
       agents: { defaults: { model: { primary: string } } }
@@ -409,7 +433,7 @@ describe('tool generators', () => {
     expect(provider.api).toBe('openai-completions');
     expect(provider.headers).toEqual({ 'User-Agent': 'openclaw' });
     expect(provider.models.map(model => model.id)).toEqual(['fast-coder', 'reasoning-model']);
-    expect(env.path).toBe('/home/tester/.openclaw/.env');
+    expect(asPosix(env.path)).toBe('/home/tester/.openclaw/.env');
     expect(env.sensitive).toBe(true);
     expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
   });
@@ -437,7 +461,7 @@ describe('tool generators', () => {
     // `${VAR}` form Hermes expands from ~/.hermes/.env. Leftover key_env keys
     // from the wizard are retired so they cannot shadow api_key.
     const [config, env] = tools.find(tool => tool.id === 'hermes')!.generate(context).files;
-    expect(config.path).toBe('/home/tester/.hermes/config.yaml');
+    expect(asPosix(config.path)).toBe('/home/tester/.hermes/config.yaml');
     expect(config.format).toBe('yaml');
     expect(config.value).toEqual({
       model: {
@@ -452,7 +476,7 @@ describe('tool generators', () => {
         api_key_env: undefined,
       },
     });
-    expect(env.path).toBe('/home/tester/.hermes/.env');
+    expect(asPosix(env.path)).toBe('/home/tester/.hermes/.env');
     expect(env.sensitive).toBe(true);
     expect(env.content).toBe('FREELLMAPI_API_KEY=freellmapi-test-key\n');
   });
@@ -473,7 +497,7 @@ describe('tool generators', () => {
     // settings.json is what a fresh `pi` starts on. A custom origin gets the
     // bare openai-node UA from Pi, so the provider names the client itself.
     const [models, settings] = tools.find(tool => tool.id === 'pi')!.generate(context).files;
-    expect(models.path).toBe('/home/tester/.pi/agent/models.json');
+    expect(asPosix(models.path)).toBe('/home/tester/.pi/agent/models.json');
     expect(models.format).toBe('json');
     expect(models.sensitive).toBe(true);
     const provider = (models.value as { providers: Record<string, any> }).providers.freellmapi;
@@ -494,7 +518,7 @@ describe('tool generators', () => {
       contextWindow: 131072,
       maxTokens: 8192,
     });
-    expect(settings.path).toBe('/home/tester/.pi/agent/settings.json');
+    expect(asPosix(settings.path)).toBe('/home/tester/.pi/agent/settings.json');
     expect(settings.sensitive).toBeUndefined();
     expect(settings.value).toEqual({ defaultProvider: 'freellmapi', defaultModel: 'fast-coder' });
   });
@@ -573,7 +597,7 @@ describe('tool generators', () => {
     // by the root `default_provider` key, and only a `type = "openai"` table
     // speaks the OpenAI-compatible wire. `context_window` is its own key.
     const [config] = tools.find(tool => tool.id === 'atomcode')!.generate(context).files;
-    expect(config.path).toBe('/home/tester/.atomcode/config.toml');
+    expect(asPosix(config.path)).toBe('/home/tester/.atomcode/config.toml');
     expect(config.format).toBe('toml');
     expect(config.sensitive).toBe(true);
     const lines = (config.content ?? '').split('\n');
