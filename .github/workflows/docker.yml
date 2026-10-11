@@ -11,14 +11,6 @@ permissions:
   contents: read
   packages: write
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/freellmapi
-
-# Each platform builds NATIVELY (ubuntu-24.04-arm is free for public repos) —
-# no QEMU. Emulated arm64 builds took ~20 min cold (better-sqlite3 compiles
-# via node-gyp) and their giant gha-cache exports hit backend errors; native
-# legs build in ~3 min with small per-arch caches. Pushes are by digest, then
-# a merge job stitches the multi-arch manifest. PRs only build (no push).
 jobs:
   build:
     name: Build (${{ matrix.platform }})
@@ -56,13 +48,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Normalize image name
+        id: normalize
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/freellmapi"
+          echo "LOWER_IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ steps.normalize.outputs.LOWER_IMAGE }}
 
-      - name: Build (and push by digest)
+      - name: Build and push
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -74,7 +72,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          outputs: type=image,name=${{ steps.normalize.outputs.LOWER_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
       - name: Export digest
         if: github.event_name != 'pull_request'
@@ -85,7 +83,7 @@ jobs:
 
       - name: Upload digest
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.3
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/digests/*
@@ -98,6 +96,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build]
     steps:
+      - name: Normalize image name
+        id: normalize
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/freellmapi"
+          echo "LOWER_IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -118,19 +122,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ steps.normalize.outputs.LOWER_IMAGE }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
             type=sha,prefix=sha-
-            # `latest` must follow the newest RELEASE, not main. This workflow runs
-            # on both main pushes and v* tags, so `{{is_default_branch}}` attached
-            # `latest` to every main build and `docker pull ...:latest` served
-            # unreleased code — the opposite of what the tag conventionally means,
-            # and what sent people to pin `v0.6.5` by hand (discussion #533).
-            # Prereleases (v1.2.3-rc1) are excluded so `latest` stays on stable.
-            # Main builds keep their `main` and `sha-` tags, so anything tracking
-            # the development stream is unaffected.
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
 
       - name: Create manifest list and push
@@ -138,7 +134,7 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf "${IMAGE}@sha256:%s " *)
+            $(printf "${{ steps.normalize.outputs.LOWER_IMAGE }}@sha256:%s " *)
 
       - name: Inspect image
-        run: docker buildx imagetools inspect "${IMAGE}:${{ steps.meta.outputs.version }}"
+        run: docker buildx imagetools inspect "${{ steps.normalize.outputs.LOWER_IMAGE }}:${{ steps.meta.outputs.version }}"
