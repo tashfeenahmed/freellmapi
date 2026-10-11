@@ -576,7 +576,11 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
   //
   // Only the pinned paths change. A Claude family alias mapped to 'auto' (the
   // default for opus/sonnet/haiku/default) resolves to no model at all and
-  // keeps auto-routing over the full chain exactly as before.
+  // keeps auto-routing over the full chain exactly as before. A tier selector
+  // (`tier:pro|mid|normal`) resolves to the tier's whole enabled pool and
+  // routes over it as a chain, so the tier acts as a capability band the
+  // router scores inside — failover stays within the band instead of falling
+  // off to an unrelated model.
   let groupChain: ChainRow[] | undefined;
   // Sticky scope for a group-pinned request: bucket by the pinned catalog id so
   // the session prefers its last successful provider of THIS model without
@@ -594,6 +598,16 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
         groupChain = chain;
         stickyScope = resolved.modelId;
       }
+    }
+  } else if (resolved.tierDbIds && resolved.tierDbIds.length > 0) {
+    const chain = resolveModelGroupCandidates(resolved.tierDbIds);
+    if (chain.length > 0) {
+      groupChain = chain;
+      // Scoped per tier, not per model: a session on tier:sonnet keeps its
+      // provider affinity when the operator re-points the family at another
+      // tier selector only if the scope follows the tier. Use the family's
+      // first tier id — stable per tier selector, distinct from any model id.
+      stickyScope = `tier:${resolved.tierDbIds[0]}`;
     }
   }
 

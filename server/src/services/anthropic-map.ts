@@ -16,7 +16,8 @@ const SETTING_KEY = 'anthropic_model_map';
 
 export const CLAUDE_FAMILIES = ['default', 'opus', 'sonnet', 'haiku'] as const;
 export type ClaudeFamily = (typeof CLAUDE_FAMILIES)[number];
-// Each value is either the sentinel 'auto' or a catalog model_id.
+// Each value is either the sentinel 'auto', a catalog model_id, or a tier
+// selector `tier:pro|mid|normal` (see resolveTierModel below).
 export type AnthropicModelMap = Record<ClaudeFamily, string>;
 
 const DEFAULT_MAP: AnthropicModelMap = { default: 'auto', opus: 'auto', sonnet: 'auto', haiku: 'auto' };
@@ -27,6 +28,25 @@ export const anthropicModelMapSchema = z.object({
   sonnet: z.string().min(1).optional(),
   haiku: z.string().min(1).optional(),
 }).strict();
+
+// Tier selectors reuse the V17 intelligence tiers (size_label) as the
+// capability axis: pro → Frontier, mid → Large, normal → Medium+Small.
+export const TIER_SELECTORS = ['tier:pro', 'tier:mid', 'tier:normal'] as const;
+export type TierSelector = (typeof TIER_SELECTORS)[number];
+
+const TIER_SIZE_LABELS: Record<Exclude<TierSelector, never>, string[]> = {
+  'tier:pro': ['Frontier'],
+  'tier:mid': ['Large'],
+  // normal deliberately absorbs Small too: the bottom of the free pool is
+  // still a valid "cheap tier" target, and excluding it would strand the
+  // smallest providers.
+  'tier:normal': ['Medium', 'Small'],
+};
+
+export function parseTierSelector(value: string): TierSelector | null {
+  const v = value.trim().toLowerCase();
+  return (TIER_SELECTORS as readonly string[]).includes(v) ? (v as TierSelector) : null;
+}
 
 export function getClaudeModelMap(): AnthropicModelMap {
   const raw = getSetting(SETTING_KEY);
@@ -83,6 +103,26 @@ export interface ResolvedAnthropicModel {
   modelId?: string;
   // True when we resolved to a specific model (for analytics/pinned labels).
   pinned: boolean;
+  // When a tier selector matched, the db ids of EVERY enabled model in that
+  // tier. The caller routes over this pool as a chain (tier order, then the
+  // usual score order inside it) instead of the full catalog.
+  tierDbIds?: number[];
+}
+
+// Resolve the db ids of every enabled model whose size_label belongs to the
+// tier, ordered by the same chain priority the rest of the router uses.
+function lookupTierDbIds(tier: TierSelector): number[] {
+  const labels = TIER_SIZE_LABELS[tier];
+  const placeholders = labels.map(() => '?').join(', ');
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT m.id as id
+    FROM models m
+    LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
+    WHERE m.enabled = 1 AND m.size_label IN (${placeholders})
+    ORDER BY COALESCE(fc.priority, 0) ASC, m.id ASC
+  `).all(...labels) as { id: number }[];
+  return rows.map(r => r.id);
 }
 
 // Resolve the model a `/v1/messages` request should route to, honoring the
@@ -108,6 +148,16 @@ export function resolveAnthropicModel(model?: string): ResolvedAnthropicModel {
   const family = classifyClaudeFamily(model);
   if (family) {
     const target = getClaudeModelMap()[family];
+    // A tier selector routes over the whole tier pool rather than pinning one
+    // model: `pinned` stays false (it is not a single model), and the caller
+    // restricts the chain to tierDbIds.
+    const tier = target ? parseTierSelector(target) : null;
+    if (tier) {
+      const tierDbIds = lookupTierDbIds(tier);
+      // An empty tier (operator re-labeled everything, or labels not yet
+      // seeded) degrades gracefully to auto rather than failing the request.
+      return tierDbIds.length ? { pinned: false, tierDbIds } : { pinned: false };
+    }
     if (!target || target === 'auto') return { pinned: false };
     const row = lookupEnabled(target);
     // A pinned-but-now-disabled/removed target degrades gracefully to auto.

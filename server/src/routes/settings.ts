@@ -161,7 +161,9 @@ settingsRouter.get('/anthropic-map', (_req: Request, res: Response) => {
 });
 
 // Update the Claude Code model map. Partial: send just the families you want to
-// change; each value is 'auto' or a catalog model_id.
+// change; each value is 'auto', a catalog model_id, or a tier selector
+// (`tier:pro` | `tier:mid` | `tier:normal`) that routes over the whole
+// capability tier instead of one model.
 settingsRouter.put('/anthropic-map', (req: Request, res: Response) => {
   try {
     res.json({ map: setClaudeModelMap(req.body) });
