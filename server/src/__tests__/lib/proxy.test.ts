@@ -53,6 +53,7 @@ const PROXY_ENV_VARS = [
   'HTTPS_PROXY',
   'HTTP_PROXY',
   'NO_PROXY',
+  'PROXY_REQUIRED_PLATFORMS',
   'FREEAPI_PROXY_LOCAL_DESTINATIONS',
   'FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS',
 ];
@@ -534,6 +535,99 @@ describe('proxyFetch routing', () => {
     await proxyFetch('https://api.example.com/v1', undefined, 'google');
     const [, init] = spy.mock.calls[0];
     expect((init as any)?.dispatcher).toBeUndefined();
+  });
+});
+
+
+describe('opt-in required proxy transport (fail closed)', () => {
+  const googleUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+  it('rejects Google without any proxy instead of fetching directly', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toMatchObject({ code: 'PROXY_REQUIRED_UNAVAILABLE' });
+    expect(direct).not.toHaveBeenCalled();
+  });
+
+  it('rejects a globally disabled proxy without direct Google egress', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    applyProxyUrl('socks5h://127.0.0.1:1080');
+    applyProxyEnabled(false);
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toThrow('proxy routing disabled or bypassed');
+    expect(direct).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Google platform bypass and NO_PROXY without direct egress', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'GOOGLE';
+    applyProxyUrl('socks5h://127.0.0.1:1080');
+    applyProxyBypass('google');
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toMatchObject({ code: 'PROXY_REQUIRED_UNAVAILABLE' });
+    expect(direct).not.toHaveBeenCalled();
+
+    applyProxyBypass('');
+    process.env.NO_PROXY = 'generativelanguage.googleapis.com';
+    applyProxyUrl('socks5h://127.0.0.1:1080');
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toMatchObject({ code: 'PROXY_REQUIRED_UNAVAILABLE' });
+    expect(direct).not.toHaveBeenCalled();
+  });
+
+  it('does not silently use direct fetch when the global SOCKS agent fails to construct', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    applyProxyUrl('socks5h://127.0.0.1:not-a-port');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toThrow('proxy not configured or proxy agent unavailable');
+    // The negative agent cache must also be fail-closed on the next request.
+    await expect(proxyFetch(googleUrl, undefined, 'google'))
+      .rejects.toMatchObject({ code: 'PROXY_REQUIRED_UNAVAILABLE' });
+    expect(direct).not.toHaveBeenCalled();
+  });
+
+  it('does not switch from a broken per-key proxy to a working global proxy', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    applyProxyUrl('http://127.0.0.1:8080');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await expect(withKeyProxy('socks5h://127.0.0.1:not-a-port', () =>
+      proxyFetch(googleUrl, undefined, 'google'),
+    )).rejects.toThrow('per-key proxy agent unavailable');
+    // No proxy dispatcher may be supplied to global fetch in this case either.
+    expect(direct).not.toHaveBeenCalled();
+  });
+
+  it('still permits explicitly direct non-Google platforms', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    applyProxyUrl('socks5h://127.0.0.1:1080');
+    applyProxyBypass('mistral');
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+
+    await proxyFetch('https://api.mistral.ai/v1/chat/completions', undefined, 'mistral');
+    expect(direct).toHaveBeenCalledTimes(1);
+    expect((direct.mock.calls[0][1] as any)?.dispatcher).toBeUndefined();
+  });
+
+  it('uses the SOCKS agent for Google when available, without direct fetch', async () => {
+    process.env.PROXY_REQUIRED_PLATFORMS = 'google';
+    applyProxyUrl('socks5h://127.0.0.1:1080');
+    const direct = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    const proxied = stubHttpsRequest();
+
+    const response = await proxyFetch(googleUrl, { method: 'GET' }, 'google');
+    expect(response.status).toBe(200);
+    expect(proxied).toHaveBeenCalledTimes(1);
+    expect(direct).not.toHaveBeenCalled();
   });
 });
 
