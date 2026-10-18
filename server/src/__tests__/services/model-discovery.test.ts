@@ -113,6 +113,78 @@ describe('parseModelCatalog tolerance (#488)', () => {
     });
   });
 
+  it.each([0, '0.000', '0e-400', '0e400'])('preserves explicit zero pricing (%s)', zero => {
+    expect(parseModelCatalog({
+      data: [{ id: 'zero', pricing: { prompt: zero, completion: zero, request: zero, image: zero } }],
+    })).toEqual([{ id: 'zero', ownedBy: null, priceNote: 'free', isFree: true }]);
+  });
+
+  it.each([
+    ['request', '0.000001', '$0.000001/request'],
+    ['image', '0.005', '$0.005/image'],
+  ])('keeps a positive %s charge in its advertised unit', (component, price, priceNote) => {
+    expect(parseModelCatalog({
+      data: [{ id: 'charged', pricing: { prompt: '0', completion: '0', [component]: price } }],
+    })).toEqual([{ id: 'charged', ownedBy: null, priceNote, isFree: false }]);
+  });
+
+  it('preserves a positive request-only price without token pricing', () => {
+    expect(parseModelCatalog({
+      data: [{ id: 'per-request', pricing: { request: 0.01 } }],
+    })).toEqual([{ id: 'per-request', ownedBy: null, priceNote: '$0.01/request', isFree: false }]);
+  });
+
+  it.each(['request', 'image'])('does not let a literal free alias hide an advertised %s charge', component => {
+    for (const [freeKey, pricingKey] of [['price', 'pricing'], ['pricing', 'price']]) {
+      expect(parseModelCatalog({
+        data: [{ id: 'charged', [freeKey]: 'Free', [pricingKey]: { prompt: '0', completion: '0', [component]: '0.01' } }],
+      })).toEqual([{ id: 'charged', ownedBy: null, priceNote: `$0.01/${component}`, isFree: false }]);
+    }
+  });
+
+  it.each([
+    ['incomplete token prices', { prompt: '0' }],
+    ['invalid completion', { prompt: '0', completion: 'unknown' }],
+    ['boolean pricing', false],
+    ['numeric pricing', 0],
+    ['null pricing', null],
+    ['array pricing', []],
+    ['blank pricing', ' '],
+    ['empty pricing', {}],
+  ])('leaves a free hint with conflicting %s unknown', (_name, pricing) => {
+    for (const [freeKey, pricingKey] of [['price', 'pricing'], ['pricing', 'price']]) {
+      expect(parseModelCatalog({
+        data: [{ id: 'unknown', [freeKey]: 'Free', [pricingKey]: pricing }],
+      })).toEqual([{ id: 'unknown', ownedBy: null }]);
+    }
+  });
+
+  it.each([
+    ['request underflow', { prompt: '0', completion: '0', request: '1e-400' }],
+    ['negative completion underflow', { prompt: '0', completion: '-1e-400' }],
+  ])('leaves %s unknown instead of accepting a rounded zero', (_name, pricing) => {
+    expect(parseModelCatalog({ data: [{ id: 'unknown', pricing }] })).toEqual([
+      { id: 'unknown', ownedBy: null },
+    ]);
+  });
+
+  it.each([
+    ['missing completion', { prompt: '0' }],
+    ['invalid completion', { prompt: '0', completion: 'unknown' }],
+    ['null completion', { prompt: '0', completion: null }],
+    ['blank completion', { prompt: '0', completion: ' ' }],
+    ['negative completion', { prompt: '0', completion: -1 }],
+    ['nonfinite completion', { prompt: '0', completion: Infinity }],
+    ['boolean completion', { prompt: '0', completion: false }],
+    ['missing prompt', { completion: '0' }],
+    ['invalid extra charge', { prompt: '0', completion: '0', request: 'unknown' }],
+    ['unsupported extra charge', { prompt: '0', completion: '0', web_search: '0.01' }],
+  ])('leaves %s pricing unknown instead of claiming free', (_name, pricing) => {
+    expect(parseModelCatalog({ data: [{ id: 'unknown', pricing }] })).toEqual([
+      { id: 'unknown', ownedBy: null },
+    ]);
+  });
+
   it('accepts a relay that ships ctx_len and a plain "free" price string (#685)', () => {
     // A generic relay, not Ollama: real /api/tags ships neither field.
     const [m] = parseModelCatalog({
