@@ -746,7 +746,7 @@ const toolChoiceSchema = z.union([
 
 const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
 
-function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+export function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
   if (!Array.isArray(stop)) return stop;
   return stop.slice(0, 4);
 }
