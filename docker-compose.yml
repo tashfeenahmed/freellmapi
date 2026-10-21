@@ -12,7 +12,7 @@ services:
     # Bound to localhost by default — FreeLLMAPI is single-user and must not be
     # exposed to the internet. Set HOST_BIND=0.0.0.0 to reach it from your LAN.
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${PORT:-3001}:3001"
+      - "127.0.0.1:3002:3001"  # poolguard owns 3001 (2026-09-19); 3002 debug loopback
     volumes:
       - freellmapi-data:/app/server/data
     # Makes `host.docker.internal` resolve to the host from inside the
@@ -35,5 +35,45 @@ services:
       start_period: 15s
       retries: 3
 
+  poolguard:
+    image: node:22-alpine
+    container_name: freellmapi-poolguard-1
+    command: node /app/sidecar.mjs
+    working_dir: /app
+    environment:
+      LISTEN_PORT: "3003"
+      UPSTREAM_HOST: freellmapi
+      UPSTREAM_PORT: "3001"
+      RETRY_MAX: "2"
+      WAIT_MIN_MS: "2000"
+      WAIT_CAP_MS: "45000"
+      EVENTS_FILE: /data/poolguard-events.jsonl
+      # Free-tier billing guard (2026-10-21, fleet-wide with LexiLava)
+      SAFE_MODEL: "gpt-oss-120b"
+      OR_INPUT_MAX: "16000"
+      OR_RPD: "50"
+      GOOGLE_RPD: "250"
+      COUNTERS_FILE: /data/poolguard-platform-counters.json
+    ports:
+      - "127.0.0.1:3001:3003"
+    volumes:
+      - ./poolguard:/app:ro
+      - ./data-poolguard:/data
+    depends_on:
+      - freellmapi
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/poolguard/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
 volumes:
   freellmapi-data:
+
+  # poolguard (2026-09-19, Eddie "eliminate the model error"): retry sidecar on the port
+  # every caller already uses. Source of truth: tools/freellmapi/poolguard/ in the hive
+  # repo. On pool exhaustion (429 "All models exhausted ... Soonest reset Xm") it waits
+  # the pool ETA and re-sends (max 2) before passing through; final failures go to
+  # data-poolguard/poolguard-events.jsonl for the 5-min fix loop (cron).
