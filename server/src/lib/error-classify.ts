@@ -21,7 +21,8 @@ export function isRetryableError(err: any): boolean {
   // rejection: fail over to another provider, but if the whole chain rejects it
   // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status === 408 || status === 409 || status === 410 || status === 422 || status === 429 || status >= 500) return true;
+  if (status === 408 || status === 409 || status === 410 || status === 413 || status === 422 || status === 429 || status >= 500) return true;
+  if (msg.includes('request too large') || msg.includes('too large for model') || msg.includes('context length') || msg.includes('maximum context')) return true;
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
