@@ -31,10 +31,25 @@ function rebuild(db: Db, scoped: boolean): void {
 
 export function up(db: Db): void {
   rebuild(db, true);
+  // Keep media identity separate from requests.model_db_id, which names chat models.
+  db.exec(`
+    ALTER TABLE requests ADD COLUMN media_model_db_id INTEGER;
+    CREATE INDEX idx_requests_media_model_db_id ON requests(media_model_db_id);
+    UPDATE requests SET media_model_db_id = (
+      SELECT mm.id FROM media_models mm
+      WHERE mm.platform = requests.platform AND mm.model_id = requests.model_id
+        AND mm.modality = requests.request_type
+        AND (mm.platform <> 'custom' OR mm.endpoint_scope = COALESCE((
+          SELECT RTRIM(TRIM(k.base_url), '/') FROM api_keys k
+          WHERE k.id = requests.key_id AND k.platform = 'custom'
+        ), ''))
+    ) WHERE request_type IN ('image', 'video', 'audio', 'transcription');
+  `);
 }
 
 export function down(db: Db): void {
   const duplicate = db.prepare('SELECT 1 FROM media_models GROUP BY platform, model_id HAVING COUNT(*) > 1 LIMIT 1').get();
   if (duplicate) throw new Error('Cannot revert media endpoint identity while duplicate model IDs exist');
   rebuild(db, false);
+  db.exec('DROP INDEX idx_requests_media_model_db_id; ALTER TABLE requests DROP COLUMN media_model_db_id;');
 }
