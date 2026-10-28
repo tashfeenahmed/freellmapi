@@ -64,6 +64,26 @@ describe('GET /api/media/usage', () => {
     expect((await get(app, '/api/media/usage?modality=not-real')).status).toBe(400);
   });
 
+  it('attributes a shared custom model ID to its own endpoint', async () => {
+    const db = getDb();
+    const insertKey = db.prepare(`INSERT INTO api_keys
+      (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+      VALUES ('custom', 'relay', 'e', 'i', 't', 'healthy', 1, ?)`);
+    const a = Number(insertKey.run('https://a.example/v1').lastInsertRowid);
+    const b = Number(insertKey.run('https://b.example/v1').lastInsertRowid);
+    const insertModel = db.prepare(`INSERT INTO media_models
+      (platform, model_id, display_name, modality, key_id, endpoint_scope)
+      VALUES ('custom', 'shared', ?, 'image', ?, ?)`);
+    insertModel.run('A', a, 'https://a.example/v1');
+    insertModel.run('B', b, 'https://b.example/v1');
+    db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, request_type)
+      VALUES ('custom', 'shared', ?, 'success', 'image')`).run(a);
+    const { body } = await get(app, '/api/media/usage?modality=image');
+    expect(body.models.filter((m: any) => m.modelId === 'shared').map((m: any) => [m.displayName, m.requestsMonth]))
+      .toEqual([['A', 1], ['B', 0]]);
+    expect(body.totalRequestsMonth).toBe(1);
+  });
+
   it('counts this month\'s requests per model and separates today', async () => {
     seedRequest('cloudflare', 'flux-1-schnell', 'image', "datetime('now')");
     getDb().prepare(`

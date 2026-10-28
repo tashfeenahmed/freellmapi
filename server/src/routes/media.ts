@@ -72,6 +72,10 @@ mediaRouter.get('/usage', (req: Request, res: Response) => {
      AND r.status = 'success'
      AND r.platform = mm.platform
      AND r.model_id = mm.model_id
+     AND (mm.platform <> 'custom' OR mm.endpoint_scope = '' OR EXISTS (
+       SELECT 1 FROM api_keys k WHERE k.id = r.key_id AND k.platform = 'custom'
+         AND RTRIM(TRIM(k.base_url), '/') = mm.endpoint_scope
+     ))
      AND r.created_at >= datetime('now', 'start of month')
     WHERE mm.modality = ? AND mm.enabled = 1
     GROUP BY mm.id
