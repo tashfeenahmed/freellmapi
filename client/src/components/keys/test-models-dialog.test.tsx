@@ -75,6 +75,8 @@ describe('TestModelsDialog', () => {
   it('lists only the provider\'s models and fires the pinned test for the clicked one', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path === '/api/models') return MODELS
+      if (path === '/api/search/engines') return []
+      if (path === '/api/decisions/models') return []
       if (path === '/api/models/2/test') return { success: true, modelId: 'llama-70b', latencyMs: 321 }
       throw new Error(`unexpected ${path}`)
     })
@@ -97,6 +99,8 @@ describe('TestModelsDialog', () => {
   it('shows the provider\'s reason on a failed test and does not re-fire within the throttle window', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path === '/api/models') return MODELS
+      if (path === '/api/search/engines') return []
+      if (path === '/api/decisions/models') return []
       if (path === '/api/models/3/test') return { success: false, modelId: 'gemini-flash', latencyMs: 40, error: 'Google API error 429: quota' }
       throw new Error(`unexpected ${path}`)
     })
@@ -117,7 +121,12 @@ describe('TestModelsDialog', () => {
   })
 
   it('says so when a custom key has no models yet', async () => {
-    vi.mocked(apiFetch).mockImplementation(async () => MODELS)
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/models') return MODELS
+      if (path === '/api/search/engines') return []
+      if (path === '/api/decisions/models') return []
+      return MODELS
+    })
     await mount('custom', 99)
     expect(container.querySelector('[data-testid="test-models-list"]')).toBeNull()
     expect(container.textContent).toContain('No models configured for this provider.')
