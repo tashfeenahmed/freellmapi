@@ -22,7 +22,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
 import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
-import { extractApiToken, getStickyModel, setStickyModel } from './proxy.js';
+import { extractApiToken, getStickyModel, setStickyModel, providerSafeStop } from './proxy.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue } from '../lib/header-value.js';
 import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
@@ -548,6 +548,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
 
   const completionOptions = {
     temperature, max_tokens, top_p, top_k: body.top_k ?? undefined, tools, tool_choice,
+    // OpenAI's `stop`, capped the same way /v1/chat/completions caps it.
+    stop: body.stop_sequences?.length ? providerSafeStop(body.stop_sequences) : undefined,
     // Native `thinking: {type, budget_tokens}` → the same internal knob the
     // OpenAI surface's reasoning_effort feeds; absent when the client sent none.
     reasoning_effort: effortFromAnthropicThinking(body.thinking),

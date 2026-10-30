@@ -213,6 +213,18 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(typeof toolUse.id).toBe('string');
   });
 
+  it('forwards stop_sequences to the upstream as stop', async () => {
+    const captured = mockJson(textCompletion('Thought: I should look up the weather.'));
+    const { status } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 128,
+      stop_sequences: ['\nObservation:'],
+      messages: [{ role: 'user', content: 'weather in Karachi?' }],
+    }, anthropicHeaders());
+
+    expect(status).toBe(200);
+    expect(captured.body.stop).toEqual(['\nObservation:']);
+  });
+
   it('translates an assistant tool_use + user tool_result turn into OpenAI tool messages', async () => {
     const captured = mockJson(textCompletion('It is sunny and 35C in Karachi.'));
     const { status, body } = await request(app, '/v1/messages', {
