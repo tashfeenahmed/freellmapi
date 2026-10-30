@@ -42,8 +42,9 @@ export const keysRouter = Router();
 // existing keys still work if the catalog re-enables them. The setup
 // checklist stops suggesting them to anyone who has no key yet; the dashboard
 // pickers hide them through `hidden` in client/src/components/keys/shared.tsx.
-// Empty since Auray was removed outright (#1583).
-const UNLISTED_PLATFORMS = new Set<string>();
+// ACLIDE: its dashboard has returned 500 since mid-October, so new users
+// cannot create a key (#1565, #1768). The API still serves existing keys.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
