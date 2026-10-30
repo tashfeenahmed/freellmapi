@@ -1253,7 +1253,15 @@
     "renameHint": "इस चेन का नाम बदलें",
     "renameConfirm": "चेन \"{oldName}\" का नाम \"{name}\" करें? auto:{oldName} कॉल करने वाले क्लाइंट्स को auto:{name} पर जाना होगा।",
     "renamePlaceholder": "नया चेन नाम",
-    "renameFailed": "चेन का नाम नहीं बदला जा सका।"
+    "renameFailed": "चेन का नाम नहीं बदला जा सका।",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "संस्करण {version} उपलब्ध है",

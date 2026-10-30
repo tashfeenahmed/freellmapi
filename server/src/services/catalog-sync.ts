@@ -6,6 +6,7 @@ import { MEDIA_PLATFORMS, TRANSCRIPTION_PLATFORMS, VIDEO_PLATFORMS } from './med
 import { SEARCH_ENGINE_PLATFORMS, SEARCH_MODALITY } from './search.js';
 import { DECISION_MODALITY, DECISION_PLATFORMS } from './decision.js';
 import { EMBEDDING_PLATFORMS } from './embeddings.js';
+import { applyPlacementPins } from './embedding-placement.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import {
@@ -1028,6 +1029,11 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         }
       }
     }
+
+    // The operator's own arrangement wins over the snapshot above. A provider moved
+    // into another family (and any priority pinned with it) has to survive this
+    // re-apply, or the dashboard silently reverts it twice a day and at boot.
+    applyPlacementPins(db);
 
     // Quirks are pure content: replace wholesale.
     db.prepare('DELETE FROM quirk_targets').run();

@@ -1253,7 +1253,15 @@
     "renameHint": "שנה שם של שרשרת זו",
     "renameConfirm": "לשנות שם השרשרת \"{oldName}\" ל‑\"{name}\"? לקוחות שקוראים ל‑auto:{oldName} יצטרכו לעבור ל‑auto:{name}.",
     "renamePlaceholder": "שם שרשרת חדש",
-    "renameFailed": "לא ניתן לשנות את שם השרשרת."
+    "renameFailed": "לא ניתן לשנות את שם השרשרת.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "גרסה {version} זמינה",

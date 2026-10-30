@@ -1253,7 +1253,15 @@
     "renameHint": "ამ ჯაჭვის გადარქმევა",
     "renameConfirm": "გადარქვათ ჯაჭვს \"{oldName}\" სახელი \"{name}\"? კლიენტებმა, რომლებიც იძახიან auto:{oldName}, უნდა გადავიდნენ auto:{name}-ზე.",
     "renamePlaceholder": "ახალი ჯაჭვის სახელი",
-    "renameFailed": "ამ ჯაჭვის გადარქმევა ვერ მოხერხდა."
+    "renameFailed": "ამ ჯაჭვის გადარქმევა ვერ მოხერხდა.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ხელმისაწვდომია ვერსია {version}",

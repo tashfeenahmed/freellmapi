@@ -1253,7 +1253,15 @@
     "renameHint": "Tukar nama rantaian ini",
     "renameConfirm": "Tukar nama rantaian \"{oldName}\" kepada \"{name}\"? Klien yang memanggil auto:{oldName} perlu bertukar ke auto:{name}.",
     "renamePlaceholder": "Nama rantaian baharu",
-    "renameFailed": "Tidak dapat menukar nama rantaian."
+    "renameFailed": "Tidak dapat menukar nama rantaian.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Versi {version} tersedia",

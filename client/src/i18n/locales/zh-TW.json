@@ -1253,7 +1253,15 @@
     "renameHint": "重新命名此鏈",
     "renameConfirm": "將鏈「{oldName}」重新命名為「{name}」？呼叫 auto:{oldName} 的客戶端必須改用 auto:{name}。",
     "renamePlaceholder": "新鏈名稱",
-    "renameFailed": "無法重新命名該鏈。"
+    "renameFailed": "無法重新命名該鏈。",
+    "strategy": "路由策略",
+    "strategyHint": "这条链如何给模型排序。选择“继承”则使用全局设置。",
+    "strategyInherit": "继承全局",
+    "strategyPriority": "手动顺序",
+    "strategyBalanced": "平衡",
+    "strategySmartest": "最智能",
+    "strategyFastest": "最快",
+    "strategyReliable": "最稳定"
   },
   "updates": {
     "versionAvailable": "版本 {version} 可用",

@@ -1253,7 +1253,15 @@
     "renameHint": "تغییر نام این زنجیره",
     "renameConfirm": "نام زنجیره \"{oldName}\" به \"{name}\" تغییر کند؟ کلاینت‌هایی که auto:{oldName} را صدا می‌زنند باید به auto:{name} بروند.",
     "renamePlaceholder": "نام جدید زنجیره",
-    "renameFailed": "تغییر نام زنجیره انجام نشد."
+    "renameFailed": "تغییر نام زنجیره انجام نشد.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "نسخهٔ {version} در دسترس است",

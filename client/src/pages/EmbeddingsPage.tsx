@@ -96,16 +96,16 @@ function SortableProviderRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`flex items-center gap-3 py-2 bg-card ${p.enabled ? '' : 'opacity-50'} ${isDragging ? 'opacity-50 relative z-10' : ''}`}
     >
-      {count > 1 && (
-        <button
-          {...attributes}
-          {...listeners}
-          aria-label={t('embeddings.dragToReorder')}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
-        >
-          {dragDots}
-        </button>
-      )}
+      {/* Always a handle, even with a single provider in the family: the drag may
+          target another family card, which is how a row joins a different chain. */}
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={t('embeddings.dragToReorder')}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground transition-colors"
+      >
+        {dragDots}
+      </button>
       <span className="w-5 text-center font-mono text-xs text-muted-foreground tabular-nums">{i + 1}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -173,8 +173,10 @@ export default function EmbeddingsPage() {
   const usageByFamily = new Map((usage?.families ?? []).map(u => [u.family, u]))
 
   const saveMutation = useMutation({
-    mutationFn: (body: { defaultFamily?: string; providers?: { id: number; priority: number; enabled: boolean }[] }) =>
-      apiFetch('/api/embeddings', { method: 'PUT', body: JSON.stringify(body) }),
+    mutationFn: (body: {
+      defaultFamily?: string
+      providers?: { id: number; priority: number; enabled: boolean; family?: string }[]
+    }) => apiFetch('/api/embeddings', { method: 'PUT', body: JSON.stringify(body) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       setLocalFamilies(null)
@@ -221,23 +223,74 @@ export default function EmbeddingsPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  function handleDragEnd(familyName: string, event: DragEndEvent) {
+  // One DndContext for every family, so a row can be dropped on a provider that
+  // lives in another family card. Per-family contexts made that impossible: a
+  // context only sees its own droppables.
+  const [dragFrom, setDragFrom] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null)
+
+  function familyOfProvider(id: number): string | null {
+    return families.find(f => f.providers.some(p => p.id === id))?.family ?? null
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
+    setDragFrom(null)
+    setDragOver(null)
     if (!over || active.id === over.id) return
+    const activeId = Number(active.id)
+    const overId = Number(over.id)
+    const from = families.find(f => f.providers.some(p => p.id === activeId))
+    const to = families.find(f => f.providers.some(p => p.id === overId))
+    if (!from || !to) return
+
+    if (from.family === to.family) {
+      setLocalFamilies(families.map(f => {
+        if (f.family !== from.family) return f
+        const oldIndex = f.providers.findIndex(p => p.id === activeId)
+        const newIndex = f.providers.findIndex(p => p.id === overId)
+        if (oldIndex < 0 || newIndex < 0) return f
+        return { ...f, providers: arrayMove(f.providers, oldIndex, newIndex).map((p, i) => ({ ...p, priority: i + 1 })) }
+      }))
+      return
+    }
+
+    // Dropped on another family: the row joins that chain. It lands at the end —
+    // the same place the server appends it, so the buffered view and the saved
+    // result agree, and the arrows order it from there.
+    const moving = from.providers.find(p => p.id === activeId)
+    if (!moving) return
     setLocalFamilies(families.map(f => {
-      if (f.family !== familyName) return f
-      const oldIndex = f.providers.findIndex(p => p.id === active.id)
-      const newIndex = f.providers.findIndex(p => p.id === over.id)
-      if (oldIndex < 0 || newIndex < 0) return f
-      return { ...f, providers: arrayMove(f.providers, oldIndex, newIndex).map((p, i) => ({ ...p, priority: i + 1 })) }
+      if (f.family === from.family) {
+        return { ...f, providers: f.providers.filter(p => p.id !== activeId).map((p, i) => ({ ...p, priority: i + 1 })) }
+      }
+      if (f.family === to.family) {
+        const nextPriority = f.providers.reduce((max, p) => Math.max(max, p.priority), 0) + 1
+        return { ...f, providers: [...f.providers, { ...moving, priority: nextPriority }] }
+      }
+      return f
     }))
   }
 
   function handleSave() {
+    // `family` travels only for rows the drag actually moved: the server treats its
+    // absence as "unchanged" and keeps the plain priority/enabled path untouched.
+    const serverFamilyOf = new Map<number, string>()
+    data?.families.forEach(f => f.providers.forEach(p => serverFamilyOf.set(p.id, f.family)))
     saveMutation.mutate({
       ...(localDefault !== null ? { defaultFamily: localDefault } : {}),
       ...(localFamilies !== null
-        ? { providers: families.flatMap(f => f.providers.map(p => ({ id: p.id, priority: p.priority, enabled: p.enabled }))) }
+        ? {
+          providers: families.flatMap(f => f.providers.map(p => {
+            const origin = serverFamilyOf.get(p.id)
+            return {
+              id: p.id,
+              priority: p.priority,
+              enabled: p.enabled,
+              ...(origin !== undefined && origin !== f.family ? { family: f.family } : {}),
+            }
+          })),
+        }
         : {}),
     })
   }
@@ -293,41 +346,60 @@ export default function EmbeddingsPage() {
             }
           />
         ) : (
-          families.map(f => {
-            const u = usageByFamily.get(f.family)
-            const noKeys = f.providers.every(p => p.keyCount === 0)
-            return (
-              <section key={f.family} className={`rounded-3xl border bg-card p-5 ${noKeys ? 'opacity-60' : ''}`}>
-                <div className="flex items-baseline justify-between gap-4 mb-3 flex-wrap">
-                  <div className="flex items-baseline gap-2.5 min-w-0">
-                    <Link to={`/models/embeddings/${encodeURIComponent(f.family)}`} className="text-sm font-medium font-mono truncate hover:underline">{f.family}</Link>
-                    <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
-                      {f.dimensions}d
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={e => {
+              setDragFrom(familyOfProvider(Number(e.active.id)))
+              setDragOver(null)
+            }}
+            onDragOver={e => setDragOver(e.over ? familyOfProvider(Number(e.over.id)) : null)}
+            onDragCancel={() => {
+              setDragFrom(null)
+              setDragOver(null)
+            }}
+            onDragEnd={handleDragEnd}
+          >
+            {families.map(f => {
+              const u = usageByFamily.get(f.family)
+              const noKeys = f.providers.every(p => p.keyCount === 0)
+              // Highlight only where the drop would actually move the row: a
+              // same-family drag is already legible from the sorting itself.
+              const isDropTarget = dragFrom !== null && dragOver === f.family && dragFrom !== f.family
+              return (
+                <section
+                  key={f.family}
+                  className={`rounded-3xl border bg-card p-5 transition-shadow ${noKeys ? 'opacity-60' : ''} ${isDropTarget ? 'ring-2 ring-foreground/25' : ''}`}
+                >
+                  <div className="flex items-baseline justify-between gap-4 mb-3 flex-wrap">
+                    <div className="flex items-baseline gap-2.5 min-w-0">
+                      <Link to={`/models/embeddings/${encodeURIComponent(f.family)}`} className="text-sm font-medium font-mono truncate hover:underline">{f.family}</Link>
+                      <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground tabular-nums">
+                        {f.dimensions}d
+                      </span>
+                      {f.maxInputTokens && (
+                        <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                          {t('embeddings.tokMax', { tokens: formatTokens(f.maxInputTokens) })}
+                        </span>
+                      )}
+                      {f.family === defaultFamily ? (
+                        <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-foreground text-background font-medium">
+                          {t('embeddings.defaultBadge')}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setLocalDefault(f.family)}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 transition-colors"
+                        >
+                          {t('embeddings.makeDefault')}
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {u ? <>{t('embeddings.usageToday', { count: u.requestsToday })} · {t('embeddings.usageMonth', { count: formatTokens(u.tokensMonth) })}</> : '—'}
                     </span>
-                    {f.maxInputTokens && (
-                      <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-                        {t('embeddings.tokMax', { tokens: formatTokens(f.maxInputTokens) })}
-                      </span>
-                    )}
-                    {f.family === defaultFamily ? (
-                      <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-foreground text-background font-medium">
-                        {t('embeddings.defaultBadge')}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => setLocalDefault(f.family)}
-                        className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 transition-colors"
-                      >
-                        {t('embeddings.makeDefault')}
-                      </button>
-                    )}
                   </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {u ? <>{t('embeddings.usageToday', { count: u.requestsToday })} · {t('embeddings.usageMonth', { count: formatTokens(u.tokensMonth) })}</> : '—'}
-                  </span>
-                </div>
 
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={e => handleDragEnd(f.family, e)}>
                   <SortableContext items={f.providers.map(p => p.id)} strategy={verticalListSortingStrategy}>
                     <div className="divide-y">
                       {f.providers.map((p, i) => (
@@ -344,10 +416,10 @@ export default function EmbeddingsPage() {
                       ))}
                     </div>
                   </SortableContext>
-                </DndContext>
-              </section>
-            )
-          })
+                </section>
+              )
+            })}
+          </DndContext>
         )}
 
         <FloatingBar show={hasChanges}>

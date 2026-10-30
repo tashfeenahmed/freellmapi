@@ -1253,7 +1253,15 @@
     "renameHint": "Zmień nazwę tego łańcucha",
     "renameConfirm": "Zmienić nazwę łańcucha \"{oldName}\" na \"{name}\"? Klienci wywołujący auto:{oldName} muszą przejść na auto:{name}.",
     "renamePlaceholder": "Nowa nazwa łańcucha",
-    "renameFailed": "Nie udało się zmienić nazwy łańcucha."
+    "renameFailed": "Nie udało się zmienić nazwy łańcucha.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Dostępna jest wersja {version}",

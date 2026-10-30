@@ -1253,7 +1253,15 @@
     "renameHint": "Cambiar el nombre de esta cadena",
     "renameConfirm": "¿Cambiar el nombre de la cadena \"{oldName}\" a \"{name}\"? Los clientes que llamen a auto:{oldName} deben pasar a auto:{name}.",
     "renamePlaceholder": "Nuevo nombre de la cadena",
-    "renameFailed": "No se pudo cambiar el nombre de la cadena."
+    "renameFailed": "No se pudo cambiar el nombre de la cadena.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "La versión {version} está disponible",

@@ -1253,7 +1253,15 @@
     "renameHint": "Преименувай тази верига",
     "renameConfirm": "Преименуване на верига \"{oldName}\" на \"{name}\"? Клиенти, извикващи auto:{oldName}, трябва да преминат към auto:{name}.",
     "renamePlaceholder": "Ново име на веригата",
-    "renameFailed": "Веригата не можа да бъде преименувана."
+    "renameFailed": "Веригата не можа да бъде преименувана.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Версия {version} е налична",

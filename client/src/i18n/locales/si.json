@@ -1253,7 +1253,15 @@
     "renameHint": "මෙම දාමයේ නම වෙනස් කරන්න",
     "renameConfirm": "දාමය \"{oldName}\" හි නම \"{name}\" ලෙස වෙනස් කරන්නද? auto:{oldName} අමතන සේවාදායකයින් auto:{name} වෙත යා යුතුය.",
     "renamePlaceholder": "නව දාම නම",
-    "renameFailed": "එම දාමයේ නම වෙනස් කළ නොහැකි විය."
+    "renameFailed": "එම දාමයේ නම වෙනස් කළ නොහැකි විය.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "අනුවාදය {version} ලබා ගත හැක",

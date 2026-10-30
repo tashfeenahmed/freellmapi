@@ -1253,7 +1253,15 @@
     "renameHint": "Přejmenovat tento řetězec",
     "renameConfirm": "Přejmenovat řetězec \"{oldName}\" na \"{name}\"? Klienti volající auto:{oldName} musí přejít na auto:{name}.",
     "renamePlaceholder": "Nový název řetězce",
-    "renameFailed": "Řetězec se nepodařilo přejmenovat."
+    "renameFailed": "Řetězec se nepodařilo přejmenovat.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Je k dispozici verze {version}",

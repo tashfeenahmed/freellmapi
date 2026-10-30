@@ -1253,7 +1253,15 @@
     "renameHint": "Renomear esta cadeia",
     "renameConfirm": "Renomear a cadeia \"{oldName}\" para \"{name}\"? Clientes que chamam auto:{oldName} devem mudar para auto:{name}.",
     "renamePlaceholder": "Novo nome da cadeia",
-    "renameFailed": "Não foi possível renomear a cadeia."
+    "renameFailed": "Não foi possível renomear a cadeia.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "A versão {version} está disponível",

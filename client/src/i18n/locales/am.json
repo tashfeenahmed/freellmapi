@@ -1253,7 +1253,15 @@
     "renameHint": "የዚህ ሰንሰለት ስም ቀይር",
     "renameConfirm": "ሰንሰለት \"{oldName}\" ስሙን ወደ \"{name}\" ቀይር? auto:{oldName} የሚጠሩ ደንበኞች ወደ auto:{name} ማለፍ አለባቸው።",
     "renamePlaceholder": "አዲስ የሰንሰለት ስም",
-    "renameFailed": "የሰንሰለቱን ስም መቀየር አልተቻለም።"
+    "renameFailed": "የሰንሰለቱን ስም መቀየር አልተቻለም።",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ስሪት {version} ይገኛል",

@@ -1253,7 +1253,15 @@
     "renameHint": "Gi denne kjeden nytt navn",
     "renameConfirm": "Gi kjeden \"{oldName}\" navnet \"{name}\"? Klienter som kaller auto:{oldName} må bytte til auto:{name}.",
     "renamePlaceholder": "Nytt kjedenavn",
-    "renameFailed": "Kunne ikke gi den kjeden nytt navn."
+    "renameFailed": "Kunne ikke gi den kjeden nytt navn.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Versjon {version} er tilgjengelig",

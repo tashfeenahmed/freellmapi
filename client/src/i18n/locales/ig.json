@@ -1253,7 +1253,15 @@
     "renameHint": "Gbanwee aha chain a",
     "renameConfirm": "Gbanwee aha chain \"{oldName}\" ka ọ bụrụ \"{name}\"? Ndị ahịa na-akpọ auto:{oldName} ga-agbanwe gaa auto:{name}.",
     "renamePlaceholder": "Aha chain ọhụrụ",
-    "renameFailed": "Enweghị ike ịgbanwe aha chain ahụ."
+    "renameFailed": "Enweghị ike ịgbanwe aha chain ahụ.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Ụdị {version} dị",

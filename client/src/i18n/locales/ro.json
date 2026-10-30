@@ -1253,7 +1253,15 @@
     "renameHint": "Redenumește acest lanț",
     "renameConfirm": "Redenumiți lanțul \"{oldName}\" în \"{name}\"? Clienții care apelau auto:{oldName} trebuie să treacă la auto:{name}.",
     "renamePlaceholder": "Numele nou al lanțului",
-    "renameFailed": "Nu s-a putut redenumi lanțul."
+    "renameFailed": "Nu s-a putut redenumi lanțul.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Versiunea {version} este disponibilă",

@@ -1253,7 +1253,15 @@
     "renameHint": "Tún orúkọ ẹwẹ̀ yìí sí i",
     "renameConfirm": "Tún orúkọ ẹwẹ̀ \"{oldName}\" sí \"{name}\"? Àwọn oníbàárà̀ tó ̀ pè auto:{oldName} gbọ́dọ̀ yí padà sí auto:{name}.",
     "renamePlaceholder": "Orúkọ ẹwẹ̀ tuntun",
-    "renameFailed": "A kò lè tún orúkọ ẹwẹ̀ yẹn sọ."
+    "renameFailed": "A kò lè tún orúkọ ẹwẹ̀ yẹn sọ.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Ẹ̀yà {version} wà",

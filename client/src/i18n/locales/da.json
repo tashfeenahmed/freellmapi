@@ -1253,7 +1253,15 @@
     "renameHint": "Omdøb denne kæde",
     "renameConfirm": "Omdøb kæden \"{oldName}\" til \"{name}\"? Klients, der kalder auto:{oldName}, skal skifte til auto:{name}.",
     "renamePlaceholder": "Nyt kædenavn",
-    "renameFailed": "Kæden kunne ikke omdøbes."
+    "renameFailed": "Kæden kunne ikke omdøbes.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Version {version} er tilgængelig",

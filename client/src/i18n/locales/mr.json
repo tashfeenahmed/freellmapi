@@ -1253,7 +1253,15 @@
     "renameHint": "या साखळीचे नाव बदला",
     "renameConfirm": "साखळी \"{oldName}\" चे नाव \"{name}\" करावे? auto:{oldName} हा कॉल करणारे क्लायंट्स auto:{name} वर जावे लागेल.",
     "renamePlaceholder": "नवीन साखळी नाव",
-    "renameFailed": "साखळीचे नाव बदलता आले नाही."
+    "renameFailed": "साखळीचे नाव बदलता आले नाही.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "आवृत्ती {version} उपलब्ध आहे",

@@ -1253,7 +1253,15 @@
     "renameHint": "ଏହି ଚେନ୍‌ର ନାମ ବଦଳାନ୍ତୁ",
     "renameConfirm": "ଚେନ୍ \"{oldName}\" ର ନାମ \"{name}\" କରନ୍ତୁ? auto:{oldName} କଲ୍ କରୁଥିବା କ୍ଲାଏଣ୍ଟମାନେ auto:{name} କୁ ଯିବା ଉଚିତ୍‌।",
     "renamePlaceholder": "ନୂଆ ଚେନ୍ ନାମ",
-    "renameFailed": "ଚେନ୍‌ର ନାମ ବଦଳାଯାଇପାରିଲା ନାହିଁ।"
+    "renameFailed": "ଚେନ୍‌ର ନାମ ବଦଳାଯାଇପାରିଲା ନାହିଁ।",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ସଂସ୍କରଣ {version} ଉପଲବ୍ଧ",

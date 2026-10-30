@@ -1253,7 +1253,15 @@
     "renameHint": "重命名此链",
     "renameConfirm": "将链“{oldName}”重命名为“{name}”？调用 auto:{oldName} 的客户端必须改用 auto:{name}。",
     "renamePlaceholder": "新链名称",
-    "renameFailed": "无法重命名该链。"
+    "renameFailed": "无法重命名该链。",
+    "strategy": "路由策略",
+    "strategyHint": "这条链如何给模型排序。选择“继承”则使用全局设置。",
+    "strategyInherit": "继承全局",
+    "strategyPriority": "手动顺序",
+    "strategyBalanced": "平衡",
+    "strategySmartest": "最智能",
+    "strategyFastest": "最快",
+    "strategyReliable": "最稳定"
   },
   "updates": {
     "versionAvailable": "版本 {version} 可用",

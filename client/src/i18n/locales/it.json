@@ -1253,7 +1253,15 @@
     "renameHint": "Rinomina questa catena",
     "renameConfirm": "Rinominare la catena \"{oldName}\" in \"{name}\"? I client che chiamano auto:{oldName} devono passare a auto:{name}.",
     "renamePlaceholder": "Nuovo nome della catena",
-    "renameFailed": "Impossibile rinominare la catena."
+    "renameFailed": "Impossibile rinominare la catena.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "È disponibile la versione {version}",

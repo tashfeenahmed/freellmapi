@@ -1253,7 +1253,15 @@
     "renameHint": "Byt namn på denna kedja",
     "renameConfirm": "Byt namn på kedjan \"{oldName}\" till \"{name}\"? Klients som anropar auto:{oldName} måste byta till auto:{name}.",
     "renamePlaceholder": "Nytt kedjenamn",
-    "renameFailed": "Det gick inte att byta namn på kedjan."
+    "renameFailed": "Det gick inte att byta namn på kedjan.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Version {version} är tillgänglig",

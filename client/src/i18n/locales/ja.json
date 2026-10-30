@@ -1253,7 +1253,15 @@
     "renameHint": "このチェーンの名前を変更",
     "renameConfirm": "チェーン「{oldName}」を「{name}」に名前を変更しますか？ auto:{oldName} を呼び出しているクライアントは auto:{name} に切り替える必要があります。",
     "renamePlaceholder": "新しいチェーン名",
-    "renameFailed": "チェーンの名前を変更できませんでした。"
+    "renameFailed": "チェーンの名前を変更できませんでした。",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "バージョン {version} が利用可能です",

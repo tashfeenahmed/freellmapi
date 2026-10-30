@@ -1253,7 +1253,15 @@
     "renameHint": "ਇਸ ਚੇਨ ਦਾ ਨਾਂ ਬਦਲੋ",
     "renameConfirm": "ਚੇਨ \"{oldName}\" ਦਾ ਨਾਂ \"{name}\" ਕਰਨਾ? auto:{oldName} ਕਾਲ ਕਰਦੇ ਕਲਾਇੰਟਾਂ ਨੂੰ auto:{name} 'ਤੇ ਜਾਣਾ ਪਵੇਗਾ।",
     "renamePlaceholder": "ਨਵਾਂ ਚੇਨ ਨਾਂ",
-    "renameFailed": "ਚੇਨ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।"
+    "renameFailed": "ਚੇਨ ਦਾ ਨਾਂ ਨਹੀਂ ਬਦਲਿਆ ਜਾ ਸਕਿਆ।",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ਸੰਸਕਰਣ {version} ਉਪਲਬਧ ਹੈ",

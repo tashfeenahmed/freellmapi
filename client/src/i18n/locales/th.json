@@ -1253,7 +1253,15 @@
     "renameHint": "เปลี่ยนชื่อเชนนี้",
     "renameConfirm": "เปลี่ยนชื่อเชน \"{oldName}\" เป็น \"{name}\"? ไคลเอนต์ที่เรียก auto:{oldName} ต้องเปลี่ยนไปใช้ auto:{name} แทน",
     "renamePlaceholder": "ชื่อเชนใหม่",
-    "renameFailed": "ไม่สามารถเปลี่ยนชื่อเชนได้"
+    "renameFailed": "ไม่สามารถเปลี่ยนชื่อเชนได้",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "มีเวอร์ชัน {version} แล้ว",

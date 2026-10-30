@@ -1253,7 +1253,15 @@
     "renameHint": "ഈ ചെയിനിന്റെ പേരു മാറ്റുക",
     "renameConfirm": "ചെയിൻ \"{oldName}\" എന്നതിന്റെ പേരു \"{name}\" ആക്കണോ? auto:{oldName} വിളിക്കുന്ന ക്ലയന്റുകൾ auto:{name} ലേക്ക് മാറണം.",
     "renamePlaceholder": "പുതിയ ചെയിൻ പേര്",
-    "renameFailed": "ചെയിനിന്റെ പേരു മാറ്റാനായില്ല."
+    "renameFailed": "ചെയിനിന്റെ പേരു മാറ്റാനായില്ല.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "പതിപ്പ് {version} ലഭ്യമാണ്",

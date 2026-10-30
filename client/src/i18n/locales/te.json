@@ -1253,7 +1253,15 @@
     "renameHint": "ఈ చైన్ పేరును మార్చండి",
     "renameConfirm": "చైన్ \"{oldName}\" పేరును \"{name}\" గా మార్చాలా? auto:{oldName} ని కాల్ చేసే క్లయింట్లు auto:{name} కి మారాలి.",
     "renamePlaceholder": "కొత్త చైన్ పేరు",
-    "renameFailed": "చైన్ పేరును మార్చడం సాధ్యం కాలేదు."
+    "renameFailed": "చైన్ పేరును మార్చడం సాధ్యం కాలేదు.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "వెర్షన్ {version} అందుబాటులో ఉంది",

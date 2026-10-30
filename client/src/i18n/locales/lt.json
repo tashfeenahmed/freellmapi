@@ -1253,7 +1253,15 @@
     "renameHint": "Pervadinti šią grandinę",
     "renameConfirm": "Pervadinti grandinę „{oldName}“ į „{name}“? Klientai, kviečianti auto:{oldName}, turi pereiti prie auto:{name}.",
     "renamePlaceholder": "Naujas grandinės pavadinimas",
-    "renameFailed": "Nepavyko pervadinti šios grandinės."
+    "renameFailed": "Nepavyko pervadinti šios grandinės.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Galima versija {version}",

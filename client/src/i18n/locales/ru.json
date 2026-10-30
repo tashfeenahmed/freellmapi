@@ -1253,7 +1253,15 @@
     "renameHint": "Переименовать эту цепочку",
     "renameConfirm": "Переименовать цепочку \"{oldName}\" в \"{name}\"? Клиенты, обращающиеся к auto:{oldName}, должны перейти на auto:{name}.",
     "renamePlaceholder": "Новое имя цепочки",
-    "renameFailed": "Не удалось переименовать цепочку."
+    "renameFailed": "Не удалось переименовать цепочку.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Доступна версия {version}",

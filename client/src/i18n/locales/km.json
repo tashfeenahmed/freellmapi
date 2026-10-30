@@ -1253,7 +1253,15 @@
     "renameHint": "ប្តូរឈ្មោះខ្សែសង្វាក់នេះ",
     "renameConfirm": "ប្តូរឈ្មោះខ្សែសង្វាក់ \"{oldName}\" ទៅ \"{name}\"? កម្មវិធីដែលហៅ auto:{oldName} ត្រូវផ្លាស់ប្តូរទៅ auto:{name} ។",
     "renamePlaceholder": "ឈ្មោះខ្សែសង្វាក់ថ្មី",
-    "renameFailed": "មិនអាចប្តូរឈ្មោះខ្សែសង្វាក់បានទេ។"
+    "renameFailed": "មិនអាចប្តូរឈ្មោះខ្សែសង្វាក់បានទេ។",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "កំណែ {version} មានហើយ",

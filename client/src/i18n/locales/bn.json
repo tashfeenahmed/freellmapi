@@ -1253,7 +1253,15 @@
     "renameHint": "এই চেইনের নাম পরিবর্তন করুন",
     "renameConfirm": "চেইন \"{oldName}\" এর নাম \"{name}\" করবেন? auto:{oldName} কল করা ক্লায়েন্টদের auto:{name} এ যেতে হবে।",
     "renamePlaceholder": "নতুন চেইন নাম",
-    "renameFailed": "চেইনের নাম পরিবর্তন করা যায়নি।"
+    "renameFailed": "চেইনের নাম পরিবর্তন করা যায়নি।",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "সংস্করণ {version} উপলব্ধ",

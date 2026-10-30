@@ -1253,7 +1253,15 @@
     "renameHint": "Преименуј овај ланац",
     "renameConfirm": "Преименовати ланац „{oldName}“ у „{name}“? Клијенти који зову auto:{oldName} морају прећи на auto:{name}.",
     "renamePlaceholder": "Нови назив ланца",
-    "renameFailed": "Није могуће преименовати тај ланац."
+    "renameFailed": "Није могуће преименовати тај ланац.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Доступна је верзија {version}",

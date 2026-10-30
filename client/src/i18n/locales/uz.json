@@ -1253,7 +1253,15 @@
     "renameHint": "Ushbu zanjir nomini o'zgartirish",
     "renameConfirm": "\"{oldName}\" zanjir nomini \"{name}\" ga o'zgartirilsinmi? auto:{oldName} ga murojaat qiladigan mijozlar auto:{name} ga o'tishi kerak.",
     "renamePlaceholder": "Yangi zanjir nomi",
-    "renameFailed": "Zanjir nomini o'zgartirib bo'lmadi."
+    "renameFailed": "Zanjir nomini o'zgartirib bo'lmadi.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "{version} versiyasi mavjud",

@@ -1253,7 +1253,15 @@
     "renameHint": "إعادة تسمية هذه السلسلة",
     "renameConfirm": "إعادة تسمية السلسلة \"{oldName}\" إلى \"{name}\"؟ يجب على العملاء الذين يستدعون auto:{oldName} التحول إلى auto:{name}.",
     "renamePlaceholder": "الاسم الجديد للسلسلة",
-    "renameFailed": "تعذّرت إعادة تسمية السلسلة."
+    "renameFailed": "تعذّرت إعادة تسمية السلسلة.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "الإصدار {version} متاح",

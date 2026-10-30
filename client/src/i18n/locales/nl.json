@@ -1253,7 +1253,15 @@
     "renameHint": "Deze keten hernoemen",
     "renameConfirm": "Keten \"{oldName}\" hernoemen naar \"{name}\"? Clients die auto:{oldName} aanroepen moeten overstappen op auto:{name}.",
     "renamePlaceholder": "Nieuwe ketennaam",
-    "renameFailed": "Kan de naam van die keten niet wijzigen."
+    "renameFailed": "Kan de naam van die keten niet wijzigen.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Versie {version} is beschikbaar",

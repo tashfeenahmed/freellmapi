@@ -1253,7 +1253,15 @@
     "renameHint": "Nimeä tämä ketju uudelleen",
     "renameConfirm": "Nimetäänkö ketju \"{oldName}\" nimelle \"{name}\"? Kutsua auto:{oldName} käyttävien asiakkaiden on vaihdettava kutsuun auto:{name}.",
     "renamePlaceholder": "Uusi ketjun nimi",
-    "renameFailed": "Ketjua ei voitu nimetä uudelleen."
+    "renameFailed": "Ketjua ei voitu nimetä uudelleen.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Versio {version} on saatavilla",

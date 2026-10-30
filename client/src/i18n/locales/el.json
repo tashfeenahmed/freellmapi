@@ -1253,7 +1253,15 @@
     "renameHint": "Μετονομασία αυτής της αλυσίδας",
     "renameConfirm": "Μετονομασία της αλυσίδας \"{oldName}\" σε \"{name}\"; Οι πελάτες που καλούν auto:{oldName} πρέπει να μεταβούν σε auto:{name}.",
     "renamePlaceholder": "Νέο όνομα αλυσίδας",
-    "renameFailed": "Δεν ήταν δυνατή η μετονομασία της αλυσίδας."
+    "renameFailed": "Δεν ήταν δυνατή η μετονομασία της αλυσίδας.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Η έκδοση {version} είναι διαθέσιμη",

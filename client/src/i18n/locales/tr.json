@@ -1253,7 +1253,15 @@
     "renameHint": "Bu zinciri yeniden adlandır",
     "renameConfirm": "\"{oldName}\" zincirinin adı \"{name}\" olarak değiştirilsin mi? auto:{oldName} kullanan istemcilerin auto:{name} değerine geçmesi gerekir.",
     "renamePlaceholder": "Yeni zincir adı",
-    "renameFailed": "Zincir yeniden adlandırılamadı."
+    "renameFailed": "Zincir yeniden adlandırılamadı.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "{version} sürümü kullanılabilir",

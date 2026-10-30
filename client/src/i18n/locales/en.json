@@ -1253,7 +1253,15 @@
     "renameHint": "Rename this chain",
     "renameConfirm": "Rename chain \"{oldName}\" to \"{name}\"? Clients calling auto:{oldName} must switch to auto:{name}.",
     "renamePlaceholder": "New chain name",
-    "renameFailed": "Couldn't rename the chain."
+    "renameFailed": "Couldn't rename the chain.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Version {version} is available",

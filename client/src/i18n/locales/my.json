@@ -1253,7 +1253,15 @@
     "renameHint": "ဤချိန်း၏ အမည်ကို ပြောင်းရန်",
     "renameConfirm": "ချိန်း \"{oldName}\" ကို \"{name}\" အမည်ပြောင်းမလား? auto:{oldName} ကိုခေါ်ဆိုသော client များသည် auto:{name} သို့ ပြောင်းရမည်။",
     "renamePlaceholder": "ချိန်းအမည်အသစ်",
-    "renameFailed": "ချိန်းအမည်ကို မပြောင်းနိုင်ပါ။"
+    "renameFailed": "ချိန်းအမည်ကို မပြောင်းနိုင်ပါ။",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ဗားရှင်း {version} ရရှိနိုင်ပါပြီ",

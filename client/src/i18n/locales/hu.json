@@ -1253,7 +1253,15 @@
     "renameHint": "Lánc átnevezése",
     "renameConfirm": "Lánc \"{oldName}\" átnevezése \"{name}\"-re? A(z) auto:{oldName}-t hívó ügyfeleknek át kell térniük auto:{name}-re.",
     "renamePlaceholder": "Új láncnév",
-    "renameFailed": "Nem sikerült átnevezni a láncot."
+    "renameFailed": "Nem sikerült átnevezni a láncot.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Elérhető a(z) {version} verzió",

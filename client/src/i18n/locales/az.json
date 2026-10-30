@@ -1253,7 +1253,15 @@
     "renameHint": "Bu zəncirin adını dəyiş",
     "renameConfirm": "\"{oldName}\" zəncirinin adı \"{name}\" ilə dəyişilsin? auto:{oldName} səsləyən müştərilər auto:{name} keçməlidir.",
     "renamePlaceholder": "Yeni zəncir adı",
-    "renameFailed": "Zəncirin adını dəyişmək alınmadı."
+    "renameFailed": "Zəncirin adını dəyişmək alınmadı.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "{version} versiyası mövcuddur",

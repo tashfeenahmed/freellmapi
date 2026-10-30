@@ -52,6 +52,9 @@ const updateSchema = z.object({
   auto_sort: z.enum(['intelligence', 'speed', 'budget']).nullable().optional(),
   layout_config: z.string().nullable().optional(),
   auto_include_new_models: z.boolean().optional(),
+  // Per-chain routing preset (#XXXX). NULL/omitted inherits the global
+  // routing_strategy, so untouched chains behave exactly as before.
+  routing_strategy: z.enum(['priority', 'balanced', 'smartest', 'fastest', 'reliable']).nullable().optional(),
 });
 
 function getId(req: Request): number {
@@ -66,7 +69,7 @@ function getId(req: Request): number {
 profilesRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const profiles = db.prepare(`
-    SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, layout_config, auto_include_new_models, created_at
+    SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, routing_strategy, layout_config, auto_include_new_models, created_at
     FROM profiles
     ORDER BY (CASE WHEN type = 'default' THEN 1 ELSE 0 END) DESC, is_favorite DESC, sort_order ASC, id ASC
   `).all();
@@ -190,7 +193,7 @@ profilesRouter.post('/', (req: Request, res: Response) => {
     }
   }
 
-  const created = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
+  const created = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, routing_strategy, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
   res.status(201).json(created);
 });
 
@@ -267,7 +270,7 @@ profilesRouter.put('/:id', (req: Request, res: Response) => {
     sortProfileModels(db, profileId, parsed.data.auto_sort);
   }
 
-  const updated = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
+  const updated = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, routing_strategy, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
   res.json(updated);
 });
 
@@ -340,7 +343,7 @@ profilesRouter.post('/:id/reset', (req: Request, res: Response) => {
   });
   transaction();
 
-  const updated = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
+  const updated = db.prepare('SELECT id, name, emoji, color, type, is_favorite, sort_order, auto_sort, routing_strategy, layout_config, auto_include_new_models, created_at FROM profiles WHERE id = ?').get(profileId);
   res.json(updated);
 });
 

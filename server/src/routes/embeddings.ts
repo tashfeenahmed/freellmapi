@@ -13,6 +13,7 @@ import {
   EmbeddingsError,
   type EmbeddingModelRow,
 } from '../services/embeddings.js';
+import { recordPlacementPin, clearPlacementPin } from '../services/embedding-placement.js';
 
 export const embeddingsRouter = Router();
 
@@ -177,6 +178,9 @@ const updateSchema = z.object({
     id: z.number(),
     priority: z.number(),
     enabled: z.boolean(),
+    // Moves the row into another family (the dashboard drops a provider onto a
+    // different family card). Omitted → a plain priority/enabled edit, unchanged.
+    family: z.string().optional(),
   })).optional(),
 });
 
@@ -199,10 +203,64 @@ embeddingsRouter.put('/', (req: Request, res: Response) => {
 
   if (parsed.data.providers) {
     const update = db.prepare('UPDATE embedding_models SET priority = ?, enabled = ? WHERE id = ?');
-    const apply = db.transaction((rows: { id: number; priority: number; enabled: boolean }[]) => {
-      for (const r of rows) update.run(r.priority, r.enabled ? 1 : 0, r.id);
-    });
-    apply(parsed.data.providers);
+    const currentRow = db.prepare('SELECT family, dimensions FROM embedding_models WHERE id = ?');
+    const moveRow = db.prepare('UPDATE embedding_models SET family = ?, priority = ?, enabled = ? WHERE id = ?');
+    // A bare aggregate over an empty family still returns one row with NULL
+    // columns, so COUNT(*) is what separates "no such family" from "empty family".
+    const targetFamily = db.prepare(
+      'SELECT COUNT(*) AS n, MIN(dimensions) AS dimensions, MAX(priority) AS maxPriority FROM embedding_models WHERE family = ?',
+    );
+    const familySize = db.prepare('SELECT COUNT(*) AS n FROM embedding_models WHERE family = ?');
+    const apply = db.transaction(
+      (rows: { id: number; priority: number; enabled: boolean; family?: string }[]) => {
+        for (const r of rows) {
+          const current = currentRow.get(r.id) as { family: string; dimensions: number } | undefined;
+          if (!current) throw new EmbeddingsError(`Unknown embedding model ${r.id}`, 404);
+          const target = r.family?.trim() || null;
+          if (!target || target === current.family) {
+            update.run(r.priority, r.enabled ? 1 : 0, r.id);
+            continue;
+          }
+          const dest = targetFamily.get(target) as {
+            n: number;
+            dimensions: number | null;
+            maxPriority: number | null;
+          };
+          if (dest.n === 0) throw new EmbeddingsError(`Unknown family '${target}'`, 400);
+          // Same model identity and same width, or not at all: a family is one
+          // vector space, and a silent dimension mismatch would corrupt every
+          // vector already stored under the target.
+          if (dest.dimensions !== current.dimensions) {
+            throw new EmbeddingsError(
+              `Embedding family '${target}' is ${dest.dimensions} dimensions, but model ${r.id} is ${current.dimensions}. Create a family of its own instead.`,
+              400,
+            );
+          }
+          // Appended, not inserted: the caller asked for "be part of this chain",
+          // and the arrow buttons are what orders it inside the chain.
+          const nextPriority = (dest.maxPriority ?? 0) + 1;
+          moveRow.run(target, nextPriority, r.enabled ? 1 : 0, r.id);
+          // catalog-sync rewrites family/priority from its snapshot at boot and
+          // twice a day; the pin is what keeps this move in place across re-applies.
+          recordPlacementPin(db, r.id, { family: target, priority: nextPriority });
+          // Moving the last member out of the default family would leave
+          // `embeddings_default_family` naming a family that no longer exists,
+          // which 503s every `model: "auto"` caller — follow the move instead.
+          if ((familySize.get(current.family) as { n: number }).n === 0 && getDefaultFamily() === current.family) {
+            setSetting('embeddings_default_family', target);
+          }
+        }
+      },
+    );
+    try {
+      apply(parsed.data.providers);
+    } catch (err: any) {
+      if (err instanceof EmbeddingsError) {
+        res.status(err.status).json({ error: { message: err.message, type: 'invalid_request_error' } });
+        return;
+      }
+      throw err;
+    }
   }
 
   res.json({ success: true });
@@ -225,6 +283,9 @@ embeddingsRouter.delete('/custom/:id', (req: Request, res: Response) => {
   const remove = db.transaction(() => {
     db.prepare("DELETE FROM embedding_models WHERE id = ? AND platform = 'custom'").run(id);
     deleteUnusedCustomEndpointKey(db, row.key_id);
+    // A pin outliving its row would be replayed onto whatever id the row is
+    // reseeded as — drop it with the row.
+    clearPlacementPin(db, id);
   });
   remove();
   if (getDefaultFamily() === row.family) {

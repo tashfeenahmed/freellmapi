@@ -1253,7 +1253,15 @@
     "renameHint": "Palitan ang pangalan ng chain na ito",
     "renameConfirm": "Palitan ang pangalan ng chain \"{oldName}\" sa \"{name}\"? Ang mga client na tumatawag ng auto:{oldName} ay dapat lumipat sa auto:{name}.",
     "renamePlaceholder": "Bagong pangalan ng chain",
-    "renameFailed": "Hindi mapalitan ang pangalan ng chain."
+    "renameFailed": "Hindi mapalitan ang pangalan ng chain.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Available na ang bersyon {version}",

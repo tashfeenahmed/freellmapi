@@ -1253,7 +1253,15 @@
     "renameHint": "Renommer cette chaîne",
     "renameConfirm": "Renommer la chaîne « {oldName} » en « {name} » ? Les clients appelant auto:{oldName} doivent passer à auto:{name}.",
     "renamePlaceholder": "Nouveau nom de la chaîne",
-    "renameFailed": "Impossible de renommer cette chaîne."
+    "renameFailed": "Impossible de renommer cette chaîne.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "La version {version} est disponible",

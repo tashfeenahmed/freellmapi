@@ -1253,7 +1253,15 @@
     "renameHint": "આ ચેનનું નામ બદલો",
     "renameConfirm": "ચેન \"{oldName}\" નું નામ \"{name}\" કરવું? auto:{oldName} કૉલ કરતા ક્લાયન્ટ્સે auto:{name} પર જવું પડશે.",
     "renamePlaceholder": "નવું ચેન નામ",
-    "renameFailed": "ચેનનું નામ બદલી શકાયું નહીં."
+    "renameFailed": "ચેનનું નામ બદલી શકાયું નહીં.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "સંસ્કરણ {version} ઉપલબ્ધ છે",

@@ -1253,7 +1253,15 @@
     "renameHint": "이 체인의 이름 변경",
     "renameConfirm": "체인 \"{oldName}\"의 이름을 \"{name}\"(으)로 변경하시겠습니까? auto:{oldName}을(를) 호출하는 클라이언트는 auto:{name}(으)로 전환해야 합니다.",
     "renamePlaceholder": "새 체인 이름",
-    "renameFailed": "체인 이름을 변경하지 못했습니다."
+    "renameFailed": "체인 이름을 변경하지 못했습니다.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "버전 {version}을(를) 사용할 수 있습니다",

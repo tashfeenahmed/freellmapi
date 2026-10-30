@@ -1253,7 +1253,15 @@
     "renameHint": "Перейменувати цей ланцюг",
     "renameConfirm": "Перейменувати ланцюг \"{oldName}\" на \"{name}\"? Клієнти, що викликають auto:{oldName}, мають перейти на auto:{name}.",
     "renamePlaceholder": "Нова назва ланцюга",
-    "renameFailed": "Не вдалося перейменувати ланцюг."
+    "renameFailed": "Не вдалося перейменувати ланцюг.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Доступна версія {version}",

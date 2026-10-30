@@ -1253,7 +1253,15 @@
     "renameHint": "Badilisha jina la mnyororo huu",
     "renameConfirm": "Badilisha jina la mnyororo \"{oldName}\" kuwa \"{name}\"? Wateja wanaoitia auto:{oldName} lazima wabadilike kwa auto:{name}.",
     "renamePlaceholder": "Jina jipya la mnyororo",
-    "renameFailed": "Imeshindwa kubadilisha jina la mnyororo."
+    "renameFailed": "Imeshindwa kubadilisha jina la mnyororo.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Toleo {version} linapatikana",

@@ -1253,7 +1253,15 @@
     "renameHint": "Đổi tên chuỗi này",
     "renameConfirm": "Đổi tên chuỗi \"{oldName}\" thành \"{name}\"? Các client gọi auto:{oldName} phải chuyển sang auto:{name}.",
     "renamePlaceholder": "Tên chuỗi mới",
-    "renameFailed": "Không thể đổi tên chuỗi."
+    "renameFailed": "Không thể đổi tên chuỗi.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Đã có phiên bản {version}",

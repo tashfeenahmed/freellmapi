@@ -1253,7 +1253,15 @@
     "renameHint": "Diese Kette umbenennen",
     "renameConfirm": "Kette \"{oldName}\" in \"{name}\" umbenennen? Clients, die auto:{oldName} aufrufen, müssen auf auto:{name} wechseln.",
     "renamePlaceholder": "Neuer Kettenname",
-    "renameFailed": "Die Kette konnte nicht umbenannt werden."
+    "renameFailed": "Die Kette konnte nicht umbenannt werden.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Version {version} ist verfügbar",

@@ -1253,7 +1253,15 @@
     "renameHint": "இந்த சங்கிலியின் பெயரிடவும்",
     "renameConfirm": "\"{oldName}\" சங்கிலியை \"{name}\" என மறுபெயரிடவா? auto:{oldName} அழைக்கும் கிளையண்டுகள் auto:{name} க்கு மாற வேண்டும்.",
     "renamePlaceholder": "புதிய சங்கிலி பெயர்",
-    "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை."
+    "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "பதிப்பு {version} கிடைக்கிறது",
