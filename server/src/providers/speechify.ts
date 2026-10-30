@@ -7,6 +7,7 @@ export const SPEECHIFY_VERSION = '2026-09-08';
 /** Speechify is TTS-only. Synthesis is dispatched by services/media.ts;
  * registration here provides credential management, not a fake chat API. */
 export class SpeechifyProvider extends BaseProvider {
+  override readonly supportsChat = false;
   readonly platform = 'speechify' as const;
   readonly name = 'Speechify';
 

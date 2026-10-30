@@ -6,6 +6,7 @@ export const BEATAPI_BASE_URL = 'https://api.beatapi.io/v1';
 /** Decision-only integration. Model availability and promotional terms live
  * in the signed catalog, not bundled seeds or the chat router. */
 export class BeatApiProvider extends BaseProvider {
+  override readonly supportsChat = false;
   readonly platform = 'beatapi' as const;
   readonly name = 'BeatAPI';
 
