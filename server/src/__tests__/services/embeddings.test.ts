@@ -3,6 +3,7 @@ import type { MockedFunction } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { resolveFamily, getDefaultFamily, runEmbeddings } from '../../services/embeddings.js';
+import { clearCooldownsForKey, setCooldown } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -49,6 +50,23 @@ describe('embeddings service', () => {
   afterEach(() => {
     globalThis.fetch = realFetch;
     vi.restoreAllMocks();
+  });
+
+  it('returns the remaining cooldown when every custom embedding key is cooling down', async () => {
+    const keyId = addCustomKey('https://embeddings.example/v1');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)
+      VALUES ('cooling-embed', 'custom', 'cooling-embed', 'Local', 2, 1, 1, '', ?)`).run(keyId);
+    setCooldown('custom', 'cooling-embed', keyId, 120_000);
+    const fetchMock = mockFetch(vi.fn());
+    try {
+      const err = await runEmbeddings('cooling-embed', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeGreaterThan(119_000);
+      expect(err.retryAfterMs).toBeLessThanOrEqual(120_000);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      clearCooldownsForKey(keyId);
+    }
   });
 
   it('reserves the shared monthly budget across concurrent embeddings and releases failures', async () => {

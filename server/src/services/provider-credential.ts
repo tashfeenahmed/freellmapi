@@ -2,6 +2,8 @@ import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { reserveMonthlyBudget } from './key-budget.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { getActiveCooldownsForKeys, isOnCooldown } from './ratelimit.js';
+import { RetryHintTracker } from '../lib/retry-hint.js';
 
 export interface ReservedProviderCredential {
   id: number;
@@ -27,8 +29,8 @@ export function reserveProviderCredential(
   row: { platform: string; key_id: number | null; model_id?: string },
   estimatedTokens: number,
   skip: (keyId: number) => boolean = () => false,
-): { credential: ReservedProviderCredential | null; budgetBlocked: boolean } {
-  if (row.platform === 'custom' && row.key_id == null) return { credential: null, budgetBlocked: false };
+): { credential: ReservedProviderCredential | null; budgetBlocked: boolean; cooldownBlocked: boolean; cooldownRetryAfterMs?: number } {
+  if (row.platform === 'custom' && row.key_id == null) return { credential: null, budgetBlocked: false, cooldownBlocked: false };
   const bound = row.key_id != null;
   const customEndpoint = row.platform === 'custom' && bound;
   const keys = getDb().prepare(`
@@ -39,9 +41,20 @@ export function reserveProviderCredential(
       AND status IN ('healthy', 'unknown') ORDER BY RANDOM()
   `).all(...(customEndpoint ? [row.key_id, row.key_id] : [bound ? row.key_id : row.platform])) as KeyRow[];
   let budgetBlocked = false;
+  let cooldownBlocked = false;
+  const cooldownHints = new RetryHintTracker();
+  const cooldowns = customEndpoint && row.model_id
+    ? getActiveCooldownsForKeys(keys.map(key => key.id))
+    : null;
   for (const keyRow of keys) {
     if (skip(keyRow.id)) continue;
     if (customEndpoint && row.model_id && !scopeAllows(parseModelScope(keyRow.model_scope_json), row.model_id)) continue;
+    if (customEndpoint && row.model_id && isOnCooldown(row.platform, row.model_id, keyRow.id)) {
+      cooldownBlocked = true;
+      const cooldown = cooldowns?.get(keyRow.id)?.find(c => c.platform === row.platform && c.modelId === row.model_id);
+      cooldownHints.record(429, cooldown?.remainingMs);
+      continue;
+    }
     let key: string;
     try {
       key = decrypt(keyRow.encrypted_key, keyRow.iv, keyRow.auth_tag);
@@ -57,7 +70,9 @@ export function reserveProviderCredential(
         release: reservation.release,
       },
       budgetBlocked,
+      cooldownBlocked,
+      cooldownRetryAfterMs: cooldownHints.retryAfterMs(),
     };
   }
-  return { credential: null, budgetBlocked };
+  return { credential: null, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs: cooldownHints.retryAfterMs() };
 }

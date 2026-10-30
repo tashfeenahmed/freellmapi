@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
-import { clearCooldownsForKey, isOnCooldown } from '../../services/ratelimit.js';
+import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription } from '../../services/media.js';
+import { clearCooldownsForKey, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -89,6 +89,87 @@ describe('media service', () => {
   });
 
   describe('image generation', () => {
+    it('returns the soonest cooldown when every eligible custom image key is cooling down', async () => {
+      const first = addCustomKey('https://media.example/v1', 'first-key');
+      const second = addCustomKey('https://media.example/v1', 'second-key');
+      const excluded = addCustomKey('https://media.example/v1', 'scoped-key');
+      addMedia('custom', 'cooling-image', 'image', 1, first);
+      getDb().prepare('UPDATE api_keys SET model_scope_json = ? WHERE id = ?').run('["other-model"]', excluded);
+      setCooldown('custom', 'cooling-image', first, 120_000);
+      setCooldown('custom', 'cooling-image', second, 180_000);
+      setCooldown('custom', 'cooling-image', excluded, 1_000);
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as any;
+      try {
+        const err = await runImageGeneration('cooling-image', { prompt: 'a cat' }).catch(e => e);
+        expect(err.status).toBe(429);
+        expect(err.retryAfterMs).toBeGreaterThan(119_000);
+        expect(err.retryAfterMs).toBeLessThanOrEqual(120_000);
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        for (const id of [first, second, excluded]) clearCooldownsForKey(id);
+      }
+    });
+
+    it('keeps an authentication failure when a sibling is cooling down', async () => {
+      const active = addCustomKey('https://media.example/v1', 'active-key');
+      const cooling = addCustomKey('https://media.example/v1', 'cooling-key');
+      addMedia('custom', 'mixed-image', 'image', 1, active);
+      setCooldown('custom', 'mixed-image', cooling, 120_000);
+      const fetchMock = vi.fn(async () => new Response('invalid key', { status: 401 }));
+      globalThis.fetch = fetchMock as any;
+      try {
+        const err = await runImageGeneration('mixed-image', { prompt: 'a cat' }).catch(e => e);
+        expect(err.status).toBe(502);
+        expect(err.retryAfterMs).toBeUndefined();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      } finally {
+        clearCooldownsForKey(cooling);
+      }
+    });
+
+    it('uses the cooldown delay when another custom key has exhausted its monthly budget', async () => {
+      const spent = addCustomKey('https://media.example/v1', 'spent-key');
+      const cooling = addCustomKey('https://media.example/v1', 'cooling-key');
+      addMedia('custom', 'budget-cooling-image', 'image', 1, spent);
+      getDb().prepare('UPDATE api_keys SET monthly_request_cap = 1 WHERE id = ?').run(spent);
+      getDb().prepare(`INSERT INTO requests (platform, model_id, key_id, status, latency_ms)
+        VALUES ('custom', 'budget-cooling-image', ?, 'success', 1)`).run(spent);
+      setCooldown('custom', 'budget-cooling-image', cooling, 120_000);
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as any;
+      try {
+        const err = await runImageGeneration('budget-cooling-image', { prompt: 'a cat' }).catch(e => e);
+        expect(err.status).toBe(429);
+        expect(err.retryAfterMs).toBeGreaterThan(119_000);
+        expect(err.retryAfterMs).toBeLessThanOrEqual(120_000);
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        clearCooldownsForKey(cooling);
+      }
+    });
+
+    it('preserves the upstream transcription delay in its custom key cooldown', async () => {
+      const keyId = addCustomKey('https://stt.example/v1', 'stt-key');
+      getDb().prepare(`INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
+        VALUES ('custom', 'cooling-stt', 'STT', 'transcription', 1, 1, '', ?)`).run(keyId);
+      const fetchMock = vi.fn(async () => new Response('slow down', { status: 429, headers: { 'retry-after': '300' } }));
+      globalThis.fetch = fetchMock as any;
+      const params = { file: Buffer.from('audio'), filename: 'clip.wav', responseFormat: 'json' };
+      try {
+        await expect(runTranscription('cooling-stt', params)).rejects.toMatchObject({ status: 429, retryAfterMs: 300_000 });
+        const cooldown = getDb().prepare(`SELECT expires_at_ms FROM rate_limit_cooldowns
+          WHERE platform = 'custom' AND model_id = 'cooling-stt' AND key_id = ?`).get(keyId) as { expires_at_ms: number };
+        expect(cooldown.expires_at_ms - Date.now()).toBeGreaterThan(299_000);
+        const err = await runTranscription('cooling-stt', params).catch(e => e);
+        expect(err.status).toBe(429);
+        expect(err.retryAfterMs).toBeGreaterThan(299_000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      } finally {
+        clearCooldownsForKey(keyId);
+      }
+    });
+
     function twoImageProviders() {
       addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 'image', 1);
       addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 'image', 2);
@@ -559,6 +640,23 @@ describe('media service', () => {
   });
 
   describe('text-to-speech', () => {
+    it('returns the remaining cooldown when every custom speech key is cooling down', async () => {
+      const keyId = addCustomKey('https://speech.example/v1');
+      addMedia('custom', 'cooling-speech', 'audio', 1, keyId);
+      setCooldown('custom', 'cooling-speech', keyId, 120_000);
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as any;
+      try {
+        const err = await runSpeech('cooling-speech', { input: 'hello' }).catch(e => e);
+        expect(err.status).toBe(429);
+        expect(err.retryAfterMs).toBeGreaterThan(119_000);
+        expect(err.retryAfterMs).toBeLessThanOrEqual(120_000);
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        clearCooldownsForKey(keyId);
+      }
+    });
+
     const freeAiUrl = 'https://api.free.ai/static/outputs/1bcc722e-4ddf-4e15-995a-b274000f99e5.wav';
     const freeAiWav = () => { const b = Buffer.alloc(48); b.write('RIFF'); b.write('WAVE', 8); return b; };
 

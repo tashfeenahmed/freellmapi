@@ -14,7 +14,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { setCooldown } from './ratelimit.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -400,12 +400,15 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
   for (const row of chain) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs), keyId => tried.has(keyId)
-        || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = reserveProviderCredential(row, estimateTokens(inputs), keyId => tried.has(keyId));
       if (!credential) {
         if (budgetBlocked) {
           lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
           hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        if (cooldownBlocked) {
+          lastError ??= new EmbeddingsError('Provider keys are cooling down', 429);
+          hints.record(429, cooldownRetryAfterMs);
         }
         break;
       }

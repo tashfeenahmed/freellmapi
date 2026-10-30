@@ -899,14 +899,17 @@ export async function runImageGeneration(model: string | undefined, params: Imag
   for (const row of chain) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-        : reserveProviderCredential(row, 0, keyId => tried.has(keyId)
-          || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform)
+        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false, cooldownBlocked: false, cooldownRetryAfterMs: undefined }
+        : reserveProviderCredential(row, 0, keyId => tried.has(keyId));
       if (!credential) {
         if (budgetBlocked) {
           lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
           hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        if (cooldownBlocked) {
+          lastError ??= new MediaError('Provider keys are cooling down', 429);
+          hints.record(429, cooldownRetryAfterMs);
         }
         break;
       }
@@ -1261,12 +1264,16 @@ export async function runTranscription(model: string | undefined, p: Transcripti
   for (const m of usable) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId, model_id: m.modelId }, 0,
-        keyId => tried.has(keyId) || isOnCooldown(m.platform, m.modelId, keyId));
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId, model_id: m.modelId }, 0,
+        keyId => tried.has(keyId) || (m.platform !== 'custom' && isOnCooldown(m.platform, m.modelId, keyId)));
       if (!credential) {
         if (budgetBlocked) {
           lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
           hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        if (cooldownBlocked) {
+          lastError ??= new MediaError('Provider keys are cooling down', 429);
+          hints.record(429, cooldownRetryAfterMs);
         }
         break;
       }
@@ -1284,7 +1291,7 @@ export async function runTranscription(model: string | undefined, p: Transcripti
         const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
         logMedia(logRow, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
         if (e.status === 429 && credential.id != null) {
-          setCooldown(m.platform, m.modelId, credential.id);
+          setCooldown(m.platform, m.modelId, credential.id, e.retryAfterMs);
         }
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
@@ -1306,14 +1313,17 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
   for (const row of chain) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-        : reserveProviderCredential(row, 0, keyId => tried.has(keyId)
-          || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform)
+        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false, cooldownBlocked: false, cooldownRetryAfterMs: undefined }
+        : reserveProviderCredential(row, 0, keyId => tried.has(keyId));
       if (!credential) {
         if (budgetBlocked) {
           lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
           hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        if (cooldownBlocked) {
+          lastError ??= new MediaError('Provider keys are cooling down', 429);
+          hints.record(429, cooldownRetryAfterMs);
         }
         break;
       }
