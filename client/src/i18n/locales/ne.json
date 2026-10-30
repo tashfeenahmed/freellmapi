@@ -450,6 +450,7 @@
     "adding": "थप्दैछ...",
     "selectProvider": "प्रदायक चयन गर्नुहोस्...",
     "accountId": "खाता आईडी",
+    "projectId": "परियोजना ID",
     "label": "लेबुल",
     "noKeyNeeded": "(कुञ्जी आवश्यक पर्दैन)",
     "outboundProxy": "आउटबाउन्ड प्रोक्सी",

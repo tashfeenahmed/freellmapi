@@ -450,6 +450,7 @@
     "adding": "Hozzátéve...",
     "selectProvider": "Válassz szolgáltatót...",
     "accountId": "Számlaazonosító",
+    "projectId": "Projektazonosító",
     "label": "Kiadó",
     "noKeyNeeded": "(kulcs nincs szükséges)",
     "outboundProxy": "Kimenő proxy",

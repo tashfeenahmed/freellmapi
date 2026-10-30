@@ -51,6 +51,33 @@ describe('embeddings service', () => {
     vi.restoreAllMocks();
   });
 
+  it('routes JamAI embeddings with project-scoped auth, native payload and fixed vectors', async () => {
+    addKey('jamai', 'proj_example:jamai_pat_testsecret');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+      VALUES ('jamai-test', 'jamai', 'ellm/BAAI/bge-m3', 'BGE M3', 1024, 1, 1, '')`).run();
+    const fetch = mockFetch(async () => new Response(JSON.stringify({ model: 'ellm/BAAI/bge-m3',
+      data: [{ index: 0, embedding: Array(1024).fill(0.1) }], usage: { prompt_tokens: 3 } })));
+    const result = await runEmbeddings('jamai-test', ['hello']);
+    expect(result.dimensions).toBe(1024);
+    expect(fetch.mock.calls[0][0]).toBe('https://api.jamaibase.com/api/v1/embeddings');
+    expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'error', headers: {
+      Authorization: 'Bearer jamai_pat_testsecret', 'X-PROJECT-ID': 'proj_example',
+    } });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ model: 'ellm/BAAI/bge-m3', input: ['hello'], type: 'document', encoding_format: 'float' });
+  });
+
+  it('rejects substituted JamAI embeddings and never logs credential-bearing error bodies', async () => {
+    addKey('jamai', 'proj_example:jamai_pat_testsecret');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
+      VALUES ('jamai-test', 'jamai', 'ellm/BAAI/bge-m3', 'BGE M3', 1024, 1, 1, '')`).run();
+    const fetch = mockFetch(async () => new Response(JSON.stringify({ model: 'wrong', data: [{ index: 0, embedding: [0.1] }] })));
+    await expect(runEmbeddings('jamai-test', ['hello'])).rejects.toThrow('malformed embeddings');
+    fetch.mockResolvedValue(new Response(JSON.stringify({ request_headers: { authorization: 'jamai_pat_testsecret' } }), { status: 403 }));
+    const error = await runEmbeddings('jamai-test', ['hello']).catch(e => e);
+    expect(String(error)).not.toContain('testsecret');
+    expect(String(error)).toContain('403');
+  });
+
   it('reserves the shared monthly budget across concurrent embeddings and releases failures', async () => {
     const keyId = addCustomKey('https://embeddings.example/v1');
     const db = getDb();

@@ -450,6 +450,7 @@
     "adding": "新增中...",
     "selectProvider": "請選擇一個提供者...",
     "accountId": "帳戶 ID",
+    "projectId": "專案 ID",
     "label": "標籤",
     "noKeyNeeded": "（無需金鑰）",
     "outboundProxy": "出站代理",

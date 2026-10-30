@@ -236,6 +236,7 @@ export interface PlatformParamPolicy {
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
 export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPolicy>> = {
+  jamai: { drop: ['top_k', 'min_p', 'seed', 'repetition_penalty', 'logprobs', 'top_logprobs', 'response_format'] },
   // Inferbase Free managed inference rejects output budgets above 1,024.
   // Match the documented upstream ceiling, not a new application quota.
   inferbase: { defaultMaxTokens: 1024, maxTokensCap: 1024 },
@@ -445,7 +446,10 @@ export function supportedParametersFor(platform: string, caps: { tools?: boolean
     'temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stop', 'stream',
     ...EXTENDED_SAMPLING_KEYS.filter(k => !dropped.has(k)),
   ];
-  if (caps.tools) params.push('tools', 'tool_choice', 'parallel_tool_calls');
+  if (caps.tools) {
+    params.push('tools', 'tool_choice');
+    if (platform !== 'jamai') params.push('parallel_tool_calls');
+  }
   return params;
 }
 

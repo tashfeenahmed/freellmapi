@@ -450,6 +450,7 @@
     "adding": "กำลังเพิ่ม...",
     "selectProvider": "เลือกผู้ให้บริการ...",
     "accountId": "รหัสบัญชี",
+    "projectId": "รหัสโปรเจกต์",
     "label": "ป้ายกำกับ",
     "noKeyNeeded": "(ไม่ต้องใช้กุญแจ)",
     "outboundProxy": "พร็อกซีขาออก",

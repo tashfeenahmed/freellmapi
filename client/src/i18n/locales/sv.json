@@ -450,6 +450,7 @@
     "adding": "Lägger till...",
     "selectProvider": "Välj en leverantör...",
     "accountId": "Konto-ID",
+    "projectId": "Projekt-ID",
     "label": "Etikett",
     "noKeyNeeded": "(ingen nyckel behövs)",
     "outboundProxy": "Utgående proxy",

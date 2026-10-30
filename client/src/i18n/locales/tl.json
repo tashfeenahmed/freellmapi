@@ -450,6 +450,7 @@
     "adding": "Dagdag pa...",
     "selectProvider": "Pumili ng provider...",
     "accountId": "Account ID",
+    "projectId": "ID ng proyekto",
     "label": "Label",
     "noKeyNeeded": "(hindi kailangan ng susi)",
     "outboundProxy": "Outbound proxy",

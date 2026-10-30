@@ -450,6 +450,7 @@
     "adding": "Legger til...",
     "selectProvider": "Velg en leverandør...",
     "accountId": "Konto-ID",
+    "projectId": "Prosjekt-ID",
     "label": "Plateselskap",
     "noKeyNeeded": "(ingen nøkkel nødvendig)",
     "outboundProxy": "Utgående proxy",

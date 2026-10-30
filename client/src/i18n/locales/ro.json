@@ -450,6 +450,7 @@
     "adding": "Adăugând...",
     "selectProvider": "Alege un furnizor...",
     "accountId": "ID cont",
+    "projectId": "ID proiect",
     "label": "Casă de discuri",
     "noKeyNeeded": "(nu e nevoie de cheie)",
     "outboundProxy": "Proxy Outbound",

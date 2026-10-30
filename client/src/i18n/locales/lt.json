@@ -450,6 +450,7 @@
     "adding": "Prideda...",
     "selectProvider": "Pasirinkite paslaugų teikėją...",
     "accountId": "Paskyros ID",
+    "projectId": "Projekto ID",
     "label": "Leidykla",
     "noKeyNeeded": "(raktas nereikalingas)",
     "outboundProxy": "Išeinantis proxy",

@@ -450,6 +450,7 @@
     "adding": "ემატება…",
     "selectProvider": "აირჩიეთ პროვაიდერი…",
     "accountId": "ანგარიშის ID",
+    "projectId": "პროექტის ID",
     "label": "ლეიბლი",
     "noKeyNeeded": "(გასაღები არ არის საჭირო)",
     "outboundProxy": "გამავალი პროქსი",

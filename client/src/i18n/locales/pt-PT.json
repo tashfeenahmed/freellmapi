@@ -450,6 +450,7 @@
     "adding": "Acrescentando...",
     "selectProvider": "Escolha um fornecedor...",
     "accountId": "ID da Conta",
+    "projectId": "ID do projeto",
     "label": "Editora",
     "noKeyNeeded": "(sem necessidade de chave)",
     "outboundProxy": "Proxy de saída",

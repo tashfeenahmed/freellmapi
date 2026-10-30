@@ -450,6 +450,7 @@
     "adding": "追加中…",
     "selectProvider": "プロバイダーを選択してください…",
     "accountId": "アカウントID",
+    "projectId": "プロジェクトID",
     "label": "ラベル",
     "noKeyNeeded": "(鍵は必要ありません)",
     "outboundProxy": "アウトバウンドプロキシ",

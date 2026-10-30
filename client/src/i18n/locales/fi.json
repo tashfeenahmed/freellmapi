@@ -450,6 +450,7 @@
     "adding": "Lisään...",
     "selectProvider": "Valitse palveluntarjoaja...",
     "accountId": "Tilin tunnus",
+    "projectId": "Projektin tunnus",
     "label": "Levy-yhtiö",
     "noKeyNeeded": "(ei avainta tarvita)",
     "outboundProxy": "Lähtevä proxy",

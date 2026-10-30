@@ -450,6 +450,7 @@
     "adding": "Əlavə edirəm...",
     "selectProvider": "Bir təminatçı seç...",
     "accountId": "Hesab ID-si",
+    "projectId": "Layihə ID-si",
     "label": "Etiket",
     "noKeyNeeded": "(açar lazım deyil)",
     "outboundProxy": "Outbound proxy",

@@ -450,6 +450,7 @@
     "adding": "جارٍ الإضافة…",
     "selectProvider": "اختر مزود…",
     "accountId": "معرف الحساب",
+    "projectId": "معرّف المشروع",
     "label": "التسمية",
     "noKeyNeeded": "(لا حاجة للمفتاح)",
     "outboundProxy": "الوكيل الصادر",

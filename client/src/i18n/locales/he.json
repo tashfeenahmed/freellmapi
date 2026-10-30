@@ -450,6 +450,7 @@
     "adding": "מוסיף...",
     "selectProvider": "בחר ספק...",
     "accountId": "מזהה חשבון",
+    "projectId": "מזהה פרויקט",
     "label": "תווית",
     "noKeyNeeded": "(אין צורך במפתח)",
     "outboundProxy": "פרוקסי יוצא",

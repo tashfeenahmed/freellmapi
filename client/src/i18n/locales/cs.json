@@ -450,6 +450,7 @@
     "adding": "Přidávám...",
     "selectProvider": "Vyberte poskytovatele...",
     "accountId": "ID účtu",
+    "projectId": "ID projektu",
     "label": "Vydavatelství",
     "noKeyNeeded": "(klíč není potřeba)",
     "outboundProxy": "Odchozí proxy",

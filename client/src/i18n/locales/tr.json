@@ -450,6 +450,7 @@
     "adding": "Ekleniyor…",
     "selectProvider": "Bir sağlayıcı seçin…",
     "accountId": "Hesap Kimliği",
+    "projectId": "Proje kimliği",
     "label": "Etiket",
     "noKeyNeeded": "(anahtara gerek yok)",
     "outboundProxy": "Giden proxy",

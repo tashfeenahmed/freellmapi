@@ -450,6 +450,7 @@
     "adding": "Додавање…",
     "selectProvider": "Изаберите провајдера…",
     "accountId": "ИД налога",
+    "projectId": "ID пројекта",
     "label": "Лабел",
     "noKeyNeeded": "(није потребан кључ)",
     "outboundProxy": "Оутбоунд проки",

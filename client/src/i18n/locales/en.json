@@ -474,6 +474,7 @@
     "adding": "Adding…",
     "selectProvider": "Select a provider…",
     "accountId": "Account ID",
+    "projectId": "Project ID",
     "label": "Label",
     "noKeyNeeded": "(no key needed)",
     "outboundProxy": "Outbound proxy",

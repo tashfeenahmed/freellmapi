@@ -450,6 +450,7 @@
     "adding": "Aggiunta…",
     "selectProvider": "Seleziona un fornitore…",
     "accountId": "ID account",
+    "projectId": "ID progetto",
     "label": "Etichetta",
     "noKeyNeeded": "(nessuna chiave necessaria)",
     "outboundProxy": "Proxy in uscita",

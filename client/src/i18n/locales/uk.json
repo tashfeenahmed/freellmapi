@@ -450,6 +450,7 @@
     "adding": "Додавання…",
     "selectProvider": "Виберіть постачальника…",
     "accountId": "ID облікового запису",
+    "projectId": "ID проєкту",
     "label": "Мітка",
     "noKeyNeeded": "(ключ не потрібен)",
     "outboundProxy": "Вихідний проксі",

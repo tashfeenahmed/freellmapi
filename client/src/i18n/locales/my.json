@@ -450,6 +450,7 @@
     "adding": "ထပ်ထည့်နေသည်...",
     "selectProvider": "ပံ့ပိုးသူတစ်ဦးကို ရွေးချယ်ပါ...",
     "accountId": "အကောင့် ID",
+    "projectId": "ပရောဂျက် ID",
     "label": "တံဆိပ်",
     "noKeyNeeded": "(သော့မလိုအပ်ပါ)",
     "outboundProxy": "အပြင်သို့ proxy",

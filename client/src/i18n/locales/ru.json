@@ -450,6 +450,7 @@
     "adding": "Добавление…",
     "selectProvider": "Выберите провайдера…",
     "accountId": "Идентификатор аккаунта",
+    "projectId": "ID проекта",
     "label": "Этикетка",
     "noKeyNeeded": "(ключ не нужен)",
     "outboundProxy": "Исходящий прокси",

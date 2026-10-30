@@ -450,6 +450,7 @@
     "adding": "En ik voeg toe...",
     "selectProvider": "Kies een zorgverlener...",
     "accountId": "Account-ID",
+    "projectId": "Project-ID",
     "label": "Label",
     "noKeyNeeded": "(geen sleutel nodig)",
     "outboundProxy": "Uitgaande proxy",

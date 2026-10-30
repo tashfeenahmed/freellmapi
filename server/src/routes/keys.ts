@@ -64,6 +64,7 @@ const PLATFORMS = [
   'gizmo',
   'blockrun',
   'moondream',
+  'jamai',
   'beatapi',
   'apinex',
   'onomeo',

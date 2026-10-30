@@ -80,3 +80,28 @@ it('still requires a key for a provider that needs one', async () => {
   await submit()
   expect(posted()).toBeUndefined()
 })
+
+describe('JamAI project-scoped PAT', () => {
+  it('requires both fields, masks the PAT, and does not offer bulk paste', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="jamai" />)
+    expect(container.textContent).toContain('Project ID')
+    expect(container.textContent).toContain('(PAT)')
+    expect(container.textContent).not.toContain('Paste several')
+    expect(keyInput().placeholder).toBe('jamai_pat_…')
+    enter(keyInput(), 'jamai_pat_example')
+    await submit()
+    expect(posted()).toBeUndefined()
+    expect(container.querySelector('#jamai-project-id')?.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('stores a trimmed composite credential using the existing encrypted-key endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="jamai" />)
+    enter(container.querySelector<HTMLInputElement>('#jamai-project-id')!, ' proj_example ')
+    await submit()
+    expect(posted()).toBeUndefined()
+    enter(keyInput(), ' jamai_pat_example ')
+    await submit()
+    expect(posted()).toEqual({ platform: 'jamai', key: 'proj_example:jamai_pat_example' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
+})

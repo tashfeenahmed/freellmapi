@@ -23,6 +23,7 @@ import { SPEKA_BASE_URL } from '../providers/speka.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 import { INFERBASE_BASE_URL } from '../providers/inferbase.js';
 import { LLMTR_BASE_URL } from '../providers/llmtr.js';
+import { JAMAI_BASE_URL, jamaiHeaders } from '../providers/jamai.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -111,6 +112,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 
 /** Provider adapters that can safely receive catalog-managed embedding rows. */
 export const EMBEDDING_PLATFORMS = new Set([
+  'jamai',
   'google',
   'nvidia',
   'openrouter',
@@ -139,6 +141,7 @@ async function openAiStyleEmbed(
   dimensions?: number,
   expectedDimensions?: number,
   timeoutMs = FETCH_TIMEOUT_MS,
+  headers?: Record<string, string>,
 ): Promise<ProviderCallResult> {
   const body: Record<string, unknown> = { model: modelId, input: inputs, ...extra };
   // Some providers (NVIDIA NeMo NIM, Google Gemini Embedding, OpenAI v3) support
@@ -152,11 +155,14 @@ async function openAiStyleEmbed(
     method: 'POST',
     // A custom endpoint with auth off holds the `no-key` sentinel: omit the
     // header instead of sending `Bearer no-key` (#1331).
-    headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    headers: headers ?? { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    ...(platform === 'jamai' ? { redirect: 'error' as const } : {}),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   }, platform, 'embedding', timeoutMs);
   if (!r.ok) {
+    // JamAI error bodies may echo credential-bearing request headers.
+    if (platform === 'jamai') throw new EmbeddingsError(`JamAI embeddings error (HTTP ${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     throw await upstreamEmbeddingsError(r);
   }
   const j = (await r.json()) as {
@@ -165,7 +171,7 @@ async function openAiStyleEmbed(
     usage?: { prompt_tokens?: number; total_tokens?: number };
   };
   const data = [...(j.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-  if (['electronhub', 'inferbase', 'llmtr'].includes(platform) && (
+  if (['electronhub', 'inferbase', 'llmtr', 'jamai'].includes(platform) && (
     j.model !== modelId || data.length !== inputs.length ||
     data.some((d, i) => d.index !== i || !Array.isArray(d.embedding) ||
       d.embedding.length !== (dimensions ?? expectedDimensions) ||
@@ -173,7 +179,7 @@ async function openAiStyleEmbed(
   )) {
     // A successful HTTP response is not enough: wrong model/dimension or
     // malformed vectors would corrupt the caller's embedding family.
-    const provider = platform === 'electronhub' ? 'ElectronHub' : platform === 'llmtr' ? 'LLMTR' : 'Inferbase';
+    const provider = platform === 'jamai' ? 'JamAI' : platform === 'electronhub' ? 'ElectronHub' : platform === 'llmtr' ? 'LLMTR' : 'Inferbase';
     throw new EmbeddingsError(`${provider} returned mismatched or malformed embeddings`, 502);
   }
   return {
@@ -290,6 +296,12 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed(`${ELECTRONHUB_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
     case 'inferbase':
       return openAiStyleEmbed(`${INFERBASE_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
+    case 'jamai':
+      if (dimensions !== undefined && dimensions !== row.dimensions) {
+        throw new EmbeddingsError('JamAI does not support an embedding dimension override', 400);
+      }
+      return openAiStyleEmbed(`${JAMAI_BASE_URL}/embeddings`, row.platform, '', row.model_id, inputs,
+        { type: 'document', encoding_format: 'float' }, undefined, row.dimensions, FETCH_TIMEOUT_MS, jamaiHeaders(key));
     case 'llmtr':
       // The catalog-approved models return fixed-width vectors. Do not send a
       // dimension override or accept a substituted model/embedding space.

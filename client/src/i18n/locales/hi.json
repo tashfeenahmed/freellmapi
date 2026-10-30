@@ -450,6 +450,7 @@
     "adding": "जोड़ा जा रहा है...",
     "selectProvider": "एक प्रदाता चुनें…",
     "accountId": "खाता आईडी",
+    "projectId": "प्रोजेक्ट आईडी",
     "label": "लेबल",
     "noKeyNeeded": "(किसी कुंजी की आवश्यकता नहीं)",
     "outboundProxy": "आउटबाउंड प्रॉक्सी",

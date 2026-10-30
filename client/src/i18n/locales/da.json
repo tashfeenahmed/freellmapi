@@ -450,6 +450,7 @@
     "adding": "Tilføjer...",
     "selectProvider": "Vælg en udbyder...",
     "accountId": "Konto-ID",
+    "projectId": "Projekt-id",
     "label": "Label",
     "noKeyNeeded": "(ingen nøgle nødvendig)",
     "outboundProxy": "Udgående proxy",

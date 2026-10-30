@@ -450,6 +450,7 @@
     "adding": "添加中…",
     "selectProvider": "请选择一个提供方…",
     "accountId": "账户 ID",
+    "projectId": "项目 ID",
     "label": "标签",
     "noKeyNeeded": "（无需密钥）",
     "outboundProxy": "出站代理",

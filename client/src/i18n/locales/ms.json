@@ -450,6 +450,7 @@
     "adding": "Menambah...",
     "selectProvider": "Pilih penyedia...",
     "accountId": "ID Akaun",
+    "projectId": "ID projek",
     "label": "Label",
     "noKeyNeeded": "(tidak perlu kunci)",
     "outboundProxy": "Proksi keluar",

@@ -450,6 +450,7 @@
     "adding": "Dodajem...",
     "selectProvider": "Odaberite pružatelja usluga...",
     "accountId": "ID računa",
+    "projectId": "ID projekta",
     "label": "Izdavačka kuća",
     "noKeyNeeded": "(nije potreban ključ)",
     "outboundProxy": "Odlazni proxy",

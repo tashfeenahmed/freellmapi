@@ -450,6 +450,7 @@
     "adding": "Đang thêm…",
     "selectProvider": "Chọn nhà cung cấp…",
     "accountId": "ID tài khoản",
+    "projectId": "ID dự án",
     "label": "Nhãn",
     "noKeyNeeded": "(không cần chìa khóa)",
     "outboundProxy": "Proxy đi",

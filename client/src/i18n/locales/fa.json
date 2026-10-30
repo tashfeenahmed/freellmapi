@@ -450,6 +450,7 @@
     "adding": "در حال افزودن…",
     "selectProvider": "انتخاب ارائه دهنده…",
     "accountId": "شناسه حساب",
+    "projectId": "شناسه پروژه",
     "label": "برچسب بزنید",
     "noKeyNeeded": "(بدون نیاز به کلید)",
     "outboundProxy": "پراکسی خروجی",

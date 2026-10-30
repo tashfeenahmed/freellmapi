@@ -450,6 +450,7 @@
     "adding": "එකතු කරමින්...",
     "selectProvider": "සපයන්නෙකු තෝරන්න...",
     "accountId": "ගිණුම් හැඳුනුම්පත",
+    "projectId": "ව්‍යාපෘති ID",
     "label": "ලේබලය",
     "noKeyNeeded": "(යතුරක් අවශ්‍ය නොවේ)",
     "outboundProxy": "පිටතට යන ප්‍රොක්සි",
