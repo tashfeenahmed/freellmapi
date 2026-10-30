@@ -73,6 +73,23 @@ describe('custom provider modalities', () => {
     vi.restoreAllMocks();
   });
 
+  it('keeps identical media model ids on separate custom endpoints', async () => {
+    for (const port of [8181, 8182]) {
+      expect((await post(app, '/api/media/custom', {
+        baseUrl: `http://127.0.0.1:${port}/v1`, model: 'shared-image',
+        modality: 'image', apiKey: `key-${port}`,
+      })).status).toBe(201);
+    }
+    const rows = getDb().prepare(`
+      SELECT k.base_url FROM media_models m JOIN api_keys k ON k.id = m.key_id
+      WHERE m.platform = 'custom' AND m.model_id = 'shared-image' ORDER BY k.base_url
+    `).all();
+    expect(rows).toEqual([
+      { base_url: 'http://127.0.0.1:8181/v1' },
+      { base_url: 'http://127.0.0.1:8182/v1' },
+    ]);
+  });
+
   it('registers a custom embedding provider after probing dimensions', async () => {
     const fetchMock = vi.fn(async () => embeddingResponse(3));
     globalThis.fetch = fetchMock as any;

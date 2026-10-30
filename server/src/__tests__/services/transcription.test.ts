@@ -282,6 +282,9 @@ describe('transcription service', () => {
     expect(r.text).toBe('local text');
     expect(r.language).toBe('en');
     expect(r.duration).toBe(3);
+    const model = getDb().prepare("SELECT id FROM media_models WHERE model_id = 'local-whisper'").get() as { id: number };
+    expect(getDb().prepare("SELECT media_model_db_id FROM requests WHERE request_type = 'transcription'").get())
+      .toEqual({ media_model_db_id: model.id });
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://127.0.0.1:9911/v1/audio/transcriptions');

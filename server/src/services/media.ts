@@ -850,13 +850,13 @@ function resolveMediaChain(model: string | undefined, modality: MediaModality): 
   return matches;
 }
 
-function logMedia(row: Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>, keyId: number | null, status: 'success' | 'error', latencyMs: number, error: string | null): void {
+function logMedia(row: Pick<MediaModelRow, 'id' | 'platform' | 'model_id' | 'modality'>, keyId: number | null, status: 'success' | 'error', latencyMs: number, error: string | null): void {
   try {
     const client = getClientContext();
     getDb()
-      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)`)
-      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality, client.ip, client.userAgent, client.agent);
+      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent, media_model_db_id)
+                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality, client.ip, client.userAgent, client.agent, row.id);
     // A served media request is evidence the key works, the same as a served
     // chat request (#1493) or a served search (#1612): stamp last_healthy_at
     // and lift an 'unknown'/'error' key out of the pool's cold corner.
@@ -1008,6 +1008,7 @@ export const MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024;
 
 /** A transcription candidate: a media_models row with its meta decoded. */
 interface SttCandidate {
+  id: number;
   platform: string;
   modelId: string;
   /** The api_keys row this model is bound to, or null to pick any healthy key
@@ -1037,6 +1038,7 @@ function toSttCandidate(row: MediaModelRow): SttCandidate {
       ? Math.min(meta.maxBytes, MAX_TRANSCRIPTION_BYTES)
       : MAX_TRANSCRIPTION_BYTES;
   return {
+    id: row.id,
     platform: row.platform,
     modelId: row.model_id,
     keyId: row.key_id,
@@ -1259,7 +1261,7 @@ export async function runTranscription(model: string | undefined, p: Transcripti
       }
       continue;
     }
-    const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
+    const logRow = { id: m.id, platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
     const started = Date.now();
     try {
       const out = await callTranscriptionProvider(m, credential, p);
