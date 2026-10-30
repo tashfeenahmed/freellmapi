@@ -112,7 +112,7 @@ export function logRequest(
   // model — written only when the failure-attribution setting is on; NULL
   // everywhere else, including every success row and every historical row.
   failureAttribution: string | null = null,
-) {
+): boolean {
   try {
     const db = getDb();
     // Caller identity from the request-scoped context (set by the express
@@ -160,8 +160,10 @@ export function logRequest(
     // compare this key's month usage to its caps and log a threshold event
     // (80%/100%, once each per month). Never throws.
     if (status === 'success' && keyId != null) noteBudgetAlerts(keyId);
+    return true;
   } catch (e) {
     console.error('Failed to log request:', e);
+    return false;
   }
 }
 
