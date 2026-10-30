@@ -6,6 +6,7 @@ import { encrypt } from '../../lib/crypto.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 import { getProvider } from '../../providers/index.js';
 import { getCatalogModelTombstone } from '../../services/model-state.js';
+import { routePinnedModel } from '../../services/router.js';
 
 let dashToken = '';
 
@@ -53,6 +54,31 @@ describe('Model Provider Actions API', () => {
   });
 
   describe('POST /api/models', () => {
+    it.each(['tavily', 'serpsearch', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'brave', 'speechify', 'freeai', 'beatapi'])
+      ('rejects chat model registration for %s', async platform => {
+        const res = await post(app, '/api/models', { platform, modelId: `nonchat-${platform}` });
+        expect(res.status).toBe(400);
+        expect(getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(platform, `nonchat-${platform}`)).toBeUndefined();
+      });
+
+    it('does not route pre-existing chat rows for a non-chat provider', () => {
+      const db = getDb();
+      const { encrypted, iv, authTag } = encrypt('synthetic-test-key');
+      db.prepare(`INSERT INTO api_keys(platform,label,encrypted_key,iv,auth_tag,status,enabled)
+        VALUES ('tavily','test',?,?,?,'healthy',1)`).run(encrypted, iv, authTag);
+      const row = db.prepare(`INSERT INTO models(platform,model_id,display_name,intelligence_rank,speed_rank,enabled)
+        VALUES ('tavily','legacy-nonchat','Legacy',1,1,1)`).run();
+      expect(routePinnedModel(Number(row.lastInsertRowid), 20)).toBeNull();
+    });
+
+    it('explains why an existing non-chat model cannot be tested as chat', async () => {
+      const db = getDb();
+      const row = db.prepare(`INSERT INTO models(platform,model_id,display_name,intelligence_rank,speed_rank,enabled)
+        VALUES ('speechify','legacy-speech','Speech',1,1,1)`).run();
+      const result = await post(app, `/api/models/${Number(row.lastInsertRowid)}/test`);
+      expect(result.body.success).toBe(false);
+      expect(result.body.error).toContain('does not support chat');
+    });
     it('rejects unauthenticated requests', async () => {
       const server = app.listen(0, '127.0.0.1');
       if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
