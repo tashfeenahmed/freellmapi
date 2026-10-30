@@ -8,6 +8,7 @@ export const BEATAPI_BASE_URL = 'https://api.beatapi.io/v1';
 export class BeatApiProvider extends BaseProvider {
   readonly platform = 'beatapi' as const;
   readonly name = 'BeatAPI';
+  readonly supportsChat = false;
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     const res = await this.fetchWithTimeout(`${BEATAPI_BASE_URL}/models`, {

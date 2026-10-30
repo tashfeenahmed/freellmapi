@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
-import { hasProvider } from '../providers/index.js';
+import { getProvider, hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
   isCatalogManagedModel,
@@ -112,6 +112,23 @@ modelsRouter.post('/', (req: Request, res: Response) => {
   if (!hasProvider(data.platform as Platform) && data.platform !== 'custom') {
     res.status(400).json({ error: { message: `Invalid platform "${data.platform}"` } });
     return;
+  }
+
+  // #1741: search, speech and decision integrations are registered so their
+  // keys pool and health-check like every other platform, but their adapters
+  // refuse chat. A chat row here would sit in the fallback chain burning a
+  // guaranteed failure on every request, so registration is rejected up front.
+  // A built-in adapter whose service genuinely speaks chat stays custom-endpoint
+  // territory — register the service as a custom endpoint instead.
+  // Strictly false, not falsy, so test doubles that omit the flag stay usable.
+  if (data.platform !== 'custom' && hasProvider(data.platform as Platform)) {
+    const provider = getProvider(data.platform as Platform)!;
+    if (provider.supportsChat === false) {
+      res.status(400).json({
+        error: { message: `${provider.name} does not support chat completions; its key serves the platform's native endpoints (e.g. search, speech), so it cannot be registered as a chat model` },
+      });
+      return;
+    }
   }
 
   const db = getDb();

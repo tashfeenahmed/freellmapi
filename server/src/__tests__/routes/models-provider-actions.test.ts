@@ -135,6 +135,37 @@ describe('Model Provider Actions API', () => {
       expect(second.body.error.message).toContain('already exists');
     });
 
+    // #1741: search/speech/decision integrations are registered for key
+    // pooling and health, but their adapters refuse chat. A chat row would
+    // sit in the fallback chain burning a guaranteed failure per request.
+    it('rejects chat registration for a non-chat built-in provider', async () => {
+      const db = getDb();
+      const modelId = `tavily-chat-${Date.now()}`;
+
+      const res = await post(app, '/api/models', {
+        platform: 'tavily',
+        modelId,
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('does not support chat completions');
+
+      // No model row, no fallback entry, no profile membership.
+      const row = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get('tavily', modelId);
+      expect(row).toBeUndefined();
+    });
+
+    it('rejects chat registration for speech and decision-only providers', async () => {
+      for (const platform of ['speechify', 'beatapi']) {
+        const res = await post(app, '/api/models', {
+          platform,
+          modelId: `${platform}-chat-${Date.now()}`,
+        });
+        expect(res.status).toBe(400);
+        expect(res.body.error.message).toContain('does not support chat completions');
+      }
+    });
+
     it('creates custom model for custom provider with endpointScope', async () => {
       const db = getDb();
       const modelId = `relay-model-${Date.now()}`;

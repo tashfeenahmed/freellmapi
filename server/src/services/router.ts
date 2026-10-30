@@ -1588,6 +1588,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     return null;
   }
   const provider = getProvider(entry.platform as Platform)!;
+  // #1741: legacy rows can exist for platforms whose adapter refuses chat
+  // (registered before the gate). They can only ever fail, so drop them from
+  // the walk here instead of spending an attempt and a cooldown on each.
+  // Strictly false, not falsy: mocked providers in tests may omit the flag.
+  if (provider.supportsChat === false) {
+    diag?.push(`${label}: platform does not serve chat completions`);
+    return null;
+  }
 
   const allKeys = db.prepare(
     "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
