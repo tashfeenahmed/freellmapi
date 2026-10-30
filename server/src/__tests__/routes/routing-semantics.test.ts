@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, beforeAll, afterAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
@@ -12,6 +12,17 @@ import {
 } from '../../services/router.js';
 import { recordQuotaObservation } from '../../services/provider-quota.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+
+// These tests auto-route to custom endpoints, which free-only routing
+// (services/free-only.ts) keeps out of automatic routing unless the operator
+// opts in. They test endpoint behaviour, not that policy, so they opt in;
+// free-only-routing.test.ts covers the policy itself.
+const savedFreeOnlySetting = process.env.FREE_ONLY_ALLOW_PLATFORMS;
+beforeAll(() => { process.env.FREE_ONLY_ALLOW_PLATFORMS = 'custom'; });
+afterAll(() => {
+  if (savedFreeOnlySetting === undefined) delete process.env.FREE_ONLY_ALLOW_PLATFORMS;
+  else process.env.FREE_ONLY_ALLOW_PLATFORMS = savedFreeOnlySetting;
+});
 
 let app: Express;
 let dashToken = '';

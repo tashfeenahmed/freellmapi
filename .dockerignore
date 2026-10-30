@@ -2,9 +2,11 @@
 .github
 node_modules
 client/node_modules
+glixel/node_modules
 server/node_modules
 shared/node_modules
 client/dist
+glixel/dist
 server/dist
 server/data
 dist

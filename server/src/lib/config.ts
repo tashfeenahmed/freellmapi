@@ -41,6 +41,9 @@ export interface Config {
   dbPath: string | null;
   dashboardOrigins: string[];
   clientDist: string | null;
+  /** Built GLIXEL app (glixel/dist), served at /glixel. GLIXEL_DIST overrides;
+   *  optional so embedders that build a Config by hand keep compiling. */
+  glixelDist?: string | null;
   proxyRateLimitRpm: number;
   /** JSON body limit (bytes) for the LLM wire surfaces — see
    *  parseRequestBodyLimitBytes. REQUEST_BODY_LIMIT_MB overrides. */
@@ -88,6 +91,7 @@ export function loadConfig(): Config {
       .map(s => s.trim())
       .filter(Boolean),
     clientDist: process.env.CLIENT_DIST ?? null,
+    glixelDist: process.env.GLIXEL_DIST ?? null,
     proxyRateLimitRpm: parseRateLimitRpm(),
     requestBodyLimitBytes: parseRequestBodyLimitBytes(),
     nodeEnv: process.env.NODE_ENV ?? 'development',

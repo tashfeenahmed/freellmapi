@@ -1,8 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
 import { routeRequest, setRoutingStrategy } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
 import { routingExhaustionBody } from '../../lib/fallback-loop.js';
+
+// These tests route over fixture platforms and models (an unknown 'test'
+// platform, a Pro-class Gemini row, a Cohere trial row) that free-only routing
+// (services/free-only.ts) would keep out of automatic routing. They test
+// key/chain mechanics, not that policy, so they switch it off;
+// free-only-routing.test.ts covers the policy itself.
+const savedFreeOnlySetting = process.env.FREE_ONLY_ROUTING;
+beforeAll(() => { process.env.FREE_ONLY_ROUTING = 'off'; });
+afterAll(() => {
+  if (savedFreeOnlySetting === undefined) delete process.env.FREE_ONLY_ROUTING;
+  else process.env.FREE_ONLY_ROUTING = savedFreeOnlySetting;
+});
 
 // A model whose PLATFORM has no enabled+healthy key can never produce a route:
 // selectKeyForModel's first query comes back empty for it, every request. So it

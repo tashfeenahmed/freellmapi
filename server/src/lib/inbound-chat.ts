@@ -99,6 +99,8 @@ interface ResolvedPin {
   preferredModel?: number;
   strictChain?: ChainRow[];
   pinnedLabel: string | null;
+  /** Rows the client named; only these get the explicit free-only policy. */
+  explicitModelIds?: Set<number>;
 }
 
 function resolvePin(model: string | undefined, messages: ChatMessage[], sessionId?: string): ResolvedPin {
@@ -131,6 +133,7 @@ function resolvePin(model: string | undefined, messages: ChatMessage[], sessionI
         : undefined,
       strictChain,
       pinnedLabel: requested,
+      explicitModelIds: new Set(strictChain.map(row => row.model_db_id)),
     };
   }
 
@@ -143,7 +146,7 @@ function resolvePin(model: string | undefined, messages: ChatMessage[], sessionI
     err.code = 'model_not_found';
     throw err;
   }
-  return { preferredModel: enabled.id, pinnedLabel: requested };
+  return { preferredModel: enabled.id, pinnedLabel: requested, explicitModelIds: new Set([enabled.id]) };
 }
 
 function sendExhaustion(
@@ -249,6 +252,8 @@ export async function runInboundChat(
         input.responseFormat !== undefined,
         state.skipPlatforms.size ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        pin.explicitModelIds,
       );
     },
     dispatch: async (route, attempt) => {

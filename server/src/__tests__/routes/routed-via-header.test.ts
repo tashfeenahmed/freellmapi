@@ -1,8 +1,19 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi, afterAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { mintDashboardToken } from '../helpers/auth.js';
+
+// These tests auto-route to custom endpoints, which free-only routing
+// (services/free-only.ts) keeps out of automatic routing unless the operator
+// opts in. They test endpoint behaviour, not that policy, so they opt in;
+// free-only-routing.test.ts covers the policy itself.
+const savedFreeOnlySetting = process.env.FREE_ONLY_ALLOW_PLATFORMS;
+beforeAll(() => { process.env.FREE_ONLY_ALLOW_PLATFORMS = 'custom'; });
+afterAll(() => {
+  if (savedFreeOnlySetting === undefined) delete process.env.FREE_ONLY_ALLOW_PLATFORMS;
+  else process.env.FREE_ONLY_ALLOW_PLATFORMS = savedFreeOnlySetting;
+});
 
 // #619: relays hand out model ids that are not header-safe — Chinese names,
 // bracketed variant suffixes, spaces. Splicing one straight into X-Routed-Via

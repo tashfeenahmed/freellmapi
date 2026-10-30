@@ -13,6 +13,7 @@ import { installProcessSafetyNet } from './lib/process-safety-net.js';
 import { NodeScheduler } from './lib/scheduler.js';
 import { loadConfig } from './lib/config.js';
 import { applyDeclarativeConfigFromEnv } from './services/declarative-config.js';
+import { warnFreeOnlyPolicy } from './services/free-only.js';
 import { restoreDbBackupIfNeeded, startDbBackupPump } from './lib/db-backup.js';
 import { startBackupScheduler } from './services/backups.js';
 import { userCount } from './services/auth.js';
@@ -49,6 +50,8 @@ async function main() {
   applyDeclarativeConfigFromEnv();
   // After initDb: the unknown-model half of this check reads the catalog.
   warnOnRoutingOverrideDrift();
+  // Say loudly when free-only routing is off or a billable platform is opted in.
+  warnFreeOnlyPolicy();
 
   // Reload the persisted response cache into the in-memory LRU so entries
   // survive a restart (the daily quota-reset re-run pattern). Best-effort:

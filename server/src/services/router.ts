@@ -45,6 +45,7 @@ import { getKeyQuotaHeadroom, inferQuotaPoolKey } from './provider-quota.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
+import { freeOnlyDecision, type RoutingMode } from './free-only.js';
 
 class RouteError extends Error {
   status: number;
@@ -1579,9 +1580,18 @@ function cachedDecrypt(keyId: number, ct: string, iv: string, authTag: string): 
   return plain;
 }
 
-function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>, diag?: string[]): RouteResult | null {
+function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: Set<string>, diag?: string[], mode: RoutingMode = 'automatic'): RouteResult | null {
   const db = getDb();
   const label = `${entry.platform}/${entry.model_id}`;
+
+  // Free-only routing (services/free-only.ts) comes first: a destination that
+  // could bill the operator is never routed to, whatever its keys look like.
+  // Every chat surface reaches a provider through this function.
+  const policy = freeOnlyDecision(entry.platform, entry.model_id, mode);
+  if (!policy.allowed) {
+    diag?.push(`${label}: blocked by free-only routing (${policy.reason})`);
+    return null;
+  }
 
   if (!hasProvider(entry.platform as Platform)) {
     diag?.push(`${label}: no provider registered`);
@@ -1898,7 +1908,9 @@ export function fitsContextWindow(_platform: string, contextWindow: number | nul
  * silently collapsed onto whatever else is available. `skipKeys` lets a slot
  * exclude keys it already failed on this request.
  */
-export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skipKeys?: Set<string>): RouteResult | null {
+// A pinned model was named by the caller (fusion config, judge, dashboard
+// "Test"), so free-only routing applies its explicit policy by default.
+export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skipKeys?: Set<string>, mode: RoutingMode = 'explicit'): RouteResult | null {
   const db = getDb();
   const entry = getModelChainRow(db, modelDbId);
   if (!entry) return null;
@@ -1908,7 +1920,7 @@ export function routePinnedModel(modelDbId: number, estimatedTokens = 1000, skip
   // 400 is classified and retried downstream). Nothing is multiplied here —
   // estimatedTokens already carries the exact capped output reserve (#470).
   if (!rowFitsRequestSize(entry, estimatedTokens)) return null;
-  return selectKeyForModel(entry, estimatedTokens, skipKeys);
+  return selectKeyForModel(entry, estimatedTokens, skipKeys, undefined, mode);
 }
 
 function rowFitsRequestSize(entry: ChainRow, estimatedTokens: number): boolean {
@@ -2019,7 +2031,12 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
   // the big model and its panel slots auto-picked from the Balanced order.
   const strategy = effectiveRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
-  const chain = getActiveChain(db).filter(e => e.enabled);
+  // Auto-picked panel slots are automatic choices, so they get the automatic
+  // free-only policy (slots named in a fusion config are checked as explicit
+  // when routePinnedModel dispatches them).
+  const chain = getActiveChain(db)
+    .filter(e => e.enabled)
+    .filter(e => freeOnlyDecision(e.platform, e.model_id, 'automatic').allowed);
 
   // Only consider models that can ACTUALLY be served RIGHT NOW — applying the
   // same gate selectKeyForModel uses when the router walks the chain: the model
@@ -2160,7 +2177,7 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   return null;
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat'): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', explicitModelDbIds?: ReadonlySet<number>): RouteResult {
   const db = getDb();
 
   const strategy = effectiveRoutingStrategy();
@@ -2378,7 +2395,12 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // first usable key's RouteResult, or null when the model has no key that
     // can serve right now — in which case we fall through to the next model in
     // the sorted chain for THIS request (no explicit penalty needed).
-    const route = selectKeyForModel(entry, estimatedTokens, skipKeys, diag);
+    // Only rows the client actually named (explicitModelDbIds: the strict group
+    // of a requested model, or a legacy single-row pin) get the explicit
+    // free-only policy. Everything else, including a sticky preference left by
+    // an earlier automatic choice, is an automatic routing decision.
+    const mode: RoutingMode = explicitModelDbIds?.has(entry.model_db_id) ? 'explicit' : 'automatic';
+    const route = selectKeyForModel(entry, estimatedTokens, skipKeys, diag, mode);
     if (route) return route;
   }
 

@@ -23,7 +23,7 @@ import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic
 import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, getStickyModel, setStickyModel } from './proxy.js';
-import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
+import { getFallbackMaxAttempts, runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue } from '../lib/header-value.js';
 import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
@@ -58,7 +58,6 @@ function isAutoModel(modelId: string | undefined): boolean {
   return lower === AUTO_MODEL_ID || lower.startsWith(`${AUTO_MODEL_ID}:`);
 }
 
-const MAX_RETRIES = 20;
 // Anthropic requires `max_tokens`; mirror the OpenAI route's routing-budget
 // default when a client somehow omits it.
 const DEFAULT_MAX_TOKENS = 1024;
@@ -611,6 +610,9 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // router scores inside — failover stays within the band instead of falling
   // off to an unrelated model.
   let groupChain: ChainRow[] | undefined;
+  // Rows the client (or the operator's family mapping) named; only these get
+  // the explicit free-only policy. A tier selector stays automatic.
+  let explicitModelIds: Set<number> | undefined;
   // Sticky scope for a group-pinned request: bucket by the pinned catalog id so
   // the session prefers its last successful provider of THIS model without
   // leaking affinity across groups. Undefined for auto (the global scope).
@@ -626,6 +628,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
       if (chain.length > 0) {
         groupChain = chain;
         stickyScope = resolved.modelId;
+        explicitModelIds = new Set(chain.map(r => r.model_db_id));
       }
     }
   } else if (resolved.tierDbIds && resolved.tierDbIds.length > 0) {
@@ -641,6 +644,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   }
 
   let preferredModel = resolved.preferredModelDbId;
+  // A legacy single-row pin (no unified group) is explicit too.
+  if (!groupChain && resolved.modelId && preferredModel != null) explicitModelIds = new Set([preferredModel]);
   if (groupChain) {
     // The strict chain already fixes the model; the only preference left is
     // which member served this session last. Passing a non-member would make
@@ -692,7 +697,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
-    maxRetries: MAX_RETRIES,
+    maxRetries: getFallbackMaxAttempts(),
     state,
     attemptLog,
     logIdentity: { surface: 'anthropic messages', requestedModel },
@@ -705,7 +710,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
       // size latched onto state so the existing size gates in router.ts skip
       // low-TPM / small-context models on retry.
       const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
-      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, false, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, false, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, explicitModelIds);
     },
     dispatch: async (route, attempt, dispatchCtx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);

@@ -29,7 +29,7 @@ import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
-import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
+import { getFallbackMaxAttempts, runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
@@ -624,7 +624,6 @@ proxyRouter.get('/usage', (req: Request, res: Response) => {
 });
 
 
-const MAX_RETRIES = 20;
 
 // Echo-tolerant tool calls: agents replay OUR responses back as history, and
 // not all of them preserve the strict OpenAI shape. `type` may be dropped
@@ -1449,6 +1448,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
   let preferredModel: number | undefined;
   let groupChain: ChainRow[] | undefined = aliasTierChain.length > 0 ? aliasTierChain : undefined;
+  // Rows the client named; only these get the explicit free-only policy.
+  let explicitModelIds: Set<number> | undefined;
 
   if (!groupChain && !isAutoModel(requestedModel) && requestedModel) {
     const db = getDb();
@@ -1456,6 +1457,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     const members = resolved?.memberDbIds ?? null;
     if (members && members.length > 0) {
       groupChain = resolveModelGroupCandidates(members, resolved!.demotedDbIds);
+      // The client named this model: every provider of it is an explicit choice.
+      explicitModelIds = new Set(groupChain.map(r => r.model_db_id));
       if (groupChain.length === 0) {
         const placeholders = members.map(() => '?').join(',');
         const anyEnabled = db.prepare(`SELECT 1 FROM models WHERE id IN (${placeholders}) AND enabled = 1 LIMIT 1`).get(...members);
@@ -1487,6 +1490,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
       const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
       if (enabled) {
         preferredModel = enabled.id;
+        explicitModelIds = new Set([enabled.id]);
       } else {
         const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
         const reason = disabled ? 'is disabled' : 'is not in the catalog';
@@ -1530,7 +1534,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   // (lib/fallback-loop.ts): the cooldown/skip/penalty/exhaustion machinery is
   // shared; only the text_completion request/stream translation lives here.
   await runFallbackLoop({
-    maxRetries: MAX_RETRIES,
+    maxRetries: getFallbackMaxAttempts(),
     state,
     attemptLog,
     logIdentity: { surface: 'legacy completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
@@ -1552,6 +1556,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         false,
         state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        explicitModelIds,
       );
     },
     dispatch: async (route, attempt, ctx) => {
@@ -2402,6 +2408,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // members and is passed to routeRequest as the STRICT chain (no other model
   // is ever reached). Undefined for auto and legacy single-row pins.
   let groupChain: ChainRow[] | undefined;
+  // Rows the client named; only these get the explicit free-only policy.
+  let explicitModelIds: Set<number> | undefined;
   // Sticky scope: auto requests bucket by routing strategy; a unified group pin
   // buckets by the canonical id the client sent, so the group prefers its last
   // successful provider without leaking stickiness across groups.
@@ -2425,6 +2433,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     const members = resolved?.memberDbIds ?? null;
     if (members && members.length > 0) {
       groupChain = resolveModelGroupCandidates(members, resolved!.demotedDbIds);
+      // The client named this model: every provider of it is an explicit choice.
+      explicitModelIds = new Set(groupChain.map(r => r.model_db_id));
       if (groupChain.length === 0) {
         // Distinguish a catalog-disabled model (404 model_not_found, OpenAI
         // semantics) from one whose providers are present but unusable
@@ -2464,6 +2474,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModel) as { id: number } | undefined;
       if (enabled) {
         preferredModel = enabled.id;
+        explicitModelIds = new Set([enabled.id]);
       } else {
         const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModel) as { id: number } | undefined;
         const reason = disabled ? 'is disabled' : 'is not in the catalog';
@@ -2511,7 +2522,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
-    maxRetries: MAX_RETRIES,
+    maxRetries: getFallbackMaxAttempts(),
     state,
     attemptLog,
     logIdentity: { surface: 'chat completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
@@ -2529,7 +2540,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
       const taskType = resolveTaskType(req, tools, messages);
-      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, explicitModelIds);
     },
     dispatch: async (route, attempt, ctx) => {
     const contextBudget = routeOutputBudget(route, estimatedInputTokens);

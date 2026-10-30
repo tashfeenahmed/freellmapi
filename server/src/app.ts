@@ -2,6 +2,7 @@ import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
+import fs from 'node:fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { keysRouter } from './routes/keys.js';
@@ -20,6 +21,8 @@ import { searchRouter } from './routes/search.js';
 import { decisionsRouter } from './routes/decisions.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { healthRouter } from './routes/health.js';
+import { providerOverviewRouter } from './routes/providers.js';
+import { glixelRouter } from './routes/glixel.js';
 import { freeTierRouter } from './routes/free-tier.js';
 import { settingsRouter } from './routes/settings.js';
 import { premiumRouter } from './routes/premium.js';
@@ -272,6 +275,8 @@ export function createApp(config?: Config) {
   app.use('/api/decisions', requireAuth, decisionsRouter);
   app.use('/api/analytics', requireAuth, analyticsRouter);
   app.use('/api/health', requireAuth, healthRouter);
+  app.use('/api/providers', requireAuth, providerOverviewRouter);
+  app.use('/api/glixel', requireAuth, glixelRouter);
   app.use('/api/free-tier', requireAuth, freeTierRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
   app.use('/api/premium', requireAuth, premiumRouter);
@@ -357,6 +362,32 @@ export function createApp(config?: Config) {
     // so nothing (crucially the /v1/chat/completions SSE streams) gets buffered
     // or re-encoded by compression.
     app.use(compression());
+
+    // GLIXEL (glixel/), the assistant app, served at /glixel ahead of the
+    // dashboard's SPA fallback. Same security model as the dashboard: the
+    // bundle is public static code that carries no secrets, and every byte of
+    // data it shows comes from the session-gated /api/* routes. Skipped when
+    // the app was not built (desktop builds, older images).
+    const glixelDist = cfg.glixelDist
+      ? path.resolve(cfg.glixelDist)
+      : path.resolve(__dirname, '../../glixel/dist');
+    const glixelIndex = path.join(glixelDist, 'index.html');
+    if (fs.existsSync(glixelIndex)) {
+      app.use('/glixel', express.static(glixelDist, {
+        index: false,
+        redirect: false,
+        setHeaders(res, filePath) {
+          res.setHeader('Cache-Control', isImmutableAsset(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache');
+        },
+      }));
+      app.use('/glixel', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') { next(); return; }
+        // A missing hashed asset is a 404, not the app shell served as JS.
+        if (req.path.startsWith('/assets/')) { res.status(404).end(); return; }
+        res.sendFile(glixelIndex, { headers: { 'Cache-Control': 'no-cache' } });
+      });
+    }
+
     app.use(express.static(clientDist, {
       // Vite emits content-hashed build assets under assets/ (index-<hash>.js,
       // chunk-<hash>.js, *.css, fonts…). The URL changes whenever the bytes do,

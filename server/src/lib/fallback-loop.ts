@@ -66,8 +66,40 @@ import { withKeyProxy } from './proxy.js';
 import { getEndpointTimeBudgetMs } from './ttfb-budget.js';
 import { learnOutputCapFromError, learnedOutputCap } from './output-cap.js';
 
-// Every surface caps failover hops at the same number.
-export const FALLBACK_MAX_RETRIES = 20;
+// Every surface caps failover hops at the same number: FALLBACK_MAX_ATTEMPTS,
+// an integer in [1, 100], default 20. An invalid value falls back to the
+// default (warned once) rather than disabling the cap, so a typo can never
+// turn into an unbounded retry loop.
+export const DEFAULT_FALLBACK_MAX_ATTEMPTS = 20;
+export const FALLBACK_MAX_ATTEMPTS_MIN = 1;
+export const FALLBACK_MAX_ATTEMPTS_MAX = 100;
+/** @deprecated Use getFallbackMaxAttempts(); kept for existing imports. */
+export const FALLBACK_MAX_RETRIES = DEFAULT_FALLBACK_MAX_ATTEMPTS;
+
+export function parseFallbackMaxAttempts(raw: string | undefined): { value: number; valid: boolean } {
+  if (raw === undefined || raw.trim() === '') return { value: DEFAULT_FALLBACK_MAX_ATTEMPTS, valid: true };
+  const trimmed = raw.trim();
+  const n = Number(trimmed);
+  if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(n) || n < FALLBACK_MAX_ATTEMPTS_MIN || n > FALLBACK_MAX_ATTEMPTS_MAX) {
+    return { value: DEFAULT_FALLBACK_MAX_ATTEMPTS, valid: false };
+  }
+  return { value: n, valid: true };
+}
+
+let warnedInvalidMaxAttempts: string | undefined;
+
+export function getFallbackMaxAttempts(): number {
+  const raw = process.env.FALLBACK_MAX_ATTEMPTS;
+  const { value, valid } = parseFallbackMaxAttempts(raw);
+  if (!valid && warnedInvalidMaxAttempts !== raw) {
+    warnedInvalidMaxAttempts = raw;
+    console.warn(
+      `[fallback] FALLBACK_MAX_ATTEMPTS must be an integer from ${FALLBACK_MAX_ATTEMPTS_MIN} to ${FALLBACK_MAX_ATTEMPTS_MAX}; ` +
+      `using the default of ${DEFAULT_FALLBACK_MAX_ATTEMPTS}`,
+    );
+  }
+  return value;
+}
 
 // ── Model-level failure benching ─────────────────────────────────────────────
 // A model that keeps failing upstream (401/429/5xx/empty-stream/timeout) must
@@ -1148,10 +1180,13 @@ function formatClassBreakdown(attempts: readonly AttemptRecord[]): string {
 //     expiry as retryAtMs.
 //   - anything else (capability filters like vision/tools, mixed reasons) →
 //     the router's status (429) with a generic routing_exhausted code.
-type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'other';
+type RoutingDiagClass = 'policy' | 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'other';
 
 function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   const l = line.toLowerCase();
+  // Free-only routing (services/free-only.ts) refused this candidate on cost
+  // grounds; waiting will not change that, so it is neither config nor time.
+  if (l.includes('blocked by free-only routing')) return 'policy';
   // "< estimated" first: the tpm_limit-too-small line also contains 'tpm',
   // which would otherwise misread as a transient window.
   if (l.includes('< estimated')) return 'too_large';
@@ -1166,6 +1201,23 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
   const diag: string[] = Array.isArray(routeErr?.diagnostics) ? routeErr.diagnostics : [];
   const message: string = routeErr?.message ?? 'No model available to route this request';
   const classes = diag.map(classifyRoutingDiagLine);
+
+  // Every candidate that had a key was refused by free-only routing. Say so
+  // plainly (403) instead of a 429 that tells the client to wait.
+  if (classes.includes('policy') && classes.every(c => c === 'policy' || c === 'config')) {
+    const blocked = diag.filter((_, i) => classes[i] === 'policy');
+    const shown = blocked.slice(0, 5).join('; ');
+    const more = blocked.length > 5 ? ` (+${blocked.length - 5} more)` : '';
+    return {
+      kind: 'bad_request',
+      status: 403,
+      type: 'permission_error',
+      code: 'free_only_blocked',
+      message: `Free-only routing refused every candidate for this request: ${shown}${more}. ` +
+        'Only documented free providers are used automatically; opt a platform in with FREE_ONLY_ALLOW_PLATFORMS ' +
+        'or add a key for a free provider.',
+    };
+  }
 
   if (diag.length === 0 || classes.every(c => c === 'config')) {
     return {
@@ -1268,7 +1320,7 @@ export interface ExhaustionInfo {
 }
 
 export interface FallbackHooks {
-  // Defaults to FALLBACK_MAX_RETRIES.
+  // Defaults to getFallbackMaxAttempts() (FALLBACK_MAX_ATTEMPTS, default 20).
   maxRetries?: number;
   // Base wall-clock retry budget override, mostly for tests. Defaults to
   // getFallbackTimeBudgetMs() (setting → env → 45s; 0 disables).
@@ -1382,7 +1434,7 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
 }
 
 async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace): Promise<void> {
-  const maxRetries = hooks.maxRetries ?? FALLBACK_MAX_RETRIES;
+  const maxRetries = hooks.maxRetries ?? getFallbackMaxAttempts();
   const baseBudgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
   const startedAt = Date.now();
   const attempts: AttemptRecord[] = hooks.attemptLog ?? [];

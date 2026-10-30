@@ -1,0 +1,219 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* GLIXEL visual language: obsidian surfaces, electric cyan, restrained violet,
+   square pixel geometry. All motion is decorative and stops for reduced-motion
+   users (and, via animation-play-state, while the page is hidden). */
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-glx-void: #05070b;
+  --color-glx-obsidian: #0b0f16;
+  --color-glx-surface: #111723;
+  --color-glx-line: #1e2836;
+  --color-glx-text: #e6edf6;
+  --color-glx-muted: #8a97ab;
+  --color-glx-cyan: #22e3f5;
+  --color-glx-violet: #8b5cf6;
+  --color-glx-ok: #34d399;
+  --color-glx-bad: #f87171;
+  --color-glx-warn: #fbbf24;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: var(--color-glx-void);
+  color: var(--color-glx-text);
+  font-family: var(--font-sans);
+}
+
+.glx-shell {
+  /* Pixel grid backdrop: static, so it costs nothing per frame. */
+  background-color: var(--color-glx-void);
+  background-image:
+    linear-gradient(to right, rgb(34 227 245 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(34 227 245 / 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.glx-panel {
+  position: relative;
+  background: linear-gradient(180deg, var(--color-glx-surface), var(--color-glx-obsidian));
+  border: 1px solid var(--color-glx-line);
+  padding: 1rem;
+  /* Square, pixel-cut corners instead of rounded cards. */
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.glx-wordmark {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  font-size: 1.35rem;
+  color: var(--color-glx-cyan);
+  text-shadow: 0 0 12px rgb(34 227 245 / 0.35);
+}
+
+.glx-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-glx-muted);
+}
+
+.glx-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.glx-stats dt {
+  font-size: 0.7rem;
+  color: var(--color-glx-muted);
+}
+.glx-stats dd {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  color: var(--color-glx-text);
+  overflow-wrap: anywhere;
+}
+
+.glx-chip {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.glx-chip-live { color: var(--color-glx-cyan); }
+.glx-chip-loading { color: var(--color-glx-muted); }
+.glx-chip-stale { color: var(--color-glx-warn); }
+.glx-chip-unavailable { color: var(--color-glx-bad); }
+
+.glx-visual-only {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-glx-violet);
+  border: 1px dashed var(--color-glx-violet);
+  padding: 0.05rem 0.35rem;
+}
+.glx-visual-only.static { position: static; }
+
+.glx-button {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--color-glx-cyan);
+  color: var(--color-glx-cyan);
+}
+.glx-button:hover { background: rgb(34 227 245 / 0.1); }
+.glx-link { color: var(--color-glx-cyan); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── Chat ───────────────────────────────────────────────────────────────── */
+.glx-bubble-user {
+  background: rgb(34 227 245 / 0.12);
+  border: 1px solid rgb(34 227 245 / 0.35);
+  clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px);
+}
+.glx-bubble-assistant {
+  background: var(--color-glx-surface);
+  border: 1px solid var(--color-glx-line);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+.glx-bubble-error {
+  background: rgb(248 113 113 / 0.08);
+  border: 1px solid rgb(248 113 113 / 0.45);
+}
+.glx-input {
+  background: var(--color-glx-obsidian);
+  border: 1px solid var(--color-glx-line);
+  color: var(--color-glx-text);
+  padding: 0.6rem 0.75rem;
+  font-size: 16px; /* 16px stops mobile browsers from zooming on focus */
+  max-height: 8rem;
+  field-sizing: content;
+}
+.glx-input:focus { outline: none; border-color: var(--color-glx-cyan); }
+.glx-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.glx-button-danger { border-color: var(--color-glx-bad); color: var(--color-glx-bad); }
+.glx-typing { color: var(--color-glx-cyan); animation: glx-blink 1s steps(2, start) infinite; }
+@keyframes glx-blink { to { visibility: hidden; } }
+
+.glx-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--color-glx-obsidian); }
+.glx-tab {
+  min-height: 3rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-glx-muted);
+}
+.glx-tab-active { color: var(--color-glx-cyan); box-shadow: inset 0 2px 0 var(--color-glx-cyan); }
+
+/* ── Markdown in replies ─────────────────────────────────────────────── */
+.glx-md { overflow-wrap: anywhere; }
+.glx-md > * + * { margin-top: 0.6rem; }
+.glx-md h1, .glx-md h2, .glx-md h3, .glx-md h4 { font-weight: 600; line-height: 1.3; margin-top: 0.9rem; }
+.glx-md h1 { font-size: 1.15rem; } .glx-md h2 { font-size: 1.05rem; } .glx-md h3, .glx-md h4 { font-size: 0.95rem; }
+.glx-md > :first-child { margin-top: 0; }
+.glx-md ul { list-style: disc; padding-left: 1.25rem; }
+.glx-md ol { list-style: decimal; padding-left: 1.25rem; }
+.glx-md li + li { margin-top: 0.25rem; }
+.glx-md blockquote { border-left: 2px solid var(--color-glx-violet); padding-left: 0.75rem; color: var(--color-glx-muted); }
+.glx-md hr { border-color: var(--color-glx-line); }
+.glx-md :not(pre) > code { font-family: var(--font-mono); font-size: 0.85em; background: var(--color-glx-obsidian); border: 1px solid var(--color-glx-line); padding: 0 0.3em; }
+.glx-md-pre { background: var(--color-glx-void); border: 1px solid var(--color-glx-line); }
+.glx-md-pre pre { overflow-x: auto; padding: 0.75rem; padding-top: 2.1rem; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5; }
+.glx-md-table { overflow-x: auto; max-width: 100%; }
+.glx-md-table table { border-collapse: collapse; font-size: 0.85rem; }
+.glx-md-table th, .glx-md-table td { border: 1px solid var(--color-glx-line); padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }
+.glx-md-table th { background: var(--color-glx-obsidian); font-weight: 600; }
+.glx-md-link { color: var(--color-glx-cyan); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.glx-chip-button {
+  font-family: var(--font-mono); font-size: 0.7rem; padding: 0.3rem 0.55rem; min-height: 1.9rem;
+  border: 1px solid var(--color-glx-line); color: var(--color-glx-muted); background: var(--color-glx-obsidian);
+}
+.glx-chip-button:hover { color: var(--color-glx-cyan); border-color: var(--color-glx-cyan); }
+.glx-select {
+  background: var(--color-glx-obsidian); border: 1px solid var(--color-glx-line); color: var(--color-glx-text);
+  padding: 0.55rem 0.6rem; font-size: 16px; max-width: 100%;
+}
+
+/* ── Voice ───────────────────────────────────────────────────────────────── */
+.glx-mic {
+  display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0;
+  border: 1px solid var(--color-glx-line); color: var(--color-glx-muted);
+}
+.glx-mic:disabled { opacity: 0.4; }
+.glx-mic-active { border-color: var(--color-glx-bad); color: var(--color-glx-bad); background: rgb(248 113 113 / 0.12); }
+.glx-voice-panel { border: 1px solid var(--color-glx-line); background: var(--color-glx-surface); padding: 0.75rem; margin-top: 0.5rem; }
+.glx-voice-live { border-color: var(--color-glx-bad); }
+.glx-voice-note { font-size: 0.75rem; padding-top: 0.4rem; color: var(--color-glx-muted); }
+.glx-rec-dot { width: 0.6rem; height: 0.6rem; border-radius: 9999px; background: var(--color-glx-bad); animation: glx-pulse 1.2s ease-in-out infinite; }
+
+/* ── Decorative core ─────────────────────────────────────────────────────── */
+.glx-cell { fill: var(--color-glx-cyan); }
+.glx-ring-0 { fill: var(--color-glx-violet); animation: glx-pulse 2.4s ease-in-out infinite; }
+.glx-ring-1 { animation: glx-flicker 3.2s steps(4, end) infinite; }
+.glx-ring-2 { opacity: 0.45; animation: glx-flicker 4.8s steps(3, end) infinite; }
+.glx-core { animation: glx-drift 24s linear infinite; transform-origin: 50% 50%; }
+
+@keyframes glx-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes glx-flicker { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.25; } }
+@keyframes glx-drift { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .glx-core, .glx-cell, .glx-typing, .glx-rec-dot { animation: none !important; }
+}

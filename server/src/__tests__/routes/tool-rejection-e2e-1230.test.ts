@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Express } from 'express';
@@ -9,6 +9,17 @@ import { resetToolCapability } from '../../lib/tool-capability.js';
 import { clearCooldownsForKey } from '../../services/ratelimit.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { addToActiveChain } from '../helpers/chain.js';
+
+// These tests auto-route to custom endpoints, which free-only routing
+// (services/free-only.ts) keeps out of automatic routing unless the operator
+// opts in. They test endpoint behaviour, not that policy, so they opt in;
+// free-only-routing.test.ts covers the policy itself.
+const savedFreeOnlySetting = process.env.FREE_ONLY_ALLOW_PLATFORMS;
+beforeAll(() => { process.env.FREE_ONLY_ALLOW_PLATFORMS = 'custom'; });
+afterAll(() => {
+  if (savedFreeOnlySetting === undefined) delete process.env.FREE_ONLY_ALLOW_PLATFORMS;
+  else process.env.FREE_ONLY_ALLOW_PLATFORMS = savedFreeOnlySetting;
+});
 
 // #1230 end to end, against two REAL local relays. `bad` answers every request
 // that carries `tools` with a 400 (but serves plain chat); `good` serves

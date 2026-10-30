@@ -18,6 +18,7 @@ COPY shared/package.json ./shared/
 COPY server/package.json ./server/
 COPY client/package.json ./client/
 COPY cli/package.json ./cli/
+COPY glixel/package.json ./glixel/
 
 RUN npm ci
 
@@ -51,6 +52,8 @@ COPY --from=build --chown=node:node /app/server/package.json ./server/package.js
 COPY --from=build --chown=node:node /app/desktop/package.json ./desktop/package.json
 COPY --from=build --chown=node:node /app/server/dist ./server/dist
 COPY --from=build --chown=node:node /app/client/dist ./client/dist
+# GLIXEL (glixel/), served by the same server at /glixel.
+COPY --from=build --chown=node:node /app/glixel/dist ./glixel/dist
 
 RUN mkdir -p /app/server/data && chown -R node:node /app/server/data
 

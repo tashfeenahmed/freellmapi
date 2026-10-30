@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
@@ -10,6 +10,17 @@ import { endpointHandle, qualifiedModelMemberId } from '../../lib/endpoint-scope
 import { logRequest } from '../../lib/request-log.js';
 import { buildModelListing } from '../../services/model-listing.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+
+// These tests auto-route to custom endpoints, which free-only routing
+// (services/free-only.ts) keeps out of automatic routing unless the operator
+// opts in. They test endpoint behaviour, not that policy, so they opt in;
+// free-only-routing.test.ts covers the policy itself.
+const savedFreeOnlySetting = process.env.FREE_ONLY_ALLOW_PLATFORMS;
+beforeAll(() => { process.env.FREE_ONLY_ALLOW_PLATFORMS = 'custom'; });
+afterAll(() => {
+  if (savedFreeOnlySetting === undefined) delete process.env.FREE_ONLY_ALLOW_PLATFORMS;
+  else process.env.FREE_ONLY_ALLOW_PLATFORMS = savedFreeOnlySetting;
+});
 
 // Per-endpoint model identity (#651). Two relays that both offer
 // `deepseek-v3.1` used to collapse into ONE models row: one enabled flag, one
