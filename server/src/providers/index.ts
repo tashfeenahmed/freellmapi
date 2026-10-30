@@ -155,6 +155,24 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.anyapi.ai/v1',
 }));
 
+// PowerTokens — OpenAI-compatible gateway (https://api.powertokens.ai/v1).
+// Free tier VERIFIED 2026-10-22 against the Models UI detail for
+// glm-4.7-flash: INPUT $0 / 1M Tokens (0 Credits), OUTPUT $0 / 1M Tokens
+// (0 Credits). Screenshot: contributor-provided Models page capture. The
+// marketing /pricing HTML may omit this id even while Models shows $0.
+// Live probes the same day: authenticated GET /v1/models lists
+// glm-4.7-flash; POST /v1/chat/completions returns 200 (~41s TTFB — hidden
+// reasoning, same class as zhipu glm-4.7-flash, so timeoutMs 60s).
+// RPM/RPD/TPD unpublished → leave null in catalog. Model rows stay in the
+// hosted catalog (not migrations): single verified free id, limits unknown,
+// same pattern as anyapi/bai gateways.
+register(new OpenAICompatProvider({
+  platform: 'powertokens',
+  name: 'PowerTokens',
+  baseUrl: 'https://api.powertokens.ai/v1',
+  timeoutMs: 60_000,
+}));
+
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible
 // and its current public roster is free without consuming GPU-instance
 // credits. Public models are experimental and may rotate, so their ids remain
