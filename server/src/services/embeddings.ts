@@ -14,6 +14,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
+import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -409,44 +410,53 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
   // limited end to end earns a Retry-After, and then the soonest one.
   const hints = new RetryHintTracker();
   for (const row of chain) {
-    const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs));
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
+    const tried = new Set<number>();
+    do {
+      const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs), keyId => tried.has(keyId)
+        || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      if (!credential) {
+        if (budgetBlocked) {
+          lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
+          hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        break;
       }
-      continue;
-    }
-    const started = Date.now();
-    try {
-      const out = await callProvider(row, credential, inputs, dimensions);
-      if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
-        throw new EmbeddingsError('upstream returned malformed embeddings', 502);
+      tried.add(credential.id);
+      const started = Date.now();
+      try {
+        const out = await callProvider(row, credential, inputs, dimensions);
+        if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
+          throw new EmbeddingsError('upstream returned malformed embeddings', 502);
+        }
+        const tokens = out.inputTokens ?? estimateTokens(inputs);
+        logEmbeddingRequest(row, credential.id, 'success', tokens, Date.now() - started, null);
+        // A served embedding is evidence the key works, the same as a served
+        // chat request (#1493) or a served search (#1612): stamp last_healthy_at
+        // and lift an 'unknown'/'error' key. Embedding-only keys (and #1459-era
+        // providers that refuse probes) had no success signal at all otherwise.
+        markKeyHealthyFromRequest(credential.id);
+        return {
+          family,
+          platform: row.platform,
+          modelId: row.model_id,
+          dimensions: out.vectors[0].length,
+          vectors: out.vectors,
+          inputTokens: tokens,
+        };
+      } catch (err: any) {
+        const e = err instanceof EmbeddingsError ? err : new EmbeddingsError(String(err?.message ?? err), 502);
+        logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
+        if (row.platform === 'custom' && e.status === 429) {
+          setCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
+        }
+        lastError = e;
+        hints.record(e.status, e.retryAfterMs);
+        if (![401, 402, 403, 429].includes(e.status)) break;
+        // fall through to the next provider in the family
+      } finally {
+        credential.release();
       }
-      const tokens = out.inputTokens ?? estimateTokens(inputs);
-      logEmbeddingRequest(row, credential.id, 'success', tokens, Date.now() - started, null);
-      // A served embedding is evidence the key works, the same as a served
-      // chat request (#1493) or a served search (#1612): stamp last_healthy_at
-      // and lift an 'unknown'/'error' key. Embedding-only keys (and #1459-era
-      // providers that refuse probes) had no success signal at all otherwise.
-      markKeyHealthyFromRequest(credential.id);
-      return {
-        family,
-        platform: row.platform,
-        modelId: row.model_id,
-        dimensions: out.vectors[0].length,
-        vectors: out.vectors,
-        inputTokens: tokens,
-      };
-    } catch (err: any) {
-      const e = err instanceof EmbeddingsError ? err : new EmbeddingsError(String(err?.message ?? err), 502);
-      logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-      // fall through to the next provider in the family
-    } finally {
-      credential.release();
-    }
+    } while (row.platform === 'custom');
   }
 
   throw new EmbeddingsError(

@@ -897,32 +897,41 @@ export async function runImageGeneration(model: string | undefined, params: Imag
   // Only a chain rate limited end to end earns a Retry-After (the soonest).
   const hints = new RetryHintTracker();
   for (const row of chain) {
-    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-      : reserveProviderCredential(row, 0);
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
+    const tried = new Set<number>();
+    do {
+      const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
+        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
+        : reserveProviderCredential(row, 0, keyId => tried.has(keyId)
+          || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      if (!credential) {
+        if (budgetBlocked) {
+          lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+          hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        break;
       }
-      continue;
-    }
-    const started = Date.now();
-    try {
-      const images = await callImageProvider(row, credential, params);
-      if (!images.length || images.every(i => !i.b64_json && !i.url)) {
-        throw new MediaError('upstream returned no image', 502);
+      if (credential.id != null) tried.add(credential.id);
+      const started = Date.now();
+      try {
+        const images = await callImageProvider(row, credential, params);
+        if (!images.length || images.every(i => !i.b64_json && !i.url)) {
+          throw new MediaError('upstream returned no image', 502);
+        }
+        logMedia(row, credential.id, 'success', Date.now() - started, null);
+        return { platform: row.platform, modelId: row.model_id, images };
+      } catch (err: any) {
+        const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+        logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+        if (row.platform === 'custom' && e.status === 429 && credential.id != null) {
+          setCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
+        }
+        lastError = e;
+        hints.record(e.status, e.retryAfterMs);
+        if (![401, 402, 403, 429].includes(e.status)) break;
+      } finally {
+        credential.release();
       }
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, images };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
+    } while (row.platform === 'custom');
   }
   throw chainError('image', lastError, hints);
 }
@@ -1250,35 +1259,40 @@ export async function runTranscription(model: string | undefined, p: Transcripti
   // Only a chain rate limited end to end earns a Retry-After (the soonest).
   const hints = new RetryHintTracker();
   for (const m of usable) {
-    const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0,
-      keyId => isOnCooldown(m.platform, m.modelId, keyId));
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
+    const tried = new Set<number>();
+    do {
+      const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId, model_id: m.modelId }, 0,
+        keyId => tried.has(keyId) || isOnCooldown(m.platform, m.modelId, keyId));
+      if (!credential) {
+        if (budgetBlocked) {
+          lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+          hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        break;
       }
-      continue;
-    }
-    const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
-    const started = Date.now();
-    try {
-      const out = await callTranscriptionProvider(m, credential, p);
-      if (p.responseFormat === 'vtt' && !out.vtt) {
-        throw new MediaError('upstream returned no vtt subtitles', 502);
+      tried.add(credential.id);
+      const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
+      const started = Date.now();
+      try {
+        const out = await callTranscriptionProvider(m, credential, p);
+        if (p.responseFormat === 'vtt' && !out.vtt) {
+          throw new MediaError('upstream returned no vtt subtitles', 502);
+        }
+        logMedia(logRow, credential.id, 'success', Date.now() - started, null);
+        return { platform: m.platform, modelId: m.modelId, ...out };
+      } catch (err: any) {
+        const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+        logMedia(logRow, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+        if (e.status === 429 && credential.id != null) {
+          setCooldown(m.platform, m.modelId, credential.id);
+        }
+        lastError = e;
+        hints.record(e.status, e.retryAfterMs);
+        if (![401, 402, 403, 429].includes(e.status)) break;
+      } finally {
+        credential.release();
       }
-      logMedia(logRow, credential.id, 'success', Date.now() - started, null);
-      return { platform: m.platform, modelId: m.modelId, ...out };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(logRow, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      if (e.status === 429 && credential.id != null) {
-        setCooldown(m.platform, m.modelId, credential.id);
-      }
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
+    } while (m.platform === 'custom');
   }
   throw chainError('transcription', lastError, hints);
 }
@@ -1290,30 +1304,39 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
   // Only a chain rate limited end to end earns a Retry-After (the soonest).
   const hints = new RetryHintTracker();
   for (const row of chain) {
-    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-      : reserveProviderCredential(row, 0);
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
+    const tried = new Set<number>();
+    do {
+      const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
+        ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
+        : reserveProviderCredential(row, 0, keyId => tried.has(keyId)
+          || (row.platform === 'custom' && isOnCooldown(row.platform, row.model_id, keyId)));
+      if (!credential) {
+        if (budgetBlocked) {
+          lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
+          hints.record(429, secondsUntilNextMonth() * 1000);
+        }
+        break;
       }
-      continue;
-    }
-    const started = Date.now();
-    try {
-      const out = await callSpeechProvider(row, credential, params);
-      if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
+      if (credential.id != null) tried.add(credential.id);
+      const started = Date.now();
+      try {
+        const out = await callSpeechProvider(row, credential, params);
+        if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
+        logMedia(row, credential.id, 'success', Date.now() - started, null);
+        return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
+      } catch (err: any) {
+        const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
+        logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
+        if (row.platform === 'custom' && e.status === 429 && credential.id != null) {
+          setCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
+        }
+        lastError = e;
+        hints.record(e.status, e.retryAfterMs);
+        if (![401, 402, 403, 429].includes(e.status)) break;
+      } finally {
+        credential.release();
+      }
+    } while (row.platform === 'custom');
   }
   throw chainError('audio', lastError, hints);
 }

@@ -98,6 +98,23 @@ describe('embeddings service', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('tries sibling endpoint keys after an embedding authentication failure', async () => {
+    const keyId = addCustomKey('https://embeddings.example/v1', 'first-key');
+    addCustomKey('https://embeddings.example/v1', 'second-key');
+    addCustomKey('https://other.example/v1', 'other-key');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)
+      VALUES ('local-embed', 'custom', 'local-embed', 'Local', 2, 1, 1, '', ?)`).run(keyId);
+    let count = 0;
+    const fetchMock = mockFetch(async () => ++count === 1 ? new Response('invalid key', { status: 401 }) : okEmbeddingResponse(2));
+    await expect(runEmbeddings('local-embed', ['hello'])).resolves.toMatchObject({ dimensions: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Set(fetchMock.mock.calls.map(c => new Headers(c[1]?.headers).get('Authorization'))))
+      .toEqual(new Set(['Bearer first-key', 'Bearer second-key']));
+    expect(fetchMock.mock.calls.map(c => String(c[0]))).toEqual([
+      'https://embeddings.example/v1/embeddings', 'https://embeddings.example/v1/embeddings',
+    ]);
+  });
+
   describe('migration seed', () => {
     it('seeds the embedding catalog with families and a default', () => {
       const rows = getDb().prepare('SELECT DISTINCT family FROM embedding_models').all() as { family: string }[];

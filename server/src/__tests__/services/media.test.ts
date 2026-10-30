@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
+import { clearCooldownsForKey, isOnCooldown } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -285,6 +286,92 @@ describe('media service', () => {
       expect(body).toMatchObject({ model: 'local-image', prompt: 'a cat', n: 2, size: '512x512' });
       const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'image' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
       expect(log.key_id).toBe(keyId);
+    });
+
+    it('uses an enabled sibling key when the bound custom media key is disabled', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8282/v1', 'disabled-key');
+      addCustomKey('http://127.0.0.1:8282/v1', 'sibling-key');
+      addCustomKey('http://127.0.0.1:8383/v1', 'other-endpoint-key');
+      addMedia('custom', 'local-image', 'image', 1, keyId);
+      getDb().prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(keyId);
+      const fetchMock = vi.fn(async () => jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('local-image', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'custom' });
+      const call = (fetchMock.mock.calls as unknown as [string, RequestInit][])[0];
+      expect(String(call[0])).toBe('http://127.0.0.1:8282/v1/images/generations');
+      expect(new Headers(call[1].headers).get('Authorization')).toBe('Bearer sibling-key');
+    });
+
+    it('tries another key on the same custom endpoint after a key failure', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8282/v1', 'first-key');
+      addCustomKey('http://127.0.0.1:8282/v1', 'second-key');
+      addCustomKey('http://127.0.0.1:8383/v1', 'other-endpoint-key');
+      addMedia('custom', 'local-image', 'image', 1, keyId);
+      const fetchMock = vi.fn().mockResolvedValueOnce(new Response('invalid key', { status: 401 }))
+        .mockResolvedValueOnce(jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('local-image', { prompt: 'a cat' })).resolves.toMatchObject({ platform: 'custom' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+      expect(calls.map(c => String(c[0]))).toEqual([
+        'http://127.0.0.1:8282/v1/images/generations', 'http://127.0.0.1:8282/v1/images/generations',
+      ]);
+      expect(new Set(calls.map(c => new Headers(c[1].headers).get('Authorization'))))
+        .toEqual(new Set(['Bearer first-key', 'Bearer second-key']));
+    });
+
+    it('does not use a sibling key scoped to a different model', async () => {
+      const bound = addCustomKey('http://127.0.0.1:8282/v1', 'disabled-key');
+      const sibling = addCustomKey('http://127.0.0.1:8282/v1', 'scoped-key');
+      addMedia('custom', 'local-image', 'image', 1, bound);
+      getDb().prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(bound);
+      getDb().prepare('UPDATE api_keys SET model_scope_json = ? WHERE id = ?').run('["other-model"]', sibling);
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('local-image', { prompt: 'a cat' })).rejects.toMatchObject({ status: 502 });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('skips a sibling that has exhausted its monthly budget', async () => {
+      const bound = addCustomKey('http://127.0.0.1:8282/v1', 'spent-key');
+      addCustomKey('http://127.0.0.1:8282/v1', 'available-key');
+      addMedia('custom', 'local-image', 'image', 1, bound);
+      const db = getDb();
+      db.prepare('UPDATE api_keys SET monthly_request_cap = 1 WHERE id = ?').run(bound);
+      db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, latency_ms)
+        VALUES ('custom', 'local-image', ?, 'success', 1)`).run(bound);
+      const fetchMock = vi.fn(async () => jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await runImageGeneration('local-image', { prompt: 'a cat' });
+      const call = (fetchMock.mock.calls as unknown as [string, RequestInit][])[0];
+      expect(new Headers(call[1].headers).get('Authorization')).toBe('Bearer available-key');
+    });
+
+    it('cools a rate-limited custom image key before using its sibling', async () => {
+      const first = addCustomKey('http://127.0.0.1:8282/v1', 'first-key');
+      const second = addCustomKey('http://127.0.0.1:8282/v1', 'second-key');
+      clearCooldownsForKey(first);
+      clearCooldownsForKey(second);
+      addMedia('custom', 'local-image', 'image', 1, first);
+      const fetchMock = vi.fn().mockResolvedValueOnce(new Response('rate limit', { status: 429 }))
+        .mockResolvedValueOnce(jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await runImageGeneration('local-image', { prompt: 'a cat' });
+      const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+      const failed = new Headers(calls[0][1].headers).get('Authorization') === 'Bearer first-key' ? first : second;
+      expect(isOnCooldown('custom', 'local-image', failed)).toBe(true);
+      clearCooldownsForKey(first);
+      clearCooldownsForKey(second);
+    });
+
+    it('does not repeat an ambiguous image failure with a sibling key', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8282/v1', 'first-key');
+      addCustomKey('http://127.0.0.1:8282/v1', 'second-key');
+      addMedia('custom', 'local-image', 'image', 1, keyId);
+      const fetchMock = vi.fn(async () => new Response('unavailable', { status: 503 }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('local-image', { prompt: 'a cat' })).rejects.toMatchObject({ status: 502 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -711,6 +798,20 @@ describe('media service', () => {
       const googleBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body));
       expect(cloudflareBody.lang).toBe('en');
       expect(googleBody.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe('Achernar');
+    });
+
+    it('tries a sibling key after a custom speech key fails', async () => {
+      const keyId = addCustomKey('http://127.0.0.1:8383/v1', 'first-key');
+      addCustomKey('http://127.0.0.1:8383/v1', 'second-key');
+      addMedia('custom', 'local-tts', 'audio', 1, keyId);
+      const fetchMock = vi.fn().mockResolvedValueOnce(new Response('invalid key', { status: 401 }))
+        .mockResolvedValueOnce(new Response(Buffer.from('MP3'), { status: 200, headers: { 'content-type': 'audio/mpeg' } }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runSpeech('local-tts', { input: 'hello' })).resolves.toMatchObject({ platform: 'custom' });
+      const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+      expect(calls).toHaveLength(2);
+      expect(new Set(calls.map(c => new Headers(c[1].headers).get('Authorization'))))
+        .toEqual(new Set(['Bearer first-key', 'Bearer second-key']));
     });
 
     it('custom audio models call the bound OpenAI-compatible endpoint', async () => {
