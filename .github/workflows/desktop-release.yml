@@ -267,6 +267,19 @@ jobs:
             echo "CSC_NAME=${identity#Developer ID Application: }"
           } >> "$GITHUB_ENV"
 
+      # GitHub reproduced the Intel runner's CloudKit failures as dropped
+      # HTTP/3 (UDP 443) connections, not rejected notarizations. Force HTTPS
+      # over TCP on this ephemeral signed-build runner before afterSign AND
+      # the DMG step use stapler. Keep all ticket/Gatekeeper checks intact.
+      # Remove when https://github.com/actions/runner-images/issues/14924 is fixed.
+      - name: Use TCP for Apple notarization on Intel macOS
+        if: matrix.os == 'macos-15-intel' && steps.maccreds.outputs.signed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'block return out quick proto udp from any to any port 443' | sudo pfctl -f -
+          sudo pfctl -E
+
       - name: Package installer
         shell: bash
         env:
