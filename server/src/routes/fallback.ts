@@ -161,7 +161,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
 const MODEL_COLUMNS = `
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
-           m.tpm_limit, m.tpd_limit, m.context_window,
+           m.tpm_limit, m.tpd_limit, m.context_window, m.context_safety_factor,
            m.monthly_token_budget, m.supports_vision, m.supports_tools,
            m.key_id, m.endpoint_scope, m.source AS model_source, ak.label AS key_label,
            mo.overrides_json IS NOT NULL AS has_overrides,
@@ -302,6 +302,8 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       // Max context length (tokens), used by the dashboard catalog filter. Null
       // for models whose context window the catalog doesn't record.
       contextWindow: r.context_window,
+      // Per-model divisor for the advertised context window; null = global default.
+      contextSafetyFactor: r.context_safety_factor ?? null,
       monthlyTokenBudget: r.monthly_token_budget,
       // Parsed once here (single source of truth) so the dashboard never re-implements
       // budget-label parsing; 0 for rate-limited/placeholder labels. See lib/budget.ts.
