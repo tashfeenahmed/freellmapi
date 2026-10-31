@@ -434,8 +434,9 @@ describe('Model management API', () => {
     // a context can it take? Both are asserted, not merely present.
     expect(chain.available).toBe(true);
     expect(chain.unavailable_reason).toBeNull();
-    expect(chain.context_window).toBe(111000);
-    expect(chain.context_length).toBe(111000);
+    // Advertised context is post-safety-factor: 111000 / 1.25 = 88800.
+    expect(chain.context_window).toBe(88800);
+    expect(chain.context_length).toBe(88800);
 
     const off = listed.body.data.find((m: any) => m.id === 'auto:off-group');
     expect(off).toBeDefined();

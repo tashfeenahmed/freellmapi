@@ -28,6 +28,11 @@
 
 import type { Db } from '../types.js';
 
+function hasColumn(db: Db, table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return columns.some(col => col.name === column);
+}
+
 // The models table as of this migration, plus the new column. Written out in
 // full rather than derived, so the rebuilt schema is auditable here and
 // identical on every run.
@@ -117,10 +122,14 @@ function rebuildModels(db: Db, extraColumns: string, copiedColumns: string, uniq
 }
 
 export function up(db: Db): void {
+  const extraColumns = `,\n      endpoint_scope TEXT NOT NULL DEFAULT ''` +
+    (hasColumn(db, 'models', 'context_safety_factor') ? `,\n      context_safety_factor REAL` : '');
+  const carriedColumns = CARRIED_COLUMNS +
+    (hasColumn(db, 'models', 'context_safety_factor') ? ', context_safety_factor' : '');
   rebuildModels(
     db,
-    `,\n      endpoint_scope TEXT NOT NULL DEFAULT ''`,
-    CARRIED_COLUMNS,
+    extraColumns,
+    carriedColumns,
     'UNIQUE(platform, model_id, endpoint_scope)',
   );
 
@@ -160,6 +169,11 @@ export function down(db: Db): void {
     );
   }
 
+  const carriedColumns = CARRIED_COLUMNS +
+    (hasColumn(db, 'models', 'context_safety_factor') ? ', context_safety_factor' : '');
+  const extraColumns = hasColumn(db, 'models', 'context_safety_factor')
+    ? ',\n      context_safety_factor REAL'
+    : '';
   db.exec('DROP INDEX IF EXISTS idx_models_endpoint_scope;');
-  rebuildModels(db, '', CARRIED_COLUMNS, 'UNIQUE(platform, model_id)');
+  rebuildModels(db, extraColumns, carriedColumns, 'UNIQUE(platform, model_id)');
 }

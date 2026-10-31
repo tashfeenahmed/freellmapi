@@ -405,7 +405,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
                    AND (m.key_id IS NULL OR k.id = m.key_id)
                )
            ) AS usable,
-           (SELECT json_group_array(m2.context_window)
+           (SELECT json_group_array(CAST(m2.context_window / COALESCE(m2.context_safety_factor, 1.25) AS REAL))
             FROM profile_models pm2
             JOIN models m2 ON m2.id = pm2.model_db_id AND m2.enabled = 1
             WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS ctxs
