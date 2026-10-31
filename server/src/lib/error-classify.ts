@@ -387,7 +387,8 @@ export function isProviderDegradedError(err: any): boolean {
 const MODEL_SCOPED_OVERLOAD = /\b(?:this|the) model is (?:currently )?(?:experiencing high demand|overloaded)\b/;
 
 export function isModelScopedOverloadError(err: any): boolean {
-  return MODEL_SCOPED_OVERLOAD.test((err?.message ?? '').toLowerCase());
+  return typeof err?.status === 'number' && err.status >= 500
+    && MODEL_SCOPED_OVERLOAD.test((err?.message ?? '').toLowerCase());
 }
 
 // #788: provider-level failures — 5xx, timeouts, transport/network errors, a
