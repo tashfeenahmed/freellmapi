@@ -401,13 +401,13 @@ function ProviderSettingsRow({
   // `members` is rebuilt on every render, so depend on the model's own values
   // rather than the object identity — otherwise the form resets mid-edit.
   const {
-    modelDbId, displayName, contextWindow, intelligenceRank, speedRank, sizeLabel,
+    modelDbId, displayName, contextWindow, contextSafetyFactor, intelligenceRank, speedRank, sizeLabel,
     rpmLimit, rpdLimit, tpmLimit, tpdLimit, supportsVision, supportsTools, enabled,
   } = model
   const source: ModelSettingsSource = useMemo(() => ({
-    displayName, contextWindow, intelligenceRank, speedRank, sizeLabel,
+    displayName, contextWindow, contextSafetyFactor, intelligenceRank, speedRank, sizeLabel,
     rpmLimit, rpdLimit, tpmLimit, tpdLimit, supportsVision, supportsTools, enabled,
-  }), [displayName, contextWindow, intelligenceRank, speedRank, sizeLabel, rpmLimit, rpdLimit,
+  }), [displayName, contextWindow, contextSafetyFactor, intelligenceRank, speedRank, sizeLabel, rpmLimit, rpdLimit,
     tpmLimit, tpdLimit, supportsVision, supportsTools, enabled])
 
   const [form, setForm] = useState(() => modelSettingsForm(source))
@@ -463,7 +463,7 @@ function ProviderSettingsRow({
           </Tooltip>
         )}
       </div>
-      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_8rem_auto_auto_auto_auto] md:items-end">
+      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_8rem_8rem_auto_auto_auto_auto] md:items-end">
         <label className="space-y-1 text-xs text-muted-foreground">
           <FieldLabel text={t('models.displayName')} overridden={overridden.has('displayName')} />
           <Input
@@ -479,6 +479,15 @@ function ProviderSettingsRow({
           invalid={invalid.contextWindow}
           overridden={overridden.has('contextWindow')}
           onChange={value => setField('contextWindow', value)}
+        />
+        <NumberField
+          label={t('models.contextSafetyFactor')}
+          hint={t('models.contextSafetyFactorHint')}
+          step={0.05}
+          value={form.contextSafetyFactor}
+          invalid={invalid.contextSafetyFactor}
+          overridden={overridden.has('contextSafetyFactor')}
+          onChange={value => setField('contextSafetyFactor', value)}
         />
         <label className="flex h-8 items-center gap-2 text-xs">
           <Switch size="sm" checked={form.supportsTools} onCheckedChange={value => setField('supportsTools', value)} />
@@ -619,6 +628,7 @@ function NumberField({
   onChange,
   min = 1,
   max,
+  step = 1,
 }: {
   label: string
   hint?: string
@@ -628,6 +638,7 @@ function NumberField({
   onChange: (value: string) => void
   min?: number
   max?: number
+  step?: number
 }) {
   return (
     <label className="space-y-1 text-xs text-muted-foreground" title={hint}>
@@ -636,7 +647,7 @@ function NumberField({
         type="number"
         min={min}
         max={max}
-        step={1}
+        step={step}
         value={value}
         onChange={e => onChange(e.target.value)}
         aria-invalid={invalid}

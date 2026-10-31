@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small set the intelligence axis: a higher tier always beats a lower one, and within a tier the intelligence rank still moves the score. A model with no recognized tier scores lowest here, but intelligence is only one of three axes — strong reliability and speed can still win it a route.",
     "sizeLabelNone": "None (lowest intelligence score)",
     "contextWindow": "Context",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "In chain",
     "saveModelSettings": "Save model settings",
     "aggregateBudget": "{count}/mo",
