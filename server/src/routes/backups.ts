@@ -31,7 +31,7 @@ const scheduleSchema = z.object({
 function parseSchedule(body: unknown): { schedule?: BackupSchedule; error?: string } {
   const parsed = scheduleSchema.safeParse(body);
   if (!parsed.success) {
-    return { error: parsed.error.errors.map((e) => e.message).join(', ') };
+    return { error: parsed.error.issues.map((e) => e.message).join(', ') };
   }
   return { schedule: { ...parsed.data, backupPath: parsed.data.backupPath.trim() } };
 }
@@ -84,7 +84,7 @@ backupsRouter.get('/', (req: Request, res: Response) => {
 backupsRouter.post('/', (req: Request, res: Response) => {
   const parsed = createSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map((e) => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map((e) => e.message).join(', ') } });
     return;
   }
   try {

@@ -114,7 +114,7 @@ geminiRouter.get(/^\/models\/(.+)$/, (req, res) => {
 function parseGenerateBody(req: Request, res: Response): GeminiInboundRequest | null {
   const parsed = generateSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .slice(0, 5)
       .map(error => `${error.path.join('.') || 'body'}: ${error.message}`)
       .join(', ');

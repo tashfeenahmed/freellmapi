@@ -29,7 +29,7 @@ moderationRouter.post('/moderations', async (req: Request, res: Response) => {
   if (!parsed.success) {
     res.status(400).json({
       error: {
-        message: parsed.error.errors.map(e => e.message).join(', '),
+        message: parsed.error.issues.map(e => e.message).join(', '),
         type: 'invalid_request_error',
       },
     });
