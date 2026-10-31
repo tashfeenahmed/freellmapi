@@ -66,6 +66,7 @@ const PLATFORMS = [
   'blockrun',
   'moondream',
   'jamai',
+  'nabh',
   'beatapi',
   'apinex',
   'onomeo',
