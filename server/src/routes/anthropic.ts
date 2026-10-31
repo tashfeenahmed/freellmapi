@@ -471,7 +471,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
 
   const parsed = messagesSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5).join(', ');
     console.warn(`[anthropic] 400 invalid /v1/messages request: ${detail}`);
