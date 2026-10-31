@@ -91,7 +91,8 @@ describe('GET /v1/models/:id (models.retrieve)', () => {
     expect(got.body.object).toBe('model');
     expect(got.body.id).toBe(row.id);
     expect(got.body.owned_by).toBe(row.owned_by);
-    expect(got.body.context_window).toBe(4096);
+    // Advertised context is post-safety-factor; retrieve must match the list.
+    expect(got.body.context_window).toBe(row.context_window);
     expect(got.body.available).toBe(true);
     expect(got.body.execution_status).toBe(row.execution_status);
   });

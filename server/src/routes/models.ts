@@ -47,6 +47,7 @@ const modelUpdateSchema = z.object({
   tpdLimit: z.number().int().positive().nullable().optional(),
   monthlyTokenBudget: z.string().max(80).optional(),
   contextWindow: z.number().int().positive().nullable().optional(),
+  contextSafetyFactor: z.number().positive().nullable().optional(),
   enabled: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
@@ -64,6 +65,7 @@ const MODEL_FIELD_COLUMNS: Record<keyof ModelOverridePatch | 'enabled', string> 
   tpdLimit: 'tpd_limit',
   monthlyTokenBudget: 'monthly_token_budget',
   contextWindow: 'context_window',
+  contextSafetyFactor: 'context_safety_factor',
   supportsVision: 'supports_vision',
   supportsTools: 'supports_tools',
   enabled: 'enabled',
@@ -79,6 +81,7 @@ type ModelRow = {
 
 function dbValue(key: keyof typeof MODEL_FIELD_COLUMNS, value: unknown): unknown {
   if (key === 'enabled' || key === 'supportsVision' || key === 'supportsTools') return value ? 1 : 0;
+  if (key === 'contextSafetyFactor') return value ?? null;
   return value;
 }
 
@@ -93,6 +96,7 @@ const createModelSchema = z.object({
   modelId: z.string().min(1).max(200),
   displayName: z.string().min(1).max(200).optional(),
   contextWindow: z.number().int().positive().nullable().optional(),
+  contextSafetyFactor: z.number().positive().nullable().optional(),
   rpmLimit: z.number().int().positive().nullable().optional(),
   rpdLimit: z.number().int().positive().nullable().optional(),
   tpmLimit: z.number().int().positive().nullable().optional(),
@@ -158,10 +162,12 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       INSERT INTO models (
         platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
         rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window,
+        context_safety_factor,
         enabled, supports_vision, supports_tools, key_id, source, endpoint_scope
       ) VALUES (
         @platform, @modelId, @displayName, @intelligenceRank, @speedRank, @sizeLabel,
         @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, '', @contextWindow,
+        @contextSafetyFactor,
         1, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
       )
     `).run({
@@ -176,6 +182,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
       contextWindow: data.contextWindow ?? null,
+      contextSafetyFactor: data.contextSafetyFactor ?? null,
       supportsVision: data.supportsVision ? 1 : 0,
       supportsTools: data.supportsTools !== undefined ? (data.supportsTools ? 1 : 0) : 1,
       keyId: boundKeyId,
@@ -205,6 +212,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       modelId: data.modelId,
       displayName: data.displayName || data.modelId,
       contextWindow: data.contextWindow ?? null,
+      contextSafetyFactor: data.contextSafetyFactor ?? null,
       rpmLimit: data.rpmLimit ?? null,
       rpdLimit: data.rpdLimit ?? null,
       tpmLimit: data.tpmLimit ?? null,
@@ -301,7 +309,7 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
         for (const key of [
           'displayName', 'intelligenceRank', 'speedRank', 'sizeLabel',
           'rpmLimit', 'rpdLimit', 'tpmLimit', 'tpdLimit',
-          'monthlyTokenBudget', 'contextWindow', 'supportsVision', 'supportsTools',
+          'monthlyTokenBudget', 'contextWindow', 'contextSafetyFactor', 'supportsVision', 'supportsTools',
         ] as const) {
           if (Object.prototype.hasOwnProperty.call(modelPatch, key)) {
             overridePatch[key] = modelPatch[key] as never;
@@ -495,6 +503,7 @@ modelsRouter.get('/', (_req: Request, res: Response) => {
     tpdLimit: m.tpd_limit,
     monthlyTokenBudget: m.monthly_token_budget,
     contextWindow: m.context_window,
+    contextSafetyFactor: m.context_safety_factor ?? null,
     enabled: m.enabled === 1,
     supportsVision: m.supports_vision === 1,
     supportsTools: m.supports_tools === 1,
