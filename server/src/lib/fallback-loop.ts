@@ -325,7 +325,22 @@ export function cooldownForError(route: RouteResult, err: any): number {
  * getCooldownDecisionForLimit, which tags 'authoritative' only when an explicit
  * Retry-After actually determined the expiry.
  */
+export const APINEX_CHECKIN_URL = 'https://apinex.bond/';
+export const APINEX_CHECKIN_MESSAGE =
+  `APINex Free requires a daily website visit. Open ${APINEX_CHECKIN_URL} and sign in to claim the daily check-in. ` +
+  'FreeLLMAPI will retry after a short cooldown, or you can resume the APINex key in the Keys dashboard after visiting.';
+
+/** HTTP 402 on APINex Free can mean a missing website check-in, not empty credits. */
+export function isApinexCheckinRequired(platform: string, err: any): boolean {
+  return platform === 'apinex' && err?.status === 402 &&
+    /daily check-?in required/i.test(String(err?.message ?? ''));
+}
+
 export function cooldownDecisionForError(route: RouteResult, err: any): CooldownDecision {
+  // Account-wide check-in gate. Persist its provenance, keep the existing
+  // cross-model bench, but re-attempt on real client traffic after 15 minutes.
+  // Never clear a proven 402 merely because /balance validated the key.
+  if (isApinexCheckinRequired(route.platform, err)) return { durationMs: 15 * 60_000, source: 'checkin' };
   if (isPaymentRequiredError(err)) return { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' };
   // Before the model-forbidden check: a suspended account is a 403 too, but
   // it is the KEY that is out, for as long as an empty balance would be — and
@@ -604,14 +619,18 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // the key on every model of the platform for the credit window. Unlike a
     // suspension the platform itself stays in play: a sibling key is a
     // different wallet and may well have credits, so only THIS key is out.
-    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'is out of credits (402)');
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
+      isApinexCheckinRequired(route.platform, err) ? 'requires daily website check-in' : 'is out of credits (402)');
   }
   // #1347 (PR 1): a provider-moment failure (429 / 5xx / timeout / transport)
   // is the provider's bad minute, not model evidence. When attribution is
   // enabled it still steers the key via the cooldown above, but leaves the
   // model's books (failure window, penalties) untouched — so one slow minute
   // stops sinking a healthy model out of routing.
-  const providerMoment = isProviderMomentAttributionEnabled() && isProviderMomentFailure(err);
+  // APINex check-in is a key/account eligibility gate, not a sick model.
+  // Do not sink model reliability or rank merely because nobody visited the site.
+  const providerMoment = isApinexCheckinRequired(route.platform, err) ||
+    (isProviderMomentAttributionEnabled() && isProviderMomentFailure(err));
   if (!providerMoment) {
     // Model-level failure benching: a model failing across keys (or repeatedly
     // on one key) must sink out of routing instead of being re-picked every
@@ -989,6 +1008,14 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
   const everyAttempt = (cls: AttemptErrorClass | ReadonlySet<AttemptErrorClass>): boolean =>
     attempts.length > 0 && attempts.every(a => (cls instanceof Set ? cls.has(a.errorClass) : a.errorClass === cls));
 
+  if (isApinexCheckinRequired('apinex', lastError) &&
+      attempts.length > 0 && attempts.every(a => a.platform === 'apinex' && a.errorClass === 'out_of_credits')) {
+    return {
+      kind: 'rate_limit', status: 429, type: 'rate_limit_error', code: 'provider_checkin_required',
+      message: `${APINEX_CHECKIN_MESSAGE}${budgetNote}${trail}`,
+    };
+  }
+
   if (everyAttempt('auth')) {
     return {
       kind: 'auth',
@@ -1166,6 +1193,18 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
   const diag: string[] = Array.isArray(routeErr?.diagnostics) ? routeErr.diagnostics : [];
   const message: string = routeErr?.message ?? 'No model available to route this request';
   const classes = diag.map(classifyRoutingDiagLine);
+
+  // Only an all-APINex check-in bench may receive this actionable code.
+  // Mixed routes (including real RPM limits) keep the normal exhaustion verdict.
+  if (diag.length > 0 && diag.every(line =>
+    /^apinex\//i.test(line) && /checkin-required:\d+/.test(line) &&
+    !/\b(?:cooldown|provider-minute-cap|rpm\/rpd-limit|tpm\/tpd-limit):\d+/.test(line)
+  )) {
+    return {
+      kind: 'rate_limit', status: 429, type: 'rate_limit_error', code: 'provider_checkin_required',
+      message: APINEX_CHECKIN_MESSAGE,
+    };
+  }
 
   if (diag.length === 0 || classes.every(c => c === 'config')) {
     return {

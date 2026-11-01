@@ -11,7 +11,7 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { verifyCredentials } from '../services/auth.js';
-import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
+import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
@@ -520,6 +520,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       modelDiscovery: canDiscover(row.platform),
       cooldowns: cooldowns.map(c => ({
         modelId: c.modelId,
+        source: c.source,
         expiresAtMs: c.expiresAtMs,
         remainingMs: c.remainingMs,
       })),
@@ -548,6 +549,29 @@ keysRouter.delete('/:id/cooldowns', (req: Request, res: Response) => {
 
   const cleared = clearCooldownsForKey(id);
   res.json({ cleared });
+});
+
+// Resume APINex after a manual website check-in without clearing unrelated
+// credit, tier, or rate-limit cooldowns on the same key.
+keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: 'Invalid key id' });
+    return;
+  }
+
+  const row = getDb().prepare('SELECT platform FROM api_keys WHERE id = ?')
+    .get(id) as { platform: string } | undefined;
+  if (!row) {
+    res.status(404).json({ error: 'Key not found' });
+    return;
+  }
+  if (row.platform !== 'apinex') {
+    res.status(400).json({ error: 'Check-in recovery is only supported for APINex keys' });
+    return;
+  }
+
+  res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
 // Is the caller connecting from this machine? Read from the real socket peer
