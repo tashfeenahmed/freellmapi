@@ -41,6 +41,7 @@ import {
   isKeyAuthError,
   isDailyQuotaExhaustedError,
   isProviderLevelError,
+  isModelScopedOverloadError,
   newClientAbortError,
 } from '../../lib/error-classify.js';
 import { invalidToolArgumentsError } from '../../lib/tool-validate.js';
@@ -790,6 +791,26 @@ describe('runFallbackLoop: a provider-level failure skips the whole platform (#7
     // wholesale, so failover spends its budget on the NEXT provider.
     expect(platformsTried(dispatch)).toEqual(['alpha', 'beta']);
     expect(state.skipPlatforms.has('alpha')).toBe(true);
+  });
+
+  it('skips sibling keys of an overloaded model but still tries a sibling model', async () => {
+    const state = newFallbackState();
+    const dispatch = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('This model is currently experiencing high demand.'), { status: 503 }))
+      .mockResolvedValueOnce('done');
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, state, route: miniRouter(state), dispatch }));
+
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const second = dispatch.mock.calls[1][0] as RouteResult;
+    expect(second.platform).toBe('alpha');
+    expect(second.modelId).toBe('alpha-small');
+    expect(state.skipModels.has(CANDIDATES[0].modelDbId)).toBe(true);
+    expect(state.skipPlatforms.has('alpha')).toBe(false);
+  });
+
+  it.each([undefined, 400, 429])('does not infer model overload from wording without a 5xx status (%s)', status => {
+    expect(isModelScopedOverloadError(Object.assign(new Error('This model is overloaded.'), { status }))).toBe(false);
   });
 
   it('a 401 on alpha key1 still rotates to alpha key2 (key-scoped, not provider-scoped)', async () => {
