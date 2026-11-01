@@ -732,6 +732,7 @@ export interface AttemptRecord {
   modelId: string;
   keyOrdinal: number;
   errorClass: AttemptErrorClass;
+  contextWindow?: number | null;
 }
 
 export function classifyAttemptError(err: any): AttemptErrorClass {
@@ -1005,14 +1006,22 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
   // attempt failed the same way, that unanimity is stronger evidence than the
   // shape of whichever error happened to come last.
   if (everyAttempt('context_too_large')) {
+    // The request exceeded every attempted model's window. Report the largest
+    // window we tried so the client knows how far over it is; retrying cannot
+    // help, shrinking the prompt or enabling a bigger model can.
+    const maxAttemptedContext = attempts.length > 0
+      ? Math.max(0, ...attempts.map(a => a.contextWindow ?? 0))
+      : null;
+
     return {
       kind: 'context_too_large',
       status: 413,
       type: 'invalid_request_error',
       code: 'context_length_exceeded',
       message: `The request is too large for every routed candidate: all ${attempts.length} attempt(s) were rejected as ` +
-        `over the model's context/size limit${budgetNote}. Retrying will not help — reduce the prompt/history size or ` +
-        `enable a larger-context model.${trail} Last error: ${safeLastError}`,
+        `over the model's context/size limit. ` +
+        `${maxAttemptedContext ? `Largest context window among attempted models: ${maxAttemptedContext} tokens. ` : ''}` +
+        `Retrying will not help — reduce the prompt/history size or enable a larger-context model.${trail} Last error: ${safeLastError}`,
     };
   }
 
@@ -1595,7 +1604,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         // KEY-fatal, not request-fatal: rotate past the bad key and revalidate
         // it immediately instead of 502-ing while healthy routes sit idle.
         recordAuthFailure(route, hooks.state);
-        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: 'auth' });
+        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: 'auth', contextWindow: route.contextWindow });
         traceAttempt('auth', err);
         lastError = err;
         if (stopIfBreakerTripped()) return;
@@ -1623,7 +1632,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
           console.warn(`[FallbackLoop] ${route.platform}/${route.modelId}: in-band provider error after ${((Date.now() - attemptStartedAt) / 1000).toFixed(1)}s silent — benching the route ${Math.round(TRUNCATION_BENCH_MS / 1000)}s (#1218 Gap 3)`);
         }
         const errorClass = classifyAttemptError(err);
-        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass });
+        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass, contextWindow: route.contextWindow });
         traceAttempt(errorClass, err);
         lastError = err;
         // A still-exempt skipBench failure (format ignored, hidden-reasoning

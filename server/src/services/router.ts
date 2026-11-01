@@ -167,6 +167,7 @@ export interface ChainRow {
   supports_vision: number;
   supports_tools: number;
   context_window: number | null;
+  context_safety_factor: number | null;
   // Custom models bind to the api_keys row carrying their endpoint (#212);
   // NULL for built-in platforms.
   key_id: number | null;
@@ -1341,7 +1342,7 @@ function getActiveChain(db: Db): ChainRow[] {
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+             m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
       WHERE pm.profile_id = ?
@@ -1353,7 +1354,7 @@ function getActiveChain(db: Db): ChainRow[] {
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+             m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
       FROM fallback_config fc
       JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
       ORDER BY fc.priority ASC
@@ -1372,7 +1373,7 @@ function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+           m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
     FROM profile_models pm
     JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
     WHERE pm.profile_id = ?
@@ -1394,7 +1395,7 @@ function getChainByGlobalSort(db: Db, globalAxis: string): ChainRow[] {
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+           m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
     FROM models m
     LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
     ${profileId != null ? 'LEFT JOIN profile_models pm ON pm.profile_id = ? AND pm.model_db_id = m.id' : ''}
@@ -1840,7 +1841,7 @@ function getModelChainRow(db: Db, modelDbId: number): ChainRow | undefined {
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+           m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
     FROM models m
     WHERE m.id = ? AND m.enabled = 1
   `).get(modelDbId) as ChainRow | undefined;
@@ -1882,14 +1883,20 @@ export function fitsContextWindowStrict(contextWindow: number | null | undefined
  * the operator's min-context-window floor (lib/min-context-window.ts): a model
  * below the configured preset is excluded from every chain, while an unknown
  * window (null) always passes. */
-export function fitsContextWindow(_platform: string, contextWindow: number | null | undefined, estimatedTokens: number, exactOutputReserve = 0): boolean {
+export function fitsContextWindow(_platform: string, contextWindow: number | null | undefined, estimatedTokens: number, exactOutputReserve = 0, safetyFactor?: number): boolean {
   if (!passesContextWindowFloor(contextWindow)) return false;
   if (contextWindow == null) return true;
+  // Use per-model safety factor when provided; fall back to global constant.
+  const factor = safetyFactor ?? CONTEXT_WINDOW_SAFETY_FACTOR;
+  // Effective window = raw advertised window / safety factor.
+  // This accounts for per-model conservatism (e.g. 1.25 means only 80% of the
+  // advertised window is considered safe for compaction / routing decisions).
+  const effectiveWindow = contextWindow / factor;
   // Raw advertised comparison first — the margin can only shrink eligibility.
-  if (estimatedTokens > contextWindow) return false;
+  if (estimatedTokens > effectiveWindow) return false;
   const reserve = Math.max(0, exactOutputReserve);
   const heuristic = Math.max(0, estimatedTokens - reserve);
-  return heuristic * CONTEXT_WINDOW_SAFETY_FACTOR + reserve <= contextWindow;
+  return heuristic * factor + reserve <= contextWindow;
 }
 
 /**
@@ -1965,7 +1972,7 @@ export function resolveModelGroupCandidates(
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+             m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
       FROM models m
       LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
       WHERE m.id = ? AND m.enabled = 1
@@ -1976,7 +1983,7 @@ export function resolveModelGroupCandidates(
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-             m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+             m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
       FROM models m
       LEFT JOIN profile_models pm ON pm.profile_id = ? AND pm.model_db_id = m.id
       LEFT JOIN fallback_config fc ON fc.model_db_id = m.id
@@ -2059,7 +2066,7 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
   const passesContextGate = (e: ChainRow, allowMarginViolators: boolean) => {
     // A null context_window means "unknown", not "zero": same convention the
     // auto-router uses, so an unspecified window is never itself a reason to skip.
-    if (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve)) return true;
+    if (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve, e.context_safety_factor ?? undefined)) return true;
     return allowMarginViolators && fitsContextWindowStrict(e.context_window, estimatedTokens);
   };
   const servableFilter = (allowMarginViolators: boolean) => chain.filter(e => {
@@ -2233,7 +2240,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       // requests (#1230); it stays reachable at the back of the main walk.
       if (requireTools && isToolBenched(e.platform, e.model_id, e.endpoint_scope)) return false;
       if (requireStructured && platformDropsResponseFormat(e.platform)) return false;
-      if (!fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve)) return false;
+      if (!fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve, e.context_safety_factor ?? undefined)) return false;
       if (e.tpm_limit != null && estimatedTokens > e.tpm_limit) return false;
       return true;
     });
@@ -2264,7 +2271,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
                m.platform, m.model_id, m.display_name, m.intelligence_rank,
                m.size_label, m.monthly_token_budget,
                m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-               m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+               m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
         FROM models m
         WHERE m.id = ? AND m.enabled = 1
       `).get(preferredModelDbId) as ChainRow | undefined;
@@ -2336,7 +2343,11 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       toolDeferred.push(e);
       continue;
     }
-    (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve) ? servingChain : marginDeferred).push(e);
+    if (fitsContextWindow(e.platform, e.context_window, estimatedTokens, exactOutputReserve, e.context_safety_factor ?? undefined)) {
+      servingChain.push(e);
+    } else {
+      marginDeferred.push(e);
+    }
   }
   servingChain.push(...marginDeferred, ...toolDeferred);
 
@@ -2457,7 +2468,7 @@ export function getRoutingScores(): { strategy: RoutingStrategy; keySelectionStr
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
+           m.supports_tools, m.context_window, m.context_safety_factor, m.key_id, m.endpoint_scope
     FROM models m
     LEFT JOIN ${profileId != null
       ? '(SELECT model_db_id, priority, enabled FROM profile_models WHERE profile_id = ?) c'
