@@ -104,6 +104,8 @@ export type Platform =
   | 'jamai'
   // One shared renewable monthly credit allowance; signed catalog only.
   | 'nabh'
+  // Daily-free video route; signed catalog only.
+  | 'novai'
   // Hosted gateways; model rows are delivered by the signed catalog only.
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'

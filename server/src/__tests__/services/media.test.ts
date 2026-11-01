@@ -512,7 +512,7 @@ describe('media service', () => {
     it('Free.ai never sends untested or premium model IDs', async () => {
       addMedia('freeai', 'premium/voice', 'audio'); addKey('freeai');
       const fetchMock = vi.spyOn(globalThis, 'fetch');
-      await expect(runSpeech('premium/voice', { input: 'Hello' })).rejects.toThrow('only the tested Kokoro');
+      await expect(runSpeech('premium/voice', { input: 'Hello' })).rejects.toThrow('not a tested free route');
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -583,14 +583,14 @@ describe('media service', () => {
       await expect(runSpeech('test-simba', { input: 'Hello' })).rejects.toThrow('Speechify returned');
     });
 
-    it('Cloudflare MeloTTS: base64 audio → audio/mpeg bytes', async () => {
+    it('Cloudflare MeloTTS: base64 audio → audio/wav bytes', async () => {
       addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio');
       addKey('cloudflare', 'acct:tok');
-      const fetchMock = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('MP3').toString('base64') } }));
+      const fetchMock = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('WAV').toString('base64') } }));
       globalThis.fetch = fetchMock as any;
       const r = await runSpeech('@cf/myshell-ai/melotts', { input: 'hi', voice: 'alloy' });
-      expect(r.contentType).toBe('audio/mpeg');
-      expect(r.audio.toString()).toBe('MP3');
+      expect(r.contentType).toBe('audio/wav');
+      expect(r.audio.toString()).toBe('WAV');
       const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
       expect(body).toMatchObject({ prompt: 'hi', lang: 'en' });
     });
