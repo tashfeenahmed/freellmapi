@@ -103,6 +103,7 @@ const UNSUPPORTED_SCHEMA_KEYS = new Set([
   'propertyNames',
   'multipleOf',
   'deprecated',
+  'enumDescriptions',
 ]);
 
 const VENDOR_EXTENSION_SCHEMA_KEY = /^x-/i;
