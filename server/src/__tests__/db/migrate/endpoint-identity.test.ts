@@ -196,7 +196,7 @@ describe('custom model endpoint identity migration', () => {
     try {
       await runMigrations(db, 'up');
       const afterFirstUp = db.prepare('SELECT * FROM models ORDER BY id').all();
-      const schemaAfterFirstUp = db.prepare(
+      const _schemaAfterFirstUp = db.prepare(
         "SELECT sql FROM sqlite_master WHERE name = 'models'",
       ).get() as { sql: string };
       const schemaAfterFirstUpCols = db.prepare('PRAGMA table_info(models)').all().map((c: any) => c.name);
