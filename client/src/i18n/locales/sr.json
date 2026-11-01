@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small одређују осу интелигенције: виши ниво увек надмашује нижи, а унутар истог нивоа ранг интелигенције и даље помера резултат. Модел без препознатог нивоа добија најнижи резултат на овој оси, али интелигенција је само једна од три осе — уз добру поузданост и брзину и даље може бити изабран.",
     "sizeLabelNone": "Ниједан (најнижи резултат интелигенције)",
     "contextWindow": "Контекст",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "У ланцу",
     "saveModelSettings": "Сачувајте подешавања модела",
     "aggregateBudget": "{count}/мес",

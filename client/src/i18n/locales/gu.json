@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small બુદ્ધિ અક્ષ નક્કી કરે છે: ઊંચું સ્તર હંમેશાં નીચલા સ્તર કરતાં આગળ રહે છે, અને એક જ સ્તરની અંદર બુદ્ધિ ક્રમ સ્કોરને હલાવતો રહે છે. માન્ય સ્તર વગરના મોડલને આ અક્ષ પર સૌથી ઓછો સ્કોર મળે છે, પણ બુદ્ધિ ત્રણ અક્ષોમાંથી માત્ર એક છે — સારી વિશ્વસનીયતા અને ઝડપ હોય તો તે તોય રૂટ જીતી શકે છે.",
     "sizeLabelNone": "કંઈ નહીં (સૌથી ઓછો બુદ્ધિ સ્કોર)",
     "contextWindow": "સંદર્ભ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "સાંકળમાં",
     "saveModelSettings": "મોડલ સેટિંગ્સ સાચવો",
     "aggregateBudget": "{count}/mo",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small बुद्धि अक्ष तय करते हैं: ऊँचा स्तर हमेशा निचले स्तर से आगे रहता है, और एक ही स्तर के भीतर बुद्धि रैंक स्कोर को हिलाती रहती है। मान्य स्तर के बिना मॉडल को इस अक्ष पर सबसे कम स्कोर मिलता है, लेकिन बुद्धि तीन अक्षों में से केवल एक है — अच्छी विश्वसनीयता और गति होने पर वह फिर भी रूट जीत सकता है।",
     "sizeLabelNone": "कोई नहीं (सबसे कम बुद्धि स्कोर)",
     "contextWindow": "प्रसंग",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "शृंखला में",
     "saveModelSettings": "मॉडल सेटिंग सहेजें",
     "aggregateBudget": "{count}/मो",

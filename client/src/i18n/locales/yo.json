@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small ló ń darí ipò imọye: ipele tó ga máa ń borí ipele tó rẹlẹ̀ nígbà gbogbo, nínú ipele kan náà sì ni ipò imọye ṣì ń yí àmì padà. Awoṣe tí kò ní ipele tí a mọ̀ yóò gba àmì tó kéré jùlọ níbí, ṣùgbọ́n imọye jẹ́ ọ̀kan péré nínú àwọn ìwọ̀n mẹ́ta — bí ìgbẹ́kẹ̀lé àti iyara bá dára, a ṣì lè yàn án.",
     "sizeLabelNone": "Kò sí (àmì imọye tó kéré jùlọ)",
     "contextWindow": "Atokọ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Ninu pq",
     "saveModelSettings": "Fi awọn eto awoṣe pamọ",
     "aggregateBudget": "{count}/mo",

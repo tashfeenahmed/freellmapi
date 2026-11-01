@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small kəşfiyyat oxunu müəyyən edir: yüksək səviyyə həmişə aşağı səviyyəni üstələyir, eyni səviyyə daxilində isə kəşfiyyat reytinqi balı dəyişməyə davam edir. Tanınmış səviyyəsi olmayan model bu oxda ən aşağı balı alır, lakin kəşfiyyat üç oxdan yalnız biridir — güclü etibarlılıq və sürət yenə də ona marşrut qazandıra bilər.",
     "sizeLabelNone": "Heç biri (ən aşağı kəşfiyyat balı)",
     "contextWindow": "Kontekst",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Zəncirdə",
     "saveModelSettings": "Model parametrlərini saxla",
     "aggregateBudget": "{count}/ay",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "A Frontier/Large/Medium/Small határozza meg az intelligencia-tengelyt: a magasabb szint mindig megelőzi az alacsonyabbat, egy szinten belül pedig az intelligencia-rangsor továbbra is mozgatja a pontszámot. A felismert szint nélküli modell ezen a tengelyen kapja a legalacsonyabb pontszámot, de az intelligencia csak egy a három tengelyből — erős megbízhatósággal és sebességgel így is elnyerheti az útválasztást.",
     "sizeLabelNone": "Nincs (legalacsonyabb intelligencia-pontszám)",
     "contextWindow": "A háttér",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Láncban",
     "saveModelSettings": "Mentési modell beállítások",
     "aggregateBudget": "{count}/hónap",

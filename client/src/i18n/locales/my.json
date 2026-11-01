@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small သည် ဉာဏ်ရည်ဝင်ရိုးကို သတ်မှတ်သည်။ အဆင့်မြင့်သည် အဆင့်နိမ့်ကို အမြဲကျော်လွန်ပြီး တူညီသောအဆင့်အတွင်း ဉာဏ်ရည်အဆင့်သတ်မှတ်ချက်က ရမှတ်ကို ဆက်လက်ရွှေ့စေသည်။ အသိအမှတ်ပြုအဆင့်မရှိသော မော်ဒယ်သည် ဤဝင်ရိုးတွင် အနိမ့်ဆုံးရမှတ်ရသည်။ သို့သော် ဉာဏ်ရည်သည် ဝင်ရိုးသုံးခုအနက် တစ်ခုသာဖြစ်၍ ယုံကြည်စိတ်ချရမှုနှင့် အမြန်နှုန်းကောင်းပါက ၎င်းကို အလိုအလျောက် ရွေးချယ်နိုင်သေးသည်။",
     "sizeLabelNone": "မရှိ (အနိမ့်ဆုံး ဉာဏ်ရည်ရမှတ်)",
     "contextWindow": "အကြောင်းအရာ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "ချိတ်ဆက်မှုအတွင်း",
     "saveModelSettings": "မော်ဒယ်ဆက်တင်များကို သိမ်းဆည်းပါ",
     "aggregateBudget": "{count}/လ",

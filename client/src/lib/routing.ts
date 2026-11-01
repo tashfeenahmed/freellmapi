@@ -26,6 +26,9 @@ export interface FallbackEntry {
   // Max context length in tokens (catalog value), or null when unrecorded.
   // Drives the catalog context-window filter on the Models page.
   contextWindow?: number | null
+  // Per-model divisor for the advertised context window; null means the
+  // gateway's global default. Kept off the wire unless the user edits it.
+  contextSafetyFactor?: number | null
   supportsVision: boolean
   supportsTools: boolean
   source?: 'catalog' | 'custom' | 'discovered'

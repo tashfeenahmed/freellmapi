@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small bestämmer underrättelseaxeln: en högre nivå slår alltid en lägre, och inom en nivå flyttar underrättelserankningen fortfarande poängen. En modell utan en igenkänd nivå får lägst poäng på den här axeln, men underrättelse är bara en av tre axlar — med god tillförlitlighet och hastighet kan den ändå väljas.",
     "sizeLabelNone": "Ingen (lägst underrättelsepoäng)",
     "contextWindow": "Bakgrund",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "I kedja",
     "saveModelSettings": "Spara modellinställningar",
     "aggregateBudget": "{count}/mo",
