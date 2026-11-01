@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
+import { registerCustomMediaModel } from '../../services/custom-media-register.js';
 
 const realFetch = globalThis.fetch;
 
@@ -285,6 +286,27 @@ describe('media service', () => {
       expect(body).toMatchObject({ model: 'local-image', prompt: 'a cat', n: 2, size: '512x512' });
       const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'image' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
       expect(log.key_id).toBe(keyId);
+    });
+
+    it('fails over between endpoints sharing an image model id with their own keys', async () => {
+      const first = addCustomKey('http://127.0.0.1:8282/v1', 'first-key');
+      const second = addCustomKey('http://127.0.0.1:8383/v1', 'second-key');
+      for (const key of [first, second]) {
+        registerCustomMediaModel(getDb(), key, { modelId: 'shared-image', displayName: null, modality: 'image' });
+      }
+      const fetchMock = vi.fn(async (url: string) => String(url).includes(':8282/')
+        ? new Response('unavailable', { status: 503 })
+        : jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('shared-image', { prompt: 'a cat' })).resolves.toMatchObject({
+        images: [{ url: 'https://example.test/image.png' }],
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+      expect(String(calls[0][0])).toContain(':8282/');
+      expect(new Headers(calls[0][1].headers).get('Authorization')).toBe('Bearer first-key');
+      expect(String(calls[1][0])).toContain(':8383/');
+      expect(new Headers(calls[1][1].headers).get('Authorization')).toBe('Bearer second-key');
     });
   });
 

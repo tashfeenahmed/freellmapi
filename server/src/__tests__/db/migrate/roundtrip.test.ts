@@ -148,6 +148,7 @@ describe('migration round trip', () => {
         REQUEST_FAILURE_ATTRIBUTION_FILENAME,
         REMOVE_AURAY_PROVIDER_FILENAME,
         KEY_LAST_HEALTHY_AT_FILENAME,
+        '20261028_000001_custom_media_endpoint_identity.ts',
       ]);
     } finally {
       db.close();
