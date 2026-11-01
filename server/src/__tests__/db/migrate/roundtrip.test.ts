@@ -51,6 +51,7 @@ const REMOVE_GITHUB_PROVIDER_FILENAME = '20261017_000002_remove_github_provider.
 const REQUEST_FAILURE_ATTRIBUTION_FILENAME = '20261017_233153_request_failure_attribution.ts';
 const REMOVE_AURAY_PROVIDER_FILENAME = '20261019_000001_remove_auray_provider.ts';
 const KEY_LAST_HEALTHY_AT_FILENAME = '20261020_000001_key_last_healthy_at.ts';
+const MODEL_MONTHLY_USAGE_FILENAME = '20261031_000001_model_monthly_usage.ts';
 
 interface SchemaRow {
   type: string;
@@ -148,6 +149,7 @@ describe('migration round trip', () => {
         REQUEST_FAILURE_ATTRIBUTION_FILENAME,
         REMOVE_AURAY_PROVIDER_FILENAME,
         KEY_LAST_HEALTHY_AT_FILENAME,
+        MODEL_MONTHLY_USAGE_FILENAME,
       ]);
     } finally {
       db.close();
