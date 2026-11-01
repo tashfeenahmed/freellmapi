@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small definem o eixo de inteligência: um nível superior sempre supera um inferior e, dentro de um nível, o ranking de inteligência continua movendo a pontuação. Um modelo sem um nível reconhecido tem a menor pontuação nesse eixo, mas a inteligência é apenas um dos três eixos: com boa confiabilidade e velocidade ele ainda pode ganhar a rota.",
     "sizeLabelNone": "Nenhum (menor pontuação de inteligência)",
     "contextWindow": "Contexto",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Na cadeia",
     "saveModelSettings": "Salvar configurações do modelo",
     "aggregateBudget": "{count}/mês",

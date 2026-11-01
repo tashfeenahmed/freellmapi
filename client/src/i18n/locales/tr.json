@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small, zekâ eksenini belirler: üst kademe her zaman alt kademeden öndedir ve aynı kademe içinde zekâ sıralaması puanı etkilemeye devam eder. Tanınan bir kademesi olmayan model bu eksende en düşük puanı alır; ancak zekâ üç eksenden yalnızca biridir. Güvenilirliği ve hızı yüksekse yine de yönlendirmede öne çıkabilir.",
     "sizeLabelNone": "Yok (en düşük zekâ puanı)",
     "contextWindow": "Bağlam",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Yedek zincirinde",
     "saveModelSettings": "Model ayarlarını kaydet",
     "aggregateBudget": "{count}/ay",

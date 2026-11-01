@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small určujú os spravodajstva: vyšší stupeň vždy prekoná nižší a v rámci jedného stupňa poradie spravodajstva stále posúva skóre. Model bez rozpoznaného stupňa má na tejto osi najnižšie skóre, ale spravodajstvo je len jedna z troch osí — pri dobrej spoľahlivosti a rýchlosti môže byť aj tak zvolený.",
     "sizeLabelNone": "Žiadna (najnižšie skóre spravodajstva)",
     "contextWindow": "Kontext",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "V reťazci",
     "saveModelSettings": "Uložiť nastavenia modelu",
     "aggregateBudget": "{count} mesačne",

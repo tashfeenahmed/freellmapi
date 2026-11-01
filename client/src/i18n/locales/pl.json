@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small wyznaczają oś inteligencji: wyższy poziom zawsze wygrywa z niższym, a w obrębie jednego poziomu ranga inteligencji nadal przesuwa wynik. Model bez rozpoznanego poziomu ma na tej osi najniższy wynik, ale inteligencja to tylko jedna z trzech osi — przy dobrej niezawodności i prędkości nadal może zostać wybrany.",
     "sizeLabelNone": "Brak (najniższy wynik inteligencji)",
     "contextWindow": "Kontekst",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "W łańcuchu",
     "saveModelSettings": "Zapisz ustawienia modelu",
     "aggregateBudget": "{count}/mies",
