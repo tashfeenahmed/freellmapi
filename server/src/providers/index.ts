@@ -542,6 +542,15 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.unorouter.com/v1',
 }));
 
+// Oxion AI (oxionai.com) — OpenAI-compatible aggregator at oxionai.com/v1.
+// Free tier provides 0.5M tokens/month (no card required). Key required.
+// Live-verified 2026-10-30.
+register(new OpenAICompatProvider({
+  platform: 'oxion',
+  name: 'Oxion AI',
+  baseUrl: 'https://oxionai.com/v1',
+}));
+
 // xKiro (xkiro.com) — OpenAI-compatible gateway at api.xkiro.com/v1 (the
 // apex serves the same API today, but the docs name api.). Free key from
 // xkiro.com (no card). Live-probed 2026-08-23 with a free-plan key: /v1/usage
