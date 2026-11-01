@@ -42,7 +42,7 @@ searchRouter.patch('/engines/:id', (req: Request, res: Response) => {
   }
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   if (!updateSearchEngine(id, parsed.data)) {

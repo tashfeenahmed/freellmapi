@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   clientNotes,
@@ -26,7 +27,9 @@ describe('detectChatGptClient', () => {
     vi.spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as fs.Stats);
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     const found = detectChatGptClient('linux');
-    expect(found).toEqual({ kind: 'cli', cliPath: '/opt/tools/bin/codex' });
+    // executableOnPath() joins with the host path module, so the expected
+    // separator differs on Windows even though the stubbed PATH is POSIX.
+    expect(found).toEqual({ kind: 'cli', cliPath: path.join('/opt/tools/bin', 'codex') });
   });
 
   it('ignores PATH directories that merely shadow the binary name', () => {

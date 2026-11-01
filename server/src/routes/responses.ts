@@ -699,7 +699,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   if (!parsed.success) {
     res.status(400).json({
       error: {
-        message: `Invalid request: ${parsed.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        message: `Invalid request: ${parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         type: 'invalid_request_error',
       },
     });
