@@ -134,6 +134,12 @@ export type Platform =
   // published. Catalog rows live in the hosted catalog (premium now, free after
   // 30 days).
   | 'anyapi'
+  // PowerTokens — OpenAI-compatible gateway (api.powertokens.ai). Free model
+  // glm-4.7-flash VERIFIED 2026-10-22 on Models UI: $0 / 1M in+out (0 Credits).
+  // Live the same day on authenticated /v1/models + chat/completions (~41s
+  // TTFB). Marketing /pricing HTML may omit the id. RPM/RPD unpublished.
+  // Hosted catalog only (no migration seed) — same as anyapi/bai gateways.
+  | 'powertokens'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
