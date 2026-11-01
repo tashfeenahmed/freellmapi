@@ -5,6 +5,7 @@ import {
   getCommunityPrior, setCommunityPriors, getCommunityPriorEnabled, setCommunityPriorEnabled,
   getPeakHoursConfig, setPeakHoursConfig,
   setMinReliabilityFloor, applyReliabilityFloor,
+  getLoadSpread, setLoadSpread,
 } from '../../services/router.js';
 import { BANDIT_PRESETS, DEFAULT_PEAK_HOURS } from '../../services/scoring.js';
 import { resetModelWeightOverrides } from '../../services/model-weight-overrides.js';
@@ -609,5 +610,94 @@ describe('reliability floor filter', () => {
     refreshStatsCache(getDb(), true);
     const counts = pickCounts(100);
     expect((counts['a'] ?? 0) + (counts['b'] ?? 0)).toBe(100); // still routes somewhere
+  });
+});
+
+describe('load spreading', () => {
+  beforeEach(() => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
+    initDb(':memory:');
+    getDb().exec('DELETE FROM fallback_config; DELETE FROM api_keys; DELETE FROM models; DELETE FROM requests;');
+    vi.clearAllMocks();
+    (ratelimit.canMakeRequest as any).mockReturnValue(true);
+    (ratelimit.canUseTokens as any).mockReturnValue(true);
+    (ratelimit.isOnCooldown as any).mockReturnValue(false);
+    ratelimit.resetLeases();
+    setLoadSpread(null);
+  });
+
+  afterEach(() => {
+    ratelimit.resetLeases();
+    setLoadSpread(null);
+  });
+
+  // Two well-observed models of the same size where 'top' edges out 'next' on
+  // intelligence alone, so a single in-flight request is enough to flip them.
+  // 'weak' anchors the bottom of the intelligence range so the two compared
+  // models are not normalized to the extremes.
+  function addPair() {
+    addModel({ platform: 'google', modelId: 'top', name: 'Top', intelligenceRank: 1, sizeLabel: 'Large', budget: '~50M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'next', name: 'Next', intelligenceRank: 2, sizeLabel: 'Large', budget: '~50M', priority: 2 });
+    addModel({ platform: 'cerebras', modelId: 'weak', name: 'Weak', intelligenceRank: 9, sizeLabel: 'Small', budget: '~50M', priority: 3 });
+    addHistory('google', 'top', { successes: 200, failures: 0 });
+    addHistory('groq', 'next', { successes: 200, failures: 0 });
+    addHistory('cerebras', 'weak', { successes: 200, failures: 0 });
+    setRoutingStrategy('smartest');
+    refreshStatsCache(getDb(), true);
+  }
+
+  // Routes and immediately releases, so the only load is what the test holds.
+  function pickReleased(runs: number): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < runs; i++) {
+      const r = routeRequest(100);
+      r.release();
+      counts[r.modelId] = (counts[r.modelId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  it('is disabled by default and rejects out-of-range values', () => {
+    expect(getLoadSpread()).toBe(0);
+    setLoadSpread(0.5);
+    expect(getLoadSpread()).toBe(0.5);
+    expect(() => setLoadSpread(1.5)).toThrow();
+    expect(() => setLoadSpread(-0.1)).toThrow();
+    setLoadSpread(null);
+    expect(getLoadSpread()).toBe(0);
+  });
+
+  it('leaves routing untouched when disabled, even with load in flight', () => {
+    addPair();
+    ratelimit.acquireLease('google', 'top', 1, 0);
+    ratelimit.acquireLease('google', 'top', 1, 0);
+    const counts = pickReleased(200);
+    expect(counts['top'] ?? 0).toBeGreaterThan((counts['next'] ?? 0) * 3);
+  });
+
+  it('routes an idle chain the same as without spreading', () => {
+    addPair();
+    setLoadSpread(1);
+    const counts = pickReleased(200);
+    expect(counts['top'] ?? 0).toBeGreaterThan((counts['next'] ?? 0) * 3);
+  });
+
+  it('moves new requests to the next model while the top one is busy', () => {
+    addPair();
+    setLoadSpread(1);
+    ratelimit.acquireLease('google', 'top', 1, 0);
+    const counts = pickReleased(200);
+    expect(counts['next'] ?? 0).toBeGreaterThan((counts['top'] ?? 0) * 3);
+  });
+
+  it('fans a burst of concurrent requests out across the chain', () => {
+    addPair();
+    setLoadSpread(1);
+    const held = Array.from({ length: 6 }, () => routeRequest(100));
+    const models = new Set(held.map(r => r.modelId));
+    held.forEach(r => r.release());
+    expect(models.has('top')).toBe(true);
+    expect(models.has('next')).toBe(true);
   });
 });
