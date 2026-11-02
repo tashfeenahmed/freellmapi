@@ -171,31 +171,6 @@ async function main() {
     model => !known.has(`openrouter/${model.id}`)
   );
 
-  if (VERIFY) {
-    const ids = [
-      'nvidia/nemotron-3.5-super-vl:free',
-      'recursive/flint-v1.0:free',
-      'thinkingmachines/inkling-small:free',
-      'thinkingmachines/inkling:free',
-      'xingchen-agi/xing4.0-29b-a4b:free',
-    ];
-
-    console.log('\\nImported model status:');
-    for (const id of ids) {
-      const model = existing.find(
-        item => item.platform === 'openrouter' && item.modelId === id
-      );
-
-      if (!model) {
-        console.log('[MISSING] ' + id);
-      } else {
-        console.log(
-          `[${model.enabled ? 'ENABLED' : 'DISABLED'}] [${model.fallbackEnabled ? 'FALLBACK ON' : 'FALLBACK OFF'}] ${id}`
-        );
-      }
-    }
-    return;
-  }
 
   console.log('\nCatalog review:');
 
