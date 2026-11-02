@@ -115,6 +115,17 @@ export function inFlightForKey(platform: string, keyId: number, now = Date.now()
   return count;
 }
 
+/** Requests this process currently has in flight against one platform+model,
+ *  across all of that platform's keys. */
+export function inFlightForModel(platform: string, modelId: string, now = Date.now()): number {
+  pruneLeases(now);
+  let count = 0;
+  for (const lease of leases.values()) {
+    if (lease.platform === platform && lease.modelId === modelId) count++;
+  }
+  return count;
+}
+
 /** False when this key already has its allowed number of requests in the air.
  *  Always true when no cap is configured, which is the default. */
 export function canUseKeyConcurrency(platform: string, keyId: number, now = Date.now()): boolean {

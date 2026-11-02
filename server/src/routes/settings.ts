@@ -24,7 +24,7 @@ import {
   getCompressionConfig,
   setCompressionConfig,
 } from '../services/compression/config.js';
-import { getHeadroomThresholds, setHeadroomThresholds, getTaskWeightShare, setTaskWeightShare, getMinReliabilityFloor, setMinReliabilityFloor, isProviderMomentAttributionEnabled, setProviderMomentAttribution } from '../services/router.js';
+import { getHeadroomThresholds, setHeadroomThresholds, getTaskWeightShare, setTaskWeightShare, getMinReliabilityFloor, setMinReliabilityFloor, getLoadSpread, setLoadSpread, isProviderMomentAttributionEnabled, setProviderMomentAttribution } from '../services/router.js';
 import { MCP_ENABLED_SETTING, isMcpServerEnabled } from './mcp.js';
 import { z } from 'zod';
 import { getAppVersion } from '../lib/app-version.js';
@@ -397,6 +397,32 @@ settingsRouter.put('/task-weight-share', (req: Request, res: Response) => {
     res.json({ share: getTaskWeightShare() });
   } catch (err: any) {
     res.status(400).json({ error: { message: `Invalid task-weight-share: ${err.message}`, type: 'invalid_request_error' } });
+  }
+});
+
+// Load spreading: how strongly requests already in flight on a model push new
+// requests to the next model in the chain. 0 = disabled (the default).
+settingsRouter.get('/load-spread', (_req: Request, res: Response) => {
+  res.json({ spread: getLoadSpread() });
+});
+
+const loadSpreadPutSchema = z.object({
+  spread: z.number().min(0).max(1).nullable().optional(),
+});
+
+// Update the load-spread strength. null clears back to disabled. Takes effect
+// on the next request — no restart needed.
+settingsRouter.put('/load-spread', (req: Request, res: Response) => {
+  const parsed = loadSpreadPutSchema.safeParse(req.body);
+  if (!parsed.success || parsed.data.spread === undefined) {
+    res.status(400).json({ error: { message: 'Invalid load-spread: send {"spread": 0..1 | null}', type: 'invalid_request_error' } });
+    return;
+  }
+  try {
+    setLoadSpread(parsed.data.spread);
+    res.json({ spread: getLoadSpread() });
+  } catch (err: any) {
+    res.status(400).json({ error: { message: `Invalid load-spread: ${err.message}`, type: 'invalid_request_error' } });
   }
 });
 

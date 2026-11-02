@@ -10,6 +10,7 @@ import {
   canUseProviderMinute,
   canUseProviderTokens,
   canUseKeyConcurrency,
+  inFlightForModel,
   acquireLease,
   releaseLease,
   getSoonestCooldownExpiry,
@@ -434,6 +435,35 @@ export function setMinReliabilityFloor(floor?: number | null): void {
     throw new Error(`Invalid value ${floor} for ${MIN_RELIABILITY_FLOOR_KEY} (must be 0..1)`);
   }
   setSetting(MIN_RELIABILITY_FLOOR_KEY, String(floor));
+}
+
+// ── Load spreading ──────────────────────────────────────────────────────────
+// Scores are computed from history, so every request in a burst sees the same
+// ranking and lands on the same top model, queueing behind the others even when
+// a near-equal model sits idle. When enabled, each request already in flight on
+// a model divides its score by (1 + spread * inFlight), so a burst fans out
+// across the top of the chain while a single request still routes exactly as
+// before. 0 (the default) disables it.
+export const LOAD_SPREAD_KEY = 'routing_load_spread';
+
+export function getLoadSpread(): number {
+  const raw = getSetting(LOAD_SPREAD_KEY);
+  if (raw === undefined || raw.trim() === '') return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0;
+}
+
+// null clears back to the default (disabled); undefined leaves it untouched.
+export function setLoadSpread(spread?: number | null): void {
+  if (spread === undefined) return;
+  if (spread === null) {
+    getDb().prepare('DELETE FROM settings WHERE key = ?').run(LOAD_SPREAD_KEY);
+    return;
+  }
+  if (!Number.isFinite(spread) || spread < 0 || spread > 1) {
+    throw new Error(`Invalid value ${spread} for ${LOAD_SPREAD_KEY} (must be 0..1)`);
+  }
+  setSetting(LOAD_SPREAD_KEY, String(spread));
 }
 
 // ── Provider-moment failure attribution (opt-in, #1347) ────────────────────
@@ -1262,9 +1292,11 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
   const intelMax = composites.length ? Math.max(...composites) : 0;
   const keyCounts = usableKeyCountsByPlatform(getDb());
   const headroomCfg = getHeadroomThresholds();
+  const spread = getLoadSpread();
+  const loadFactor = (e: ChainRow) => spread > 0 ? 1 + spread * inFlightForModel(e.platform, e.model_id) : 1;
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled, keyCounts, headroomCfg).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, sampled, keyCounts, headroomCfg).score / loadFactor(e) }))
     // Higher score first WITHIN a tier; manual priority breaks ties so the chain
     // still matters.
     .sort((a, b) => tier(a.e) - tier(b.e) || b.s - a.s || a.e.priority - b.e.priority)
