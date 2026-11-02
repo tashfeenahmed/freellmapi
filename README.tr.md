@@ -66,7 +66,7 @@ Bunları elle birleştirmek zahmetli: otuz dört farklı SDK, otuz dört farklı
 
 Ücretsiz planlar da her hafta değişiyor: sağlayıcılar yeni modeller çıkarıyor, eskilerini kaldırıyor ve kotaları haber vermeden değiştiriyor. FreeLLMAPI bunları sizin için takip eder. Yönlendirici, imzalı model kataloğunu [freellmapi.co](https://freellmapi.co) üzerinden kendisi alır; kurulumunuz `git pull` gerekmeden güncel kalır. Güncellemelerin ne kadar hızlı geldiği için [Premium (canlı katalog)](#premium-live-catalog) bölümüne bakın.
 
-![Ücretsiz planlar bir arada — 34 sağlayıcıdan ayda yaklaşık 7,4 milyar token](repo-assets/free-tier.png)
+![Ücretsiz planlar bir arada — 34 sağlayıcıdan ayda yaklaşık 7,4 milyar token](repo-assets/i18n/tr/free-tier.png)
 
 <a id="supported-providers"></a>
 
@@ -140,7 +140,7 @@ npx freellmapi setup-claude --url http://localhost:3001 --api-key <unified-key>
 
 ## Diğer çözümlerle karşılaştırma
 
-![OpenRouter, LiteLLM ve Portkey ile özellik karşılaştırması](repo-assets/comparison.png)
+![OpenRouter, LiteLLM ve Portkey ile özellik karşılaştırması](repo-assets/i18n/tr/comparison.png)
 
 Temmuz 2026 tarihli herkese açık belgelere dayanır; düzeltmelerinizi bekliyoruz.
 
@@ -148,7 +148,7 @@ Temmuz 2026 tarihli herkese açık belgelere dayanır; düzeltmelerinizi bekliyo
 
 ## Özellikler
 
-![Özelliklere genel bakış](repo-assets/features.png)
+![Özelliklere genel bakış](repo-assets/i18n/tr/features.png)
 
 - **OpenAI tarzındaki tüm uç noktalar** — `/v1/chat/completions`, `/v1/responses` (Codex CLI için), `/v1/completions` (editörde satır içi otomatik tamamlama), `/v1/images/generations`, `/v1/videos/generations`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/embeddings` ve `/v1/models`. Resmî SDK’larla veya OpenAI uyumlu istemcilerle akışlı ve akışsız çalışır. [API başvurusu →](docs/en/api/01-rest-api.md)
 - **Anthropic Messages API** — `/v1/messages`, aynı yönlendirici üzerinden Anthropic iletişim biçimini kullanır. Böylece **Claude Code** ve resmî Anthropic SDK’ları ücretsiz model havuzunuzla çalışır. [Ayrıntılar →](docs/en/api/01-rest-api.md#anthropic--claude-clients)
@@ -301,7 +301,7 @@ Yönlendirici üzerinden bir sohbet isteği gönderin; isteği hangi sağlayıc�
 
 ## Nasıl çalışır?
 
-![Tek istek, en iyi ücretsiz model — canlı puanlar, bekleme süreleri ve kota takibiyle yedek model zinciri](repo-assets/router-flow.png)
+![Tek istek, en iyi ücretsiz model — canlı puanlar, bekleme süreleri ve kota takibiyle yedek model zinciri](repo-assets/i18n/tr/router-flow.png)
 
 Tek istek, en iyi ücretsiz model: yönlendirici, geçerli bir anahtarı olan ve tüm hız sınırlarının altında kalan en yüksek öncelikli modeli seçer, anahtarın şifresini bellekte çözer ve sağlayıcıyı çağırır. 429/5xx hatasında bu anahtarı beklemeye alıp zincirdeki sıradaki modeli dener. Bileşenlerin açıklamaları, yönlendirmenin iç işleyişi ve işletim ayrıntıları **[mimari rehberindedir](docs/en/architecture/00-high-level-index.md)**.
 
