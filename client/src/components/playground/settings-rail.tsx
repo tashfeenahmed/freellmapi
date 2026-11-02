@@ -1,7 +1,9 @@
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { ModelCombobox, type ModelComboOption } from '@/components/model-combobox'
+import { appendPromptSkill, PLAYGROUND_SKILLS } from '@/lib/playground-skills'
 import {
   SAMPLING_FIELDS,
   SAMPLING_RANGES,
@@ -159,6 +161,8 @@ export function SettingsRail({
   webSearchChain,
 }: SettingsRailProps) {
   const { t } = useI18n()
+  const [selectedSkillId, setSelectedSkillId] = useState('')
+  const selectedSkill = PLAYGROUND_SKILLS.find(skill => skill.id === selectedSkillId)
   // Anything the collapsed strip should own up to: a system prompt riding on
   // every request, or a knob overriding the provider's default.
   const tweaked = samplingActiveCount(sampling) > 0 || systemPrompt.trim().length > 0 || webSearch
@@ -263,6 +267,37 @@ export function SettingsRail({
               rows={4}
               className="max-h-64 min-h-[88px] w-full resize-y rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="playground-prompt-skill" className="block text-xs font-medium">
+              Built-in prompt skills
+            </label>
+            <select
+              id="playground-prompt-skill"
+              value={selectedSkillId}
+              onChange={event => setSelectedSkillId(event.target.value)}
+              className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="">Choose a skill…</option>
+              {PLAYGROUND_SKILLS.map(skill => (
+                <option key={skill.id} value={skill.id}>{skill.name}</option>
+              ))}
+            </select>
+            {selectedSkill && (
+              <p className="text-[11px] leading-snug text-muted-foreground">{selectedSkill.description}</p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!selectedSkill}
+              onClick={() => {
+                if (selectedSkill) onSystemPromptChange(appendPromptSkill(systemPrompt, selectedSkill))
+              }}
+            >
+              {t('common.apply')}
+            </Button>
           </div>
 
           <div className="space-y-3">

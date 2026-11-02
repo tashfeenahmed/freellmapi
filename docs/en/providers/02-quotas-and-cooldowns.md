@@ -37,8 +37,16 @@ A 429 blocks that model+key pair for a period:
 | Model forbidden (403 tier gate) | 1 day | Key valid, model gated to a higher tier. |
 | Local endpoint errors | 5s | Never enters the ladder. |
 
-**Operator ceiling (#952).** Relay endpoints often return "busy" or "insufficient balance" for transient reasons, and a few of those per key can walk a whole pool onto day-long benches. Fallback page → routing options → *Longest automatic cooldown* (`routing_cooldown_ceiling_ms`, `PUT /api/fallback/routing {"cooldownCeilingMs"}`) caps the escalation ladder and the 402/403 benches at 10 min, 1 h or 6 h. Provider-stated retry times (Retry-After, daily-quota resets) are never shortened. The *Router pressure* panel's **Clear all** (`DELETE /api/fallback/penalty-inspector`) lifts every cooldown, score penalty, ladder counter and cross-key failure streak at once; the per-key reset (`DELETE /api/keys/:id/cooldowns`) remains for the surgical case.
+**Operator ceiling (#952).** Relay endpoints often return "busy" or "insufficient balance" for transient reasons, and a few of those per key can walk a whole pool onto day-long benches. Fallback page → routing options → *Longest automatic cooldown* (`routing_cooldown_ceiling_ms`, `PUT /api/fallback/routing {"cooldownCeilingMs"}`) caps the escalation ladder and the 402/403 benches at 10 min, 1 h or 6 h. Provider-stated retry times (Retry-After, daily-quota resets) are never shortened. The *Router pressure* panel's **Clear all** (`DELETE /api/fallback/penalty-inspector`) lifts every cooldown, score penalty, ladder counter, cross-key failure streak, and provider circuit at once; the per-key reset (`DELETE /api/keys/:id/cooldowns`) remains for the surgical case.
 | Auth failure (401) | benched until the next health cycle | ~5 minutes. |
+
+### Provider outage circuit breaker
+
+Provider-level 5xx, timeout, transport, and degraded-deployment failures are counted across requests per platform and custom endpoint. Three consecutive such failures within 60 seconds open that circuit for 30 seconds; repeated failed recovery probes increase the open interval exponentially, capped at five minutes. While open, routing skips that provider/deployment rather than spending another request's time budget on it. Once the interval expires, one request at a time gets a half-open probe; a successful response closes the circuit, while another provider-level failure reopens it. Auth, quota/rate-limit, model-not-found, and request-shape errors do not count as outage evidence. State is persisted in SQLite so a server restart does not immediately send traffic back into a known outage.
+
+### Learned output ceilings
+
+When a provider rejects an oversized `max_tokens` value and names its maximum, the router learns the lower output ceiling for that model and endpoint. It clamps later requests to that value and persists it in SQLite, avoiding a repeat failover after restart. Custom relay ceilings stay isolated by endpoint; an error from one relay never changes another relay's output budget. Learned values expire after 90 days so a provider's changed model limits can be relearned rather than clamped forever.
 
 ### Provenance and probe-based early recovery
 

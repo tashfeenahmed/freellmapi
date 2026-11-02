@@ -42,6 +42,7 @@ import { modelStatsKey, endpointScopeForBaseUrl } from '../lib/endpoint-scope.js
 import { isToolBenched } from '../lib/tool-capability.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getKeyQuotaHeadroom, inferQuotaPoolKey } from './provider-quota.js';
+import { acquireProviderCircuit, releaseProviderCircuitProbe } from '../lib/provider-circuit-breaker.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
@@ -111,11 +112,13 @@ export function summarizeExhaustion(
     else if (l.includes('drops response_format')) bump('platform cannot honor response_format');
     else if (/ruled out|already-failed/.test(l)) bump('failed earlier this request');
     else if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap/.test(l)) bump('rate-limited or on cooldown');
+    else if (l.includes('provider-circuit-open')) bump('provider circuit open');
     else bump('unavailable');
   }
   // Most actionable buckets first.
   const order = [
     'rate-limited or on cooldown',
+    'provider circuit open',
     'no usable key configured',
     'prompt too large for the model',
     'model lacks vision',
@@ -1700,6 +1703,13 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     const budget = reserveMonthlyBudget(key.id, estimatedTokens);
     if (!budget.allowed) { note('monthly-budget-cap'); continue; }
     const leaseId = acquireLease(entry.platform, entry.model_id, key.id, estimatedTokens);
+    const circuit = acquireProviderCircuit(entry.platform, entry.endpoint_scope ?? '');
+    if (!circuit.allowed) {
+      releaseLease(leaseId);
+      budget.release();
+      note('provider-circuit-open');
+      continue;
+    }
     return {
       provider: resolvedProvider,
       modelId: entry.model_id,
@@ -1715,7 +1725,11 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       endpointScope: entry.endpoint_scope ?? '',
       rpdLimit: limits.rpd,
       tpdLimit: limits.tpd,
-      release: () => { releaseLease(leaseId); budget.release(); },
+      release: () => {
+        releaseLease(leaseId);
+        budget.release();
+        if (circuit.probe) releaseProviderCircuitProbe(entry.platform, entry.endpoint_scope ?? '');
+      },
     };
   }
 
