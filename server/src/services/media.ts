@@ -26,10 +26,11 @@ import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
 import { KENARI_BASE_URL, requireKenariFreeModel } from '../providers/kenari.js';
 import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
+import { cpuCanRunSharp } from '../lib/image-normalize.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -361,6 +362,8 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'novai':
+      return callNovaiImage(row, key, p);
     case 'plugsky': {
       // Both routes share the monthly image allowance. dall-e-3 is Plugsky's
       // compatibility alias for FLUX Dev, NOT OpenAI DALL-E (catalog label).
@@ -497,6 +500,77 @@ async function callImageProvider(
     }
     default:
       throw new MediaError(`no image adapter for platform '${row.platform}'`, 500);
+  }
+}
+
+/** CogView returns a signed UFile URL, sometimes labelled PNG while containing
+ * JPEG bytes. Decode a bounded image and return normalized PNG base64 so SDKs
+ * do not inherit that incorrect MIME type or an expiring upstream URL. */
+async function callNovaiImage(row: MediaModelRow, key: string | null, p: ImageParams): Promise<Array<{ b64_json: string }>> {
+  if (!key) throw new MediaError('NovAI API key required', 401);
+  if (row.model_id !== 'cogview-3-flash') throw new MediaError('NovAI images support only the tested free CogView 3 Flash route', 400);
+  if ((p.n !== undefined && p.n !== 1) || (p.size !== undefined && p.size !== '1024x1024')) {
+    throw new MediaError('NovAI CogView 3 Flash supports one 1024x1024 image per request through this adapter', 400);
+  }
+  // Keep the gateway bootable on installations without a compatible native
+  // image library. In particular, loading libvips on pre-SSE4.2 CPUs can crash
+  // the process, not merely reject the import. Fail only this route, before
+  // spending provider quota, and let the existing media chain fail over.
+  if (!cpuCanRunSharp()) throw new MediaError('NovAI images require a compatible image decoder', 502);
+  let sharp: typeof import('sharp').default;
+  try { sharp = (await import('sharp')).default; }
+  catch { throw new MediaError('NovAI images require the optional image decoder', 502); }
+  const deadline = Date.now() + FETCH_TIMEOUT_MS;
+  const remaining = () => {
+    if (Date.now() >= deadline) throw new MediaError('NovAI image generation timed out', 504);
+    return Math.max(1, deadline - Date.now());
+  };
+  const response = await mediaFetch(`${NOVAI_BASE_URL}/images/generations`, 'novai', 'image', {
+    method: 'POST', redirect: 'error',
+    headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    body: JSON.stringify({ model: row.model_id, prompt: p.prompt, size: '1024x1024', n: 1 }),
+  }, remaining());
+  const body = await response.json() as { error?: unknown; model?: unknown; data?: { url?: unknown }[] } | null;
+  if (body?.error || (body?.model !== undefined && body.model !== row.model_id) || !Array.isArray(body?.data)
+      || body.data.length !== 1 || typeof body.data[0]?.url !== 'string') {
+    throw new MediaError('NovAI returned an invalid image response', 502);
+  }
+  let url: URL;
+  try { url = new URL(body.data[0].url); } catch { throw new MediaError('NovAI returned an invalid image URL', 502); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
+      || !(url.hostname === 'aiapi-pro.com' || url.hostname.endsWith('.ufileos.com'))
+      || !(await assessProviderUrl(url.href)).allowed) {
+    throw new MediaError('NovAI returned an unsafe image URL', 502);
+  }
+  // No authorization on output downloads; redirects cannot move the request
+  // outside the allowlist or turn a signed URL into a private-network fetch.
+  const image = await mediaFetch(url.href, 'novai', 'image', { method: 'GET', redirect: 'error' }, remaining());
+  const maxBytes = 16 * 1024 * 1024;
+  if (!image.body || Number(image.headers.get('content-length')) > maxBytes) {
+    await image.body?.cancel(); throw new MediaError('NovAI image output is missing or too large', 502);
+  }
+  const reader = image.body.getReader(), chunks: Buffer[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      remaining();
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > maxBytes) { await reader.cancel(); throw new MediaError('NovAI image output is too large', 502); }
+      chunks.push(Buffer.from(value));
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = Buffer.concat(chunks);
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (!png && !jpeg) throw new MediaError('NovAI returned no recognized PNG or JPEG image', 502);
+  try {
+    const normalized = await sharp(bytes, { limitInputPixels: 16 * 1024 * 1024, failOn: 'warning' }).png().toBuffer();
+    if (normalized.length > maxBytes) throw new Error('Decoded image too large');
+    return [{ b64_json: normalized.toString('base64') }];
+  } catch {
+    throw new MediaError('NovAI returned an invalid or oversized image', 502);
   }
 }
 
