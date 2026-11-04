@@ -68,6 +68,7 @@ const PLATFORMS = [
   'jamai',
   'nabh',
   'novai',
+  'freeinference',
   'beatapi',
   'apinex',
   'onomeo',
