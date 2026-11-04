@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { reserveMonthlyBudget } from './key-budget.js';
+import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getActiveCooldownsForKeys, isOnCooldown } from './ratelimit.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
@@ -61,6 +62,8 @@ export function reserveProviderCredential(
     } catch {
       continue;
     }
+    // Same per-account Workers AI neuron cap the chat router honours.
+    if (row.platform === 'cloudflare' && !cloudflareNeuronsAvailable(key)) continue;
     const reservation = reserveMonthlyBudget(keyRow.id, estimatedTokens);
     if (!reservation.allowed) { budgetBlocked = true; continue; }
     return {
