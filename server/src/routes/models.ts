@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
-import { hasProvider } from '../providers/index.js';
+import { getProvider, hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
   isCatalogManagedModel,
@@ -113,6 +113,10 @@ modelsRouter.post('/', (req: Request, res: Response) => {
   const data = parsed.data;
   if (!hasProvider(data.platform as Platform) && data.platform !== 'custom') {
     res.status(400).json({ error: { message: `Invalid platform "${data.platform}"` } });
+    return;
+  }
+  if (data.platform !== 'custom' && !getProvider(data.platform as Platform)?.supportsChat) {
+    res.status(400).json({ error: { message: `Platform "${data.platform}" does not support chat completions` } });
     return;
   }
 
@@ -390,6 +394,14 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
     return;
   }
   modelTestCooldowns.set(id, now);
+
+  // Check if the provider supports chat (non-chat providers should be rejected early)
+  const provider = getProvider(modelRow.platform as Platform);
+  if (provider && !provider.supportsChat) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'Platform does not support chat completions' });
+    return;
+  }
 
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.

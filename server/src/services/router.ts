@@ -1591,6 +1591,10 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     return null;
   }
   const provider = getProvider(entry.platform as Platform)!;
+  if (!provider.supportsChat) {
+    diag?.push(`${label}: provider does not support chat`);
+    return null;
+  }
 
   const allKeys = db.prepare(
     "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
