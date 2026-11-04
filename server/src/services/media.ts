@@ -27,6 +27,7 @@ import { KENARI_BASE_URL, requireKenariFreeModel } from '../providers/kenari.js'
 import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
+import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
@@ -234,6 +235,10 @@ interface ProviderCredential {
   id: number | null;
   key: string | null;
   baseUrl: string | null;
+}
+
+function capAsMediaError(e: CloudflareNeuronCapError): MediaError {
+  return new MediaError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000);
 }
 
 async function mediaFetch(
@@ -477,7 +482,9 @@ async function callImageProvider(
           body: JSON.stringify(body),
         };
       }
-      const r = await mediaFetch(url, 'cloudflare', 'image', init);
+      const imageUsage = { tiles: Math.ceil(w / 512) * Math.ceil(h / 512) };
+      const r = await meterCloudflare(`${accountId}:${token}`, row.model_id, imageUsage,
+        () => mediaFetch(url, 'cloudflare', 'image', init), () => imageUsage, capAsMediaError);
       // FLUX returns JSON { result: { image: <b64> } }; SDXL returns raw PNG bytes.
       const ct = r.headers.get('content-type') ?? '';
       if (ct.includes('application/json')) {
@@ -934,13 +941,15 @@ async function callSpeechProvider(
       const { accountId, token } = parseCfKey(key);
       const aura = /^@cf\/deepgram\/aura(?:-1|-2-en|-2-es)$/.test(row.model_id);
       if (p.format && p.format !== (aura ? 'mp3' : 'wav')) throw new MediaError(`Cloudflare ${aura ? 'Aura supports mp3' : 'MeloTTS supports wav'} output through this adapter`, 400);
-      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
+      // MeloTTS bills per audio minute: ~150 spoken words (~900 chars) a minute.
+      const speechUsage = { characters: p.input.length, audioMinutes: Math.max(1 / 60, p.input.length / 900) };
+      const r = await meterCloudflare(`${accountId}:${token}`, row.model_id, speechUsage, () => mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         // MeloTTS has a language selector, not a voice selector. In particular,
         // OpenAI's default `alloy` must never be sent as `lang`.
         body: JSON.stringify(aura ? { text: p.input } : { prompt: p.input, lang: 'en' }),
-      });
+      }), () => speechUsage, capAsMediaError);
       if (aura) {
         const audio = Buffer.from(await r.arrayBuffer());
         if (audio.length < 10 || !(audio.toString('ascii', 0, 3) === 'ID3' || (audio[0] === 255 && (audio[1] & 224) === 224))) throw new MediaError('Cloudflare returned no recognized MP3 audio', 502);
@@ -1432,7 +1441,11 @@ async function callTranscriptionProvider(
             headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
             body: p.file,
           };
-      const r = await mediaFetch(url, 'cloudflare', 'transcription', init);
+      // Billed per audio minute; ~1 MB a minute is a generous guess for the
+      // compressed formats clients send (an uncompressed WAV overestimates).
+      const audioUsage = { audioMinutes: Math.max(1 / 60, p.file.length / 1_000_000) };
+      const r = await meterCloudflare(`${accountId}:${token}`, m.modelId, audioUsage,
+        () => mediaFetch(url, 'cloudflare', 'transcription', init), () => audioUsage, capAsMediaError);
       const j = (await r.json()) as {
         result?: {
           text?: string;

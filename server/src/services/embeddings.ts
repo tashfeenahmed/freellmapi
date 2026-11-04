@@ -14,6 +14,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
+import { meterCloudflare, roughTokens } from './cloudflare-neurons.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -315,9 +316,15 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       if (sep === -1) throw new EmbeddingsError('cloudflare key is not in account_id:token form', 500);
       const accountId = key.slice(0, sep);
       const token = key.slice(sep + 1);
-      return openAiStyleEmbed(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
-        row.platform, token, row.model_id, inputs, {},
+      return meterCloudflare(
+        key, row.model_id,
+        { inputTokens: inputs.reduce((sum, text) => sum + roughTokens(text), 0) },
+        () => openAiStyleEmbed(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
+          row.platform, token, row.model_id, inputs, {},
+        ),
+        r => (r.inputTokens != null ? { inputTokens: r.inputTokens } : null),
+        e => new EmbeddingsError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000),
       );
     }
     case 'huggingface': {

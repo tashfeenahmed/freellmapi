@@ -28,6 +28,7 @@ import {
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS, isProviderMomentFailure } from '../lib/error-classify.js';
 import { checkMonthlyBudget, reserveMonthlyBudget } from './key-budget.js';
+import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
 import { modelsWithOverriddenField, getCatalogModelTombstone } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
@@ -1687,6 +1688,10 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       note('decrypt-error');
       continue;
     }
+    // Workers AI's free neurons are per ACCOUNT, and on Workers Paid nothing
+    // upstream says when they are gone: Cloudflare bills instead. Skip a key
+    // whose account has reached today's neuron cap (services/cloudflare-neurons.ts).
+    if (entry.platform === 'cloudflare' && !cloudflareNeuronsAvailable(decryptedKey)) { note('cloudflare-neuron-cap'); continue; }
 
     const resolvedProvider = entry.platform === 'custom'
       ? resolveProvider('custom', key.base_url)

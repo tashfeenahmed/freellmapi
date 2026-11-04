@@ -119,7 +119,7 @@ describe('legacy baseline re-run against a post-rename DB (#1603)', () => {
 
     await expect(runMigrations(db, 'up')).resolves.toBeUndefined();
     // No model id appears twice, and the runner recorded the journal.
-    expect(db.prepare('SELECT COUNT(*) AS n FROM migrations').get()).toEqual({ n: 47 });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM migrations').get()).toEqual({ n: 48 });
     expect(db.prepare('SELECT COUNT(*) AS n FROM (SELECT platform, model_id FROM models GROUP BY platform, model_id HAVING COUNT(*) > 1)').get()).toEqual({ n: 0 });
   });
 });
