@@ -514,11 +514,9 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
 
   // Build per-model breakdown (only platforms with keys), preserving enabled state
   const usageRows = db.prepare(`
-    SELECT platform, model_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-    GROUP BY platform, model_id
+    SELECT platform, model_id, tokens AS used
+    FROM model_monthly_usage
+    WHERE month = strftime('%Y-%m', 'now')
   `).all() as { platform: string; model_id: string; used: number }[];
   const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
 
