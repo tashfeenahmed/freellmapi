@@ -65,6 +65,10 @@ import { logRequest, persistRequestAttempts } from './request-log.js';
 import { withKeyProxy } from './proxy.js';
 import { getEndpointTimeBudgetMs } from './ttfb-budget.js';
 import { learnOutputCapFromError, learnedOutputCap } from './output-cap.js';
+import {
+  recordProviderCircuitFailure,
+  recordProviderCircuitSuccess,
+} from './provider-circuit-breaker.js';
 
 // Every surface caps failover hops at the same number.
 export const FALLBACK_MAX_RETRIES = 20;
@@ -512,8 +516,9 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // failover hop per key. Key-scoped failures (auth/quota) stay on the
   // single-key path, and the per-key cooldown below is still the only thing
   // that outlives the request.
-  if (isProviderLevelError(err)) {
+  if (!isHedgeAbortError(err) && isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
+    recordProviderCircuitFailure(route.platform, route.endpointScope, now);
   }
   // Too big for this model is a fact about the REQUEST, not the model's
   // health: it still serves every smaller request. Skip it for this request
@@ -1663,6 +1668,9 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     // stream had already flushed bytes when the attempt ended (mid-stream
     // error or pre-commit disconnect) — the parent row carries the specifics.
     traceAttempt(outcome === 'done' ? 'ok' : 'committed');
+    if (outcome === 'done') {
+      recordProviderCircuitSuccess(route.platform, route.endpointScope);
+    }
     return;
     } finally {
       if (hedgeTimer) clearTimeout(hedgeTimer);

@@ -5,6 +5,7 @@ import { getDb, initDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { recordRateLimitHit, getAllPenalties } from '../../services/router.js';
 import { setCooldown, isOnCooldown, getNextCooldownDuration, getCooldownCeilingMs } from '../../services/ratelimit.js';
+import { recordProviderCircuitFailure } from '../../lib/provider-circuit-breaker.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -60,6 +61,7 @@ describe('Router pressure controls (#952)', () => {
     getNextCooldownDuration(platform, modelId, keyId);
     expect(isOnCooldown(platform, modelId, keyId)).toBe(true);
     expect(getAllPenalties().some(p => p.modelDbId === modelDbId)).toBe(true);
+    for (let i = 0; i < 3; i++) recordProviderCircuitFailure(platform, '', Date.now() + i);
 
     const before = await request(app, 'GET', '/api/fallback/penalty-inspector');
     expect(before.status).toBe(200);
@@ -70,9 +72,11 @@ describe('Router pressure controls (#952)', () => {
     expect(cleared.body.cooldowns).toBeGreaterThanOrEqual(1);
     expect(cleared.body.penalties).toBeGreaterThanOrEqual(1);
     expect(typeof cleared.body.failureWindows).toBe('number');
+    expect(cleared.body.providerCircuits).toBeGreaterThanOrEqual(1);
 
     expect(isOnCooldown(platform, modelId, keyId)).toBe(false);
     expect(getAllPenalties().some(p => p.modelDbId === modelDbId)).toBe(false);
+    expect(getDb().prepare('SELECT COUNT(*) AS count FROM provider_circuit_breakers').get()).toEqual({ count: 0 });
     // Ladder restarted: the next hit is the first rung again, not the third.
     expect(getNextCooldownDuration(platform, modelId, keyId)).toBe(2 * 60_000);
 
