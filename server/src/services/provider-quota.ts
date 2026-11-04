@@ -120,6 +120,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'speka') return 'speka::monthly-credit';
   if (platform === 'nabh') return 'nabh::monthly-credit';
   if (platform === 'novai') return 'novai::daily-free';
+  if (platform === 'freeinference') return 'freeinference::daily-free';
   if (platform === 'apinex') return 'apinex::daily-free';
   // onomeo: one 30-calls/5-hour account allowance across every free model,
   // so one pool (issue #1460).
