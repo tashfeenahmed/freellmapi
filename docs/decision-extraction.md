@@ -7,6 +7,26 @@ HAL-X and AI SENSE support `/v1/decisions` and `/v1/systemone`, not chat complet
 
 Provider contracts: [HAL-X](https://api.hal-x.ai/docs), [AI SENSE](https://www.aisense.no/free-public-api-decide-api-endpoint).
 
+## Custom decision endpoints (#1777)
+
+You can also point decisions at your own endpoint instead of a catalog provider: register it with `POST /api/media/custom` and `modality: "decision"`, giving the endpoint's `baseUrl`, a `model` id, and an optional `apiKey` (omit it for a keyless local endpoint). It then appears on the Decision page and in `GET /v1/decisions/models`, and `POST /v1/decisions` runs it like any other decision model.
+
+The endpoint speaks a proposed generic contract — one call per question, since a single decision value cannot answer several distinct questions:
+
+```http
+POST {base_url}/decide
+Authorization: Bearer <key>
+Content-Type: application/json
+
+{"model": "my-decider", "prompt": "Which tier?\n\nState: fix: TypeError…", "choices": ["light", "code"], "context": "fix: TypeError…"}
+```
+
+```json
+{"decision": "code", "confidence": 0.9, "reasoning": "It is a stack trace."}
+```
+
+`choices` are the question's options (`criteria` keys for a `choice` question, `["yes", "no"]` for `noul`, level indexes `"0"`, `"1"`, … for `score`); `decision` must be one of them, and `confidence` (0–1, defaults to 1 when omitted) is split across the options as the answer's probabilities. A decision outside the options, a missing decision, or a down endpoint is a 502 — the answer is never fabricated, and there is no fallback chain for decisions. This contract is a proposal, not a declared standard: the built-in providers share no wire shape, so if the maintainer settles a different one, this adapter follows it. Outbound URLs go through the same guard as every custom provider endpoint (#440), so cloud metadata addresses stay blocked.
+
 ## Clairic (Cloudflare Workers AI)
 
 Clairic extracts fields rather than answering choice/noul/score questions. It is excluded from question auto-routing and the choice playground. Its tested text and number fields are available on the same authenticated endpoint:
