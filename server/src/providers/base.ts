@@ -186,6 +186,19 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
    * finish. Composed with the per-attempt timeout in fetchWithTimeout; never
    * serialized into the request body. */
   signal?: AbortSignal;
+  /**
+   * Anthropic compatibility metadata from a `/v1/messages` caller (#1589):
+   * the request's `safeguards` field and `anthropic-beta` header, carried
+   * with the request through the routing loop so a future Anthropic-native
+   * upstream adapter can forward them. OpenAI-compatible adapters MUST NOT
+   * serialize this into the outbound body — strict upstreams 400 on unknown
+   * top-level fields — so it is kept out of the request payload by
+   * construction (providers build the body from known fields only).
+   */
+  anthropicCompat?: {
+    safeguards?: unknown;
+    anthropicBeta?: string;
+  };
 }
 
 /** Per-call abort/timeout wiring for fetchWithTimeout. */

@@ -370,6 +370,8 @@ caller's `system` turn, exactly as on `/v1/chat/completions`.
 
 Claude model names map to your free pool on the **Keys → Anthropic** tab: each family (`default`, `opus`, `sonnet`, `haiku`) routes to `auto` (the router picks a free model) or a model you pin. `POST /v1/messages/count_tokens` and a content-negotiated `GET /v1/models` (Anthropic shape when `anthropic-version` is sent) are implemented too. Streaming, system prompts, tool use, and image input all translate across the same router as the OpenAI endpoints.
 
+**Classifier passthrough, not eligibility (#1589).** A client's `safeguards` request field and `anthropic-beta` header are accepted and carried with the request, and `safeguard_results` an upstream returns are passed through unchanged in both the JSON response and the streaming `message_delta`. The `safeguards` field itself is stripped from the body sent to OpenAI-compatible upstreams (they reject unknown fields). This is passthrough only: the server-side classifier checks behind Claude Code's no-charge auto-mode treatment run on Anthropic's servers, and no free non-Anthropic provider in the pool can perform them — so when the routed provider sends no classifier results, none are returned and nothing is fabricated, and the request is not presented as eligible.
+
 **Claude Code** — point it at your server and start it:
 
 *On macOS / Linux (Bash):*
