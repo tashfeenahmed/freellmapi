@@ -93,6 +93,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'navy', label: 'NavyAI (free key)', url: 'https://api.navy' },
   { value: 'nara', label: 'NaraRouter (free key)', url: 'https://router.bynara.id' },
   { value: 'sealion', label: 'SEA-LION (free key)', url: 'https://sea-lion.ai' },
+  { value: 'llmkiwi', label: 'LLM.kiwi (free account)', url: 'https://llm.kiwi' },
   { value: 'orcarouter', label: 'OrcaRouter (free key)', url: 'https://www.orcarouter.ai' },
   { value: 'unorouter', label: 'UnoRouter (free key)', url: 'https://unorouter.com' },
   { value: 'xkiro', label: 'xKiro (free key)', url: 'https://xkiro.com' },

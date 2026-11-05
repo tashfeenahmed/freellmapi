@@ -51,6 +51,7 @@ import { OnomeoProvider } from './onomeo.js';
 import { IteraComputeProvider } from './iteracompute.js';
 import { SerpSearchProvider } from './serpsearch.js';
 import { BraveProvider } from './brave.js';
+import { LlmKiwiProvider } from './llmkiwi.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -110,6 +111,7 @@ register(new OnomeoProvider());
 register(new IteraComputeProvider());
 register(new SerpSearchProvider());
 register(new BraveProvider());
+register(new LlmKiwiProvider());
 
 // Free-plan grants are shared wallets, not free credits per model. Eligibility
 // and tested model rows belong in Oracle, never in bundled DB migrations.
