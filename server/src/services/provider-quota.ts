@@ -173,6 +173,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'navy') return 'navy::free';
   if (platform === 'nara') return 'nara::free';
   if (platform === 'sealion') return 'sealion::free';
+  if (platform === 'llmkiwi') return 'llmkiwi::account';
   // OrcaRouter: one rate-limited free allowance across all `*-free` aliases
   // and the `orcarouter/free` auto route (limits unpublished; 429 on cap).
   if (platform === 'orcarouter') return 'orcarouter::free';
