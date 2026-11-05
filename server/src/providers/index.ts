@@ -55,6 +55,11 @@ import { IteraComputeProvider } from './iteracompute.js';
 import { SerpSearchProvider } from './serpsearch.js';
 import { BraveProvider } from './brave.js';
 import { LlmKiwiProvider } from './llmkiwi.js';
+import { TokenReplyProvider } from './tokenreply.js';
+import { MnnProvider } from './mnn.js';
+import { FishAudioProvider } from './fishaudio.js';
+import { CartesiaProvider } from './cartesia.js';
+import { TinyFishProvider } from './tinyfish.js';
 
 const providers = new Map<Platform, BaseProvider>();
 
@@ -116,6 +121,11 @@ register(new IteraComputeProvider());
 register(new SerpSearchProvider());
 register(new BraveProvider());
 register(new LlmKiwiProvider());
+register(new TokenReplyProvider());
+register(new MnnProvider());
+register(new FishAudioProvider());
+register(new CartesiaProvider());
+register(new TinyFishProvider());
 
 // Free-plan grants are shared wallets, not free credits per model. Eligibility
 // and tested model rows belong in Oracle, never in bundled DB migrations.
