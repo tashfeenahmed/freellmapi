@@ -1,12 +1,29 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { listSearchEngines, updateSearchEngine, runSearch, SearchError } from '../services/search.js';
+import { listSearchEngines, updateSearchEngine, runSearch, runTinyFishFetch, SearchError } from '../services/search.js';
 
 // Dashboard: the Models → Search page (#1174). Engines come from the catalog's
 // searchEngines registry (plus custom relays); this lists them with key and
 // usage counts and lets the operator switch one off or change the order.
 export const searchRouter = Router();
+
+searchRouter.post('/fetch', async (req: Request, res: Response) => {
+  const parsed = z.object({
+    urls: z.array(z.string().url()).min(1).max(10),
+    format: z.enum(['markdown', 'html', 'json']).optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Provide 1–10 valid URLs and an optional markdown, html, or json format' } });
+    return;
+  }
+  try {
+    res.json(await runTinyFishFetch(parsed.data.urls, parsed.data.format));
+  } catch (err: unknown) {
+    const status = err instanceof SearchError ? err.status : 502;
+    res.status(status).json({ error: { message: err instanceof Error ? err.message : 'Fetch failed' } });
+  }
+});
 
 searchRouter.get('/engines', (_req: Request, res: Response) => {
   res.json(listSearchEngines());
