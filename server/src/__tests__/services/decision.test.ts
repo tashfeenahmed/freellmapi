@@ -64,7 +64,71 @@ describe('decision service', () => {
   });
 
   it('has adapters for the supported decision platforms', () => {
-    expect([...DECISION_PLATFORMS].sort()).toEqual(['apinex', 'beatapi', 'blockrun', 'cloudflare', 'openrouter']);
+    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'halx', 'openrouter']);
+  });
+
+  function seed(platform: string, model: string) {
+    getDb().prepare("INSERT INTO media_models (platform,model_id,display_name,modality,priority,enabled,quota_label) VALUES (?,?,?,'decision',20,1,'free')").run(platform, model, model);
+  }
+
+  it('maps HAL-X questions and never transmits a saved credential', async () => {
+    seed('halx', 'THX-01'); addKey('halx', 'no-key');
+    const fn = mockFetch(() => json({ model: 'THX-01', answers: ANSWERS, usage: { input_tokens: 35, output_tokens: 0 } }));
+    expect((await runDecision(REQUEST, { model: 'THX-01' })).provider).toBe('halx');
+    expect(calls(fn)[0][0]).toBe('https://api.hal-x.ai/v1/systemone');
+    expect(calls(fn)[0][1].headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(calls(fn)[0][1].redirect).toBe('error');
+    expect(bodyOf(calls(fn)[0]).questions.tier).toEqual({ type: 'choice', question: REQUEST.questions.tier.instructions, criteria: REQUEST.questions.tier.criteria });
+    expect(decisionsAvailable()).toBe(true);
+  });
+
+  it.each(['clef', 'nimble', 'tev1'])('selects AI SENSE %s rather than its default rules engine', async model => {
+    seed('aisense', model); addKey('aisense', 'no-key');
+    const fn = mockFetch(() => json({ model, model_version: model + ':latest', answers: ANSWERS, usage: { input_tokens: 42 } }));
+    const result = await runDecision(REQUEST, { model });
+    expect(result.modelVersion).toBe(model + ':latest');
+    expect(result.answers).toEqual(ANSWERS);
+    expect(calls(fn)[0][0]).toBe('https://aisenseapi.com/services/v1/decide');
+    expect(bodyOf(calls(fn)[0])).toEqual({ model, state: { message: REQUEST.state }, questions: REQUEST.questions });
+    expect(calls(fn)[0][1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('rejects substituted and missing keyless decision answers', async () => {
+    seed('halx', 'THX-01'); addKey('halx', 'no-key');
+    for (const response of [{ model: 'other', answers: ANSWERS }, { model: 'THX-01', answers: {} }, { model: 'THX-01', answers: { tier: { type: 'choice', choice: 'wrong' } } }]) {
+      mockFetch(() => json(response));
+      await expect(runDecision(REQUEST, { model: 'THX-01' })).rejects.toMatchObject({ status: 502 });
+    }
+  });
+
+  it('keeps keyless-provider rate limits in the normal cooldown chain', async () => {
+    seed('aisense', 'clef'); const key = addKey('aisense', 'no-key');
+    mockFetch(() => json({ error: 'daily quota' }, 429, { 'retry-after': '3600' }));
+    await expect(runDecision(REQUEST, { model: 'clef' })).rejects.toMatchObject({ status: 429, retryAfterMs: 3600000 });
+    expect(isOnCooldown('aisense', 'clef', key)).toBe(true);
+  });
+
+  it('sends Clairic fields, preserves nullable values and excludes it from choice auto-routing', async () => {
+    seed('cloudflare', '@cf/cloudflare/clairic'); addKey('cloudflare', 'acct:tok');
+    const request = { state: 'Invoice INV-2291: four units at $250 plus $80 shipping.', fields: { invoice_number: { type: 'text' as const }, total: { type: 'number' as const, decimals: 2, unit: 'USD' } } };
+    const answers = { invoice_number: { type: 'text', value: null, p_null: 1 }, total: { type: 'number', value: 1080 } };
+    const fn = mockFetch(() => json({ success: true, result: { model: 'clairic', answers, truncated: false, usage: { input_tokens: 288 } } }));
+    expect(await runDecision(request)).toMatchObject({ model: '@cf/cloudflare/clairic', answers, truncated: false, usage: { input_tokens: 288, output_tokens: 0 } });
+    expect(bodyOf(calls(fn)[0])).toEqual({ model: 'clairic', ...request });
+    await expect(runDecision(REQUEST, { model: '@cf/cloudflare/clairic' })).rejects.toMatchObject({ status: 400 });
+    await expect(runDecision(request, { model: '@cf/cloudflare/clef-flash' })).rejects.toMatchObject({ status: 400 });
+    getDb().prepare("UPDATE media_models SET enabled=0 WHERE model_id != '@cf/cloudflare/clairic'").run();
+    expect(decisionsAvailable()).toBe(false);
+    await expect(runDecision(REQUEST)).rejects.toMatchObject({ status: 503 });
+    expect(calls(fn)).toHaveLength(1);
+  });
+
+  it('reports extraction cooldown rather than claiming no key is installed', async () => {
+    seed('cloudflare', '@cf/cloudflare/clairic'); addKey('cloudflare', 'acct:tok');
+    const request = { state: 'Invoice $20', fields: { total: { type: 'number' as const } } };
+    mockFetch(() => json({ error: 'quota exceeded' }, 429, { 'retry-after': '60' }));
+    await expect(runDecision(request)).rejects.toMatchObject({ status: 429 });
+    await expect(runDecision(request)).rejects.toMatchObject({ status: 429, code: 'decision_keys_cooling_down' });
   });
 
   it('calls Cloudflare ai/run with the account from the key and the short model selector', async () => {

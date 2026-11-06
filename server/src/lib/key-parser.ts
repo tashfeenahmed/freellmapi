@@ -69,6 +69,11 @@ export const PREFIX_MAP: Record<string, string> = {
   GIZMO_: 'gizmo',
   BLOCKRUN_: 'blockrun',
   MOONDREAM_: 'moondream',
+  JAMAI_: 'jamai',
+  NABH_: 'nabh',
+  NOVAI_: 'novai',
+  FREEINFERENCE_: 'freeinference',
+  FREEMODEL_: 'freemodel',
   GOOGLE_: 'google',
   GEMINI_: 'google',
   GROQ_: 'groq',
@@ -189,6 +194,15 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   gizmo: 'gizmo',
   blockrun: 'blockrun',
   moondream: 'moondream',
+  jamai: 'jamai',
+  nabh: 'nabh',
+  novai: 'novai',
+  freeinference: 'freeinference',
+  'freeinference.org': 'freeinference',
+  freemodel: 'freemodel',
+  'freemodel.in': 'freemodel',
+  'aiapi-pro.com': 'novai',
+  'nabh.cloud': 'nabh',
   'sail-research': 'sail',
   sailresearch: 'sail',
   electronhub: 'electronhub',
@@ -771,7 +785,13 @@ function toParsedKeys(pairs: KeyPair[]): ParseResult {
   const keys: ParsedKey[] = [];
   const skipped: string[] = [];
 
-  for (const { key, value, platform: statedPlatform, baseUrl, label, models } of pairs) {
+  const project = pairs.find(pair => pair.key.toUpperCase() === 'JAMAI_PROJECT_ID')?.value.trim();
+  for (const { key, value: rawValue, platform: statedPlatform, baseUrl, label, models } of pairs) {
+    // Project metadata is not itself a credential. Support the SDK's paired
+    // environment fields as well as our encrypted/exported composite value.
+    if (key.toUpperCase() === 'JAMAI_PROJECT_ID') continue;
+    const value = project && /^JAMAI_(API_KEY|PAT|KEY)$/i.test(key) && !rawValue.includes(':')
+      ? `${project}:${rawValue.trim()}` : rawValue;
     const prefix = extractPrefix(key);
     const platform = statedPlatform ?? detectPlatform(prefix);
     // The name before `=` becomes the stored label (splitRawKey in the import

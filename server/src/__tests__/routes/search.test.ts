@@ -121,6 +121,20 @@ describe('search routes', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('tests a search engine using its search adapter, pinned to the selected row', async () => {
+    addKey('tavily');
+    addKey('exa');
+    getDb().prepare("INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled) VALUES ('exa', 'tavily-search', 'Duplicate ID', 'search', -1, 1)").run();
+    let requested = '';
+    mockUpstream(url => { requested = url; return new Response(JSON.stringify({ results: [{ title: 'Example', url: 'https://example.com', content: 'ok' }] }), { headers: { 'content-type': 'application/json' } }); });
+    const list = await call(app, 'GET', '/api/search/engines');
+    const engine = list.body.find((e: any) => e.platform === 'tavily');
+    const response = await call(app, 'POST', `/api/search/engines/${engine.id}/test`, { body: { query: 'example' } });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ provider: 'tavily', engine: 'tavily-search' });
+    expect(requested).toContain('/search');
+  });
+
   it('GET /api/analytics/search returns the search summary', async () => {
     getDb().prepare(`INSERT INTO search_requests (engine_id, platform, status, latency_ms, result_count) VALUES ('exa-search', 'exa', 'ok', 300, 5)`).run();
     const { status, body } = await call(app, 'GET', '/api/analytics/search?range=30d');

@@ -134,6 +134,24 @@ describe('Analytics API', () => {
     expect(body.totalRequests).toBe(2);
   });
 
+  it('range=all reports the unpruned lifetime headline totals', async () => {
+    // Rows far older than any retention window, plus a recent one. The
+    // lifetime counters in `settings` span all of them, so 'all' must total
+    // every inserted row, not merely the retained window.
+    insertRequest('2026-01-01 00:00:00');
+    insertRequest('2026-03-15 08:00:00');
+    insertRequest('2026-05-29 11:59:59');
+
+    const { status, body } = await request(app, '/api/analytics/summary?range=all');
+
+    expect(status).toBe(200);
+    expect(body.totalRequests).toBe(3);
+    expect(body.totalInputTokens).toBe(3);
+    expect(body.totalOutputTokens).toBe(6);
+    expect(body.lifetimeTotalRequests).toBe(3);
+    expect(body.firstRequestAt).toBe('2026-01-01 00:00:00');
+  });
+
   // Regression guard for the hour-key FORMAT written by the real production
   // writer (lib/request-log.logRequest). The bug this prevents: the writer
   // stores keys as SQLite's 'YYYY-MM-DD HH:00:00' (space), but the summary

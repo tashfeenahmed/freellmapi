@@ -81,4 +81,15 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
     expect(body.summary.configured).toBe(1);
     expect(body.summary.unconfigured).toBe(body.summary.total - 1);
   });
+
+  // ACLIDE's dashboard is down, so new users cannot get a key (#1768): it is
+  // not suggested to anyone without one, but an existing key still shows.
+  it('hides an unlisted provider until it has a key', async () => {
+    let { body } = await request(app, '/api/keys/providers');
+    expect(body.providers.some((p: { platform: string }) => p.platform === 'aclide')).toBe(false);
+    addKey('aclide');
+    ({ body } = await request(app, '/api/keys/providers'));
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'aclide'))
+      .toMatchObject({ configured: true, keyCount: 1 });
+  });
 });

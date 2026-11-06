@@ -708,6 +708,17 @@ describe('isProviderLevelError (#788: the PROVIDER is sick, not this key)', () =
     expect(isProviderLevelError(Object.assign(new Error("Function id 'x': DEGRADED function cannot be invoked"), { status: 400 }))).toBe(true);
   });
 
+  it('keeps a 5xx that blames one busy model scoped to that model, not the platform', () => {
+    // Google's per-model load shedding: sibling Gemini models on the same key
+    // still serve, so `auto` must be able to fail over within the platform.
+    expect(isProviderLevelError(Object.assign(new Error(
+      'Google API error 503: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+    ), { status: 503 }))).toBe(false);
+    expect(isProviderLevelError(Object.assign(new Error('API error 503: The model is overloaded. Please try again later.'), { status: 503 }))).toBe(false);
+    // Generic overload wording that does not single out a model stays provider-level.
+    expect(isProviderLevelError(Object.assign(new Error('API error 503: Service temporarily overloaded'), { status: 503 }))).toBe(true);
+  });
+
   it('does not misfire on digits or wording that merely LOOK like a 5xx', () => {
     // The whole point of the structured-status rule: these all carry '500'/'503'
     // /'unavailable' in their text, and condemning the platform on any of them

@@ -578,11 +578,17 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     const inVideoCatalog = new Set<string>();
     const inSearchCatalog = new Set<string>();
     const inDecisionCatalog = new Set<string>();
+    // Historical audio entries can duplicate a dedicated STT row. The STT
+    // registry is authoritative; a disabled legacy listing must not disable
+    // its still-enabled transcription route in the shared media table.
+    const dedicatedTranscriptions = new Set((catalog.transcriptionModels ?? [])
+      .filter(m => TRANSCRIPTION_PLATFORMS.has(m.platform)).map(m => `${m.platform}:${m.modelId}`));
 
     for (const m of catalog.models) {
       // Media modalities are gated on MEDIA_PLATFORMS (decoupled from the chat
       // provider registry) and routed to media_models, then skip the chat path.
       const modality = m.modality ?? 'text';
+      if (modality === 'audio' && dedicatedTranscriptions.has(`${m.platform}:${m.modelId}`)) continue;
       if (MEDIA_MODALITIES.has(modality)) {
         if (!MEDIA_PLATFORMS.has(m.platform)) {
           counts.skippedUnknownPlatform++;

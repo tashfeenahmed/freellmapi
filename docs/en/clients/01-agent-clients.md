@@ -126,25 +126,25 @@ requires, both taken from the live catalog.
 ### AtomCode (`atomcode`)
 
 [AtomCode](https://atomcode.atomgit.com/docs/en/) is AtomGit's terminal
-coding agent, written in Rust. It reads `~/.atomcode/config.toml`, where a
-root `default_provider` key names one `[providers.<id>]` table and
-`type = "openai"` makes that table speak the OpenAI-compatible wire.
-`setup-atomcode` writes a `[providers.freellmapi]` table — `base_url` on the
-gateway's `/v1`, the unified key as `api_key`, the chosen model and its
-`context_window` from the live catalog — and sets `default_provider` to it.
-The write is a structural merge: the root key is placed above any existing
-tables, only the `freellmapi` table is replaced, and other `[providers.*]`
-tables and settings in the file are left as they were.
+coding agent, written in Rust. It reads `~/.atomcode/config.toml`.
+`setup-atomcode` writes `[provider_accounts.freellmapi]` with `provider = "openai"`,
+the gateway's `/v1` as `base_url`, and the unified key as `api_key`.
+`[models.freellmapi]` references that account and stores the chosen model and
+its `context_window` from the live catalog. The root `default_model` selects
+this model entry, taking precedence over any legacy `default_provider`.
+The write is a structural merge: the root key is placed above existing
+tables, the two generated tables are replaced, and unrelated accounts,
+models, legacy providers and settings are preserved.
 
 ```bash
 npx freellmapi setup-atomcode --url http://localhost:3001 --api-key <unified-key>
 atomcode
 ```
 
-AtomCode has no environment-variable fallback for the key, so it is written
-into the config file; the file is created with mode 0600 and a timestamped
-backup is taken before an existing one is changed. `--model <id>` pins the
-default model.
+The generator writes the unified key into the config file; the file is
+created with mode 0600 and a timestamped backup is taken before an existing
+one is changed. `--model <id>` pins the default model. Restart AtomCode to
+load the updated configuration.
 
 ### OpenClaw
 

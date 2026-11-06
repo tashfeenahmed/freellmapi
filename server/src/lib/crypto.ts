@@ -211,6 +211,41 @@ export function decrypt(encrypted: string, iv: string, authTag: string): string 
   return decrypted;
 }
 
+/**
+ * Whether the loaded key can open the secrets already stored in this database.
+ *
+ * A key file that exists but no longer matches the ciphertext is a silent
+ * disaster: every `api_keys` row fails GCM authentication, so the health checks
+ * report one platform at a time as broken with "Unsupported state or unable to
+ * authenticate data", and the router ends up with no usable key. Nothing in that
+ * output says the key file is the problem. Probing one row at boot turns the
+ * whole class into a single accurate diagnosis.
+ *
+ * The mismatch is easy to reach: appdata is portable, so copying a database
+ * between installs while keeping the older `.encryption-key` (or restoring from
+ * a backup that carries its own) produces exactly this state.
+ *
+ * Returns null when there is nothing to check: no key init yet, no `api_keys`
+ * table, or no stored secret.
+ */
+export function probeStoredSecrets(db: Db): boolean | null {
+  let row: { encrypted: string; iv: string; auth_tag: string } | undefined;
+  try {
+    row = db.prepare(
+      'SELECT encrypted_key AS encrypted, iv, auth_tag FROM api_keys WHERE length(encrypted_key) > 0 LIMIT 1',
+    ).get() as typeof row;
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+  try {
+    decrypt(row.encrypted, row.iv, row.auth_tag);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // A masked key is display-only — it feeds the `maskedKey` field every key,
 // media, embedding and client-profile route hands to the dashboard — so it must
 // never be enough to reconstruct the secret. The old short-key branch was
