@@ -3,7 +3,10 @@ import { OpenAICompatProvider } from './openai-compat.js';
 
 export const BEATAPI_BASE_URL = 'https://api.beatapi.io/v1';
 
+/** Decision-only integration. Model availability and promotional terms live
+ * in the signed catalog, not bundled seeds or the chat router. */
 export class BeatApiProvider extends OpenAICompatProvider {
+  override readonly supportsChat = false;
   constructor() {
     super({ platform: 'beatapi', name: 'BeatAPI', baseUrl: BEATAPI_BASE_URL });
   }
