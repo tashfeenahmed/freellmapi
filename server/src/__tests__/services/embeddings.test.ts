@@ -67,6 +67,8 @@ describe('embeddings service', () => {
     } finally {
       clearCooldownsForKey(keyId);
     }
+  });
+
   it('routes JamAI embeddings with project-scoped auth, native payload and fixed vectors', async () => {
     addKey('jamai', 'proj_example:jamai_pat_testsecret');
     getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)

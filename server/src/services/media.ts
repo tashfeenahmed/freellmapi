@@ -1097,7 +1097,7 @@ export async function runImageGeneration(model: string | undefined, params: Imag
   for (const row of chain) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform) || row.platform === 'ovh'
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform)
         ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false, cooldownBlocked: false, cooldownRetryAfterMs: undefined }
         : reserveProviderCredential(row, 0, keyId => tried.has(keyId));
       if (!credential) {
@@ -1552,7 +1552,7 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
   for (const row of chain) {
     const tried = new Set<number>();
     do {
-      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform)
+      const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs } = KEYLESS_CAPABLE.has(row.platform) || row.platform === 'ovh'
         ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false, cooldownBlocked: false, cooldownRetryAfterMs: undefined }
         : reserveProviderCredential(row, 0, keyId => tried.has(keyId));
       if (!credential) {
