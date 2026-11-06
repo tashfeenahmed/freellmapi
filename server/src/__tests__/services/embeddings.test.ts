@@ -79,7 +79,10 @@ describe('embeddings service', () => {
   });
 
   it('reserves the shared monthly budget across concurrent embeddings and releases failures', async () => {
-    const keyId = addCustomKey('https://embeddings.example/v1');
+    // Fetch is mocked, but the custom-provider SSRF guard runs before it.
+    // Use a TEST-NET literal so public DNS latency cannot race waitFor's 1s
+    // deadline. Keep the real URL guard and budget reservation path intact.
+    const keyId = addCustomKey('https://203.0.113.10/v1');
     const db = getDb();
     db.prepare('UPDATE api_keys SET monthly_request_cap = 1 WHERE id = ?').run(keyId);
     db.prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)

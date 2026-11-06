@@ -102,6 +102,14 @@ export type Platform =
   // across models. Signed catalog only; no bundled model seeds.
   | 'moondream'
   | 'jamai'
+  // One shared renewable monthly credit allowance; signed catalog only.
+  | 'nabh'
+  // Daily-free video route; signed catalog only.
+  | 'novai'
+  // Research API; chat and embeddings share a daily quota. Requests are logged.
+  | 'freeinference'
+  // Personal BYOK client; shared monthly account allowance, Telegram verification.
+  | 'freemodel'
   // Hosted gateways; model rows are delivered by the signed catalog only.
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'
