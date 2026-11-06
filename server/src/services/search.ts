@@ -91,6 +91,7 @@ export interface SearchOptions {
   includeAnswer?: boolean;
   /** Pin one engine by id; omitted or 'auto' walks the whole chain. */
   engine?: string;
+  engineRowId?: number;
   /** Agent the search runs for (e.g. 'claude-code'); defaults to the request's
    *  detected client. Recorded on search_requests. */
   clientAgent?: string | null;
@@ -636,8 +637,13 @@ export function noSearchMessage(s: SearchStatus = searchStatus()): string {
   return `No search engine is ready. ${parts.join(' ')}`.trim();
 }
 
-function searchChain(engine: string | undefined): SearchEngineRow[] {
+function searchChain(engine: string | undefined, engineRowId?: number): SearchEngineRow[] {
   const enabled = orderedEngines().filter(r => r.enabled === 1 && ADAPTERS[r.platform]);
+  if (engineRowId !== undefined) {
+    const row = enabled.find(r => r.id === engineRowId);
+    if (!row) throw new SearchError('Search engine is unavailable or disabled', 400);
+    return [row];
+  }
   // Custom relays first, catalog engines after, each group in effective order.
   const chain = [...enabled.filter(r => r.platform === 'custom'), ...enabled.filter(r => r.platform !== 'custom')];
   if (!engine || engine === 'auto') return chain;
@@ -655,7 +661,7 @@ function searchChain(engine: string | undefined): SearchEngineRow[] {
 }
 
 export async function runSearch(query: string, opts: SearchOptions = {}): Promise<SearchResponse> {
-  const chain = searchChain(opts.engine);
+  const chain = searchChain(opts.engine, opts.engineRowId);
   const maxResults = Math.min(Math.max(1, Math.floor(opts.maxResults ?? DEFAULT_RESULTS)), MAX_RESULTS);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   // Rough token estimate for the ledger row (~4 chars/token), the same

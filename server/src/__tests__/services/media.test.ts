@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
+import { registerCustomMediaModel } from '../../services/custom-media-register.js';
 
 const realFetch = globalThis.fetch;
 
@@ -286,6 +287,27 @@ describe('media service', () => {
       const log = getDb().prepare("SELECT key_id FROM requests WHERE request_type = 'image' ORDER BY id DESC LIMIT 1").get() as { key_id: number };
       expect(log.key_id).toBe(keyId);
     });
+
+    it('fails over between endpoints sharing an image model id with their own keys', async () => {
+      const first = addCustomKey('http://127.0.0.1:8282/v1', 'first-key');
+      const second = addCustomKey('http://127.0.0.1:8383/v1', 'second-key');
+      for (const key of [first, second]) {
+        registerCustomMediaModel(getDb(), key, { modelId: 'shared-image', displayName: null, modality: 'image' });
+      }
+      const fetchMock = vi.fn(async (url: string) => String(url).includes(':8282/')
+        ? new Response('unavailable', { status: 503 })
+        : jsonResponse({ data: [{ url: 'https://example.test/image.png' }] }));
+      globalThis.fetch = fetchMock as any;
+      await expect(runImageGeneration('shared-image', { prompt: 'a cat' })).resolves.toMatchObject({
+        images: [{ url: 'https://example.test/image.png' }],
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+      expect(String(calls[0][0])).toContain(':8282/');
+      expect(new Headers(calls[0][1].headers).get('Authorization')).toBe('Bearer first-key');
+      expect(String(calls[1][0])).toContain(':8383/');
+      expect(new Headers(calls[1][1].headers).get('Authorization')).toBe('Bearer second-key');
+    });
   });
 
   describe('video generation', () => {
@@ -512,7 +534,7 @@ describe('media service', () => {
     it('Free.ai never sends untested or premium model IDs', async () => {
       addMedia('freeai', 'premium/voice', 'audio'); addKey('freeai');
       const fetchMock = vi.spyOn(globalThis, 'fetch');
-      await expect(runSpeech('premium/voice', { input: 'Hello' })).rejects.toThrow('only the tested Kokoro');
+      await expect(runSpeech('premium/voice', { input: 'Hello' })).rejects.toThrow('not a tested free route');
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -583,14 +605,14 @@ describe('media service', () => {
       await expect(runSpeech('test-simba', { input: 'Hello' })).rejects.toThrow('Speechify returned');
     });
 
-    it('Cloudflare MeloTTS: base64 audio → audio/mpeg bytes', async () => {
+    it('Cloudflare MeloTTS: base64 audio → audio/wav bytes', async () => {
       addMedia('cloudflare', '@cf/myshell-ai/melotts', 'audio');
       addKey('cloudflare', 'acct:tok');
-      const fetchMock = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('MP3').toString('base64') } }));
+      const fetchMock = vi.fn(async () => jsonResponse({ result: { audio: Buffer.from('WAV').toString('base64') } }));
       globalThis.fetch = fetchMock as any;
       const r = await runSpeech('@cf/myshell-ai/melotts', { input: 'hi', voice: 'alloy' });
-      expect(r.contentType).toBe('audio/mpeg');
-      expect(r.audio.toString()).toBe('MP3');
+      expect(r.contentType).toBe('audio/wav');
+      expect(r.audio.toString()).toBe('WAV');
       const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
       expect(body).toMatchObject({ prompt: 'hi', lang: 'en' });
     });

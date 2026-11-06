@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Platform } from '@freellmapi/shared/types.js';
-import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { getDb, getUnifiedApiKey, isKeyStoreDecryptable } from '../db/index.js';
 import { isEncryptionKeyInitialized } from '../lib/crypto.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { getProvider } from '../providers/index.js';
@@ -41,6 +41,7 @@ function isDbReachable(): boolean {
 statusRouter.get('/livez', (_req: Request, res: Response) => {
   const db = isDbReachable();
   const encryptionKey = isEncryptionKeyInitialized();
+  const storedKeysDecryptable = isKeyStoreDecryptable();
   const uptime_s = Math.floor(process.uptime());
   const version = openapiSpec.info.version;
 
@@ -54,7 +55,10 @@ statusRouter.get('/livez', (_req: Request, res: Response) => {
     return;
   }
 
-  res.json({ status: 'ok', version, uptime_s });
+  // A loaded key that cannot open the stored ciphertext leaves the instance
+  // just as unable to route as a missing key, but the process itself is fine.
+  // Report it without a 503 so a wrong key file cannot restart-loop a container.
+  res.json({ status: 'ok', version, uptime_s, stored_keys_decryptable: storedKeysDecryptable });
 });
 
 // GET /readyz — readiness. 200 when at least one upstream is serviceable right

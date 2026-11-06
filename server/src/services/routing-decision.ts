@@ -223,9 +223,13 @@ export async function chooseRoutingPreset(messages: readonly ChatMessage[], sign
  */
 export async function applyDecisionRouting(
   messages: readonly ChatMessage[],
-  opts: { pinned?: boolean; signal?: AbortSignal } = {},
+  opts: { pinned?: boolean; preset?: PresetStrategy; signal?: AbortSignal } = {},
 ): Promise<DecisionPick | null> {
-  if (getRoutingStrategy() !== 'decision' || opts.pinned) return null;
+  // A request that named an `auto:<axis>` alias already picked its preset
+  // (#1628): don't spend a decision call on it — the alias's axis routes the
+  // request whatever the decision model would have said, and the pick would
+  // only misreport it in X-FreeLLM-Routing-Strategy.
+  if (getRoutingStrategy() !== 'decision' || opts.pinned || opts.preset) return null;
   const pick = await chooseRoutingPreset(messages, opts.signal);
   setRequestRoutingStrategy(pick.strategy);
   record(pick);

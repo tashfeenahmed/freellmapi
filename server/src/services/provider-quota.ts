@@ -118,6 +118,10 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'sail') return 'sail::monthly-credit';
   if (platform === 'aclide') return 'aclide::monthly-credit';
   if (platform === 'speka') return 'speka::monthly-credit';
+  if (platform === 'nabh') return 'nabh::monthly-credit';
+  if (platform === 'novai') return 'novai::daily-free';
+  if (platform === 'freeinference') return 'freeinference::daily-free';
+  if (platform === 'freemodel') return 'freemodel::account-free';
   if (platform === 'apinex') return 'apinex::daily-free';
   // onomeo: one 30-calls/5-hour account allowance across every free model,
   // so one pool (issue #1460).
@@ -187,6 +191,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 }
 
 function isSharedPool(platform: Platform): boolean {
+  if (platform === 'freemodel') return true;
   if (platform === 'apinex') return true;
   if (platform === 'onomeo') return true;
   if (platform === 'iteracompute') return true;
@@ -201,6 +206,8 @@ function isSharedPool(platform: Platform): boolean {
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
 
 const HEADER_SPECS: Partial<Record<Platform, HeaderSpec[]>> = {
+  // The bare headers describe a rate window, not the monthly balance.
+  freemodel: [{ metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' }],
   // Observe upstream limits without inventing per-model budgets. CLōD's
   // rate window is distinct from its daily grant; Speechify bills characters,
   // not tokens, and does not publish token headers.

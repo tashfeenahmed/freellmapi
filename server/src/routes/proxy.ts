@@ -746,7 +746,7 @@ const toolChoiceSchema = z.union([
 
 const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
 
-function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+export function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
   if (!Array.isArray(stop)) return stop;
   return stop.slice(0, 4);
 }
@@ -1552,6 +1552,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         false,
         state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        resolvedChain?.strategyOverride,
       );
     },
     dispatch: async (route, attempt, ctx) => {
@@ -2250,7 +2252,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // store and replayed as SSE rather than JSON (see below).
   const cacheKey = (cacheActive(cacheDirective) && isCacheableTemperature(temperature))
     ? computeCacheKey({
-        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
+        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice, parallel_tool_calls,
         // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
         stop,
         // The knobs below are NOT in chatCompletionSchema, so zod strips them
@@ -2262,8 +2264,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         response_format: req.body?.response_format ?? undefined,
         n: req.body?.n ?? undefined,
         seed: req.body?.seed ?? undefined,
+        top_k: req.body?.top_k ?? undefined,
+        min_p: req.body?.min_p ?? undefined,
         presence_penalty: req.body?.presence_penalty ?? undefined,
         frequency_penalty: req.body?.frequency_penalty ?? undefined,
+        repetition_penalty: req.body?.repetition_penalty ?? undefined,
         logit_bias: req.body?.logit_bias ?? undefined,
         logprobs: req.body?.logprobs ?? undefined,
         top_logprobs: req.body?.top_logprobs ?? undefined,
@@ -2507,7 +2512,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
   // this turn routes with. Skipped when the client pinned a model or the
   // conversation is sticky to one. Any doubt routes as Balanced.
-  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, signal: clientAbort.signal });
+  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, preset: resolvedChain?.strategyOverride, signal: clientAbort.signal });
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
@@ -2529,7 +2534,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
       const taskType = resolveTaskType(req, tools, messages);
-      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride);
     },
     dispatch: async (route, attempt, ctx) => {
     const contextBudget = routeOutputBudget(route, estimatedInputTokens);

@@ -264,6 +264,21 @@ describe('POST /v1/responses (#96)', () => {
     expect(completed).toContain('"output_text":"Hello"');
   });
 
+  it('stream: response.completed carries the upstream token usage', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() { throw new Error('should not be called'); },
+      async *streamChatCompletion() {
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello' }, finish_reason: 'stop' }] };
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [], usage: { prompt_tokens: 1234, completion_tokens: 56, total_tokens: 1290 } };
+      },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: true }, key);
+    expect(status).toBe(200);
+    const completed = JSON.parse(text.split('event: response.completed')[1].split('\n').find(l => l.startsWith('data: '))!.slice(6));
+    expect(completed.response.usage).toMatchObject({ input_tokens: 1234, output_tokens: 56, total_tokens: 1290 });
+  });
+
   it('stream: a turn cut off at the token limit ends as response.incomplete', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() { throw new Error('should not be called'); },
@@ -349,6 +364,24 @@ describe('POST /v1/responses (#96)', () => {
     expect(status).toBe(200);
     const body = JSON.parse(text);
     expect(body.usage.output_tokens_details.reasoning_tokens).toBe(2);
+  });
+
+  it('non-stream: reports cached_tokens from the provider usage when advertised', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'answer' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12, prompt_tokens_details: { cached_tokens: 8 } },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    expect(status).toBe(200);
+    const body = JSON.parse(text);
+    expect(body.usage.input_tokens_details.cached_tokens).toBe(8);
   });
 
   it('stream: tool-call deltas produce function_call events with assembled arguments', async () => {

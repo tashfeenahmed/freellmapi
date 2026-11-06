@@ -104,8 +104,8 @@ describe('Router guard for non-chat providers (#1741)', () => {
     expect(route!.modelDbId).toBe(groqId);
   });
 
-  it('skips legacy speechify and beatapi chat rows', async () => {
-    for (const platform of ['speechify', 'beatapi']) {
+  it('skips legacy speechify, HAL-X and AI SENSE chat rows', async () => {
+    for (const platform of ['speechify', 'halx', 'aisense']) {
       clearChain();
 
       const p = getProvider(platform);
@@ -133,6 +133,30 @@ describe('Router guard for non-chat providers (#1741)', () => {
       // refused by the guard) rather than attempting a doomed chat call.
       expect(() => routeRequest(1000)).toThrow(/All models exhausted/);
     }
+  });
+
+  it('continues routing to BeatAPI through its chat adapter', () => {
+    const db = getDb();
+    addKey('beatapi');
+    const modelId = Number(db.prepare(`
+      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label,
+        rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget,
+        context_window, enabled, supports_vision, supports_tools, source)
+      VALUES ('beatapi', 'beatapi-chat-regression', 'BeatAPI Chat', 1, 1, 'Small',
+        NULL, NULL, NULL, NULL, '~1M', 128000, 1, 0, 1, 'user')
+    `).run().lastInsertRowid);
+    db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, 1, 1)').run(modelId);
+    const active = db.prepare("SELECT value FROM settings WHERE key = 'active_profile_id'").get() as { value: string } | undefined;
+    if (active) {
+      db.prepare('INSERT INTO profile_models (profile_id, model_db_id, priority, enabled) VALUES (?, ?, 1, 1)')
+        .run(Number(active.value), modelId);
+    }
+
+    const route = routeRequest(1000);
+    expect(route.modelDbId).toBe(modelId);
+    expect(route.platform).toBe('beatapi');
+    expect(route.provider).toBe(getProvider('beatapi'));
+    expect(route.provider.supportsChat).toBe(true);
   });
 
   it('still routes to a custom endpoint whose adapter supports chat', async () => {

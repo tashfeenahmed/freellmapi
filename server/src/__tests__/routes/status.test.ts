@@ -47,6 +47,8 @@ describe('status & interop endpoints (#433)', () => {
     expect(body.status).toBe('ok');
     expect(typeof body.version).toBe('string');
     expect(typeof body.uptime_s).toBe('number');
+    // Nothing stored yet, so the key-store probe has no opinion either way.
+    expect(body.stored_keys_decryptable).toBeNull();
   });
 
   it('GET /readyz returns 503 no_upstreams_configured when nothing is set up', async () => {
