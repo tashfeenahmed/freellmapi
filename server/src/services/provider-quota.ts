@@ -191,6 +191,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 }
 
 function isSharedPool(platform: Platform): boolean {
+  if (platform === 'freemodel') return true;
   if (platform === 'apinex') return true;
   if (platform === 'onomeo') return true;
   if (platform === 'iteracompute') return true;
