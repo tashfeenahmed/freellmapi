@@ -46,6 +46,7 @@ import * as removeGithubProvider from '../migrations/20261017_000002_remove_gith
 import * as requestFailureAttribution from '../migrations/20261017_233153_request_failure_attribution.js';
 import * as removeAurayProvider from '../migrations/20261019_000001_remove_auray_provider.js';
 import * as keyLastHealthyAt from '../migrations/20261020_000001_key_last_healthy_at.js';
+import * as modelContextSafetyFactor from '../migrations/20261031_000001_model_context_safety_factor.js';
 import * as cloudflareNeuronUsage from '../migrations/20261104_000001_cloudflare_neuron_usage.js';
 
 export interface MigrationModule {
@@ -105,6 +106,7 @@ export const REMOVE_GITHUB_PROVIDER_FILENAME = '20261017_000002_remove_github_pr
 export const REQUEST_FAILURE_ATTRIBUTION_FILENAME = '20261017_233153_request_failure_attribution.ts';
 export const REMOVE_AURAY_PROVIDER_FILENAME = '20261019_000001_remove_auray_provider.ts';
 export const KEY_LAST_HEALTHY_AT_FILENAME = '20261020_000001_key_last_healthy_at.ts';
+export const MODEL_CONTEXT_SAFETY_FACTOR_FILENAME = '20261031_000001_model_context_safety_factor.ts';
 export const CLOUDFLARE_NEURON_USAGE_FILENAME = '20261104_000001_cloudflare_neuron_usage.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
@@ -155,5 +157,6 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: REQUEST_FAILURE_ATTRIBUTION_FILENAME, module: requestFailureAttribution },
   { filename: REMOVE_AURAY_PROVIDER_FILENAME, module: removeAurayProvider },
   { filename: KEY_LAST_HEALTHY_AT_FILENAME, module: keyLastHealthyAt },
+  { filename: MODEL_CONTEXT_SAFETY_FACTOR_FILENAME, module: modelContextSafetyFactor },
   { filename: CLOUDFLARE_NEURON_USAGE_FILENAME, module: cloudflareNeuronUsage },
 ];

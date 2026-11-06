@@ -428,6 +428,7 @@ function upsertModel(db: Db, input: z.infer<typeof modelSchema>): void {
     tpdLimit: 'tpd_limit',
     monthlyTokenBudget: 'monthly_token_budget',
     contextWindow: 'context_window',
+    contextSafetyFactor: 'context_safety_factor',
     supportsVision: 'supports_vision',
     supportsTools: 'supports_tools',
     enabled: 'enabled',
