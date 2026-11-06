@@ -31,6 +31,11 @@ function SearchEngineCard({
   pending: boolean
 }) {
   const { t, locale } = useI18n()
+  const test = useMutation({
+    mutationFn: () => apiFetch(`/api/search/engines/${e.id}/test`, {
+      method: 'POST', body: JSON.stringify({ query: 'OpenAI' }),
+    }),
+  })
   const freeFrom = freeFromDate(e.premiumSince)
   const features = e.features ?? {}
   return (
@@ -93,7 +98,13 @@ function SearchEngineCard({
           disabled={pending}
           aria-label={e.displayName}
         />
+        <button type="button" className="text-xs underline disabled:opacity-50"
+          onClick={() => test.mutate()} disabled={!e.enabled || e.keyCount === 0 || test.isPending}>
+          {test.isPending ? t('common.loading') : t('keys.testModel')}
+        </button>
       </div>
+      {test.isSuccess && <p role="status" className="mt-2 text-xs">{t('common.success')}</p>}
+      {test.isError && <p role="alert" className="mt-2 text-xs text-destructive">{test.error.message}</p>}
     </section>
   )
 }

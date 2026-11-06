@@ -92,6 +92,21 @@ describe('decision routes', () => {
     expect(res.body.answers).toEqual(ANSWERS);
   });
 
+  it('accepts extraction fields and rejects mixed/unsupported extraction schemas', async () => {
+    getDb().prepare("INSERT INTO media_models (platform,model_id,display_name,modality,priority,enabled,quota_label) VALUES ('cloudflare','@cf/cloudflare/clairic','Clairic','decision',20,1,'free')").run();
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ success: true, result: {
+      model: 'clairic', answers: { total: { type: 'number', value: 1080 } }, usage: { input_tokens: 288 }, truncated: false,
+    } }), { status: 200 })) as typeof fetch;
+    const body = { model: '@cf/cloudflare/clairic', state: 'Total $1080', fields: { total: { type: 'number', unit: 'USD' } } };
+    const good = await call(app, 'POST', '/v1/decisions', { body });
+    expect(good.status).toBe(200);
+    expect(good.body.answers.total.value).toBe(1080);
+    expect(good.body.truncated).toBe(false);
+    for (const bad of [{ ...body, questions: BODY.questions }, { ...body, state: {} }, { ...body, fields: {} }, { ...body, fields: { total: { type: 'unsupported' } } }]) {
+      expect((await call(app, 'POST', '/v1/decisions', { body: bad })).status).toBe(400);
+    }
+  });
+
   it('validates the body', async () => {
     const noState = await call(app, 'POST', '/v1/decisions', { body: { questions: BODY.questions } });
     expect(noState.status).toBe(400);

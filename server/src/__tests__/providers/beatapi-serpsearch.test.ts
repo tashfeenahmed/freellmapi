@@ -17,13 +17,19 @@ describe.each([
     expect(AUTH_JSON_PROVIDER_MAP[platform]).toBe(platform);
   });
 
-  it('rejects ordinary and streaming chat without making a request', async () => {
+  it.skipIf(platform === 'beatapi')('rejects ordinary and streaming chat without making a request', async () => {
     const fetch = vi.spyOn(global, 'fetch');
     const base = getProvider(platform)!;
     await expect(base.chatCompletion('k', [], 'm')).rejects.toMatchObject({ status: 422 });
     await expect(base.streamChatCompletion('k', [], 'm').next()).rejects.toMatchObject({ status: 422 });
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+it('forwards BeatAPI tool calls in chat responses', async () => {
+  vi.spyOn(global, 'fetch').mockResolvedValue(json({ id: 'chat-1', object: 'chat.completion', created: 1, model: 'test-model', choices: [{ index: 0, message: { role: 'assistant', content: null, tool_calls: [{ id: 'call-1', type: 'function', function: { name: 'lookup', arguments: '{}' } }] }, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 } }));
+  const result = await new BeatApiProvider().chatCompletion('test-key', [{ role: 'user', content: 'hello' }], 'test-model');
+  expect(result.choices[0].message.tool_calls?.[0].function.name).toBe('lookup');
 });
 
 it.each([null, {}, { data: {} }, { data: [], error: 'failure' }])('rejects malformed BeatAPI lists', async body => {

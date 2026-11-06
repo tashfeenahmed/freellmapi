@@ -1080,29 +1080,30 @@ function cursor(_ctx: GenerateContext): Generation {
 function atomcode(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   const configDir = path.join(ctx.homeDir, '.atomcode');
-  // AtomCode picks its provider by name: a root `default_provider` key names
-  // one `[providers.<id>]` table, and `type = "openai"` is what makes that
-  // table speak the OpenAI-compatible wire. Root key first, table second, so
-  // mergeToml can slot the key above any tables already in the file.
+  // default_model takes precedence over legacy default_provider settings.
+  // Keep the selector above tables so mergeToml writes it at the root.
   return {
     files: [{
       path: path.join(configDir, 'config.toml'),
       format: 'toml',
       sensitive: true,
       content: [
-        'default_provider = "freellmapi"',
+        'default_model = "freellmapi"',
         '',
-        '[providers.freellmapi]',
-        'type = "openai"',
+        '[provider_accounts.freellmapi]',
+        'provider = "openai"',
         `base_url = ${JSON.stringify(v1Url(ctx.url))}`,
         `api_key = ${JSON.stringify(ctx.apiKey)}`,
+        '',
+        '[models.freellmapi]',
+        'account = "freellmapi"',
         `model = ${JSON.stringify(model.id)}`,
         `context_window = ${contextWindow(model)}`,
       ].join('\n'),
     }],
     notes: [
-      'AtomCode reads ~/.atomcode/config.toml; other [providers.*] tables in it are kept.',
-      `default_provider now points at [providers.freellmapi] with ${model.id} as its model.`,
+      'AtomCode reads ~/.atomcode/config.toml; unrelated accounts, models and legacy providers are kept.',
+      `default_model now points at [models.freellmapi] with ${model.id} via [provider_accounts.freellmapi].`,
       'Point base_url at the unified /v1 endpoint; api_key is the unified key shown on the Agents page.',
       'One-shot check: atomcode -p "Say hello" (telemetry is on by default: atomcode telemetry disable).',
     ],

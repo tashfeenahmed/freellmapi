@@ -1,6 +1,6 @@
 {
   "name": "freellmapi-desktop",
-  "version": "0.16.11",
+  "version": "0.16.20",
   "description": "FreeLLMAPI menu-bar app — local OpenAI-compatible LLM router",
   "author": {
     "name": "tashfeenahmed",
@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.0",

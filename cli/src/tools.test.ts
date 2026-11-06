@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tools } from './tools.js';
+import { renderFile } from './config-files.js';
 import type { GenerateContext } from './types.js';
 
 // Pinning ctx.detectedClient is not enough: tools.ts falls back to a live
@@ -666,24 +667,55 @@ describe('tool generators', () => {
     expect(provider.providerName).toBe('FreeLLMAPI (Work Box)');
   });
 
-  it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {
-    // AtomCode ignores a bare `[provider]` table: it looks up the table named
-    // by the root `default_provider` key, and only a `type = "openai"` table
-    // speaks the OpenAI-compatible wire. `context_window` is its own key.
+  it('writes AtomCode account and model tables with a root default_model', () => {
     const [config] = tools.find(tool => tool.id === 'atomcode')!.generate(context).files;
     expect(asPosix(config.path)).toBe('/home/tester/.atomcode/config.toml');
     expect(config.format).toBe('toml');
     expect(config.sensitive).toBe(true);
     const lines = (config.content ?? '').split('\n');
-    expect(lines[0]).toBe('default_provider = "freellmapi"');
-    expect(lines).toContain('[providers.freellmapi]');
-    expect(lines.indexOf('[providers.freellmapi]')).toBeGreaterThan(0);
-    expect(lines).toContain('type = "openai"');
+    expect(lines[0]).toBe('default_model = "freellmapi"');
+    expect(lines).toContain('[provider_accounts.freellmapi]');
+    expect(lines).toContain('provider = "openai"');
     expect(lines).toContain('base_url = "http://localhost:3000/v1"');
     expect(lines).toContain('api_key = "freellmapi-test-key"');
+    expect(lines).toContain('[models.freellmapi]');
+    expect(lines).toContain('account = "freellmapi"');
     expect(lines).toContain('model = "fast-coder"');
     expect(lines).toContain('context_window = 131072');
-    expect(config.content).not.toContain('[provider]');
+    expect(config.content).not.toContain('default_provider');
+  });
+
+  it('switches an existing AtomCode default without removing unrelated configuration', () => {
+    const [config] = tools.find(tool => tool.id === 'atomcode')!.generate({
+      ...context, requestedModelId: 'reasoning-model', url: 'http://localhost:3000/v1',
+    }).files;
+    const existing = [
+      'default_model = "personal"',
+      'default_provider = "legacy"',
+      '[models.personal]',
+      'account = "personal"',
+      'model = "keep-model"',
+      '[provider_accounts.personal]',
+      'provider = "openai"',
+      'api_key = "keep-key"',
+      '[models.freellmapi]',
+      'model = "stale-model"',
+      '[provider_accounts.freellmapi]',
+      'api_key = "stale-key"',
+    ].join('\n');
+    const merged = renderFile(config, existing);
+    const lines = merged.split('\n');
+    const firstTable = lines.findIndex(line => line.startsWith('['));
+    expect(lines.slice(0, firstTable)).toContain('default_model = "freellmapi"');
+    expect(merged.match(/^default_model =/gm)).toHaveLength(1);
+    expect(merged).toContain('default_provider = "legacy"');
+    expect(merged).toContain('[models.personal]\naccount = "personal"\nmodel = "keep-model"');
+    expect(merged).toContain('[provider_accounts.personal]\nprovider = "openai"\napi_key = "keep-key"');
+    expect(merged).toContain('model = "reasoning-model"');
+    expect(merged).toContain('context_window = 262144');
+    expect(merged).toContain('base_url = "http://localhost:3000/v1"');
+    expect(merged).not.toContain('stale-');
+    expect(renderFile(config, merged)).toBe(merged);
   });
 
   it('uses /v1 for every OpenAI-compatible generated base URL', () => {
