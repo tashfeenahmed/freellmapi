@@ -1591,7 +1591,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     return null;
   }
   const provider = getProvider(entry.platform as Platform)!;
-  if (!provider.supportsChat) {
+  if (provider.supportsChat === false) {
     diag?.push(`${label}: provider does not support chat`);
     return null;
   }

@@ -54,8 +54,7 @@ describe('Model Provider Actions API', () => {
   });
 
   describe('POST /api/models', () => {
-    it.each(['tavily', 'serpsearch', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'brave', 'speechify', 'freeai', 'beatapi'])
-      ('rejects chat model registration for %s', async platform => {
+    it.each(['tavily', 'serpsearch', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'brave', 'speechify', 'freeai', 'beatapi'])('rejects chat model registration for %s', async platform => {
         const res = await post(app, '/api/models', { platform, modelId: `nonchat-${platform}` });
         expect(res.status).toBe(400);
         expect(getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(platform, `nonchat-${platform}`)).toBeUndefined();
