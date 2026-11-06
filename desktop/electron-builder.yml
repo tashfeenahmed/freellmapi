@@ -24,6 +24,7 @@ asar: true
 afterPack: ./scripts/after-pack-linux-sandbox.mjs
 afterSign: ./scripts/after-sign-notarize.mjs
 asarUnpack:
+  - "**/node_modules/@img/**"
   - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/better-sqlite3/build/Release/**"
 # client-dist is staged into desktop/ by `npm run stage:client` (scripts/stage-client.mjs).
