@@ -72,6 +72,12 @@ mediaRouter.get('/usage', (req: Request, res: Response) => {
      AND r.status = 'success'
      AND r.platform = mm.platform
      AND r.model_id = mm.model_id
+     AND (r.media_model_db_id = mm.id OR (r.media_model_db_id IS NULL AND (
+       mm.platform <> 'custom' OR mm.endpoint_scope = COALESCE((
+         SELECT RTRIM(TRIM(k.base_url), '/') FROM api_keys k
+         WHERE k.id = r.key_id AND k.platform = 'custom'
+       ), '')
+     )))
      AND r.created_at >= datetime('now', 'start of month')
     WHERE mm.modality = ? AND mm.enabled = 1
     GROUP BY mm.id
