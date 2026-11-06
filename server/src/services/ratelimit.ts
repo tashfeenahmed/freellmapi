@@ -861,7 +861,7 @@ const cooldowns = new Map<string, number>(); // key -> expiry timestamp
 //                     no evidence the account was topped up, so never probed.
 //   'tier'          — 403 model-not-on-tier. Same reasoning: the key validates
 //                     fine while the model stays gated, so never probed.
-export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier';
+export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier' | 'checkin';
 
 // Escalating cooldown: track hits per key over a rolling 24h window so a
 // daily-quota exhaustion (OpenRouter free: 50/day, Cohere free: 33/day, etc.)
@@ -1276,7 +1276,19 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
   return true;
 }
 
+/** Why an active model/key is benched. Used only after the existing cooldown gate rejects a route. */
+export function getCooldownSource(platform: string, modelId: string, keyId: number): CooldownSource | null {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT source FROM rate_limit_cooldowns
+       WHERE platform = ? AND model_id = ? AND key_id = ? AND expires_at_ms > ?
+    `).get(platform, modelId, keyId, Date.now()) as { source: CooldownSource } | undefined;
+    return row?.source ?? null;
+  }) ?? null;
+}
+
 export interface ActiveCooldown {
+  source: CooldownSource;
   platform: string;
   modelId: string;
   keyId: number;
@@ -1302,16 +1314,17 @@ export function getActiveCooldownsForKeys(
 
   const placeholders = unique.map(() => '?').join(', ');
   const rows = withDb(db => db.prepare(`
-    SELECT platform, model_id, key_id, expires_at_ms
+    SELECT platform, model_id, key_id, expires_at_ms, source
       FROM rate_limit_cooldowns
      WHERE expires_at_ms > ?
        AND key_id IN (${placeholders})
      ORDER BY expires_at_ms ASC
-  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number }[]) ?? [];
+  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number; source: CooldownSource }[]) ?? [];
 
   for (const row of rows) {
     const list = grouped.get(row.key_id) ?? [];
     list.push({
+      source: row.source,
       platform: row.platform,
       modelId: row.model_id,
       keyId: row.key_id,
@@ -1351,6 +1364,38 @@ export function clearCooldownsForKey(keyId: number): number {
   }
 
   return Math.max(cleared, memoryCleared);
+}
+
+/**
+ * Remove only APINex daily website-check-in cooldowns for a key.
+ * The existing all-sources clear remains available to operators; this scoped
+ * recovery must not lift credit, tier, or provider-confirmed rate limits.
+ * Read the persisted source before touching in-memory state, so an unknown
+ * source is never cleared optimistically when the database is unavailable.
+ */
+export function clearApinexCheckinCooldownsForKey(keyId: number): number {
+  if (!Number.isInteger(keyId)) return 0;
+
+  const removed = withDb(db => db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT model_id FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).all(keyId) as { model_id: string }[];
+
+    const result = db.prepare(`
+      DELETE FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).run(keyId);
+    return { modelIds: rows.map(row => row.model_id), count: Number(result.changes ?? 0) };
+  })());
+
+  if (!removed) return 0;
+  for (const modelId of removed.modelIds) {
+    const key = `apinex:${modelId}:${keyId}`;
+    cooldowns.delete(`${key}:cooldown`);
+    cooldownHits.delete(key);
+  }
+  return removed.count;
 }
 
 /**
