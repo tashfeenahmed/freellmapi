@@ -168,6 +168,7 @@ export interface CacheKeyInput {
   max_tokens?: number;
   tools?: unknown;
   tool_choice?: unknown;
+  parallel_tool_calls?: unknown;
   // Every remaining sampling/format knob a client can send. All are part of the
   // key so two requests that differ ONLY in one of these can never be served
   // each other's cached answer (worst case otherwise: a response_format
@@ -179,8 +180,11 @@ export interface CacheKeyInput {
   response_format?: unknown;
   n?: unknown;
   seed?: unknown;
+  top_k?: unknown;
+  min_p?: unknown;
   presence_penalty?: unknown;
   frequency_penalty?: unknown;
+  repetition_penalty?: unknown;
   logit_bias?: unknown;
   logprobs?: unknown;
   top_logprobs?: unknown;
@@ -209,14 +213,18 @@ export function computeCacheKey(input: CacheKeyInput): string {
     // set never collides with (or is served) another's cached answer.
     tools: input.tools,
     tool_choice: input.tool_choice,
+    parallel_tool_calls: input.parallel_tool_calls,
     // Remaining knobs (see CacheKeyInput). Absent/undefined fields are dropped
     // by stableStringify, so requests without them keep hashing identically.
     stop: input.stop,
     response_format: input.response_format,
     n: defaultableNumber(input.n, 1),
     seed: input.seed,
+    top_k: input.top_k,
+    min_p: input.min_p,
     presence_penalty: defaultableNumber(input.presence_penalty, 0),
     frequency_penalty: defaultableNumber(input.frequency_penalty, 0),
+    repetition_penalty: input.repetition_penalty,
     logit_bias: input.logit_bias,
     logprobs: input.logprobs,
     top_logprobs: input.top_logprobs,

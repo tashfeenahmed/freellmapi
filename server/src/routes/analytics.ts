@@ -34,11 +34,22 @@ function firstParam(value: unknown): string | undefined {
   return undefined;
 }
 
+// The lower-bound a range translates to. `range=all` maps to a floor older than
+// any real row, so every `created_at >= ?` / `hour >= ?` below keeps matching
+// the full retained history without branching a single query — the same "no
+// cutoff" result searchAnalytics('all') reaches by dropping its WHERE
+// (services/search.ts). The /summary headline totals for `all` come from the
+// unpruned lifetime counters in `settings` instead (see readLifetimeTotals),
+// so they stay exact even past the raw/hourly prune horizon.
+const ALL_TIME_SINCE = '0000-01-01 00:00:00';
+
 // Return the rolling cutoff timestamp for the selected analytics range.
 function getSinceTimestamp(range: string): string {
   const now = Date.now();
 
   switch (range) {
+    case 'all':
+      return ALL_TIME_SINCE;
     case '24h':
       return toSqliteDateTime(now - 24 * 60 * 60 * 1000);
     case '30d':
@@ -92,6 +103,25 @@ function readLifetimeSettings() {
   return row?.value ?? null;
 }
 
+// Lifetime counters written by lib/request-log.ts on every logged request and
+// never pruned (unlike `requests` and `request_hourly`). They are the only
+// source that stays exact for `range=all`, so the summary headline reads them
+// there. Absent on an install that has not logged since the aggregate migration
+// landed — treat a missing key as 0.
+function readLifetimeTotals() {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT key, value FROM settings
+    WHERE key IN ('total_requests', 'total_input_tokens', 'total_output_tokens')
+  `).all() as Array<{ key: string; value: string }>;
+  const totals = new Map(rows.map(r => [r.key, Number(r.value) || 0]));
+  return {
+    requests: totals.get('total_requests') ?? 0,
+    inputTokens: totals.get('total_input_tokens') ?? 0,
+    outputTokens: totals.get('total_output_tokens') ?? 0,
+  };
+}
+
 // Summary stats
 // Web searches (#1174) live in their own log (search_requests), so they never
 // show up in the chat totals above; the dashboard's search cards read this.
@@ -116,7 +146,17 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
   // only reported for ranges where recent activity still exists. The aggregate
   // is the source of truth for headline numbers.
   const aggregate = readAggregateSince(since);
-  const totalRequests = aggregate.total_requests ?? 0;
+  const lifetime = readLifetimeTotals();
+  const isAllTime = range === 'all';
+  // Headline totals. `range=all` reads the unpruned lifetime counters from
+  // `settings` so the numbers stay exact past the raw/hourly prune horizon;
+  // every bounded range reads the durable `request_hourly` aggregate for that
+  // window. Everything below that needs per-row detail (latency, savings,
+  // pins, request-type split) stays on the raw table and is therefore bounded
+  // by retention for `all` too — see the endpoint comment on getSinceTimestamp.
+  const totalRequests = isAllTime ? lifetime.requests : (aggregate.total_requests ?? 0);
+  const totalInputTokens = isAllTime ? lifetime.inputTokens : (aggregate.total_input_tokens ?? 0);
+  const totalOutputTokens = isAllTime ? lifetime.outputTokens : (aggregate.total_output_tokens ?? 0);
   // Success rate over success+error only: a 'canceled' request (#752 — client
   // hung up) still counts in the totals but is neither a success nor a
   // failure, so it must not dilute the rate.
@@ -202,8 +242,8 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
   res.json({
     totalRequests,
     successRate: Math.round(successRate * 10) / 10,
-    totalInputTokens: aggregate.total_input_tokens ?? 0,
-    totalOutputTokens: aggregate.total_output_tokens ?? 0,
+    totalInputTokens,
+    totalOutputTokens,
     avgLatencyMs: Math.round(latencyRow?.avg_latency_ms ?? 0),
     // Latency spread (raw rows): p50 typical, p95 tail. Null when the raw
     // window is empty.
@@ -225,8 +265,9 @@ analyticsRouter.get('/summary', (req: Request, res: Response) => {
     firstRequestAt: lifetimeFirst ?? aggregate.first_request_at ?? null,
     // Lifetime total since install — useful when the user wants to see "all
     // time" alongside the selected range window. Sourced from settings so it
-    // survives the raw-row prune entirely.
-    lifetimeTotalRequests: Number((db.prepare(`SELECT value FROM settings WHERE key='total_requests'`).get() as { value?: string } | undefined)?.value ?? 0) || 0,
+    // survives the raw-row prune entirely; equals `totalRequests` under
+    // `range=all`.
+    lifetimeTotalRequests: lifetime.requests,
   });
 });
 

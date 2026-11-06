@@ -33,7 +33,7 @@ npx freellmapi setup-claude --model gpt-4o  # 固定模型
 | `setup-crush` | `~/.config/crush/config.json` | OpenAI Chat | Crush（charmbracelet） |
 | `setup-dsh` | `~/.dsh/config.json` | OpenAI Chat | DeepSeek Harness（#995） |
 | `setup-mimo` | `~/.config/mimocode/config.json` | OpenAI Chat | MiMo Code `~/.config/mimocode/config.json` `default_provider=freellmapi` + `[providers.freellmapi]` `type=openai` `base_url=/v1` `api_key` `model` `context_window`（#1003） |
-| `setup-atomcode` | `~/.atomcode/config.toml` | OpenAI Chat | AtomCode `default_provider=freellmapi` + `[providers.freellmapi]` TOML 保留其他提供方（#1025） |
+| `setup-atomcode` | `~/.atomcode/config.toml` | OpenAI Chat | `default_model=freellmapi` + `[provider_accounts.freellmapi]` + `[models.freellmapi]`；保留其他账户、模型和旧版提供方配置 |
 | `setup-cursor` | 仅指引 | OpenAI Chat | 手动 `Cursor Settings → Models → Add Model`（无文件） |
 | `setup-generic` | 仅指引 | OpenAI Chat | 任意 OpenAI 兼容客户端 |
 

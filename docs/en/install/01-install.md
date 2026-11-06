@@ -145,6 +145,10 @@ before rotating.
 Request analytics are retained for 90 days or 100000 request rows by default,
 whichever limit prunes first. Set `REQUEST_ANALYTICS_RETENTION_DAYS=0` or
 `REQUEST_ANALYTICS_MAX_ROWS=0` in `.env` to disable either retention limit.
+The provider quota history (`provider_quota_observations`) is kept for 7 days
+or 50000 rows by default; tune it with `QUOTA_OBSERVATIONS_RETENTION_DAYS` and
+`QUOTA_OBSERVATIONS_MAX_ROWS`. Pruning frees pages inside the database file but
+does not shrink it; run `VACUUM` while the app is stopped to reclaim disk space.
 
 Open http://localhost:5173 (the Vite dev UI), add your provider keys on the **Keys** page, reorder the **Fallback Chain** to taste, and grab your unified API key from the **Keys** page header. That unified key is what you point your OpenAI SDK at.
 

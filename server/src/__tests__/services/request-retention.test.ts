@@ -114,9 +114,11 @@ describe('request analytics retention', () => {
     expect(rows.map(row => row.error)).toEqual(['row-3', 'row-4']);
   });
 
-  it('prunes hourly aggregate rows older than 30 days and only when the daily gate has elapsed', () => {
+  it('prunes hourly aggregate rows older than the raw retention window and only when the daily gate has elapsed', () => {
     // Hourly buckets never auto-create themselves in this test (logRequest is
     // the only writer), so seed them by hand to exercise the prune path.
+    process.env.REQUEST_ANALYTICS_RETENTION_DAYS = '30';
+    process.env.REQUEST_ANALYTICS_MAX_ROWS = '0';
     const db = getDb();
     db.prepare(`CREATE TABLE IF NOT EXISTS request_hourly (
       hour TEXT PRIMARY KEY, total_requests INTEGER NOT NULL DEFAULT 0

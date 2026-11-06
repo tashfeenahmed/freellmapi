@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import type { ChatMessage, ChatContent } from '@freellmapi/shared/types.js';
 import { getSetting, setSetting } from '../db/index.js';
 import { setRequestRoutingStrategy } from '../lib/client-context.js';
-import { DecisionError, listDecisionModels, runDecision } from './decision.js';
+import { CLAIRIC_MODEL, DecisionError, listDecisionModels, runDecision } from './decision.js';
 import { getRoutingStrategy } from './router.js';
 import type { PresetStrategy } from './scoring.js';
 
@@ -223,9 +223,13 @@ export async function chooseRoutingPreset(messages: readonly ChatMessage[], sign
  */
 export async function applyDecisionRouting(
   messages: readonly ChatMessage[],
-  opts: { pinned?: boolean; signal?: AbortSignal } = {},
+  opts: { pinned?: boolean; preset?: PresetStrategy; signal?: AbortSignal } = {},
 ): Promise<DecisionPick | null> {
-  if (getRoutingStrategy() !== 'decision' || opts.pinned) return null;
+  // A request that named an `auto:<axis>` alias already picked its preset
+  // (#1628): don't spend a decision call on it — the alias's axis routes the
+  // request whatever the decision model would have said, and the pick would
+  // only misreport it in X-FreeLLM-Routing-Strategy.
+  if (getRoutingStrategy() !== 'decision' || opts.pinned || opts.preset) return null;
   const pick = await chooseRoutingPreset(messages, opts.signal);
   setRequestRoutingStrategy(pick.strategy);
   record(pick);
@@ -246,7 +250,7 @@ export function routingStrategyHeader(pick: DecisionPick): string {
 export function getDecisionRoutingStatus() {
   const settings = getDecisionRoutingSettings();
   const candidates = listDecisionModels()
-    .filter(m => m.enabled)
+    .filter(m => m.enabled && m.modelId !== CLAIRIC_MODEL)
     .filter(m => settings.model === 'auto' ? !AUTO_SKIP_PLATFORMS.has(m.platform) : m.modelId === settings.model)
     .sort((a, b) => a.priority - b.priority || a.id - b.id);
   return {

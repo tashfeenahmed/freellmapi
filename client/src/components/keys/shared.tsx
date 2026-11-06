@@ -30,7 +30,7 @@ export function GetKeyLink({ url }: { url: string }) {
 // offered to new users (add/import/add-model pickers, setup checklist), but an
 // existing key still shows with its label so it can be edited or removed.
 export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean; hidden?: boolean }[] = [
-  { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys' },
+  { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys', hidden: true },
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
   { value: 'kenari', label: 'Kenari (shared daily free chat and images)', url: 'https://kenari.id' },
   { value: 'kiosapi', label: 'KiosAPI (shared daily free chat)', url: 'https://kiosapi.id/dashboard/keys' },
@@ -46,6 +46,11 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'gizmo', label: 'Gizmo (monthly free-model requests)', url: 'https://gizmoplatforms.com/developers' },
   { value: 'blockrun', label: 'BlockRun (zero-priced models)', url: 'https://user.blockrun.ai/dashboard/keys' },
   { value: 'moondream', label: 'Moondream ($5 shared monthly credits)', url: 'https://moondream.ai/c/cloud/api-keys' },
+  { value: 'jamai', label: 'JamAI Base (monthly ELLM allowance)', url: 'https://cloud.jamaibase.com' },
+  { value: 'nabh', label: 'nabh.cloud (50 shared monthly credits)', url: 'https://app.nabh.cloud' },
+  { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
+  { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
+  { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
   { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
   { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
@@ -54,9 +59,9 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'experiential', label: 'Experiential Labs (shared monthly credits)', url: 'https://platform.experientiallabs.ai' },
   { value: 'router9', label: 'Router9 (shared monthly credits)', url: 'https://www.router9.com' },
   { value: 'septor', label: 'Septor Labs (daily free-model quota)', url: 'https://septorlabs.com/dashboard' },
-  { value: 'clod', label: 'CLōD (shared daily free requests)', url: 'https://newapp.clod.io' },
+  { value: 'clod', label: 'CLōD (shared daily free requests)', url: 'https://app.clod.io' },
   { value: 'speechify', label: 'Speechify (monthly free TTS characters)', url: 'https://platform.speechify.ai' },
-  { value: 'freeai', label: 'Free.ai (shared daily free TTS tokens)', url: 'https://free.ai/account/#api-keys' },
+  { value: 'freeai', label: 'Free.ai (shared free speech / transcription quota)', url: 'https://free.ai/account/#api-keys' },
   { value: 'blaze', label: 'BlazeAPI (daily free tokens; Discord verification)', url: 'https://blazeapi.org/dashboard' },
   { value: 'lucidity', label: 'Lucidity Composite (daily free-model requests)', url: 'https://composite.lucidity.sh' },
   { value: 'airforce', label: 'Api.Airforce (daily free requests; 1 per minute)', url: 'https://api.airforce' },

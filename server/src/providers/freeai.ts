@@ -14,7 +14,7 @@ export function freeAiAudioUrl(body: unknown): string | null {
   } catch { return null; }
 }
 
-/** TTS-only until the mismatched chat aliases are resolved. Free accounts share
+/** Speech/transcription only until the mismatched chat aliases are resolved. Free accounts share
  * 30K tokens/day and 1K API requests/month (no card; verified 2026-10-11).
  * https://free.ai/api/ — model rows belong only in the signed catalog. */
 export class FreeAiProvider extends BaseProvider {
@@ -38,11 +38,11 @@ export class FreeAiProvider extends BaseProvider {
   }
 
   async chatCompletion(): Promise<ChatCompletionResponse> {
-    throw Object.assign(new Error('Free.ai currently supports /v1/audio/speech, not chat completions'), { status: 400 });
+    throw Object.assign(new Error('Free.ai supports speech and transcription, not chat completions'), { status: 400 });
   }
 
   // eslint-disable-next-line require-yield
   async *streamChatCompletion(): AsyncGenerator<ChatCompletionChunk> {
-    throw Object.assign(new Error('Free.ai currently supports /v1/audio/speech, not chat completions'), { status: 400 });
+    throw Object.assign(new Error('Free.ai supports speech and transcription, not chat completions'), { status: 400 });
   }
 }

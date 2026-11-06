@@ -183,6 +183,25 @@ describe('response cache', () => {
         .not.toBe(computeCacheKey({ model: 'auto', messages, logprobs: true }));
     });
 
+    it('changes when top_k, min_p, repetition_penalty, or parallel_tool_calls change', () => {
+      // These are forwarded upstream as extended sampling params, so two
+      // requests differing only in one of them ask for different answers.
+      const messages = [msg('user', 'hello')];
+      const base = computeCacheKey({ model: 'auto', messages });
+      expect(computeCacheKey({ model: 'auto', messages, top_k: 40 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, top_k: 40 }))
+        .not.toBe(computeCacheKey({ model: 'auto', messages, top_k: 1 }));
+      expect(computeCacheKey({ model: 'auto', messages, min_p: 0.1 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, repetition_penalty: 1.2 })).not.toBe(base);
+      expect(computeCacheKey({ model: 'auto', messages, parallel_tool_calls: false })).not.toBe(base);
+      // Absent knobs still hash like before.
+      expect(computeCacheKey({
+        model: 'auto', messages,
+        top_k: undefined, min_p: undefined, repetition_penalty: undefined, parallel_tool_calls: undefined,
+      }))
+        .toBe(base);
+    });
+
     it('identical requests with the new knobs present collapse to the same key', () => {
       const messages = [msg('user', 'give me data')];
       const full = () => computeCacheKey({

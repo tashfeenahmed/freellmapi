@@ -14,6 +14,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
+import { meterCloudflare, roughTokens } from './cloudflare-neurons.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -23,6 +24,8 @@ import { SPEKA_BASE_URL } from '../providers/speka.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 import { INFERBASE_BASE_URL } from '../providers/inferbase.js';
 import { LLMTR_BASE_URL } from '../providers/llmtr.js';
+import { JAMAI_BASE_URL, jamaiHeaders } from '../providers/jamai.js';
+import { FREEINFERENCE_BASE_URL } from '../providers/freeinference.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -111,6 +114,8 @@ const FETCH_TIMEOUT_MS = 30_000;
 
 /** Provider adapters that can safely receive catalog-managed embedding rows. */
 export const EMBEDDING_PLATFORMS = new Set([
+  'freeinference',
+  'jamai',
   'google',
   'nvidia',
   'openrouter',
@@ -139,6 +144,7 @@ async function openAiStyleEmbed(
   dimensions?: number,
   expectedDimensions?: number,
   timeoutMs = FETCH_TIMEOUT_MS,
+  headers?: Record<string, string>,
 ): Promise<ProviderCallResult> {
   const body: Record<string, unknown> = { model: modelId, input: inputs, ...extra };
   // Some providers (NVIDIA NeMo NIM, Google Gemini Embedding, OpenAI v3) support
@@ -152,11 +158,14 @@ async function openAiStyleEmbed(
     method: 'POST',
     // A custom endpoint with auth off holds the `no-key` sentinel: omit the
     // header instead of sending `Bearer no-key` (#1331).
-    headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    headers: headers ?? { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    ...(platform === 'jamai' ? { redirect: 'error' as const } : {}),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   }, platform, 'embedding', timeoutMs);
   if (!r.ok) {
+    // JamAI error bodies may echo credential-bearing request headers.
+    if (platform === 'jamai') throw new EmbeddingsError(`JamAI embeddings error (HTTP ${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     throw await upstreamEmbeddingsError(r);
   }
   const j = (await r.json()) as {
@@ -165,7 +174,7 @@ async function openAiStyleEmbed(
     usage?: { prompt_tokens?: number; total_tokens?: number };
   };
   const data = [...(j.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-  if (['electronhub', 'inferbase', 'llmtr'].includes(platform) && (
+  if (['electronhub', 'inferbase', 'llmtr', 'jamai'].includes(platform) && (
     j.model !== modelId || data.length !== inputs.length ||
     data.some((d, i) => d.index !== i || !Array.isArray(d.embedding) ||
       d.embedding.length !== (dimensions ?? expectedDimensions) ||
@@ -173,13 +182,44 @@ async function openAiStyleEmbed(
   )) {
     // A successful HTTP response is not enough: wrong model/dimension or
     // malformed vectors would corrupt the caller's embedding family.
-    const provider = platform === 'electronhub' ? 'ElectronHub' : platform === 'llmtr' ? 'LLMTR' : 'Inferbase';
+    const provider = platform === 'jamai' ? 'JamAI' : platform === 'electronhub' ? 'ElectronHub' : platform === 'llmtr' ? 'LLMTR' : 'Inferbase';
     throw new EmbeddingsError(`${provider} returned mismatched or malformed embeddings`, 502);
   }
   return {
     vectors: data.map(d => d.embedding),
     inputTokens: j.usage?.prompt_tokens ?? j.usage?.total_tokens ?? null,
   };
+}
+
+/** The gateway requests bge-m3 but replies with its canonical BAAI/bge-m3
+ * identity. These are the only accepted aliases; never mix embedding spaces. */
+async function freeInferenceEmbed(row: EmbeddingModelRow, key: string, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
+  if (!key.trim() || key === 'no-key') throw new EmbeddingsError('FreeInference API key is required', 401);
+  if (row.model_id !== 'bge-m3' || row.dimensions !== 1024 || (dimensions !== undefined && dimensions !== 1024)) {
+    throw new EmbeddingsError('FreeInference embeddings support only bge-m3 at 1024 dimensions', 400);
+  }
+  const r = await proxyFetch(`${FREEINFERENCE_BASE_URL}/embeddings`, {
+    method: 'POST', redirect: 'error',
+    headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    body: JSON.stringify({ model: row.model_id, input: inputs, encoding_format: 'float' }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  }, row.platform, 'embedding', FETCH_TIMEOUT_MS);
+  if (!r.ok) throw new EmbeddingsError(`FreeInference embeddings error (HTTP ${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
+  const j = await r.json().catch(() => null) as {
+    model?: string; data?: { index?: number; embedding?: number[] }[];
+    usage?: { prompt_tokens?: number; total_tokens?: number };
+  } | null;
+  if (!j || !['bge-m3', 'BAAI/bge-m3'].includes(j.model ?? '') || !Array.isArray(j.data) ||
+      j.data.length !== inputs.length || j.data.some(d => !d || !Number.isInteger(d.index))) {
+    throw new EmbeddingsError('FreeInference returned mismatched or malformed embeddings', 502);
+  }
+  const data = [...j.data].sort((a, b) => a.index! - b.index!);
+  if (data.some((d, i) => d.index !== i || !Array.isArray(d.embedding) || d.embedding.length !== 1024 ||
+      d.embedding.some(v => typeof v !== 'number' || !Number.isFinite(v)))) {
+    throw new EmbeddingsError('FreeInference returned mismatched or malformed embeddings', 502);
+  }
+  const tokens = j.usage?.prompt_tokens ?? j.usage?.total_tokens;
+  return { vectors: data.map(d => d.embedding!), inputTokens: typeof tokens === 'number' && Number.isFinite(tokens) && tokens >= 0 ? tokens : null };
 }
 
 export async function probeEmbeddingDimensions(baseUrl: string, key: string, modelId: string): Promise<number> {
@@ -270,6 +310,8 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
 async function callProvider(row: EmbeddingModelRow, credential: ProviderCredential, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
   const { key } = credential;
   switch (row.platform) {
+    case 'freeinference':
+      return freeInferenceEmbed(row, key, inputs, dimensions);
     case 'custom':
       if (!credential.baseUrl) throw new EmbeddingsError('custom embedding provider is missing base_url', 500);
       return openAiStyleEmbed(`${credential.baseUrl}/embeddings`, row.platform, key, row.model_id, inputs, {}, dimensions);
@@ -290,6 +332,12 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed(`${ELECTRONHUB_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
     case 'inferbase':
       return openAiStyleEmbed(`${INFERBASE_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
+    case 'jamai':
+      if (dimensions !== undefined && dimensions !== row.dimensions) {
+        throw new EmbeddingsError('JamAI does not support an embedding dimension override', 400);
+      }
+      return openAiStyleEmbed(`${JAMAI_BASE_URL}/embeddings`, row.platform, '', row.model_id, inputs,
+        { type: 'document', encoding_format: 'float' }, undefined, row.dimensions, FETCH_TIMEOUT_MS, jamaiHeaders(key));
     case 'llmtr':
       // The catalog-approved models return fixed-width vectors. Do not send a
       // dimension override or accept a substituted model/embedding space.
@@ -303,9 +351,15 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       if (sep === -1) throw new EmbeddingsError('cloudflare key is not in account_id:token form', 500);
       const accountId = key.slice(0, sep);
       const token = key.slice(sep + 1);
-      return openAiStyleEmbed(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
-        row.platform, token, row.model_id, inputs, {},
+      return meterCloudflare(
+        key, row.model_id,
+        { inputTokens: inputs.reduce((sum, text) => sum + roughTokens(text), 0) },
+        () => openAiStyleEmbed(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
+          row.platform, token, row.model_id, inputs, {},
+        ),
+        r => (r.inputTokens != null ? { inputTokens: r.inputTokens } : null),
+        e => new EmbeddingsError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000),
       );
     }
     case 'huggingface': {

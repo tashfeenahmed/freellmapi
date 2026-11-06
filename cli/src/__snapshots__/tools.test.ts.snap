@@ -25,12 +25,15 @@ exports[`tool generators > setup-atomcode has stable golden output 1`] = `
 {
   "files": [
     {
-      "content": "default_provider = "freellmapi"
+      "content": "default_model = "freellmapi"
 
-[providers.freellmapi]
-type = "openai"
+[provider_accounts.freellmapi]
+provider = "openai"
 base_url = "http://localhost:3000/v1"
 api_key = "freellmapi-test-key"
+
+[models.freellmapi]
+account = "freellmapi"
 model = "fast-coder"
 context_window = 131072",
       "format": "toml",
@@ -39,8 +42,8 @@ context_window = 131072",
     },
   ],
   "notes": [
-    "AtomCode reads ~/.atomcode/config.toml; other [providers.*] tables in it are kept.",
-    "default_provider now points at [providers.freellmapi] with fast-coder as its model.",
+    "AtomCode reads ~/.atomcode/config.toml; unrelated accounts, models and legacy providers are kept.",
+    "default_model now points at [models.freellmapi] with fast-coder via [provider_accounts.freellmapi].",
     "Point base_url at the unified /v1 endpoint; api_key is the unified key shown on the Agents page.",
     "One-shot check: atomcode -p "Say hello" (telemetry is on by default: atomcode telemetry disable).",
   ],

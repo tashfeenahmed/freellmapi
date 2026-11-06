@@ -79,6 +79,17 @@ it('promotes an engine to default with priority 0', async () => {
   expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ priority: 0 })
 })
 
+it('tests the selected engine through the search test endpoint', async () => {
+  await mount([engine({ id: 7 })])
+  const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'Test')!
+  expect(button).toBeTruthy()
+  act(() => button.click())
+  await flush()
+  const request = vi.mocked(apiFetch).mock.calls.find(([path]) => path === '/api/search/engines/7/test')
+  expect(request?.[1]?.method).toBe('POST')
+  expect(JSON.parse(String(request?.[1]?.body)).query).toBeTruthy()
+})
+
 it('shows the empty state before the catalog carries any engine', async () => {
   await mount([])
   expect(container.textContent).toContain('No search engines yet')

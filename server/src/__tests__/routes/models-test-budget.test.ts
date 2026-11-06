@@ -45,6 +45,47 @@ it('records successful test usage in monthly accounting and request history', as
   expect(logged).toEqual({caller:'model-test',input_tokens:3,output_tokens:2});
   expect(checkMonthlyBudget(keyId,0).allowed).toBe(false);
 });
+it('does not report an empty completion as a successful model test', async () => {
+  vi.spyOn(getProvider('groq')!,'chatCompletion').mockResolvedValue({
+    ...answer, choices:[{...answer.choices[0],message:{role:'assistant',content:''},finish_reason:'length'}],
+  });
+  const result=await post('/api/models/'+ids[0]+'/test');
+  expect(result.body.success).toBe(false);
+  expect(result.body.error).toMatch(/empty|output limit/i);
+  expect(getMonthlyUsage(keyId)).toEqual({requests:1,tokens:5});
+  expect(getDb().prepare('SELECT status,input_tokens,output_tokens FROM requests WHERE key_id=?').get(keyId))
+    .toEqual({status:'error',input_tokens:3,output_tokens:2});
+});
+it('counts reasoning tokens when an empty completion omits usage', async () => {
+  vi.spyOn(getProvider('groq')!,'chatCompletion').mockResolvedValue({
+    ...answer, usage:undefined,
+    choices:[{...answer.choices[0],message:{role:'assistant',content:null,reasoning_content:'x'.repeat(32)}}],
+  });
+  expect((await post('/api/models/'+ids[0]+'/test')).body.success).toBe(false);
+  expect(getMonthlyUsage(keyId)).toEqual({requests:1,tokens:24});
+  expect(getDb().prepare('SELECT status,input_tokens,output_tokens FROM requests WHERE key_id=?').get(keyId))
+    .toEqual({status:'error',input_tokens:16,output_tokens:8});
+  expect(getDb().prepare("SELECT SUM(tokens) AS tokens FROM rate_limit_usage WHERE key_id=? AND kind='tokens'").get(keyId))
+    .toEqual({tokens:24});
+});
+it('rolls back empty-completion monthly usage when request history cannot be written', async () => {
+  getDb().exec(`CREATE TRIGGER reject_model_test_log BEFORE INSERT ON requests
+    WHEN NEW.caller='model-test' AND NEW.input_tokens > 0
+    BEGIN SELECT RAISE(ABORT, 'synthetic history failure'); END`);
+  vi.spyOn(console,'error').mockImplementation(()=>{});
+  vi.spyOn(getProvider('groq')!,'chatCompletion').mockResolvedValue({
+    ...answer, choices:[{...answer.choices[0],message:{role:'assistant',content:''}}],
+  });
+  const result=await post('/api/models/'+ids[0]+'/test');
+  expect(result.body.success).toBe(false);
+  expect(result.body.error).toMatch(/persist model test usage/i);
+  expect(getMonthlyUsage(keyId)).toEqual({requests:0,tokens:0});
+  expect(checkMonthlyBudget(keyId,20).allowed).toBe(true);
+  expect(getDb().prepare('SELECT status,input_tokens,output_tokens FROM requests WHERE key_id=?').get(keyId))
+    .toEqual({status:'error',input_tokens:0,output_tokens:0});
+  expect(getDb().prepare("SELECT SUM(tokens) AS tokens FROM rate_limit_usage WHERE key_id=? AND kind='tokens'").get(keyId))
+    .toEqual({tokens:5});
+});
 it('reserves capacity across models while a test is in flight and releases it after failure', async () => {
   let reject!: (error: Error)=>void;
   let started!: ()=>void;

@@ -23,6 +23,8 @@ import { logRequest } from '../lib/request-log.js';
 import { withKeyProxy } from '../lib/proxy.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { recordRequest, recordTokens } from '../services/ratelimit.js';
+import { recordMonthlyUsage } from '../services/key-budget.js';
+import { contentToString } from '../lib/content.js';
 
 export const modelsRouter = Router();
 
@@ -406,10 +408,27 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
       { max_tokens: outputLimit, timeoutMs: 15_000 },
     ));
     const latencyMs = Date.now() - startTime;
-    const outputTokens = response.usage?.completion_tokens ?? Math.ceil((response.choices?.[0]?.message?.content?.length ?? 0) / 4);
+    const message = response.choices?.[0]?.message;
+    const outputChars = contentToString(message?.content).length + (message?.reasoning_content?.length ?? 0)
+      + (message?.tool_calls ?? []).reduce((sum, call) => sum + (call.function?.arguments?.length ?? 0), 0);
+    const outputTokens = response.usage?.completion_tokens ?? Math.ceil(outputChars / 4);
     const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
     recordRequest(route.platform, route.modelId, route.keyId);
     recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+    if (!contentToString(message?.content ?? '') && !message?.tool_calls?.length) {
+      const error = 'Empty completion; the test output limit may be too small for this model.';
+      // The upstream completed a request even though it produced no usable
+      // answer. Error rows do not settle the monthly ledger automatically.
+      getDb().transaction(() => {
+        recordMonthlyUsage(route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+        if (!logRequest(route.platform, route.modelId, route.keyId, 'error', inputTokens, outputTokens,
+          latencyMs, error, null, route.modelId, null, 'model-test')) {
+          throw new Error('Failed to persist model test usage.');
+        }
+      })();
+      res.json({ success: false, modelId: route.modelId, latencyMs, error });
+      return;
+    }
     // The request-log transaction also settles the durable monthly ledger.
     logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens,
       latencyMs, null, null, route.modelId, null, 'model-test');

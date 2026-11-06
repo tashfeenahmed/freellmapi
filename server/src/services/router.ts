@@ -16,7 +16,7 @@ import {
   modelWindowUsedFraction,
 } from './ratelimit.js';
 import {
-  BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
+  BANDIT_PRESETS, DEFAULT_STRATEGY, type PresetStrategy, type RoutingStrategy, type RoutingWeights,
   type KeySelectionStrategy,
   reliabilityPosterior, expectedReliability, sampleBeta,
   speedScore, intelligenceScore, intelligenceComposite, headroomFactor, rateWindowHeadroomFactor,
@@ -28,6 +28,7 @@ import {
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS, isProviderMomentFailure } from '../lib/error-classify.js';
 import { checkMonthlyBudget, reserveMonthlyBudget } from './key-budget.js';
+import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
 import { modelsWithOverriddenField, getCatalogModelTombstone } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
@@ -1271,26 +1272,16 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
     .map(x => x.e);
 }
 
-/**
- * Route a request to the best available model.
- *
- * Ordering depends on the configured strategy (see orderChain). Everything
- * downstream — key round-robin, cooldowns, token pre-checks, custom base_url
- * resolution, vision filtering, sticky sessions — is strategy-independent.
- *
- * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
- * This prevents hallucination from model switching mid-conversation.
- *
- * @param estimatedTokens - estimated total tokens for rate limit check
- * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
- * @param preferredModelDbId - try this model first (sticky session)
- * @param requireVision - only consider models that accept image input (#118)
- * @param requireTools - only consider models that emit structured tool_calls
- * @param skipPlatforms - platforms ruled out for the rest of this request (#788)
- */
 export interface ResolvedChain {
   chain: ChainRow[];
   strategyKey: string;
+  /** Set for the global-sort aliases (`auto:smart`, `auto:fast`, …): the
+   *  preset their axis maps to. routeRequest re-orders whatever chain it is
+   *  handed under the GLOBAL strategy, which silently threw the alias's
+   *  ordering away (#1628) — callers must pass this through so the request is
+   *  scored under the axis the client asked for. Absent for plain `auto` and
+   *  `auto:<chain-name>`, where the operator's global strategy is what governs. */
+  strategyOverride?: PresetStrategy;
 }
 
 const GLOBAL_SORT_ALIASES: Record<string, string> = {
@@ -1298,6 +1289,19 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
   fast: 'fast', fastest: 'fast', speed: 'fast',
   cheap: 'cheap', cheapest: 'cheap', price: 'cheap', budget: 'cheap',
   reliable: 'reliable', reliability: 'reliable',
+  balanced: 'balanced',
+};
+
+/** The routing preset each global-sort axis stands for. Shared by the chain
+ *  sort in getChainByGlobalSort and by ResolvedChain.strategyOverride, so the
+ *  order the alias resolves to and the order routeRequest re-sorts with can
+ *  never drift apart. `auto:cheap` is budget-leaning but keeps the balanced
+ *  blend — everything in this pool is already free (see the API docs). */
+const GLOBAL_AXIS_STRATEGY: Record<string, PresetStrategy> = {
+  smart: 'smartest',
+  fast: 'fastest',
+  cheap: 'balanced',
+  reliable: 'reliable',
   balanced: 'balanced',
 };
 
@@ -1398,14 +1402,7 @@ function getChainByGlobalSort(db: Db, globalAxis: string): ChainRow[] {
     WHERE m.enabled = 1 AND ${chainEnabled}
   `).all(...(profileId != null ? [profileId] : [])) as ChainRow[];
 
-  const strategyMap: Record<string, RoutingStrategy> = {
-    'smart': 'smartest',
-    'fast': 'fastest',
-    'cheap': 'balanced',
-    'reliable': 'reliable',
-    'balanced': 'balanced'
-  };
-  const strat = strategyMap[globalAxis] || 'balanced';
+  const strat = GLOBAL_AXIS_STRATEGY[globalAxis] ?? 'balanced';
   
   return orderChain(allEnabled, strat);
 }
@@ -1459,7 +1456,13 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
       err.status = 400;
       throw err;
     }
-    return { chain, strategyKey: `auto:${globalAxis}` };
+    return {
+      chain,
+      strategyKey: `auto:${globalAxis}`,
+      // The caller must score this chain under the alias's preset, not the
+      // global one — see ResolvedChain.strategyOverride (#1628).
+      strategyOverride: GLOBAL_AXIS_STRATEGY[globalAxis] ?? 'balanced',
+    };
   }
 
   const chain = getChainByProfileName(db, suffix);
@@ -1685,6 +1688,10 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       note('decrypt-error');
       continue;
     }
+    // Workers AI's free neurons are per ACCOUNT, and on Workers Paid nothing
+    // upstream says when they are gone: Cloudflare bills instead. Skip a key
+    // whose account has reached today's neuron cap (services/cloudflare-neurons.ts).
+    if (entry.platform === 'cloudflare' && !cloudflareNeuronsAvailable(decryptedKey)) { note('cloudflare-neuron-cap'); continue; }
 
     const resolvedProvider = entry.platform === 'custom'
       ? resolveProvider('custom', key.base_url)
@@ -2160,10 +2167,36 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   return null;
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat'): RouteResult {
+/**
+ * Route a request to the best available model.
+ *
+ * Ordering depends on the configured strategy (see orderChain) — or on
+ * `strategyOverride`, when the request named an `auto:<axis>` alias. Everything
+ * downstream — key round-robin, cooldowns, token pre-checks, custom base_url
+ * resolution, vision filtering, sticky sessions — is strategy-independent.
+ *
+ * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
+ * This prevents hallucination from model switching mid-conversation.
+ *
+ * @param estimatedTokens - estimated total tokens for rate limit check
+ * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
+ * @param preferredModelDbId - try this model first (sticky session)
+ * @param requireVision - only consider models that accept image input (#118)
+ * @param requireTools - only consider models that emit structured tool_calls
+ * @param skipPlatforms - platforms ruled out for the rest of this request (#788)
+ * @param strategyOverride - score the chain under this preset instead of the
+ *   global one. Set by the `auto:<axis>` aliases (ResolvedChain.strategyOverride,
+ *   #1628); leave unset everywhere else.
+ */
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', strategyOverride?: PresetStrategy): RouteResult {
   const db = getDb();
 
-  const strategy = effectiveRoutingStrategy();
+  // The alias's axis wins for this request (#1628): scoring the prefetched
+  // chain under the global strategy silently discarded what `auto:smart` /
+  // `auto:fast` asked for. Absent an override, whatever this request routes
+  // with governs — the operator's setting, or the preset the 'decision' model
+  // picked (#1354).
+  const strategy = strategyOverride ?? effectiveRoutingStrategy();
   if (strategy !== 'priority') refreshStatsCache(db);
 
   const chain = (prefetchedChain ?? getActiveChain(db)).filter(e => e.enabled);

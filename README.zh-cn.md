@@ -15,7 +15,7 @@
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 浏览完整目录：474 个模型系列，635 个免费端点
 
-[English](README.md) · **简体中文**
+[English](README.md) · **简体中文** · [O'zbekcha](README.uz.md)
 
 本翻译可能滞后，最新内容以英文 README 为准。
 
@@ -209,6 +209,7 @@ npx freellmapi setup-claude --url http://localhost:3001 --api-key <统一密钥>
 | Continue | `setup-continue` | `/v1` |
 | Aider | `setup-aider` | `/v1` |
 | OpenCode | `setup-opencode` | `/v1` |
+| AtomCode | `setup-atomcode` | `/v1` |
 | Goose | `setup-goose` | `/v1` |
 | Qwen Code | `setup-qwen` | `/v1`（或原生 `/v1beta`） |
 | Roo / Kilo / Crush | `setup-roo` / `setup-kilo` / `setup-crush` | `/v1` |
