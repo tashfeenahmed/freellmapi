@@ -436,6 +436,7 @@ export const platformColors: Record<string, string> = {
   nabh:        '#0ea5e9',
   novai:       '#8b5cf6',
   freeinference: '#a51c30',
+  freemodel:   '#16a34a',
   electronhub: '#6366f1',
   experiential: '#14b8a6',
   router9:      '#8b5cf6',
