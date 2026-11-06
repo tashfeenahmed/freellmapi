@@ -37,7 +37,7 @@ export function reserveProviderCredential(
   const keys = getDb().prepare(`
     SELECT id, encrypted_key, iv, auth_tag, base_url, model_scope_json FROM api_keys
     WHERE ${customEndpoint
-      ? "platform = 'custom' AND (id = ? OR (base_url IS NOT NULL AND base_url <> '' AND base_url = (SELECT base_url FROM api_keys WHERE id = ?)))"
+      ? "(id = ? OR (platform = 'custom' AND base_url IS NOT NULL AND base_url <> '' AND base_url = (SELECT base_url FROM api_keys WHERE id = ? AND platform = 'custom')))"
       : bound ? 'id = ?' : 'platform = ?'} AND enabled = 1
       AND status IN ('healthy', 'unknown') ORDER BY RANDOM()
   `).all(...(customEndpoint ? [row.key_id, row.key_id] : [bound ? row.key_id : row.platform])) as KeyRow[];
