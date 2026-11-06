@@ -32,9 +32,11 @@ function rebuild(db: Db, scoped: boolean): void {
 export function up(db: Db): void {
   rebuild(db, true);
   // Keep media identity separate from requests.model_db_id, which names chat models.
+  // Idempotent: the baseline re-run test replays every migration.
+  const hasColumn = (db.prepare("PRAGMA table_info(requests)").all() as { name: string }[]).some(c => c.name === 'media_model_db_id');
+  if (!hasColumn) db.exec('ALTER TABLE requests ADD COLUMN media_model_db_id INTEGER');
   db.exec(`
-    ALTER TABLE requests ADD COLUMN media_model_db_id INTEGER;
-    CREATE INDEX idx_requests_media_model_db_id ON requests(media_model_db_id);
+    CREATE INDEX IF NOT EXISTS idx_requests_media_model_db_id ON requests(media_model_db_id);
     UPDATE requests SET media_model_db_id = (
       SELECT mm.id FROM media_models mm
       WHERE mm.platform = requests.platform AND mm.model_id = requests.model_id
