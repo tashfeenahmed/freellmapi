@@ -61,6 +61,8 @@ Your router updates its own model catalog from a signed feed: new free models, q
 
 Every serious AI lab now offers a free tier, a few million tokens a month, a few thousand requests a day. On its own each tier is a toy. Stacked together, they add up to roughly **7.4 billion tokens per month** of working inference capacity, across **474 model families / 635 provider endpoints** from small-and-fast to reasonably capable.
 
+**The 7.4B figure is a catalog-wide estimate, not tokens credited to your account.** Your usable capacity depends on which provider accounts and keys you configure, their current free-tier limits, and any usage outside FreeLLMAPI. Some limits are request-based or shared across models, so the figure is not a guaranteed personal balance.
+
 The problem is that stacking them by hand is painful: thirty-four different SDKs, thirty-four different rate limits, thirty-four places a request can fail. FreeLLMAPI collapses that into one OpenAI-compatible endpoint. Point any OpenAI client library at your local server, and it routes transparently across whichever providers you've added keys for.
 
 And the free-tier landscape shifts weekly: providers launch models, retire them, and change quotas without notice. FreeLLMAPI tracks all of that for you. The router pulls a signed model catalog from [freellmapi.co](https://freellmapi.co) on its own, so your install keeps up without a `git pull`. See [Premium (live catalog)](#premium-live-catalog) for how fast it keeps up.
