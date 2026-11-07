@@ -25,7 +25,7 @@ Published tags: `latest` (default branch), `v*.*.*` (git release tags), and `sha
 
 Build shape ([Dockerfile](../../../Dockerfile)):
 
-- Three stages on the `node:20-bookworm-slim` base (`deps` → `build` → `runtime`); only already-built artifacts are copied into the runtime stage.
+- Three stages on the `node:24-bookworm-slim` base (`deps` → `build` → `runtime`); only already-built artifacts are copied into the runtime stage.
 - The runtime sets `NODE_ENV=production`, `PORT=3001`, and `FREELLMAPI_INSTALL_METHOD=docker`; the process is `node server/dist/index.js`.
 - A `FREELLMAPI_COMMIT_SHA` ARG/ENV pair sits deliberately after all `COPY` layers: the SHA changes every commit, and placing it higher would invalidate the layer cache for the whole image on each build.
 - The runtime also copies `desktop/package.json` (a 400-byte manifest) so a container install can name its own release version (#703).

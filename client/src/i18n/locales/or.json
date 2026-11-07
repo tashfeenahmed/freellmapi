@@ -450,6 +450,7 @@
     "adding": "ଯୋଡ଼ିବା...",
     "selectProvider": "ଏକ ପ୍ରଦାନକାରୀ ଚୟନ କରନ୍ତୁ...",
     "accountId": "ଆକାଉଣ୍ଟ ID",
+    "projectId": "ପ୍ରକଳ୍ପ ID",
     "label": "ଲେବଲ୍",
     "noKeyNeeded": "(କୌଣସି ଚାବି ଆବଶ୍ୟକ ନାହିଁ)",
     "outboundProxy": "ଆଉଟବାଉଣ୍ଡ ପ୍ରକ୍ସି",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ମାସିକ ଟୋକେନ୍ ସୀମା",
     "capUnlimitedPlaceholder": "ଅସୀମିତ",
     "capEditHint": "ସୀମା ପ୍ରତି ମାସର ୧ ତାରିଖରେ ୦୦:୦୦ UTC ରେ ରିସେଟ୍ ହୁଏ। ଅସୀମିତ ପାଇଁ ଖାଲି ରଖନ୍ତୁ।",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ଏହି ମାସରେ {requests} ଅନୁରୋଧ, {tokens} ଟୋକେନ୍",
     "quotaBalanceHint": "{limit} {metric} ମଧ୍ୟରୁ {remaining} ବାକି",
-    "quotaBalanceLeft": "{remaining} ବାକି"
-,
+    "quotaBalanceLeft": "{remaining} ବାକି",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "୩୦ ଡି",
     "range90d": "90d",
+    "rangeAll": "ସମସ୍ତ ସମୟ",
+    "rangeAllNote": "ମୁଖ୍ୟ ମୋଟ ସଂଖ୍ୟା ସମସ୍ତ ସମୟର। ସଫଳତା ହାର ଏବଂ ତଳେ ଥିବା ବିବରଣୀ ଏହି ଇନଷ୍ଟଲ୍ ଏବେ ବି ରଖିଥିବା ଇତିହାସକୁ ଆବରଣ କରେ।",
     "requests": "ଅନୁରୋଧ[ସମ୍ପାଦନା]",
     "successRate": "ସଫଳତା ହାର",
     "inputTokens": "ଇନପୁଟ୍ ଟୋକେନ୍",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ଫଲବ୍ୟାକ୍ ଉଦ୍ୟମ",
     "savingsHint": "ଆପଣ ପ୍ରକୃତରେ ଗତ {range} ରେ ${actual} ସଞ୍ଚୟ କରିଛନ୍ତି। ସମାନ ଟୋକେନ୍ ପେଡ୍ ଏପିଆଇ ଉପରେ ମୂଲ୍ୟବାନ ହୋଇଥାନ୍ତା, ଯାହା ମଡେଲ୍ ପିଛା ମୂଲ୍ୟ ରହିଥାନ୍ତା । ଦେଖାଯାଇଥିବା ନମ୍ବର ଶେଷ {span} ଡାଟାରୁ ପୂର୍ଣ୍ଣ 30 ଦିନ ପର୍ଯ୍ୟନ୍ତ ଆପଣଙ୍କ ଗତି ପ୍ରୋଜେକ୍ଟ କରେ।",
     "savingsHintExact": "ଆପଣ ପ୍ରକୃତରେ ଗତ {range} ରେ ${actual} ସଞ୍ଚୟ କରିଛନ୍ତି। ସମାନ ଟୋକେନ୍ ପେଡ୍ ଏପିଆଇ ଉପରେ ମୂଲ୍ୟବାନ ହୋଇଥାନ୍ତା, ଯାହା ମଡେଲ୍ ପିଛା ମୂଲ୍ୟ ରହିଥାନ୍ତା । ଦେଖାଯାଉଥିବା ସଂଖ୍ୟା ହେଉଛି ଆପଣଙ୍କ ପ୍ରକୃତ 30-ଦିନର ମୋଟ।",
+    "savingsHintAll": "ସଂରକ୍ଷିତ ସମସ୍ତ ଇତିହାସରେ ଆପଣ ${actual} ସଞ୍ଚୟ କରିଛନ୍ତି। ସେହି ଟୋକେନ୍ ଦେୟ API ରେ, ପ୍ରତ୍ୟେକ ମଡେଲର ମୂଲ୍ୟରେ, ଏତିକି ଖର୍ଚ୍ଚ ହୋଇଥାନ୍ତା। ଦେଖାଯାଇଥିବା ସଂଖ୍ୟା ଶେଷ {span} ଡାଟାରୁ ଆପଣଙ୍କ ସାମ୍ପ୍ରତିକ ଗତିକୁ ପୂର୍ଣ୍ଣ 30 ଦିନକୁ ଆକଳନ କରେ।",
     "requestsHintPinned": "ଏହି ଅନୁରୋଧଗୁଡ଼ିକ ମଧ୍ୟରୁ {pinned} ଏକ ନିର୍ଦ୍ଦିଷ୍ଟ ମଡେଲକୁ ନାମ ଦ୍ୱାରା ପିନ୍ କରିଥିଲେ । {honored} ପିନ୍ ହୋଇଥିବା ମଡେଲ୍ ଦ୍ୱାରା ପରିବେଷଣ କରାଯାଇଥିଲା; {failed} ଏକ ଭିନ୍ନ ଗୋଟିଏରେ ବିଫଳ ହେଲା | ଅବଶିଷ୍ଟଗୁଡିକ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ମାର୍ଗଦର୍ଶନ କରାଯାଇଥିଲା ।",
     "requestsHintAuto": "ଏହି ଅବଧିରେ ସମସ୍ତ ଅନୁରୋଧ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ମାର୍ଗଦର୍ଶନ କରାଯାଇଥିଲା; କୌଣସି କ୍ଲାଏଣ୍ଟ ନାମ ଦ୍ୱାରା ଏକ ନିର୍ଦ୍ଧିଷ୍ଟ ମଡେଲ୍ ପିନ୍ କରିନାହାଁନ୍ତି।",
     "requestsHintTypes": "{chat} ଚାଟ୍ କରନ୍ତୁ ଏବଂ {embedding} ଏମ୍ବେଡିଂ ଅନୁରୋଧଗୁଡିକ।",
@@ -872,7 +882,9 @@
     "emptyDescription": "ସର୍ଭର ଲେଖିବା ସହିତ ଏଣ୍ଟ୍ରିଗୁଡିକ ଏଠାରେ ଦେଖାଯିବ। ଆଉଟପୁଟ ଆଶା କରିଥିଲେ ସ୍ତର, ପ୍ରଦାନକାରୀ କିମ୍ୱା ସନ୍ଧାନ ଫିଲ୍ଟରର ପରିସର ବଢ଼ାନ୍ତୁ।",
     "noLevelsTitle": "କୌଣସି ସ୍ତର ବଛାଯାଇନାହିଁ",
     "noLevelsDescription": "ଲଗ ଆଉଟପୁଟ ଦେଖିବାକୁ ଅନ୍ତତଃ ଗୋଟିଏ ସ୍ତର ଚାଲୁ କରନ୍ତୁ।",
-    "loadFailed": "ସର୍ଭର ଲଗ ଲୋଡ କରାଯାଇପାରିଲା ନାହିଁ।"
+    "loadFailed": "ସର୍ଭର ଲଗ ଲୋଡ କରାଯାଇପାରିଲା ନାହିଁ।",
+    "eventFilter": "ଇଭେଣ୍ଟ",
+    "allEvents": "ସମସ୍ତ ଇଭେଣ୍ଟ"
   },
   "playground": {
     "title": "ଖେଳ ପଡିଆ",

@@ -450,6 +450,7 @@
     "adding": "បន្ថែម...",
     "selectProvider": "ជ្រើសរើសអ្នកផ្តល់សេវា...",
     "accountId": "លេខសម្គាល់គណនី",
+    "projectId": "លេខសម្គាល់គម្រោង",
     "label": "ស្លាក",
     "noKeyNeeded": "(មិនចាំបាច់ប្រើសោ)",
     "outboundProxy": "ប្រូកស៊ីចេញ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ដែនកំណត់តូខិនប្រចាំខែ",
     "capUnlimitedPlaceholder": "គ្មានដែនកំណត់",
     "capEditHint": "ដែនកំណត់កំណត់ឡើងវិញនៅថ្ងៃទី 1 ម៉ោង 00:00 UTC ទុកទទេប្រសិនបើគ្មានដែនកំណត់។",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ខែនេះ {requests} ស្នើសុំ {tokens} តូខិន",
     "quotaBalanceHint": "នៅសល់ {remaining} ក្នុងចំណោម {limit} {metric}",
-    "quotaBalanceLeft": "នៅសល់ {remaining}"
-,
+    "quotaBalanceLeft": "នៅសល់ {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "៧ ថ្ងៃ",
     "range30d": "30d",
     "range90d": "៩០ថ្ងៃ",
+    "rangeAll": "គ្រប់ពេល",
+    "rangeAllNote": "ចំនួនសរុបសំខាន់ៗគឺសម្រាប់គ្រប់ពេល។ អត្រាជោគជ័យ និងការបែងចែកខាងក្រោម គ្របដណ្តប់ប្រវត្តិដែលការដំឡើងនេះនៅតែរក្សាទុក។",
     "requests": "សំណើ",
     "successRate": "អត្រាជោគជ័យ",
     "inputTokens": "សញ្ញាបញ្ចូល",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ការព្យាយាមត្រឡប់ក្រោយ",
     "savingsHint": "អ្នកបានសង្គ្រោះ ${actual} ក្នុងរយៈពេល {range} ចុងក្រោយ។ នោះជាតម្លៃដែល token ដូចគ្នានឹងមានតម្លៃលើ API ដែលត្រូវបង់ប្រាក់ ដោយកំណត់តម្លៃតាមម៉ូឌែល។ ចំនួនដែលបង្ហាញបង្ហាញពីល្បឿនរបស់អ្នកចាប់ពី {span} ចុងក្រោយនៃទិន្នន័យរហូតដល់ 30 ថ្ងៃពេញ។",
     "savingsHintExact": "អ្នកបានសង្គ្រោះ ${actual} ក្នុងរយៈពេល {range} ចុងក្រោយ។ នោះជាតម្លៃដែល token ដូចគ្នានឹងមានតម្លៃលើ API ដែលត្រូវបង់ប្រាក់ ដោយកំណត់តម្លៃតាមម៉ូឌែល។ ចំនួនដែលបង្ហាញគឺជាចំនួនសរុបពិតប្រាកដ ៣០ ថ្ងៃរបស់អ្នក។",
+    "savingsHintAll": "អ្នកបានសន្សំ ${actual} ពេញប្រវត្តិដែលបានរក្សាទុក។ នេះជាតម្លៃដែលថូខឹនដដែលនឹងចំណាយលើ API បង់ប្រាក់ តាមតម្លៃម៉ូដែលនីមួយៗ។ លេខដែលបង្ហាញ ព្យាករល្បឿនថ្មីៗរបស់អ្នកពីទិន្នន័យ {span} ចុងក្រោយ ទៅ 30 ថ្ងៃពេញ។",
     "requestsHintPinned": "{pinned} ក្នុងចំណោមសំណើទាំងនេះ បានភ្ជាប់ម៉ូដែលជាក់លាក់តាមឈ្មោះ។ {honored} ត្រូវបានបម្រើដោយម៉ូដែលដែលបានដាក់ពិន; {failed} បានបរាជ័យទៅកម្មវិធីផ្សេងទៀត។ ផ្លូវដែលនៅសល់ត្រូវបានបើកបរដោយស្វ័យប្រវត្តិ។",
     "requestsHintAuto": "សំណើទាំងអស់ក្នុងរយៈពេលនេះត្រូវបានបញ្ជូនដោយស្វ័យប្រវត្តិ; មិនមានអតិថិជនណាមួយភ្ជាប់ម៉ូដែលជាក់លាក់តាមឈ្មោះទេ។",
     "requestsHintTypes": "{chat} chat {embedding} និង embedding requests។",
@@ -872,7 +882,9 @@
     "emptyDescription": "ធាតុនឹងបង្ហាញនៅទីនេះនៅពេលម៉ាស៊ីនមេសរសេរវា។ សូមពង្រីកតម្រងកម្រិត អ្នកផ្តល់សេវា ឬការស្វែងរក ប្រសិនបើអ្នករំពឹងថាមានលទ្ធផល។",
     "noLevelsTitle": "មិនបានជ្រើសរើសកម្រិតណាមួយ",
     "noLevelsDescription": "សូមបើកកម្រិតយ៉ាងហោចណាស់មួយ ដើម្បីមើលលទ្ធផលកំណត់ហេតុ។",
-    "loadFailed": "មិនអាចផ្ទុកកំណត់ហេតុម៉ាស៊ីនមេបានទេ។"
+    "loadFailed": "មិនអាចផ្ទុកកំណត់ហេតុម៉ាស៊ីនមេបានទេ។",
+    "eventFilter": "ព្រឹត្តិការណ៍",
+    "allEvents": "ព្រឹត្តិការណ៍ទាំងអស់"
   },
   "playground": {
     "title": "កន្លែងលេងក្មេង",

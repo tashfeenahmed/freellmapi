@@ -450,6 +450,7 @@
     "adding": "追加中…",
     "selectProvider": "プロバイダーを選択してください…",
     "accountId": "アカウントID",
+    "projectId": "プロジェクトID",
     "label": "ラベル",
     "noKeyNeeded": "(鍵は必要ありません)",
     "outboundProxy": "アウトバウンドプロキシ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "月間トークン上限",
     "capUnlimitedPlaceholder": "無制限",
     "capEditHint": "上限は毎月1日 00:00 UTC にリセットされます。無制限は空欄のままにしてください。",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "今月 {requests} リクエスト、{tokens} トークン",
     "quotaBalanceHint": "{limit} {metric}中 残り {remaining}",
-    "quotaBalanceLeft": "残り {remaining}"
-,
+    "quotaBalanceLeft": "残り {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7日",
     "range30d": "30日",
     "range90d": "90日",
+    "rangeAll": "全期間",
+    "rangeAllNote": "主要な合計は全期間の値です。成功率と下の内訳は、このインストールがまだ保持している履歴を対象にしています。",
     "requests": "リクエスト",
     "successRate": "成功率",
     "inputTokens": "入力トークン",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "フォールバックの試行",
     "savingsHint": "実際には、前回の {range} よりも ${actual} を節約できました。これは、同じトークンがモデルごとに価格設定された有料 API でかかるコストです。表示される数値は、最後の {span} データから丸 30 日までのペースを予測します。",
     "savingsHintExact": "実際には、前回の {range} よりも ${actual} を節約できました。これは、同じトークンがモデルごとに価格設定された有料 API でかかるコストです。表示される数字は実際の 30 日間の合計です。",
+    "savingsHintAll": "保持されている全履歴で ${actual} を節約しました。同じトークンを有料 API で使った場合の、モデルごとの料金です。表示される数値は、直近 {span} のデータのペースを 30 日分に換算したものです。",
     "requestsHintPinned": "これらのリクエストのうち {pinned} は、特定のモデルを名前で固定しました。 {honored} は固定モデルによって提供されました。 {failed} は別のものにフェイルオーバーしました。残りは自動ルーティングされました。",
     "requestsHintAuto": "この期間のすべてのリクエストは自動ルーティングされました。クライアントが特定のモデルを名前で固定することはありませんでした。",
     "requestsHintTypes": "{chat} チャットと {embedding} 埋め込みリクエスト。",
@@ -872,7 +882,9 @@
     "emptyDescription": "サーバーが書き込むと、ここにエントリが表示されます。出力があるはずの場合は、レベル・プロバイダー・検索のフィルターを広げてください。",
     "noLevelsTitle": "レベルが選択されていません",
     "noLevelsDescription": "ログ出力を表示するには、レベルを 1 つ以上オンにしてください。",
-    "loadFailed": "サーバーログを読み込めませんでした。"
+    "loadFailed": "サーバーログを読み込めませんでした。",
+    "eventFilter": "イベント",
+    "allEvents": "すべてのイベント"
   },
   "playground": {
     "title": "遊び場",

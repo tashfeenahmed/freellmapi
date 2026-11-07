@@ -450,6 +450,7 @@
     "adding": "Tilføjer...",
     "selectProvider": "Vælg en udbyder...",
     "accountId": "Konto-ID",
+    "projectId": "Projekt-id",
     "label": "Label",
     "noKeyNeeded": "(ingen nøgle nødvendig)",
     "outboundProxy": "Udgående proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Månedlig grænse for tokens",
     "capUnlimitedPlaceholder": "Ubegrænset",
     "capEditHint": "Grænser nulstilles den 1. kl. 00:00 UTC. Lad være tomt for ubegrænset.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} anmodninger, {tokens} tokens denne måned",
     "quotaBalanceHint": "{remaining} af {limit} {metric} tilbage",
-    "quotaBalanceLeft": "{remaining} tilbage"
-,
+    "quotaBalanceLeft": "{remaining} tilbage",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Hele perioden",
+    "rangeAllNote": "Hovedtallene gælder hele perioden. Succesraten og opdelingerne nedenfor dækker den historik, denne installation stadig gemmer.",
     "requests": "Anmodninger",
     "successRate": "Succesrate",
     "inputTokens": "Inputtokens",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Forsøg på at falde tilbage",
     "savingsHint": "Du har faktisk gemt ${actual} over de sidste {range}. Det er, hvad de samme tokens ville have kostet på betalte API'er, prissat pr. model. Det viste tal projicerer dit tempo fra de sidste {span} data til hele 30 dage.",
     "savingsHintExact": "Du har faktisk gemt ${actual} over de sidste {range}. Det er, hvad de samme tokens ville have kostet på betalte API'er, prissat pr. model. Det viste tal er dit reelle 30-dages gennemsnit.",
+    "savingsHintAll": "Du har sparet ${actual} over al gemt historik. Det er, hvad de samme tokens ville have kostet hos betalte API'er, prissat pr. model. Det viste tal fremskriver dit seneste tempo fra de sidste {span} data til hele 30 dage.",
     "requestsHintPinned": "{pinned} af disse anmodninger fastgjorde en bestemt model ved navn. {honored} blev betjent af den fastlåste model; {failed} fejlede over til en anden. Resten blev automatisk rutet.",
     "requestsHintAuto": "Alle anmodninger i denne periode blev automatisk videresendt; Ingen kunde har fastgjort en bestemt model ved navn.",
     "requestsHintTypes": "{chat} chat og {embedding} indlejringsanmodninger.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Poster vises her, efterhånden som serveren skriver dem. Udvid filtrene for niveau, udbyder eller søgning, hvis du forventede output.",
     "noLevelsTitle": "Ingen niveauer valgt",
     "noLevelsDescription": "Slå mindst ét niveau til for at se logoutput.",
-    "loadFailed": "Kunne ikke indlæse serverloggen."
+    "loadFailed": "Kunne ikke indlæse serverloggen.",
+    "eventFilter": "Hændelse",
+    "allEvents": "Alle hændelser"
   },
   "playground": {
     "title": "Legeplads",

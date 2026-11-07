@@ -14,8 +14,10 @@
 import { getDb } from '../db/index.js';
 import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
+import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { checkMonthlyBudget, secondsUntilNextMonth } from './key-budget.js';
+import { noteBudgetAlerts } from './budget-alerts.js';
 import { markKeyHealthyFromRequest } from './health.js';
 
 /* ------------------------------------------------------------------ */
@@ -75,15 +77,19 @@ export function listModerationModels(): ModerationModelRow[] {
   const rows: ModerationModelRow[] = [];
   for (const platform of PLATFORM_ORDER) {
     const ep = MODERATION_MODELS[platform];
-    const key = db.prepare(`
-      SELECT id, encrypted_key, iv, auth_tag
+    const keys = db.prepare(`
+      SELECT id, encrypted_key, iv, auth_tag, model_scope_json
         FROM api_keys
        WHERE platform = ?
          AND enabled = 1
          AND status IN ('healthy', 'unknown')
        ORDER BY id
-       LIMIT 1
-    `).get(platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
+    `).all(platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; model_scope_json: string | null }[];
+    // Per-key model scope (#657): a relay key scoped to a chat model group must
+    // never be picked to serve the moderation model — the same wall the chat
+    // router and search pools honour. Walk the platform's keys in the old
+    // first-key order and take the first one the scope admits.
+    const key = keys.find(k => scopeAllows(parseModelScope(k.model_scope_json), ep.modelId));
     if (key) {
       rows.push({
         platform,
@@ -161,6 +167,9 @@ function logModerationRequest(
       INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
       VALUES (?, ?, ?, ?, 0, 0, ?, ?, 'moderation', ?, ?, ?)
     `).run(row.platform, row.modelId, row.keyId, status, latencyMs, error, client.ip, client.userAgent, client.agent);
+    // Soft budget alert (#1158 follow-on): the ledger trigger fired with this
+    // row, so compare the caps once. No-op for uncapped keys.
+    if (status === 'success' && row.keyId != null) noteBudgetAlerts(row.keyId);
   } catch (e) {
     console.error('Failed to log moderation request:', e);
   }

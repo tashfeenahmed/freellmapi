@@ -235,6 +235,14 @@ export abstract class BaseProvider {
    * on outgoing requests. Defaults to false; set by subclasses. */
   keyless = false;
 
+  /** Whether this built-in platform can serve chat completions (#1741). Search,
+   * speech and decision integrations register so their keys pool and
+   * health-check like every other platform, but their adapters refuse chat.
+   * False lets POST /api/models reject chat registrations up front and keeps
+   * the router from walking a chain entry that can only ever fail. Defaults to
+   * true; overridden by subclasses. */
+  readonly supportsChat: boolean = true;
+
   abstract chatCompletion(
     apiKey: string,
     messages: ChatMessage[],

@@ -450,6 +450,7 @@
     "adding": "ထပ်ထည့်နေသည်...",
     "selectProvider": "ပံ့ပိုးသူတစ်ဦးကို ရွေးချယ်ပါ...",
     "accountId": "အကောင့် ID",
+    "projectId": "ပရောဂျက် ID",
     "label": "တံဆိပ်",
     "noKeyNeeded": "(သော့မလိုအပ်ပါ)",
     "outboundProxy": "အပြင်သို့ proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "လစဉ်တိုကင်အကန့်အသတ်",
     "capUnlimitedPlaceholder": "အကန့်အသတ်မရှိ",
     "capEditHint": "အကန့်အသတ်များကို လ၏ ပထမရက် ၀၀:၀၀ UTC တွင် ပြန်ချမှတ်သည်။ မရှိလိုပါက ဗလာထားပါ။",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ယခုလ တောင်းဆိုမှု {requests}၊ တိုကင် {tokens}",
     "quotaBalanceHint": "{limit} {metric} အနက် {remaining} ကျန်သည်",
-    "quotaBalanceLeft": "{remaining} ကျန်သည်"
-,
+    "quotaBalanceLeft": "{remaining} ကျန်သည်",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "၃၀ ရက်",
     "range90d": "၉၀ ဒီ",
+    "rangeAll": "အချိန်အားလုံး",
+    "rangeAllNote": "အဓိကစုစုပေါင်းများသည် အချိန်အားလုံးအတွက် ဖြစ်သည်။ အောင်မြင်မှုနှုန်းနှင့် အောက်ပါအသေးစိတ်များသည် ဤထည့်သွင်းမှု သိမ်းဆည်းထားဆဲ မှတ်တမ်းကို ဖော်ပြသည်။",
     "requests": "တောင်းဆိုချက်များ",
     "successRate": "အောင်မြင်မှုနှုန်း",
     "inputTokens": "ထည့်သွင်းထားသော token များ",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "နောက်ပြန်လှည့်ရန် ကြိုးစားမှုများ",
     "savingsHint": "နောက်ဆုံး ${actual} ကို {range} လောက် သိမ်းထားတယ်။ ဒါဟာ မော်ဒယ်အလိုက် စျေးနှုန်းဖြင့် ပေးသွင်းထားသော API များတွင် တူညီသော token များ၏ ကုန်ကျစရိတ်ဖြစ်သည်။ ပြသထားသော နံပါတ်သည် နောက်ဆုံး ဒေတာ {span} မှ ၃၀ ရက်အထိ သင့်အမြန်နှုန်းကို ခန့်မှန်းသည်။",
     "savingsHintExact": "နောက်ဆုံး ${actual} ကို {range} လောက် သိမ်းထားတယ်။ ဒါဟာ မော်ဒယ်အလိုက် စျေးနှုန်းဖြင့် ပေးသွင်းထားသော API များတွင် တူညီသော token များ၏ ကုန်ကျစရိတ်ဖြစ်သည်။ ပြထားတဲ့နံပါတ်က သင့်ရဲ့ တကယ့် ၃၀ ရက်စုစုပေါင်းပါ။",
+    "savingsHintAll": "သိမ်းဆည်းထားသော မှတ်တမ်းအားလုံးတွင် ${actual} ချွေတာခဲ့သည်။ တူညီသော token များကို ငွေပေး API များတွင် မော်ဒယ်တစ်ခုချင်းစီ၏ ဈေးနှုန်းဖြင့် သုံးလျှင် ကုန်ကျမည့် ပမာဏဖြစ်သည်။ ပြသထားသော ကိန်းဂဏန်းသည် နောက်ဆုံး {span} ဒေတာမှ သင့်မကြာသေးမီ အရှိန်ကို ရက် 30 အပြည့်သို့ ခန့်မှန်းတွက်ချက်သည်။",
     "requestsHintPinned": "{pinned} မော်ဒယ်တစ်ခုကို အမည်ဖြင့် သတ်မှတ်ထားသည်။ {honored} pinned မော်ဒယ်ဖြင့် ဝန်ဆောင်မှုပေးခဲ့သည်။ {failed} အခြားတစ်ခုသို့ မအောင်မြင်ခဲ့ပါ။ ကျန်ရှိသော ရထားများကို အလိုအလျောက် လမ်းကြောင်းဖြင့် သွားခဲ့သည်။",
     "requestsHintAuto": "ဤကာလအတွင်း တောင်းဆိုမှုအားလုံးကို အလိုအလျောက် လမ်းညွှန်ပေးခဲ့သည်။ မည်သည့် client မှ မော်ဒယ်တစ်ခုကို အမည်ဖြင့် pin မလုပ်ခဲ့ပါ။",
     "requestsHintTypes": "{chat} စကားပြောခြင်းနှင့် {embedding} ထည့်သွင်းခြင်းတောင်းဆိုမှုများ ပြုလုပ်နိုင်သည်။",
@@ -872,7 +882,9 @@
     "emptyDescription": "ဆာဗာက ရေးသားသည်နှင့်အမျှ အချက်အလက်များ ဤနေရာတွင် ပေါ်လာပါမည်။ ရလဒ်ရှိမည်ဟု မျှော်လင့်ပါက အဆင့်၊ ဝန်ဆောင်မှုပေးသူ သို့မဟုတ် ရှာဖွေမှု စစ်ထုတ်ချက်များကို ကျယ်ပြန့်အောင် ပြင်ပါ။",
     "noLevelsTitle": "အဆင့် တစ်ခုမျှ မရွေးထားပါ",
     "noLevelsDescription": "မှတ်တမ်းများ မြင်ရရန် အနည်းဆုံး အဆင့်တစ်ခု ဖွင့်ပါ။",
-    "loadFailed": "ဆာဗာမှတ်တမ်းကို တင်၍မရပါ။"
+    "loadFailed": "ဆာဗာမှတ်တမ်းကို တင်၍မရပါ။",
+    "eventFilter": "အီးဗင့်",
+    "allEvents": "အီးဗင့်အားလုံး"
   },
   "playground": {
     "title": "ကစားကွင်း",

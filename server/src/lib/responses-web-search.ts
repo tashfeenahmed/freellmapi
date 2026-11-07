@@ -136,7 +136,7 @@ class ResponsesSse {
 
   complete(response: Item): void {
     this.stopHeartbeat();
-    this.write('response.completed', { response });
+    this.write(response.status === 'incomplete' ? 'response.incomplete' : 'response.completed', { response });
     try { this.res.end(); } catch { /* already closed */ }
   }
 
@@ -246,7 +246,8 @@ export async function maybeServeResponsesWebSearch(
         const finalResponse = {
           ...reply,
           id: responseId,
-          status: 'completed',
+          // Keep a token-limit or content-filter cut visible (see routes/responses.ts).
+          status: reply.status === 'incomplete' ? 'incomplete' : 'completed',
           output: assembled,
           output_text: assembled.map(itemText).join(''),
           usage: {

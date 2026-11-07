@@ -450,6 +450,7 @@
     "adding": "Dodajem...",
     "selectProvider": "Odaberite pružatelja usluga...",
     "accountId": "ID računa",
+    "projectId": "ID projekta",
     "label": "Izdavačka kuća",
     "noKeyNeeded": "(nije potreban ključ)",
     "outboundProxy": "Odlazni proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Mjesečno ograničenje tokena",
     "capUnlimitedPlaceholder": "Neograničeno",
     "capEditHint": "Ograničenja se resetiraju 1. u 00:00 UTC. Ostavite prazno za neograničeno.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} zahtjeva, {tokens} tokena ovaj mjesec",
     "quotaBalanceHint": "Preostalo {remaining} od {limit} {metric}",
-    "quotaBalanceLeft": "Preostalo {remaining}"
-,
+    "quotaBalanceLeft": "Preostalo {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Cijelo vrijeme",
+    "rangeAllNote": "Glavni zbrojevi odnose se na cijelo vrijeme. Stopa uspjeha i raščlambe ispod pokrivaju povijest koju ova instalacija još čuva.",
     "requests": "Zahtjevi",
     "successRate": "Stopa uspješnosti",
     "inputTokens": "Ulazni tokeni",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Pokušaji povlačenja",
     "savingsHint": "Zapravo si uštedio ${actual} u zadnjih {range}. To je cijena iste cijene za iste tokene na plaćenim API-jima, po modelu. Prikazani broj projicira vaš tempo od posljednjih {span} podataka do punih 30 dana.",
     "savingsHintExact": "Zapravo si uštedio ${actual} u zadnjih {range}. To je cijena iste cijene za iste tokene na plaćenim API-jima, po modelu. Prikazani broj je vaš stvarni ukupni iznos za 30 dana.",
+    "savingsHintAll": "Uštedjeli ste ${actual} kroz svu sačuvanu povijest. Toliko bi isti tokeni koštali na plaćenim API-jima, po cijeni svakog modela. Prikazani broj projicira vaš nedavni tempo iz posljednjih {span} podataka na punih 30 dana.",
     "requestsHintPinned": "{pinned} od tih zahtjeva označilo je određeni model po imenu. {honored} su služili modeli s pričvršćivačima; {failed} je prešla na drugu. Ostali su automatski usmjereni.",
     "requestsHintAuto": "Svi zahtjevi u tom razdoblju bili su automatski usmjereni; nijedan klijent nije zakačio određeni model po imenu.",
     "requestsHintTypes": "{chat} chat i {embedding} zahtjeve za ugrađivanje.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Unosi se pojavljuju ovdje čim ih server zapiše. Proširite filtre razine, pružatelja ili pretrage ako ste očekivali izlaz.",
     "noLevelsTitle": "Nije odabrana nijedna razina",
     "noLevelsDescription": "Uključite barem jednu razinu da biste vidjeli sadržaj loga.",
-    "loadFailed": "Nije moguće učitati log servera."
+    "loadFailed": "Nije moguće učitati log servera.",
+    "eventFilter": "Događaj",
+    "allEvents": "Svi događaji"
   },
   "playground": {
     "title": "Igralište",

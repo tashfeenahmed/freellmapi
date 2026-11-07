@@ -197,6 +197,9 @@ curl "http://localhost:3001/v1beta/models/gemini-2.5-flash:generateContent" \
 
 Gemini model names like `gemini-2.5-flash` resolve through the Gemini family map (Keys → Gemini model mapping) rather than the catalog directly, so they route to Auto or whichever catalog model each family is pinned to. Catalog ids work verbatim too.
 
+A client-profile key (`sk-cp-…`) authenticates the `/v1beta` generate/stream routes as
+well, with its enforced prompt injected ahead of `systemInstruction`.
+
 `contents` text, inline data, function calls/responses, system instructions,
 function declarations, structured JSON output, generation controls, and
 thinking budgets translate into the same internal chat/fallback pipeline.
@@ -361,6 +364,10 @@ curl http://localhost:3001/v1/messages \
   }'
 ```
 
+A **client-profile key** (`sk-cp-…`, see the dashboard's Profiles page) authenticates
+`/v1/messages` too: the profile's server-enforced system prompt is injected ahead of the
+caller's `system` turn, exactly as on `/v1/chat/completions`.
+
 Claude model names map to your free pool on the **Keys → Anthropic** tab: each family (`default`, `opus`, `sonnet`, `haiku`) routes to `auto` (the router picks a free model) or a model you pin. `POST /v1/messages/count_tokens` and a content-negotiated `GET /v1/models` (Anthropic shape when `anthropic-version` is sent) are implemented too. Streaming, system prompts, tool use, and image input all translate across the same router as the OpenAI endpoints.
 
 **Claude Code** — point it at your server and start it:
@@ -509,6 +516,16 @@ pointing to the next UTC month. OpenAI-compatible endpoints also return
 `error.code: "quota_exceeded"`; other protocol adapters preserve their native
 error format. Fusion subcalls obey the caps but retain Fusion's aggregate error
 format. If another key has capacity, normal fallback can use it.
+
+Crossing 80% and again 100% of either cap logs a soft budget alert — a
+structured `key_budget_threshold` event in the dashboard's Logs page (the same
+viewer as provider logs), naming the key, the cap kind, the usage and the reset
+time. Each threshold fires once per key per UTC month, so a key cannot flood the
+log. This mirrors LiteLLM's budget alerts and OpenRouter's per-key spend-limit
+alert: the warning arrives while requests still flow, before the hard `429`.
+Set `BUDGET_ALERT_WEBHOOK_URL` to also POST each alert as JSON
+(`type: freellmapi.key_budget_threshold`) to a webhook, such as a Slack or
+Discord workflow.
 
 Embeddings additionally relay the upstream providers' own back-off. A provider
 that answers `429` is simply skipped for the next one in the family; only when

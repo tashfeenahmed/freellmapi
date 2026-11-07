@@ -450,6 +450,7 @@
     "adding": "ემატება…",
     "selectProvider": "აირჩიეთ პროვაიდერი…",
     "accountId": "ანგარიშის ID",
+    "projectId": "პროექტის ID",
     "label": "ლეიბლი",
     "noKeyNeeded": "(გასაღები არ არის საჭირო)",
     "outboundProxy": "გამავალი პროქსი",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "თვიური ტოკენების ლიმიტი",
     "capUnlimitedPlaceholder": "შეუზღუდავი",
     "capEditHint": "ლიმიტები სათითაო თვის 1-ს 00:00 UTC აღდგება. დატოვეთ ცარიელი შეუზღუდავისთვის.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ამ თვეში {requests} მოთხოვნა, {tokens} ტოკენი",
     "quotaBalanceHint": "დარჩა {remaining} / {limit} {metric}",
-    "quotaBalanceLeft": "დარჩა {remaining}"
-,
+    "quotaBalanceLeft": "დარჩა {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7დ",
     "range30d": "30 დ",
     "range90d": "90 დ",
+    "rangeAll": "მთელი დრო",
+    "rangeAllNote": "მთავარი ჯამები მთელ დროს მოიცავს. წარმატების მაჩვენებელი და ქვემოთ მოცემული დეტალები მოიცავს ისტორიას, რომელსაც ეს ინსტალაცია ჯერ კიდევ ინახავს.",
     "requests": "ითხოვს",
     "successRate": "წარმატების მაჩვენებელი",
     "inputTokens": "შეიტანეთ ნიშნები",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "სარეზერვო მცდელობები",
     "savingsHint": "თქვენ რეალურად დაზოგეთ ${actual} ბოლო {range}-ზე. ეს არის ის, რაც იგივე ტოკენები დაჯდებოდა ფასიან API-ებზე, თითო მოდელის ფასით. ნაჩვენები რიცხვი ასახავს თქვენს ტემპს ბოლო {span} მონაცემებიდან სრულ 30 დღემდე.",
     "savingsHintExact": "თქვენ რეალურად დაზოგეთ ${actual} ბოლო {range}-ზე. ეს არის ის, რაც იგივე ტოკენები დაჯდებოდა ფასიან API-ებზე, თითო მოდელის ფასით. ნაჩვენები რიცხვი არის თქვენი რეალური 30 დღიანი ჯამი.",
+    "savingsHintAll": "შენახულ მთელ ისტორიაში დაზოგეთ ${actual}. ამდენი დაჯდებოდა იგივე ტოკენები ფასიან API-ებზე, თითოეული მოდელის ფასით. ნაჩვენები რიცხვი ბოლო {span} მონაცემების მიხედვით თქვენს ბოლოდროინდელ ტემპს სრულ 30 დღეზე ავრცელებს.",
     "requestsHintPinned": "ამ მოთხოვნებიდან {pinned}-მ დაასახელა კონკრეტული მოდელი სახელით. {honored} ემსახურებოდა დამაგრებული მოდელის მიერ; {failed} ვერ გადავიდა სხვაზე. დანარჩენს ავტომატური მარშრუტი გაუკეთეს.",
     "requestsHintAuto": "ამ პერიოდის ყველა მოთხოვნა განხორციელდა ავტომატური მარშრუტით; არცერთმა კლიენტმა არ დაასახელა კონკრეტული მოდელი სახელით.",
     "requestsHintTypes": "{chat} ჩატი და {embedding} ჩაშენების მოთხოვნები.",
@@ -872,7 +882,9 @@
     "emptyDescription": "ჩანაწერები აქ გამოჩნდება, როგორც კი სერვერი ჩაწერს მათ. თუ გამოტანას ელოდით, გააფართოვეთ დონის, პროვაიდერის ან ძებნის ფილტრები.",
     "noLevelsTitle": "დონეები არჩეული არ არის",
     "noLevelsDescription": "ჩართეთ ერთი დონე მაინც, რომ ჟურნალის გამოტანა ნახოთ.",
-    "loadFailed": "სერვერის ჟურნალის ჩატვირთვა ვერ მოხერხდა."
+    "loadFailed": "სერვერის ჟურნალის ჩატვირთვა ვერ მოხერხდა.",
+    "eventFilter": "მოვლენა",
+    "allEvents": "ყველა მოვლენა"
   },
   "playground": {
     "title": "სათამაშო მოედანი",

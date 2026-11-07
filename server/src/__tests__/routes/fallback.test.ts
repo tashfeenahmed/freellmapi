@@ -459,4 +459,14 @@ describe('Fallback API', () => {
     const { status } = await request(app, 'POST', '/api/fallback/sort/invalid');
     expect(status).toBe(400);
   });
+
+  it('POST /api/fallback/sort/constructor returns 400, not 500', async () => {
+    // Inherited Object members (`constructor`, `toString`, …) are truthy, so
+    // a bare `SORT_PRESETS[preset]` read used to pass the whitelist guard and
+    // crash `prepare()` when the function object got interpolated into SQL.
+    const { status } = await request(app, 'POST', '/api/fallback/sort/constructor');
+    expect(status).toBe(400);
+    const { status: tsStatus } = await request(app, 'POST', '/api/fallback/sort/toString');
+    expect(tsStatus).toBe(400);
+  });
 });

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { clearAllCooldowns, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
+import { getProvider } from '../../providers/index.js';
+import { BraveProvider } from '../../providers/brave.js';
 import {
   runSearch,
   SearchError,
@@ -10,6 +12,9 @@ import {
   searchAnalytics,
   searchAvailable,
   decodeEntities,
+  searchStatus,
+  noSearchMessage,
+  SEARCH_PLATFORM_INFO,
 } from '../../services/search.js';
 import { SEARCH_PLATFORMS as SHARED_SEARCH_PLATFORMS } from '../../../../shared/types.js';
 import { SEARCH_PLATFORMS } from '../../lib/search-platforms.js';
@@ -152,6 +157,75 @@ describe('search service', () => {
     expect(out).toMatchObject({ answer: 'yes', provider: 'linkup', results: [{ title: 'S', url: 'https://s', content: 'src' }] });
   });
 
+  describe('Brave (#1641)', () => {
+    const badKey = { error: { code: 'SUBSCRIPTION_TOKEN_INVALID', detail: 'The provided subscription token is invalid.', status: 422 }, type: 'ErrorResponse' };
+    beforeEach(() => {
+      getDb().prepare(`
+        INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, meta_json)
+        VALUES ('brave', 'brave-search', 'Brave Search', 'search', -1, 1, 'free monthly credits', '{}')
+      `).run();
+    });
+
+    it('searches web and news with the subscription token and maps hits', async () => {
+      addKey('brave');
+      let fn = mockFetch(() => json({ web: { results: [{ title: 'A &amp; B', url: 'https://a', description: 'alpha' }, { title: 'no url' }] } }));
+      let out = await runSearch('cats & dogs', { maxResults: 3 });
+      const url = new URL(calls(fn)[0][0]);
+      expect(`${url.origin}${url.pathname}`).toBe('https://api.search.brave.com/res/v1/web/search');
+      expect(url.searchParams.get('q')).toBe('cats & dogs');
+      expect(url.searchParams.get('count')).toBe('3');
+      // Brave decorates matched terms with <strong> unless asked not to;
+      // without this the hits carry raw markup every other engine never emits.
+      expect(url.searchParams.get('text_decorations')).toBe('false');
+      expect(new Headers(calls(fn)[0][1].headers).get('x-subscription-token')).toBe('brave-test-key');
+      expect(out).toMatchObject({ provider: 'brave', engine: 'brave-search', results: [{ title: 'A & B', url: 'https://a', content: 'alpha', score: 1 }] });
+
+      fn = mockFetch(() => json({ results: [{ title: 'N', url: 'https://n', description: 'fresh' }] }));
+      out = await runSearch('q', { topic: 'news' });
+      expect(new URL(calls(fn)[0][0]).pathname).toBe('/res/v1/news/search');
+      expect(out.results).toEqual([{ title: 'N', url: 'https://n', content: 'fresh', score: 1 }]);
+    });
+
+    it('benches a key Brave rejects (422 SUBSCRIPTION_TOKEN_INVALID), but not a key whose request was refused (422 VALIDATION)', async () => {
+      const key = addKey('brave');
+      mockFetch(() => json({ error: { code: 'VALIDATION', detail: 'Unable to validate request parameter(s)', status: 422 } }, 422));
+      await expect(runSearch('q', { engine: 'brave-search' })).rejects.toBeInstanceOf(SearchError);
+      expect(isOnCooldown('brave', 'brave-search', key)).toBe(false);
+
+      mockFetch(() => json(badKey, 422));
+      await expect(runSearch('q', { engine: 'brave-search' })).rejects.toBeInstanceOf(SearchError);
+      expect(isOnCooldown('brave', 'brave-search', key)).toBe(true);
+    });
+
+    it('cools a rate-limited key down only for the one-second burst window', async () => {
+      const key = addKey('brave');
+      mockFetch(() => json({ error: { code: 'RATE_LIMITED', detail: 'Request rate limit exceeded for plan' } }, 429));
+      await expect(runSearch('q', { engine: 'brave-search' })).rejects.toBeInstanceOf(SearchError);
+      expect(isOnCooldown('brave', 'brave-search', key)).toBe(true);
+      const later = Date.now() + 2_000;
+      vi.spyOn(Date, 'now').mockReturnValue(later);
+      expect(isOnCooldown('brave', 'brave-search', key)).toBe(false);
+    });
+
+    it('parks a key whose monthly credit is spent (429 QUOTA_LIMITED) for the long credit cooldown', async () => {
+      const key = addKey('brave');
+      mockFetch(() => json({ error: { code: 'QUOTA_LIMITED', detail: 'Request quota limit exceeded for plan' } }, 429));
+      await expect(runSearch('q', { engine: 'brave-search' })).rejects.toBeInstanceOf(SearchError);
+      const later = Date.now() + 60 * 60_000;
+      vi.spyOn(Date, 'now').mockReturnValue(later);
+      expect(isOnCooldown('brave', 'brave-search', key)).toBe(true);
+    });
+
+    it('validates a key with a free no-query request: bad token is invalid, VALIDATION means the key is fine', async () => {
+      const brave = new BraveProvider();
+      mockFetch(() => json(badKey, 422));
+      expect(await brave.validateKey('bad')).toMatchObject({ valid: false });
+      mockFetch(() => json({ error: { code: 'VALIDATION', detail: 'Unable to validate request parameter(s)', status: 422 } }, 422));
+      expect(await brave.validateKey('good')).toBe(true);
+      expect(brave.supportsKeyPolling).toBe(false);
+    });
+  });
+
   describe('Parallel (keyless)', () => {
     function seedParallel(): void {
       getDb().prepare(`
@@ -230,6 +304,64 @@ describe('search service', () => {
         : json({ results: [{ title: 'T', url: 'https://t', content: 'c' }] }));
       const out = await runSearch('q');
       expect(out.provider).toBe('tavily');
+    });
+  });
+
+  describe('Keenable (keyless)', () => {
+    function seedKeenable(): void {
+      getDb().prepare(`
+        INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, meta_json)
+        VALUES ('keenable', 'keenable-search', 'Keenable Search', 'search', 5, 1, 'Free, no key needed', '{}')
+      `).run();
+    }
+    const hits = { results: [
+      { url: 'https://a', title: 'A &amp; B', description: '', snippet: 'one', published_at: '2026-05-05T00:00:00Z' },
+      { url: 'https://b', title: '', description: '', snippet: 'x'.repeat(2_000) },
+      { url: '', title: 'dropped', description: '', snippet: 'x' },
+    ] };
+
+    it('searches the public endpoint with the stored sentinel and maps snippets', async () => {
+      seedKeenable();
+      addKey('keenable', 'no-key');
+      expect(searchAvailable()).toBe(true);
+      const fn = mockFetch(() => json(hits));
+      const out = await runSearch('node version');
+      const [url, init] = calls(fn)[0];
+      expect(url).toBe('https://api.keenable.ai/v1/search/public');
+      expect((init.headers as Record<string, string>)['X-Keenable-Title']).toBe('freellmapi');
+      expect((init.headers as Record<string, string>)['X-API-Key']).toBeUndefined();
+      expect(bodyOf(calls(fn)[0])).toEqual({ query: 'node version', max_results: 5 });
+      expect(out).toMatchObject({ provider: 'keenable', engine: 'keenable-search' });
+      expect(out.results).toEqual([
+        { title: 'A & B', url: 'https://a', content: 'one', score: 1 },
+        { title: 'https://b', url: 'https://b', content: `${'x'.repeat(1_500)}…`, score: 0.5 },
+      ]);
+    });
+
+    it('uses the keyed endpoint with X-API-Key when a real key is stored', async () => {
+      seedKeenable();
+      addKey('keenable', 'real-keenable-key');
+      const fn = mockFetch(() => json(hits));
+      const out = await runSearch('q', { maxResults: 1 });
+      const [url, init] = calls(fn)[0];
+      expect(url).toBe('https://api.keenable.ai/v1/search');
+      expect((init.headers as Record<string, string>)['X-API-Key']).toBe('real-keenable-key');
+      expect(bodyOf(calls(fn)[0])).toEqual({ query: 'q', max_results: 1 });
+      expect(out.results).toHaveLength(1);
+    });
+
+    it('cools a rate-limited keyless row down and fails over to the next engine', async () => {
+      seedKeenable();
+      addKey('keenable', 'no-key');
+      addKey('tavily');
+      updateSearchEngine(listSearchEngines().find(e => e.engineId === 'keenable-search')!.id, { priority: 0 });
+      const fn = mockFetch(url => url.startsWith('https://api.keenable.ai')
+        ? json({ error: 'Too many requests' }, 429, { 'retry-after': '30' })
+        : json({ results: [{ title: 'T', url: 'https://t', content: 'c' }] }));
+      expect((await runSearch('q')).provider).toBe('tavily');
+      // The benched Keenable row is skipped on the next search.
+      await runSearch('q2');
+      expect(calls(fn).map(c => new URL(c[0]).host)).toEqual(['api.keenable.ai', 'api.tavily.com', 'api.tavily.com']);
     });
   });
 
@@ -358,5 +490,82 @@ describe('decodeEntities', () => {
     expect(decodeEntities('Tom &amp; Jerry &quot;live&quot; &#x2014; &nbsp;ok')).toBe('Tom & Jerry "live" \u2014  ok');
     expect(decodeEntities('&bogus; stays')).toBe('&bogus; stays');
     expect(decodeEntities('plain')).toBe('plain');
+  });
+  it('leaves lone-surrogate entities verbatim instead of corrupting the string', () => {
+    // Obfuscated-email bait on scraped pages renders as a lone surrogate
+    // entity. String.fromCodePoint happily "decodes" it, producing a string
+    // that is not valid UTF-16: JSON.stringify turns it into U+FFFD escapes
+    // and strict encoders/serialisers choke on it. The entity must survive
+    // untouched, exactly like the out-of-range case (&#x110000;).
+    expect(decodeEntities('contact &#xD800; us')).toBe('contact &#xD800; us');
+    expect(decodeEntities('tail &#xDFFF; end')).toBe('tail &#xDFFF; end');
+    expect(decodeEntities('&#65533;?')).toBe('\uFFFD?'); // real replacement char still decodes
+    expect(decodeEntities('&#x110000; too big')).toBe('&#x110000; too big');
+    expect(decodeEntities('&#x1F600; emoji')).toBe('\u{1F600} emoji');
+  });
+});
+
+describe('search status and the no-engine message', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    seedSearchEngines();
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+  });
+
+  const addEngine = (platform: string, engineId: string, enabled = 1) => getDb().prepare(`
+    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+    VALUES (?, ?, ?, 'search', 10, ?, 'free')
+  `).run(platform, engineId, engineId, enabled);
+
+  it('covers every search platform and matches each provider\'s keyless flag', () => {
+    expect(Object.keys(SEARCH_PLATFORM_INFO).sort()).toEqual([...SEARCH_PLATFORMS].sort());
+    for (const p of SEARCH_PLATFORMS) {
+      expect(Boolean(SEARCH_PLATFORM_INFO[p]!.keyless), p).toBe(Boolean(getProvider(p)?.keyless));
+    }
+  });
+
+  it('separates keyless keys whose engine is missing from the installed catalog', async () => {
+    // Free catalog without Parallel or Keenable rows, both set up keyless.
+    addKey('parallel', 'no-key');
+    addKey('keenable', 'no-key');
+    const s = searchStatus();
+    expect(s.status).toBe('needs_configuration');
+    expect(s.missing_from_catalog).toEqual(['parallel', 'keenable']);
+    expect(s.engines.map(e => e.state)).toEqual(['needs_key', 'needs_key', 'needs_key', 'needs_key']);
+    const msg = noSearchMessage(s);
+    expect(msg).toContain('Parallel and Keenable are set up on the Keys page, but the installed catalog has no engines for them yet');
+    expect(msg).toContain('add a Tavily, Exa, Firecrawl or Linkup key');
+    expect(msg).not.toContain('no key needed');
+    await expect(runSearch('q')).rejects.toMatchObject({ status: 503, code: 'no_search_keys', message: msg });
+  });
+
+  it('offers a keyless engine only when the installed catalog has it', () => {
+    addEngine('keenable', 'keenable-search');
+    expect(noSearchMessage()).toContain('add Keenable (no key needed), or add a Tavily, Exa, Firecrawl or Linkup key on the Keys page');
+    expect(searchStatus().missing_from_catalog).toEqual([]);
+  });
+
+  it('reports failed keys, turned-off engines and cooldowns per engine', () => {
+    const exa = addKey('exa');
+    getDb().prepare("UPDATE api_keys SET status = 'invalid' WHERE platform = 'exa'").run();
+    addKey('linkup');
+    getDb().prepare("UPDATE media_models SET enabled = 0 WHERE platform = 'linkup'").run();
+    const tavily = addKey('tavily');
+    setCooldown('tavily', 'tavily-search', tavily, 60_000);
+    const s = searchStatus();
+    expect(Object.fromEntries(s.engines.map(e => [e.platform, e.state]))).toEqual({
+      tavily: 'cooling_down', exa: 'key_error', firecrawl: 'needs_key', linkup: 'disabled',
+    });
+    expect(s.status).toBe('cooling_down');
+    const msg = noSearchMessage(s);
+    expect(msg).toContain('The Exa key failed its last check');
+    expect(msg).toContain('Turned off under Models → Search: Linkup.');
+    expect(exa).toBeGreaterThan(0);
+  });
+
+  it('is ready once one engine has a usable key', () => {
+    addKey('firecrawl');
+    expect(searchStatus().status).toBe('ready');
   });
 });

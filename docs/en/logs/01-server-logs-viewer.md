@@ -53,6 +53,7 @@ Cursor-based pagination built for a dashboard that polls every few seconds.
 | `levels` | `csv` (optional) | Comma-separated level filter: `trace,debug,info,warn,error`. Unknown levels return `400`. |
 | `q` | `string` (optional) | Case-insensitive text search across `message`, `provider`, `source`, `event`. |
 | `provider` | `string` (optional) | Exact provider name filter (e.g., `openai`, `anthropic`). |
+| `event` | `string` (optional) | Exact structured event name filter (e.g., `key_invalid`, `key_budget_threshold`). Composable with `provider`. |
 | `limit` | `integer` (optional) | Clamped to `[1, 500]`, default `200`. |
 
 **Response:**
@@ -152,6 +153,10 @@ see exactly the same lines in the dashboard that they would see in the terminal.
   debug=muted) with live counts from the `counts` payload.
 - **Provider dropdown:** Populated dynamically from the `provider` field of
   entries seen in the current stream.
+- **Event dropdown:** Same accumulate-as-you-stream contract as the provider
+  dropdown, built from the `event` field — the quick path to the structured
+  operational events (budget thresholds, key invalidation, cooldown recovery)
+  without typing exact strings into free text.
 - **Clear button:** Confirmed action calling `POST /api/logs/clear`, then
   invalidates the query cache and resets local state.
 

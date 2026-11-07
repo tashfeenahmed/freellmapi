@@ -450,6 +450,7 @@
     "adding": "Přidávám...",
     "selectProvider": "Vyberte poskytovatele...",
     "accountId": "ID účtu",
+    "projectId": "ID projektu",
     "label": "Vydavatelství",
     "noKeyNeeded": "(klíč není potřeba)",
     "outboundProxy": "Odchozí proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Měsíční limit tokenů",
     "capUnlimitedPlaceholder": "Neomezeno",
     "capEditHint": "Limity se resetují 1. dne v 00:00 UTC. Nechte prázdné pro neomezeno.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} požadavků, {tokens} tokenů tento měsíc",
     "quotaBalanceHint": "Zbývá {remaining} z {limit} {metric}",
-    "quotaBalanceLeft": "Zbývá {remaining}"
-,
+    "quotaBalanceLeft": "Zbývá {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Celkově",
+    "rangeAllNote": "Hlavní součty jsou za celou dobu. Úspěšnost a přehledy níže pokrývají historii, kterou tato instalace stále uchovává.",
     "requests": "Požadavky",
     "successRate": "Úspěšnost",
     "inputTokens": "Vstupní tokeny",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Záložní pokusy",
     "savingsHint": "Ve skutečnosti jsi za poslední {range} ušetřil ${actual}. To je cena, kterou by stejné tokeny stály na placených API, oceněné podle modelu. Zobrazené číslo promítá vaše tempo od posledního {span} dat na plných 30 dní.",
     "savingsHintExact": "Ve skutečnosti jsi za poslední {range} ušetřil ${actual}. To je cena, kterou by stejné tokeny stály na placených API, oceněné podle modelu. Zobrazené číslo je váš skutečný 30denní součet.",
+    "savingsHintAll": "Za celou uchovanou historii jste ušetřili ${actual}. Tolik by stejné tokeny stály u placených API, podle ceny každého modelu. Zobrazené číslo promítá vaše nedávné tempo z posledních {span} dat na celých 30 dní.",
     "requestsHintPinned": "{pinned} z těchto požadavků připnuly konkrétní model jménem. {honored} obsluhoval model s připnutým kolíkem; {failed} přešel na jiný. Ostatní byly automaticky směrovány.",
     "requestsHintAuto": "Všechny požadavky v tomto období byly automaticky směrovány; žádný klient nepřipnul konkrétní model jménem.",
     "requestsHintTypes": "{chat} chat a {embedding} žádosti o vložení.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Záznamy se zde objeví, jakmile je server zapíše. Pokud jste čekali výstup, rozšiřte filtry úrovně, poskytovatele nebo hledání.",
     "noLevelsTitle": "Není vybrána žádná úroveň",
     "noLevelsDescription": "Zapněte alespoň jednu úroveň, abyste viděli výstup logu.",
-    "loadFailed": "Log serveru se nepodařilo načíst."
+    "loadFailed": "Log serveru se nepodařilo načíst.",
+    "eventFilter": "Událost",
+    "allEvents": "Všechny události"
   },
   "playground": {
     "title": "Hřiště",

@@ -450,6 +450,7 @@
     "adding": "新增中...",
     "selectProvider": "請選擇一個提供者...",
     "accountId": "帳戶 ID",
+    "projectId": "專案 ID",
     "label": "標籤",
     "noKeyNeeded": "（無需金鑰）",
     "outboundProxy": "出站代理",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "每月 Token 上限",
     "capUnlimitedPlaceholder": "無限制",
     "capEditHint": "配額在每月 1 日 00:00 UTC 重設。留空表示無限制。",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "本月 {requests} 次請求，{tokens} tokens",
     "quotaBalanceHint": "剩餘 {remaining} / {limit} {metric}",
-    "quotaBalanceLeft": "剩餘 {remaining}"
-,
+    "quotaBalanceLeft": "剩餘 {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 天",
     "range30d": "30 天",
     "range90d": "90 天",
+    "rangeAll": "全部時間",
+    "rangeAllNote": "頂部總計為全部時間。成功率與下方明細涵蓋此安裝仍保留的歷史紀錄。",
     "requests": "請求數",
     "successRate": "成功率",
     "inputTokens": "輸入 Token",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "備援嘗試",
     "savingsHint": "過去 {range} 實際節省了 ${actual}。這是相同的 Token 在按模型計費的付費 API 上的花費。顯示的數字是根據過去 {span} 的資料按比例推算至 30 天。",
     "savingsHintExact": "在過去 {range}，您實際節省了 ${actual}。這是相同的 Token 在按模型計費的付費 API 上的花費。顯示的數字是真實經過的 30 天總額。",
+    "savingsHintAll": "在全部保留的歷史中，你節省了 ${actual}。這是同樣的權杖在付費 API 上按各模型價格計算的費用。顯示的數字是按最近 {span} 資料的速度推算的完整 30 天值。",
     "requestsHintPinned": "其中有 {pinned} 個請求用名稱指定了模型。{honored} 個由所指定的模型處理；{failed} 個由其他模型接手。其餘為自動路由。",
     "requestsHintAuto": "在此期間的所有請求均為自動路由；沒有用戶端用名稱指定特定模型。",
     "requestsHintTypes": "{chat} 個對話請求和 {embedding} 個嵌入請求。",
@@ -872,7 +882,9 @@
     "emptyDescription": "伺服器寫入日誌時，項目會顯示在這裡。若預期會有輸出，請放寬等級、提供者或搜尋篩選條件。",
     "noLevelsTitle": "未選擇等級",
     "noLevelsDescription": "至少開啟一個等級才能看到日誌輸出。",
-    "loadFailed": "無法載入伺服器日誌。"
+    "loadFailed": "無法載入伺服器日誌。",
+    "eventFilter": "事件",
+    "allEvents": "全部事件"
   },
   "playground": {
     "title": "遊樂場",

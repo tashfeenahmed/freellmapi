@@ -450,6 +450,7 @@
     "adding": "যোগ করা হচ্ছে...",
     "selectProvider": "একটি প্রদানকারী নির্বাচন করুন...",
     "accountId": "অ্যাকাউন্ট আইডি",
+    "projectId": "প্রকল্প আইডি",
     "label": "লেবেল",
     "noKeyNeeded": "(কোন চাবির প্রয়োজন নেই)",
     "outboundProxy": "আউটবাউন্ড প্রক্সি",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "মাসিক টোকেন সীমা",
     "capUnlimitedPlaceholder": "সীমাহীন",
     "capEditHint": "সীমা প্রতি মাসের ১ তারিখে ০০:০০ UTC-তে রিসেট হয়। সীমাহীন রাখতে খালি রাখুন।",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "এই মাসে {requests} অনুরোধ, {tokens} টোকেন",
     "quotaBalanceHint": "{limit} {metric}-এর মধ্যে {remaining} বাকি",
-    "quotaBalanceLeft": "{remaining} বাকি"
-,
+    "quotaBalanceLeft": "{remaining} বাকি",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "সব সময়",
+    "rangeAllNote": "প্রধান মোটগুলি সব সময়ের। সাফল্যের হার এবং নিচের বিশ্লেষণগুলি এই ইনস্টল এখনও যে ইতিহাস রাখে তা কভার করে।",
     "requests": "অনুরোধ",
     "successRate": "সাফল্যের হার",
     "inputTokens": "ইনপুট টোকেন",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ফলব্যাক প্রচেষ্টা",
     "savingsHint": "আপনি আসলে শেষ {range} থেকে ${actual} সংরক্ষণ করেছেন। একই টোকেনগুলির দাম প্রতি মডেলের দামের জন্য প্রদত্ত এপিআই-এ খরচ হবে৷ দেখানো সংখ্যাটি শেষ {span} ডেটা থেকে সম্পূর্ণ 30 দিন পর্যন্ত আপনার গতি প্রজেক্ট করে।",
     "savingsHintExact": "আপনি আসলে শেষ {range} থেকে ${actual} সংরক্ষণ করেছেন। একই টোকেনগুলির দাম প্রতি মডেলের দামের জন্য প্রদত্ত এপিআই-এ খরচ হবে৷ দেখানো সংখ্যাটি আপনার প্রকৃত 30-দিনের মোট।",
+    "savingsHintAll": "সংরক্ষিত সমস্ত ইতিহাস জুড়ে আপনি ${actual} সাশ্রয় করেছেন। একই টোকেন পেইড API-তে মডেল অনুযায়ী মূল্যে এটাই খরচ হতো। দেখানো সংখ্যাটি শেষ {span} ডেটা থেকে আপনার সাম্প্রতিক গতিকে পূর্ণ 30 দিনে প্রক্ষেপণ করে।",
     "requestsHintPinned": "এই অনুরোধগুলির মধ্যে {pinned} নামের একটি নির্দিষ্ট মডেল পিন করা হয়েছে৷ {honored} পিন করা মডেল দ্বারা পরিবেশিত হয়েছিল; {failed} অন্য একটিতে ব্যর্থ হয়েছে৷ বাকিগুলো ছিল স্বয়ংক্রিয়ভাবে।",
     "requestsHintAuto": "এই সময়ের মধ্যে সমস্ত অনুরোধ স্বয়ংক্রিয়ভাবে রুট করা হয়েছিল; কোন ক্লায়েন্ট নাম দ্বারা একটি নির্দিষ্ট মডেল পিন.",
     "requestsHintTypes": "{chat} চ্যাট এবং {embedding} এম্বেড করার অনুরোধ।",
@@ -872,7 +882,9 @@
     "emptyDescription": "সার্ভার যেমন লেখে, এন্ট্রিগুলি এখানে দেখা যাবে। আউটপুট আশা করে থাকলে লেভেল, প্রদানকারী বা অনুসন্ধান ফিল্টারের পরিসর বাড়ান।",
     "noLevelsTitle": "কোনো লেভেল নির্বাচিত নয়",
     "noLevelsDescription": "লগ আউটপুট দেখতে অন্তত একটি লেভেল চালু করুন।",
-    "loadFailed": "সার্ভার লগ লোড করা গেল না।"
+    "loadFailed": "সার্ভার লগ লোড করা গেল না।",
+    "eventFilter": "ইভেন্ট",
+    "allEvents": "সমস্ত ইভেন্ট"
   },
   "playground": {
     "title": "খেলার মাঠ",

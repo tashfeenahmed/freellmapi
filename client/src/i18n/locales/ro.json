@@ -450,6 +450,7 @@
     "adding": "Adăugând...",
     "selectProvider": "Alege un furnizor...",
     "accountId": "ID cont",
+    "projectId": "ID proiect",
     "label": "Casă de discuri",
     "noKeyNeeded": "(nu e nevoie de cheie)",
     "outboundProxy": "Proxy Outbound",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Limită lunară de tokeni",
     "capUnlimitedPlaceholder": "Nelimitat",
     "capEditHint": "Limitele se resetează în ziua 1 la 00:00 UTC. Lasă gol pentru nelimitat.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} cereri, {tokens} tokeni luna aceasta",
     "quotaBalanceHint": "Au rămas {remaining} din {limit} {metric}",
-    "quotaBalanceLeft": "Au rămas {remaining}"
-,
+    "quotaBalanceLeft": "Au rămas {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Tot timpul",
+    "rangeAllNote": "Totalurile principale sunt pentru tot timpul. Rata de succes și defalcările de mai jos acoperă istoricul pe care această instalare îl mai păstrează.",
     "requests": "Cereri",
     "successRate": "Rata de succes",
     "inputTokens": "Jetoane de intrare",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Încercări de rezervă",
     "savingsHint": "De fapt, ai salvat ${actual} în ultimele {range}. Asta ar fi costat aceleași tokenuri pe API-urile plătite, prețuiți pe model. Numărul afișat proiectează ritmul tău de la ultimele {span} de date la 30 de zile complete.",
     "savingsHintExact": "De fapt, ai salvat ${actual} în ultimele {range}. Asta ar fi costat aceleași tokenuri pe API-urile plătite, prețuiți pe model. Numărul afișat este totalul real al celor 30 de zile.",
+    "savingsHintAll": "Ați economisit ${actual} în tot istoricul păstrat. Atât ar fi costat aceleași tokenuri pe API-uri plătite, la prețul fiecărui model. Numărul afișat proiectează ritmul dvs. recent din ultimele {span} de date pe 30 de zile complete.",
     "requestsHintPinned": "{pinned} dintre aceste cereri fixau un model specific după nume. {honored} erau deservite de modelul cu pin; {failed} eșuat la altcineva. Restul au fost rutați automat.",
     "requestsHintAuto": "Toate cererile din această perioadă erau rutate automat; niciun client nu fixa un model specific după nume.",
     "requestsHintTypes": "{chat} chat și cererile de {embedding} de încorporare.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Intrările apar aici pe măsură ce serverul le scrie. Lărgește filtrele de nivel, furnizor sau căutare dacă te așteptai la rezultate.",
     "noLevelsTitle": "Niciun nivel selectat",
     "noLevelsDescription": "Activează cel puțin un nivel pentru a vedea jurnalul.",
-    "loadFailed": "Nu s-a putut încărca jurnalul serverului."
+    "loadFailed": "Nu s-a putut încărca jurnalul serverului.",
+    "eventFilter": "Eveniment",
+    "allEvents": "Toate evenimentele"
   },
   "playground": {
     "title": "Locul de joacă",

@@ -450,6 +450,7 @@
     "adding": "Đang thêm…",
     "selectProvider": "Chọn nhà cung cấp…",
     "accountId": "ID tài khoản",
+    "projectId": "ID dự án",
     "label": "Nhãn",
     "noKeyNeeded": "(không cần chìa khóa)",
     "outboundProxy": "Proxy đi",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Giới hạn token hàng tháng",
     "capUnlimitedPlaceholder": "Không giới hạn",
     "capEditHint": "Giới hạn đặt lại vào ngày 1 lúc 00:00 UTC. Để trống để không giới hạn.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} yêu cầu, {tokens} token tháng này",
     "quotaBalanceHint": "Còn {remaining}/{limit} {metric}",
-    "quotaBalanceLeft": "Còn {remaining}"
-,
+    "quotaBalanceLeft": "Còn {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 ngày",
     "range30d": "30 ngày",
     "range90d": "90 ngày",
+    "rangeAll": "Toàn thời gian",
+    "rangeAllNote": "Tổng chính là của toàn thời gian. Tỷ lệ thành công và các phân tích bên dưới bao gồm lịch sử mà bản cài đặt này vẫn lưu giữ.",
     "requests": "Yêu cầu",
     "successRate": "Tỷ lệ thành công",
     "inputTokens": "Mã thông báo đầu vào",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "nỗ lực dự phòng",
     "savingsHint": "Bạn thực sự đã tiết kiệm được ${actual} trong {range} vừa qua. Đó là giá của các mã thông báo tương tự đối với các API trả phí, được định giá cho mỗi mô hình. Con số được hiển thị phản ánh tốc độ của bạn từ dữ liệu {span} cuối cùng đến đủ 30 ngày.",
     "savingsHintExact": "Bạn thực sự đã tiết kiệm được ${actual} trong {range} vừa qua. Đó là giá của các mã thông báo tương tự đối với các API trả phí, được định giá cho mỗi mô hình. Con số hiển thị là tổng thời gian thực trong 30 ngày của bạn.",
+    "savingsHintAll": "Bạn đã tiết kiệm ${actual} trên toàn bộ lịch sử được lưu giữ. Đó là chi phí của cùng số token đó trên các API trả phí, theo giá từng mô hình. Con số hiển thị dự phóng tốc độ gần đây của bạn từ {span} dữ liệu cuối cùng thành trọn 30 ngày.",
     "requestsHintPinned": "{pinned} trong số các yêu cầu này đã ghim một mẫu máy cụ thể theo tên. {honored} được phục vụ bởi mô hình được ghim; {failed} chuyển sang một cái khác không thành công. Phần còn lại được tự động định tuyến.",
     "requestsHintAuto": "Tất cả các yêu cầu trong giai đoạn này đều được định tuyến tự động; không có khách hàng nào ghim một mô hình cụ thể theo tên.",
     "requestsHintTypes": "Yêu cầu trò chuyện {chat} và nhúng {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Các mục sẽ xuất hiện ở đây khi máy chủ ghi nhật ký. Hãy nới rộng bộ lọc mức, nhà cung cấp hoặc tìm kiếm nếu bạn mong có kết quả.",
     "noLevelsTitle": "Chưa chọn mức nào",
     "noLevelsDescription": "Bật ít nhất một mức để xem nội dung nhật ký.",
-    "loadFailed": "Không thể tải nhật ký máy chủ."
+    "loadFailed": "Không thể tải nhật ký máy chủ.",
+    "eventFilter": "Sự kiện",
+    "allEvents": "Tất cả sự kiện"
   },
   "playground": {
     "title": "Sân chơi",

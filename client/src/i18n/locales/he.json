@@ -450,6 +450,7 @@
     "adding": "מוסיף...",
     "selectProvider": "בחר ספק...",
     "accountId": "מזהה חשבון",
+    "projectId": "מזהה פרויקט",
     "label": "תווית",
     "noKeyNeeded": "(אין צורך במפתח)",
     "outboundProxy": "פרוקסי יוצא",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "מכסת טוקנים חודשית",
     "capUnlimitedPlaceholder": "ללא הגבלה",
     "capEditHint": "המכסות מתאפסות ב-1 בחודש ב-00:00 UTC. השאירו ריק כדי להישאר ללא הגבלה.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} בקשות, {tokens} טוקנים החודש",
     "quotaBalanceHint": "נותרו {remaining} מתוך {limit} {metric}",
-    "quotaBalanceLeft": "נותרו {remaining}"
-,
+    "quotaBalanceLeft": "נותרו {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "כל הזמן",
+    "rangeAllNote": "הסכומים הראשיים הם לכל הזמן. שיעור ההצלחה והפירוטים שלמטה מכסים את ההיסטוריה שההתקנה הזו עדיין שומרת.",
     "requests": "בקשות",
     "successRate": "שיעור הצלחה",
     "inputTokens": "טוקני קלט",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ניסיונות גיבוי",
     "savingsHint": "בעצם שמרת ${actual} במהלך {range} האחרון. זה מה שאותם טוקנים היו עולים על APIs בתשלום, לפי דגם. המספר המוצג מעריך את הקצב שלך מ {span} הנתונים האחרון ל-30 יום מלאים.",
     "savingsHintExact": "בעצם שמרת ${actual} במהלך {range} האחרון. זה מה שאותם טוקנים היו עולים על APIs בתשלום, לפי דגם. המספר המוצג הוא סך 30 הימים האמיתי שלך.",
+    "savingsHintAll": "חסכת ${actual} לאורך כל ההיסטוריה השמורה. זה מה שאותם טוקנים היו עולים ב-API בתשלום, לפי מחיר כל מודל. המספר המוצג מקרין את הקצב האחרון שלך מ-{span} האחרונים של הנתונים ל-30 ימים מלאים.",
     "requestsHintPinned": "{pinned} מהבקשות הללו הצמידה דגם מסוים בשמו. {honored} קיבלו שירות על ידי דגם עם סיכה; {failed} נכשל לעבור למערכת אחרת. השאר עברו ניתוב אוטומטי.",
     "requestsHintAuto": "כל הבקשות בתקופה זו ניתבו אוטומטית; אף לקוח לא הצמיד דגם מסוים בשמו.",
     "requestsHintTypes": "{chat} צ'אט ובקשות {embedding} הטמעה.",
@@ -872,7 +882,9 @@
     "emptyDescription": "רשומות יופיעו כאן ככל שהשרת יכתוב אותן. אם ציפית לפלט, הרחב את מסנני הרמה, הספק או החיפוש.",
     "noLevelsTitle": "לא נבחרו רמות",
     "noLevelsDescription": "הפעל לפחות רמה אחת כדי לראות את פלט היומן.",
-    "loadFailed": "לא ניתן לטעון את יומן השרת."
+    "loadFailed": "לא ניתן לטעון את יומן השרת.",
+    "eventFilter": "אירוע",
+    "allEvents": "כל האירועים"
   },
   "playground": {
     "title": "מגרש משחקים",

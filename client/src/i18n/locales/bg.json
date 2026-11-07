@@ -450,6 +450,7 @@
     "adding": "Добавям...",
     "selectProvider": "Изберете доставчик...",
     "accountId": "Идентификация на акаунта",
+    "projectId": "Идентификатор на проекта",
     "label": "Лейбъл",
     "noKeyNeeded": "(не е нужен ключ)",
     "outboundProxy": "Изходящ прокси",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Месечен лимит на токени",
     "capUnlimitedPlaceholder": "Неограничен",
     "capEditHint": "Лимитите се нулират на 1-во число 00:00 UTC. Оставете празно за неограничен.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} заявки, {tokens} токени този месец",
     "quotaBalanceHint": "Остават {remaining} от {limit} {metric}",
-    "quotaBalanceLeft": "Остават {remaining}"
-,
+    "quotaBalanceLeft": "Остават {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "За цялото време",
+    "rangeAllNote": "Основните суми са за цялото време. Процентът на успех и разбивките по-долу обхващат историята, която тази инсталация все още пази.",
     "requests": "Заявки",
     "successRate": "Процент на успех",
     "inputTokens": "Входни токени",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Резервни опити",
     "savingsHint": "Всъщност запази ${actual} през последната {range}. Това е, което биха стрували същите токени при платени API-та, според цената на модел. Показаното число проектира темпото ви от последната {span} данни до пълни 30 дни.",
     "savingsHintExact": "Всъщност запази ${actual} през последната {range}. Това е, което биха стрували същите токени при платени API-та, според цената на модел. Показаното число е реалният ти общ резултат за 30 дни.",
+    "savingsHintAll": "Спестихте ${actual} за цялата запазена история. Толкова биха стрували същите токени при платени API, по цена на модел. Показаното число проектира скорошното ви темпо от последните {span} данни върху пълни 30 дни.",
     "requestsHintPinned": "{pinned} от тези заявки закачиха конкретен модел по име. {honored} се обслужваха от модела с игли; {failed} се провали, преминах към друг. Останалите бяха с автомаршрут.",
     "requestsHintAuto": "Всички заявки през този период бяха автоматично насочени; Нито един клиент не е посочил конкретен модел по име.",
     "requestsHintTypes": "{chat} чат и {embedding} заявки за вграждане.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Записите се появяват тук, докато сървърът ги записва. Разширете филтрите по ниво, доставчик или търсене, ако очаквате изход.",
     "noLevelsTitle": "Няма избрани нива",
     "noLevelsDescription": "Включете поне едно ниво, за да видите изхода от лога.",
-    "loadFailed": "Логът на сървъра не можа да бъде зареден."
+    "loadFailed": "Логът на сървъра не можа да бъде зареден.",
+    "eventFilter": "Събитие",
+    "allEvents": "Всички събития"
   },
   "playground": {
     "title": "Детска площадка",

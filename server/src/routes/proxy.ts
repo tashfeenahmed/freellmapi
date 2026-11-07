@@ -29,7 +29,7 @@ import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
-import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
+import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, exhaustedRetryError, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
@@ -37,10 +37,11 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, type NormalizedModel } from '../services/model-listing.js';
+import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
+import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
 
 export const proxyRouter = Router();
 
@@ -404,14 +405,14 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
                    AND (m.key_id IS NULL OR k.id = m.key_id)
                )
            ) AS usable,
-           (SELECT MAX(m2.context_window)
+           (SELECT json_group_array(m2.context_window)
             FROM profile_models pm2
             JOIN models m2 ON m2.id = pm2.model_db_id AND m2.enabled = 1
-            WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS max_ctx
+            WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS ctxs
     FROM profiles p
     WHERE p.type = 'custom'
     ORDER BY p.sort_order, p.id
-  `).all() as { id: number; name: string; usable: number; max_ctx: number | null }[];
+  `).all() as { id: number; name: string; usable: number; ctxs: string | null }[];
 
   // Claude-family discovery entries (#880). The Anthropic-shaped GET /v1/models
   // in routes/anthropic.ts already lists one id per Claude family so clients
@@ -485,17 +486,20 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
       unavailable_reason: autoContextWindow != null ? null : 'no_models',
     },
     ...claudeFamilyEntries,
-    ...profileRows.map(p => ({
-      id: `auto:${p.name.toLowerCase()}`,
-      object: 'model',
-      created: 0,
-      owned_by: 'freellmapi',
-      name: `Auto: ${p.name} (named fallback chain)`,
-      context_window: p.max_ctx,
-      context_length: p.max_ctx,
-      available: p.usable === 1,
-      unavailable_reason: p.usable === 1 ? null : 'no_models',
-    })),
+    ...profileRows.map(p => {
+      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      return {
+        id: `auto:${p.name.toLowerCase()}`,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: `Auto: ${p.name} (named fallback chain)`,
+        context_window: ctx,
+        context_length: ctx,
+        available: p.usable === 1,
+        unavailable_reason: p.usable === 1 ? null : 'no_models',
+      };
+    }),
     ...esFiltered.map(m => ({
       id: m.id,
       object: 'model',
@@ -541,6 +545,15 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
 // (sk-cp-...) is handed to a downstream client and must not see what every
 // other client spent.
 proxyRouter.get('/usage', (req: Request, res: Response) => {
+  // A URL-token request carries the injected unified key (routes/url-tokens.ts)
+  // — which is precisely why it must not pass a unified-key gate. The token is
+  // handed to a headerless client (a teammate, a widget, a phone app); the
+  // ledger behind this route is every provider key's spend. Same reasoning as
+  // the client-profile refusal below.
+  if ((req as Request & { urlTokenAuthenticated?: boolean }).urlTokenAuthenticated) {
+    res.status(403).json({ error: { message: 'Usage is only available to the unified API key', type: 'permission_error' } });
+    return;
+  }
   const auth = requireInferenceAuth(req, res);
   if (!auth) return;
   if (auth.kind !== 'unified') {
@@ -733,7 +746,7 @@ const toolChoiceSchema = z.union([
 
 const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
 
-function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+export function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
   if (!Array.isArray(stop)) return stop;
   return stop.slice(0, 4);
 }
@@ -968,8 +981,15 @@ const DecisionBody = z.object({
   model: z.string().min(1).optional(),
   state: z.unknown().refine(v => v !== undefined && v !== null && v !== '', { message: 'state is required' }),
   questions: z.record(z.string().min(1).max(100), DecisionQuestionBody)
-    .refine(q => Object.keys(q).length >= 1 && Object.keys(q).length <= 64, { message: 'questions must hold 1 to 64 entries' }),
-});
+    .refine(q => Object.keys(q).length >= 1 && Object.keys(q).length <= 64, { message: 'questions must hold 1 to 64 entries' }).optional(),
+  fields: z.record(z.string().min(1).max(100), z.object({
+    type: z.enum(['text', 'number']),
+    instructions: z.string().max(2000).optional(),
+    decimals: z.number().int().min(0).max(10).optional(),
+    unit: z.string().max(100).optional(),
+  }).strict()).refine(f => Object.keys(f).length >= 1 && Object.keys(f).length <= 64, { message: 'fields must hold 1 to 64 entries' }).optional(),
+}).refine(b => (b.questions !== undefined) !== (b.fields !== undefined), { message: 'Send either questions or fields' })
+  .refine(b => !b.fields || typeof b.state === 'string', { message: 'Extraction requires text state' });
 
 async function handleDecision(req: Request, res: Response): Promise<void> {
   if (!requireInferenceAuth(req, res)) return;
@@ -982,9 +1002,9 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
   const abort = new AbortController();
   res.on('close', () => { if (!res.writableFinished) abort.abort(); });
   try {
-    const { model, state, questions } = parsed.data;
+    const { model, state, questions, fields } = parsed.data;
     const result = await runDecision(
-      { state, questions: questions as Parameters<typeof runDecision>[0]['questions'] },
+      fields ? { state: state as string, fields } : { state, questions: questions as NonNullable<Parameters<typeof runDecision>[0]['questions']> },
       { model, signal: abort.signal },
     );
     res.json({
@@ -993,6 +1013,8 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       provider: result.provider,
       answers: result.answers,
       usage: result.usage,
+      ...(result.modelVersion ? { model_version: result.modelVersion } : {}),
+      ...(result.truncated !== undefined ? { truncated: result.truncated } : {}),
     });
   } catch (err: any) {
     if (res.headersSent || abort.signal.aborted) return;
@@ -1483,6 +1505,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
   const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
   const state = newFallbackState();
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Client-disconnect fan-out: the flag stops the loop before the NEXT
   // attempt; the AbortController (threaded to the provider as
@@ -1529,6 +1552,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         false,
         state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        resolvedChain?.strategyOverride,
       );
     },
     dispatch: async (route, attempt, ctx) => {
@@ -1549,6 +1574,24 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         let sawText = false;
         let upstreamFinish: string | null = null;
         const buffered: unknown[] = [];
+        // True once this attempt is over (success, committed error, or thrown)
+        // — the keep-alive interval polls it and stops itself.
+        let streamSettled = false;
+
+        // Send the SSE headers once. Split out of flushHeaders so the
+        // #1642 keep-alive can commit the response with a content-free ping
+        // while the hold window is still open, without dumping the buffered
+        // (possibly reasoning-bearing) frames early.
+        let headersSentEarly = false;
+        const sendSseHeaders = () => {
+          if (headersSentEarly) return;
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
+          setFallbackHeaders(res, attempt, attemptLog);
+          headersSentEarly = true;
+        };
 
         const flushHeaders = () => {
           if (headerSent) return;
@@ -1556,11 +1599,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           // reasoning) in the pump loop below; this call only backfills streams
           // that reached the commit point without one.
           if (ttfbMs === null) ttfbMs = Date.now() - start;
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
-          setFallbackHeaders(res, attempt, attemptLog);
+          sendSseHeaders();
           headerSent = true;
           // Committed: the answer is on its way, so the retry budget must no
           // longer cancel this attempt (it could not fail over now anyway).
@@ -1568,6 +1607,18 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           for (const frame of buffered) res.write(`data: ${JSON.stringify(frame)}\n\n`);
           buffered.length = 0;
         };
+
+        // #1642: optional heartbeat for the silent reasoning window. A bare
+        // SSE comment resets client idle watchdogs without committing content.
+        const keepaliveStop = startStreamKeepalive(streamKeepaliveMs(),
+          () => streamSettled,
+          () => {
+            sendSseHeaders();
+            // Bytes on the wire = the response can no longer fail over
+            // invisibly; stop the retry budget from cancelling it.
+            ctx.disarmHedge();
+            res.write(': keepalive\n\n');
+          });
 
         try {
           const gen = route.provider.streamChatCompletion(
@@ -1649,7 +1700,10 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           // client-abort branch stops the ladder without benching or an
           // error log row (the socket is gone; nothing to render).
           if (isClientAbortError(streamErr)) throw streamErr;
-          if (headerSent) {
+          // headerSent = real content went out. headersSentEarly also counts:
+          // a #1642 keep-alive ping flushed the SSE headers, so the response
+          // is on the wire and this attempt can no longer fail over invisibly.
+          if (headerSent || headersSentEarly) {
             console.error(`[Proxy] Mid-stream legacy completion error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
@@ -1667,6 +1721,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             return 'committed';
           }
           throw streamErr;
+        } finally {
+          // #1642: this attempt is over whichever path it left by — the
+          // keep-alive interval must not outlive it.
+          streamSettled = true;
+          keepaliveStop();
         }
       }
 
@@ -2112,7 +2171,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const hasFinalToolCalls = Array.isArray(finalToolCalls) && finalToolCalls.length > 0;
         if (hasFinalToolCalls) {
           writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-          writeFrame({ ...base, choices: [{ index: 0, delta: { tool_calls: finalToolCalls }, finish_reason: null }] });
+          writeFrame({ ...base, choices: [{ index: 0, delta: { tool_calls: finalToolCalls.map((call, index) => ({ ...call, index })) }, finish_reason: null }] });
           writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: response.usage });
         } else {
           if (!answerStarted) {
@@ -2193,7 +2252,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // store and replayed as SSE rather than JSON (see below).
   const cacheKey = (cacheActive(cacheDirective) && isCacheableTemperature(temperature))
     ? computeCacheKey({
-        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
+        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice, parallel_tool_calls,
         // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
         stop,
         // The knobs below are NOT in chatCompletionSchema, so zod strips them
@@ -2205,8 +2264,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         response_format: req.body?.response_format ?? undefined,
         n: req.body?.n ?? undefined,
         seed: req.body?.seed ?? undefined,
+        top_k: req.body?.top_k ?? undefined,
+        min_p: req.body?.min_p ?? undefined,
         presence_penalty: req.body?.presence_penalty ?? undefined,
         frequency_penalty: req.body?.frequency_penalty ?? undefined,
+        repetition_penalty: req.body?.repetition_penalty ?? undefined,
         logit_bias: req.body?.logit_bias ?? undefined,
         logprobs: req.body?.logprobs ?? undefined,
         top_logprobs: req.body?.top_logprobs ?? undefined,
@@ -2439,6 +2501,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const state = newFallbackState();
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
@@ -2449,7 +2512,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
   // this turn routes with. Skipped when the client pinned a model or the
   // conversation is sticky to one. Any doubt routes as Balanced.
-  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, signal: clientAbort.signal });
+  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, preset: resolvedChain?.strategyOverride, signal: clientAbort.signal });
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
@@ -2471,7 +2534,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
       const taskType = resolveTaskType(req, tools, messages);
-      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride);
     },
     dispatch: async (route, attempt, ctx) => {
     const contextBudget = routeOutputBudget(route, estimatedInputTokens);
@@ -2530,6 +2593,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let totalOutputTokens = 0;
         let headerSent = false;
         let ttfbMs: number | null = null;
+        const attemptStart = Date.now();
 
         // Hold-window state: 'undecided' until the first text either matches
         // a dialect marker (→ 'dialect': buffer everything, rescue at end),
@@ -2569,17 +2633,28 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           streamFrames.push(frame);
         };
 
-        const flushHeaders = () => {
-          if (headerSent) return;
-          // #764: backfill only — the pump loop already records ttfb on the
-          // first token (content or reasoning) it sees.
-          if (ttfbMs === null) ttfbMs = Date.now() - start;
+        // Send the SSE headers once. Split out of flushHeaders so the
+        // #1642 keep-alive can commit the response with a content-free ping
+        // while the hold window is still open, without dumping the held
+        // preamble frames early.
+        let headersSentEarly = false;
+        const sendSseHeaders = () => {
+          if (headersSentEarly) return;
           res.setHeader('Content-Type', 'text/event-stream');
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
           res.setHeader('X-FreeLLM-Cache', cacheKey ? 'MISS' : 'OFF');
           setFallbackHeaders(res, attempt, attemptLog);
+          headersSentEarly = true;
+        };
+
+        const flushHeaders = () => {
+          if (headerSent) return;
+          // #764: backfill only — the pump loop already records ttfb on the
+          // first token (content or reasoning) it sees.
+          if (ttfbMs === null) ttfbMs = Date.now() - start;
+          sendSseHeaders();
           headerSent = true;
           // Committed: the answer is on its way, so the retry budget must no
           // longer cancel this attempt (it could not fail over now anyway).
@@ -2603,6 +2678,19 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           collectFrame(frame);
           res.write(frame);
         };
+
+        // #1642: optional heartbeat for the silent reasoning window. A bare
+        // SSE comment resets client idle watchdogs without committing content.
+        let streamSettled = false;
+        const keepaliveStop = startStreamKeepalive(streamKeepaliveMs(),
+          () => streamSettled,
+          () => {
+            sendSseHeaders();
+            // Bytes on the wire = the response can no longer fail over
+            // invisibly; stop the retry budget from cancelling it.
+            ctx.disarmHedge();
+            res.write(': keepalive\n\n');
+          });
 
         try {
           const gen = route.provider.streamChatCompletion(
@@ -2705,6 +2793,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
               // reasoning keys; forwarding them raw would duplicate the call).
               // #764: thinking-only chunks still consumed tokens — count them.
               if (reasoning.length > 0) totalOutputTokens += Math.ceil(reasoning.length / 4);
+              // #1642: long reasoning with nothing sent yet: commit, then stream it live.
+              // Not for response_format: json mode keeps its free failover (#933).
+              if (reasoning.length > 0 && !headerSent && !samplingParams.response_format && Date.now() - attemptStart >= REASONING_HOLD_MAX_MS) flushHeaders();
               if (choice.delta && Object.keys(choice.delta).some(k => k !== 'content' && k !== 'tool_calls' && choice.delta[k] != null)) {
                 // `usage: undefined` (dropped by JSON.stringify): it was held
                 // above and is re-emitted once, after our finish chunk.
@@ -2785,8 +2876,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // Opt-in schema verdict, taken AFTER the rescue so it covers the
           // calls the rescue reconstructed from prose — those are the ones
           // most likely to be malformed, and running first exempted exactly
-          // them. `!headerSent` is the whole licence to throw here: the commit
-          // point is held until the first meaningful content, so the common
+          // them. No prose flushed yet is the whole licence to throw here (after
+          // a #1642 reasoning-only commit the catch ends it with `stream_error`):
+          // the commit point is held until the first meaningful content, so the common
           // tool-call turn (no prose before the call) has sent no bytes yet and
           // can still fail over invisibly. A turn that already flushed prose is
           // past the point of no return — the catch below would have to tear
@@ -2794,7 +2886,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // for the client than forwarding a tool call the schema dislikes.
           // Off-by-default or not, this check must never turn a served answer
           // into a broken one.
-          if (isToolArgumentValidationEnabled() && !headerSent && completedCalls.length > 0) {
+          if (isToolArgumentValidationEnabled() && mode !== 'passthrough' && completedCalls.length > 0) {
             const invalid = invalidToolCallReasons(completedCalls, schemas);
             if (invalid.length > 0) throw invalidToolArgumentsError(route.displayName, invalid);
           }
@@ -2805,16 +2897,17 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // throw below, which would bench a healthy model+key for 90s and
           // log a provider error for every Ctrl-C during a reasoning model's
           // TTFB window.
-          if (clientGone && !headerSent && heldText.trim().length === 0 && completedCalls.length === 0) {
+          if (clientGone && mode !== 'passthrough' && heldText.trim().length === 0 && completedCalls.length === 0) {
             console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
             return 'committed';
           }
 
-          const hasText = headerSent || heldText.trim().length > 0;
+          const hasText = mode === 'passthrough' || heldText.trim().length > 0;
           if (!hasText && completedCalls.length === 0) {
             // Nothing usable came out — same failover semantics as the
-            // non-stream empty-completion path. Headers can't have been sent
-            // (header flush requires payload), so the client never notices.
+            // non-stream empty-completion path. Headers are only sent here after a
+            // #1642 long-reasoning commit, where the catch emits stream_error;
+            // otherwise the client never notices.
             // finish_reason 'length' = the model spent the whole output budget
             // on hidden reasoning before any visible text: fail over, but skip
             // the cooldown/penalty (not a provider-health signal).
@@ -2838,9 +2931,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // model that answers in prose despite the forwarded response_format
           // ships the essay as a "success" — the worst case for a
           // machine-readable request. json mode held every byte (headers never
-          // flushed), so failing over here is free: skipBench (provider
-          // healthy, the MODEL misbehaved) + skipModelForRequest (a sibling
-          // key would misbehave identically). Mirrors proxy.ts non-stream.
+          // flushed, and the #1642 long-reasoning commit is skipped for it), so
+          // failing over here is free: skipBench (provider healthy, the MODEL
+          // misbehaved) + skipModelForRequest (a sibling key would misbehave
+          // identically). Mirrors proxy.ts non-stream.
           if (mode === 'json' && samplingParams.response_format && completedCalls.length === 0) {
             const enforced = enforceJsonContent(heldText);
             if (!enforced.ok) {
@@ -2961,7 +3055,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // client-abort branch stops the ladder without benching or an
           // error log row (the socket is gone; nothing to render).
           if (isClientAbortError(streamErr)) throw streamErr;
-          if (headerSent) {
+          // headerSent = real content went out. headersSentEarly also counts:
+          // a #1642 keep-alive ping flushed the SSE headers, so the response
+          // is on the wire and this attempt can no longer fail over invisibly.
+          if (headerSent || headersSentEarly) {
             // Mid-stream error after real payload reached the client — finish
             // the SSE response honestly instead of leaving the client hanging.
             console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
@@ -2985,6 +3082,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // error frames, abrupt EOF, stalls, empty completions, and unparseable
           // dialect turns alike.
           throw streamErr;
+        } finally {
+          // #1642: this attempt is over whichever path it left by — the
+          // keep-alive interval must not outlive it.
+          streamSettled = true;
+          keepaliveStop();
         }
       } else {
         const result = await route.provider.chatCompletion(

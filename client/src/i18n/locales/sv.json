@@ -450,6 +450,7 @@
     "adding": "Lägger till...",
     "selectProvider": "Välj en leverantör...",
     "accountId": "Konto-ID",
+    "projectId": "Projekt-ID",
     "label": "Etikett",
     "noKeyNeeded": "(ingen nyckel behövs)",
     "outboundProxy": "Utgående proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Månadslimit för tokens",
     "capUnlimitedPlaceholder": "Obegränsat",
     "capEditHint": "Gränserna nollställs den 1:a kl 00:00 UTC. Lämna tomt för obegränsat.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} förfrågningar, {tokens} tokens denna månad",
     "quotaBalanceHint": "{remaining} av {limit} {metric} kvar",
-    "quotaBalanceLeft": "{remaining} kvar"
-,
+    "quotaBalanceLeft": "{remaining} kvar",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Hela tiden",
+    "rangeAllNote": "Huvudsummorna gäller hela tiden. Lyckandegraden och uppdelningarna nedan täcker den historik som den här installationen fortfarande sparar.",
     "requests": "Önskemål",
     "successRate": "Framgångsfrekvens",
     "inputTokens": "Inmatningstokens",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Försök till reserv",
     "savingsHint": "Du sparade faktiskt ${actual} under de senaste {range}. Det är vad samma tokens skulle ha kostat på betalda API:er, prissatt per modell. Siffran som visas visar din takt från senaste {span} data till hela 30 dagar.",
     "savingsHintExact": "Du sparade faktiskt ${actual} under de senaste {range}. Det är vad samma tokens skulle ha kostat på betalda API:er, prissatt per modell. Siffran som visas är din verkliga 30-dagarssumma.",
+    "savingsHintAll": "Du har sparat ${actual} över all sparad historik. Det är vad samma tokens skulle ha kostat hos betalda API:er, prissatt per modell. Siffran som visas räknar upp din senaste takt från de senaste {span} data till hela 30 dagar.",
     "requestsHintPinned": "{pinned} av dessa förfrågningar höll en specifik modell vid namn. {honored} betjänades av den fastnålade modellen; {failed} gick över till en annan. Resten var auto-rout.",
     "requestsHintAuto": "Alla förfrågningar under denna period var auto-routade; Ingen kund har fäst en specifik modell vid namn.",
     "requestsHintTypes": "{chat} chatta och {embedding} inbäddningsförfrågningar.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Poster visas här allteftersom servern skriver dem. Bredda filtren för nivå, leverantör eller sökning om du väntade dig utdata.",
     "noLevelsTitle": "Inga nivåer valda",
     "noLevelsDescription": "Slå på minst en nivå för att se loggutdata.",
-    "loadFailed": "Det gick inte att läsa in serverloggen."
+    "loadFailed": "Det gick inte att läsa in serverloggen.",
+    "eventFilter": "Händelse",
+    "allEvents": "Alla händelser"
   },
   "playground": {
     "title": "Lekplats",

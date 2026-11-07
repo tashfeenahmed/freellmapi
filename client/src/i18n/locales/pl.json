@@ -450,6 +450,7 @@
     "adding": "Dodawanie…",
     "selectProvider": "Wybierz dostawcę…",
     "accountId": "Identyfikator konta",
+    "projectId": "ID projektu",
     "label": "Etykieta",
     "noKeyNeeded": "(nie potrzeba klucza)",
     "outboundProxy": "Wychodzące proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Miesięczny limit tokenów",
     "capUnlimitedPlaceholder": "Bez limitu",
     "capEditHint": "Limity resetują się 1. dnia miesiąca o 00:00 UTC. Pozostaw puste, aby bez limitu.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} żądań, {tokens} tokenów w tym miesiącu",
     "quotaBalanceHint": "Pozostało {remaining} z {limit} {metric}",
-    "quotaBalanceLeft": "Pozostało {remaining}"
-,
+    "quotaBalanceLeft": "Pozostało {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Cały okres",
+    "rangeAllNote": "Główne sumy obejmują cały okres. Wskaźnik powodzenia i zestawienia poniżej obejmują historię, którą ta instalacja wciąż przechowuje.",
     "requests": "Żądania",
     "successRate": "Wskaźnik sukcesu",
     "inputTokens": "Tokeny wejściowe",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Próby awaryjne",
     "savingsHint": "Faktycznie zaoszczędziłeś ${actual} w ciągu ostatniego {range}. Tyle kosztowałyby te same tokeny w płatnych interfejsach API, wycenione według modelu. Wyświetlana liczba odzwierciedla Twoje tempo od ostatniego {span} danych do pełnych 30 dni.",
     "savingsHintExact": "Faktycznie zaoszczędziłeś ${actual} w ciągu ostatniego {range}. Tyle kosztowałyby te same tokeny w płatnych interfejsach API, wycenione według modelu. Wyświetlana liczba to rzeczywista suma 30 dni.",
+    "savingsHintAll": "Zaoszczędziłeś ${actual} w całej zachowanej historii. Tyle kosztowałyby te same tokeny w płatnych API, według ceny każdego modelu. Pokazana liczba rzutuje Twoje ostatnie tempo z ostatnich {span} danych na pełne 30 dni.",
     "requestsHintPinned": "{pinned} tych żądań przypinało konkretny model według nazwy. {honored} były obsługiwane przez model przypięty; {failed} zostało przełączone awaryjnie na inny. Resztę wyznaczono automatycznie.",
     "requestsHintAuto": "Wszystkie żądania w tym okresie zostały automatycznie przekierowane; żaden klient nie przypiął konkretnego modelu po nazwie.",
     "requestsHintTypes": "Żądania czatu {chat} i osadzania {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Wpisy pojawią się tutaj, gdy serwer zacznie je zapisywać. Poszerz filtry poziomu, dostawcy lub wyszukiwania, jeśli spodziewasz się wyników.",
     "noLevelsTitle": "Nie wybrano poziomów",
     "noLevelsDescription": "Włącz co najmniej jeden poziom, aby zobaczyć zawartość logu.",
-    "loadFailed": "Nie udało się wczytać logu serwera."
+    "loadFailed": "Nie udało się wczytać logu serwera.",
+    "eventFilter": "Zdarzenie",
+    "allEvents": "Wszystkie zdarzenia"
   },
   "playground": {
     "title": "Plac zabaw",

@@ -273,6 +273,32 @@ describe('GoogleProvider', () => {
     expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('tool_calls');
   });
 
+  it('gives every streamed tool call its own index and id, including parallel calls in one chunk', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation(async () => {
+      const frames = [
+        { candidates: [{ content: { parts: [
+          { functionCall: { name: 'get_weather', args: { city: 'Dublin' } } },
+          { functionCall: { name: 'get_weather', args: { city: 'Paris' } } },
+        ] } }] },
+        { candidates: [{ content: { parts: [{ functionCall: { name: 'get_time', args: { tz: 'UTC' } } }] } }] },
+        { candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] },
+      ];
+      // One body, so every frame is parsed within the same millisecond.
+      return new Response(frames.map(f => `data: ${JSON.stringify(f)}\n\n`).join(''), { status: 200 });
+    });
+
+    const chunks: any[] = [];
+    for await (const c of provider.streamChatCompletion('test-key', [{ role: 'user', content: 'Weather and time?' }], 'gemini-3.5-flash')) chunks.push(c);
+
+    const calls = chunks.flatMap(c => c.choices[0].delta.tool_calls ?? []);
+    expect(calls.map(c => [c.index, c.function.name, c.function.arguments])).toEqual([
+      [0, 'get_weather', '{"city":"Dublin"}'],
+      [1, 'get_weather', '{"city":"Paris"}'],
+      [2, 'get_time', '{"tz":"UTC"}'],
+    ]);
+    expect(new Set(calls.map(c => c.id)).size).toBe(3);
+  });
+
   it('keeps functionCall/functionResponse history for Gemma multi-turn tool round-trips (#582)', async () => {
     let capturedBody: any;
     vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {

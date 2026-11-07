@@ -135,6 +135,50 @@ describe('Model Provider Actions API', () => {
       expect(second.body.error.message).toContain('already exists');
     });
 
+    // #1741: search/speech/decision integrations are registered for key
+    // pooling and health, but their adapters refuse chat. A chat row would
+    // sit in the fallback chain burning a guaranteed failure per request.
+    it.each(['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'serpsearch', 'brave'] as const)('rejects chat registration for search provider %s', async platform => {
+      const db = getDb();
+      const modelId = `${platform}-chat-${Date.now()}`;
+
+      const res = await post(app, '/api/models', {
+        platform,
+        modelId,
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toContain('does not support chat completions');
+
+      // No model row, no fallback entry, no profile membership.
+      const row = db.prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?').get(platform, modelId);
+      expect(row).toBeUndefined();
+    });
+
+    it('rejects chat registration for speech and decision-only providers', async () => {
+      for (const platform of ['speechify', 'halx', 'aisense']) {
+        const res = await post(app, '/api/models', {
+          platform,
+          modelId: `${platform}-chat-${Date.now()}`,
+        });
+        expect(res.status).toBe(400);
+        expect(res.body.error.message).toContain('does not support chat completions');
+      }
+    });
+
+    it('allows BeatAPI chat registration after its chat adapter was added', async () => {
+      const modelId = `beatapi-chat-${Date.now()}`;
+      const res = await post(app, '/api/models', { platform: 'beatapi', modelId });
+
+      expect(getProvider('beatapi')!.supportsChat).toBe(true);
+      expect(res.status).toBe(201);
+      expect(res.body.model.modelId).toBe(modelId);
+      expect(getDb().prepare('SELECT platform FROM models WHERE id = ?').get(res.body.id))
+        .toEqual({ platform: 'beatapi' });
+      expect(getDb().prepare('SELECT enabled FROM fallback_config WHERE model_db_id = ?').get(res.body.id))
+        .toEqual({ enabled: 1 });
+    });
+
     it('creates custom model for custom provider with endpointScope', async () => {
       const db = getDb();
       const modelId = `relay-model-${Date.now()}`;

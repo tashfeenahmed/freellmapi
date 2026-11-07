@@ -56,7 +56,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   const baseUrlError = !baseUrl.trim()
     ? t('validation.required')
     : !isHttpUrl(baseUrl)
-      ? t('validation.url')
+      ? `${t('validation.url')} (http://localhost:8080/v1)`
       : null
   const modelError = models.length === 0 ? t('validation.required') : null
 

@@ -450,6 +450,7 @@
     "adding": "Añadiendo…",
     "selectProvider": "Selecciona un proveedor…",
     "accountId": "ID de cuenta",
+    "projectId": "ID del proyecto",
     "label": "Etiqueta",
     "noKeyNeeded": "(no se necesita clave)",
     "outboundProxy": "Proxy de salida",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Límite mensual de tokens",
     "capUnlimitedPlaceholder": "Ilimitado",
     "capEditHint": "Los límites se reinician el día 1 a las 00:00 UTC. Déjelo en blanco para ilimitado.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} solicitudes, {tokens} tokens este mes",
     "quotaBalanceHint": "Quedan {remaining} de {limit} {metric}",
-    "quotaBalanceLeft": "Quedan {remaining}"
-,
+    "quotaBalanceLeft": "Quedan {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 d",
     "range30d": "30 d",
     "range90d": "90 d",
+    "rangeAll": "Todo el tiempo",
+    "rangeAllNote": "Los totales principales son de todo el tiempo. La tasa de éxito y los desgloses de abajo cubren el historial que esta instalación aún conserva.",
     "requests": "Solicitudes",
     "successRate": "Tasa de éxito",
     "inputTokens": "Tokens de entrada",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Intentos de reserva",
     "savingsHint": "Realmente ahorraste {actual} $ en los últimos {range}. Eso es lo que los mismos tokens habrían costado en APIs de pago, con precio por modelo. La cifra mostrada proyecta tu ritmo de los {span} de datos más recientes a 30 días completos.",
     "savingsHintExact": "Realmente ahorraste {actual} $ en los últimos {range}. Eso es lo que los mismos tokens habrían costado en APIs de pago, con precio por modelo. La cifra mostrada es tu total real de 30 días.",
+    "savingsHintAll": "Ahorraste ${actual} en todo el historial conservado. Es lo que habrían costado los mismos tokens en API de pago, con el precio de cada modelo. La cifra mostrada proyecta tu ritmo reciente de los últimos {span} de datos a 30 días completos.",
     "requestsHintPinned": "{pinned} de estas solicitudes fijaron un modelo concreto por su nombre. {honored} fueron atendidas por el modelo fijado; {failed} conmutaron a otro. El resto se enrutaron automáticamente.",
     "requestsHintAuto": "Todas las solicitudes de este periodo se enrutaron automáticamente; ningún cliente fijó un modelo concreto por su nombre.",
     "requestsHintTypes": "{chat} solicitudes de chat y {embedding} de embeddings.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Las entradas aparecen aquí a medida que el servidor las escribe. Amplía los filtros de nivel, proveedor o búsqueda si esperabas ver algo.",
     "noLevelsTitle": "Ningún nivel seleccionado",
     "noLevelsDescription": "Activa al menos un nivel para ver el registro.",
-    "loadFailed": "No se pudo cargar el registro del servidor."
+    "loadFailed": "No se pudo cargar el registro del servidor.",
+    "eventFilter": "Evento",
+    "allEvents": "Todos los eventos"
   },
   "playground": {
     "title": "Entorno de pruebas",

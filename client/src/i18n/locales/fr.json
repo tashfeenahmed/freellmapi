@@ -450,6 +450,7 @@
     "adding": "Ajout…",
     "selectProvider": "Sélectionner un fournisseur…",
     "accountId": "ID de compte",
+    "projectId": "ID du projet",
     "label": "Libellé",
     "noKeyNeeded": "(aucune clé requise)",
     "outboundProxy": "Proxy sortant",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Plafond mensuel de jetons",
     "capUnlimitedPlaceholder": "Illimité",
     "capEditHint": "Les plafonds sont réinitialisés le 1er à 00:00 UTC. Laissez vide pour illimité.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} requêtes, {tokens} jetons ce mois",
     "quotaBalanceHint": "{remaining} sur {limit} {metric} restants",
-    "quotaBalanceLeft": "{remaining} restants"
-,
+    "quotaBalanceLeft": "{remaining} restants",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Sauvegardes",
@@ -775,6 +782,8 @@
     "range7d": "7 j",
     "range30d": "30 j",
     "range90d": "90 j",
+    "rangeAll": "Depuis le début",
+    "rangeAllNote": "Les totaux principaux couvrent toute la période. Le taux de réussite et les répartitions ci-dessous couvrent l'historique que cette installation conserve encore.",
     "requests": "Requêtes",
     "successRate": "Taux de réussite",
     "inputTokens": "Tokens en entrée",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Tentatives de repli",
     "savingsHint": "Vous avez réellement économisé {actual} $ sur les {range} derniers. C'est ce que les mêmes tokens auraient coûté sur des API payantes, tarifés par modèle. Le chiffre affiché projette votre rythme des {span} de données les plus récentes sur 30 jours complets.",
     "savingsHintExact": "Vous avez réellement économisé {actual} $ sur les {range} derniers. C'est ce que les mêmes tokens auraient coûté sur des API payantes, tarifés par modèle. Le chiffre affiché est votre total réel sur 30 jours.",
+    "savingsHintAll": "Vous avez économisé ${actual} sur tout l'historique conservé. C'est ce qu'auraient coûté les mêmes tokens sur des API payantes, au prix de chaque modèle. Le chiffre affiché projette votre rythme récent des dernières {span} de données sur 30 jours complets.",
     "requestsHintPinned": "{pinned} de ces requêtes ont épinglé un modèle précis par son nom. {honored} ont été traitées par le modèle épinglé ; {failed} ont basculé vers un autre. Les autres ont été routées automatiquement.",
     "requestsHintAuto": "Toutes les requêtes de cette période ont été routées automatiquement ; aucun client n'a épinglé de modèle précis par son nom.",
     "requestsHintTypes": "{chat} requêtes de chat et {embedding} d'embeddings.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Les entrées apparaissent ici au fur et à mesure que le serveur les écrit. Élargissez les filtres de niveau, de fournisseur ou de recherche si vous attendiez des résultats.",
     "noLevelsTitle": "Aucun niveau sélectionné",
     "noLevelsDescription": "Activez au moins un niveau pour voir le journal.",
-    "loadFailed": "Impossible de charger le journal du serveur."
+    "loadFailed": "Impossible de charger le journal du serveur.",
+    "eventFilter": "Événement",
+    "allEvents": "Tous les événements"
   },
   "playground": {
     "title": "Bac à sable",

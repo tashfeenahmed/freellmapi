@@ -450,6 +450,7 @@
     "adding": "Aggiunta…",
     "selectProvider": "Seleziona un fornitore…",
     "accountId": "ID account",
+    "projectId": "ID progetto",
     "label": "Etichetta",
     "noKeyNeeded": "(nessuna chiave necessaria)",
     "outboundProxy": "Proxy in uscita",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Limite mensile di token",
     "capUnlimitedPlaceholder": "Illimitato",
     "capEditHint": "I limiti si azzerano il 1 del mese alle 00:00 UTC. Lascia vuoto per illimitato.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} richieste, {tokens} token questo mese",
     "quotaBalanceHint": "Rimangono {remaining} di {limit} {metric}",
-    "quotaBalanceLeft": "Rimangono {remaining}"
-,
+    "quotaBalanceLeft": "Rimangono {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7g",
     "range30d": "30g",
     "range90d": "90g",
+    "rangeAll": "Sempre",
+    "rangeAllNote": "I totali principali coprono tutto il periodo. Il tasso di successo e le ripartizioni qui sotto coprono la cronologia che questa installazione conserva ancora.",
     "requests": "Richieste",
     "successRate": "Tasso di successo",
     "inputTokens": "Token in input",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Tentativi di fallback",
     "savingsHint": "Hai effettivamente risparmiato ${actual} negli ultimi {range}. Questo è quanto gli stessi token sarebbero costati su API a pagamento, prezzate per modello. Il numero mostrato proietta il tuo ritmo dagli ultimi {span} di dati a 30 giorni interi.",
     "savingsHintExact": "Hai effettivamente risparmiato ${actual} negli ultimi {range}. Questo è quanto gli stessi token sarebbero costati su API a pagamento, prezzate per modello. Il numero mostrato è il tuo totale reale di 30 giorni.",
+    "savingsHintAll": "Hai risparmiato ${actual} su tutta la cronologia conservata. È quanto sarebbero costati gli stessi token su API a pagamento, al prezzo di ciascun modello. Il numero mostrato proietta il tuo ritmo recente degli ultimi {span} di dati su 30 giorni completi.",
     "requestsHintPinned": "{pinned} di queste richieste hanno fissato un modello specifico per nome. {honored} sono state servite dal modello fissato; {failed} sono cadute in fallback su uno diverso. Le restanti sono state instradate automaticamente.",
     "requestsHintAuto": "Tutte le richieste in questo periodo sono state instradate automaticamente; nessun client ha fissato un modello specifico per nome.",
     "requestsHintTypes": "{chat} richieste di chat e {embedding} di embedding.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Le voci compaiono qui man mano che il server le scrive. Allarga i filtri di livello, fornitore o ricerca se ti aspettavi dei risultati.",
     "noLevelsTitle": "Nessun livello selezionato",
     "noLevelsDescription": "Attiva almeno un livello per vedere l'output del log.",
-    "loadFailed": "Impossibile caricare il log del server."
+    "loadFailed": "Impossibile caricare il log del server.",
+    "eventFilter": "Evento",
+    "allEvents": "Tutti gli eventi"
   },
   "playground": {
     "title": "Playground",

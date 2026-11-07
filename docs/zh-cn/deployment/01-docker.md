@@ -25,7 +25,7 @@ docker pull ghcr.io/tashfeenahmed/freellmapi:latest   # 或固定到某个发布
 
 构建形态（[Dockerfile](../../../Dockerfile)）：
 
-- 基于 `node:20-bookworm-slim` 的三个阶段（`deps` → `build` → `runtime`）；只有已构建完成的产物会被复制进 runtime 阶段。
+- 基于 `node:24-bookworm-slim` 的三个阶段（`deps` → `build` → `runtime`）；只有已构建完成的产物会被复制进 runtime 阶段。
 - runtime 阶段设置 `NODE_ENV=production`、`PORT=3001` 和 `FREELLMAPI_INSTALL_METHOD=docker`；进程为 `node server/dist/index.js`。
 - 一对 `FREELLMAPI_COMMIT_SHA` ARG/ENV 刻意放在所有 `COPY` 层之后：SHA 每次提交都会变，放得更高会让每次构建都使整个镜像的层缓存失效。
 - runtime 还会复制 `desktop/package.json`（一个约 400 字节的清单），让容器安装能报出自己的发布版本（#703）。

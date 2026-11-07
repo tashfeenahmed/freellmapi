@@ -450,6 +450,7 @@
     "adding": "Nfi…",
     "selectProvider": "Yan olupese kan…",
     "accountId": "ID iroyin",
+    "projectId": "ID iṣẹ́",
     "label": "Aami",
     "noKeyNeeded": "(ko si bọtini nilo)",
     "outboundProxy": "Aṣoju ti njade",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Òpín token oṣooṣù",
     "capUnlimitedPlaceholder": "Kò ní òpín",
     "capEditHint": "A tún òpín ṣe ní ọjọ́ kìíní ní 00:00 UTC. Fi sílẹ̀ ṣófo fún aláìlópin.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} ìbéèrè, {tokens} token oṣù yìí",
     "quotaBalanceHint": "{remaining} nínú {limit} {metric} ló kù",
-    "quotaBalanceLeft": "{remaining} ló kù"
-,
+    "quotaBalanceLeft": "{remaining} ló kù",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Gbogbo ìgbà",
+    "rangeAllNote": "Àpapọ̀ pàtàkì jẹ́ ti gbogbo ìgbà. Ìwọ̀n àṣeyọrí àti àwọn àlàyé ní ìsàlẹ̀ bo ìtàn tí ìfisílẹ̀ yìí ṣì ń tọ́jú.",
     "requests": "Awọn ibeere",
     "successRate": "Oṣuwọn aṣeyọri",
     "inputTokens": "Awọn ami igbewọle",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Awọn igbiyanju apadabọ",
     "savingsHint": "O ti fipamọ ${actual} gangan lori {range} ti o kẹhin. Iyẹn ni awọn ami-ami kanna yoo ni idiyele lori awọn API ti o san, ti idiyele fun awoṣe. Nọmba ti o han ṣe iṣẹ akanṣe iyara rẹ lati {span} ti data to kẹhin si ọjọ 30 ni kikun.",
     "savingsHintExact": "O ti fipamọ ${actual} gangan lori {range} ti o kẹhin. Iyẹn ni awọn ami-ami kanna yoo ni idiyele lori awọn API ti o san, ti idiyele fun awoṣe. Nọmba ti o han jẹ apapọ 30-ọjọ gidi rẹ.",
+    "savingsHintAll": "O ti fipamọ́ ${actual} káàkiri gbogbo ìtàn tí a tọ́jú. Èyí ni iye tí àwọn token kan náà ì bá ná lórí API tí a ń sanwó fún, ní iye owó àwòṣe kọ̀ọ̀kan. Nọ́ńbà tí a fihàn ṣe àsọtẹ́lẹ̀ ìyára rẹ àìpẹ́ láti {span} ìkẹyìn dátà sí ọjọ́ 30 kíkún.",
     "requestsHintPinned": "{pinned} ti awọn ibeere wọnyi pinni awoṣe kan pato nipasẹ orukọ. {honored} ni a sin nipasẹ awoṣe ti a pinni; {failed} kuna lori si kan ti o yatọ. Awọn iyokù ti wa ni idojukọ laifọwọyi.",
     "requestsHintAuto": "Gbogbo awọn ibeere ni asiko yii jẹ ọna-laifọwọyi; ko si onibara pinni kan pato awoṣe nipa orukọ.",
     "requestsHintTypes": "{chat} iwiregbe ati awọn ibeere ifibọ {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Awọn akọsilẹ yoo han nibi bi olupin ṣe n kọ wọn. Fẹ awọn asẹ ipele, olupese tabi wiwa siwaju sii ti o ba nireti abajade.",
     "noLevelsTitle": "Ko si ipele ti a yan",
     "noLevelsDescription": "Tan o kere ju ipele kan lati ri abajade àkọọlẹ.",
-    "loadFailed": "A kò lè gbé àkọọlẹ olupin wọlé."
+    "loadFailed": "A kò lè gbé àkọọlẹ olupin wọlé.",
+    "eventFilter": "Ìṣẹ̀lẹ̀",
+    "allEvents": "Gbogbo ìṣẹ̀lẹ̀"
   },
   "playground": {
     "title": "Ibi isereile",

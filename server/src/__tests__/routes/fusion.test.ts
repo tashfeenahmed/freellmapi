@@ -970,7 +970,8 @@ describe('fusion route (/v1/chat/completions, model: "fusion")', () => {
     expect(traceFrames.some(f => f._fusion?.tool_calls?.[0]?.id === 'call_weather_stream')).toBe(true);
 
     const toolFrame = frames.find(f => f.choices?.[0]?.delta?.tool_calls);
-    expect(toolFrame.choices[0].delta.tool_calls).toEqual(toolCalls);
+    // A streamed tool-call delta carries its `index` (OpenAI chunk schema).
+    expect(toolFrame.choices[0].delta.tool_calls).toEqual(toolCalls.map((call, index) => ({ ...call, index })));
     expect(frames.map(f => f.choices?.[0]?.finish_reason).filter(Boolean)).toEqual(['tool_calls']);
     expect(text).not.toContain('JUDGE SHOULD NOT RUN');
     expect(text.trimEnd().endsWith('data: [DONE]')).toBe(true);

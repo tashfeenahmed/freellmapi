@@ -833,10 +833,10 @@ describe('applyCatalog: searchEngines', () => {
 
   it('skips an engine whose platform has no search adapter in this binary', () => {
     const roster = searchRoster();
-    roster.push({ platform: 'brave', engineId: 'brave-search', displayName: 'Brave', priority: 5, enabled: true });
+    roster.push({ platform: 'kagi', engineId: 'kagi-search', displayName: 'Kagi', priority: 5, enabled: true });
     const counts = applyCatalog(getDb(), searchCatalog(roster));
     expect(counts.skippedUnknownPlatform).toBeGreaterThanOrEqual(1);
-    expect(searchRows().map(r => r.model_id)).not.toContain('brave-search');
+    expect(searchRows().map(r => r.model_id)).not.toContain('kagi-search');
   });
 
   it('rejects a malformed searchEngines entry before applying the cached catalog', () => {

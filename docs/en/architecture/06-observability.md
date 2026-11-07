@@ -49,7 +49,7 @@ On first ingest (or explicit `initServerLogs()` call):
 
 ### Querying & Maintenance
 
-The public query API (`queryLogs({ levels, q, provider, sinceId, limit })`), level-count badges (`levelCounts()`), and clear/reset behavior (`clearLogs()`, `resetServerLogsForTest()`) are specified in the [Server Logs Viewer API contract](../logs/01-server-logs-viewer.md#api-contract). The ID counter is preserved across `clearLogs()` so a dashboard cursor never sees duplicate ids.
+The public query API (`queryLogs({ levels, q, provider, event, sinceId, limit })`), level-count badges (`levelCounts()`), and clear/reset behavior (`clearLogs()`, `resetServerLogsForTest()`) are specified in the [Server Logs Viewer API contract](../logs/01-server-logs-viewer.md#api-contract). The ID counter is preserved across `clearLogs()` so a dashboard cursor never sees duplicate ids.
 
 ### Desktop file logger
 

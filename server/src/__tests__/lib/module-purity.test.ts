@@ -43,6 +43,8 @@ const PURE_MODULES = [
   'retry-hint.ts',
   // Search platform list; the provider list, keys route and search service import it.
   'search-platforms.ts',
+  // SSE keep-alive helper (#1642); env is injected, the response is a callback.
+  'stream-keepalive.ts',
   'structured-output.ts',
   'tool-args.ts',
   'tool-call-rescue.ts',

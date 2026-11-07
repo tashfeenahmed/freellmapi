@@ -25,6 +25,30 @@ const RELEASES_URL = 'https://github.com/tashfeenahmed/freellmapi/releases/lates
 const BACKGROUND_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const FIRST_BACKGROUND_CHECK_MS = 60 * 1000;
 
+/** Upper bound for one update check, covering both the proxy setup and
+ *  electron-updater's request to the feed (#1666). electron-updater has no
+ *  built-in timeout, so a stalled proxy or an unreachable GitHub leaves the
+ *  promise pending forever and the Updates dialog spinning on "Checking".
+ *  Overridable so tests can use a short deadline. */
+let CHECK_TIMEOUT_MS = 30_000;
+
+export function _setCheckTimeoutMsForTests(ms: number): void {
+  CHECK_TIMEOUT_MS = ms;
+}
+
+/** Reject with a timeout error after `ms`, leaving the underlying promise
+ *  running (electron-updater cannot be cancelled from outside; its late
+ *  result is simply ignored because `inFlight` has already been cleared). */
+function withCheckTimeout<T>(p: Promise<T>, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} timed out after ${Math.round(CHECK_TIMEOUT_MS / 1000)}s`)), CHECK_TIMEOUT_MS);
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 export interface UpdaterHooks {
   /** The dashboard's opt-in (settings table `update_check_enabled`). */
   autoCheckEnabled: () => boolean;
@@ -171,8 +195,10 @@ export function checkForUpdates(): Promise<UpdateState> {
     return Promise.resolve(state);
   }
   if (!inFlight) stage = 'check';
-  inFlight ??= useAppProxy()
-    .then(() => autoUpdater.checkForUpdates())
+  // Both the proxy setup and the feed request are bounded: a stalled proxy or
+  // an unreachable feed used to leave this pending forever (#1666).
+  inFlight ??= withCheckTimeout(useAppProxy(), 'applying the update proxy')
+    .then(() => withCheckTimeout(autoUpdater.checkForUpdates(), 'checking for updates'))
     .then(() => state)
     .catch((err) => {
       setState({ phase: 'error', during: 'check', message: message(err) });
@@ -187,7 +213,10 @@ export async function downloadUpdate(): Promise<UpdateState> {
   stage = 'download';
   setState({ phase: 'downloading', version: state.version, percent: 0 });
   try {
-    await useAppProxy();
+    // The proxy step gets the same bound as the check (it can stall the same
+    // way); the download itself is intentionally unbounded — a full installer
+    // on a slow link legitimately takes minutes.
+    await withCheckTimeout(useAppProxy(), 'applying the update proxy');
     await autoUpdater.downloadUpdate();
   } catch (err) {
     setState({ phase: 'error', during: 'download', message: message(err) });

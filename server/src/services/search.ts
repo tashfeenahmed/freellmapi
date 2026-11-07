@@ -6,13 +6,16 @@ import { proxyFetch } from '../lib/proxy.js';
 import { isSearchPlatform } from '../lib/search-platforms.js';
 import { TAVILY_BASE_URL } from '../providers/tavily.js';
 import { SERPSEARCH_BASE_URL } from '../providers/serpsearch.js';
+import { BRAVE_BASE_URL, BRAVE_BAD_KEY_CODE } from '../providers/brave.js';
 import { EXA_BASE_URL } from '../providers/exa.js';
 import { FIRECRAWL_BASE_URL } from '../providers/firecrawl.js';
 import { LINKUP_BASE_URL } from '../providers/linkup.js';
 import { PARALLEL_BASE_URL, PARALLEL_MCP_URL } from '../providers/parallel.js';
+import { KEENABLE_APP_TITLE, KEENABLE_BASE_URL } from '../providers/keenable.js';
 import { isAnonymousCredential } from '../lib/credential.js';
 import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
+import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -88,6 +91,7 @@ export interface SearchOptions {
   includeAnswer?: boolean;
   /** Pin one engine by id; omitted or 'auto' walks the whole chain. */
   engine?: string;
+  engineRowId?: number;
   /** Agent the search runs for (e.g. 'claude-code'); defaults to the request's
    *  detected client. Recorded on search_requests. */
   clientAgent?: string | null;
@@ -229,7 +233,19 @@ export function decodeEntities(v: string): string {
   return v.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {
       const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
+      // Lone surrogates (0xD800–0xDFFF) are in the 0..0x10FFFF range but are
+      // not valid Unicode scalar values: fromCodePoint hands back a broken
+      // string whose half gets replaced with U+FFFD by every JSON encoder
+      // and rejected outright by strict ones. Web pages carry them as bait
+      // (obfuscated-email addresses render as &#xD800;-style entities), and
+      // this decoder runs on every hit title and snippet from every engine.
+      // Same guard as safeCodePoint in routes/update.ts, which caught this
+      // exact class in the update-check feed. Leave the entity verbatim —
+      // it is display text, not a hard parse dependency.
+      const isLoneSurrogate = code >= 0xd800 && code <= 0xdfff;
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff && !isLoneSurrogate
+        ? String.fromCodePoint(code)
+        : m;
     }
     return NAMED_ENTITIES[e.toLowerCase()] ?? m;
   });
@@ -310,6 +326,40 @@ const ADAPTERS: Record<string, Adapter> = {
       rows = (result.organic_results ?? []) as unknown[];
     }
     const hits = rows.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object').map(r => ({
+      title: str(r.title), url: str(r.url), content: str(r.description),
+    }));
+    return { results: keepHits(hits).slice(0, n) };
+  },
+  // Brave: a bad key is a 422 carrying BRAVE_BAD_KEY_CODE (mapped to 401 so
+  // coolDown benches it), a QUOTA_LIMITED 429 is spent credit (mapped to 402),
+  // and any other 429 is its 1-second burst window.
+  brave: async (cred, query, opts, n) => {
+    const news = opts.topic === 'news';
+    const url = new URL(`${BRAVE_BASE_URL}/${news ? 'news' : 'web'}/search`);
+    url.searchParams.set('q', query);
+    url.searchParams.set('count', String(n));
+    // Brave decorates matched terms with <strong> tags by default
+    // (text_decorations=true), so titles and snippets would reach the caller
+    // wrapped in markup every other engine never emits. Ask for plain text.
+    url.searchParams.set('text_decorations', 'false');
+    let parsed: { web?: { results?: unknown }; results?: unknown } | null;
+    try {
+      parsed = await upstream(url.toString(), 'brave', {
+        method: 'GET', redirect: 'error', headers: { 'X-Subscription-Token': cred.key, Accept: 'application/json' },
+      }, opts.signal) as typeof parsed;
+    } catch (e) {
+      if (!(e instanceof SearchError)) throw e;
+      if (e.status === 422 && e.message.includes(BRAVE_BAD_KEY_CODE)) throw new SearchError(e.message, 401);
+      // A 429 for a spent monthly allowance (QUOTA_LIMITED) is the credits-
+      // spent case, not a burst: park the key like a 402 instead of retrying
+      // it every second until the month resets.
+      if (e.status === 429 && /quota/i.test(e.message)) throw new SearchError(e.message, 402);
+      // Brave sends no Retry-After; its burst window is one second.
+      if (e.status === 429) throw new SearchError(e.message, 429, undefined, e.retryAfterMs ?? 1_000);
+      throw e;
+    }
+    const rows = news ? parsed?.results : parsed?.web?.results;
+    const hits = (Array.isArray(rows) ? rows : []).filter((r): r is Record<string, unknown> => !!r && typeof r === 'object').map(r => ({
       title: str(r.title), url: str(r.url), content: str(r.description),
     }));
     return { results: keepHits(hits).slice(0, n) };
@@ -408,6 +458,28 @@ const ADAPTERS: Record<string, Adapter> = {
     }));
     return { results: keepHits(hits) };
   },
+
+  // Keyless: the stored `no-key` sentinel calls the public endpoint, which
+  // only needs the app title; a real key calls the keyed endpoint. Both return
+  // the same result shape, with the page text in `snippet`.
+  keenable: async (cred, query, opts, n) => {
+    const anonymous = isAnonymousCredential(cred.key);
+    const parsed = await upstream(`${KEENABLE_BASE_URL}/search${anonymous ? '/public' : ''}`, 'keenable', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Keenable-Title': KEENABLE_APP_TITLE,
+        ...(anonymous ? {} : { 'X-API-Key': cred.key.trim() }),
+      },
+      body: JSON.stringify({ query, max_results: n }),
+    }, opts.signal) as { results?: Array<Record<string, unknown>> };
+    const hits = (Array.isArray(parsed?.results) ? parsed.results : []).slice(0, n).map(r => ({
+      title: str(r.title) || str(r.url),
+      url: str(r.url),
+      content: str(r.snippet) || str(r.description),
+    }));
+    return { results: keepHits(hits) };
+  },
 };
 
 /** Platforms with a search adapter. catalog-sync gates searchEngines rows on
@@ -416,7 +488,7 @@ export const SEARCH_ENGINE_PLATFORMS = new Set(Object.keys(ADAPTERS).filter(p =>
 
 // ── Routing ─────────────────────────────────────────────────────────────────
 
-function logSearch(row: SearchEngineRow, keyId: number | null, status: 'ok' | 'error', latencyMs: number, resultCount: number, clientAgent: string | null, error: string | null): void {
+function logSearch(row: SearchEngineRow, keyId: number | null, status: 'ok' | 'error', latencyMs: number, resultCount: number, clientAgent: string | null, error: string | null, estimatedTokens: number): void {
   try {
     getDb()
       .prepare(`INSERT INTO search_requests (engine_id, platform, key_id, status, latency_ms, result_count, client_agent, error)
@@ -424,6 +496,24 @@ function logSearch(row: SearchEngineRow, keyId: number | null, status: 'ok' | 'e
       .run(row.model_id, row.platform, keyId, status, latencyMs, resultCount, clientAgent, error);
   } catch (e) {
     console.error('Failed to log search request:', e);
+  }
+  // The per-key monthly caps (#1158) and GET /v1/usage read the
+  // key_monthly_usage ledger, which the requests_key_monthly_usage trigger
+  // feeds from `requests`. Search only wrote search_requests, so a served
+  // search spent provider quota the cap never saw — the exact rerank gap
+  // (#1621/#1627). request_type='search' follows the rerank/embeddings
+  // precedent; the dashboard's Search page keeps reading search_requests.
+  try {
+    const client = getClientContext();
+    getDb().prepare(`
+      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'search', ?, ?, ?)
+    `).run(row.platform, row.model_id, keyId, status === 'ok' ? 'success' : 'error', estimatedTokens, latencyMs, error, client.ip, client.userAgent, client.agent ?? clientAgent);
+    // Soft budget alert (#1158 follow-on): the ledger trigger fired with this
+    // row, so compare the caps once. No-op for uncapped keys.
+    if (status === 'ok' && keyId != null) noteBudgetAlerts(keyId);
+  } catch (e) {
+    console.error('Failed to log search request to requests table:', e);
   }
 }
 
@@ -463,8 +553,97 @@ export function searchAvailable(): boolean {
   return false;
 }
 
-function searchChain(engine: string | undefined): SearchEngineRow[] {
+// Display names and keyless flags for the diagnostics below. Kept local
+// because providers/index pulls in search-only.ts, which imports this module;
+// a test pins it to SEARCH_PLATFORMS and to each provider's `keyless`.
+export const SEARCH_PLATFORM_INFO: Record<string, { name: string; keyless?: boolean }> = {
+  tavily: { name: 'Tavily' },
+  exa: { name: 'Exa' },
+  firecrawl: { name: 'Firecrawl' },
+  linkup: { name: 'Linkup' },
+  parallel: { name: 'Parallel', keyless: true },
+  serpsearch: { name: 'SerpSearch' },
+  keenable: { name: 'Keenable', keyless: true },
+  brave: { name: 'Brave Search' },
+};
+
+const platformName = (p: string): string => SEARCH_PLATFORM_INFO[p]?.name ?? p;
+
+export type SearchEngineState = 'ready' | 'cooling_down' | 'needs_key' | 'key_error' | 'disabled';
+
+export interface SearchStatus {
+  /** ready: a search can run now; cooling_down: keys exist but every one is
+   *  benched; needs_configuration: nothing to search with. */
+  status: 'ready' | 'cooling_down' | 'needs_configuration';
+  /** Every engine in the installed catalog (plus custom relays), in order. */
+  engines: Array<{ engine: string; platform: string; state: SearchEngineState }>;
+  /** Search platforms with a saved key whose engine is not in the installed
+   *  catalog yet, so the key cannot search until a catalog update adds it. */
+  missing_from_catalog: string[];
+}
+
+/** Search readiness from local state only: catalog rows, saved keys and
+ *  cooldowns. Runs no search and spends no quota. */
+export function searchStatus(): SearchStatus {
+  const db = getDb();
+  const keys = db.prepare('SELECT id, platform, status FROM api_keys WHERE enabled = 1').all() as
+    { id: number; platform: string; status: string }[];
+  const rows = orderedEngines().filter(r => ADAPTERS[r.platform]);
+  const engines = rows.map(row => {
+    const own = row.platform === 'custom' ? keys.filter(k => k.id === row.key_id) : keys.filter(k => k.platform === row.platform);
+    const usable = own.filter(k => k.status === 'healthy' || k.status === 'unknown');
+    const state: SearchEngineState = row.enabled !== 1 ? 'disabled'
+      : own.length === 0 ? 'needs_key'
+      : usable.length === 0 ? 'key_error'
+      : usable.every(k => isOnCooldown(row.platform, row.model_id, k.id)) ? 'cooling_down'
+      : 'ready';
+    return { engine: row.model_id, platform: row.platform, state };
+  });
+  const inCatalog = new Set(allEngineRows().map(r => r.platform));
+  const missing = [...new Set(keys.map(k => k.platform))]
+    .filter(p => isSearchPlatform(p) && !inCatalog.has(p))
+    .sort((a, b) => Object.keys(SEARCH_PLATFORM_INFO).indexOf(a) - Object.keys(SEARCH_PLATFORM_INFO).indexOf(b));
+  const status = engines.some(e => e.state === 'ready') ? 'ready'
+    : engines.some(e => e.state === 'cooling_down') ? 'cooling_down'
+    : 'needs_configuration';
+  return { status, engines, missing_from_catalog: missing };
+}
+
+const listOf = (names: string[], joiner: 'and' | 'or'): string =>
+  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} ${joiner} ${names.at(-1)}`;
+
+/** The "nothing to search with" message, built from what is installed: it
+ *  names only engines this catalog has, and says why a saved key cannot run. */
+export function noSearchMessage(s: SearchStatus = searchStatus()): string {
+  const parts: string[] = [];
+  if (s.missing_from_catalog.length > 0) {
+    const names = s.missing_from_catalog.map(platformName);
+    parts.push(`${listOf(names, 'and')} ${names.length === 1 ? 'is' : 'are'} set up on the Keys page, but the installed catalog has no ${names.length === 1 ? 'engine for it' : 'engines for them'} yet. ${names.length === 1 ? 'It starts' : 'They start'} working on ${names.length === 1 ? 'its' : 'their'} own once a catalog update adds ${names.length === 1 ? 'it' : 'them'}.`);
+  }
+  const named = (state: SearchEngineState) =>
+    [...new Set(s.engines.filter(e => e.state === state && e.platform !== 'custom').map(e => platformName(e.platform)))];
+  const off = s.engines.filter(e => e.state === 'disabled' && e.platform !== 'custom' && SEARCH_PLATFORM_INFO[e.platform]);
+  const broken = named('key_error');
+  if (broken.length > 0) parts.push(`The ${listOf(broken, 'and')} ${broken.length === 1 ? 'key' : 'keys'} failed ${broken.length === 1 ? 'its' : 'their'} last check; re-check on the Keys page.`);
+  const needKey = s.engines.filter(e => e.state === 'needs_key' && e.platform !== 'custom').map(e => e.platform);
+  const keyless = [...new Set(needKey.filter(p => SEARCH_PLATFORM_INFO[p]?.keyless))].map(platformName);
+  const keyed = [...new Set(needKey.filter(p => !SEARCH_PLATFORM_INFO[p]?.keyless))].map(platformName);
+  const remedies: string[] = [];
+  if (keyless.length > 0) remedies.push(`add ${listOf(keyless, 'or')} (no key needed)`);
+  if (keyed.length > 0) remedies.push(`add a ${listOf(keyed, 'or')} key`);
+  if (remedies.length > 0) parts.push(`To search, ${remedies.join(', or ')} on the Keys page.`);
+  if (off.length > 0) parts.push(`Turned off under Models → Search: ${listOf([...new Set(off.map(e => platformName(e.platform)))], 'and')}.`);
+  if (s.engines.length === 0) parts.push('The installed catalog has no search engines. Check for a catalog update on the Premium page.');
+  return `No search engine is ready. ${parts.join(' ')}`.trim();
+}
+
+function searchChain(engine: string | undefined, engineRowId?: number): SearchEngineRow[] {
   const enabled = orderedEngines().filter(r => r.enabled === 1 && ADAPTERS[r.platform]);
+  if (engineRowId !== undefined) {
+    const row = enabled.find(r => r.id === engineRowId);
+    if (!row) throw new SearchError('Search engine is unavailable or disabled', 400);
+    return [row];
+  }
   // Custom relays first, catalog engines after, each group in effective order.
   const chain = [...enabled.filter(r => r.platform === 'custom'), ...enabled.filter(r => r.platform !== 'custom')];
   if (!engine || engine === 'auto') return chain;
@@ -482,9 +661,13 @@ function searchChain(engine: string | undefined): SearchEngineRow[] {
 }
 
 export async function runSearch(query: string, opts: SearchOptions = {}): Promise<SearchResponse> {
-  const chain = searchChain(opts.engine);
+  const chain = searchChain(opts.engine, opts.engineRowId);
   const maxResults = Math.min(Math.max(1, Math.floor(opts.maxResults ?? DEFAULT_RESULTS)), MAX_RESULTS);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
+  // Rough token estimate for the ledger row (~4 chars/token), the same
+  // heuristic rerank uses. It sizes the requests-table row so the monthly
+  // caps (#1158) and /v1/usage see search spend.
+  const estTokens = Math.ceil(query.length / 4);
 
   let lastError: SearchError | null = null;
   let attempted = 0;
@@ -513,7 +696,7 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
       try {
         const out = await ADAPTERS[row.platform]!(credential, query, opts, maxResults);
         if (out.results.length === 0) throw new SearchError('upstream returned no valid search hits', 502);
-        logSearch(row, credential.id, 'ok', Date.now() - started, out.results.length, clientAgent, null);
+        logSearch(row, credential.id, 'ok', Date.now() - started, out.results.length, clientAgent, null, estTokens);
         // A served search is the evidence the key works, the same as a served
         // chat request: it stamps last_healthy_at and lifts an 'unknown' or
         // 'error' key. For SerpSearch, Exa and Parallel it is the only evidence
@@ -528,7 +711,7 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
         };
       } catch (err: any) {
         const e = err instanceof SearchError ? err : new SearchError(String(err?.message ?? err), 502);
-        logSearch(row, credential.id, 'error', Date.now() - started, 0, clientAgent, e.message.slice(0, 300));
+        logSearch(row, credential.id, 'error', Date.now() - started, 0, clientAgent, e.message.slice(0, 300), estTokens);
         coolDown(row, credential.id, e);
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
@@ -552,11 +735,7 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
         'search_keys_cooling_down',
       );
     }
-    throw new SearchError(
-      'No search key configured. Enable Parallel (no key needed) or add a Tavily, Exa, Firecrawl or Linkup key on the Keys page.',
-      503,
-      'no_search_keys',
-    );
+    throw new SearchError(noSearchMessage(), 503, 'no_search_keys');
   }
   // Only statuses the caller can act on pass through (see media chainError):
   // an upstream 401 means OUR provider key failed, not the caller's.

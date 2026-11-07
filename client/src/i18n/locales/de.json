@@ -450,6 +450,7 @@
     "adding": "Hinzufügen…",
     "selectProvider": "Wählen Sie einen Anbieter aus…",
     "accountId": "Konto-ID",
+    "projectId": "Projekt-ID",
     "label": "Etikett",
     "noKeyNeeded": "(kein Schlüssel erforderlich)",
     "outboundProxy": "Ausgehender Proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Monatliches Token-Limit",
     "capUnlimitedPlaceholder": "Unbegrenzt",
     "capEditHint": "Limits werden am 1. um 00:00 UTC zurückgesetzt. Leer lassen für unbegrenzt.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} Anfragen, {tokens} Tokens diesen Monat",
     "quotaBalanceHint": "{remaining} von {limit} {metric} übrig",
-    "quotaBalanceLeft": "{remaining} übrig"
-,
+    "quotaBalanceLeft": "{remaining} übrig",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Gesamter Zeitraum",
+    "rangeAllNote": "Die Gesamtsummen gelten für den gesamten Zeitraum. Erfolgsquote und die Aufschlüsselungen unten umfassen den Verlauf, den diese Installation noch speichert.",
     "requests": "Anfragen",
     "successRate": "Erfolgsquote",
     "inputTokens": "Eingabe-Tokens",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Rückfallversuche",
     "savingsHint": "Sie haben gegenüber dem letzten {range} tatsächlich ${actual} gespart. Das ist der Preis, den die gleichen Token bei kostenpflichtigen APIs pro Modell gekostet hätten. Die angezeigte Zahl projiziert Ihr Tempo von den letzten {span} Daten auf volle 30 Tage.",
     "savingsHintExact": "Sie haben gegenüber dem letzten {range} tatsächlich ${actual} gespart. Das ist der Preis, den die gleichen Token bei kostenpflichtigen APIs pro Modell gekostet hätten. Die angezeigte Zahl ist Ihr tatsächlicher 30-Tage-Gesamtbetrag.",
+    "savingsHintAll": "Sie haben über den gesamten gespeicherten Verlauf ${actual} gespart. So viel hätten dieselben Token bei kostenpflichtigen APIs gekostet, pro Modell berechnet. Die angezeigte Zahl projiziert Ihr jüngstes Tempo aus den letzten {span} Daten auf volle 30 Tage.",
     "requestsHintPinned": "{pinned} dieser Anfragen hat ein bestimmtes Modell namentlich angepinnt. {honored} wurden vom gepinnten Modell bedient; {failed} ist auf ein anderes fehlgeschlagen. Der Rest wurde automatisch weitergeleitet.",
     "requestsHintAuto": "Alle Anfragen in diesem Zeitraum wurden automatisch weitergeleitet; Kein Kunde hat ein bestimmtes Modell namentlich angeheftet.",
     "requestsHintTypes": "{chat}-Chat und {embedding}-Einbettungsanfragen.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Einträge erscheinen hier, sobald der Server sie schreibt. Erweitern Sie die Filter für Ebene, Anbieter oder Suche, wenn Sie eine Ausgabe erwartet haben.",
     "noLevelsTitle": "Keine Ebene ausgewählt",
     "noLevelsDescription": "Schalten Sie mindestens eine Ebene ein, um die Protokollausgabe zu sehen.",
-    "loadFailed": "Das Serverprotokoll konnte nicht geladen werden."
+    "loadFailed": "Das Serverprotokoll konnte nicht geladen werden.",
+    "eventFilter": "Ereignis",
+    "allEvents": "Alle Ereignisse"
   },
   "playground": {
     "title": "Spielplatz",

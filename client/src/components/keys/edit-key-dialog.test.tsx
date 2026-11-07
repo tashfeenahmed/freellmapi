@@ -7,6 +7,7 @@ import { I18nProvider } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import type { ApiKey } from '../../../../shared/types'
 import { EditKeyDialog } from './edit-key-dialog'
+import { capUsage } from './cap-usage'
 import { EditModelsDialog } from './edit-models-dialog'
 
 vi.mock('@/lib/api', () => ({ apiFetch: vi.fn() }))
@@ -118,12 +119,77 @@ describe('editing provider credentials', () => {
     mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 50 }} onOpenChange={onOpenChange} />)
     expect(document.querySelector('details')!.open).toBe(true)
   })
+  it('renders a usage bar with the 80% warning once a capped key crosses it', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 100, monthlyTokenCap: 0,
+      monthlyUsage: { requests: 85, tokens: 10, resetsAt: '2026-11-01T00:00:00.000Z' } }} onOpenChange={onOpenChange} />)
+    const bars = container.querySelectorAll('[role="progressbar"]')
+    // Only the capped dimension gets a bar (token cap = unlimited).
+    expect(bars.length).toBe(1)
+    expect(bars[0]!.getAttribute('aria-valuenow')).toBe('85')
+    expect(container.textContent).toContain('85 of 100 (85%)')
+    expect(container.textContent).toContain('Over 80% of this cap')
+  })
+  it('shows the exhausted warning at 100% and no warning below 80%', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 100,
+      monthlyUsage: { requests: 100, tokens: 0, resetsAt: '2026-11-01T00:00:00.000Z' } }} onOpenChange={onOpenChange} />)
+    expect(container.textContent).toContain('Cap reached')
+    // Tear the first root down properly: clearing innerHTML before unmount
+    // leaves React removing nodes that are no longer children (NOT_FOUND_ERR).
+    act(() => root.unmount())
+    container.remove()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', monthlyRequestCap: 100,
+      monthlyUsage: { requests: 79, tokens: 0, resetsAt: '2026-11-01T00:00:00.000Z' } }} onOpenChange={onOpenChange} />)
+    expect(container.textContent).not.toContain('Over 80%')
+    expect(container.textContent).toContain('79 of 100 (79%)')
+  })
+  it('capUsage: uncapped is null, cap <= 0 never divides', () => {
+    expect(capUsage(5, 0)).toBeNull()
+    expect(capUsage(5, -1)).toBeNull()
+    expect(capUsage(80, 100)).toEqual({ fraction: 0.8, overWarning: true })
+    expect(capUsage(79, 100)).toEqual({ fraction: 0.79, overWarning: false })
+    expect(capUsage(150, 100)!.overWarning).toBe(true)
+  })
   it('does not submit a non-numeric cap', async () => {
     mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq' }} onOpenChange={onOpenChange} />)
     enter('#edit-key-request-cap', '10k')
     await submit()
     expect(apiFetch).not.toHaveBeenCalled()
     expect(container.querySelector('#edit-key-request-cap')!.getAttribute('aria-invalid')).toBe('true')
+  })
+  it('sets a per-key proxy on a custom endpoint (#1526)', async () => {
+    // A custom key also renders GroupLabelField, which lists /api/keys.
+    vi.mocked(apiFetch).mockImplementation(async path => path === '/api/keys' ? [] : { success: true })
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'custom', baseUrl: 'https://api.example.com/v1' }} onOpenChange={onOpenChange} />)
+    enter('#edit-key-proxy', ' socks5://user:pass@10.0.0.2:1080 ')
+    await submit()
+    expect(apiFetch).toHaveBeenCalledWith('/api/keys/7', { method: 'PATCH', body: JSON.stringify({ proxyUrl: 'socks5://user:pass@10.0.0.2:1080' }) })
+  })
+  it('shows the saved proxy masked and never submits it back', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', maskedProxyUrl: 'http://user:***@proxy:8080' }} onOpenChange={onOpenChange} />)
+    expect(container.textContent).toContain('http://user:***@proxy:8080')
+    expect(container.querySelector<HTMLInputElement>('#edit-key-proxy')!.value).toBe('')
+    enter('#edit-key-label', 'Renamed')
+    await submit()
+    expect(apiFetch).toHaveBeenCalledWith('/api/keys/7', { method: 'PATCH', body: JSON.stringify({ label: 'Renamed' }) })
+  })
+  it('Remove clears the saved proxy with an empty proxyUrl', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', maskedProxyUrl: 'http://proxy:8080' }} onOpenChange={onOpenChange} />)
+    const toggle = [...container.querySelectorAll('button')].find(b => b.textContent === 'Remove')!
+    act(() => { toggle.click() })
+    expect(toggle.textContent).toBe('Undo')
+    await submit()
+    expect(apiFetch).toHaveBeenCalledWith('/api/keys/7', { method: 'PATCH', body: JSON.stringify({ proxyUrl: '' }) })
+  })
+  it('Undo after Remove leaves the proxy alone', async () => {
+    mount(<EditKeyDialog apiKey={{ ...key, platform: 'groq', maskedProxyUrl: 'http://proxy:8080' }} onOpenChange={onOpenChange} />)
+    const toggle = [...container.querySelectorAll('button')].find(b => b.textContent === 'Remove')!
+    act(() => { toggle.click() })
+    act(() => { toggle.click() })
+    await submit()
+    expect(apiFetch).not.toHaveBeenCalled()
   })
   it('loads model choices from the full catalog instead of a limited active chain', async () => {
     vi.mocked(apiFetch).mockImplementation(async path => path === '/api/models'

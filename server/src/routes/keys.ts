@@ -17,7 +17,7 @@ import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, e
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { isSearchPlatform } from '../lib/search-platforms.js';
-import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError } from '../services/model-discovery.js';
+import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError, type DiscoveredModelKind } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
 import { recordCustomModelTombstone } from '../services/custom-model-tombstone.js';
@@ -42,8 +42,9 @@ export const keysRouter = Router();
 // existing keys still work if the catalog re-enables them. The setup
 // checklist stops suggesting them to anyone who has no key yet; the dashboard
 // pickers hide them through `hidden` in client/src/components/keys/shared.tsx.
-// Empty since Auray was removed outright (#1583).
-const UNLISTED_PLATFORMS = new Set<string>();
+// ACLIDE: its dashboard has returned 500 since mid-October, so new users
+// cannot create a key (#1565, #1768). The API still serves existing keys.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
@@ -54,6 +55,8 @@ const UNLISTED_PLATFORMS = new Set<string>();
 const PLATFORMS = [
   'aclide',
   'speka',
+  'kenari',
+  'kiosapi',
   'typhoon',
   'plugsky',
   'inferbase',
@@ -62,13 +65,23 @@ const PLATFORMS = [
   'gizmo',
   'blockrun',
   'moondream',
+  'jamai',
+  'nabh',
+  'novai',
+  'varosity',
+  'freeinference',
+  'freemodel',
   'beatapi',
   'apinex',
   'onomeo',
+  'iteracompute',
   'serpsearch',
+  'brave',
+  'halx',
+  'aisense',
   'freeai',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
-  'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'cloudflare', 'zhipu', 'ollama',
+  'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
   'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
@@ -96,6 +109,24 @@ const upload = multer({
 // string would be stored, encrypted, and only surface as a failed dispatcher
 // at request time, one attempt at a time. '' = no override (global proxy).
 const proxyUrlSchema = z.string().max(KEY_PROXY_URL_MAX).refine(isValidKeyProxyUrl, { message: KEY_PROXY_URL_ERROR });
+
+// A label is free text, and two formats read it back as STRUCTURE: the .env
+// export writes it as a `# label` comment line (a label carrying a newline
+// injects a real `GOOGLE_KEY=...` line that the importer then loads as a
+// key), and the CSV export writes it as one cell (the formula guard quotes the
+// cell but cannot stop a newline from splitting the record). So a label is one
+// line of text, full stop: line breaks and other control characters collapse
+// to a space, and it is trimmed and bounded like every other operator label
+// (groupLabel is trim().max(80)).
+const LABEL_MAX = 200;
+function sanitizeLabel(label: string): string {
+  // eslint-disable-next-line no-control-regex -- collapsing control chars is the point.
+  return label.replace(/[\r\n\t\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, LABEL_MAX);
+}
+// Defensive read for exports: rows stored by older builds can still hold a
+// newline, and an export must never write one into a label position.
+const labelForExport = (label: string | null | undefined): string =>
+  label == null ? '' : sanitizeLabel(label);
 
 const addKeySchema = z.object({
   platform: z.enum(PLATFORMS),
@@ -633,7 +664,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
       if (k.platform === 'custom' && k.baseUrl) {
         customIndex++;
         return [
-          `# ${k.label || `custom endpoint ${customIndex}`}`,
+          `# ${labelForExport(k.label) || `custom endpoint ${customIndex}`}`,
           `CUSTOM_${customIndex}_BASE_URL=${k.baseUrl}`,
           `CUSTOM_${customIndex}_KEY=${k.key}`,
         ].join('\n');
@@ -641,7 +672,8 @@ keysRouter.get('/export', (req: Request, res: Response) => {
       const n = (seenPerPlatform.get(k.platform) ?? 0) + 1;
       seenPerPlatform.set(k.platform, n);
       const envKey = `${k.platform.toUpperCase()}_KEY${n > 1 ? `_${n}` : ''}=${k.key}`;
-      return k.label ? `# ${k.label}\n${envKey}` : envKey;
+      const comment = labelForExport(k.label);
+      return comment ? `# ${comment}\n${envKey}` : envKey;
     });
     const content = lines.join('\n\n') + '\n';
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -656,9 +688,11 @@ keysRouter.get('/export', (req: Request, res: Response) => {
     // CSV formula-injection guard: a spreadsheet treats a cell that starts with
     // =, +, -, @, tab or CR as a live formula, so a label like `=HYPERLINK(...)`
     // would execute on open. Prefix such cells with a single quote to force them
-    // to be read as text. Applied only to free-text fields the user controls
-    // (labels); the key value must round-trip verbatim for re-import, and the
-    // platform is one of our own fixed enum values.
+    // to be read as text. Applied to the free-text fields the user controls
+    // (labels AND base_url — the custom endpoint column is free text too, and
+    // the importer strips the guard quote back off both); the key value must
+    // round-trip verbatim for re-import, and the platform is one of our own
+    // fixed enum values.
     const neutralize = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
     // base_url is the fourth column: a custom row is an ENDPOINT, and without
     // its URL the key cannot be re-imported (#687). Blank for every other
@@ -666,7 +700,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
     // written by older builds still load.
     const header = 'platform,key,label,base_url';
     const lines = decryptedKeys.map(k =>
-      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(k.label)), escCsv(k.baseUrl ?? '')].join(',')
+      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(labelForExport(k.label))), escCsv(neutralize(k.baseUrl ?? ''))].join(',')
     );
     const content = [header, ...lines].join('\n') + '\n';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -732,7 +766,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  const { platform, label } = parsed.data;
+  const { platform } = parsed.data;
+  const label = parsed.data.label === undefined ? undefined : sanitizeLabel(parsed.data.label);
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
@@ -846,6 +881,11 @@ const modelEntrySchema = z.union([
     displayName: z.string().optional(),
     supportsTools: z.boolean().optional(),
     supportsVision: z.boolean().optional(),
+    // #1506: a kind forwarded from discovery metadata (the endpoint's own
+    // `type`/metadata) so an id with no media keyword still routes to the
+    // table that can serve it. Absent, the handler falls back to the
+    // id-based classifier (#1051).
+    kind: z.enum(['embedding', 'image', 'audio', 'transcription', 'video']).optional(),
   }),
 ]);
 // `baseUrl` and `keyId` are both optional but at least one is required: the
@@ -1330,9 +1370,9 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // whatever name it already has on re-registration (see the upsert below).
   const topTools = parsed.data.supportsTools;
   const topVision = parsed.data.supportsVision;
-  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean }[] = [];
+  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; kind?: DiscoveredModelKind }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
@@ -1341,12 +1381,13 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       displayName: rawDisplay?.trim() || null,
       supportsTools: tools ?? topTools,
       supportsVision: vision ?? topVision,
+      kind,
     });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind);
   }
   // A lone model submitted through the plural `models` also carries its name in
   // the top-level `displayName` — that is exactly what the dashboard's custom
@@ -1401,7 +1442,14 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // on the entry is an operator override: someone who says "this is a chat
   // model with vision/tools" wins over the keyword guess.
   const overridden = (e: typeof entries[number]) => e.supportsTools !== undefined || e.supportsVision !== undefined;
-  const kindOf = (e: typeof entries[number]) => overridden(e) ? undefined : classifyModelId(e.modelId);
+  const kindOf = (e: typeof entries[number]) => {
+    // #1506: a forwarded discovery kind is authoritative for a generic-id
+    // model; an explicit capability flag forces chat over both the kind and
+    // the id guess (#1051).
+    if (overridden(e)) return undefined;
+    if (e.kind !== undefined) return e.kind;
+    return classifyModelId(e.modelId);
+  };
   const chatEntries = entries.filter(e => kindOf(e) === undefined || kindOf(e) === 'embedding');
   const embedEntries = chatEntries.filter(e => kindOf(e) === 'embedding');
   const pureChatEntries = chatEntries.filter(e => kindOf(e) !== 'embedding');
@@ -1904,7 +1952,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   }
   if (label !== undefined) {
     updates.push('label = ?');
-    values.push(label);
+    values.push(sanitizeLabel(label));
   }
   // #590: stored encrypted (credentials), so a change rewrites all three
   // columns; '' clears them to NULL.

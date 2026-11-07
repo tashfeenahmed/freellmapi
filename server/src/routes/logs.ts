@@ -89,6 +89,7 @@ logsRouter.get('/', (req: Request, res: Response) => {
     levels,
     q: firstParam(req.query.q),
     provider: firstParam(req.query.provider),
+    event: firstParam(req.query.event),
     sinceId,
     limit,
   });

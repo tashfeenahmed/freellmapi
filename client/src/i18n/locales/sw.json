@@ -450,6 +450,7 @@
     "adding": "Inaongeza...",
     "selectProvider": "Chagua mtoa huduma...",
     "accountId": "Kitambulisho cha Akaunti",
+    "projectId": "Kitambulisho cha mradi",
     "label": "Lebo",
     "noKeyNeeded": "(hakuna ufunguo unaohitajika)",
     "outboundProxy": "Wakala wa nje",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Kikomo cha kila mwezi cha tokeni",
     "capUnlimitedPlaceholder": "Bila kikomo",
     "capEditHint": "Vikomo huwekwa upya tarehe 1 saa 00:00 UTC. Acha wazi bila kikomo.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Maombi {requests}, tokeni {tokens} mwezi huu",
     "quotaBalanceHint": "Zimebaki {remaining} kati ya {limit} {metric}",
-    "quotaBalanceLeft": "Zimebaki {remaining}"
-,
+    "quotaBalanceLeft": "Zimebaki {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Muda wote",
+    "rangeAllNote": "Jumla kuu ni za muda wote. Kiwango cha mafanikio na mgawanyo ulio hapa chini unahusu historia ambayo usakinishaji huu bado unahifadhi.",
     "requests": "Maombi",
     "successRate": "Kiwango cha mafanikio",
     "inputTokens": "Ishara za kuingiza",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Majaribio ya kurudi nyuma",
     "savingsHint": "Umehifadhi ${actual} zaidi ya {range} iliyopita. Hiyo ndiyo tokeni zile zile zingegharimu API zinazolipiwa, bei kwa kila modeli. Nambari iliyoonyeshwa inakuza kasi yako kutoka {span} ya mwisho ya data hadi siku 30 kamili.",
     "savingsHintExact": "Umehifadhi ${actual} zaidi ya {range} iliyopita. Hiyo ndiyo tokeni zile zile zingegharimu API zinazolipiwa, bei kwa kila modeli. Nambari iliyoonyeshwa ni jumla yako halisi ya siku 30.",
+    "savingsHintAll": "Umeokoa ${actual} katika historia yote iliyohifadhiwa. Hiyo ndiyo gharama ambayo tokeni hizo hizo zingegharimu kwenye API za kulipia, kwa bei ya kila modeli. Nambari inayoonyeshwa inakadiria kasi yako ya hivi karibuni kutoka {span} za mwisho za data hadi siku 30 kamili.",
     "requestsHintPinned": "{pinned} ya maombi haya yalibandikwa modeli maalum kwa jina. {honored} zilihudumiwa na kielelezo kilichobandikwa; {failed} imeshindwa hadi nyingine tofauti. Zingine zilielekezwa kiotomatiki.",
     "requestsHintAuto": "Maombi yote katika kipindi hiki yalielekezwa kiotomatiki; hakuna mteja aliyebandika mfano maalum kwa jina.",
     "requestsHintTypes": "{chat} chat na {embedding} maombi ya kupachika.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Maingizo huonekana hapa seva inapoyaandika. Panua vichujio vya kiwango, mtoa huduma au utafutaji ikiwa ulitarajia matokeo.",
     "noLevelsTitle": "Hakuna kiwango kilichochaguliwa",
     "noLevelsDescription": "Washa angalau kiwango kimoja ili kuona matokeo ya kumbukumbu.",
-    "loadFailed": "Imeshindwa kupakia kumbukumbu ya seva."
+    "loadFailed": "Imeshindwa kupakia kumbukumbu ya seva.",
+    "eventFilter": "Tukio",
+    "allEvents": "Matukio yote"
   },
   "playground": {
     "title": "Uwanja wa michezo",

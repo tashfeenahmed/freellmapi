@@ -450,6 +450,7 @@
     "adding": "Əlavə edirəm...",
     "selectProvider": "Bir təminatçı seç...",
     "accountId": "Hesab ID-si",
+    "projectId": "Layihə ID-si",
     "label": "Etiket",
     "noKeyNeeded": "(açar lazım deyil)",
     "outboundProxy": "Outbound proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Aylıq token limiti",
     "capUnlimitedPlaceholder": "Limitsiz",
     "capEditHint": "Limitlər hər ayın 1-i 00:00 UTC-də sıfırlanır. Limitsiz üçün boş buraxın.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Bu ay {requests} sorğu, {tokens} token",
     "quotaBalanceHint": "{limit} {metric} içindən {remaining} qalıb",
-    "quotaBalanceLeft": "{remaining} qalıb"
-,
+    "quotaBalanceLeft": "{remaining} qalıb",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Bütün dövr",
+    "rangeAllNote": "Əsas cəmlər bütün dövr üzrədir. Uğur faizi və aşağıdakı bölgülər bu quraşdırmanın hələ saxladığı tarixçəni əhatə edir.",
     "requests": "İstifadələr",
     "successRate": "Uğur nisbəti",
     "inputTokens": "Giriş tokenləri",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Ehtiyat cəhdlər",
     "savingsHint": "Əslində, son {range} ərzində ${actual}-ni xilas etdiniz. Bu, eyni tokenlərin ödənişli API-lərdə, modelə görə qiymət baxımından dəyəri olardı. Göstərilən rəqəm son {span} məlumatdan tam 30 günə qədər sürətinizi proqnozlaşdırır.",
     "savingsHintExact": "Əslində, son {range} ərzində ${actual}-ni xilas etdiniz. Bu, eyni tokenlərin ödənişli API-lərdə, modelə görə qiymət baxımından dəyəri olardı. Göstərilən rəqəm sizin real 30 günlük ümumi nəticənizdir.",
+    "savingsHintAll": "Saxlanılan bütün tarixçə üzrə ${actual} qənaət etdiniz. Eyni tokenlər ödənişli API-lərdə, model qiyməti ilə bu qədər baha başa gələrdi. Göstərilən rəqəm son {span} məlumat üzrə son tempinizi tam 30 günə proqnozlaşdırır.",
     "requestsHintPinned": "Bu sorğulardan {pinned} konkret modeli adı ilə pinlədi. {honored} pinli model ilə xidmət olunurdu; {failed} başqa birinə keçə bilmədim. Qalanları avtomatik yönləndirildi.",
     "requestsHintAuto": "Bu dövrdə bütün sorğular avtomatik yönləndirilirdi; Heç bir müştəri konkret modeli adı ilə pinləməyib.",
     "requestsHintTypes": "{chat} chat və {embedding} embedding sorğuları.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Server qeydləri yazdıqca onlar burada görünəcək. Nəticə gözləyirdinizsə, səviyyə, təchizatçı və ya axtarış filtrlərini genişləndirin.",
     "noLevelsTitle": "Səviyyə seçilməyib",
     "noLevelsDescription": "Log çıxışını görmək üçün ən azı bir səviyyəni aktivləşdirin.",
-    "loadFailed": "Server logu yüklənə bilmədi."
+    "loadFailed": "Server logu yüklənə bilmədi.",
+    "eventFilter": "Hadisə",
+    "allEvents": "Bütün hadisələr"
   },
   "playground": {
     "title": "Uşaq meydançası",

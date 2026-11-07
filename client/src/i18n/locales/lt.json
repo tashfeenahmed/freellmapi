@@ -450,6 +450,7 @@
     "adding": "Prideda...",
     "selectProvider": "Pasirinkite paslaugų teikėją...",
     "accountId": "Paskyros ID",
+    "projectId": "Projekto ID",
     "label": "Leidykla",
     "noKeyNeeded": "(raktas nereikalingas)",
     "outboundProxy": "Išeinantis proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Mėnesinis žetonų limitas",
     "capUnlimitedPlaceholder": "Neribota",
     "capEditHint": "Limitai atstatomi 1 d. 00:00 UTC. Palikite tuščią neribotam.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} užklausos, {tokens} žetonai šį mėnesį",
     "quotaBalanceHint": "Liko {remaining} iš {limit} {metric}",
-    "quotaBalanceLeft": "Liko {remaining}"
-,
+    "quotaBalanceLeft": "Liko {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Visas laikas",
+    "rangeAllNote": "Pagrindinės sumos apima visą laiką. Sėkmės rodiklis ir toliau pateikti suskirstymai apima istoriją, kurią šis diegimas dar saugo.",
     "requests": "Prašymai",
     "successRate": "Sėkmės rodiklis",
     "inputTokens": "Įvesties žetonai",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Atsarginiai bandymai",
     "savingsHint": "Iš tikrųjų per pastaruosius {range} sutaupėte ${actual}. Tiek tie patys žetonai būtų kainavę mokamuose API, kainavę pagal modelį. Parodytas skaičius prognozuoja jūsų tempą nuo paskutinio duomenų {span} iki pilnų 30 dienų.",
     "savingsHintExact": "Iš tikrųjų per pastaruosius {range} sutaupėte ${actual}. Tiek tie patys žetonai būtų kainavę mokamuose API, kainavę pagal modelį. Parodytas skaičius yra jūsų tikrasis 30 dienų skaičius.",
+    "savingsHintAll": "Per visą išsaugotą istoriją sutaupėte ${actual}. Tiek tie patys žetonai būtų kainavę mokamose API, pagal kiekvieno modelio kainą. Rodomas skaičius jūsų naujausią tempą iš paskutinių {span} duomenų projektuoja visoms 30 dienų.",
     "requestsHintPinned": "{pinned} šių užklausų pagal pavadinimą buvo prisegti konkretus modelis. {honored} buvo aptarnaujami su smeigtukais pritvirtintu modeliu; {failed} perėjo į kitą. Likę buvo automatiškai nukreipti.",
     "requestsHintAuto": "Visi prašymai šiuo laikotarpiu buvo automatiškai nukreipiami; Nė vienas klientas neprisegė konkretaus modelio vardu.",
     "requestsHintTypes": "{chat} pokalbių ir {embedding} įterpimo užklausų.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Įrašai atsiras čia, kai serveris juos užrašys. Jei tikėjotės rezultatų, išplėskite lygio, tiekėjo ar paieškos filtrus.",
     "noLevelsTitle": "Nepasirinktas nė vienas lygis",
     "noLevelsDescription": "Įjunkite bent vieną lygį, kad matytumėte žurnalo įrašus.",
-    "loadFailed": "Nepavyko įkelti serverio žurnalo."
+    "loadFailed": "Nepavyko įkelti serverio žurnalo.",
+    "eventFilter": "Įvykis",
+    "allEvents": "Visi įvykiai"
   },
   "playground": {
     "title": "Žaidimų aikštelė",

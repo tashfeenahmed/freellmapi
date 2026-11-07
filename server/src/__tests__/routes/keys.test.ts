@@ -217,7 +217,7 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
-  it.each(['freeai', 'inferbase', 'simplellm', 'aclide', 'speka', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'])('accepts a %s key without seeding gated model rows', async platform => {
+  it.each(['varosity', 'freeinference', 'novai', 'nabh', 'freeai', 'inferbase', 'simplellm', 'aclide', 'speka', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'])('accepts a %s key without seeding gated model rows', async platform => {
     const { status, body } = await request(app, 'POST', '/api/keys', {
       platform, key: 'not-a-real-test-key-12345', label: 'Gateway test',
     });
@@ -412,7 +412,7 @@ describe('Keys API', () => {
     expect(storedKey(created.id)).toBe('kilo-real-secret');
   });
 
-  it.each(['kilo', 'ovh', 'aihorde', 'parallel'])('POST /api/keys without a key stores one anonymous %s row', async (platform) => {
+  it.each(['kilo', 'ovh', 'aihorde', 'parallel', 'keenable'])('POST /api/keys without a key stores one anonymous %s row', async (platform) => {
     const first = await request(app, 'POST', '/api/keys', { platform });
     const second = await request(app, 'POST', '/api/keys', { platform, key: '   ' });
 
@@ -425,7 +425,7 @@ describe('Keys API', () => {
     expect(keys[0]).toMatchObject({ platform, keyless: true, keyOptional: true, exportable: false });
   });
 
-  it.each(['kilo', 'ovh', 'aihorde', 'parallel'])('POST /api/keys stores a real %s key encrypted', async (platform) => {
+  it.each(['kilo', 'ovh', 'aihorde', 'parallel', 'keenable'])('POST /api/keys stores a real %s key encrypted', async (platform) => {
     const { status, body } = await request(app, 'POST', '/api/keys', { platform, key: ` ${platform}-secret-123 `, label: 'mine' });
 
     expect(status).toBe(201);

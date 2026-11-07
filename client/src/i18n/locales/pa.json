@@ -450,6 +450,7 @@
     "adding": "ਜੋੜ ਰਿਹਾ ਹੈ...",
     "selectProvider": "ਇੱਕ ਪ੍ਰਦਾਤਾ ਚੁਣੋ...",
     "accountId": "ਖਾਤਾ ID",
+    "projectId": "ਪ੍ਰੋਜੈਕਟ ID",
     "label": "ਲੇਬਲ",
     "noKeyNeeded": "(ਕੋਈ ਕੁੰਜੀ ਦੀ ਲੋੜ ਨਹੀਂ)",
     "outboundProxy": "ਆਊਟਬਾਉਂਡ ਪ੍ਰੌਕਸੀ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ਮਹੀਨਾਵਾਰੀ ਟੋਕਨ ਸੀਮਾ",
     "capUnlimitedPlaceholder": "ਅਸੀਮਤ",
     "capEditHint": "ਸੀਮਾਵਾਂ ਹਰ ਮਹੀਨੇ 1 ਤਾਰੀਖ਼ ਨੂੰ 00:00 UTC 'ਤੇ ਰੀਸੈੱਟ ਹੁੰਦੀਆਂ ਹਨ। ਅਸੀਮਤ ਲਈ ਖਾਲੀ ਛੱਡੋ।",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ਇਸ ਮਹੀਨੇ {requests} ਬੇਨਤੀਆਂ, {tokens} ਟੋਕਨ",
     "quotaBalanceHint": "{limit} {metric} ਵਿੱਚੋਂ {remaining} ਬਾਕੀ",
-    "quotaBalanceLeft": "{remaining} ਬਾਕੀ"
-,
+    "quotaBalanceLeft": "{remaining} ਬਾਕੀ",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 ਡੀ",
     "range30d": "30 ਡੀ",
     "range90d": "90 ਡੀ",
+    "rangeAll": "ਸਾਰਾ ਸਮਾਂ",
+    "rangeAllNote": "ਮੁੱਖ ਕੁੱਲ ਜੋੜ ਸਾਰੇ ਸਮੇਂ ਦੇ ਹਨ। ਸਫਲਤਾ ਦਰ ਅਤੇ ਹੇਠਾਂ ਦਿੱਤੇ ਵੇਰਵੇ ਉਸ ਇਤਿਹਾਸ ਨੂੰ ਕਵਰ ਕਰਦੇ ਹਨ ਜੋ ਇਹ ਇੰਸਟਾਲ ਅਜੇ ਵੀ ਰੱਖਦਾ ਹੈ।",
     "requests": "ਬੇਨਤੀਆਂ",
     "successRate": "ਸਫਲਤਾ ਦਰ",
     "inputTokens": "ਇਨਪੁਟ ਟੋਕਨ",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ਫਾਲਬੈਕ ਕੋਸ਼ਿਸ਼ਾਂ",
     "savingsHint": "ਤੁਸੀਂ ਅਸਲ ਵਿੱਚ ਪਿਛਲੇ {range} ਵਿੱਚ ${actual} ਦੀ ਬਚਤ ਕੀਤੀ ਹੈ। ਇਹ ਉਹੀ ਟੋਕਨਾਂ ਦਾ ਭੁਗਤਾਨ ਕੀਤੇ APIs 'ਤੇ ਕੀਮਤ ਹੋਵੇਗੀ, ਪ੍ਰਤੀ ਮਾਡਲ ਦੀ ਕੀਮਤ. ਦਿਖਾਇਆ ਗਿਆ ਸੰਖਿਆ ਤੁਹਾਡੇ ਡੇਟਾ ਦੇ ਆਖਰੀ {span} ਤੋਂ ਪੂਰੇ 30 ਦਿਨਾਂ ਤੱਕ ਦੀ ਗਤੀ ਨੂੰ ਪ੍ਰੋਜੈਕਟ ਕਰਦੀ ਹੈ।",
     "savingsHintExact": "ਤੁਸੀਂ ਅਸਲ ਵਿੱਚ ਪਿਛਲੇ {range} ਵਿੱਚ ${actual} ਦੀ ਬਚਤ ਕੀਤੀ ਹੈ। ਇਹ ਉਹੀ ਟੋਕਨਾਂ ਦਾ ਭੁਗਤਾਨ ਕੀਤੇ APIs 'ਤੇ ਕੀਮਤ ਹੋਵੇਗੀ, ਪ੍ਰਤੀ ਮਾਡਲ ਦੀ ਕੀਮਤ. ਦਿਖਾਇਆ ਗਿਆ ਸੰਖਿਆ ਤੁਹਾਡੇ ਅਸਲ 30-ਦਿਨਾਂ ਦਾ ਕੁੱਲ ਹੈ।",
+    "savingsHintAll": "ਤੁਸੀਂ ਸੰਭਾਲੇ ਗਏ ਸਾਰੇ ਇਤਿਹਾਸ ਵਿੱਚ ${actual} ਬਚਾਏ। ਇਹੀ ਟੋਕਨ ਭੁਗਤਾਨ ਵਾਲੇ API 'ਤੇ, ਹਰ ਮਾਡਲ ਦੀ ਕੀਮਤ 'ਤੇ, ਇੰਨੇ ਮਹਿੰਗੇ ਪੈਂਦੇ। ਦਿਖਾਈ ਗਈ ਸੰਖਿਆ ਆਖਰੀ {span} ਡੇਟਾ ਤੋਂ ਤੁਹਾਡੀ ਹਾਲੀਆ ਰਫ਼ਤਾਰ ਨੂੰ ਪੂਰੇ 30 ਦਿਨਾਂ 'ਤੇ ਅਨੁਮਾਨਦੀ ਹੈ।",
     "requestsHintPinned": "ਇਹਨਾਂ ਬੇਨਤੀਆਂ ਵਿੱਚੋਂ {pinned} ਨੇ ਇੱਕ ਖਾਸ ਮਾਡਲ ਨੂੰ ਨਾਮ ਨਾਲ ਪਿੰਨ ਕੀਤਾ ਹੈ। {honored} ਨੂੰ ਪਿੰਨ ਕੀਤੇ ਮਾਡਲ ਦੁਆਰਾ ਪਰੋਸਿਆ ਗਿਆ ਸੀ; {failed} ਇੱਕ ਵੱਖਰੇ ਵਿੱਚ ਅਸਫਲ ਰਿਹਾ। ਬਾਕੀ ਆਟੋ-ਰੂਟ ਕੀਤੇ ਗਏ ਸਨ।",
     "requestsHintAuto": "ਇਸ ਮਿਆਦ ਵਿੱਚ ਸਾਰੀਆਂ ਬੇਨਤੀਆਂ ਆਟੋ-ਰੂਟ ਕੀਤੀਆਂ ਗਈਆਂ ਸਨ; ਕਿਸੇ ਵੀ ਕਲਾਇੰਟ ਨੇ ਨਾਮ ਦੁਆਰਾ ਇੱਕ ਖਾਸ ਮਾਡਲ ਨੂੰ ਪਿੰਨ ਨਹੀਂ ਕੀਤਾ।",
     "requestsHintTypes": "{chat} ਚੈਟ ਅਤੇ {embedding} ਏਮਬੈਡਿੰਗ ਬੇਨਤੀਆਂ।",
@@ -872,7 +882,9 @@
     "emptyDescription": "ਜਿਵੇਂ-ਜਿਵੇਂ ਸਰਵਰ ਲਿਖਦਾ ਹੈ, ਐਂਟਰੀਆਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ। ਜੇ ਤੁਹਾਨੂੰ ਆਉਟਪੁੱਟ ਦੀ ਉਮੀਦ ਸੀ ਤਾਂ ਪੱਧਰ, ਪ੍ਰਦਾਤਾ ਜਾਂ ਖੋਜ ਫਿਲਟਰਾਂ ਦਾ ਘੇਰਾ ਵਧਾਓ।",
     "noLevelsTitle": "ਕੋਈ ਪੱਧਰ ਨਹੀਂ ਚੁਣਿਆ",
     "noLevelsDescription": "ਲੌਗ ਆਉਟਪੁੱਟ ਵੇਖਣ ਲਈ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਪੱਧਰ ਚਾਲੂ ਕਰੋ।",
-    "loadFailed": "ਸਰਵਰ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
+    "loadFailed": "ਸਰਵਰ ਲੌਗ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "eventFilter": "ਈਵੈਂਟ",
+    "allEvents": "ਸਾਰੇ ਈਵੈਂਟ"
   },
   "playground": {
     "title": "ਖੇਡ ਦਾ ਮੈਦਾਨ",

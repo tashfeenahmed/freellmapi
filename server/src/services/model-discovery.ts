@@ -306,9 +306,9 @@ const KIND_METADATA_KEYS = ['type', 'task', 'object', 'model_type', 'modelType']
 const KIND_METADATA_VALUES: ReadonlyArray<readonly [DiscoveredModelKind, RegExp]> = [
   ['embedding', /embedding/],
   ['transcription', /(speech-?to-?text|transcri|asr\b|\bstt\b)/],
-  ['audio', /(text-?to-?speech|\btts\b|speech-?synthesis)/],
+  ['audio', /(text-?to-?speech|\btts\b|speech-?synthesis|^audio$)/],
   ['video', /video/],
-  ['image', /(text-?to-?image|image-?generation|diffusion)/],
+  ['image', /(text-?to-?image|image-?generation|diffusion|^images?$)/],
 ];
 
 /** The model's kind read off its id, for upstreams that advertise no usable

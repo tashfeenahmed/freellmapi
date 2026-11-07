@@ -450,6 +450,7 @@
     "adding": "Ana ƙara…",
     "selectProvider": "Zaɓi mai bada…",
     "accountId": "ID Account",
+    "projectId": "ID na aikin",
     "label": "Lakabi",
     "noKeyNeeded": "(babu maɓalli da ake buƙata)",
     "outboundProxy": "Wakili mai fita",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Iyakar token ta wata",
     "capUnlimitedPlaceholder": "Ba iyaka ba",
     "capEditHint": "Ana saita iyakoki a ranar 1 00:00 UTC. Bara komai don mara iyaka.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Buƙatotu {requests}, token {tokens} wannan wata",
     "quotaBalanceHint": "Saura {remaining} daga {limit} {metric}",
-    "quotaBalanceLeft": "Saura {remaining}"
-,
+    "quotaBalanceLeft": "Saura {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d ku",
+    "rangeAll": "Duk lokaci",
+    "rangeAllNote": "Jimillar manyan alkaluma na duk lokaci ne. Ƙimar nasara da bayanan da ke ƙasa sun shafi tarihin da wannan shigarwa ke riƙe da shi har yanzu.",
     "requests": "Bukatu",
     "successRate": "Yawan nasara",
     "inputTokens": "Alamomin shigarwa",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Ƙoƙarin koma baya",
     "savingsHint": "A zahiri kun adana ${actual} akan {range} na ƙarshe. Wannan shine abin da alamomi iri ɗaya zasu kasance akan APIs da aka biya, farashin kowane ƙira. Lambar da aka nuna tana aiwatar da tafiyarku daga ƙarshen {span} na bayanai zuwa cikakkun kwanaki 30.",
     "savingsHintExact": "A zahiri kun adana ${actual} akan {range} na ƙarshe. Wannan shine abin da alamomi iri ɗaya zasu kasance akan APIs da aka biya, farashin kowane ƙira. Lambar da aka nuna ita ce jimlar kwanaki 30 na gaske.",
+    "savingsHintAll": "Kun adana ${actual} a cikin duk tarihin da aka riƙe. Wannan shi ne abin da tokens iri ɗaya za su kashe a kan API masu biyan kuɗi, bisa farashin kowane samfuri. Lambar da aka nuna tana hasashen saurin ku na kwanan nan daga {span} na ƙarshe na bayanai zuwa cikakkun kwanaki 30.",
     "requestsHintPinned": "{pinned} na waɗannan buƙatun sun lika takamaiman samfurin suna. {honored} an yi amfani da su ta hanyar ƙirar da aka liƙa; {failed} ya gaza zuwa wani daban. Sauran an yi ta atomatik.",
     "requestsHintAuto": "Duk buƙatun da ke cikin wannan lokacin an sarrafa su ta atomatik; babu abokin ciniki da ya liƙa takamaiman samfuri da suna.",
     "requestsHintTypes": "{chat} taɗi da buƙatun saka {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Shigarwa na bayyana nan yayin da uwar garken ke rubuta su. Faɗaɗa matatun mataki, mai samarwa ko bincike idan kana tsammanin fitarwa.",
     "noLevelsTitle": "Ba a zaɓi kowane mataki ba",
     "noLevelsDescription": "Kunna aƙalla mataki ɗaya don ganin fitarwar log.",
-    "loadFailed": "An kasa loda log ɗin uwar garke."
+    "loadFailed": "An kasa loda log ɗin uwar garke.",
+    "eventFilter": "Lambar",
+    "allEvents": "Duk lambobi"
   },
   "playground": {
     "title": "filin wasa",

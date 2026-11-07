@@ -450,6 +450,7 @@
     "adding": "ಸೇರಿಸಲಾಗುತ್ತಿದೆ...",
     "selectProvider": "ಪೂರೈಕೆದಾರರನ್ನು ಆಯ್ಕೆಮಾಡಿ...",
     "accountId": "ಖಾತೆ ಐಡಿ",
+    "projectId": "ಪ್ರಾಜೆಕ್ಟ್ ID",
     "label": "ಲೇಬಲ್",
     "noKeyNeeded": "(ಯಾವುದೇ ಕೀ ಅಗತ್ಯವಿಲ್ಲ)",
     "outboundProxy": "ಹೊರಹೋಗುವ ಪ್ರಾಕ್ಸಿ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ಮಾಸಿಕ ಟೋಕನ್ ಮಿತಿ",
     "capUnlimitedPlaceholder": "ಅಪರಿಮಿತ",
     "capEditHint": "ಮಿತಿಗಳು ಪ್ರತಿ ತಿಂಗಳು 1 ರಂದು 00:00 UTC ನಲ್ಲಿ ಮರುಹೊಂದಿಸುತ್ತವೆ. ಅಪರಿಮಿತಕ್ಕೆ ಖಾಲಿ ಬಿಡಿ.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ಈ ತಿಂಗಳು {requests} ವಿನಂತಿಗಳು, {tokens} ಟೋಕನ್‌ಗಳು",
     "quotaBalanceHint": "{limit} {metric} ಪೈಕಿ {remaining} ಉಳಿದಿದೆ",
-    "quotaBalanceLeft": "{remaining} ಉಳಿದಿದೆ"
-,
+    "quotaBalanceLeft": "{remaining} ಉಳಿದಿದೆ",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7ಡಿ",
     "range30d": "30ಡಿ",
     "range90d": "90ಡಿ",
+    "rangeAll": "ಎಲ್ಲಾ ಸಮಯ",
+    "rangeAllNote": "ಮುಖ್ಯ ಒಟ್ಟು ಮೊತ್ತಗಳು ಎಲ್ಲಾ ಸಮಯದವು. ಯಶಸ್ಸಿನ ದರ ಮತ್ತು ಕೆಳಗಿನ ವಿಭಜನೆಗಳು ಈ ಇನ್‌ಸ್ಟಾಲ್ ಇನ್ನೂ ಉಳಿಸಿಕೊಂಡಿರುವ ಇತಿಹಾಸವನ್ನು ಒಳಗೊಂಡಿವೆ.",
     "requests": "ವಿನಂತಿಗಳು",
     "successRate": "ಯಶಸ್ಸಿನ ಪ್ರಮಾಣ",
     "inputTokens": "ಇನ್ಪುಟ್ ಟೋಕನ್ಗಳು",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ಹಿನ್ನಡೆಯ ಪ್ರಯತ್ನಗಳು",
     "savingsHint": "ನೀವು ನಿಜವಾಗಿಯೂ ಕಳೆದ {range} ನಲ್ಲಿ ${actual} ಅನ್ನು ಉಳಿಸಿದ್ದೀರಿ. ಅದೇ ಟೋಕನ್‌ಗಳು ಪಾವತಿಸಿದ API ಗಳಲ್ಲಿ ಬೆಲೆಯನ್ನು ಹೊಂದಿದ್ದು, ಪ್ರತಿ ಮಾದರಿಗೆ ಬೆಲೆಯಾಗಿರುತ್ತದೆ. ತೋರಿಸಲಾದ ಸಂಖ್ಯೆಯು ಕೊನೆಯ {span} ಡೇಟಾದಿಂದ ಪೂರ್ಣ 30 ದಿನಗಳವರೆಗೆ ನಿಮ್ಮ ವೇಗವನ್ನು ಯೋಜಿಸುತ್ತದೆ.",
     "savingsHintExact": "ನೀವು ನಿಜವಾಗಿಯೂ ಕಳೆದ {range} ನಲ್ಲಿ ${actual} ಅನ್ನು ಉಳಿಸಿದ್ದೀರಿ. ಅದೇ ಟೋಕನ್‌ಗಳು ಪಾವತಿಸಿದ API ಗಳಲ್ಲಿ ಬೆಲೆಯನ್ನು ಹೊಂದಿದ್ದು, ಪ್ರತಿ ಮಾದರಿಗೆ ಬೆಲೆಯಾಗಿರುತ್ತದೆ. ತೋರಿಸಿರುವ ಸಂಖ್ಯೆಯು ನಿಮ್ಮ ನಿಜವಾದ 30-ದಿನಗಳ ಒಟ್ಟು ಮೊತ್ತವಾಗಿದೆ.",
+    "savingsHintAll": "ಉಳಿಸಿಕೊಂಡ ಎಲ್ಲಾ ಇತಿಹಾಸದಲ್ಲಿ ನೀವು ${actual} ಉಳಿಸಿದ್ದೀರಿ. ಅದೇ ಟೋಕನ್‌ಗಳು ಪಾವತಿಸಿದ API ಗಳಲ್ಲಿ, ಪ್ರತಿ ಮಾದರಿಯ ಬೆಲೆಯಲ್ಲಿ, ಇಷ್ಟು ವೆಚ್ಚವಾಗುತ್ತಿದ್ದವು. ತೋರಿಸಿದ ಸಂಖ್ಯೆ ಕೊನೆಯ {span} ಡೇಟಾದಿಂದ ನಿಮ್ಮ ಇತ್ತೀಚಿನ ವೇಗವನ್ನು ಪೂರ್ಣ 30 ದಿನಗಳಿಗೆ ಅಂದಾಜಿಸುತ್ತದೆ.",
     "requestsHintPinned": "ಈ ವಿನಂತಿಗಳಲ್ಲಿ {pinned} ನಿರ್ದಿಷ್ಟ ಮಾದರಿಯನ್ನು ಹೆಸರಿನಿಂದ ಪಿನ್ ಮಾಡಲಾಗಿದೆ. {honored} ಅನ್ನು ಪಿನ್ ಮಾಡಲಾದ ಮಾದರಿಯ ಮೂಲಕ ನೀಡಲಾಯಿತು; {failed} ವಿಭಿನ್ನವಾಗಿ ವಿಫಲವಾಗಿದೆ. ಉಳಿದವುಗಳನ್ನು ಸ್ವಯಂ-ಮಾರ್ಗಗೊಳಿಸಲಾಯಿತು.",
     "requestsHintAuto": "ಈ ಅವಧಿಯಲ್ಲಿ ಎಲ್ಲಾ ವಿನಂತಿಗಳನ್ನು ಸ್ವಯಂ-ಮಾರ್ಗಗೊಳಿಸಲಾಗಿದೆ; ಯಾವುದೇ ಕ್ಲೈಂಟ್ ಹೆಸರಿನಿಂದ ನಿರ್ದಿಷ್ಟ ಮಾದರಿಯನ್ನು ಪಿನ್ ಮಾಡಿಲ್ಲ.",
     "requestsHintTypes": "{chat} ಚಾಟ್ ಮತ್ತು {embedding} ಎಂಬೆಡಿಂಗ್ ವಿನಂತಿಗಳು.",
@@ -872,7 +882,9 @@
     "emptyDescription": "ಸರ್ವರ್ ಬರೆಯುತ್ತಿದ್ದಂತೆ ನಮೂದುಗಳು ಇಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತವೆ. ಔಟ್‌ಪುಟ್ ನಿರೀಕ್ಷಿಸಿದ್ದರೆ ಮಟ್ಟ, ಪೂರೈಕೆದಾರ ಅಥವಾ ಹುಡುಕಾಟ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ವಿಸ್ತರಿಸಿ.",
     "noLevelsTitle": "ಯಾವುದೇ ಮಟ್ಟ ಆಯ್ಕೆಯಾಗಿಲ್ಲ",
     "noLevelsDescription": "ಲಾಗ್ ಔಟ್‌ಪುಟ್ ನೋಡಲು ಕನಿಷ್ಠ ಒಂದು ಮಟ್ಟವನ್ನು ಆನ್ ಮಾಡಿ.",
-    "loadFailed": "ಸರ್ವರ್ ಲಾಗ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ."
+    "loadFailed": "ಸರ್ವರ್ ಲಾಗ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+    "eventFilter": "ಘಟನೆ",
+    "allEvents": "ಎಲ್ಲಾ ಘಟನೆಗಳು"
   },
   "playground": {
     "title": "ಆಟದ ಮೈದಾನ",

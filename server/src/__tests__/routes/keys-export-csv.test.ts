@@ -90,4 +90,26 @@ describe('Keys CSV export — formula injection guard (FIX 3)', () => {
     expect(dataLine).toContain('"My Groq Key"');
     expect(dataLine).not.toContain("'My Groq Key");
   });
+
+  it('neutralizes formula-leading base_url cells too (free text like the label)', async () => {
+    getDb().prepare('DELETE FROM api_keys').run();
+    // A custom endpoint whose base_url opens with '=' — exactly the shape the
+    // label guard covers. Without the guard the cell opens as a live formula
+    // in Excel/Sheets and the base_url cannot round-trip (the importer only
+    // strips the guard quote from labels). Stored directly because the custom
+    // POST path URL-validates base_url; the export must guard the column
+    // whatever wrote it (older build, restored backup, hand-edited DB).
+    const { encrypt } = await import('../../lib/crypto.js');
+    const enc = encrypt('sk-local-abc123');
+    getDb().prepare(`
+      INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, base_url, enabled, status)
+      VALUES ('custom', 'evil endpoint', ?, ?, ?, '=HYPERLINK("http://evil.example","click")', 1, 'healthy')
+    `).run(enc.encrypted, enc.iv, enc.authTag);
+
+    const { status, text } = await exportCsvText(app);
+    expect(status).toBe(200);
+    const dataLine = text.trim().split('\n').find(l => l.includes('sk-local-abc123'))!;
+    expect(dataLine).toContain('"\'=HYPERLINK');
+    expect(dataLine).not.toContain(',"=HYPERLINK');
+  });
 });

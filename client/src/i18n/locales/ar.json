@@ -450,6 +450,7 @@
     "adding": "جارٍ الإضافة…",
     "selectProvider": "اختر مزود…",
     "accountId": "معرف الحساب",
+    "projectId": "معرّف المشروع",
     "label": "التسمية",
     "noKeyNeeded": "(لا حاجة للمفتاح)",
     "outboundProxy": "الوكيل الصادر",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "الحد الشهري للرموز",
     "capUnlimitedPlaceholder": "غير محدود",
     "capEditHint": "تُصفَّر الحدود في 1 من الشهر 00:00 بتوقيت UTC. اتركه فارغًا بلا حد.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} طلبًا، {tokens} رمز هذا الشهر",
     "quotaBalanceHint": "متبقٍ {remaining} من {limit} {metric}",
-    "quotaBalanceLeft": "متبقٍ {remaining}"
-,
+    "quotaBalanceLeft": "متبقٍ {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 د",
     "range30d": "30 د",
     "range90d": "90 د",
+    "rangeAll": "كل الوقت",
+    "rangeAllNote": "الإجماليات الرئيسية لكل الوقت. أما معدل النجاح والتفاصيل أدناه فتغطي السجل الذي لا يزال هذا التثبيت يحتفظ به.",
     "requests": "الطلبات",
     "successRate": "معدل النجاح",
     "inputTokens": "رموز الإدخال",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "محاولات تراجعية",
     "savingsHint": "لقد قمت بالفعل بتوفير {actual} دولارًا خلال {range} الأخير. هذا هو ما ستكلفه نفس الرموز المميزة على واجهات برمجة التطبيقات المدفوعة، بسعر كل نموذج. يعرض الرقم الموضح سرعتك من آخر {span} من البيانات إلى 30 يومًا كاملة.",
     "savingsHintExact": "لقد قمت بالفعل بتوفير {actual} دولارًا خلال {range} الأخير. هذا هو ما ستكلفه نفس الرموز المميزة على واجهات برمجة التطبيقات المدفوعة، بسعر كل نموذج. الرقم الموضح هو الإجمالي الحقيقي لمدة 30 يومًا.",
+    "savingsHintAll": "وفّرت ${actual} عبر كل السجل المحفوظ. هذا ما كانت ستكلفه الرموز نفسها على واجهات API المدفوعة، بسعر كل نموذج. الرقم المعروض يُسقط وتيرتك الأخيرة من آخر {span} من البيانات على 30 يومًا كاملة.",
     "requestsHintPinned": "قامت {pinned} من هذه الطلبات بتثبيت نموذج محدد بالاسم. تم تقديم {honored} بواسطة النموذج المثبت. فشل {failed} في الانتقال إلى آخر. تم توجيه الباقي تلقائيًا.",
     "requestsHintAuto": "تم توجيه جميع الطلبات في هذه الفترة تلقائيًا؛ لم يقم أي عميل بتثبيت نموذج محدد بالاسم.",
     "requestsHintTypes": "طلبات الدردشة والتضمين {chat} {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "تظهر الإدخالات هنا فور كتابتها من الخادم. إذا كنت تتوقع مخرجات، فوسّع مرشّحات المستوى أو المزوّد أو البحث.",
     "noLevelsTitle": "لم يتم تحديد أي مستوى",
     "noLevelsDescription": "فعّل مستوى واحدًا على الأقل لعرض مخرجات السجل.",
-    "loadFailed": "تعذّر تحميل سجل الخادم."
+    "loadFailed": "تعذّر تحميل سجل الخادم.",
+    "eventFilter": "حدث",
+    "allEvents": "جميع الأحداث"
   },
   "playground": {
     "title": "ملعب",

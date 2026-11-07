@@ -450,6 +450,7 @@
     "adding": "Pridávam...",
     "selectProvider": "Vyberte poskytovateľa...",
     "accountId": "ID účtu",
+    "projectId": "ID projektu",
     "label": "Vydavateľstvo",
     "noKeyNeeded": "(kľúč nie je potrebný)",
     "outboundProxy": "Odchádzajúca proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Mesačný limit tokenov",
     "capUnlimitedPlaceholder": "Neobmedzene",
     "capEditHint": "Limity sa resetujú 1. dňa o 00:00 UTC. Pre neobmedzene nechajte prázdne.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} požiadaviek, {tokens} tokenov tento mesiac",
     "quotaBalanceHint": "Zostáva {remaining} z {limit} {metric}",
-    "quotaBalanceLeft": "Zostáva {remaining}"
-,
+    "quotaBalanceLeft": "Zostáva {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Celkovo",
+    "rangeAllNote": "Hlavné súčty sú za celé obdobie. Úspešnosť a prehľady nižšie pokrývajú históriu, ktorú táto inštalácia ešte uchováva.",
     "requests": "Požiadavky",
     "successRate": "Úspešnosť",
     "inputTokens": "Vstupné tokeny",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Záložné pokusy",
     "savingsHint": "Vlastne si za posledné {range} ušetril ${actual}. Toľko by stáli tie isté tokeny na platených API, ocenené podľa modelu. Zobrazené číslo premieta vaše tempo od posledných {span} dát na plných 30 dní.",
     "savingsHintExact": "Vlastne si za posledné {range} ušetril ${actual}. Toľko by stáli tie isté tokeny na platených API, ocenené podľa modelu. Zobrazené číslo je váš skutočný 30-dňový súčet.",
+    "savingsHintAll": "Za celú uchovanú históriu ste ušetrili ${actual}. Toľko by rovnaké tokeny stáli v platených API, podľa ceny každého modelu. Zobrazené číslo premieta vaše nedávne tempo z posledných {span} údajov na celých 30 dní.",
     "requestsHintPinned": "{pinned} z týchto požiadaviek pripnuli konkrétny model podľa mena. {honored} obsluhoval model s kolíkmi; {failed} prešli na iné. Ostatné boli automaticky smerované.",
     "requestsHintAuto": "Všetky požiadavky v tomto období boli automaticky smerované; Žiadny klient nepripol konkrétny model podľa mena.",
     "requestsHintTypes": "{chat} chat a {embedding} požiadavky na vloženie.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Záznamy sa tu objavia, hneď ako ich server zapíše. Ak ste čakali výstup, rozšírte filtre úrovne, poskytovateľa alebo hľadania.",
     "noLevelsTitle": "Nie je vybraná žiadna úroveň",
     "noLevelsDescription": "Zapnite aspoň jednu úroveň, aby ste videli výstup logu.",
-    "loadFailed": "Log servera sa nepodarilo načítať."
+    "loadFailed": "Log servera sa nepodarilo načítať.",
+    "eventFilter": "Udalosť",
+    "allEvents": "Všetky udalosti"
   },
   "playground": {
     "title": "Ihrisko",

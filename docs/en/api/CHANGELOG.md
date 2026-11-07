@@ -4,6 +4,10 @@
 
 Doc revision history for `docs/api/`, seeded from API-relevant commits.
 
+## 2026-10-23
+
+- **fix(api): client-profile keys now authenticate `/v1/messages` and `/v1beta`** — the `sk-cp-*` keys from #411 were accepted only by `/v1/chat/completions` and `/v1/responses`; the Anthropic and Gemini surfaces still compared the unified key alone, so a downstream app speaking the Claude or Gemini wire format got `401` with its own profile key. Both routes now resolve through `resolveAuth`: profile keys carry their server-enforced system prompt (injected first, after compression on `/v1/messages`, ahead of `systemInstruction` on `/v1beta` — same ordering contract), and a disabled profile fails like a bad key. Source: `server/src/routes/anthropic.ts`, `server/src/routes/gemini.ts`.
+
 ## 2026-10-20
 
 - **docs(api): document `GET /v1/usage`** — the endpoint shipped with #1600 and gained a per-key breakdown in #1614 but was never in `01-rest-api.md`. Added a Usage API section: response shape (`month`, `resetsAt`, `requests`, `tokens`, `byPlatform[]`, `byKey[]` with `requestCap`/`tokenCap`, `null` = unlimited), unified-key-only auth (`403` for client profiles), deleted keys surfacing under platform `removed`, and the ledger-not-clamped-at-cap semantics that match `429 quota_exceeded`. Source: `server/src/routes/proxy.ts` (`GET /v1/usage` handler).

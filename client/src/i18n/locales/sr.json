@@ -450,6 +450,7 @@
     "adding": "Додавање…",
     "selectProvider": "Изаберите провајдера…",
     "accountId": "ИД налога",
+    "projectId": "ID пројекта",
     "label": "Лабел",
     "noKeyNeeded": "(није потребан кључ)",
     "outboundProxy": "Оутбоунд проки",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Месечни лимит токена",
     "capUnlimitedPlaceholder": "Неограничено",
     "capEditHint": "Лимити се ресетују 1. у 00:00 UTC. Оставите празно за неограничено.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} захтева, {tokens} токена овог месеца",
     "quotaBalanceHint": "Преостало {remaining} од {limit} {metric}",
-    "quotaBalanceLeft": "Преостало {remaining}"
-,
+    "quotaBalanceLeft": "Преостало {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7д",
     "range30d": "30д",
     "range90d": "90д",
+    "rangeAll": "Све време",
+    "rangeAllNote": "Главни збирови се односе на све време. Стопа успеха и рашчлањавања испод обухватају историју коју ова инсталација још чува.",
     "requests": "Захтеви",
     "successRate": "Стопа успеха",
     "inputTokens": "Улазни токени",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Резервни покушаји",
     "savingsHint": "Заправо сте уштедели ${actual} током последњег {range}. То је оно што би исти токени коштали на плаћеним АПИ-јима, по цени по моделу. Приказани број пројектује ваш темпо од последњег {span} података до пуних 30 дана.",
     "savingsHintExact": "Заправо сте уштедели ${actual} током последњег {range}. То је оно што би исти токени коштали на плаћеним АПИ-јима, по цени по моделу. Приказани број је ваш стварни укупан број од 30 дана.",
+    "savingsHintAll": "Уштедели сте ${actual} кроз сву сачувану историју. Толико би исти токени коштали на плаћеним API-јима, по цени сваког модела. Приказани број пројектује ваш недавни темпо из последњих {span} података на пуних 30 дана.",
     "requestsHintPinned": "{pinned} ових захтева је закачио одређени модел по имену. {honored} је служио закачени модел; {failed} није успео да пређе на други. Остали су аутоматски рутирани.",
     "requestsHintAuto": "Сви захтеви у овом периоду су аутоматски преусмерени; ниједан клијент није закачио одређени модел по имену.",
     "requestsHintTypes": "{chat} ћаскање и {embedding} захтеви за уграђивање.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Уноси се појављују овде чим их сервер упише. Проширите филтере нивоа, провајдера или претраге ако сте очекивали излаз.",
     "noLevelsTitle": "Није изабран ниједан ниво",
     "noLevelsDescription": "Укључите бар један ниво да бисте видели садржај лога.",
-    "loadFailed": "Није могуће учитати лог сервера."
+    "loadFailed": "Није могуће учитати лог сервера.",
+    "eventFilter": "Догађај",
+    "allEvents": "Сви догађаји"
   },
   "playground": {
     "title": "Игралиште",

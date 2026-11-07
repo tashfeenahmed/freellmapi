@@ -13,10 +13,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Both ends of the supported engines range (package.json: >=20.18 <25).
-        # 20 is the CI baseline that has historically caught crashes newer local
-        # Node versions hid; 22 is the current LTS most contributors run.
-        node-version: ['20', '22']
+        # The supported engines range (package.json: >=20.18 <25). 20 is the
+        # CI baseline that has historically caught crashes newer local Node
+        # versions hid; 22 is the LTS most contributors run; 24 is what the
+        # Docker image ships since the Node 20 line reached end of life.
+        node-version: ['20', '22', '24']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

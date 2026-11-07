@@ -26,6 +26,7 @@ import {
   runFallbackLoop,
   setExhaustionHeaders,
   setFallbackHeaders,
+  REASONING_HOLD_MAX_MS,
   type AttemptRecord,
   type ExhaustionBody,
 } from './fallback-loop.js';
@@ -201,6 +202,7 @@ export async function runInboundChat(
   // (#956 review).
   const outputReserve = routingReserveTokens(maxTokens);
   const estimatedTotal = estimatedInputTokens + outputReserve;
+  state.estimatedTotalTokens = estimatedTotal;
   const schemas = toolSchemaMap(input.tools);
   let clientGone = false;
   const clientAbort = new AbortController();
@@ -365,6 +367,7 @@ export async function runInboundChat(
       // invisibly, instead of locking the ladder on a blank reply. Flushed in
       // order (before the text/tool output) the moment the stream commits.
       let heldReasoning = '';
+      const attemptStart = Date.now();
       const commit = () => {
         if (committed) return;
         res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
@@ -417,6 +420,8 @@ export async function runInboundChat(
           if (typeof deltaReasoning === 'string' && deltaReasoning) {
             reasoning += deltaReasoning;
             outputTokens += Math.ceil(deltaReasoning.length / 4);
+            // #1642: long reasoning with nothing sent yet: commit, then stream it live.
+            if (!committed && wire.sendReasoningDelta && Date.now() - attemptStart >= REASONING_HOLD_MAX_MS) commit();
             if (committed) {
               wire.sendReasoningDelta?.(res, route, deltaReasoning);
             } else {
@@ -480,9 +485,10 @@ export async function runInboundChat(
         // Opt-in schema verdict, before the tool calls are committed. Tool
         // calls are buffered to the end of the stream on this path, so a
         // tool-only turn has sent nothing yet and can still fail over. A turn
-        // that already streamed text is past its commit point — leave it
+        // that already streamed real text is past its commit point — leave it
         // alone rather than tearing down a stream the client is reading.
-        if (isToolArgumentValidationEnabled() && toolCalls.length > 0 && !committed) {
+        // Whitespace or an early reasoning commit (#1642) is not real text.
+        if (isToolArgumentValidationEnabled() && toolCalls.length > 0 && (!committed || !text.trim())) {
           const invalid = invalidToolCallReasons(toolCalls, schemas);
           if (invalid.length > 0) throw invalidToolArgumentsError(route.displayName, invalid);
         }

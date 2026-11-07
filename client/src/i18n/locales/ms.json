@@ -450,6 +450,7 @@
     "adding": "Menambah...",
     "selectProvider": "Pilih penyedia...",
     "accountId": "ID Akaun",
+    "projectId": "ID projek",
     "label": "Label",
     "noKeyNeeded": "(tidak perlu kunci)",
     "outboundProxy": "Proksi keluar",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Had token bulanan",
     "capUnlimitedPlaceholder": "Tanpa had",
     "capEditHint": "Had diset semula pada 1 haribulan 00:00 UTC. Biarkan kosong untuk tanpa had.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini",
     "quotaBalanceHint": "Baki {remaining} daripada {limit} {metric}",
-    "quotaBalanceLeft": "Baki {remaining}"
-,
+    "quotaBalanceLeft": "Baki {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Sepanjang masa",
+    "rangeAllNote": "Jumlah utama adalah untuk sepanjang masa. Kadar kejayaan dan pecahan di bawah meliputi sejarah yang masih disimpan oleh pemasangan ini.",
     "requests": "Permintaan",
     "successRate": "Kadar kejayaan",
     "inputTokens": "Token input",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Cubaan sandaran",
     "savingsHint": "Anda sebenarnya telah menyimpan ${actual} dalam {range} lepas. Itulah kos token yang sama pada API berbayar, dinilai mengikut model. Nombor yang dipaparkan meramalkan kadar anda dari {span} data terakhir hingga 30 hari penuh.",
     "savingsHintExact": "Anda sebenarnya telah menyimpan ${actual} dalam {range} lepas. Itulah kos token yang sama pada API berbayar, dinilai mengikut model. Nombor yang ditunjukkan adalah jumlah sebenar 30 hari anda.",
+    "savingsHintAll": "Anda telah menjimatkan ${actual} merentas semua sejarah yang disimpan. Itulah kos token yang sama pada API berbayar, mengikut harga setiap model. Nombor yang dipaparkan mengunjurkan kadar terkini anda daripada {span} data terakhir kepada 30 hari penuh.",
     "requestsHintPinned": "{pinned} permintaan ini menyematkan model tertentu dengan nama. {honored} dihidangkan oleh model yang disematkan; {failed} gagal beralih ke yang lain. Yang lain adalah laluan automatik.",
     "requestsHintAuto": "Semua permintaan dalam tempoh ini adalah laluan automatik; Tiada klien yang menyematkan model tertentu dengan nama.",
     "requestsHintTypes": "{chat} sembang dan {embedding} permintaan penyematan.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Entri akan muncul di sini apabila pelayan menulisnya. Luaskan penapis aras, penyedia atau carian jika anda menjangkakan ada output.",
     "noLevelsTitle": "Tiada aras dipilih",
     "noLevelsDescription": "Hidupkan sekurang-kurangnya satu aras untuk melihat output log.",
-    "loadFailed": "Tidak dapat memuatkan log pelayan."
+    "loadFailed": "Tidak dapat memuatkan log pelayan.",
+    "eventFilter": "Acara",
+    "allEvents": "Semua acara"
   },
   "playground": {
     "title": "Taman Permainan",

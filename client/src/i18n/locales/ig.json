@@ -450,6 +450,7 @@
     "adding": "Na-agbakwụnye…",
     "selectProvider": "Họrọ onye na-eweta…",
     "accountId": "NJ akaụntụ",
+    "projectId": "ID ọrụ",
     "label": "Labelụ",
     "noKeyNeeded": "(Ọ dịghị igodo achọrọ)",
     "outboundProxy": "Proxy na-apụ apụ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Oke token ọnwa",
     "capUnlimitedPlaceholder": "Enweghị oke",
     "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
     "quotaBalanceHint": "{remaining} n'ime {limit} {metric} fọdụrụ",
-    "quotaBalanceLeft": "{remaining} fọdụrụ"
-,
+    "quotaBalanceLeft": "{remaining} fọdụrụ",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Oge niile",
+    "rangeAllNote": "Ngụkọta isi bụ nke oge niile. Ọnụego ihe ịga nke ọma na nkọwa ndị dị n'okpuru na-ekpuchi akụkọ ihe mere eme nke ntinye a ka na-echekwa.",
     "requests": "Arịrịọ",
     "successRate": "Ọnụọgụ ịga nke ọma",
     "inputTokens": "Ntinye akara",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Mgbalị ịla azụ",
     "savingsHint": "Ị zọpụtara ${actual} karịa {range} ikpeazụ. Nke ahụ bụ ihe otu akara ahụ ga-eri na API akwụrụ ụgwọ, ọnụ n'otu ụdị. Ọnụọgụ egosiri na-arụ ọrụ ịzọ ụkwụ gị site na {span} nke data ikpeazụ ruo ụbọchị 30 zuru ezu.",
     "savingsHintExact": "Ị zọpụtara ${actual} karịa {range} ikpeazụ. Nke ahụ bụ ihe otu akara ahụ ga-eri na API akwụrụ ụgwọ, ọnụ n'otu ụdị. Ọnụọgụ egosiri bụ mkpokọta ụbọchị iri atọ gị n'ezie.",
+    "savingsHintAll": "Ị chekwara ${actual} n'akụkọ niile echekwara. Nke a bụ ihe otu tokens ahụ gaara efu na API a na-akwụ ụgwọ, dabere na ọnụahịa nke ọ bụla model. Ọnụọgụ egosiri na-atụ anya ọsọ gị nso nso a site na {span} ikpeazụ nke data ruo ụbọchị 30 zuru ezu.",
     "requestsHintPinned": "{pinned} nke arịrịọ ndị a etinyere otu ụdị aha n'aha. {honored} bụ ndị e ji ihe atụ atụnyere jee ozi; {failed} dara na nke ọzọ. Akpọrọ ndị ọzọ aka akpaaka.",
     "requestsHintAuto": "Arịrịọ niile dị n'oge a na-akpaghị aka; Ọ nweghị onye ahịa tinyere otu ụdị n'aha.",
     "requestsHintTypes": "{chat} nkata na arịrịọ ntinye {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Ihe ndekọ na-apụta ebe a ka sava na-ede ha. Gbasaa nzacha ọkwa, onye na-eweta ma ọ bụ ọchụchọ ma ọ bụrụ na ị tụrụ anya nsonaazụ.",
     "noLevelsTitle": "Ahọrọghị ọkwa ọ bụla",
     "noLevelsDescription": "Gbanye ma ọ dịkarịa ala otu ọkwa ka ị hụ ihe ndekọ.",
-    "loadFailed": "Enweghị ike ibugo ndekọ sava."
+    "loadFailed": "Enweghị ike ibugo ndekọ sava.",
+    "eventFilter": "Ihe omume",
+    "allEvents": "Ihe omume niile"
   },
   "playground": {
     "title": "Ebe egwuregwu",

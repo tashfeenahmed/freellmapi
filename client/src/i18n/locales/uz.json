@@ -450,6 +450,7 @@
     "adding": "Qo‘shilmoqda…",
     "selectProvider": "Provayderni tanlang…",
     "accountId": "Hisob identifikatori",
+    "projectId": "Loyiha ID",
     "label": "Yorliq",
     "noKeyNeeded": "(kalit kerak emas)",
     "outboundProxy": "Chiquvchi proksi",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Oylik token chegarasi",
     "capUnlimitedPlaceholder": "Cheksiz",
     "capEditHint": "Chegaralar har oyning 1-sana 00:00 UTC da tiklanadi. Cheksiz uchun bo‘sh qoldiring.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Bu oy {requests} so‘rov, {tokens} token",
     "quotaBalanceHint": "{limit} {metric} dan {remaining} qoldi",
-    "quotaBalanceLeft": "{remaining} qoldi"
-,
+    "quotaBalanceLeft": "{remaining} qoldi",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Butun davr",
+    "rangeAllNote": "Asosiy jamlar butun davr uchun. Muvaffaqiyat darajasi va quyidagi tafsilotlar ushbu o'rnatma hali saqlayotgan tarixni qamrab oladi.",
     "requests": "So'rovlar",
     "successRate": "Muvaffaqiyat darajasi",
     "inputTokens": "Kirish belgilari",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Qayta urinishlar",
     "savingsHint": "Oxirgi {range} davomida siz aslida ${actual} saqladingiz. Xuddi shu tokenlar har bir model uchun narxlangan pulli API-larda shunday turadi. Ko'rsatilgan raqam oxirgi {span} ma'lumotlardan to'liq 30 kungacha bo'lgan tezlikni prognoz qiladi.",
     "savingsHintExact": "Oxirgi {range} davomida siz aslida ${actual} saqladingiz. Xuddi shu tokenlar har bir model uchun narxlangan pulli API-larda shunday turadi. Ko'rsatilgan raqam sizning haqiqiy 30 kunlik jami hisoblanadi.",
+    "savingsHintAll": "Saqlangan butun tarix davomida ${actual} tejadingiz. Xuddi shu tokenlar pullik API'larda, har bir model narxida, shuncha turardi. Ko'rsatilgan raqam so'nggi {span} ma'lumotlardagi yaqindagi sur'atingizni to'liq 30 kunga proyeksiya qiladi.",
     "requestsHintPinned": "Ushbu soʻrovlarning {pinned} qismi maʼlum bir modelni nomi bilan bogʻlab qoʻygan. {honored} mahkamlangan model tomonidan xizmat ko'rsatildi; {failed} boshqasiga o‘tib bo‘lmadi. Qolganlari avtomatik yo'naltirildi.",
     "requestsHintAuto": "Bu davrdagi barcha soʻrovlar avtomatik yoʻnaltirildi; Hech bir mijoz ma'lum bir modelni nomi bilan bog'lamagan.",
     "requestsHintTypes": "{chat} chat va {embedding} o‘rnatish so‘rovlari.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Server yozuvlarni yozgani sari ular shu yerda paydo boʻladi. Natija kutgan boʻlsangiz, daraja, provayder yoki qidiruv filtrlarini kengaytiring.",
     "noLevelsTitle": "Daraja tanlanmagan",
     "noLevelsDescription": "Jurnal chiqishini koʻrish uchun kamida bitta darajani yoqing.",
-    "loadFailed": "Server jurnalini yuklab boʻlmadi."
+    "loadFailed": "Server jurnalini yuklab boʻlmadi.",
+    "eventFilter": "Hodisa",
+    "allEvents": "Barcha hodisalar"
   },
   "playground": {
     "title": "O'yin maydonchasi",

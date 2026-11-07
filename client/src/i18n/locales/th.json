@@ -450,6 +450,7 @@
     "adding": "กำลังเพิ่ม...",
     "selectProvider": "เลือกผู้ให้บริการ...",
     "accountId": "รหัสบัญชี",
+    "projectId": "รหัสโปรเจกต์",
     "label": "ป้ายกำกับ",
     "noKeyNeeded": "(ไม่ต้องใช้กุญแจ)",
     "outboundProxy": "พร็อกซีขาออก",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ขีดจำกัดโทเคนรายเดือน",
     "capUnlimitedPlaceholder": "ไม่จำกัด",
     "capEditHint": "ขีดจำกัดจะรีเซ็ตวันที่ 1 เวลา 00:00 UTC เว้นว่างไว้หากไม่จำกัด",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "เดือนนี้ {requests} คำขอ {tokens} โทเคน",
     "quotaBalanceHint": "เหลือ {remaining} จาก {limit} {metric}",
-    "quotaBalanceLeft": "เหลือ {remaining}"
-,
+    "quotaBalanceLeft": "เหลือ {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7วัน",
     "range30d": "30วัน",
     "range90d": "90วัน",
+    "rangeAll": "ตลอดเวลา",
+    "rangeAllNote": "ยอดรวมหลักเป็นของตลอดเวลา อัตราความสำเร็จและรายละเอียดด้านล่างครอบคลุมประวัติที่การติดตั้งนี้ยังเก็บไว้",
     "requests": "คำขอ",
     "successRate": "อัตราความสำเร็จ",
     "inputTokens": "โทเค็นอินพุต",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "ความพยายามสำรอง",
     "savingsHint": "จริงๆ แล้วคุณประหยัดเงินได้ ${actual} จาก {range} ล่าสุด นั่นคือสิ่งที่โทเค็นเดียวกันจะมีราคาสำหรับ API แบบชำระเงินซึ่งมีราคาต่อรุ่น ตัวเลขที่แสดงจะคาดการณ์อัตราการก้าวของคุณจากข้อมูล {span} ล่าสุดไปจนถึง 30 วันเต็ม",
     "savingsHintExact": "จริงๆ แล้วคุณประหยัดเงินได้ ${actual} จาก {range} ล่าสุด นั่นคือสิ่งที่โทเค็นเดียวกันจะมีราคาสำหรับ API แบบชำระเงินซึ่งมีราคาต่อรุ่น ตัวเลขที่แสดงคือยอดรวมจริงใน 30 วันของคุณ",
+    "savingsHintAll": "คุณประหยัดได้ ${actual} ตลอดประวัติที่เก็บไว้ นี่คือค่าใช้จ่ายของโทเค็นเดียวกันบน API แบบเสียเงิน ตามราคาของแต่ละโมเดล ตัวเลขที่แสดงคาดการณ์อัตราล่าสุดของคุณจากข้อมูล {span} ล่าสุดเป็น 30 วันเต็ม",
     "requestsHintPinned": "{pinned} ของคำขอเหล่านี้ปักหมุดโมเดลเฉพาะตามชื่อ {honored} ให้บริการโดยโมเดลที่ปักหมุดไว้ {failed} ล้มเหลวในการส่งต่อไปยังอันอื่น ส่วนที่เหลือถูกกำหนดเส้นทางอัตโนมัติ",
     "requestsHintAuto": "คำขอทั้งหมดในช่วงเวลานี้ถูกกำหนดเส้นทางอัตโนมัติ ไม่มีลูกค้ารายใดปักหมุดรุ่นใดรุ่นหนึ่งตามชื่อ",
     "requestsHintTypes": "แชท {chat} และคำขอฝัง {embedding}",
@@ -872,7 +882,9 @@
     "emptyDescription": "รายการจะปรากฏที่นี่เมื่อเซิร์ฟเวอร์เขียนบันทึก หากคาดว่าควรมีผลลัพธ์ ให้ขยายตัวกรองระดับ ผู้ให้บริการ หรือคำค้นหา",
     "noLevelsTitle": "ยังไม่ได้เลือกระดับ",
     "noLevelsDescription": "เปิดอย่างน้อยหนึ่งระดับเพื่อดูผลลัพธ์ในบันทึก",
-    "loadFailed": "ไม่สามารถโหลดบันทึกเซิร์ฟเวอร์ได้"
+    "loadFailed": "ไม่สามารถโหลดบันทึกเซิร์ฟเวอร์ได้",
+    "eventFilter": "เหตุการณ์",
+    "allEvents": "เหตุการณ์ทั้งหมด"
   },
   "playground": {
     "title": "สนามเด็กเล่น",

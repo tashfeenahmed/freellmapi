@@ -450,6 +450,7 @@
     "adding": "Добавление…",
     "selectProvider": "Выберите провайдера…",
     "accountId": "Идентификатор аккаунта",
+    "projectId": "ID проекта",
     "label": "Этикетка",
     "noKeyNeeded": "(ключ не нужен)",
     "outboundProxy": "Исходящий прокси",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Месячный лимит токенов",
     "capUnlimitedPlaceholder": "Без ограничений",
     "capEditHint": "Лимиты сбрасываются 1-го числа в 00:00 UTC. Оставьте пустым для безлимита.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} запросов, {tokens} токенов в этом месяце",
     "quotaBalanceHint": "Осталось {remaining} из {limit} {metric}",
-    "quotaBalanceLeft": "Осталось {remaining}"
-,
+    "quotaBalanceLeft": "Осталось {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7д",
     "range30d": "30 дней",
     "range90d": "90д",
+    "rangeAll": "За всё время",
+    "rangeAllNote": "Итоги — за всё время. Процент успеха и сводки ниже охватывают историю, сохранившуюся в базе.",
     "requests": "Запросы",
     "successRate": "Уровень успеха",
     "inputTokens": "Входные токены",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Попытки отката",
     "savingsHint": "Фактически вы сэкономили ${actual} за последний {range}. Именно столько стоили бы те же токены для платных API, по цене за модель. Показанное число отображает ваш темп от последнего {span} данных до полных 30 дней.",
     "savingsHintExact": "Фактически вы сэкономили ${actual} за последний {range}. Именно столько стоили бы те же токены для платных API, по цене за модель. Показанное число — это ваш реальный итог за 30 дней.",
+    "savingsHintAll": "Всего сэкономлено ${actual} за всё время. Именно столько стоили бы те же токены для платных API, по цене за модель. Показанное число — проекция темпа за последние {span} на полных 30 дней.",
     "requestsHintPinned": "{pinned} из этих запросов закрепил конкретную модель по названию. {honored} обслуживались закрепленной моделью; {failed} переключился на другой. Остальные были маршрутизированы автоматически.",
     "requestsHintAuto": "Все запросы за этот период были маршрутизированы автоматически; ни один клиент не закрепил конкретную модель по имени.",
     "requestsHintTypes": "Чат {chat} и запросы на встраивание {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Записи появятся здесь, как только сервер их запишет. Если вы ожидали вывод, расширьте фильтры по уровню, поставщику или поиску.",
     "noLevelsTitle": "Уровни не выбраны",
     "noLevelsDescription": "Включите хотя бы один уровень, чтобы видеть вывод журнала.",
-    "loadFailed": "Не удалось загрузить журнал сервера."
+    "loadFailed": "Не удалось загрузить журнал сервера.",
+    "eventFilter": "Событие",
+    "allEvents": "Все события"
   },
   "playground": {
     "title": "Детская площадка",

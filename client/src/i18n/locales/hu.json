@@ -450,6 +450,7 @@
     "adding": "Hozzátéve...",
     "selectProvider": "Válassz szolgáltatót...",
     "accountId": "Számlaazonosító",
+    "projectId": "Projektazonosító",
     "label": "Kiadó",
     "noKeyNeeded": "(kulcs nincs szükséges)",
     "outboundProxy": "Kimenő proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Havi token keret",
     "capUnlimitedPlaceholder": "Korlátlan",
     "capEditHint": "A keretek havonta 1-jén 00:00 UTC-kor nullázódnak. Korlátlanhoz hagyja üresen.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} kérés, {tokens} token ebben a hónapban",
     "quotaBalanceHint": "{limit} {metric} közül {remaining} maradt",
-    "quotaBalanceLeft": "{remaining} maradt"
-,
+    "quotaBalanceLeft": "{remaining} maradt",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Teljes időszak",
+    "rangeAllNote": "A fő összesítések a teljes időszakra vonatkoznak. A sikerességi arány és az alábbi bontások azt az előzményt fedik le, amelyet ez a telepítés még megőriz.",
     "requests": "Kérések",
     "successRate": "Sikerességi arány",
     "inputTokens": "Bemeneti tokenek",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Tartalék kísérletek",
     "savingsHint": "Valójában az elmúlt {range} alatt ${actual}-t mentettél. Ez az, amennyibe kerültek volna ugyanazok a tokenek fizetős API-kon, modellenkénti árakon. A megjelenített szám az utolsó {span} adat ütemét mutatja elő, hogy teljes 30 napig tart.",
     "savingsHintExact": "Valójában az elmúlt {range} alatt ${actual}-t mentettél. Ez az, amennyibe kerültek volna ugyanazok a tokenek fizetős API-kon, modellenkénti árakon. A megjelenített szám a valós 30 napos összértéked.",
+    "savingsHintAll": "A teljes megőrzött előzmény alatt ${actual} összeget takarított meg. Ennyibe kerültek volna ugyanazok a tokenek fizetős API-kon, modellenkénti áron. A megjelenített szám a legutóbbi {span} adat alapján vetíti ki a friss tempóját teljes 30 napra.",
     "requestsHintPinned": "{pinned} kérések közül egy adott modellt név szerint rögzítettek. {honored} a tűzött modell szolgálta ki; {failed} átcsúszott egy másik helyre. A többieket automatikusan irányították.",
     "requestsHintAuto": "Ebben az időszakban minden kérést automatikusan irányítottak; egyetlen ügyfél sem rögzített egy adott modellt név szerint.",
     "requestsHintTypes": "{chat} csevegés és {embedding} beágyazási kérések.",
@@ -872,7 +882,9 @@
     "emptyDescription": "A bejegyzések itt jelennek meg, ahogy a szerver írja őket. Ha kimenetre számított, bővítse a szint-, szolgáltató- vagy keresési szűrőket.",
     "noLevelsTitle": "Nincs kiválasztott szint",
     "noLevelsDescription": "A naplókimenet megtekintéséhez kapcsoljon be legalább egy szintet.",
-    "loadFailed": "Nem sikerült betölteni a szerver naplóját."
+    "loadFailed": "Nem sikerült betölteni a szerver naplóját.",
+    "eventFilter": "Esemény",
+    "allEvents": "Minden esemény"
   },
   "playground": {
     "title": "Játszótér",

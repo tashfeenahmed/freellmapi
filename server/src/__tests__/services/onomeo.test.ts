@@ -63,6 +63,48 @@ describe('onomeo key validation', () => {
 });
 
 describe('onomeo chat', () => {
+  it.each(['glm-5.2', undefined, '', null, 123])('rejects a substituted or missing completion identity (%s)', async model => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(json({ ...completion(), model }));
+    await expect(new OnomeoProvider().chatCompletion('test-key', [], 'deepseek-v4-flash'))
+      .rejects.toMatchObject({ status: 502, message: 'onomeo returned a different or missing model identity' });
+  });
+
+  it.each(['glm-5.2', undefined, '', null])('rejects a stream identity (%s) before emitting any content', async model => {
+    const frame = { id: 'c', object: 'chat.completion.chunk', created: 1, model,
+      choices: [{ index: 0, delta: { role: 'assistant', content: 'Wrong answer', tool_calls: [] }, finish_reason: null }] };
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(`data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`, {
+      headers: { 'content-type': 'text/event-stream' },
+    }));
+    const stream = new OnomeoProvider().streamChatCompletion('test-key', [], 'deepseek-v4-flash');
+    await expect(stream.next()).rejects.toMatchObject({ status: 502 });
+  });
+
+  it('rejects identity changes in later stream frames without leaking their content', async () => {
+    const frames = ['glm-4.5-flash', 'glm-5.2'].map(model => `data: ${JSON.stringify({
+      id: 'c', object: 'chat.completion.chunk', created: 1, model,
+      choices: [{ index: 0, delta: { content: model }, finish_reason: null }],
+    })}\n\n`);
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(frames.join('') + 'data: [DONE]\n\n', {
+      headers: { 'content-type': 'text/event-stream' },
+    }));
+    const stream = new OnomeoProvider().streamChatCompletion('test-key', [], 'glm-4.5-flash');
+    expect((await stream.next()).value?.choices[0].delta.content).toBe('glm-4.5-flash');
+    await expect(stream.next()).rejects.toMatchObject({ status: 502 });
+  });
+
+  it('preserves tool-call frames with an exact identity, including a namespaced route', async () => {
+    const model = 'stealth/glyph-cluster';
+    const tool_calls = [{ index: 0, id: 'call_1', type: 'function', function: { name: 'lookup', arguments: '{}' } }];
+    const frame = { id: 'c', object: 'chat.completion.chunk', created: 1, model,
+      choices: [{ index: 0, delta: { tool_calls }, finish_reason: 'tool_calls' }] };
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(`data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`, {
+      headers: { 'content-type': 'text/event-stream' },
+    }));
+    const stream = new OnomeoProvider().streamChatCompletion('test-key', [], model);
+    expect((await stream.next()).value).toMatchObject(frame);
+    expect((await stream.next()).done).toBe(true);
+  });
+
   it('forwards OpenAI-shape completions with attribution', async () => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(completion('glm-5.3')));
     const result = await new OnomeoProvider().chatCompletion('test-key', [{ role: 'user', content: 'Hi' }], 'glm-5.3', { max_tokens: 512 });

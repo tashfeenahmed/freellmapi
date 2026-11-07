@@ -19,6 +19,13 @@ urlTokenRouter.use((req: Request, res: Response, next: NextFunction) => {
     });
     return;
   }
+  // A URL token buys headerless INFERENCE, not the operator's console. The
+  // injection below makes the request look unified to every downstream
+  // router, so routes that read only for the unified key check THIS flag and
+  // refuse — otherwise a shareable, revocable token handed to a headerless
+  // client reads exactly what the client-profile-key rule in routes/proxy.ts
+  // forbids: the install-wide spend ledger (/v1/usage reports every key's
+  // monthly spend, caps and which account is nearly drained).
   // Downstream protocol routers retain their normal authentication checks.
   // Supply the unified key internally only after the separately revocable URL
   // token was verified; it never appears in the public URL.

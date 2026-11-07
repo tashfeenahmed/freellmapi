@@ -450,6 +450,7 @@
     "adding": "Legger til...",
     "selectProvider": "Velg en leverandør...",
     "accountId": "Konto-ID",
+    "projectId": "Prosjekt-ID",
     "label": "Plateselskap",
     "noKeyNeeded": "(ingen nøkkel nødvendig)",
     "outboundProxy": "Utgående proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Månedlig grense for tokens",
     "capUnlimitedPlaceholder": "Ubegrenset",
     "capEditHint": "Grensene nullstilles den 1. kl. 00:00 UTC. La stå tomt for ubegrenset.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} forespørsler, {tokens} tokens denne måneden",
     "quotaBalanceHint": "{remaining} av {limit} {metric} igjen",
-    "quotaBalanceLeft": "{remaining} igjen"
-,
+    "quotaBalanceLeft": "{remaining} igjen",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Hele perioden",
+    "rangeAllNote": "Hovedtallene gjelder hele perioden. Suksessraten og oppdelingene nedenfor dekker historikken denne installasjonen fortsatt lagrer.",
     "requests": "Forespørsler",
     "successRate": "Suksessrate",
     "inputTokens": "Inndatatokens",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Forsøk på tilbaketrekning",
     "savingsHint": "Du har faktisk lagret ${actual} de siste {range}. Det er det de samme tokenene ville kostet på betalte API-er, priset per modell. Tallet som vises projiserer tempoet ditt fra siste {span} data til hele 30 dager.",
     "savingsHintExact": "Du har faktisk lagret ${actual} de siste {range}. Det er det de samme tokenene ville kostet på betalte API-er, priset per modell. Tallet som vises er din reelle 30-dagers total.",
+    "savingsHintAll": "Du har spart ${actual} over all lagret historikk. Det er hva de samme tokenene ville ha kostet hos betalte API-er, priset per modell. Tallet som vises fremskriver ditt nylige tempo fra de siste {span} med data til hele 30 dager.",
     "requestsHintPinned": "{pinned} av disse forespørslene festet en spesifikk modell ved navn. {honored} ble betjent av den pinnede modellen; {failed} gikk over til en annen. Resten ble automatisk rutet.",
     "requestsHintAuto": "Alle forespørsler i denne perioden ble automatisk rutet; Ingen kunde festet en spesifikk modell ved navn.",
     "requestsHintTypes": "{chat} chatte og {embedding} innbyggingsforespørsler.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Oppføringer vises her etter hvert som serveren skriver dem. Utvid filtrene for nivå, leverandør eller søk hvis du ventet utdata.",
     "noLevelsTitle": "Ingen nivåer valgt",
     "noLevelsDescription": "Slå på minst ett nivå for å se loggutdata.",
-    "loadFailed": "Kunne ikke laste inn serverloggen."
+    "loadFailed": "Kunne ikke laste inn serverloggen.",
+    "eventFilter": "Hendelse",
+    "allEvents": "Alle hendelser"
   },
   "playground": {
     "title": "Lekeplass",

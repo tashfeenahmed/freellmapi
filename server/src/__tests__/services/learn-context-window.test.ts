@@ -86,3 +86,46 @@ describe('learnContextWindowFromError (persistence)', () => {
     expect(windowOf(id)).toBe(200000);
   });
 });
+
+describe('learnContextWindowFromError with the refused request size (#1717)', () => {
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+  });
+
+  function insertModel(contextWindow: number | null): number {
+    const info = getDb().prepare(
+      `INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, context_window)
+       VALUES ('bazaarlink', ?, 'M', 50, 50, ?)`,
+    ).run(`m-${Math.random().toString(36).slice(2)}`, contextWindow);
+    return info.lastInsertRowid as number;
+  }
+  const windowOf = (id: number) =>
+    (getDb().prepare('SELECT context_window FROM models WHERE id = ?').get(id) as { context_window: number | null }).context_window;
+  const freeTier = { message: 'BazaarLink API error 400: This request is too large for a free tier' };
+
+  it('learns a ceiling below the refused size when the provider names no window', () => {
+    const id = insertModel(1_048_576);
+    expect(learnContextWindowFromError(id, freeTier, 500_000)).toBe(450_000);
+    expect(windowOf(id)).toBe(450_000);
+  });
+
+  it('only ever lowers the window', () => {
+    const id = insertModel(131_072);
+    expect(learnContextWindowFromError(id, freeTier, 500_000)).toBeNull();
+    expect(windowOf(id)).toBe(131_072);
+  });
+
+  it('prefers a window the provider names over the refused size', () => {
+    const id = insertModel(1_048_576);
+    const named = { message: "This endpoint's maximum context length is 262144 tokens." };
+    expect(learnContextWindowFromError(id, named, 500_000)).toBe(262144);
+  });
+
+  it('leaves per-minute throughput rejections to the tpm learner', () => {
+    const id = insertModel(131_072);
+    const groq = { message: 'Request too large for model `x` on tokens per minute (TPM): Limit 30000, Requested 33476' };
+    expect(learnContextWindowFromError(id, groq, 33_476)).toBeNull();
+    expect(windowOf(id)).toBe(131_072);
+  });
+});

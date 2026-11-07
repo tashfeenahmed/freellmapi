@@ -450,6 +450,7 @@
     "adding": "در حال افزودن…",
     "selectProvider": "انتخاب ارائه دهنده…",
     "accountId": "شناسه حساب",
+    "projectId": "شناسه پروژه",
     "label": "برچسب بزنید",
     "noKeyNeeded": "(بدون نیاز به کلید)",
     "outboundProxy": "پراکسی خروجی",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "سقف ماهانه توکن‌ها",
     "capUnlimitedPlaceholder": "نامحدود",
     "capEditHint": "سقف‌ها در اول هر ماه ساعت ۰۰:۰۰ UTC بازنشانی می‌شوند. برای نامحدود خالی بگذارید.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} درخواست، {tokens} توکن در این ماه",
     "quotaBalanceHint": "{remaining} از {limit} {metric} باقی مانده",
-    "quotaBalanceLeft": "{remaining} باقی مانده"
-,
+    "quotaBalanceLeft": "{remaining} باقی مانده",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30 روز",
     "range90d": "90 روز",
+    "rangeAll": "همه زمان‌ها",
+    "rangeAllNote": "جمع‌های اصلی مربوط به همه زمان‌هاست. نرخ موفقیت و جزئیات زیر، سابقه‌ای را پوشش می‌دهند که این نصب هنوز نگه می‌دارد.",
     "requests": "درخواست ها",
     "successRate": "میزان موفقیت",
     "inputTokens": "توکن های ورودی",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "تلاش های برگشتی",
     "savingsHint": "شما در واقع {actual} دلار را نسبت به آخرین {range} پس انداز کرده اید. این همان چیزی است که همان توکن‌ها در APIهای پولی با قیمت هر مدل هزینه خواهند داشت. عدد نشان داده شده سرعت شما را از آخرین {span} داده تا 30 روز کامل نشان می دهد.",
     "savingsHintExact": "شما در واقع {actual} دلار را نسبت به آخرین {range} پس انداز کرده اید. این همان چیزی است که همان توکن‌ها در APIهای پولی با قیمت هر مدل هزینه خواهند داشت. عدد نشان داده شده کل 30 روزه واقعی شماست.",
+    "savingsHintAll": "در کل سابقه نگه‌داری‌شده ${actual} صرفه‌جویی کرده‌اید. این همان هزینه‌ای است که همین توکن‌ها در APIهای پولی، با قیمت هر مدل، داشتند. عدد نمایش‌داده‌شده سرعت اخیر شما را از {span} آخر داده‌ها به ۳۰ روز کامل تعمیم می‌دهد.",
     "requestsHintPinned": "{pinned} از این درخواست ها یک مدل خاص را با نام پین کرد. {honored} توسط مدل پین شده ارائه شد. {failed} در مورد دیگری شکست خورد. بقیه به صورت خودکار مسیریابی شدند.",
     "requestsHintAuto": "همه درخواست‌ها در این دوره به‌طور خودکار مسیریابی شدند. هیچ مشتری مدل خاصی را با نام پین نکرد.",
     "requestsHintTypes": "چت {chat} و درخواست های جاسازی {embedding}.",
@@ -872,7 +882,9 @@
     "emptyDescription": "ورودی‌ها همزمان با نوشته‌شدن توسط سرور اینجا ظاهر می‌شوند. اگر انتظار خروجی داشتید، فیلترهای سطح، ارائه‌دهنده یا جستجو را گسترده‌تر کنید.",
     "noLevelsTitle": "هیچ سطحی انتخاب نشده است",
     "noLevelsDescription": "برای دیدن خروجی لاگ، دست‌کم یک سطح را فعال کنید.",
-    "loadFailed": "بارگیری لاگ سرور انجام نشد."
+    "loadFailed": "بارگیری لاگ سرور انجام نشد.",
+    "eventFilter": "رویداد",
+    "allEvents": "همه رویدادها"
   },
   "playground": {
     "title": "زمین بازی",

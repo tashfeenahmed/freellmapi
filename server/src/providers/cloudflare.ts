@@ -9,6 +9,8 @@ import { contentToString, contentHasImage } from '../lib/content.js';
 import { extractThinkFromMessage } from '../lib/think-tags.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
+import { estimateInputTokens } from '../lib/content.js';
+import { startCloudflareCall, type CloudflareNeuronCall } from '../services/cloudflare-neurons.js';
 
 /**
  * Cloudflare Workers AI provider.
@@ -33,6 +35,16 @@ export class CloudflareProvider extends BaseProvider {
     return modelId === '@cf/zai-org/glm-4.7-flash'
       ? Math.max(CHAT_TIMEOUT_MS, GLM_47_FLASH_TIMEOUT_MS)
       : CHAT_TIMEOUT_MS;
+  }
+
+  // Charge the call's estimated neurons before it goes out (#neurons): on
+  // Workers Paid nothing upstream stops a run once the free 10K/day is gone,
+  // so the meter does. Throws the Free plan's own "daily free allocation" 429
+  // when the account has no room left, which benches the account until
+  // midnight UTC through the ordinary failure path.
+  private meterCall(apiKey: string, modelId: string, messages: ChatMessage[], options: CompletionOptions | undefined, maxTokens: number | undefined): { meter: CloudflareNeuronCall; inputTokens: number } {
+    const inputTokens = estimateInputTokens(messages, options?.tools);
+    return { meter: startCloudflareCall(apiKey, modelId, { inputTokens, maxOutputTokens: maxTokens }), inputTokens };
   }
 
   private parseKey(apiKey: string): { accountId: string; token: string } {
@@ -63,6 +75,8 @@ export class CloudflareProvider extends BaseProvider {
   ): Promise<ChatCompletionResponse> {
     const { accountId, token } = this.parseKey(apiKey);
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
+    const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+    const { meter, inputTokens } = this.meterCall(apiKey, modelId, messages, options, maxTokens);
 
     const res = await this.fetchWithTimeout(url, {
       method: 'POST',
@@ -74,7 +88,7 @@ export class CloudflareProvider extends BaseProvider {
         model: modelId,
         messages: this.normalizeMessages(messages),
         temperature: options?.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        max_tokens: maxTokens,
         top_p: options?.top_p,
         stop: options?.stop,
         tools: options?.tools,
@@ -95,11 +109,16 @@ export class CloudflareProvider extends BaseProvider {
     });
 
     if (!res.ok) {
+      // An error answer ran no inference, so it bills no neurons.
+      meter.refund();
       const err = await res.json().catch(() => ({}));
       throw providerHttpError(res, `Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`, err);
     }
 
     const data = await res.json() as ChatCompletionResponse;
+    meter.settle(data.usage
+      ? { inputTokens: data.usage.prompt_tokens ?? inputTokens, outputTokens: data.usage.completion_tokens ?? 0 }
+      : null);
     // Workers AI hosts DeepSeek-style models that inline their reasoning trace
     // as a leading `<think>…</think>` block in content; move it to
     // reasoning_content (no-op for messages without the tag).
@@ -119,6 +138,8 @@ export class CloudflareProvider extends BaseProvider {
   ): AsyncGenerator<ChatCompletionChunk> {
     const { accountId, token } = this.parseKey(apiKey);
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
+    const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+    const { meter, inputTokens } = this.meterCall(apiKey, modelId, messages, options, maxTokens);
 
     const res = await this.fetchWithTimeout(url, {
       method: 'POST',
@@ -130,7 +151,7 @@ export class CloudflareProvider extends BaseProvider {
         model: modelId,
         messages: this.normalizeMessages(messages),
         temperature: options?.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        max_tokens: maxTokens,
         top_p: options?.top_p,
         stop: options?.stop,
         tools: options?.tools,
@@ -152,13 +173,42 @@ export class CloudflareProvider extends BaseProvider {
     });
 
     if (!res.ok) {
+      // An error answer ran no inference, so it bills no neurons.
+      meter.refund();
       const err = await res.json().catch(() => ({}));
       throw providerHttpError(res, `Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`, err);
     }
 
     // First-byte grace (#584): reuse the per-model chat timeout (GLM 4.7
     // Flash's 200s included) as the budget for the first stream read.
-    yield* this.readSseStream(res, { firstByteTimeoutMs: this.timeoutFor(modelId, options?.timeoutMs) });
+    // Settle on the stream's own usage chunk when Cloudflare sends one, else on
+    // the streamed text (~4 chars a token). A stream cut short is billed for
+    // whatever ran, so it keeps the larger of its estimate and what arrived.
+    let usage: ChatCompletionChunk['usage'] | undefined;
+    let chars = 0;
+    let finished = false;
+    try {
+      for await (const chunk of this.readSseStream(res, { firstByteTimeoutMs: this.timeoutFor(modelId, options?.timeoutMs) })) {
+        if (chunk.usage) usage = chunk.usage;
+        for (const choice of chunk.choices ?? []) {
+          const d = choice?.delta;
+          if (!d) continue;
+          chars += (d.content?.length ?? 0) + (d.reasoning_content?.length ?? 0);
+          for (const call of d.tool_calls ?? []) chars += (call.function?.name?.length ?? 0) + (call.function?.arguments?.length ?? 0);
+        }
+        yield chunk;
+      }
+      finished = true;
+    } finally {
+      const streamed = Math.ceil(chars / 4);
+      if (usage) {
+        meter.settle({ inputTokens: usage.prompt_tokens ?? inputTokens, outputTokens: usage.completion_tokens ?? streamed });
+      } else if (finished) {
+        meter.settle({ inputTokens, outputTokens: streamed });
+      } else {
+        meter.settleAtLeast({ inputTokens, outputTokens: streamed });
+      }
+    }
   }
 
   async validateKey(apiKey: string, quotaContext?: QuotaObservationContext): Promise<KeyValidationResult> {

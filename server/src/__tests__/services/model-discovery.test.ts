@@ -388,6 +388,30 @@ describe('non-chat kind inferred from the model id (#1051)', () => {
     expect(n.kind).toBe('embedding');
   });
 
+  it('classifies bare "audio" and "image" type metadata (#1506)', () => {
+    // OpenRouter and similar OpenAI-compatible relays use bare `type` values.
+    // A model whose id carries no keyword at all must still be classified by
+    // its metadata, not silently fall through to chat and 404 every chain.
+    const [a] = parseModelCatalog({ data: [{ id: 'generic-model-7b', type: 'audio' }] });
+    expect(a.kind).toBe('audio');
+    const [i] = parseModelCatalog({ data: [{ id: 'generic-model-3b', type: 'image' }] });
+    expect(i.kind).toBe('image');
+    // The same bare value on a different metadata key classifies the same way.
+    const [m] = parseModelCatalog({ data: [{ id: 'm1', model_type: 'audio' }] });
+    expect(m.kind).toBe('audio');
+    const [n] = parseModelCatalog({ data: [{ id: 'm2', object: 'image' }] });
+    expect(n.kind).toBe('image');
+  });
+
+  it('keeps vision-chat task metadata as chat, not image or audio generation (#1506)', () => {
+    // Hugging Face style tasks name an input modality; only the bare values
+    // above mean a generation model.
+    for (const type of ['image-text-to-text', 'image-to-text', 'audio-text-to-text', 'any-to-any']) {
+      const [m] = parseModelCatalog({ data: [{ id: 'generic-model-9b', type }] });
+      expect(m.kind, type).toBeUndefined();
+    }
+  });
+
   it("ignores OpenAI's uninformative object:'model'", () => {
     const [m] = parseModelCatalog({ data: [{ id: 'gpt-x', object: 'model' }] });
     expect(m.kind).toBeUndefined();

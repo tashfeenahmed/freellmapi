@@ -450,6 +450,7 @@
     "adding": "Acrescentando...",
     "selectProvider": "Escolha um fornecedor...",
     "accountId": "ID da Conta",
+    "projectId": "ID do projeto",
     "label": "Editora",
     "noKeyNeeded": "(sem necessidade de chave)",
     "outboundProxy": "Proxy de saída",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Limite mensal de tokens",
     "capUnlimitedPlaceholder": "Ilimitado",
     "capEditHint": "Os limites são repostos no dia 1 às 00:00 UTC. Deixe em branco para ilimitado.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} pedidos, {tokens} tokens este mês",
     "quotaBalanceHint": "Restam {remaining} de {limit} {metric}",
-    "quotaBalanceLeft": "Restam {remaining}"
-,
+    "quotaBalanceLeft": "Restam {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Todo o período",
+    "rangeAllNote": "Os totais principais são de todo o período. A taxa de sucesso e as discriminações abaixo cobrem o histórico que esta instalação ainda guarda.",
     "requests": "Pedidos",
     "successRate": "Taxa de sucesso",
     "inputTokens": "Tokens de entrada",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Tentativas de recuo",
     "savingsHint": "Na verdade, guardaste ${actual} nos últimos {range}. É isso que os mesmos tokens teriam custado em APIs pagas, com preço por modelo. O número mostrado projeta o seu ritmo dos últimos {span} de dados para 30 dias completos.",
     "savingsHintExact": "Na verdade, guardaste ${actual} nos últimos {range}. É isso que os mesmos tokens teriam custado em APIs pagas, com preço por modelo. O número mostrado é o seu total real de 30 dias.",
+    "savingsHintAll": "Poupou ${actual} em todo o histórico guardado. É o que os mesmos tokens teriam custado em APIs pagas, ao preço de cada modelo. O número apresentado projeta o seu ritmo recente dos últimos {span} de dados para 30 dias completos.",
     "requestsHintPinned": "{pinned} destes pedidos fixava um modelo específico pelo nome. {honored} eram servidos pelo modelo com pinos; {failed} mudou para outro. Os restantes foram encaminhados automaticamente.",
     "requestsHintAuto": "Todos os pedidos neste período eram encaminhados automaticamente; nenhum cliente fixava um modelo específico pelo nome.",
     "requestsHintTypes": "{chat} pedido de chat e {embedding} de embedding.",
@@ -872,7 +882,9 @@
     "emptyDescription": "As entradas aparecem aqui à medida que o servidor as escreve. Alargue os filtros de nível, fornecedor ou pesquisa se esperava ver resultados.",
     "noLevelsTitle": "Nenhum nível selecionado",
     "noLevelsDescription": "Ative pelo menos um nível para ver o registo.",
-    "loadFailed": "Não foi possível carregar o registo do servidor."
+    "loadFailed": "Não foi possível carregar o registo do servidor.",
+    "eventFilter": "Evento",
+    "allEvents": "Todos os eventos"
   },
   "playground": {
     "title": "Parque infantil",

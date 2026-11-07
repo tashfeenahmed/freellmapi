@@ -450,6 +450,7 @@
     "adding": "በማከል ላይ...",
     "selectProvider": "አቅራቢ ይምረጡ...",
     "accountId": "የመለያ መታወቂያ",
+    "projectId": "የፕሮጀክት መለያ",
     "label": "መለያ",
     "noKeyNeeded": "(ምንም ቁልፍ አያስፈልግም)",
     "outboundProxy": "የወጪ ፕሮክሲ",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "ወርሃዊ የቶከን ገደብ",
     "capUnlimitedPlaceholder": "ወሰን የለሽ",
     "capEditHint": "ገደቦች በእያንዳንዱ ወር 1 ቀን 00:00 UTC ዳግም ይጀምራሉ። ለወሰን አልባ ባዶ ይተዉ።",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "በዚህ ወር {requests} ጥያቄዎች፣ {tokens} ቶከኖች",
     "quotaBalanceHint": "ከ{limit} {metric} {remaining} ቀርቷል",
-    "quotaBalanceLeft": "{remaining} ቀርቷል"
-,
+    "quotaBalanceLeft": "{remaining} ቀርቷል",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7 ዲ",
     "range30d": "30 ዲ",
     "range90d": "90 ዲ",
+    "rangeAll": "ሁሉም ጊዜ",
+    "rangeAllNote": "ዋና ድምሮቹ የሁሉም ጊዜ ናቸው። የስኬት መጠኑ እና ከታች ያሉት ዝርዝሮች ይህ ጭነት አሁንም የያዘውን ታሪክ ይሸፍናሉ።",
     "requests": "ጥያቄዎች",
     "successRate": "የስኬት መጠን",
     "inputTokens": "የግቤት ማስኬቶች",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "የውድቀት ሙከራዎች",
     "savingsHint": "ባለፉት {range} ${actual}ን አስቀምጠዋል። በአንድ ሞዴል ዋጋ በሚከፈልባቸው ኤፒአይዎች ላይ ተመሳሳይ ቶከኖች ያስከፍላሉ። የሚታየው ቁጥር ከመጨረሻው የውሂብ {span} እስከ 30 ቀናት ድረስ ፍጥነትዎን ያዘጋጃል።",
     "savingsHintExact": "ባለፉት {range} ${actual}ን አስቀምጠዋል። በአንድ ሞዴል ዋጋ በሚከፈልባቸው ኤፒአይዎች ላይ ተመሳሳይ ቶከኖች ያስከፍላሉ። የሚታየው ቁጥር የእርስዎ ትክክለኛ የ30-ቀን ድምር ነው።",
+    "savingsHintAll": "በተያዘው ታሪክ ሁሉ ${actual} አጠራቅመዋል። ተመሳሳዩ ቶከኖች በሚከፈልባቸው APIዎች ላይ በሞዴል ዋጋ ይህን ያህል ያስወጡ ነበር። የሚታየው ቁጥር ካለፉት {span} ውሂብ የቅርብ ጊዜ ፍጥነትዎን ወደ ሙሉ 30 ቀናት ያሰላል።",
     "requestsHintPinned": "ከእነዚህ ጥያቄዎች ውስጥ {pinned} አንድን የተወሰነ ሞዴል በስም ሰካ። {honored} በተሰካው ሞዴል አገልግለዋል; {failed} ወደ ሌላ አልተሳካም። የተቀሩት በራስ-ሰር ተዘዋውረዋል።",
     "requestsHintAuto": "በዚህ ጊዜ ውስጥ ያሉት ሁሉም ጥያቄዎች በራስ-ሰር ተዘዋውረዋል; አንድም ደንበኛ አንድን የተወሰነ ሞዴል በስም አልሰካም።",
     "requestsHintTypes": "{chat} ይወያዩ እና {embedding} የመክተት ጥያቄዎች።",
@@ -872,7 +882,9 @@
     "emptyDescription": "አገልጋዩ ሲጽፋቸው ግቤቶች እዚህ ይታያሉ። ውጤት የጠበቁ ከሆነ የደረጃ፣ የአቅራቢ ወይም የፍለጋ ማጣሪያዎችን ያስፉ።",
     "noLevelsTitle": "ምንም ደረጃ አልተመረጠም",
     "noLevelsDescription": "የመዝገብ ውጤትን ለማየት ቢያንስ አንድ ደረጃ ያብሩ።",
-    "loadFailed": "የአገልጋዩን መዝገብ መጫን አልተቻለም።"
+    "loadFailed": "የአገልጋዩን መዝገብ መጫን አልተቻለም።",
+    "eventFilter": "ክስተት",
+    "allEvents": "ሁሉም ክስተቶች"
   },
   "playground": {
     "title": "የመጫወቻ ሜዳ",

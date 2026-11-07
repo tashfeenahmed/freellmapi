@@ -4,7 +4,7 @@ import path from 'path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'url';
 import { runMigrationsSync } from './migrate/runner.js';
-import { initEncryptionKey, isEncryptionKeyInitialized } from '../lib/crypto.js';
+import { initEncryptionKey, isEncryptionKeyInitialized, probeStoredSecrets } from '../lib/crypto.js';
 import { restrictAllToOwner, restrictDirToOwner } from '../lib/file-permissions.js';
 import { nodeSqliteFactory } from './node-sqlite.js';
 import type { Db, DbFactory } from './types.js';
@@ -219,7 +219,30 @@ export function initDb(
 
   if (!isEncryptionKeyInitialized()) initEncryptionKey(db);
 
+  keyStoreDecryptable = probeStoredSecrets(db);
+  if (keyStoreDecryptable === false) {
+    console.error(
+      '[crypto] The loaded encryption key cannot decrypt the provider keys in this database. ' +
+      'Every request will fail with "Unsupported state or unable to authenticate data" and nothing ' +
+      'will route until this is fixed. The database and the key file (.encryption-key next to it, ' +
+      'or ENCRYPTION_KEY) came from different installs — restore the key that belongs to this ' +
+      'database, then restart.',
+    );
+  }
+
   return db;
+}
+
+let keyStoreDecryptable: boolean | null = null;
+
+/**
+ * Result of the boot-time probe: true when the key opens stored secrets, false
+ * when it does not, null when the database holds no secret to check. Read by the
+ * health and status endpoints so a key mismatch is visible instead of surfacing
+ * as one failing provider after another.
+ */
+export function isKeyStoreDecryptable(): boolean | null {
+  return keyStoreDecryptable;
 }
 
 export function getUnifiedApiKey(): string {

@@ -85,6 +85,22 @@ export function getMonthlyUsage(keyId: number, now = Date.now()): MonthlyUsage {
 }
 
 /**
+ * Settle one successful request straight into the ledger, for surfaces that
+ * log to their own table instead of `requests` (decisions). Same arithmetic
+ * as the requests_key_monthly_usage trigger, so caps and /v1/usage see it
+ * without the request also counting in the dashboard's request analytics.
+ */
+export function recordMonthlyUsage(keyId: number, tokens: number, now = Date.now()): void {
+  getDb().prepare(`
+    INSERT INTO key_monthly_usage (key_id, month, requests, tokens)
+    VALUES (?, ?, 1, ?)
+    ON CONFLICT(key_id, month) DO UPDATE SET
+      requests = requests + 1,
+      tokens = tokens + excluded.tokens
+  `).run(keyId, new Date(now).toISOString().slice(0, 7), Math.max(0, Math.floor(tokens)));
+}
+
+/**
  * Check a key against its monthly caps, taking the current month's successful
  * usage plus the tokens THIS request would add. Returns allowed when both caps
  * are 0 (unlimited) or neither would be exceeded.

@@ -381,7 +381,7 @@ export class SailProvider extends BaseProvider {
     yield { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
     if (content) yield { ...base, choices: [{ index: 0, delta: { content }, finish_reason: null }] };
     if (toolCalls.length > 0) {
-      yield { ...base, choices: [{ index: 0, delta: { tool_calls: toolCalls }, finish_reason: null }] };
+      yield { ...base, choices: [{ index: 0, delta: { tool_calls: toolCalls.map((call, index) => ({ ...call, index })) }, finish_reason: null }] };
     }
     yield { ...base, choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason }] };
   }

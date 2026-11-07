@@ -450,6 +450,7 @@
     "adding": "Dagdag pa...",
     "selectProvider": "Pumili ng provider...",
     "accountId": "Account ID",
+    "projectId": "ID ng proyekto",
     "label": "Label",
     "noKeyNeeded": "(hindi kailangan ng susi)",
     "outboundProxy": "Outbound proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Buwanang limit ng token",
     "capUnlimitedPlaceholder": "Walang limit",
     "capEditHint": "Nireset ang limit sa ika-1 ng buwan, 00:00 UTC. Iwanang blangko kung walang limit.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} kahilingan, {tokens} token ngayong buwan",
     "quotaBalanceHint": "{remaining} sa {limit} {metric} ang natitira",
-    "quotaBalanceLeft": "{remaining} ang natitira"
-,
+    "quotaBalanceLeft": "{remaining} ang natitira",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Lahat ng panahon",
+    "rangeAllNote": "Ang mga pangunahing kabuuan ay para sa lahat ng panahon. Saklaw ng success rate at ng mga detalye sa ibaba ang kasaysayang hawak pa ng install na ito.",
     "requests": "Mga kahilingan",
     "successRate": "Antas ng tagumpay",
     "inputTokens": "Mga input token",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Mga Pagtatangka sa Fallback",
     "savingsHint": "Talagang nakasave ka ng ${actual} nitong nakaraang {range}. Iyan ang presyo ng parehong tokens sa mga bayad na API, na may presyo kada modelo. Ang bilang na ipinapakita ay nagpapakita ng iyong bilis mula sa huling {span} ng datos hanggang sa buong 30 araw.",
     "savingsHintExact": "Talagang nakasave ka ng ${actual} nitong nakaraang {range}. Iyan ang presyo ng parehong tokens sa mga bayad na API, na may presyo kada modelo. Ang ipinakitang numero ay ang iyong tunay na kabuuan sa loob ng 30 araw.",
+    "savingsHintAll": "Nakatipid ka ng ${actual} sa buong naitagong kasaysayan. Iyan ang magagastos ng parehong mga token sa mga bayad na API, ayon sa presyo ng bawat model. Ipinapalagay ng ipinapakitang numero ang iyong kamakailang bilis mula sa huling {span} ng data sa buong 30 araw.",
     "requestsHintPinned": "{pinned} sa mga kahilingang ito ay nag-pin ng isang partikular na modelo sa pangalan. {honored} ay pinagsilbihan ng pinned model; Nabigo {failed} sa iba. Ang iba pa ay auto-routed.",
     "requestsHintAuto": "Lahat ng kahilingan sa panahong ito ay auto-routed; Walang kliyente na nag-pin ng partikular na modelo sa pangalan.",
     "requestsHintTypes": "{chat} chat at {embedding} embedding requests.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Lumilitaw dito ang mga entry habang isinusulat ang mga ito ng server. Palawakin ang mga filter ng antas, provider o paghahanap kung umaasa ka ng output.",
     "noLevelsTitle": "Walang napiling antas",
     "noLevelsDescription": "Mag-on ng kahit isang antas para makita ang output ng log.",
-    "loadFailed": "Hindi ma-load ang server log."
+    "loadFailed": "Hindi ma-load ang server log.",
+    "eventFilter": "Kaganapan",
+    "allEvents": "Lahat ng kaganapan"
   },
   "playground": {
     "title": "Palaruan",

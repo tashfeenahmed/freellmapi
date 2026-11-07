@@ -450,6 +450,7 @@
     "adding": "Lisään...",
     "selectProvider": "Valitse palveluntarjoaja...",
     "accountId": "Tilin tunnus",
+    "projectId": "Projektin tunnus",
     "label": "Levy-yhtiö",
     "noKeyNeeded": "(ei avainta tarvita)",
     "outboundProxy": "Lähtevä proxy",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "Kuukausittainen tokenraja",
     "capUnlimitedPlaceholder": "Rajoittamaton",
     "capEditHint": "Rajat nollautuvat kuun 1. päivänä 00:00 UTC. Jätä tyhjäksi rajoittamattomaan.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} pyyntöä, {tokens} tokenia tässä kuussa",
     "quotaBalanceHint": "{remaining}/{limit} {metric} jäljellä",
-    "quotaBalanceLeft": "{remaining} jäljellä"
-,
+    "quotaBalanceLeft": "{remaining} jäljellä",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90d",
+    "rangeAll": "Koko ajalta",
+    "rangeAllNote": "Pääsummat ovat koko ajalta. Onnistumisprosentti ja alla olevat erittelyt kattavat historian, jota tämä asennus vielä säilyttää.",
     "requests": "Pyynnöt",
     "successRate": "Onnistumisprosentti",
     "inputTokens": "Syötetokenit",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "Varasuunnitelmat",
     "savingsHint": "Olet itse asiassa säästänyt ${actual}:n viimeisen {range} aikana. Sen verran samat tokenit maksaisivat maksetuissa API-rajapinnoissa, mallikohtaisesti. Näytetty luku ennustaa vauhtisi viimeisestä {span} datasta täyteen 30 päivään.",
     "savingsHintExact": "Olet itse asiassa säästänyt ${actual}:n viimeisen {range} aikana. Sen verran samat tokenit maksaisivat maksetuissa API-rajapinnoissa, mallikohtaisesti. Näytetty luku on todellinen 30 päivän kokonaismääräsi.",
+    "savingsHintAll": "Säästit ${actual} koko säilytetyn historian aikana. Sen verran samat tokenit olisivat maksaneet maksullisissa API-palveluissa mallikohtaisella hinnalla. Näytetty luku ennustaa viimeaikaisen tahtisi viimeisten {span} datan perusteella täydelle 30 päivälle.",
     "requestsHintPinned": "{pinned} näistä pyynnöistä kiinnitti tietyn mallin nimeltä. {honored} palvelivat naulattua mallia; {failed} epäonnistui toiseen. Loput reititettiin automaattisesti.",
     "requestsHintAuto": "Kaikki pyynnöt tänä aikana ohjattiin automaattisesti; yksikään asiakas ei kiinnittänyt tiettyä mallia nimeltä.",
     "requestsHintTypes": "{chat} chatissa ja {embedding} upotuspyynnöissä.",
@@ -872,7 +882,9 @@
     "emptyDescription": "Merkinnät ilmestyvät tähän sitä mukaa kun palvelin kirjoittaa niitä. Laajenna taso-, palveluntarjoaja- tai hakusuodattimia, jos odotit tulostetta.",
     "noLevelsTitle": "Ei valittuja tasoja",
     "noLevelsDescription": "Valitse vähintään yksi taso nähdäksesi lokitulosteen.",
-    "loadFailed": "Palvelimen lokia ei voitu ladata."
+    "loadFailed": "Palvelimen lokia ei voitu ladata.",
+    "eventFilter": "Tapahtuma",
+    "allEvents": "Kaikki tapahtumat"
   },
   "playground": {
     "title": "Leikkipaikka",

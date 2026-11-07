@@ -455,6 +455,9 @@ export interface LogQuery {
   levels?: ServerLogLevel[];
   q?: string;
   provider?: string;
+  /** Exact structured event name (e.g. 'key_invalid') — same contract as
+   *  provider: case-sensitive equality against entry.event. */
+  event?: string;
   sinceId?: number;
   limit?: number;
 }
@@ -485,12 +488,20 @@ export function levelCounts(): LogLevelCounts {
   return counts;
 }
 
-function matches(entry: ServerLogEntry, levels: Set<ServerLogLevel> | null, needle: string | null, provider: string | null): boolean {
-  if (levels && !levels.has(entry.level)) return false;
-  if (provider !== null && entry.provider !== provider) return false;
-  if (needle !== null) {
+interface LogFilters {
+  levels: Set<ServerLogLevel> | null;
+  needle: string | null;
+  provider: string | null;
+  event: string | null;
+}
+
+function matches(entry: ServerLogEntry, filters: LogFilters): boolean {
+  if (filters.levels && !filters.levels.has(entry.level)) return false;
+  if (filters.provider !== null && entry.provider !== filters.provider) return false;
+  if (filters.event !== null && entry.event !== filters.event) return false;
+  if (filters.needle !== null) {
     const haystack = `${entry.message} ${entry.provider ?? ''} ${entry.source ?? ''} ${entry.event ?? ''}`.toLowerCase();
-    if (!haystack.includes(needle)) return false;
+    if (!haystack.includes(filters.needle)) return false;
   }
   return true;
 }
@@ -502,9 +513,12 @@ export function queryLogs(query: LogQuery = {}): ServerLogEntry[] {
   // A caller already caught up costs one comparison, not a scan.
   if (sinceId !== undefined && sinceId >= lastId) return [];
 
-  const levels = query.levels && query.levels.length > 0 ? new Set(query.levels) : null;
-  const needle = query.q && query.q.trim() !== '' ? query.q.trim().toLowerCase() : null;
-  const provider = query.provider && query.provider.trim() !== '' ? query.provider.trim() : null;
+  const filters: LogFilters = {
+    levels: query.levels && query.levels.length > 0 ? new Set(query.levels) : null,
+    needle: query.q && query.q.trim() !== '' ? query.q.trim().toLowerCase() : null,
+    provider: query.provider && query.provider.trim() !== '' ? query.provider.trim() : null,
+    event: query.event && query.event.trim() !== '' ? query.event.trim() : null,
+  };
   const limit = clampLimit(query.limit);
 
   const out: ServerLogEntry[] = [];
@@ -512,7 +526,7 @@ export function queryLogs(query: LogQuery = {}): ServerLogEntry[] {
   for (let i = ring.length - 1; i >= 0 && out.length < limit; i--) {
     const entry = ring[i]!;
     if (sinceId !== undefined && entry.id <= sinceId) break;
-    if (matches(entry, levels, needle, provider)) out.push(entry);
+    if (matches(entry, filters)) out.push(entry);
   }
   return out.reverse();
 }

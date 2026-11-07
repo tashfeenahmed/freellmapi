@@ -17,6 +17,7 @@ import { providerTimeoutMs } from '../lib/provider-timeout.js';
 import { isAbortLikeError } from '../lib/error-classify.js';
 import { contentToString } from '../lib/content.js';
 import { bearerAuthHeader } from '../lib/credential.js';
+import { createHash } from 'node:crypto';
 
 // Shared with the media/embeddings custom-endpoint paths; re-exported so
 // existing imports keep working (#1331).
@@ -42,6 +43,39 @@ export function isMoonshotEndpoint(baseUrl: string): boolean {
     return false;
   }
   return MOONSHOT_HOST_SUFFIXES.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+/** Hosts that ARE OpenCode's Zen gateway (opencode.ai and subdomains — the Go
+ * tier serves `https://opencode.ai/zen/go/v1`). */
+const OPENCODE_HOST_SUFFIXES = ['opencode.ai'];
+
+/**
+ * Whether a base URL points at OpenCode's gateway. Since 2026-09-05 OpenCode Go
+ * rejects every chat request that lacks `x-opencode-session` with a 400, while
+ * `GET /models` answers without it — so a key passes the health check and then
+ * silently fails over on every completion (#1639). Gated on the endpoint host,
+ * the same way isMoonshotEndpoint gates the `partial` flag.
+ */
+export function isOpencodeEndpoint(baseUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return OPENCODE_HOST_SUFFIXES.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+/**
+ * A stable UUID derived from the credential: OpenCode asks for "any stable
+ * UUID per conversation" on `x-opencode-session` and uses it to route, so the
+ * header must not change between calls. The adapter never sees conversation
+ * boundaries, so the key is the stablest identity available — one session id
+ * per credential, deterministic across restarts, never persisted anywhere.
+ */
+function stableSessionUuid(apiKey: string): string {
+  const hex = createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 /**
@@ -151,6 +185,15 @@ export class OpenAICompatProvider extends BaseProvider {
   private resolveParallelToolCalls(options?: CompletionOptions): boolean | undefined {
     if (this.forceSingleToolCall && options?.tools && options.tools.length > 0) return false;
     return options?.parallel_tool_calls;
+  }
+
+  /** Headers the endpoint requires beyond auth. OpenCode's gateway rejects chat
+   * requests without `x-opencode-session` (#1639) — a stable UUID per
+   * credential, since the adapter has no conversation boundary to key one on.
+   * Empty for every other endpoint. */
+  private sessionHeaders(apiKey: string): Record<string, string> {
+    if (!isOpencodeEndpoint(this.baseUrl)) return {};
+    return { 'x-opencode-session': stableSessionUuid(apiKey) };
   }
 
   /** Some providers (Groq especially) reject a model's tool call with a 400
@@ -332,6 +375,7 @@ export class OpenAICompatProvider extends BaseProvider {
       headers: {
         ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
+        ...this.sessionHeaders(apiKey),
         ...this.extraHeaders,
       },
       body: JSON.stringify({
@@ -463,6 +507,7 @@ export class OpenAICompatProvider extends BaseProvider {
       headers: {
         ...this.authHeader(apiKey),
         'Content-Type': 'application/json',
+        ...this.sessionHeaders(apiKey),
         ...this.extraHeaders,
       },
       body: JSON.stringify({

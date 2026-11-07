@@ -450,6 +450,7 @@
     "adding": "थप्दैछ...",
     "selectProvider": "प्रदायक चयन गर्नुहोस्...",
     "accountId": "खाता आईडी",
+    "projectId": "परियोजना ID",
     "label": "लेबुल",
     "noKeyNeeded": "(कुञ्जी आवश्यक पर्दैन)",
     "outboundProxy": "आउटबाउन्ड प्रोक्सी",
@@ -714,17 +715,23 @@
     "monthlyTokenCapLabel": "मासिक टोकन सीमा",
     "capUnlimitedPlaceholder": "असीमित",
     "capEditHint": "सीमा हरेक महिनाको १ गते ००:०० UTC मा रिसेट हुन्छ। असीमितका लागि खाली राख्नुहोस्।",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "यस महिना {requests} अनुरोध, {tokens} टोकन",
     "quotaBalanceHint": "{limit} {metric} मध्ये {remaining} बाँकी",
-    "quotaBalanceLeft": "{remaining} बाँकी"
-,
+    "quotaBalanceLeft": "{remaining} बाँकी",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -775,6 +782,8 @@
     "range7d": "7d",
     "range30d": "30d",
     "range90d": "90 डी",
+    "rangeAll": "सम्पूर्ण समय",
+    "rangeAllNote": "मुख्य कुल योगहरू सम्पूर्ण समयका हुन्। सफलता दर र तलका विवरणहरूले यो इन्स्टलले अझै राखेको इतिहास समेट्छन्।",
     "requests": "अनुरोधहरू",
     "successRate": "सफलताको दर",
     "inputTokens": "आगत टोकनहरू",
@@ -798,6 +807,7 @@
     "fallbackAttempts": "फलब्याक प्रयासहरू",
     "savingsHint": "तपाईंले वास्तवमै पछिल्लो {range} मा ${actual} बचत गर्नुभयो। यो भनेको समान टोकनहरू भुक्तान गरिएको एपीआईहरूमा खर्च हुने थियो, प्रति मोडेल मूल्य। देखाइएको संख्याले तपाईंको गतिलाई डेटाको अन्तिम {span} देखि पूर्ण 30 दिनसम्म प्रोजेक्ट गर्दछ।",
     "savingsHintExact": "तपाईंले वास्तवमै पछिल्लो {range} मा ${actual} बचत गर्नुभयो। यो भनेको समान टोकनहरू भुक्तान गरिएको एपीआईहरूमा खर्च हुने थियो, प्रति मोडेल मूल्य। देखाइएको संख्या तपाईंको वास्तविक 30-दिनको कुल हो।",
+    "savingsHintAll": "तपाईंले सुरक्षित गरिएको सम्पूर्ण इतिहासमा ${actual} बचत गर्नुभयो। उही टोकनहरू सशुल्क API मा, प्रत्येक मोडेलको मूल्यमा, यति खर्च हुन्थ्यो। देखाइएको संख्याले अन्तिम {span} डेटाबाट तपाईंको हालको गतिलाई पूरा 30 दिनमा अनुमान गर्छ।",
     "requestsHintPinned": "यी {pinned} अनुरोधहरूले नामद्वारा एक विशिष्ट मोडेल पिन गरे। {honored} पिन गरिएको मोडेलद्वारा सेवा गरिएको थियो; {failed} फरक कुरामा असफल भएँ। बाँकी स्वत: मार्ग थिए।",
     "requestsHintAuto": "यस अवधिमा सबै अनुरोधहरू स्वत: मार्ग थिए; कुनै पनि क्लाइन्टले नामद्वारा निर्दिष्ट मोडेल पिन गरेन।",
     "requestsHintTypes": "{chat} कुराकानी गर्नुहोस् र {embedding} एम्बेड अनुरोधहरू गर्नुहोस्।",
@@ -872,7 +882,9 @@
     "emptyDescription": "सर्भरले लेख्दै जाँदा प्रविष्टिहरू यहाँ देखिनेछन्। आउटपुटको अपेक्षा गर्नुभएको थियो भने स्तर, प्रदायक वा खोज फिल्टरको दायरा बढाउनुहोस्।",
     "noLevelsTitle": "कुनै स्तर चयन गरिएको छैन",
     "noLevelsDescription": "लग आउटपुट हेर्न कम्तीमा एउटा स्तर चालु गर्नुहोस्।",
-    "loadFailed": "सर्भर लग लोड गर्न सकिएन।"
+    "loadFailed": "सर्भर लग लोड गर्न सकिएन।",
+    "eventFilter": "इभेन्ट",
+    "allEvents": "सबै इभेन्ट"
   },
   "playground": {
     "title": "खेल मैदान[सम्पादन गर्ने]",
