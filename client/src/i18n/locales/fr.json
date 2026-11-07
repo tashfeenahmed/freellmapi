@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avancé",
     "sectionPreview": "Aperçu",
     "generalDescription": "Langue et apparence de ce tableau de bord.",
+    "startAtLogin": "Démarrer au démarrage du système",
+    "startAtLoginHelp": "Lancez FreeLLMAPI automatiquement à l'ouverture de session sur votre ordinateur.",
     "advancedDescription": "Seuils et interrupteurs de sécurité du pipeline de compression.",
     "compressionTitle": "Compression des prompts",
     "compressionDescription": "Réduisez la taille des requêtes avant le routage tout en préservant le code, les erreurs, les chemins, les nombres et les définitions d'outils.",

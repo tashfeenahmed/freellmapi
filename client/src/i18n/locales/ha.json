@@ -109,6 +109,8 @@
     "sectionAdvanced": "Na ci gaba",
     "sectionPreview": "Samfoti",
     "generalDescription": "Harshe da kamanni na wannan dashboard.",
+    "startAtLogin": "Fara a farawar tsarin",
+    "startAtLoginHelp": "ƙaddamar da FreeLLMAPI ta atomatik lokacin shiga kwamfutarka.",
     "advancedDescription": "Iyaka da maɓallan tsaro na tsarin matsawa.",
     "compressionTitle": "Matsawar prompt",
     "compressionDescription": "Rage girman buƙata kafin turawa yayin da ake kiyaye kod, kurakurai, hanyoyi, lambobi da ma'anonin kayan aiki.",

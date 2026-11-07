@@ -109,6 +109,8 @@
     "sectionAdvanced": "Kina",
     "sectionPreview": "Hakikisho",
     "generalDescription": "Lugha na mwonekano wa dashibodi hii.",
+    "startAtLogin": "Anza wakati mfumo unapoanza",
+    "startAtLoginHelp": "Zindua FreeLLMAPI kiotomatiki unapoingia kwenye kompyuta yako.",
     "advancedDescription": "Vizingiti na swichi za usalama za mfumo wa ubanaji.",
     "compressionTitle": "Ubanaji wa agizo",
     "compressionDescription": "Punguza ukubwa wa ombi kabla ya uelekezaji huku ukihifadhi msimbo, hitilafu, njia, nambari, na ufafanuzi wa zana.",

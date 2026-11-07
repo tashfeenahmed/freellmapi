@@ -109,6 +109,8 @@
     "sectionAdvanced": "उन्नत",
     "sectionPreview": "पूर्वावलोकन",
     "generalDescription": "इस डैशबोर्ड की भाषा और दिखावट।",
+    "startAtLogin": "सिस्टम स्टार्टअप पर शुरू करें",
+    "startAtLoginHelp": "अपने कंप्यूटर में साइन इन करने पर FreeLLMAPI स्वचालित रूप से लॉन्च करें।",
     "advancedDescription": "संपीड़न पाइपलाइन के लिए सीमाएँ और सुरक्षा स्विच।",
     "compressionTitle": "प्रॉम्प्ट संपीड़न",
     "compressionDescription": "कोड, त्रुटियाँ, पाथ, संख्याएँ और टूल परिभाषाएँ सुरक्षित रखते हुए रूटिंग से पहले अनुरोध का आकार घटाएँ।",

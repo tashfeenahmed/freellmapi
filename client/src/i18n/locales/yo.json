@@ -109,6 +109,8 @@
     "sectionAdvanced": "Ilọsiwaju",
     "sectionPreview": "Awotẹlẹ",
     "generalDescription": "Ede ati irisi dasibodu yii.",
+    "startAtLogin": "Bẹrẹ ni ibẹrẹ eto",
+    "startAtLoginHelp": "Mu FreeLLMAPI ṣiṣẹ laifọwọyi nigbati o wọle si kọnputa rẹ.",
     "advancedDescription": "Awọn ààlà ati awọn àmúyẹ ààbò fun ìlànà ifunpọ.",
     "compressionTitle": "Ifunpọ ilana",
     "compressionDescription": "Din iwọn ibeere ku ṣaaju ipa ọna lakoko ti o n tọju koodu, awọn aṣiṣe, awọn ipa ọna, awọn nọmba, ati awọn itumọ irinṣẹ.",

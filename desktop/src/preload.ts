@@ -30,6 +30,15 @@ contextBridge.exposeInMainWorld('__FREEAPI_PLATFORM__', process.platform);
 // runs as.
 contextBridge.exposeInMainWorld('__FREEAPI_SESSION__', () => ipcRenderer.invoke('freeapi:session-token'));
 
+// "Start on system startup" for the dashboard's Settings dialog. Mirrors the
+// popover's login-item toggle, but as a narrow get/set pair the dashboard can
+// call. Reads the OS-level "open at login" flag so the switch reflects reality
+// (and stays in sync with the popover's own toggle).
+contextBridge.exposeInMainWorld('__FREEAPI_LOGIN_ITEM__', {
+  get: () => ipcRenderer.invoke('freeapi:get-login-item'),
+  set: (open: boolean) => ipcRenderer.invoke('freeapi:set-login-item', open),
+});
+
 // The running build's version, so the dashboard can show which one it is and
 // offer a check against the published releases (#703). Arrives the same way the
 // token does; absent in a browser, where the dashboard simply omits the row

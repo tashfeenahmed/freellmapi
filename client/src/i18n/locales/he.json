@@ -109,6 +109,8 @@
     "sectionAdvanced": "מתקדם",
     "sectionPreview": "תצוגה מקדימה",
     "generalDescription": "שפה ומראה של לוח הבקרה הזה.",
+    "startAtLogin": "הפעלה עם הפעלת המערכת",
+    "startAtLoginHelp": "השק את FreeLLMAPI אוטומטית בכניסה למחשב.",
     "advancedDescription": "ספים ומתגי בטיחות עבור צינור הדחיסה.",
     "compressionTitle": "דחיסת פרומפטים",
     "compressionDescription": "הקטנת גודל הבקשה לפני הניתוב תוך שמירה על קוד, שגיאות, נתיבים, מספרים והגדרות כלים.",

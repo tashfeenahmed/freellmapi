@@ -109,6 +109,8 @@
     "sectionAdvanced": "Lanjutan",
     "sectionPreview": "Pratinjau",
     "generalDescription": "Bahasa dan tampilan dasbor ini.",
+    "startAtLogin": "Mulai saat sistem dimulai",
+    "startAtLoginHelp": "Luncurkan FreeLLMAPI secara otomatis saat Anda masuk ke komputer.",
     "advancedDescription": "Ambang batas dan sakelar pengaman untuk alur kompresi.",
     "compressionTitle": "Kompresi prompt",
     "compressionDescription": "Kurangi ukuran permintaan sebelum perutean sambil mempertahankan kode, error, path, angka, dan definisi alat.",

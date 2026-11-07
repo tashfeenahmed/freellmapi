@@ -109,6 +109,8 @@
     "sectionAdvanced": "Advanced",
     "sectionPreview": "Preview",
     "generalDescription": "Language and appearance of this dashboard.",
+    "startAtLogin": "Start on system startup",
+    "startAtLoginHelp": "Launch FreeLLMAPI automatically when you sign into your computer.",
     "advancedDescription": "Thresholds and safety switches for the compression pipeline.",
     "compressionTitle": "Prompt compression",
     "compressionDescription": "Reduce request size before routing while preserving code, errors, paths, numbers, and tool definitions.",

@@ -109,6 +109,8 @@
     "sectionAdvanced": "Nke dị elu",
     "sectionPreview": "Nlele",
     "generalDescription": "Asụsụ na ọdịdị nke dashboard a.",
+    "startAtLogin": "Malite na mbido sistemụ",
+    "startAtLoginHelp": "Mịlọ FreeLLMAPI ozugbo mgbe ị banyere na kọmputa gị.",
     "advancedDescription": "Oke na mgbanwe nchekwa maka usoro mpịkọta.",
     "compressionTitle": "Mpịkọta prompt",
     "compressionDescription": "Belata nha arịrịọ tupu ntụzịaka ma na-echekwa koodu, njehie, ụzọ, ọnụọgụgụ, na nkọwa ngwaọrụ.",

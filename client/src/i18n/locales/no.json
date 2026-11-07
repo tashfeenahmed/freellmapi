@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avansert",
     "sectionPreview": "Forhåndsvisning",
     "generalDescription": "Språk og utseende for dette dashbordet.",
+    "startAtLogin": "Start ved systemoppstart",
+    "startAtLoginHelp": "Start FreeLLMAPI automatisk når du logger på datamaskinen.",
     "advancedDescription": "Terskler og sikkerhetsbrytere for komprimeringspipelinen.",
     "compressionTitle": "Promptkomprimering",
     "compressionDescription": "Reduser forespørselsstørrelsen før ruting, samtidig som kode, feil, stier, tall og verktøydefinisjoner bevares.",

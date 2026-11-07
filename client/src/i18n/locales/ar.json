@@ -109,6 +109,8 @@
     "sectionAdvanced": "متقدم",
     "sectionPreview": "المعاينة",
     "generalDescription": "لغة لوحة التحكم هذه ومظهرها.",
+    "startAtLogin": "بدء التشغيل مع النظام",
+    "startAtLoginHelp": "شغّل FreeLLMAPI تلقائيًا عند تسجيل الدخول إلى جهاز الكمبيوتر.",
     "advancedDescription": "الحدود ومفاتيح الأمان الخاصة بمسار الضغط.",
     "compressionTitle": "ضغط الموجه",
     "compressionDescription": "تقليل حجم الطلب قبل التوجيه مع الحفاظ على الكود والأخطاء والمسارات والأرقام وتعريفات الأدوات.",

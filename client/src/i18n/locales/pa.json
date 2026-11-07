@@ -109,6 +109,8 @@
     "sectionAdvanced": "ਉੱਨਤ",
     "sectionPreview": "ਝਲਕ",
     "generalDescription": "ਇਸ ਡੈਸ਼ਬੋਰਡ ਦੀ ਭਾਸ਼ਾ ਅਤੇ ਦਿੱਖ।",
+    "startAtLogin": "ਸਿਸਟਮ ਸਟਾਰਟਅਪ 'ਤੇ ਸ਼ੁਰੂ ਕਰੋ",
+    "startAtLoginHelp": "ਜਦੋਂ ਤੁਸੀਂ ਆਪਣੇ ਕੰਪਿਊਟਰ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰਦੇ ਹੋ ਤਾਂ FreeLLMAPI ਨੂੰ ਆਪਣੇ ਆਪ ਲਾਂਚ ਕਰੋ।",
     "advancedDescription": "ਕੰਪਰੈਸ਼ਨ ਪਾਈਪਲਾਈਨ ਲਈ ਹੱਦਾਂ ਅਤੇ ਸੁਰੱਖਿਆ ਸਵਿੱਚ।",
     "compressionTitle": "ਪ੍ਰੋਂਪਟ ਕੰਪਰੈਸ਼ਨ",
     "compressionDescription": "ਕੋਡ, ਗਲਤੀਆਂ, ਪਾਥ, ਨੰਬਰ ਅਤੇ ਟੂਲ ਪਰਿਭਾਸ਼ਾਵਾਂ ਨੂੰ ਸੁਰੱਖਿਅਤ ਰੱਖਦੇ ਹੋਏ ਰੂਟਿੰਗ ਤੋਂ ਪਹਿਲਾਂ ਬੇਨਤੀ ਦਾ ਆਕਾਰ ਘਟਾਓ।",

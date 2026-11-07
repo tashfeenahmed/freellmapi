@@ -109,6 +109,8 @@
     "sectionAdvanced": "Geavanceerd",
     "sectionPreview": "Voorbeeld",
     "generalDescription": "Taal en uiterlijk van dit dashboard.",
+    "startAtLogin": "Starten bij het opstarten van het systeem",
+    "startAtLoginHelp": "Start FreeLLMAPI automatisch wanneer u zich bij uw computer aanmeldt.",
     "advancedDescription": "Drempelwaarden en veiligheidsschakelaars voor de compressiepipeline.",
     "compressionTitle": "Promptcompressie",
     "compressionDescription": "Verklein de omvang van verzoeken vóór routering, met behoud van code, fouten, paden, getallen en tooldefinities.",

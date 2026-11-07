@@ -109,6 +109,8 @@
     "sectionAdvanced": "Advanced",
     "sectionPreview": "Preview",
     "generalDescription": "Wika at hitsura ng dashboard na ito.",
+    "startAtLogin": "Magsimula sa pagsisimula ng system",
+    "startAtLoginHelp": "Ilunsad ang FreeLLMAPI nang awtomatiko kapag nag-sign in ka sa iyong computer.",
     "advancedDescription": "Mga threshold at safety switch para sa compression pipeline.",
     "compressionTitle": "Compression ng prompt",
     "compressionDescription": "Bawasan ang laki ng request bago ang routing habang pinapanatili ang code, mga error, path, numero, at tool definition.",

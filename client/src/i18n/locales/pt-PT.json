@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avançado",
     "sectionPreview": "Pré-visualização",
     "generalDescription": "Idioma e aspeto deste painel.",
+    "startAtLogin": "Iniciar ao iniciar o sistema",
+    "startAtLoginHelp": "Inicie o FreeLLMAPI automaticamente quando iniciar sessão no computador.",
     "advancedDescription": "Limiares e interruptores de segurança do pipeline de compressão.",
     "compressionTitle": "Compressão de prompts",
     "compressionDescription": "Reduza o tamanho dos pedidos antes do encaminhamento, preservando código, erros, caminhos, números e definições de ferramentas.",

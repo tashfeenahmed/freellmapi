@@ -109,6 +109,8 @@
     "sectionAdvanced": "උසස්",
     "sectionPreview": "පෙරදසුන",
     "generalDescription": "මෙම උපකරණ පුවරුවේ භාෂාව සහ පෙනුම.",
+    "startAtLogin": "පද්ධති ආරම්භයේදී ආරම්භ කරන්න",
+    "startAtLoginHelp": "ඔබ පරිගණකයට පුරනය වන විට FreeLLMAPI ස්වයංක්‍රීයව දියත් කරන්න.",
     "advancedDescription": "සම්පීඩන නල මාර්ගය සඳහා සීමා සහ ආරක්ෂක ස්විච.",
     "compressionTitle": "ප්‍රොම්ප්ට් සම්පීඩනය",
     "compressionDescription": "කේතය, දෝෂ, මාර්ග, අංක සහ මෙවලම් නිර්වචන ආරක්ෂා කරමින් රවුටින් වලට පෙර ඉල්ලීමේ ප්‍රමාණය අඩු කරන්න.",

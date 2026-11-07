@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avanzate",
     "sectionPreview": "Anteprima",
     "generalDescription": "Lingua e aspetto di questa dashboard.",
+    "startAtLogin": "Avvia all'avvio del sistema",
+    "startAtLoginHelp": "Avvia FreeLLMAPI automaticamente quando accedi al computer.",
     "advancedDescription": "Soglie e interruttori di sicurezza della pipeline di compressione.",
     "compressionTitle": "Compressione dei prompt",
     "compressionDescription": "Riduci la dimensione delle richieste prima del routing preservando codice, errori, percorsi, numeri e definizioni degli strumenti.",

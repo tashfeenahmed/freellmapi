@@ -109,6 +109,8 @@
     "sectionAdvanced": "Напредно",
     "sectionPreview": "Преглед",
     "generalDescription": "Језик и изглед ове контролне табле.",
+    "startAtLogin": "Покрени при покретању система",
+    "startAtLoginHelp": "Аутоматски покрените FreeLLMAPI када се пријавите на рачунар.",
     "advancedDescription": "Прагови и сигурносни прекидачи ланца компресије.",
     "compressionTitle": "Компресија промптова",
     "compressionDescription": "Смањује величину захтева пре рутирања, уз очување кода, грешака, путања, бројева и дефиниција алата.",
