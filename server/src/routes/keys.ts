@@ -38,13 +38,15 @@ import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUr
 
 export const keysRouter = Router();
 
-// Providers that stopped offering free API access but keep their adapter so
-// existing keys still work if the catalog re-enables them. The setup
+// Providers whose free signup/key creation is unavailable keep their adapter
+// and catalog models so existing keys continue working. The setup
 // checklist stops suggesting them to anyone who has no key yet; the dashboard
 // pickers hide them through `hidden` in client/src/components/keys/shared.tsx.
 // ACLIDE: its dashboard has returned 500 since mid-October, so new users
 // cannot create a key (#1565, #1768). The API still serves existing keys.
-const UNLISTED_PLATFORMS = new Set<string>(['aclide']);
+// Waterfall: users report being unable to create new keys (#1768). A working
+// public site/models endpoint does not establish that key creation works.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace

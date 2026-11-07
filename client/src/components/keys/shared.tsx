@@ -26,8 +26,8 @@ export function GetKeyLink({ url }: { url: string }) {
 // one (#1331): the key field is optional, a blank submit stores a sentinel so
 // routing treats the platform as configured and calls go out anonymously, and
 // a real key is stored and sent like any other.
-// `hidden: true` providers stopped offering free API access: they are no longer
-// offered to new users (add/import/add-model pickers, setup checklist), but an
+// `hidden: true` providers have unavailable free signup/key creation: they are
+// not offered to new users (add/import/add-model pickers, setup checklist), but an
 // existing key still shows with its label so it can be edited or removed.
 export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean; hidden?: boolean }[] = [
   { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys', hidden: true },
@@ -67,7 +67,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'lucidity', label: 'Lucidity Composite (daily free-model requests)', url: 'https://composite.lucidity.sh' },
   { value: 'airforce', label: 'Api.Airforce (daily free requests; 1 per minute)', url: 'https://api.airforce' },
   { value: 'dreamprompting', label: 'DreamPrompting (rolling 24h free tokens and requests)', url: 'https://dreamprompting.com' },
-  { value: 'waterfall', label: 'Waterfall (community free models)', url: 'https://getwaterfall.org' },
+  { value: 'waterfall', label: 'Waterfall (community free models)', url: 'https://getwaterfall.org', hidden: true },
   { value: 'logfare', label: 'Logfare (fair-use free models)', url: 'https://logfare.ai' },
   { value: 'bai', label: 'B.AI (promotional free model)', url: 'https://b.ai' },
   { value: 'radeon', label: 'AMD Radeon Cloud (free shared models)', url: 'https://developer.amd.com.cn/radeon/tokenfactory' },
