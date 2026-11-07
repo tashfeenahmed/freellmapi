@@ -1,5 +1,6 @@
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { BaseProvider } from './base.js';
+import { AntigravityProvider } from './antigravity.js';
 import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { CohereProvider } from './cohere.js';
@@ -649,6 +650,8 @@ register(new OpenAICompatProvider({
 
 // Locally-hosted inference (llama.cpp / vLLM / Ollama on CPU) can be slow, so
 // custom providers get the same extended timeout as Ollama Cloud.
+register(new AntigravityProvider());
+
 const CUSTOM_PROVIDER_TIMEOUT_MS = 120000;
 
 export function getProvider(platform: Platform): BaseProvider | undefined {

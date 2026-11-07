@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { keysRouter } from './routes/keys.js';
+import { antigravityRouter } from './routes/antigravity.js';
 import { clientProfilesRouter } from './routes/client-profiles.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { logsRouter } from './routes/logs.js';
@@ -252,6 +253,7 @@ export function createApp(config?: Config) {
   app.use('/api/keys/export', createAdminRateLimiter(EXPORT_RATE_LIMIT_RPM));
 
   app.use('/api/keys', requireAuth, keysRouter);
+  app.use('/api/antigravity', requireAuth, antigravityRouter);
   // Per-client key management (#411). Dashboard-session gated like the rest of
   // /api — the profile keys it mints authenticate only the /v1 inference
   // surface and are never valid here.

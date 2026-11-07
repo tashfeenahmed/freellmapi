@@ -168,6 +168,9 @@ export type Platform =
   | 'pollinations'
   | 'llm7'
   | 'huggingface'
+  // Google Antigravity / Cloud Code Assist — per-user Google OAuth (JSON blob
+  // credential), v1internal wire protocol; see providers/antigravity.ts.
+  | 'antigravity'
   // OpenCode Zen — OpenAI-compatible gateway. Free promotional models require a
   // free (no-card) account key from opencode.ai/auth; see migrateModelsV18.
   | 'opencode'
