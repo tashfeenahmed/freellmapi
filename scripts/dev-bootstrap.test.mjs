@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -97,4 +97,25 @@ test('Bash bootstrap installs when the lockfile stamp is missing', { skip: proce
     (fixture) => execFile('bash', [join(projectRoot, 'scripts', 'dev-bootstrap.sh'), '--project-root', fixture]),
     t,
   );
+});
+test('PowerShell bootstrap resolves the project root without an explicit argument', { skip: powershell === null }, async (t) => {
+  const { fixture } = await makeFixture(t);
+
+  const scriptsDir = join(fixture, 'scripts');
+  await mkdir(scriptsDir);
+
+  const script = join(scriptsDir, 'dev-bootstrap.ps1');
+  await copyFile(
+    join(projectRoot, 'scripts', 'dev-bootstrap.ps1'),
+    script,
+  );
+
+  await runPowerShell([
+    '-NoProfile',
+    '-ExecutionPolicy', 'Bypass',
+    '-File', script,
+  ]);
+
+  const generatedEnv = await readFile(join(fixture, '.env'), 'utf8');
+  assert.match(generatedEnv, /^ENCRYPTION_KEY=[0-9a-f]{64}\r?\nPORT=3001\r?\n$/);
 });
