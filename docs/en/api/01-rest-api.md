@@ -178,6 +178,12 @@ resp = client.chat.completions.create(
 print(resp.choices[0].message.content)
 ```
 
+## Web search (`POST /v1/search`)
+
+`POST /v1/search` runs a query through the enabled search engines (Tavily, Exa, Firecrawl, Linkup) and returns `{ query, results, provider, engine }`. `GET /v1/search/engines` lists them and whether each is usable.
+
+**Custom search relays (#1777).** You can point search at your own relay instead of a catalog engine: register it with `POST /api/media/custom` and `modality: "search"`, giving the relay's `baseUrl`, a `model` id, and an optional `apiKey` (omit it for a keyless local relay). The relay speaks the Tavily wire shape — `POST {base_url}/search` with `{ query, max_results }` — and returns `{ results: [{ title, url, content, score? }] }`. Registered relays are tried before every catalog engine, so a working relay always answers first; a down relay fails over to the catalog engines the same way any engine failure does.
+
 ## Native Gemini API
 
 Gemini SDKs and Gemini CLI can use the native `/v1beta` surface:
