@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small menentukan paksi perisikan: tahap yang lebih tinggi sentiasa mengatasi yang lebih rendah, dan dalam satu tahap kedudukan perisikan masih menggerakkan skor. Model tanpa tahap yang dikenali mendapat skor terendah pada paksi ini, tetapi perisikan hanyalah satu daripada tiga paksi — kebolehpercayaan dan kelajuan yang baik masih boleh memenangkan laluan untuknya.",
     "sizeLabelNone": "Tiada (skor perisikan terendah)",
     "contextWindow": "Konteks",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Dalam rangkaian",
     "saveModelSettings": "Simpan tetapan model",
     "aggregateBudget": "{count}/bulan",

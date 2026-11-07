@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small определят оста на разузнаването: по-високият клас винаги превъзхожда по-ниския, а в рамките на един клас рангът на разузнаването продължава да мести оценката. Модел без разпознат клас получава най-ниската оценка по тази ос, но разузнаването е само една от три оси — силна надеждност и скорост все пак могат да му спечелят маршрут.",
     "sizeLabelNone": "Без (най-ниска оценка за разузнаване)",
     "contextWindow": "Контекст",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Във верига",
     "saveModelSettings": "Запазване на настройките на модела",
     "aggregateBudget": "{count}/месец",

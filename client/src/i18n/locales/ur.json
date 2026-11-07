@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small ذہانت کے محور کا تعین کرتے ہیں: اونچا درجہ ہمیشہ نچلے درجے سے آگے رہتا ہے، اور ایک ہی درجے کے اندر ذہانت کی درجہ بندی اسکور کو ہلاتی رہتی ہے۔ تسلیم شدہ درجے کے بغیر ماڈل کو اس محور پر سب سے کم اسکور ملتا ہے، مگر ذہانت تین محوروں میں سے صرف ایک ہے — بھروسے مندی اور رفتار اچھی ہوں تو وہ پھر بھی منتخب ہو سکتا ہے۔",
     "sizeLabelNone": "کوئی نہیں (سب سے کم ذہانت اسکور)",
     "contextWindow": "سیاق و سباق",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "زنجیر میں",
     "saveModelSettings": "ماڈل کی ترتیبات کو محفوظ کریں۔",
     "aggregateBudget": "{count}/mo",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small déterminent l'axe d'intelligence : un niveau supérieur prime toujours sur un niveau inférieur, et au sein d'un même niveau le rang d'intelligence continue de faire bouger le score. Un modèle sans niveau reconnu obtient le score le plus bas sur cet axe, mais l'intelligence n'est qu'un axe sur trois : une bonne fiabilité et une bonne vitesse peuvent quand même lui valoir le routage.",
     "sizeLabelNone": "Aucun (score d'intelligence le plus bas)",
     "contextWindow": "Contexte",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Dans la chaîne",
     "saveModelSettings": "Enregistrer les paramètres du modèle",
     "aggregateBudget": "{count}/mois",

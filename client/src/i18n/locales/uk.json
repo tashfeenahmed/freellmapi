@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small задають вісь інтелекту: вищий рівень завжди випереджає нижчий, а в межах рівня ранг інтелекту й далі зсуває оцінку. Модель без розпізнаного рівня отримує на цій осі найнижчу оцінку, але інтелект — лише одна з трьох осей: за доброї надійності та швидкості її все одно можуть обрати.",
     "sizeLabelNone": "Немає (найнижча оцінка інтелекту)",
     "contextWindow": "Контекст",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "У ланцюжку",
     "saveModelSettings": "Зберегти налаштування моделі",
     "aggregateBudget": "{count}/міс",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small බුද්ධි අක්ෂය තීරණය කරයි: ඉහළ මට්ටමක් සැමවිටම පහළ මට්ටමක් අභිබවා යයි, එකම මට්ටමක් තුළ බුද්ධි ශ්‍රේණිය තවමත් ලකුණු වෙනස් කරයි. හඳුනාගත් මට්ටමක් නැති ආකෘතියකට මෙම අක්ෂයේ අඩුම ලකුණු ලැබේ, නමුත් බුද්ධිය අක්ෂ තුනෙන් එකක් පමණි — හොඳ විශ්වසනීයත්වයක් සහ වේගයක් තිබේ නම් එය තවමත් තෝරාගත හැකිය.",
     "sizeLabelNone": "කිසිවක් නැත (අඩුම බුද්ධි ලකුණු)",
     "contextWindow": "සන්දර්භය",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "දාමයේ",
     "saveModelSettings": "ආකෘති සැකසුම් සුරකින්න",
     "aggregateBudget": "{count}/mo",

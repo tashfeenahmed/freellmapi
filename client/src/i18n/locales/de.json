@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small bestimmen die Intelligenz-Achse: eine höhere Stufe schlägt immer eine niedrigere, und innerhalb einer Stufe verschiebt der Intelligenz-Rang die Wertung weiterhin. Ein Modell ohne erkannte Stufe erhält auf dieser Achse die niedrigste Wertung, doch Intelligenz ist nur eine von drei Achsen — mit starker Zuverlässigkeit und Geschwindigkeit kann es trotzdem geroutet werden.",
     "sizeLabelNone": "Keine (niedrigste Intelligenz-Wertung)",
     "contextWindow": "Kontext",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "In Kette",
     "saveModelSettings": "Modelleinstellungen speichern",
     "aggregateBudget": "{count}/Mo",

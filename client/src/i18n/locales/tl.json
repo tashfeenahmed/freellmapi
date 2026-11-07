@@ -234,6 +234,8 @@
     "sizeLabelHint": "Tinutukoy ng Frontier/Large/Medium/Small ang axis ng intelihensiya: laging nangunguna ang mas mataas na antas kaysa sa mas mababa, at sa loob ng isang antas ay patuloy pa ring iginagalaw ng ranggo ng intelihensiya ang iskor. Ang modelong walang kilalang antas ay nakakakuha ng pinakamababang iskor sa axis na ito, ngunit isa lamang sa tatlong axis ang intelihensiya — kung maganda ang pagiging maaasahan at bilis, maaari pa rin itong mapili para sa ruta.",
     "sizeLabelNone": "Wala (pinakamababang iskor ng intelihensiya)",
     "contextWindow": "Konteksto",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Naka-chain",
     "saveModelSettings": "I-save ang mga setting ng modelo",
     "aggregateBudget": "{count}/buwan",

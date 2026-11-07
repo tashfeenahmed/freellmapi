@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small nustato intelekto ašį: aukštesnis lygis visada pranoksta žemesnį, o to paties lygio viduje intelekto reitingas vis dar keičia įvertį. Modelis be atpažinto lygio šioje ašyje gauna žemiausią įvertį, tačiau intelektas – tik viena iš trijų ašių: esant geram patikimumui ir greičiui jis vis tiek gali būti pasirinktas.",
     "sizeLabelNone": "Nėra (žemiausias intelekto įvertis)",
     "contextWindow": "Kontekstas",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Grandinėje",
     "saveModelSettings": "Išsaugoti modelio nustatymus",
     "aggregateBudget": "{count}/mo",

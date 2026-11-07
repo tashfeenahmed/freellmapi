@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small 決定智慧軸：檔位越高在該軸上永遠越占優，同一檔位內智慧排名仍會改變分數。未識別檔位的模型在該軸上分數最低，但智慧只是三條軸之一——可靠性與速度夠好時，它仍可能被自動路由選中。",
     "sizeLabelNone": "無（智慧分數最低）",
     "contextWindow": "上下文",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "置入備援鏈",
     "saveModelSettings": "儲存模型設定",
     "aggregateBudget": "{count}/月",

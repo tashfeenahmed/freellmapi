@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small määrittävät tiedusteluakselin: korkeampi taso voittaa aina alemman, ja saman tason sisällä tiedustelusijoitus siirtää yhä pisteitä. Malli, jolla ei ole tunnistettua tasoa, saa tällä akselilla matalimmat pisteet, mutta tiedustelu on vain yksi kolmesta akselista — vahva luotettavuus ja nopeus voivat silti voittaa sille reitityksen.",
     "sizeLabelNone": "Ei mitään (matalimmat tiedustelupisteet)",
     "contextWindow": "Tausta",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Ketjussa",
     "saveModelSettings": "Tallennusmallin asetukset",
     "aggregateBudget": "{count}/kuukausi",

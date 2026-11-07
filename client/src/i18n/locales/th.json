@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small กำหนดแกนความฉลาด ระดับที่สูงกว่าจะเหนือกว่าระดับที่ต่ำกว่าเสมอ และภายในระดับเดียวกันอันดับความฉลาดยังคงขยับคะแนน โมเดลที่ไม่มีระดับที่รู้จักจะได้คะแนนต่ำสุดบนแกนนี้ แต่ความฉลาดเป็นเพียงหนึ่งในสามแกน หากความน่าเชื่อถือและความเร็วดี ก็ยังถูกกำหนดเส้นทางอัตโนมัติได้",
     "sizeLabelNone": "ไม่มี (คะแนนความฉลาดต่ำสุด)",
     "contextWindow": "บริบท",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "ในห่วงโซ่",
     "saveModelSettings": "บันทึกการตั้งค่าโมเดล",
     "aggregateBudget": "{count}/เดือน",

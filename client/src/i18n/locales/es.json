@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small fijan el eje de inteligencia: un nivel superior siempre supera a uno inferior y, dentro de un nivel, el rango de inteligencia sigue moviendo la puntuación. Un modelo sin un nivel reconocido obtiene la puntuación más baja en este eje, pero la inteligencia es solo uno de los tres ejes: con buena fiabilidad y velocidad todavía puede ganarse la ruta.",
     "sizeLabelNone": "Ninguno (puntuación de inteligencia más baja)",
     "contextWindow": "Contexto",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "En cadena",
     "saveModelSettings": "Guardar ajustes del modelo",
     "aggregateBudget": "{count}/mes",

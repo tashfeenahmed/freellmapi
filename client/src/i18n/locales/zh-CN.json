@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small 决定智能轴：档位越高在该轴上始终越占优，同一档位内智能排名仍会改变得分。未识别档位的模型在该轴上得分最低，但智能只是三条轴之一——稳定性与速度足够好时，它仍可能被自动路由选中。",
     "sizeLabelNone": "无（智能得分最低）",
     "contextWindow": "上下文",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "置入回退链",
     "saveModelSettings": "保存模型设置",
     "aggregateBudget": "{count}/月",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small がインテリジェンス軸を決めます。上位のティアは常に下位のティアを上回り、同じティア内でもインテリジェンス順位がスコアを動かします。認識されるティアのないモデルはこの軸で最下位のスコアになりますが、インテリジェンスは 3 つの軸のうちの 1 つにすぎず、信頼性と速度が高ければ自動ルーティングで選ばれることもあります。",
     "sizeLabelNone": "なし（インテリジェンススコア最下位）",
     "contextWindow": "コンテキスト",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "連鎖中",
     "saveModelSettings": "モデル設定の保存",
     "aggregateBudget": "{count}/月",

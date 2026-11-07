@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small bestemmer etterretningsaksen: et høyere nivå slår alltid et lavere, og innenfor et nivå flytter etterretningsrangeringen fortsatt poengsummen. En modell uten et gjenkjent nivå får den laveste poengsummen på denne aksen, men etterretning er bare én av tre akser — god pålitelighet og hastighet kan fortsatt gi den ruten.",
     "sizeLabelNone": "Ingen (laveste etterretningspoeng)",
     "contextWindow": "Kontekst",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "I kjeden",
     "saveModelSettings": "Lagre modellinnstillinger",
     "aggregateBudget": "{count}/mo",

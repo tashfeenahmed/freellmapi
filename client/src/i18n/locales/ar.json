@@ -234,6 +234,8 @@
     "sizeLabelHint": "تحدد Frontier/Large/Medium/Small محور الذكاء: الفئة الأعلى تتفوق دائمًا على الأدنى، وداخل الفئة الواحدة يظل ترتيب الذكاء يحرّك النتيجة. النموذج بلا فئة معروفة يحصل على أدنى درجة على هذا المحور، لكن الذكاء واحد من ثلاثة محاور فقط — فالموثوقية والسرعة العاليتان قد تفوزان له بالتوجيه.",
     "sizeLabelNone": "بدون (أدنى درجة ذكاء)",
     "contextWindow": "السياق",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "في السلسلة",
     "saveModelSettings": "حفظ إعدادات النموذج",
     "aggregateBudget": "{count}/مو",

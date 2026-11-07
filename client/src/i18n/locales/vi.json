@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small quyết định trục tình báo: bậc cao hơn luôn vượt bậc thấp hơn, và trong cùng một bậc thì thứ hạng tình báo vẫn làm dịch chuyển điểm. Mô hình không có bậc được nhận diện sẽ nhận điểm thấp nhất trên trục này, nhưng tình báo chỉ là một trong ba trục — độ tin cậy và tốc độ tốt vẫn có thể giúp nó được chọn định tuyến.",
     "sizeLabelNone": "Không có (điểm tình báo thấp nhất)",
     "contextWindow": "Bối cảnh",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Trong chuỗi",
     "saveModelSettings": "Lưu cài đặt mô hình",
     "aggregateBudget": "{count}/tháng",

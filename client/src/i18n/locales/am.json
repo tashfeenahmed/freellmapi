@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small የአእምሮ ዘንግን ይወስናሉ፦ ከፍ ያለ ደረጃ ሁልጊዜ ከዝቅተኛው ይበልጣል፣ በአንድ ደረጃ ውስጥ ደግሞ የአእምሮ ደረጃው ነጥቡን ማንቀሳቀሱን ይቀጥላል። የታወቀ ደረጃ የሌለው ሞዴል በዚህ ዘንግ ላይ ዝቅተኛውን ነጥብ ያገኛል፤ ነገር ግን አእምሮ ከሦስቱ ዘንጎች አንዱ ብቻ ነው — ጠንካራ አስተማማኝነትና ፍጥነት አሁንም መንገዱን ሊያሸንፉለት ይችላሉ።",
     "sizeLabelNone": "ምንም (ዝቅተኛው የአእምሮ ነጥብ)",
     "contextWindow": "አውድ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "በሰንሰለት ውስጥ",
     "saveModelSettings": "የሞዴል ቅንብሮችን ያስቀምጡ",
     "aggregateBudget": "{count} / ወር",

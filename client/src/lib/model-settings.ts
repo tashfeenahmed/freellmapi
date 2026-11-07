@@ -12,7 +12,7 @@ export const LIMIT_FIELDS = ['rpmLimit', 'rpdLimit', 'tpmLimit', 'tpdLimit'] as 
 
 export type RankField = typeof RANK_FIELDS[number]
 export type LimitField = typeof LIMIT_FIELDS[number]
-export type NumericField = RankField | LimitField | 'contextWindow'
+export type NumericField = RankField | LimitField | 'contextWindow' | 'contextSafetyFactor'
 export type EditableField = NumericField | 'displayName' | 'sizeLabel' | 'supportsVision' | 'supportsTools'
 
 export const RANK_MIN = 1
@@ -29,6 +29,7 @@ export type SizeLabel = typeof SIZE_LABELS[number]
 export type ModelSettingsForm = {
   displayName: string
   contextWindow: string
+  contextSafetyFactor: string
   intelligenceRank: string
   speedRank: string
   sizeLabel: string
@@ -49,6 +50,7 @@ export type ModelSettingsForm = {
 export type ModelSettingsPatch = {
   displayName?: string
   contextWindow?: number | null
+  contextSafetyFactor?: number | null
   intelligenceRank?: number
   speedRank?: number
   sizeLabel?: string
@@ -65,6 +67,9 @@ export type ModelSettingsPatch = {
 export type ModelSettingsSource = {
   displayName: string
   contextWindow?: number | null
+  // Divides the advertised context window; blank falls back to the global
+  // default. Only sent to the server when the user edits it.
+  contextSafetyFactor?: number | null
   intelligenceRank: number
   speedRank: number
   sizeLabel: string
@@ -99,6 +104,14 @@ export function parseOptionalCount(text: string): number | null | undefined {
   return value !== undefined && value > 0 ? value : undefined
 }
 
+// Blank means "use the global default"; anything else must be a positive
+// decimal. A factor below 1 would advertise more context than the model has.
+export function parseOptionalFactor(text: string): number | null | undefined {
+  if (text.trim() === '') return null
+  const value = Number(text.trim())
+  return Number.isFinite(value) && value > 0 ? value : undefined
+}
+
 // Ranks are required and bounded, same as the PATCH schema.
 export function parseRank(text: string): number | undefined {
   const value = numberFrom(text)
@@ -113,6 +126,7 @@ export function modelSettingsForm(model: ModelSettingsSource): ModelSettingsForm
   return {
     displayName: model.displayName,
     contextWindow: countText(model.contextWindow),
+    contextSafetyFactor: countText(model.contextSafetyFactor),
     intelligenceRank: countText(model.intelligenceRank),
     speedRank: countText(model.speedRank),
     sizeLabel: model.sizeLabel,
@@ -135,6 +149,7 @@ export function reviewModelSettings(
     intelligenceRank: parseRank(form.intelligenceRank),
     speedRank: parseRank(form.speedRank),
     contextWindow: parseOptionalCount(form.contextWindow),
+    contextSafetyFactor: parseOptionalFactor(form.contextSafetyFactor),
     rpmLimit: parseOptionalCount(form.rpmLimit),
     rpdLimit: parseOptionalCount(form.rpdLimit),
     tpmLimit: parseOptionalCount(form.tpmLimit),
@@ -145,6 +160,7 @@ export function reviewModelSettings(
     intelligenceRank: parsed.intelligenceRank === undefined,
     speedRank: parsed.speedRank === undefined,
     contextWindow: parsed.contextWindow === undefined,
+    contextSafetyFactor: parsed.contextSafetyFactor === undefined,
     rpmLimit: parsed.rpmLimit === undefined,
     rpdLimit: parsed.rpdLimit === undefined,
     tpmLimit: parsed.tpmLimit === undefined,
@@ -163,6 +179,7 @@ export function reviewModelSettings(
   if (parsed.speedRank !== model.speedRank) changes.speedRank = parsed.speedRank
   if (form.sizeLabel !== model.sizeLabel) changes.sizeLabel = form.sizeLabel
   if (parsed.contextWindow !== (model.contextWindow ?? null)) changes.contextWindow = parsed.contextWindow
+  if (parsed.contextSafetyFactor !== (model.contextSafetyFactor ?? null)) changes.contextSafetyFactor = parsed.contextSafetyFactor
   if (parsed.rpmLimit !== (model.rpmLimit ?? null)) changes.rpmLimit = parsed.rpmLimit
   if (parsed.rpdLimit !== (model.rpdLimit ?? null)) changes.rpdLimit = parsed.rpdLimit
   if (parsed.tpmLimit !== (model.tpmLimit ?? null)) changes.tpmLimit = parsed.tpmLimit

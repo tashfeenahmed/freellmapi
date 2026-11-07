@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small determinano l'asse dell'intelligenza: un livello superiore ha sempre la precedenza su uno inferiore e, all'interno di un livello, la posizione di intelligenza continua a spostare il punteggio. Un modello senza un livello riconosciuto ottiene il punteggio più basso su questo asse, ma l'intelligenza è solo uno dei tre assi: con buona affidabilità e velocità può comunque essere instradato.",
     "sizeLabelNone": "Nessuno (punteggio di intelligenza più basso)",
     "contextWindow": "Contesto",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "Nella catena",
     "saveModelSettings": "Salva impostazioni modello",
     "aggregateBudget": "{count}/mese",

@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small বুদ্ধিমত্তার অক্ষ নির্ধারণ করে: উঁচু স্তর সব সময় নিচু স্তরকে ছাড়িয়ে যায়, আর একই স্তরের ভিতরে বুদ্ধিমত্তার র‍্যাঙ্ক স্কোরকে নাড়াতে থাকে। স্বীকৃত স্তর ছাড়া মডেল এই অক্ষে সবচেয়ে কম স্কোর পায়, তবে বুদ্ধিমত্তা তিনটি অক্ষের মাত্র একটি — ভালো নির্ভরযোগ্যতা ও গতি থাকলে সেটি তবুও রুট জিততে পারে।",
     "sizeLabelNone": "কিছুই না (সবচেয়ে কম বুদ্ধিমত্তার স্কোর)",
     "contextWindow": "প্রসঙ্গ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "শৃঙ্খলে",
     "saveModelSettings": "মডেল সেটিংস সংরক্ষণ করুন",
     "aggregateBudget": "{count}/মাস",

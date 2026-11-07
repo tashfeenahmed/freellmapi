@@ -234,6 +234,8 @@
     "sizeLabelHint": "Frontier/Large/Medium/Small ಗುಪ್ತಚರ ಅಕ್ಷವನ್ನು ನಿರ್ಧರಿಸುತ್ತವೆ: ಹೆಚ್ಚಿನ ಹಂತವು ಯಾವಾಗಲೂ ಕಡಿಮೆ ಹಂತವನ್ನು ಮೀರಿಸುತ್ತದೆ, ಮತ್ತು ಒಂದೇ ಹಂತದೊಳಗೆ ಗುಪ್ತಚರ ಶ್ರೇಣಿಯು ಸ್ಕೋರ್ ಅನ್ನು ಬದಲಾಯಿಸುತ್ತಲೇ ಇರುತ್ತದೆ. ಗುರುತಿಸಲಾದ ಹಂತವಿಲ್ಲದ ಮಾದರಿಗೆ ಈ ಅಕ್ಷದಲ್ಲಿ ಅತ್ಯಂತ ಕಡಿಮೆ ಸ್ಕೋರ್ ಸಿಗುತ್ತದೆ, ಆದರೆ ಗುಪ್ತಚರವು ಮೂರು ಅಕ್ಷಗಳಲ್ಲಿ ಒಂದು ಮಾತ್ರ — ಉತ್ತಮ ವಿಶ್ವಾಸಾರ್ಹತೆ ಮತ್ತು ವೇಗವಿದ್ದರೆ ಅದು ಆಗಲೂ ಮಾರ್ಗವನ್ನು ಗೆಲ್ಲಬಹುದು.",
     "sizeLabelNone": "ಯಾವುದೂ ಇಲ್ಲ (ಅತ್ಯಂತ ಕಡಿಮೆ ಗುಪ್ತಚರ ಸ್ಕೋರ್)",
     "contextWindow": "ಸಂದರ್ಭ",
+    "contextSafetyFactor": "Context safety",
+    "contextSafetyFactorHint": "Divides the context window this gateway advertises, so clients compact before the provider rejects the request. Blank uses the global default (1.25). Raise it for models that reject prompts sooner than their nominal window.",
     "inFallback": "ಸರಪಳಿಯಲ್ಲಿ",
     "saveModelSettings": "ಮಾದರಿ ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ಉಳಿಸಿ",
     "aggregateBudget": "{count}/ತಿಂ",
