@@ -34,7 +34,7 @@ export default function PremiumPage() {
     queryClient.invalidateQueries({ queryKey: ['premium'] })
     // A sync may have changed every model list (chat, embeddings, media,
     // search) and quirks, not just ['models'].
-    for (const queryKey of [['models'], ['fallback'], ['embeddings'], ['media'], ['search-engines']]) {
+    for (const queryKey of [['models'], ['fallback'], ['embeddings'], ['media'], ['search-engines'], ['search-status']]) {
       queryClient.invalidateQueries({ queryKey })
     }
   }
