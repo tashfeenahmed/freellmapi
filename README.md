@@ -177,6 +177,11 @@ On Windows, the easiest path is the desktop **[`.exe` installer from Releases](h
 
 Everything else — Docker Compose, local development, declarative startup config, production builds, LAN access, and backups — is in **[docs/en/install/01-install.md](docs/en/install/01-install.md)**.
 
+## One-Click Deploy
+
+<a href="https://repocloud.io/details/FreeLLMAPI/"><img src="https://d16t0pc4846x52.cloudfront.net/deploylobe.svg" alt="Deploy on RepoCloud" height="42"></a>
+<a href="https://railway.com/deploy/freellmapi"><img src="https://railway.com/button.svg" alt="Deploy on Railway" height="42"></a>
+
 ## Desktop app
 
 A native menu-bar app lives in [`desktop/`](./desktop): the entire router + dashboard running locally from your tray, with a glass popover showing live request stats.
