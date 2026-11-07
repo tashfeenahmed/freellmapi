@@ -368,6 +368,10 @@ export interface ApiKeyCooldown {
   remainingMs: number;
 }
 
+/** What a key's healthy verdict rests on (#1516, display-only). See
+ *  `ApiKey.verificationBasis`. */
+export type KeyVerificationBasis = 'models_only' | 'inference_verified';
+
 export interface ApiKey {
   id: number;
   platform: Platform;
@@ -394,6 +398,12 @@ export interface ApiKey {
    *  live request (#1493). Unlike lastCheckedAt, a transport error does not
    *  refresh it, so "checked recently but never worked" is visible. */
   lastHealthyAt?: string | null;
+  /** What the key's healthy verdict actually rests on (#1516, display-only):
+   *  'models_only' when it comes from the /models catalog probe — a 200 there
+   *  says nothing about real inference — 'inference_verified' once the key
+   *  served a live request. Null = never verified, or cleared by an invalid
+   *  verdict. Changes no routing. */
+  verificationBasis?: KeyVerificationBasis | null;
   lastHealthError: string | null;
   /** Model ids this key is limited to; null = serves every model of its
    *  platform (#657). */

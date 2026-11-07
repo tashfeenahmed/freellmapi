@@ -511,6 +511,11 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       // request) — distinct from lastCheckedAt, which a transport error also
       // refreshes.
       lastHealthyAt: row.last_healthy_at ?? null,
+      // #1516 (display-only): what the healthy verdict rests on — a /models
+      // probe ('models_only') or a served request ('inference_verified').
+      // Null = never verified. Exposed so the dashboard can say which it is;
+      // it changes no routing.
+      verificationBasis: row.verification_basis ?? null,
       lastHealthError: row.last_health_error ?? null,
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
