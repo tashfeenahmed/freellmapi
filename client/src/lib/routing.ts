@@ -491,6 +491,7 @@ export const platformColors: Record<string, string> = {
   serpsearch:  '#2563eb',
   keenable:    '#7c3aed',
   brave:       '#fb542b',
+  outcrawl:    '#0d9488',
   beatapi:     '#8b5cf6',
   apinex:      '#06b6d4',
   onomeo:      '#f97316',
