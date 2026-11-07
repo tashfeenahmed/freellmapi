@@ -427,7 +427,13 @@ export class OpenAICompatProvider extends BaseProvider {
     let data: ChatCompletionResponse;
     let parseErr: unknown;
     try {
-      data = await res.json() as ChatCompletionResponse;
+      const raw = await res.json() as ChatCompletionResponse & { safeguard_results?: unknown };
+      data = raw;
+      // #1589: an upstream that returns Anthropic classifier results carries
+      // them top-level on the completion body. Keep them on the typed
+      // response verbatim (never synthesized, never rewritten) so the
+      // Anthropic surface can return them to the client unchanged.
+      if (raw.safeguard_results !== undefined) data.safeguard_results = raw.safeguard_results;
     } catch (err) {
       // An aborted body read (per-attempt deadline, client disconnect) is not
       // a malformed body — rethrow so it keeps its abort classification
