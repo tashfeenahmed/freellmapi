@@ -34,6 +34,7 @@ import {
   statusLabelKey,
 } from './shared'
 import { balanceByKey } from './quota-balance'
+import { ApinexCheckinNotice } from './apinex-checkin-notice'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -914,22 +915,11 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                             </div>
                           )}
                           {checkinRequired && (
-                            <div className="flex flex-wrap items-center gap-2 border-t px-4 py-3 pl-8 text-xs" role="status">
-                              <CircleAlert className="size-3.5 flex-shrink-0 text-amber-600" />
-                              <span className="flex-1 min-w-[210px]">
-                                {locale === 'ru'
-                                  ? 'APINex Free: требуется ежедневный вход на сайт. После входа можно сразу возобновить ключ, без ожидания cooldown.'
-                                  : 'APINex Free requires a daily website visit. Sign in, then resume this key without waiting for cooldown.'}
-                              </span>
-                              <a href="https://apinex.bond/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">
-                                {locale === 'ru' ? 'Открыть APINex' : 'Open APINex'} <ExternalLink className="size-3" />
-                              </a>
-                              <Button size="xs" variant="outline" disabled={resumeCheckinKey.isPending} onClick={() => resumeCheckinKey.mutate(k.id)}>
-                                {resumeCheckinKey.isPending && resumeCheckinKey.variables === k.id
-                                  ? (locale === 'ru' ? 'Сброс...' : 'Resuming...')
-                                  : (locale === 'ru' ? 'Возобновить ключ' : 'Resume key')}
-                              </Button>
-                            </div>
+                            <ApinexCheckinNotice
+                              disabled={resumeCheckinKey.isPending}
+                              resuming={resumeCheckinKey.isPending && resumeCheckinKey.variables === k.id}
+                              onResume={() => resumeCheckinKey.mutate(k.id)}
+                            />
                           )}
                           {lastHealthError && (
                             <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-destructive" role="status">
