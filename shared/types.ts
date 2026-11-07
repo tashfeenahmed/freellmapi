@@ -77,6 +77,8 @@ export type Platform =
   | 'kiosapi'
   // Decision-only JEV adapter; promotional availability is catalog-managed.
   | 'beatapi'
+  // OpenAI-compatible aggregator. Free tier is 0.5M tokens/month, no card required; verified live on 2026-10-30.
+  | 'oxion'
   // Free-category chat and decisions share one weighted daily allowance.
   | 'apinex'
   // OpenAI-compatible gateway; free models share a 30-calls/5-hour account
