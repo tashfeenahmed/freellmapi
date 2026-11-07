@@ -48,6 +48,7 @@ import {
   isProviderBadRequestError,
   isProviderDegradedError,
   isProviderLevelError,
+  isModelScopedOverloadError,
   isProviderMomentFailure,
   isContextTooLargeError,
   isTimeoutErrorText,
@@ -458,7 +459,9 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // Context-too-large is MODEL-level too: a sibling key serves the same model
   // with the same context window (and, for Groq-style per-key TPM 413s, the
   // same tier ceiling), so it would reject the same request identically.
-  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || err?.skipModelForRequest === true) {
+  // A model-scoped overload also affects sibling keys: skip directly to a
+  // different model while keeping the rest of the provider available.
+  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || isModelScopedOverloadError(err) || err?.skipModelForRequest === true) {
     state.skipModels.add(route.modelDbId);
   }
   // A stale CATALOG (not a single dead model) answers model-not-found on every
