@@ -61,6 +61,11 @@ export interface ImportSelectedResponse {
 // SambaNova was dropped in V23 (free tier permanently retired — 402
 // "payment method required" once the one-time $5 trial credit lapses).
 export type Platform =
+  // OpenAI-compatible gateway; only signed-catalog models may be selected.
+  | 'tokenreply'
+  | 'mnn'
+  // Free auto/hrllm access; numeric rate/token limits are unpublished.
+  | 'llmkiwi'
   | 'google'
   | 'groq'
   | 'cerebras'
@@ -119,6 +124,9 @@ export type Platform =
   | 'septor'
   | 'clod'
   | 'speechify'
+  // TTS-only providers; free-plan models are published in the media catalog.
+  | 'fishaudio'
+  | 'cartesia'
   // Self-hosted TTS: shared 30K tokens/day and 1K API requests/month, no card.
   // Model rows arrive only through the signed, freshness-gated catalog.
   | 'freeai'
@@ -161,6 +169,7 @@ export type Platform =
   | 'halx'
   | 'aisense'
   | 'brave'
+  | 'tinyfish'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'
@@ -291,7 +300,7 @@ export type Platform =
  *  web_search tools), never chat. Search engine rows arrive through the
  *  catalog's `searchEngines` registry. The server keeps its own runtime copy in
  *  server/src/lib/search-platforms.ts (shared is type-only on the server). */
-export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave'] as const;
+export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave', 'tinyfish'] as const;
 export type SearchPlatform = (typeof SEARCH_PLATFORMS)[number];
 
 export function isSearchPlatform(platform: string): platform is SearchPlatform {

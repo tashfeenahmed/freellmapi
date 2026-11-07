@@ -20,6 +20,8 @@ import { assessProviderUrl } from '../lib/url-guard.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
+import { CARTESIA_BASE_URL, CARTESIA_VERSION } from '../providers/cartesia.js';
+import { FISH_AUDIO_BASE_URL, FISH_AUDIO_FREE_ENDS_AT } from '../providers/fishaudio.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
@@ -31,7 +33,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'fishaudio', 'cartesia', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -44,7 +46,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'cartesia']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -795,6 +797,35 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'fishaudio': {
+      if (row.model_id !== 's2.1-pro-free') throw new MediaError('Fish Audio free API supports only s2.1-pro-free', 400);
+      if (Date.now() >= FISH_AUDIO_FREE_ENDS_AT) throw new MediaError('Fish Audio S2.1 Pro Free offer has ended; disable its hosted catalog row', 402);
+      if (p.format && p.format !== 'mp3') throw new MediaError('Fish Audio adapter currently supports mp3 output', 400);
+      const openAiVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const r = await mediaFetch(`${FISH_AUDIO_BASE_URL}/v1/tts`, 'fishaudio', 'audio', {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, model: row.model_id },
+        body: JSON.stringify({ text: p.input, format: 'mp3', ...(p.voice && !openAiVoices.has(p.voice.toLowerCase()) ? { reference_id: p.voice } : {}) }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      if (audio.length < 10 || !r.headers.get('content-type')?.toLowerCase().startsWith('audio/')) throw new MediaError('Fish Audio returned no recognized audio bytes', 502);
+      return { audio, contentType: r.headers.get('content-type')! };
+    }
+    case 'cartesia': {
+      if (row.model_id !== 'sonic-3.6') throw new MediaError('Unknown Cartesia free speech model', 400);
+      if (p.format && p.format !== 'wav') throw new MediaError('Cartesia adapter currently supports wav output', 400);
+      const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const voice = !p.voice || standardVoices.has(p.voice.toLowerCase()) ? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4' : p.voice;
+      const r = await mediaFetch(`${CARTESIA_BASE_URL}/tts/bytes`, 'cartesia', 'audio', {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, 'Cartesia-Version': CARTESIA_VERSION },
+        body: JSON.stringify({ model_id: row.model_id, transcript: p.input, voice,
+          output_format: { container: 'wav', encoding: 'pcm_s16le', sample_rate: 24000 } }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      if (audio.length < 10) throw new MediaError('Cartesia returned empty audio', 502);
+      return { audio, contentType: 'audio/wav' };
+    }
     case 'freeai': {
       if (!key) throw new MediaError('Free.ai API key required', 401);
       if (!['kokoro', 'melotts', 'chatterbox', 'qwen3-tts', 'vibevoice'].includes(row.model_id)) throw new MediaError('Free.ai speech model is not a tested free route', 400);
@@ -1314,6 +1345,20 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'cartesia': {
+      if (m.modelId !== 'ink-whisper') throw new MediaError('Unknown Cartesia free transcription model', 400);
+      const form = new FormData();
+      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('model', m.modelId);
+      if (p.language) form.append('language', p.language);
+      const r = await mediaFetch(`${CARTESIA_BASE_URL}/stt`, 'cartesia', 'transcription', {
+        method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${key}`, 'Cartesia-Version': CARTESIA_VERSION }, body: form,
+      });
+      const j = await r.json() as { text?: unknown; language?: unknown; duration?: unknown } | null;
+      if (typeof j?.text !== 'string') throw new MediaError('Cartesia returned no transcription text', 502);
+      return { text: j.text, language: typeof j.language === 'string' ? j.language : undefined,
+        duration: typeof j.duration === 'number' ? j.duration : undefined };
+    }
     case 'google': {
       if (m.modelId !== 'gemini-3.5-transcribe') throw new MediaError('Unknown Google transcription model', 400);
       const r = await mediaFetch('https://generativelanguage.googleapis.com/v1beta/interactions', 'google', 'transcription', {

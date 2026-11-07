@@ -83,7 +83,7 @@ const PLATFORMS = [
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
   'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
-  'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
+  'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'llmkiwi', 'tokenreply', 'mnn', 'fishaudio', 'cartesia', 'tinyfish', 'custom',
 ] as const;
 
 const ALLOWED_IMPORT_EXTENSIONS = new Set(['.env', '.json', '.jsonc', '.md', '.txt', '.csv']);
