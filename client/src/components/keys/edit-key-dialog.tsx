@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
+import { invalidateSearchQueries } from '@/lib/search'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogPopup, DialogTitle } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field-error'
@@ -136,6 +137,7 @@ export function EditKeyDialog({
       apiFetch(`/api/keys/${apiKey.id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     onSuccess: () => {
       for (const key of ['keys', 'health']) queryClient.invalidateQueries({ queryKey: [key] })
+      invalidateSearchQueries(queryClient)
       onOpenChange(false)
     },
   })

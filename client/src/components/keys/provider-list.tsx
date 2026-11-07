@@ -45,7 +45,7 @@ import { ModelScopeDialog } from './model-scope-dialog'
 import { TestModelsDialog } from './test-models-dialog'
 import { AddModelDialog } from './add-model-dialog'
 import { groupHandle } from '@/lib/endpoint-groups'
-import { SEARCH_PROVIDERS, isSearchPlatform } from '@/lib/search'
+import { invalidateSearchQueries, SEARCH_PROVIDERS, isSearchPlatform } from '@/lib/search'
 
 type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 
@@ -136,6 +136,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     mutationFn: (id: number) => apiFetch(`/api/keys/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       // Deleting the last key of a platform flips it back to unconfigured in
       // the checklist strip.
@@ -147,6 +148,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     mutationFn: (model: ApiKeyModel) => apiFetch(customModelDeletePath(model), { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['models'] })
@@ -161,6 +163,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     mutationFn: (keyId: number) => apiFetch<{ cleared: number }>(`/api/keys/${keyId}/cooldowns/checkin`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
     },
   })
@@ -173,6 +176,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       if (keys.find(k => k.id === keyId)?.autoHealthCheck === false) toast.info(t('keys.noAutoCheckHint'))
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
     },
   })
 
@@ -192,7 +196,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         body: JSON.stringify({ keyId }),
       }),
     onSuccess: (data) => {
-      for (const key of ['keys', 'health', 'fallback']) {
+      for (const key of ['keys', 'health', 'fallback', 'search-engines', 'search-status']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] })
@@ -220,6 +224,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
@@ -231,6 +236,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       apiFetch(`/api/keys/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
@@ -261,6 +267,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }
     },
     onSuccess: ({ action, done, failed }) => {
+      invalidateSearchQueries(queryClient)
       for (const key of ['keys', 'health', 'fallback']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
@@ -290,6 +297,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }
     },
     onSuccess: ({ done, failed }) => {
+      invalidateSearchQueries(queryClient)
       for (const key of ['keys', 'health', 'fallback', 'models', 'embeddings', 'media']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
