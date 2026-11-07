@@ -1,0 +1,32 @@
+name: Discover Free Models
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Discover free OpenRouter models
+        run: node scripts/discover-openrouter-free-models.mjs
+
+      - name: Upload model catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrouter-free-models
+          path: generated/free-models/openrouter.json
+          retention-days: 30

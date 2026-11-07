@@ -12,7 +12,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/freellmapi
+  IMAGE: ghcr.io/myceeee/freellmapi
 
 # Each platform builds NATIVELY (ubuntu-24.04-arm is free for public repos) —
 # no QEMU. Emulated arm64 builds took ~20 min cold (better-sqlite3 compiles

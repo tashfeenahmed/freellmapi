@@ -118,7 +118,34 @@ describe('Model Provider Actions API', () => {
       expect(pm.length).toBeGreaterThan(0);
     });
 
-    it('rejects duplicate model creation for the same platform', async () => {
+    it('creates a model disabled and outside the fallback chain when requested', async () => {
+    const db = getDb();
+    const modelId = 'disabled-import-' + Date.now();
+
+    const res = await post(app, '/api/models', {
+      platform: 'openrouter',
+      modelId,
+      displayName: 'Imported free model',
+      enabled: false,
+      fallbackEnabled: false,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.model.enabled).toBe(false);
+    expect(res.body.model.fallbackEnabled).toBe(false);
+
+    const row = db.prepare('SELECT enabled FROM models WHERE id = ?').get(res.body.id) as any;
+    expect(row.enabled).toBe(0);
+
+    const fallback = db.prepare('SELECT enabled FROM fallback_config WHERE model_db_id = ?').get(res.body.id) as any;
+    expect(fallback.enabled).toBe(0);
+
+    const profiles = db.prepare('SELECT enabled FROM profile_models WHERE model_db_id = ?').all(res.body.id) as any[];
+    expect(profiles.length).toBeGreaterThan(0);
+    expect(profiles.every(profile => profile.enabled === 0)).toBe(true);
+  });
+
+  it('rejects duplicate model creation for the same platform', async () => {
       const modelId = `dup-model-${Date.now()}`;
 
       const first = await post(app, '/api/models', {
