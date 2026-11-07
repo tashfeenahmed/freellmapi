@@ -39,6 +39,7 @@ import { Router9Provider } from './router9.js';
 import { SeptorProvider } from './septor.js';
 import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
+import { VarosityProvider } from './varosity.js';
 import { FreeAiProvider } from './freeai.js';
 import { BlazeProvider } from './blaze.js';
 import { LucidityProvider } from './lucidity.js';
@@ -124,6 +125,7 @@ register(new Router9Provider());
 register(new SeptorProvider());
 register(new ClodProvider());
 register(new SpeechifyProvider());
+register(new VarosityProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
 // Five more OpenAI-compatible gateways. Each pins the response model to the
