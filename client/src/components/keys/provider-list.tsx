@@ -34,6 +34,7 @@ import {
   statusLabelKey,
 } from './shared'
 import { balanceByKey } from './quota-balance'
+import { ApinexCheckinNotice } from './apinex-checkin-notice'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -151,6 +152,16 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       queryClient.invalidateQueries({ queryKey: ['media'] })
+    },
+  })
+
+  // Operator-controlled recovery after APINex daily website visit.
+  // Only APINex check-in cooldowns are cleared; actual quotas remain enforced.
+  const resumeCheckinKey = useMutation({
+    mutationFn: (keyId: number) => apiFetch<{ cleared: number }>(`/api/keys/${keyId}/cooldowns/checkin`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      queryClient.invalidateQueries({ queryKey: ['health'] })
     },
   })
 
@@ -635,6 +646,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                       const hasCustomModels = customModels.length > 0
                       const isExpanded = expandedKeyIds.has(k.id)
                       const isChecking = checkKey.isPending && checkKey.variables === k.id
+                      const checkinRequired = k.platform === 'apinex' && k.cooldowns?.some(c => c.source === 'checkin')
                       return (
                         <div key={k.id} className="bg-card">
                           <div className="group/krow flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
@@ -901,6 +913,13 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                 {k.modelsAvailable === 0 && <> {t('keys.noModelsYetHint')}</>}
                               </span>
                             </div>
+                          )}
+                          {checkinRequired && (
+                            <ApinexCheckinNotice
+                              disabled={resumeCheckinKey.isPending}
+                              resuming={resumeCheckinKey.isPending && resumeCheckinKey.variables === k.id}
+                              onResume={() => resumeCheckinKey.mutate(k.id)}
+                            />
                           )}
                           {lastHealthError && (
                             <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-destructive" role="status">
