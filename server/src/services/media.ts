@@ -26,17 +26,18 @@ import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
 import { KENARI_BASE_URL, requireKenariFreeModel } from '../providers/kenari.js';
 import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
+import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
 import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
  *  chat models. Keep its adapter allowlist separate for the same reason. */
-export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface', 'novai']);
+export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface', 'novai', 'varosity']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
 const KEYLESS_CAPABLE = new Set(['pollinations']);
@@ -86,6 +87,15 @@ export interface ImageResult {
   platform: string;
   modelId: string;
   images: Array<{ b64_json?: string; url?: string }>;
+}
+
+/** Preserve native adapter status/backoff for the existing failover chain. */
+async function varosityResult<T>(work: Promise<T>): Promise<T> {
+  try { return await work; }
+  catch (error) {
+    if (error instanceof VarosityMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    throw error;
+  }
 }
 export interface SpeechResult {
   platform: string;
@@ -367,6 +377,8 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'varosity':
+      return varosityResult(varosityImage(row.model_id, key, p));
     case 'novai':
       return callNovaiImage(row, key, p);
     case 'plugsky': {
@@ -747,6 +759,8 @@ async function callVideoProvider(
 ): Promise<{ video: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'varosity':
+      return varosityResult(varosityVideo(row.model_id, key, p, clientSignal));
     case 'novai':
       return callNovaiVideo(row, key, p, clientSignal);
     case 'pollinations': {
@@ -795,6 +809,8 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'varosity':
+      return varosityResult(varositySpeech(row.model_id, key, p));
     case 'freeai': {
       if (!key) throw new MediaError('Free.ai API key required', 401);
       if (!['kokoro', 'melotts', 'chatterbox', 'qwen3-tts', 'vibevoice'].includes(row.model_id)) throw new MediaError('Free.ai speech model is not a tested free route', 400);
