@@ -121,6 +121,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'nabh') return 'nabh::monthly-credit';
   if (platform === 'novai') return 'novai::daily-free';
   if (platform === 'varosity') return 'varosity::account-credit';
+  if (platform === 'rime') return 'rime::monthly-credit';
   if (platform === 'freeinference') return 'freeinference::daily-free';
   if (platform === 'freemodel') return 'freemodel::account-free';
   if (platform === 'apinex') return 'apinex::daily-free';
@@ -193,6 +194,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 
 function isSharedPool(platform: Platform): boolean {
   if (platform === 'varosity') return true;
+  if (platform === 'rime') return true;
   if (platform === 'freemodel') return true;
   if (platform === 'apinex') return true;
   if (platform === 'onomeo') return true;

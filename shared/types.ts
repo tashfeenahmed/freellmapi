@@ -107,6 +107,8 @@ export type Platform =
   // Daily-free video route; signed catalog only.
   | 'novai'
   | 'varosity'
+  // Native TTS and transcription; one shared renewable monthly credit grant.
+  | 'rime'
   // Research API; chat and embeddings share a daily quota. Requests are logged.
   | 'freeinference'
   // Personal BYOK client; shared monthly account allowance, Telegram verification.

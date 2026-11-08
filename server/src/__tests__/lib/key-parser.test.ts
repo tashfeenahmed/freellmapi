@@ -16,6 +16,8 @@ import {
 describe('key parser', () => {
   it('imports Varosity keys by environment name or provider alias', () => {
     expect(detectPlatform('VAROSITY_')).toBe('varosity');
+    expect(detectPlatform('RIME_')).toBe('rime');
+    expect(AUTH_JSON_PROVIDER_MAP['rime.ai']).toBe('rime');
     expect(AUTH_JSON_PROVIDER_MAP['varosity.ai']).toBe('varosity');
     expect(parseKeysFromFile('VAROSITY_API_KEY=vsk_test_not_a_real_key_12345', '.env').keys).toEqual([
       expect.objectContaining({ platform: 'varosity', rawKey: 'VAROSITY_API_KEY=vsk_test_not_a_real_key_12345' }),
