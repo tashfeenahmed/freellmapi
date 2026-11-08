@@ -46,6 +46,7 @@ import * as removeGithubProvider from '../migrations/20261017_000002_remove_gith
 import * as requestFailureAttribution from '../migrations/20261017_233153_request_failure_attribution.js';
 import * as removeAurayProvider from '../migrations/20261019_000001_remove_auray_provider.js';
 import * as keyLastHealthyAt from '../migrations/20261020_000001_key_last_healthy_at.js';
+import * as customMediaEndpointIdentity from '../migrations/20261028_000001_custom_media_endpoint_identity.js';
 import * as cloudflareNeuronUsage from '../migrations/20261104_000001_cloudflare_neuron_usage.js';
 
 export interface MigrationModule {
@@ -155,5 +156,6 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: REQUEST_FAILURE_ATTRIBUTION_FILENAME, module: requestFailureAttribution },
   { filename: REMOVE_AURAY_PROVIDER_FILENAME, module: removeAurayProvider },
   { filename: KEY_LAST_HEALTHY_AT_FILENAME, module: keyLastHealthyAt },
+  { filename: '20261028_000001_custom_media_endpoint_identity.ts', module: customMediaEndpointIdentity },
   { filename: CLOUDFLARE_NEURON_USAGE_FILENAME, module: cloudflareNeuronUsage },
 ];

@@ -3,6 +3,9 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
+import { resolveCustomEndpointKey } from '../../services/custom-endpoint.js';
+import { registerCustomMediaModel } from '../../services/custom-media-register.js';
+import { runImageGeneration } from '../../services/media.js';
 
 // GET /api/media/usage backs the month-to-date card on the Image and Audio
 // tabs. Image and audio calls are billed per image or per character, not per
@@ -62,6 +65,51 @@ describe('GET /api/media/usage', () => {
   it('rejects a missing or unknown modality', async () => {
     expect((await get(app, '/api/media/usage')).status).toBe(400);
     expect((await get(app, '/api/media/usage?modality=not-real')).status).toBe(400);
+  });
+
+  it('attributes a shared custom model ID to its own endpoint', async () => {
+    const db = getDb();
+    const insertKey = db.prepare(`INSERT INTO api_keys
+      (platform, label, encrypted_key, iv, auth_tag, status, enabled, base_url)
+      VALUES ('custom', 'relay', 'e', 'i', 't', 'healthy', 1, ?)`);
+    const a = Number(insertKey.run('https://a.example/v1').lastInsertRowid);
+    const b = Number(insertKey.run('https://b.example/v1').lastInsertRowid);
+    const insertModel = db.prepare(`INSERT INTO media_models
+      (platform, model_id, display_name, modality, key_id, endpoint_scope)
+      VALUES ('custom', 'shared', ?, 'image', ?, ?)`);
+    insertModel.run('A', a, 'https://a.example/v1');
+    insertModel.run('B', b, 'https://b.example/v1');
+    insertModel.run('Legacy', null, '');
+    db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, request_type)
+      VALUES ('custom', 'shared', ?, 'success', 'image')`).run(a);
+    const { body } = await get(app, '/api/media/usage?modality=image');
+    expect(body.models.filter((m: any) => m.modelId === 'shared').map((m: any) => [m.displayName, m.requestsMonth]))
+      .toEqual([['A', 1], ['B', 0], ['Legacy', 0]]);
+    expect(body.totalRequestsMonth).toBe(1);
+  });
+
+  it('retains endpoint usage after deleting a credential from its pool', async () => {
+    const db = getDb();
+    const first = resolveCustomEndpointKey(db, 'http://127.0.0.1:8282/v1', 'first-test-key', undefined);
+    const sibling = resolveCustomEndpointKey(db, 'http://127.0.0.1:8282/v1', 'second-test-key', undefined);
+    const { modelDbId } = registerCustomMediaModel(db, first.keyId, {
+      modelId: 'rotating-image', displayName: 'Rotating Image', modality: 'image',
+    });
+    const realFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ url: 'https://example.test/image.png' }] }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
+      await runImageGeneration('rotating-image', { prompt: 'a cat' });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    db.prepare('UPDATE media_models SET key_id = ? WHERE id = ?').run(sibling.keyId, modelDbId);
+    db.prepare('DELETE FROM api_keys WHERE id = ?').run(first.keyId);
+
+    const { body } = await get(app, '/api/media/usage?modality=image');
+    expect(body.models.find((m: any) => m.id === modelDbId).requestsMonth).toBe(1);
+    expect(body.totalRequestsMonth).toBe(1);
   });
 
   it('counts this month\'s requests per model and separates today', async () => {

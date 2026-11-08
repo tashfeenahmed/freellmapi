@@ -6,6 +6,7 @@ import {
   canMakeRequest,
   canUseTokens,
   isOnCooldown,
+  getCooldownSource,
   canUseProvider,
   canUseProviderMinute,
   canUseProviderTokens,
@@ -1591,6 +1592,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     return null;
   }
   const provider = getProvider(entry.platform as Platform)!;
+  // #1741: legacy rows can exist for platforms whose adapter refuses chat
+  // (registered before the gate). They can only ever fail, so drop them from
+  // the walk here instead of spending an attempt and a cooldown on each.
+  // Strictly false, not falsy: mocked providers in tests may omit the flag.
+  if (provider.supportsChat === false) {
+    diag?.push(`${label}: platform does not serve chat completions`);
+    return null;
+  }
 
   const allKeys = db.prepare(
     "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
@@ -1660,7 +1669,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
     if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }
 
-    if (isOnCooldown(entry.platform, entry.model_id, key.id)) { note('cooldown'); continue; }
+    if (isOnCooldown(entry.platform, entry.model_id, key.id)) {
+      // APINex's required website visit is not a spent token or RPM budget.
+      // Preserve this reason in zero-attempt routing diagnostics so DSH can
+      // show actionable instructions even after the initial 402 was benched.
+      const checkin = entry.platform === 'apinex' && getCooldownSource(entry.platform, entry.model_id, key.id) === 'checkin';
+      note(checkin ? 'checkin-required' : 'cooldown');
+      continue;
+    }
     if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
     // Account-wide per-minute budget, checked before the per-model gates: a model
     // with a NULL rpm_limit would otherwise sail past them and spend a budget its

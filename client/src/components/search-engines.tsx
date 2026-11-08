@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Globe } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { EmptyState } from '@/components/empty-state'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { ModelsTabs } from '@/components/models-tabs'
 import { UsageSummaryCard } from '@/components/usage-summary-card'
 import { useI18n } from '@/i18n'
-import { engineChain, freeFromDate, type SearchAnalytics, type SearchEngine } from '@/lib/search'
+import { engineChain, freeFromDate, invalidateSearchQueries, type SearchAnalytics, type SearchEngine } from '@/lib/search'
+import { useSearchReadiness } from '@/hooks/use-search-readiness'
+import { SearchReadinessNotice } from './search-readiness-notice'
 
 const pill = 'text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground'
 
@@ -31,10 +31,12 @@ function SearchEngineCard({
   pending: boolean
 }) {
   const { t, locale } = useI18n()
+  const queryClient = useQueryClient()
   const test = useMutation({
     mutationFn: () => apiFetch(`/api/search/engines/${e.id}/test`, {
       method: 'POST', body: JSON.stringify({ query: 'OpenAI' }),
     }),
+    onSettled: () => invalidateSearchQueries(queryClient),
   })
   const freeFrom = freeFromDate(e.premiumSince)
   const features = e.features ?? {}
@@ -117,11 +119,9 @@ export function SearchEnginesView() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
 
-  const { data: engines = [], isLoading } = useQuery<SearchEngine[]>({
-    queryKey: ['search-engines'],
-    queryFn: () => apiFetch('/api/search/engines'),
-    refetchInterval: 30_000,
-  })
+  const readiness = useSearchReadiness()
+  const engines = readiness.engines
+  const isLoading = readiness.loading
 
   // Only `today` is read here; the month total is the sum of the engine rows.
   const { data: analytics } = useQuery<SearchAnalytics>({
@@ -133,7 +133,7 @@ export function SearchEnginesView() {
   const update = useMutation({
     mutationFn: ({ id, ...body }: { id: number; enabled?: boolean; priority?: number }) =>
       apiFetch(`/api/search/engines/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-engines'] }),
+    onSuccess: () => invalidateSearchQueries(queryClient),
   })
 
   const ordered = engines
@@ -169,14 +169,13 @@ export function SearchEnginesView() {
           />
         )}
 
+        <SearchReadinessNotice {...readiness} onRetry={readiness.retry} />
         {isLoading ? (
           <>
             <CardSkeleton />
             <CardSkeleton />
           </>
-        ) : ordered.length === 0 ? (
-          <EmptyState icon={Globe} title={t('search.empty')} />
-        ) : (
+        ) : readiness.failed || ordered.length === 0 ? null : (
           ordered.map(e => (
             <SearchEngineCard
               key={e.id}
