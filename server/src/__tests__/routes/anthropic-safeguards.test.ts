@@ -2,11 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
-import { encrypt } from '../../lib/crypto.js';
 import { extractAnthropicCompat } from '../../routes/anthropic.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 
-// Claude Code auto-mode classifier billing passthrough (#1589).
+// Upstream safeguard response metadata compatibility (related to #1589).
 //
 // FreeLLMAPI converts Anthropic → internal OpenAI-shaped chat and routes it
 // through the normal fallback loop; it is not a raw proxy to api.anthropic.com,
@@ -15,8 +14,8 @@ import { mintDashboardToken } from '../helpers/auth.js';
 // `anthropic-beta` header need to survive intake instead of being dropped by
 // the conversion. These tests drive the route end to end through a mocked
 // Groq upstream. The beta header value below is a TEST FIXTURE, not a real
-// Anthropic value: the official doc page names none, so the suite asserts
-// generic header preservation, never a guessed value.
+// Anthropic value. The suite checks metadata extraction, not eligibility for
+// Anthropic's server-side classifier or no-charge requests.
 
 let dashToken = '';
 
@@ -141,10 +140,12 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     // carried as unknown, never rejected.
     expect(extractAnthropicCompat({}, {})).toEqual({});
     expect(extractAnthropicCompat({ safeguards: 'a-string' }, {}).safeguards).toBe('a-string');
-    expect(extractAnthropicCompat({}, { 'anthropic-beta': ['a', 'b'] }).anthropicBeta).toBe('a');
+    expect(extractAnthropicCompat({}, { 'anthropic-beta': ['a', 'b'] }).anthropicBeta).toBe('a, b');
+    expect(extractAnthropicCompat({}, { 'anthropic-beta': [] })).toEqual({});
+    expect(extractAnthropicCompat({}, { 'anthropic-beta': '' })).toEqual({});
   });
 
-  it('accepts safeguards + anthropic-beta without 400 and never forwards safeguards upstream', async () => {
+  it('accepts safeguards + anthropic-beta without forwarding either to an OpenAI upstream', async () => {
     const captured = mockJson(textCompletion('Hello.'));
     const { status, body } = await request(app, '/v1/messages', {
       model: 'claude-sonnet-4-5', max_tokens: 64,
@@ -159,6 +160,7 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     // construction (the provider builds the body from known fields only)
     // while the route keeps it in the request's compat metadata.
     expect(captured.body).not.toHaveProperty('safeguards');
+    expect(new Headers(captured.headers).has('anthropic-beta')).toBe(false);
   });
 
   it('plumbs upstream safeguard_results into the JSON response unchanged', async () => {
@@ -204,6 +206,43 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     expect(status).toBe(200);
     const msgDelta = sseEvents(text).find(e => e.event === 'message_delta');
     expect(msgDelta!.data.safeguard_results).toEqual(SAFEGUARD_RESULTS);
+  });
+
+  it('keeps safeguard_results from a choice-less final metadata frame', async () => {
+    mockStream(sse(
+      { id: 'c1', choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: 'stop' }] },
+      { id: 'c1', choices: [], usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 }, safeguard_results: SAFEGUARD_RESULTS },
+      '[DONE]',
+    ));
+    const { status, text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, anthropicHeaders());
+
+    expect(status).toBe(200);
+    const deltas = sseEvents(text).filter(e => e.event === 'message_delta');
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0].data.safeguard_results).toEqual(SAFEGUARD_RESULTS);
+    expect(deltas[0].data.usage).toEqual({ input_tokens: 11, output_tokens: 7 });
+  });
+
+  it('does not fabricate safeguard_results in a stream without upstream results', async () => {
+    mockStream(sse(
+      { id: 'c1', choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: 'stop' }] },
+      '[DONE]',
+    ));
+    const { status, text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+      safeguards: SAFEGUARDS_REQUEST,
+    }, anthropicHeaders({ 'anthropic-beta': 'test-beta-fixture' }));
+
+    expect(status).toBe(200);
+    const deltas = sseEvents(text).filter(e => e.event === 'message_delta');
+    expect(deltas).toHaveLength(1);
+    for (const event of sseEvents(text)) {
+      expect(event.data).not.toHaveProperty('safeguard_results');
+    }
   });
 
   it('keeps the upstream tool_use id unchanged (no rewriting or prefixing)', async () => {

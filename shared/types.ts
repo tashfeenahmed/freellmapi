@@ -586,8 +586,7 @@ export interface ChatCompletionResponse {
     model: string;
   };
   // Anthropic auto-mode classifier results, when the upstream supplied them
-  // (#1589). Never synthesized here: a free non-Anthropic upstream has no
-  // classifier to run, so the field is simply absent on those routes.
+  // (#1589). Never synthesized here; absent when the upstream sends none.
   safeguard_results?: unknown;
 }
 

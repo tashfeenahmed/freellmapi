@@ -173,9 +173,8 @@ interface AnthropicMessageResponse {
 // Anthropic compatibility metadata a `/v1/messages` caller may carry (#1589):
 // Claude Code sends its auto-mode classifier state as the `safeguards`
 // request field plus an `anthropic-beta` header. Both are opaque to this
-// gateway — the header value is never asserted (the official doc names none),
-// and the field is carried as unknown — but they must not be silently
-// dropped by the Anthropic → internal conversion.
+// gateway. Preserve them as internal metadata for a future native adapter;
+// current OpenAI-compatible adapters intentionally do not forward either.
 export interface AnthropicCompatMetadata {
   safeguards?: unknown;
   anthropicBeta?: string;
@@ -188,8 +187,8 @@ export function extractAnthropicCompat(
   const out: AnthropicCompatMetadata = {};
   if (body.safeguards !== undefined) out.safeguards = body.safeguards;
   const beta = headers['anthropic-beta'];
-  const first = Array.isArray(beta) ? beta[0] : beta;
-  if (typeof first === 'string' && first.length > 0) out.anthropicBeta = first;
+  const value = Array.isArray(beta) ? beta.join(', ') : beta;
+  if (typeof value === 'string' && value.length > 0) out.anthropicBeta = value;
   return out;
 }
 
@@ -850,8 +849,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
         stop_sequence: null,
         usage: { input_tokens: promptTokens, output_tokens: completionTokens },
         // #1589: return upstream-supplied classifier results verbatim. Absent
-        // when the routed provider sent none — never fabricated, so a
-        // free-provider route is never presented as classifier-eligible.
+        // when the routed provider sent none — never fabricated. Preserving
+        // metadata alone does not establish server-side classifier eligibility.
         ...(result.safeguard_results !== undefined ? { safeguard_results: result.safeguard_results } : {}),
       };
 
