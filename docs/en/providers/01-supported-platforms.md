@@ -15,7 +15,7 @@ Of the 43 built-in platforms, **10 use dedicated adapters** and **33 ride `OpenA
 | Platform | Display name | Auth | Adapter | Notes |
 | --- | --- | --- | --- | --- |
 | `google` | Google Gemini | Keyed | Native (`GoogleProvider`) | Gemini wire format; 60s default timeout because Gemma reasoning variants take 20–60s on cold start. |
-| `groq` | Groq | Keyed | OpenAI-compat | Standard compatible endpoint at `api.groq.com/openai/v1`. |
+| `groq` | Groq | Keyed | OpenAI-compat | Standard compatible endpoint at `api.groq.com/openai/v1`; [Orpheus speech](09-groq-speech.md) uses the same key. |
 | `cerebras` | Cerebras | Keyed | OpenAI-compat | `api.cerebras.ai/v1`. |
 | `electronhub` | ElectronHub | Keyed | OpenAI-compat subclass | Shared weekly credit pool; validates against `/v1/user/me`, rejects HTTP-200 proxy-error banners. [Funding and integration notes](04-recurring-credit-gateways.md). |
 | `experiential` | Experiential Labs | Keyed | OpenAI-compat subclass | Shared monthly credit pool; authenticated `/v1/models`, model-specific Claude sampling compatibility. [Funding and account-verification notes](04-recurring-credit-gateways.md). |

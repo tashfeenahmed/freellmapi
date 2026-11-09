@@ -33,7 +33,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -811,6 +811,50 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'groq': {
+      const arabic = row.model_id === 'canopylabs/orpheus-arabic-saudi';
+      if (!arabic && row.model_id !== 'canopylabs/orpheus-v1-english') throw new MediaError('Unknown Groq speech model', 400);
+      if (!key) throw new MediaError('Groq API key required', 401);
+      if (!p.input.trim() || [...p.input].length > 200) throw new MediaError('Groq Orpheus requires 1–200 characters per request', 400);
+      if (p.format && p.format !== 'wav') throw new MediaError('Groq Orpheus supports wav output through this adapter', 400);
+      const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const supplied = p.voice?.trim().toLowerCase();
+      const voice = !supplied || standardVoices.has(supplied) ? (arabic ? 'fahad' : 'troy') : supplied;
+      const voices = arabic ? ['abdullah', 'fahad', 'sultan', 'lulwa', 'noura', 'aisha'] : ['autumn', 'diana', 'hannah', 'austin', 'daniel', 'troy'];
+      if (!voices.includes(voice)) throw new MediaError('Unsupported voice for this Groq Orpheus model', 400);
+      const r = await mediaFetch('https://api.groq.com/openai/v1/audio/speech', 'groq', 'audio', {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice, response_format: 'wav' }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      // Validate the bytes, not a provider MIME header: HTTP 200 JSON errors
+      // or truncated RIFF responses must fail over rather than become audio.
+      let pcm = false, data = false;
+      const streamed = audio.length >= 12 && audio.readUInt32LE(4) === 0xffffffff;
+      const wav = audio.length > 44 && audio.toString('ascii', 0, 4) === 'RIFF'
+        && audio.toString('ascii', 8, 12) === 'WAVE' && (streamed || audio.readUInt32LE(4) + 8 === audio.length);
+      let offset = 12;
+      if (wav) while (offset + 8 <= audio.length) {
+        const chunk = audio.toString('ascii', offset, offset + 4), declared = audio.readUInt32LE(offset + 4);
+        // Groq streams WAV with unseekable 0xffffffff RIFF/data sizes. Once
+        // fully buffered, normalize those sizes without changing any samples.
+        const unboundedData = streamed && chunk === 'data' && declared === 0xffffffff;
+        const size = unboundedData ? audio.length - offset - 8 : declared;
+        if (offset + 8 + size > audio.length) break;
+        if (chunk === 'fmt ' && size >= 16) pcm = audio.readUInt16LE(offset + 8) === 1
+          && audio.readUInt16LE(offset + 10) > 0 && audio.readUInt32LE(offset + 12) > 0
+          && audio.readUInt16LE(offset + 22) === 16;
+        if (chunk === 'data') {
+          data = size > 0 && size % 2 === 0;
+          if (unboundedData) audio.writeUInt32LE(size, offset + 4);
+        }
+        offset += 8 + size + size % 2;
+      }
+      if (!wav || !pcm || !data || offset !== audio.length) throw new MediaError('Groq returned no valid PCM16 WAV audio', 502);
+      if (streamed) audio.writeUInt32LE(audio.length - 8, 4);
+      return { audio, contentType: 'audio/wav' };
+    }
     case 'rime':
       return nativeMediaResult(rimeSpeech(row.model_id, key, p));
     case 'varosity':
