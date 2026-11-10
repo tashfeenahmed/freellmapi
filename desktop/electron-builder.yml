@@ -34,7 +34,7 @@ extraResources:
   - from: client-dist
     to: client-dist
 mac:
-  artifactName: "${productName}-${version}-${arch}.${ext}"
+  artifactName: "${productName}-${version}-macos-${arch}.${ext}"
   category: public.app-category.developer-tools
   icon: assets/icon.icns
   hardenedRuntime: true

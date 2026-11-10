@@ -14,12 +14,12 @@ const yaml = createRequire(import.meta.url)('js-yaml');
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const config = yaml.load(readFileSync(join(desktopRoot, 'electron-builder.yml'), 'utf8')) as Record<string, any>;
 
-function expand(template: string): string {
+function expand(template: string, arch = 'x64', ext = 'exe'): string {
   return template
     .replace('${productName}', config.productName)
     .replace('${version}', '1.2.3')
-    .replace('${arch}', 'x64')
-    .replace('${ext}', 'exe');
+    .replace('${arch}', arch)
+    .replace('${ext}', ext);
 }
 
 describe('updater artifact names', () => {
@@ -34,5 +34,11 @@ describe('updater artifact names', () => {
 
   it('names the Windows installer the way latest.yml will', () => {
     expect(expand(config.nsis.artifactName)).toBe('FreeLLMAPI-Setup-1.2.3.exe');
+  });
+
+  it.each(['arm64', 'x64'])('identifies macOS %s downloads by platform and architecture', (arch) => {
+    for (const ext of ['zip', 'dmg']) {
+      expect(expand(config.mac.artifactName, arch, ext)).toBe(`FreeLLMAPI-1.2.3-macos-${arch}.${ext}`);
+    }
   });
 });
