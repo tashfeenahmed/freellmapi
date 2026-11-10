@@ -408,6 +408,14 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   }
   modelTestCooldowns.set(id, now);
 
+  // Legacy rows for non-chat platforms: explain instead of reporting a missing key.
+  const platformProvider = hasProvider(modelRow.platform as Platform) ? getProvider(modelRow.platform as Platform) : undefined;
+  if (platformProvider?.supportsChat === false) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'Platform does not support chat completions' });
+    return;
+  }
+
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.
   const inputEstimate = 16;
