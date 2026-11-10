@@ -50,6 +50,14 @@ it('omits Waterfall and ACLIDE from the add-key provider picker', async () => {
   expect(options).not.toContain('aclide')
 })
 
+it('offers Varosity without promising a recurring daily credit', async () => {
+  await mount(<AddKeyForm onSuccess={() => {}} />)
+  const option = container.querySelector('option[value="varosity"]')
+  expect(option).not.toBeNull()
+  expect(option?.textContent).toContain('Varosity')
+  expect(option?.textContent).not.toMatch(/daily/i)
+})
+
 it('omits Waterfall and ACLIDE from the add-model provider picker', async () => {
   await mount(<AddModelDialog open onOpenChange={() => {}} />)
   const options = [...container.querySelectorAll('#provider-platform-select option')].map(option => (option as HTMLOptionElement).value)

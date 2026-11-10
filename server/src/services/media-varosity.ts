@@ -6,7 +6,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { VAROSITY_BASE_URL } from '../providers/varosity.js';
 import type { ImageParams, SpeechParams, VideoParams } from './media.js';
 
-/** Only the ten live-tested routes. All share the account's daily credits;
+/** Only the ten live-tested routes. All share the account's credits;
  * this is not a promise of free unlimited use or an allowance per model. */
 const IMAGES = new Set(['flux-3-klein', 'flux-2-pro', 'qwen-image-3.0', 'gpt-image-2.5-flare']);
 const VOICES: Record<string, string> = {
