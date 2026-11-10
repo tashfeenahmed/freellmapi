@@ -106,6 +106,24 @@ describe('Keys API', () => {
     expect(body[0].platform).toBe('groq');
   });
 
+  it('GET /api/keys exposes verificationBasis (#1516, display-only)', async () => {
+    // A fresh key has never been verified, so the basis is null; once a real
+    // request upgrades it, the same row reads 'inference_verified'.
+    await request(app, 'POST', '/api/keys', {
+      platform: 'groq',
+      key: 'gsk_test123456789',
+    });
+
+    const first = await request(app, 'GET', '/api/keys');
+    expect(first.status).toBe(200);
+    expect(first.body).toHaveLength(1);
+    expect(first.body[0].verificationBasis).toBeNull();
+
+    getDb().prepare("UPDATE api_keys SET verification_basis = 'inference_verified'").run();
+    const second = await request(app, 'GET', '/api/keys');
+    expect(second.body[0].verificationBasis).toBe('inference_verified');
+  });
+
   it('POST /api/keys warns when the platform has no catalog models yet (#438)', async () => {
     const db = getDb();
     // Simulate the Agnes case: a registered platform whose models aren't in

@@ -309,9 +309,15 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
     // #1493: stamp last_healthy_at only on a VALID verdict. A transport error
     // (the catch below) refreshes last_checked_at but records no success, so
     // "checked recently" and "worked recently" stay distinguishable.
+    // #1516 (display-only): a valid probe only ever proves /models answered,
+    // so it records verification_basis = 'models_only' — but only when the
+    // key has no basis yet, so a probe never downgrades a key a real request
+    // already proved ('inference_verified'). An invalid verdict clears the
+    // basis: whatever was proved no longer holds. A transport error (catch
+    // below) leaves the basis alone.
     db.prepare(isValid
-      ? "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now'), last_healthy_at = datetime('now') WHERE id = ?"
-      : "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now') WHERE id = ?")
+      ? "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now'), last_healthy_at = datetime('now'), verification_basis = COALESCE(verification_basis, 'models_only') WHERE id = ?"
+      : "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now'), verification_basis = NULL WHERE id = ?")
       .run(status, lastError, keyId);
 
     if (isValid) {
@@ -466,7 +472,10 @@ export function markKeyHealthyFromRequest(keyId: number): void {
     if (lastStamp === undefined || now - lastStamp >= LAST_HEALTHY_STAMP_INTERVAL_MS) {
       lastHealthyStampedAt.set(keyId, now);
       getDb()
-        .prepare("UPDATE api_keys SET last_healthy_at = datetime('now') WHERE id = ?")
+        // #1516 (display-only): a served request is real inference, so it
+        // upgrades the basis to 'inference_verified' — the strongest
+        // evidence a key can carry, and no probe may downgrade it later.
+        .prepare("UPDATE api_keys SET last_healthy_at = datetime('now'), verification_basis = 'inference_verified' WHERE id = ?")
         .run(keyId);
     }
     getDb()
