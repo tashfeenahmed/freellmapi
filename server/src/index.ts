@@ -23,6 +23,7 @@ import { installLogRedaction } from './lib/log-redaction.js';
 import { cleanupExpiredCooldowns } from './services/ratelimit.js';
 import { loadCacheFromDb } from './services/cache.js';
 import { installGracefulShutdown } from './lib/graceful-shutdown.js';
+import { localTrustStartupWarning } from './lib/request-locality.js';
 
 // Before any other statement runs, so no provider key can reach stdout — users
 // paste server output into bug reports. Module scope, not inside main(), so it
@@ -33,6 +34,8 @@ async function main() {
   const config = loadConfig();
   const { port: PORT, host: HOST } = config;
   warnOnEnvDrift();
+  const localTrustWarning = localTrustStartupWarning(config.trustProxy);
+  if (localTrustWarning) console.warn(localTrustWarning);
 
   // Install first so a late provider socket reset (undici HTTP/2 error with no
   // listener) can't take the proxy down. Genuine bugs still exit 1.

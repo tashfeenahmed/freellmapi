@@ -104,6 +104,17 @@ describe('POST /api/auth/desktop-session (#1399)', () => {
     }
   });
 
+  it('refuses every caller, loopback included, when DISABLE_LOCAL_TRUST=true', async () => {
+    process.env.DISABLE_LOCAL_TRUST = 'true';
+    try {
+      expect((await call(app(), 'POST', '/api/auth/desktop-session')).status).toBe(403);
+      expect((await call(app(), 'GET', '/api/auth/status')).body.desktop).toBe(false);
+    } finally {
+      delete process.env.DISABLE_LOCAL_TRUST;
+    }
+    expect((await call(app(), 'GET', '/api/auth/status')).body.desktop).toBe(true);
+  });
+
   it('refuses a DNS-rebinding page (non-local Host header)', async () => {
     const res = await call(app(), 'POST', '/api/auth/desktop-session', { host: 'evil.example:31415' });
     expect(res.status).toBe(403);

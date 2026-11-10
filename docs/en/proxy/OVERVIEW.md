@@ -18,6 +18,7 @@ Related: the full `.env` surface is in [`../env/01-variables.md`](../env/01-vari
 | File | Description |
 | --- | --- |
 | [01-fetch-relay.md](01-fetch-relay.md) | Fetch Relay transport: `FreeLLMAPI -> Fetch Relay -> provider`, `PROXY_MODE=fetch-relay` (`forward` default), `PROXY_URL` as relay URL, `FETCH_RELAY_TOKEN` (encrypted at rest, env precedence, empty=unauthenticated), `Fetch-Relay-Authorization: Bearer <relay-token>` + `Fetch-Relay-Target: <provider-url>` hop headers, loopback-https guard, streaming/manual-redirect, Cloudflare Worker (`examples/fetch-relay-worker/`) reference. |
+| [02-nginx.md](02-nginx.md) | Inbound: running behind nginx. Secure config, `TRUST_PROXY` + `DISABLE_LOCAL_TRUST`, which nginx configs are unsafe and why, verification steps. |
 | [CHANGELOG.md](CHANGELOG.md) | Doc revision history for this domain. |
 
 ## Conventions

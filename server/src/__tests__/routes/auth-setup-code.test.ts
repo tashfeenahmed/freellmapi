@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import { authRouter } from '../../routes/auth.js';
 import { initDb, getDb } from '../../db/index.js';
@@ -131,6 +131,25 @@ describe('First-run setup code gate (FIX 1)', () => {
     expect(status).toBe(201);
   });
 
+  describe('DISABLE_LOCAL_TRUST=true', () => {
+    beforeEach(() => { process.env.DISABLE_LOCAL_TRUST = 'true'; });
+    afterEach(() => { delete process.env.DISABLE_LOCAL_TRUST; });
+
+    // A bare nginx `proxy_pass` adds no forwarding header, so every visitor
+    // looks like a direct loopback client. The switch is the only defense.
+    it('requires the code even from a direct loopback socket', async () => {
+      const { status, body } = await postSetup(appWithRemote('127.0.0.1'), CREDS);
+      expect(status).toBe(403);
+      expect(body.error.type).toBe('setup_code_required');
+      expect((getDb().prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number }).c).toBe(0);
+    });
+
+    it('still accepts the setup code', async () => {
+      const { status } = await postSetup(appWithRemote('127.0.0.1'), { ...CREDS, setupCode: getSetupCode() });
+      expect(status).toBe(201);
+    });
+  });
+
   describe('spoofed loopback through a same-host reverse proxy (regression)', () => {
     const expectRefused = async (app: Express, headers: Record<string, string>) => {
       const { status, body } = await postSetup(app, CREDS, headers);
@@ -167,6 +186,14 @@ describe('First-run setup code gate (FIX 1)', () => {
       await expectRefused(appWithRemote('127.0.0.1', 1), { 'X-Real-IP': '203.0.113.7' });
       await expectRefused(appWithRemote('127.0.0.1'), { 'X-Real-IP': '127.0.0.1' });
       await expectRefused(appWithRemote('127.0.0.1'), { Forwarded: 'for=127.0.0.1' });
+    });
+
+    // nginx forwarding only X-Real-IP passes the client's own X-Forwarded-For
+    // through untouched; under TRUST_PROXY=1 that spoof used to resolve as
+    // the client.
+    it('rejects a spoofed X-Forwarded-For that contradicts the proxy-stated X-Real-IP', async () => {
+      await expectRefused(appWithRemote('127.0.0.1', 1), { 'X-Real-IP': '203.0.113.7', 'X-Forwarded-For': '127.0.0.1' });
+      await expectRefused(appWithRemote('127.0.0.1', ['loopback']), { 'X-Real-IP': '203.0.113.7', 'X-Forwarded-For': '127.0.0.1' });
     });
 
     it('never grants locality to a remote socket, whatever the headers say', async () => {

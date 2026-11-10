@@ -145,6 +145,22 @@ describe('Desktop re-auth bypass is loopback-only (#786)', () => {
     expect(res.status).toBe(403);
   });
 
+  it('demands the password for reveal and export when DISABLE_LOCAL_TRUST=true', async () => {
+    process.env.FREEAPI_DESKTOP = '1';
+    process.env.DISABLE_LOCAL_TRUST = 'true';
+    try {
+      const id = await addKey();
+      const reveal = await call(appWithRemote('127.0.0.1'), `/api/keys/${id}/reveal`, 'POST');
+      expect(reveal.status).toBe(403);
+      expect(reveal.body.key).toBeUndefined();
+      const exported = await call(appWithRemote('127.0.0.1'), '/api/keys/export?format=json', 'GET');
+      expect(exported.status).toBe(403);
+      expect(exported.body.keys).toBeUndefined();
+    } finally {
+      delete process.env.DISABLE_LOCAL_TRUST;
+    }
+  });
+
   // Regression: a same-host reverse proxy is a loopback socket for every
   // client. The old check read the socket alone, so on a desktop build behind
   // such a proxy any remote dashboard session could lift plaintext keys

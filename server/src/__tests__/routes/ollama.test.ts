@@ -69,6 +69,20 @@ describe('Ollama emulation', () => {
     expect((await request(app, 'GET', '/api/version')).body.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
+  it('closes open-loopback to every caller when DISABLE_LOCAL_TRUST=true; key-required still works', async () => {
+    setSetting('ollama_emulation', 'open-loopback');
+    process.env.DISABLE_LOCAL_TRUST = 'true';
+    try {
+      expect((await request(app, 'GET', '/api/tags')).status).toBe(403);
+      setSetting('ollama_emulation', 'key-required');
+      expect((await request(app, 'GET', '/api/tags')).status).toBe(401);
+      const keyed = await request(app, 'GET', '/api/tags', undefined, { Authorization: `Bearer ${getUnifiedApiKey()}` });
+      expect(keyed.status).toBe(200);
+    } finally {
+      delete process.env.DISABLE_LOCAL_TRUST;
+    }
+  });
+
   it('advertises auto plus only available models, and accepts :latest names', async () => {
     setSetting('ollama_emulation', 'open-loopback');
     const tags = await request(app, 'GET', '/api/tags');
@@ -139,7 +153,8 @@ describe('Ollama emulation', () => {
   it('does not treat LAN peers as loopback clients', () => {
     const peer = (remoteAddress: string, forwarded?: string) => ({
       socket: { remoteAddress },
-      headers: forwarded ? { 'x-forwarded-for': forwarded } : {},
+      httpVersion: '1.1',
+      headers: { host: 'localhost:11434', ...(forwarded ? { 'x-forwarded-for': forwarded } : {}) },
     }) as any;
     expect(isLoopback(peer('127.0.0.1'))).toBe(true);
     expect(isLoopback(peer('::1'))).toBe(true);

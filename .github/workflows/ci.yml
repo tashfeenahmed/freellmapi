@@ -32,6 +32,12 @@ jobs:
       - name: Check migration round trip
         run: npm run test:migrations
 
+      # The reverse-proxy locality suite runs against a real nginx
+      # (server/src/__tests__/integration/nginx-proxy.test.ts). The runner
+      # image usually ships it; install only when missing.
+      - name: Install nginx (proxy integration tests)
+        run: command -v nginx || (sudo apt-get update && sudo apt-get install -y nginx)
+
       # COVERAGE makes the server suite collect coverage inside this run rather
       # than running the whole suite a second time. Only the Node 22 leg sets
       # it, so the Node 20 leg keeps uninstrumented timings. Reporting only,
@@ -39,6 +45,8 @@ jobs:
       - name: Run tests
         env:
           COVERAGE: ${{ matrix.node-version == '22' && '1' || '' }}
+          # Fail instead of skipping if nginx is unavailable.
+          REQUIRE_NGINX_TESTS: '1'
         run: npm test
 
       # server + cli only; the client has its own backlog of ESLint violations
