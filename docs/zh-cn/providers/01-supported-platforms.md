@@ -19,6 +19,7 @@
 | `cerebras` | Cerebras | 带密钥 | OpenAI 兼容 | `api.cerebras.ai/v1`。 |
 | `bai` | B.AI | 带密钥 | OpenAI 兼容 | #918 加入的网关；目录里唯一的一行是限时 0 额度促销，保留在托管目录中。 |
 | `anyapi` | AnyAPI | 带密钥 | OpenAI 兼容 | 免费档 $0 / 无需信用卡 / 不循环扣费，上限为「免费和基础」模型每日 10 万词元；未公布 RPM/RPD（#772）。模型 id 经由目录同步送达，绝不盲目播种。 |
+| `powertokens` | PowerTokens | 带密钥 | OpenAI 兼容 | 免费模型 `glm-4.7-flash` 已于 2026-10-22 在 Models 详情核实：$0 / 1M 输入+输出（0 Credits）；同日认证 `/v1/models` 与 chat 可调。营销 `/pricing` 页可能未列出该 id。隐藏推理 60s 超时。模型行仅托管目录（RPM/RPD 未公布）。 |
 | `nvidia` | NVIDIA NIM | 带密钥 | OpenAI 兼容 | `parallel_tool_calls` 固定为 false（#255）；180s 超时兼任流式首字节宽限（#584）。 |
 | `mistral` | Mistral | 带密钥 | OpenAI 兼容 | `api.mistral.ai/v1`。 |
 | `sambanova` | SambaNova | 已退役（V23） | 未注册 | 免费额度永久消失；因历史密钥行而保留在类型联合中。 |
