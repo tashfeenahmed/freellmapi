@@ -9,6 +9,7 @@ import type { Server } from 'node:http';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -19,6 +20,8 @@ let token: string;
 beforeEach(async () => {
   process.env.ENCRYPTION_KEY = '0'.repeat(64);
   initDb(':memory:');
+  // Cooldowns live in module memory; each fresh DB reuses key id 1.
+  clearAllCooldowns();
   const db = getDb();
   const secret = encrypt('embed-rate-test-key');
   const keyId = Number(db.prepare(`INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, enabled, status, base_url)
