@@ -183,6 +183,22 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.powertokens.ai/v1',
 }));
 
+// cheapllm.shop - OpenAI-compatible host for a single model,
+// deepseek-v4.1-flash-1017 (https://cheapllm.shop/v1). Free tier per
+// https://cheapllm.shop/docs#free-tier (checked 2026-11-10): free with no rate
+// limit during the beta, then a permanent free tier of at least 5,000 input +
+// 1,000 output tokens per rolling hour per account; email sign-up, no card.
+// When busy it queues and retries instead of answering 429, and the model
+// reasons before answering, so allow 180s. GET /v1/models is public without a
+// key but answers 401 when a bad key is sent, so the default validation probe
+// is meaningful and free. Model rows live in the hosted catalog.
+register(new OpenAICompatProvider({
+  platform: 'cheapllm',
+  name: 'cheapllm.shop',
+  baseUrl: 'https://cheapllm.shop/v1',
+  timeoutMs: 180_000,
+}));
+
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible
 // and its current public roster is free without consuming GPU-instance
 // credits. Public models are experimental and may rotate, so their ids remain
