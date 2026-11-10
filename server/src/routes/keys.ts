@@ -34,6 +34,7 @@ import {
 import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
+import { isLocalRequest } from '../lib/request-locality.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 
 export const keysRouter = Router();
@@ -580,15 +581,12 @@ keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
   res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
-// Is the caller connecting from this machine? Read from the real socket peer
-// address, NOT req.ip or X-Forwarded-For: those are caller-controlled, so
-// trusting them here would let a remote caller claim to be local.
+// Is the caller connecting from this machine? A loopback socket is required,
+// and a request a same-host reverse proxy forwarded is local only when
+// TRUST_PROXY resolves its client to loopback (lib/request-locality.ts).
+// X-Forwarded-For alone is caller-controlled, so it can never claim locality.
 function isLoopbackRemote(req: Request): boolean {
-  let addr = req.socket?.remoteAddress ?? '';
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
+  return isLocalRequest(req);
 }
 
 // #786: the desktop build has no user-set password (its machine user's password

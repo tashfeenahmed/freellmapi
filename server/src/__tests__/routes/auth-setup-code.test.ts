@@ -7,11 +7,13 @@ import { generateSetupCode, getSetupCode } from '../../lib/setup-code.js';
 // FIX 1: first-run setup is frictionless from the local machine (loopback) but
 // a remote caller must present the one-time setup code minted at boot. The real
 // connection here is always loopback, so a middleware overrides req.socket with
-// the address under test (the route reads req.socket.remoteAddress, never req.ip
-// or X-Forwarded-For).
+// the address under test. Forwarded headers are honoured only through the
+// app's `trust proxy` setting (TRUST_PROXY), which the optional second argument
+// sets the same way createApp() does.
 
-function appWithRemote(remoteAddr: string): Express {
+function appWithRemote(remoteAddr: string, trustProxy: boolean | number | string[] = false): Express {
   const app = express();
+  app.set('trust proxy', trustProxy);
   app.use(express.json());
   app.use((req, _res, next) => {
     Object.defineProperty(req, 'socket', { value: { remoteAddress: remoteAddr }, configurable: true });
@@ -107,13 +109,69 @@ describe('First-run setup code gate (FIX 1)', () => {
     expect(count).toBe(0);
   });
 
-  it('still allows a same-host proxy that forwards a local browser', async () => {
-    const { status } = await postSetup(
+  // Without TRUST_PROXY nothing in X-Forwarded-For can be verified: the client
+  // writes it. A proxied request is therefore never local, even one that
+  // claims 127.0.0.1. (This used to pass, which was the bypass below.)
+  it('requires the code for a proxied request when TRUST_PROXY is unset', async () => {
+    const { status, body } = await postSetup(
       appWithRemote('127.0.0.1'),
       CREDS,
       { 'X-Forwarded-For': '127.0.0.1' },
     );
+    expect(status).toBe(403);
+    expect(body.error.type).toBe('setup_code_required');
+  });
+
+  it('allows a same-host proxy that forwards a local browser when TRUST_PROXY=1', async () => {
+    const { status } = await postSetup(
+      appWithRemote('127.0.0.1', 1),
+      CREDS,
+      { 'X-Forwarded-For': '127.0.0.1' },
+    );
     expect(status).toBe(201);
+  });
+
+  describe('spoofed loopback through a same-host reverse proxy (regression)', () => {
+    const expectRefused = async (app: Express, headers: Record<string, string>) => {
+      const { status, body } = await postSetup(app, CREDS, headers);
+      expect(status).toBe(403);
+      expect(body.error.type).toBe('setup_code_required');
+      const count = (getDb().prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number }).c;
+      expect(count).toBe(0);
+    };
+
+    // nginx `$proxy_add_x_forwarded_for` appends the real client after
+    // whatever the client sent, so the first entry is attacker-written.
+    it('rejects an attacker-written first hop (nginx append), TRUST_PROXY unset', async () => {
+      await expectRefused(appWithRemote('127.0.0.1'), { 'X-Forwarded-For': '127.0.0.1, 203.0.113.7' });
+    });
+
+    it('rejects an attacker-written first hop (nginx append), TRUST_PROXY=1', async () => {
+      await expectRefused(appWithRemote('127.0.0.1', 1), { 'X-Forwarded-For': '127.0.0.1, 203.0.113.7' });
+    });
+
+    it('rejects an attacker-written first hop with a trusted loopback proxy list', async () => {
+      await expectRefused(appWithRemote('127.0.0.1', ['loopback']), { 'X-Forwarded-For': '127.0.0.1, 203.0.113.7' });
+    });
+
+    // TRUST_PROXY=true trusts every hop, so req.ip is the left-most entry: the
+    // one the client wrote. It can never prove locality.
+    it('rejects any proxied request when TRUST_PROXY=true', async () => {
+      await expectRefused(appWithRemote('127.0.0.1', true), { 'X-Forwarded-For': '127.0.0.1' });
+      await expectRefused(appWithRemote('127.0.0.1', true), { 'X-Forwarded-For': '127.0.0.1, 203.0.113.7' });
+    });
+
+    // A proxy that names the client only in X-Real-IP / Forwarded has no
+    // X-Forwarded-For chain for TRUST_PROXY to verify.
+    it('rejects a proxied request identified only by X-Real-IP or Forwarded', async () => {
+      await expectRefused(appWithRemote('127.0.0.1', 1), { 'X-Real-IP': '203.0.113.7' });
+      await expectRefused(appWithRemote('127.0.0.1'), { 'X-Real-IP': '127.0.0.1' });
+      await expectRefused(appWithRemote('127.0.0.1'), { Forwarded: 'for=127.0.0.1' });
+    });
+
+    it('never grants locality to a remote socket, whatever the headers say', async () => {
+      await expectRefused(appWithRemote('203.0.113.7', true), { 'X-Forwarded-For': '127.0.0.1' });
+    });
   });
 
   it('accepts the setup code through a proxy with a remote forwarded hop', async () => {

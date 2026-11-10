@@ -15,12 +15,67 @@ import type { Request, Response, NextFunction } from 'express';
 const WINDOW_MS = 60_000;
 const DEFAULT_RPM = 120;
 // Bound the IP map so a flood of distinct (e.g. spoofed) source addresses can't
-// grow it without limit; expired entries are pruned opportunistically.
+// grow it without limit (see IpWindowTracker).
 const MAX_TRACKED_IPS = 10_000;
 
 interface WindowState {
   count: number;
   resetAt: number;
+}
+
+export interface RateLimiterOptions {
+  /** Cap on tracked client IPs. Default MAX_TRACKED_IPS. */
+  maxTrackedIps?: number;
+}
+
+/**
+ * Per-IP fixed windows with a hard size bound.
+ *
+ * Every window lasts WINDOW_MS, and an entry is (re)inserted at the end of the
+ * Map whenever its window starts. Map iteration follows insertion order, so the
+ * entries are always sorted by resetAt, oldest first. That gives:
+ *  - expiry pruning that pops from the front and stops at the first live
+ *    window: amortized O(1) per request, instead of a full scan once the map
+ *    is large (which used to run on EVERY request while it was over the cap);
+ *  - a hard cap: if a distributed flood keeps more than `maxTracked` windows
+ *    live, the oldest live window is evicted. The map can never grow past the
+ *    cap. Eviction only forgets a count (that IP starts a fresh window), so it
+ *    can never block a request that would otherwise have been allowed.
+ */
+export class IpWindowTracker {
+  private readonly windows = new Map<string, WindowState>();
+
+  constructor(private readonly maxTracked: number = MAX_TRACKED_IPS) {}
+
+  get size(): number {
+    return this.windows.size;
+  }
+
+  /** Count one request for `ip` and return its current window. */
+  hit(ip: string, now: number): WindowState {
+    this.pruneExpired(now);
+    let state = this.windows.get(ip);
+    if (!state || now >= state.resetAt) {
+      // Delete before set so a restarted window moves to the end and the
+      // insertion order stays sorted by resetAt.
+      this.windows.delete(ip);
+      state = { count: 0, resetAt: now + WINDOW_MS };
+      this.windows.set(ip, state);
+      while (this.windows.size > this.maxTracked) {
+        const oldest = this.windows.keys().next().value as string;
+        this.windows.delete(oldest);
+      }
+    }
+    state.count += 1;
+    return state;
+  }
+
+  private pruneExpired(now: number): void {
+    for (const [key, value] of this.windows) {
+      if (now < value.resetAt) break;
+      this.windows.delete(key);
+    }
+  }
 }
 
 function parseLimit(): number {
@@ -31,9 +86,9 @@ function parseLimit(): number {
   return Math.floor(n);
 }
 
-export function createProxyRateLimiter(rpmLimit?: number) {
+export function createProxyRateLimiter(rpmLimit?: number, options: RateLimiterOptions = {}) {
   const limit = rpmLimit !== undefined ? Math.floor(Math.max(0, rpmLimit)) : parseLimit();
-  const windows = new Map<string, WindowState>();
+  const windows = new IpWindowTracker(options.maxTrackedIps);
 
   return function proxyRateLimit(req: Request, res: Response, next: NextFunction): void {
     if (limit === 0) {
@@ -44,18 +99,7 @@ export function createProxyRateLimiter(rpmLimit?: number) {
     const now = Date.now();
     const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
-    let state = windows.get(ip);
-    if (!state || now >= state.resetAt) {
-      state = { count: 0, resetAt: now + WINDOW_MS };
-      windows.set(ip, state);
-    }
-    state.count += 1;
-
-    if (windows.size > MAX_TRACKED_IPS) {
-      for (const [key, value] of windows) {
-        if (now >= value.resetAt) windows.delete(key);
-      }
-    }
+    const state = windows.hit(ip, now);
 
     res.setHeader('X-RateLimit-Limit', String(limit));
     res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - state.count)));
@@ -98,9 +142,9 @@ function parseAdminLimit(): number {
   return Math.floor(n);
 }
 
-export function createAdminRateLimiter(rpm?: number) {
+export function createAdminRateLimiter(rpm?: number, options: RateLimiterOptions = {}) {
   const limit = rpm !== undefined ? Math.floor(Math.max(0, rpm)) : parseAdminLimit();
-  const windows = new Map<string, WindowState>();
+  const windows = new IpWindowTracker(options.maxTrackedIps);
 
   return function adminRateLimit(req: Request, res: Response, next: NextFunction): void {
     if (limit === 0) {
@@ -111,18 +155,7 @@ export function createAdminRateLimiter(rpm?: number) {
     const now = Date.now();
     const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
-    let state = windows.get(ip);
-    if (!state || now >= state.resetAt) {
-      state = { count: 0, resetAt: now + WINDOW_MS };
-      windows.set(ip, state);
-    }
-    state.count += 1;
-
-    if (windows.size > MAX_TRACKED_IPS) {
-      for (const [key, value] of windows) {
-        if (now >= value.resetAt) windows.delete(key);
-      }
-    }
+    const state = windows.hit(ip, now);
 
     res.setHeader('X-RateLimit-Limit', String(limit));
     res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - state.count)));

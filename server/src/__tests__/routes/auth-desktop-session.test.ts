@@ -93,6 +93,17 @@ describe('POST /api/auth/desktop-session (#1399)', () => {
     expect(res.status).toBe(403);
   });
 
+  // Regression: nginx `$proxy_add_x_forwarded_for` keeps the client's own
+  // X-Forwarded-For and appends the real address, so a remote client could
+  // put 127.0.0.1 first and be handed the install's session.
+  it('refuses a spoofed loopback hop relayed by a local reverse proxy', async () => {
+    for (const forwarded of ['127.0.0.1, 203.0.113.9', '127.0.0.1']) {
+      const res = await call(app(), 'POST', '/api/auth/desktop-session', { 'x-forwarded-for': forwarded });
+      expect(res.status, forwarded).toBe(403);
+      expect((await call(app(), 'GET', '/api/auth/status', { 'x-forwarded-for': forwarded })).body.desktop).toBe(false);
+    }
+  });
+
   it('refuses a DNS-rebinding page (non-local Host header)', async () => {
     const res = await call(app(), 'POST', '/api/auth/desktop-session', { host: 'evil.example:31415' });
     expect(res.status).toBe(403);

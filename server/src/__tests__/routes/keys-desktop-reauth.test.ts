@@ -144,4 +144,27 @@ describe('Desktop re-auth bypass is loopback-only (#786)', () => {
     server.close();
     expect(res.status).toBe(403);
   });
+
+  // Regression: a same-host reverse proxy is a loopback socket for every
+  // client. The old check read the socket alone, so on a desktop build behind
+  // such a proxy any remote dashboard session could lift plaintext keys
+  // without the password.
+  it('demands the password for a request a local reverse proxy forwarded', async () => {
+    process.env.FREEAPI_DESKTOP = '1';
+    const id = await addKey();
+    for (const forwarded of ['203.0.113.7', '127.0.0.1, 203.0.113.7', '127.0.0.1']) {
+      const app = appWithRemote('127.0.0.1');
+      const server = app.listen(0, '127.0.0.1');
+      if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
+      const addr = server.address() as { port: number };
+      const res = await fetch(`http://127.0.0.1:${addr.port}/api/keys/${id}/reveal`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'X-Forwarded-For': forwarded },
+      });
+      const body = await res.json().catch(() => null) as any;
+      server.close();
+      expect(res.status, forwarded).toBe(403);
+      expect(body?.key).toBeUndefined();
+    }
+  });
 });

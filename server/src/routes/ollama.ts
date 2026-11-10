@@ -11,6 +11,7 @@ import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
+import { isLocalRequest } from '../lib/request-locality.js';
 
 export const ollamaRouter = Router();
 
@@ -21,19 +22,12 @@ export function getOllamaEmulationMode(): OllamaEmulationMode {
   return stored === 'open-loopback' || stored === 'key-required' ? stored : 'off';
 }
 
+// Open-loopback mode serves inference with no key, so "loopback" must mean a
+// client on this machine, not just a loopback socket: a same-host reverse proxy
+// is a loopback socket for every client on the internet. lib/request-locality.ts
+// only accepts a proxied request when TRUST_PROXY resolves its client to loopback.
 export function isLoopback(req: Request): boolean {
-  const isLoopbackAddress = (value: string | undefined) => {
-    const address = value?.trim().replace(/^::ffff:/i, '');
-    return address === '127.0.0.1' || address === '::1';
-  };
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request instead of silently widening
-  // open-loopback mode through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
+  return isLocalRequest(req);
 }
 
 function authorize(req: Request, res: Response): boolean {
