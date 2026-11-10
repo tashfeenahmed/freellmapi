@@ -152,6 +152,21 @@ describe('custom speech-to-text endpoint, end to end', () => {
     expect(row).toMatchObject({ platform: 'custom', request_type: 'transcription', status: 'success' });
   });
 
+  it('tries a sibling key after a custom transcription key fails', async () => {
+    expect((await registerStt(app)).status).toBe(201);
+    expect((await registerStt(app, { apiKey: 'second-key' })).status).toBe(201);
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ error: 'invalid key' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ text: 'transcribed' }));
+    globalThis.fetch = fetchMock as any;
+    const result = await postTranscription(app, { model: 'Systran/faster-whisper-large-v3' });
+    expect(result.status).toBe(200);
+    expect(result.body.text).toBe('transcribed');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(new Set(calls.map(c => new Headers(c[1].headers).get('Authorization'))))
+      .toEqual(new Set(['Bearer stt-secret-key', 'Bearer second-key']));
+  });
+
   it("'whisper-1' auto-routes to the only registered STT model (stock OpenAI clients)", async () => {
     expect((await registerStt(app)).status).toBe(201);
     const fetchMock = vi.fn(async () => jsonResponse({ text: 'auto routed' }));
