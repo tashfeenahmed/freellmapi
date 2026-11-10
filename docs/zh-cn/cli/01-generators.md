@@ -25,7 +25,7 @@ npx freellmapi setup-claude --model gpt-4o  # 固定模型
 | `setup-cline` | `~/.config/Code/User/settings.json` | OpenAI Chat | Cline VS Code 扩展 |
 | `setup-continue` | `~/.continue/config.json` | OpenAI Chat | Continue 幽灵文本自动补全 |
 | `setup-aider` | `~/.aider.conf.yml` | OpenAI Chat | Aider 结对编程 |
-| `setup-opencode` | `~/.config/opencode/config.json` | OpenAI Chat | OpenCode 智能体 |
+| `setup-opencode` | `~/.config/opencode/opencode.json` + 密钥写入 `~/.local/share/opencode/auth.json` | OpenAI Chat | OpenCode 智能体 |
 | `setup-goose` | `~/.config/goose/config.yaml` | OpenAI Chat | Goose 智能体 |
 | `setup-qwen` | `~/.qwen/settings.json` | OpenAI/Gemini | Qwen Code，`/v1` 或原生 `/v1beta` |
 | `setup-roo` | `~/.config/roo/config.json` | OpenAI Chat | Roo Code |
