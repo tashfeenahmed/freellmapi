@@ -168,21 +168,19 @@ register(new OpenAICompatProvider({
 }));
 
 // PowerTokens — OpenAI-compatible gateway (https://api.powertokens.ai/v1).
-// Free tier VERIFIED 2026-10-22 against the Models UI detail for
-// glm-4.7-flash: INPUT $0 / 1M Tokens (0 Credits), OUTPUT $0 / 1M Tokens
-// (0 Credits). Screenshot: contributor-provided Models page capture. The
-// marketing /pricing HTML may omit this id even while Models shows $0.
-// Live probes the same day: authenticated GET /v1/models lists
-// glm-4.7-flash; POST /v1/chat/completions returns 200 (~41s TTFB — hidden
-// reasoning, same class as zhipu glm-4.7-flash, so timeoutMs 60s).
-// RPM/RPD/TPD unpublished → leave null in catalog. Model rows stay in the
-// hosted catalog (not migrations): single verified free id, limits unknown,
-// same pattern as anyapi/bai gateways.
+// Free model glm-4.7-flash: $0 / 1M in + out (0 Credits) on the Models UI
+// (contributor-verified 2026-10-22). Re-tested 2026-11-10 with an unrestricted
+// key: authenticated GET /v1/models lists it (84 ids), non-streaming chat 200
+// in ~2.6s, streaming SSE 200 in ~3.6s. Upstream returns 429 code 1305
+// ("temporarily overloaded") under load; the router's normal 429 cooldown
+// handles it. Keys can be restricted per model in the PowerTokens dashboard,
+// which surfaces as 403 token_model_forbidden. RPM/RPD/TPD unpublished, so the
+// row lives only in the hosted catalog (premium now, free after 30 days), the
+// same pattern as anyapi/bai. Default 60s timeout is enough.
 register(new OpenAICompatProvider({
   platform: 'powertokens',
   name: 'PowerTokens',
   baseUrl: 'https://api.powertokens.ai/v1',
-  timeoutMs: 60_000,
 }));
 
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible

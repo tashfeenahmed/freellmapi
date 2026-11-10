@@ -14,19 +14,24 @@ describe('PowerTokens provider registration', () => {
     expect(provider.baseUrl).toBe('https://api.powertokens.ai/v1');
   });
 
-  it('uses a 60s timeout for glm-4.7-flash hidden reasoning', () => {
+  it('keeps the default 60s request timeout', () => {
     const provider = getProvider('powertokens') as unknown as { timeoutMs: number };
     expect(provider.timeoutMs).toBe(60_000);
   });
 
   it('resolves from .env prefixes', () => {
-    for (const prefix of ['POWERTOKENS_', 'POWER_TOKENS_', 'PT_']) {
+    for (const prefix of ['POWERTOKENS_', 'POWER_TOKENS_']) {
       expect(detectPlatform(prefix)).toBe('powertokens');
     }
   });
 
+  it('does not claim generic PT_ / pt names', () => {
+    expect(detectPlatform('PT_')).not.toBe('powertokens');
+    expect(AUTH_JSON_PROVIDER_MAP.pt).toBeUndefined();
+  });
+
   it('resolves from auth.json aliases', () => {
-    for (const alias of ['powertokens', 'power-tokens', 'pt']) {
+    for (const alias of ['powertokens', 'power-tokens']) {
       expect(AUTH_JSON_PROVIDER_MAP[alias]).toBe('powertokens');
     }
   });
