@@ -3,6 +3,7 @@ import { parseRetryAfterMs, parseStatedRetryMs } from '../providers/base.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { assessProviderUrl } from '../lib/url-guard.js';
 import { isSearchPlatform } from '../lib/search-platforms.js';
 import { TAVILY_BASE_URL } from '../providers/tavily.js';
 import { SERPSEARCH_BASE_URL } from '../providers/serpsearch.js';
@@ -303,6 +304,18 @@ async function tavilyShaped(url: string, platform: string, cred: ReservedProvide
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  tinyfish: async (cred, query, opts, n) => {
+    const url = new URL('https://api.search.tinyfish.ai/');
+    url.searchParams.set('query', query);
+    url.searchParams.set('domain_type', opts.topic === 'news' ? 'news' : 'web');
+    const parsed = await upstream(url.toString(), 'tinyfish', {
+      method: 'GET', redirect: 'error', headers: { 'X-API-Key': cred.key.trim(), Accept: 'application/json' },
+    }, opts.signal) as { results?: Array<Record<string, unknown>> };
+    const hits = (Array.isArray(parsed?.results) ? parsed.results : []).slice(0, n).map(r => ({
+      title: str(r.title), url: str(r.url), content: str(r.snippet),
+    }));
+    return { results: keepHits(hits) };
+  },
   serpsearch: async (cred, query, opts, n) => {
     const news = opts.topic === 'news';
     const url = new URL(`${SERPSEARCH_BASE_URL}/${news ? 'news' : 'search'}`);
@@ -565,6 +578,7 @@ export const SEARCH_PLATFORM_INFO: Record<string, { name: string; keyless?: bool
   serpsearch: { name: 'SerpSearch' },
   keenable: { name: 'Keenable', keyless: true },
   brave: { name: 'Brave Search' },
+  tinyfish: { name: 'TinyFish' },
 };
 
 const platformName = (p: string): string => SEARCH_PLATFORM_INFO[p]?.name ?? p;
@@ -746,6 +760,54 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
     lastError?.code,
     status === 429 ? hints.retryAfterMs() : undefined,
   );
+}
+
+export interface TinyFishFetchResult {
+  results: Array<Record<string, unknown>>;
+  errors: Array<Record<string, unknown>>;
+}
+
+/** Fetch pages through TinyFish's no-wallet Search/Fetch product. A TinyFish
+ * engine must be enabled in the signed catalog; the API key is reserved and
+ * released through the same budget, cooldown, and health path as search. */
+export async function runTinyFishFetch(urls: string[], format: 'markdown' | 'html' | 'json' = 'markdown'): Promise<TinyFishFetchResult> {
+  if (urls.length < 1 || urls.length > 10) throw new SearchError('TinyFish accepts between 1 and 10 URLs per fetch', 400);
+  for (const value of urls) {
+    let url: URL;
+    try { url = new URL(value); } catch { throw new SearchError('TinyFish fetch URLs must be valid HTTP or HTTPS URLs', 400); }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+      throw new SearchError('TinyFish fetch URLs must be HTTP or HTTPS and cannot include credentials', 400);
+    }
+    const assessment = await assessProviderUrl(url.href, { blockPrivate: true });
+    if (!assessment.allowed) throw new SearchError(`TinyFish fetch URL rejected: ${assessment.reason ?? 'private target'}`, 400);
+  }
+  const row = orderedEngines().find(r => r.platform === 'tinyfish' && r.enabled === 1 && !!ADAPTERS[r.platform]);
+  if (!row) throw new SearchError('TinyFish Fetch is unavailable until a TinyFish engine is enabled in the catalog', 503, 'no_tinyfish_fetch');
+  const { credential, budgetBlocked } = reserveProviderCredential(row, 0, keyId => isOnCooldown(row.platform, row.model_id, keyId));
+  if (!credential) throw new SearchError(budgetBlocked ? 'Monthly key budget exhausted' : 'No healthy TinyFish API key is available', budgetBlocked ? 429 : 503);
+  const started = Date.now();
+  try {
+    const parsed = await upstream('https://api.fetch.tinyfish.ai/', 'tinyfish', {
+      method: 'POST', redirect: 'error',
+      headers: { 'X-API-Key': credential.key.trim(), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ urls, format }),
+    }) as { results?: unknown; errors?: unknown };
+    if (!Array.isArray(parsed?.results) || !Array.isArray(parsed?.errors)) {
+      throw new SearchError('TinyFish returned an invalid fetch response', 502);
+    }
+    const results = parsed.results.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object' && !Array.isArray(r));
+    const errors = parsed.errors.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object' && !Array.isArray(r));
+    logSearch(row, credential.id, results.length ? 'ok' : 'error', Date.now() - started, results.length, 'api-fetch', errors.length ? JSON.stringify(errors).slice(0, 300) : null, 0);
+    if (results.length) markKeyHealthyFromRequest(credential.id);
+    return { results, errors };
+  } catch (err: any) {
+    const e = err instanceof SearchError ? err : new SearchError(String(err?.message ?? err), 502);
+    logSearch(row, credential.id, 'error', Date.now() - started, 0, 'api-fetch', e.message.slice(0, 300), 0);
+    coolDown(row, credential.id, e);
+    throw e;
+  } finally {
+    credential.release();
+  }
 }
 
 /** Whole seconds the client should wait before retrying: the upstream back-off

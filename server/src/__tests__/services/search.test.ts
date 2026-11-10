@@ -6,6 +6,7 @@ import { getProvider } from '../../providers/index.js';
 import { BraveProvider } from '../../providers/brave.js';
 import {
   runSearch,
+  runTinyFishFetch,
   SearchError,
   listSearchEngines,
   updateSearchEngine,
@@ -20,6 +21,7 @@ import { SEARCH_PLATFORMS as SHARED_SEARCH_PLATFORMS } from '../../../../shared/
 import { SEARCH_PLATFORMS } from '../../lib/search-platforms.js';
 import { seedSearchEngines } from '../helpers/search-engines.js';
 import { clearLastHealthyStampState } from '../../services/health.js';
+import * as urlGuard from '../../lib/url-guard.js';
 
 const realFetch = globalThis.fetch;
 
@@ -44,6 +46,13 @@ function addCustomRelay(baseUrl: string, engineId = 'my-relay'): number {
     VALUES ('custom', ?, ?, 'search', 99, 1, 'custom endpoint', ?)
   `).run(engineId, engineId, keyId);
   return keyId;
+}
+
+function addTinyfishEngine(engineId = 'tinyfish-search'): number {
+  return Number(getDb().prepare(`
+    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+    VALUES ('tinyfish', ?, ?, 'search', 10, 1, 'free Search/Fetch allowance')
+  `).run(engineId, engineId).lastInsertRowid);
 }
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -112,6 +121,40 @@ describe('search service', () => {
       { title: 'B', url: 'https://b', content: 'beta', score: 0.5 },
     ]);
     expect(logRows()).toEqual([{ engine_id: 'exa-search', platform: 'exa', status: 'ok', result_count: 2 }]);
+  });
+
+  it('maps TinyFish Search API results and sends X-API-Key auth', async () => {
+    addTinyfishEngine(); addKey('tinyfish');
+    const fn = mockFetch(() => json({ results: [{ title: 'A page', url: 'https://example.com/a', snippet: 'A useful excerpt', position: 1 }] }));
+    const out = await runSearch('example query', { maxResults: 1 });
+    expect(calls(fn)[0][0]).toBe('https://api.search.tinyfish.ai/?query=example+query&domain_type=web');
+    expect(new Headers(calls(fn)[0][1].headers).get('x-api-key')).toBe('tinyfish-test-key');
+    expect(out).toMatchObject({ provider: 'tinyfish', engine: 'tinyfish-search', results: [{ title: 'A page', content: 'A useful excerpt' }] });
+  });
+
+  it('fetches TinyFish URLs through the free Fetch API and reports per-URL errors', async () => {
+    addTinyfishEngine(); addKey('tinyfish');
+    vi.spyOn(urlGuard, 'assessProviderUrl').mockResolvedValue({ allowed: true });
+    const fn = mockFetch(() => json({ results: [{ url: 'https://example.com', title: 'Example', text: '# Example' }], errors: [{ url: 'https://missing.example', error: 'page_not_found' }] }));
+    const out = await runTinyFishFetch(['https://example.com', 'https://missing.example']);
+    expect(calls(fn)[0][0]).toBe('https://api.fetch.tinyfish.ai/');
+    expect(new Headers(calls(fn)[0][1].headers).get('x-api-key')).toBe('tinyfish-test-key');
+    expect(bodyOf(calls(fn)[0])).toEqual({ urls: ['https://example.com', 'https://missing.example'], format: 'markdown' });
+    expect(out.errors).toEqual([{ url: 'https://missing.example', error: 'page_not_found' }]);
+  });
+
+  it.each(['ftp://example.com/file', 'https://user:pass@example.com'])('rejects malformed TinyFish fetch URL %s before network access', async url => {
+    const fn = mockFetch(() => json({ results: [], errors: [] }));
+    await expect(runTinyFishFetch([url])).rejects.toMatchObject({ status: 400 });
+    expect(calls(fn)).toHaveLength(0);
+  });
+
+  it('blocks private-address TinyFish targets before any outbound request', async () => {
+    addTinyfishEngine(); addKey('tinyfish');
+    vi.spyOn(urlGuard, 'assessProviderUrl').mockResolvedValue({ allowed: false, reason: 'resolves to a private address' });
+    const fn = mockFetch(() => json({ results: [], errors: [] }));
+    await expect(runTinyFishFetch(['https://127.0.0.1/private'])).rejects.toMatchObject({ status: 400 });
+    expect(calls(fn)).toHaveLength(0);
   });
 
   it('a served search marks the key as working; a failed one does not (#1493)', async () => {

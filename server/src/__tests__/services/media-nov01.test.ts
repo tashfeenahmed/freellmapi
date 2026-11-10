@@ -47,6 +47,24 @@ describe('renewable audio routes', () => {
     expect((await runSpeech(model, { input: 'hello', voice: 'alloy' })).audio).toEqual(mp3);
     expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ model, input: 'hello', voice_id: 'gb_jane_neutral', response_format: 'mp3' });
   });
+  it('routes Fish Audio only to the tested free MP3 TTS model', async () => {
+    seed('fishaudio', 's2.1-pro-free', 'audio');
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(mp3, { headers: { 'content-type': 'audio/mpeg' } }));
+    const result = await runSpeech('s2.1-pro-free', { input: 'hello' });
+    expect(result.contentType).toBe('audio/mpeg');
+    expect(fetch.mock.calls[0][0]).toBe('https://api.fish.audio/v1/tts');
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).get('model')).toBe('s2.1-pro-free');
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ text: 'hello', format: 'mp3' });
+  });
+  it('routes Cartesia Sonic TTS using the tested WAV voice/output shape', async () => {
+    seed('cartesia', 'sonic-3.6', 'audio');
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(wav, { headers: { 'content-type': 'audio/wav' } }));
+    const result = await runSpeech('sonic-3.6', { input: 'hello', voice: 'alloy' });
+    expect(result.contentType).toBe('audio/wav');
+    expect(fetch.mock.calls[0][0]).toBe('https://api.cartesia.ai/tts/bytes');
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).get('cartesia-version')).toBe('2026-08-14');
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toMatchObject({ model_id: 'sonic-3.6', transcript: 'hello', voice: 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4', output_format: { container: 'wav', encoding: 'pcm_s16le', sample_rate: 24000 } });
+  });
   it.each(['@cf/deepgram/aura-1', '@cf/deepgram/aura-2-en', '@cf/deepgram/aura-2-es'])('uses text and binary MP3 for %s', async model => {
     seed('cloudflare', model, 'audio');
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(mp3));
@@ -77,6 +95,16 @@ describe('transcription integration', () => {
     expect((await runTranscription(model, input)).text).toBe('blue train');
     expect(fetch.mock.calls[0][0]).toBe('https://generativelanguage.googleapis.com/v1beta/interactions');
     expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ model, store: false, input: [{ type: 'audio', data: wav.toString('base64'), mime_type: 'audio/wav' }] });
+  });
+  it('routes Cartesia Ink Whisper transcription as multipart and normalizes text', async () => {
+    seed('cartesia', 'ink-whisper', 'transcription');
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json({ text: 'blue train', language: 'en', duration: 0.72 }));
+    expect(await runTranscription('ink-whisper', input)).toMatchObject({ text: 'blue train', language: 'en', duration: 0.72 });
+    expect(fetch.mock.calls[0][0]).toBe('https://api.cartesia.ai/stt');
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).get('cartesia-version')).toBe('2026-08-14');
+    const form = fetch.mock.calls[0][1]?.body as FormData;
+    expect(form.get('model')).toBe('ink-whisper');
+    expect(Buffer.from(await (form.get('file') as File).arrayBuffer())).toEqual(wav);
   });
   it('parses Cloudflare Nova 3 nested transcript', async () => {
     seed('cloudflare', '@cf/deepgram/nova-3', 'transcription');
