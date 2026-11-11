@@ -327,6 +327,8 @@
     "minReliabilityFloorOff": "关闭",
     "providerMomentAttribution": "把限流失败归因到渠道",
     "providerMomentAttributionHint": "开启后，429、5xx、超时和连接中断会被视为「渠道这一刻不行」：仍会冷却对应的 key，但不再计入模型的可靠性评分。默认关闭——关闭即保持现有评分行为。",
+    "customFallbackMode": "自定义渠道 5xx 回退粒度",
+    "customFallbackModeHint": "模型级（默认）：某个 relay 5xx 只跳过该 relay 的模型，其他 relay 不受影响。平台级：5xx 跳过整个 custom 平台（原始行为）。",
     "guardrails": "护栏",
     "guardrailsTooltip": "始终生效的护栏：免费额度余量 × 实时限流惩罚。低于 1.0 表示该模型正在被抑制。",
     "scoreTooltip": "最终路由得分 = 三个维度的加权平均值，再乘以护栏系数。得分越高越优先路由。",

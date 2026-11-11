@@ -18,7 +18,7 @@ import { benchCloudflareAccount } from '../services/cloudflare-daily-quota.js';
 // the fire-and-forget key revalidation kicked off on an upstream 401 (below).
 
 import type { RouteResult } from '../services/router.js';
-import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
+import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled, getCustomFallbackMode } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
 import {
   recordRequest,
@@ -138,12 +138,21 @@ function benchKeyAcrossPlatform(
   source: CooldownSource,
   state: FallbackState,
   reason: string,
+  endpointScope?: string,
 ): void {
   let modelIds: string[] = [];
   try {
-    modelIds = (getDb().prepare(
-      'SELECT model_id FROM models WHERE platform = ? AND enabled = 1 AND (key_id IS NULL OR key_id = ?)',
-    ).all(route.platform, route.keyId) as { model_id: string }[]).map(r => r.model_id);
+    if (endpointScope) {
+      // Custom relays share platform 'custom' (#651): bench only the models on
+      // THIS relay, not every relay's models.
+      modelIds = (getDb().prepare(
+        'SELECT model_id FROM models WHERE platform = ? AND endpoint_scope = ? AND enabled = 1 AND (key_id IS NULL OR key_id = ?)',
+      ).all(route.platform, endpointScope, route.keyId) as { model_id: string }[]).map(r => r.model_id);
+    } else {
+      modelIds = (getDb().prepare(
+        'SELECT model_id FROM models WHERE platform = ? AND enabled = 1 AND (key_id IS NULL OR key_id = ?)',
+      ).all(route.platform, route.keyId) as { model_id: string }[]).map(r => r.model_id);
+    }
   } catch (dbErr: any) {
     console.warn(`[FallbackLoop] could not list ${route.platform} models to bench key ${route.keyId}: ${dbErr?.message ?? dbErr}`);
     return;
@@ -243,6 +252,15 @@ export interface FallbackState {
   // MODEL_NOT_FOUND_PLATFORM_LIMIT distinct misses the platform joins
   // skipPlatforms for the rest of the request.
   modelNotFoundPlatforms: Map<string, Set<number>>;
+  // Custom relays ruled out wholesale for this request, by endpoint scope
+  // (normalized base_url). Same lifetime and meaning as skipPlatforms, one
+  // level finer: it exists because every custom relay shares platform 'custom'
+  // (#651), so a platform-wide skip would take the healthy relays with it.
+  skipEndpoints: Set<string>;
+  // Per-request tally of DISTINCT custom model rows that answered a
+  // provider-level error, keyed by endpoint scope (#651 family). From
+  // PROVIDER_ERROR_ENDPOINT_LIMIT the endpoint joins skipEndpoints.
+  providerErrorEndpoints: Map<string, Set<number>>;
 }
 
 /** Total for the next dispatch. Input-only observations still need output space. */
@@ -255,7 +273,7 @@ export function fallbackRoutingTokens(state: FallbackState, estimatedTotal: numb
 }
 
 export function newFallbackState(): FallbackState {
-  return { skipKeys: new Set<string>(), skipModels: new Set<number>(), skipPlatforms: new Set<string>(), modelNotFoundPlatforms: new Map() };
+  return { skipKeys: new Set<string>(), skipModels: new Set<number>(), skipPlatforms: new Set<string>(), skipEndpoints: new Set<string>(), providerErrorEndpoints: new Map(), modelNotFoundPlatforms: new Map() };
 }
 
 // DISTINCT model_not_found hops on one platform, within one request, before the
@@ -264,6 +282,13 @@ export function newFallbackState(): FallbackState {
 // (NavyAI: 24 models tried in one session, 0 ok, #1218). 3 keeps one fluke
 // removal from condemning a provider.
 export const MODEL_NOT_FOUND_PLATFORM_LIMIT = 3;
+
+// Same threshold intent as MODEL_NOT_FOUND_PLATFORM_LIMIT: three distinct
+// custom models on one relay answering a provider-level error (5xx) means the
+// relay's gateway itself is down — it would answer the same 5xx for every
+// model it serves. From the threshold the endpoint joins skipEndpoints so the
+// loop stops burning one failover hop per model on a genuinely dead relay.
+export const PROVIDER_ERROR_ENDPOINT_LIMIT = 3;
 
 // Milliseconds until the next UTC midnight — when most providers' daily free
 // allocations reset. Floored at one minute so a hit seconds before midnight
@@ -531,7 +556,29 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // single-key path, and the per-key cooldown below is still the only thing
   // that outlives the request.
   if (isProviderLevelError(err)) {
-    state.skipPlatforms.add(route.platform);
+    if (getCustomFallbackMode() === 'model' && route.platform === 'custom' && route.endpointScope) {
+      // Every custom relay shares the platform id 'custom' (#651), so a
+      // platform-wide skip would take the healthy relays with it. Custom model
+      // rows are endpoint-scoped (unique on platform+model_id+endpoint_scope),
+      // so modelDbId already names exactly ONE relay's copy of ONE model:
+      // skipping it leaves the sibling relays — and this relay's other models —
+      // in play, and the loop fails over to a different CHANNEL instead of
+      // giving up on the whole platform.
+      state.skipModels.add(route.modelDbId);
+      // A relay whose gateway itself is down answers the same 5xx for every
+      // model it serves. Counting DISTINCT failed model rows per endpoint and
+      // ruling the endpoint out from the threshold keeps a genuinely dead
+      // relay from burning one failover hop per model, while a single broken
+      // model stays a per-model skip.
+      const seen = state.providerErrorEndpoints.get(route.endpointScope) ?? new Set<number>();
+      seen.add(route.modelDbId);
+      state.providerErrorEndpoints.set(route.endpointScope, seen);
+      if (seen.size >= PROVIDER_ERROR_ENDPOINT_LIMIT) {
+        state.skipEndpoints.add(route.endpointScope);
+      }
+    } else {
+      state.skipPlatforms.add(route.platform);
+    }
   }
   // Too big for this model is a fact about the REQUEST, not the model's
   // health: it still serves every smaller request. Skip it for this request
@@ -613,8 +660,17 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // be a different account, but with the budget already spent on this one
   // the next PROVIDER is the better hop.
   if (isAccountSuspendedError(err)) {
-    state.skipPlatforms.add(route.platform);
-    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'reports the account suspended');
+    if (route.platform === 'custom' && route.endpointScope) {
+      // Custom relays share platform 'custom' (#651): a suspended account on
+      // one relay must not rule out the healthy relays. Skip only this relay's
+      // endpoint and bench the key across THIS relay's models, not every
+      // relay's.
+      state.skipEndpoints.add(route.endpointScope);
+      benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'reports the account suspended', route.endpointScope);
+    } else {
+      state.skipPlatforms.add(route.platform);
+      benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'reports the account suspended');
+    }
   } else if (isPaymentRequiredError(err)) {
     // A 402 is the ACCOUNT's balance, not one model's (#1239: one broke
     // HuggingFace key answered three different models with 402 in a single

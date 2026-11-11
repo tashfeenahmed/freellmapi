@@ -1554,6 +1554,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         outputReserve,
         undefined,
         resolvedChain?.strategyOverride,
+        state.skipEndpoints.size > 0 ? state.skipEndpoints : undefined,
       );
     },
     dispatch: async (route, attempt, ctx) => {
@@ -2534,7 +2535,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
       const taskType = resolveTaskType(req, tools, messages);
-      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride);
+      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride, state.skipEndpoints.size > 0 ? state.skipEndpoints : undefined);
     },
     dispatch: async (route, attempt, ctx) => {
     const contextBudget = routeOutputBudget(route, estimatedInputTokens);
