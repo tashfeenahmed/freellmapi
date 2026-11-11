@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avançado",
     "sectionPreview": "Pré-visualização",
     "generalDescription": "Idioma e aspeto deste painel.",
+    "startAtLogin": "Iniciar ao iniciar o sistema",
+    "startAtLoginHelp": "Inicie o FreeLLMAPI automaticamente quando iniciar sessão no computador.",
     "advancedDescription": "Limiares e interruptores de segurança do pipeline de compressão.",
     "compressionTitle": "Compressão de prompts",
     "compressionDescription": "Reduza o tamanho dos pedidos antes do encaminhamento, preservando código, erros, caminhos, números e definições de ferramentas.",
@@ -1260,7 +1262,15 @@
     "renameHint": "Mudar o nome desta cadeia",
     "renameConfirm": "Mudar o nome da cadeia \"{oldName}\" para \"{name}\"? Os clientes que chamam auto:{oldName} devem passar para auto:{name}.",
     "renamePlaceholder": "Novo nome da cadeia",
-    "renameFailed": "Não foi possível mudar o nome da cadeia."
+    "renameFailed": "Não foi possível mudar o nome da cadeia.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "A versão {version} está disponível",
