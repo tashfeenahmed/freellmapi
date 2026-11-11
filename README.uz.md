@@ -346,6 +346,7 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 ### Hissa qo'shganlar
 
 <a href="https://github.com/moaaz12-web"><img src="https://images.weserv.nl/?url=github.com/moaaz12-web.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@moaaz12-web" /></a>
+<a href="https://github.com/AdityaxDeore"><img src="https://images.weserv.nl/?url=github.com/AdityaxDeore.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@AdityaxDeore" /></a>
 <a href="https://github.com/lukasulc"><img src="https://images.weserv.nl/?url=github.com/lukasulc.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lukasulc" /></a>
 <a href="https://github.com/VinhPhamAI"><img src="https://images.weserv.nl/?url=github.com/VinhPhamAI.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@VinhPhamAI" /></a>
 <a href="https://github.com/deadc"><img src="https://images.weserv.nl/?url=github.com/deadc.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@deadc" /></a>
@@ -371,7 +372,7 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/thedavidweng"><img src="https://images.weserv.nl/?url=github.com/thedavidweng.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedavidweng" /></a>
 <a href="https://github.com/bharvey42"><img src="https://images.weserv.nl/?url=github.com/bharvey42.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@bharvey42" /></a>
 <a href="https://github.com/yuvrxj-afk"><img src="https://images.weserv.nl/?url=github.com/yuvrxj-afk.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@yuvrxj-afk" /></a>
-<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/v0rtex1223"><img src="https://images.weserv.nl/?url=github.com/v0rtex1223.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@v0rtex1223" /></a>
 <a href="https://github.com/nicyoong"><img src="https://images.weserv.nl/?url=github.com/nicyoong.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nicyoong" /></a>
 <a href="https://github.com/Aldo-f"><img src="https://images.weserv.nl/?url=github.com/Aldo-f.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aldo-f" /></a>
 <a href="https://github.com/Tazrif-Raim"><img src="https://images.weserv.nl/?url=github.com/Tazrif-Raim.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tazrif-Raim" /></a>
@@ -505,6 +506,17 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/kjgggggg"><img src="https://images.weserv.nl/?url=github.com/kjgggggg.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kjgggggg" /></a>
 <a href="https://github.com/TheoCui-Saulcy"><img src="https://images.weserv.nl/?url=github.com/TheoCui-Saulcy.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TheoCui-Saulcy" /></a>
 <a href="https://github.com/MatthewRobertDunn"><img src="https://images.weserv.nl/?url=github.com/MatthewRobertDunn.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MatthewRobertDunn" /></a>
+<a href="https://github.com/nk-batman21"><img src="https://images.weserv.nl/?url=github.com/nk-batman21.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nk-batman21" /></a>
+<a href="https://github.com/PowerTokens"><img src="https://images.weserv.nl/?url=github.com/PowerTokens.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@PowerTokens" /></a>
+<a href="https://github.com/navzo"><img src="https://images.weserv.nl/?url=github.com/navzo.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@navzo" /></a>
+<a href="https://github.com/motasimfuad"><img src="https://images.weserv.nl/?url=github.com/motasimfuad.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@motasimfuad" /></a>
+<a href="https://github.com/thedevil11255"><img src="https://images.weserv.nl/?url=github.com/thedevil11255.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedevil11255" /></a>
+<a href="https://github.com/kvianAR"><img src="https://images.weserv.nl/?url=github.com/kvianAR.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kvianAR" /></a>
+<a href="https://github.com/TanmayShah29"><img src="https://images.weserv.nl/?url=github.com/TanmayShah29.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TanmayShah29" /></a>
+<a href="https://github.com/heydryft"><img src="https://images.weserv.nl/?url=github.com/heydryft.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@heydryft" /></a>
+<a href="https://github.com/leucds2018-hub"><img src="https://images.weserv.nl/?url=github.com/leucds2018-hub.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@leucds2018-hub" /></a>
+<a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
+<a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
 
 ## Ogohlantirish
 
