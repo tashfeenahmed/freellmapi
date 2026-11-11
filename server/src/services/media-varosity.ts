@@ -172,7 +172,7 @@ export async function varositySpeech(model: string, key: string | null, p: Speec
 
 export async function varosityVideo(model: string, key: string | null, p: VideoParams, clientSignal?: AbortSignal): Promise<{ video: Buffer; contentType: string }> {
   if (model !== 'grok-imagine-video') throw new VarosityMediaError('Varosity video model is not a tested route', 400);
-  // One second costs less than the shared daily grant. Never silently use the
+  // One second keeps each clip cheap (about 7 cents). Never silently use the
   // provider's more expensive multi-second default or a BYOK billing fallback.
   if ((p.duration !== undefined && p.duration !== 1) || (p.aspectRatio && p.aspectRatio !== '16:9') || p.image || p.seed !== undefined || p.audio === false) throw new VarosityMediaError('Varosity video supports one-second landscape text-to-video with audio through this adapter', 400);
   const work = session(key, 'video', clientSignal);
