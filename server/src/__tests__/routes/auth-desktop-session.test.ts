@@ -93,6 +93,17 @@ describe('POST /api/auth/desktop-session (#1399)', () => {
     expect(res.status).toBe(403);
   });
 
+  // #1884: an appending local proxy leaves the caller's own header in front of the
+  // hop it adds, so the front of the list must never be the deciding value.
+  it('refuses a proxied request that claims a loopback client in front of the proxy hop', async () => {
+    const res = await call(app(), 'POST', '/api/auth/desktop-session', {
+      'x-forwarded-for': '127.0.0.1, 203.0.113.9',
+    });
+    expect(res.status).toBe(403);
+    // The refused request must not have created the install's account either.
+    expect(userCount()).toBe(0);
+  });
+
   it('refuses a DNS-rebinding page (non-local Host header)', async () => {
     const res = await call(app(), 'POST', '/api/auth/desktop-session', { host: 'evil.example:31415' });
     expect(res.status).toBe(403);

@@ -1,12 +1,21 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { listSearchEngines, updateSearchEngine, runSearch, SearchError } from '../services/search.js';
+import { listSearchEngines, updateSearchEngine, runSearch, searchStatus, SearchError } from '../services/search.js';
+import { getSyncState } from '../services/catalog-sync.js';
 
 // Dashboard: the Models → Search page (#1174). Engines come from the catalog's
 // searchEngines registry (plus custom relays); this lists them with key and
 // usage counts and lets the operator switch one off or change the order.
 export const searchRouter = Router();
+
+// Dashboard diagnostics only: local catalog/key/cooldown state. No provider
+// probes, license changes, catalog enrollment or bypass of the 30-day gate.
+searchRouter.get('/status', (_req: Request, res: Response) => {
+  const { appliedVersion, appliedTier, lastSyncMs, lastError } = getSyncState();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ...searchStatus(), catalog: { appliedVersion, appliedTier, lastSyncMs, lastError } });
+});
 
 searchRouter.get('/engines', (_req: Request, res: Response) => {
   res.json(listSearchEngines());
@@ -42,7 +51,7 @@ searchRouter.patch('/engines/:id', (req: Request, res: Response) => {
   }
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   if (!updateSearchEngine(id, parsed.data)) {

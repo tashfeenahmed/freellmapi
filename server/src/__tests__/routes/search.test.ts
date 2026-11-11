@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { clearAllCooldowns, setCooldown } from '../../services/ratelimit.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { seedSearchEngines } from '../helpers/search-engines.js';
 
@@ -66,6 +66,37 @@ describe('search routes', () => {
   it('POST /v1/search requires the gateway key', async () => {
     const { status } = await call(app, 'POST', '/v1/search', { body: { query: 'q' }, auth: null });
     expect(status).toBe(401);
+  });
+
+  it('authenticates dashboard search diagnostics', async () => {
+    expect((await call(app, 'GET', '/api/search/status', { auth: null })).status).toBe(401);
+  });
+
+  it('distinguishes missing engines from missing keys without making upstream calls', async () => {
+    addKey('parallel'); addKey('keenable');
+    setSetting('catalog_applied_tier', 'monthly'); setSetting('catalog_applied_version', 'test-free');
+    setSetting('catalog_last_error', 'catalog signature verification failed');
+    const upstream = vi.fn(); globalThis.fetch = upstream;
+    const response = await call(app, 'GET', '/api/search/status');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.body).toMatchObject({ status: 'needs_configuration', missing_from_catalog: ['parallel', 'keenable'],
+      catalog: { appliedTier: 'monthly', appliedVersion: 'test-free', lastError: 'catalog signature verification failed' } });
+    expect(response.body.engines.every((e: any) => e.state === 'needs_key')).toBe(true);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM media_models WHERE platform IN ('parallel','keenable')").get()).toEqual({ n: 0 });
+  });
+
+  it('updates readiness after key add, cooldown, disable and delete', async () => {
+    const key = addKey('tavily');
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('ready');
+    setCooldown('tavily', 'tavily-search', key, 60_000);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('cooling_down');
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+    getDb().prepare('UPDATE api_keys SET enabled=0 WHERE id=?').run(key);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('needs_configuration');
+    getDb().prepare('DELETE FROM api_keys WHERE id=?').run(key);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('needs_configuration');
   });
 
   it('POST /v1/search returns a 503 with a code when no search key exists', async () => {

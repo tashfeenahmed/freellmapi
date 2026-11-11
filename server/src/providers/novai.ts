@@ -1,5 +1,6 @@
 import type { ChatCompletionChunk, ChatCompletionResponse, ChatMessage } from '@freellmapi/shared/types.js';
 import type { CompletionOptions, KeyValidationResult } from './base.js';
+import { providerRequestError } from './base.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 
@@ -67,7 +68,7 @@ class AnswerFilter {
 
 function checkModel(model: string): void {
   if (!CHAT_MODELS.has(model)) {
-    throw Object.assign(new Error('NovAI chat supports only the tested daily-free GLM routes'), { status: 400 });
+    throw providerRequestError('NovAI chat supports only the tested daily-free GLM routes', 'model');
   }
 }
 

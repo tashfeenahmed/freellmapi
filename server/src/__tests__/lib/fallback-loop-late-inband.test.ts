@@ -83,8 +83,8 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  clearCooldownsForKey(PLATFORM, keyA);
-  clearCooldownsForKey(PLATFORM, keyB);
+  clearCooldownsForKey(keyA);
+  clearCooldownsForKey(keyB);
 });
 
 // The wall clock is what decides "late" — these tests use a tiny budget and a
