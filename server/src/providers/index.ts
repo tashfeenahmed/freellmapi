@@ -9,6 +9,7 @@ import { FirecrawlProvider } from './firecrawl.js';
 import { LinkupProvider } from './linkup.js';
 import { ParallelProvider } from './parallel.js';
 import { KeenableProvider } from './keenable.js';
+import { OutcrawlProvider } from './outcrawl.js';
 import { KeylessDecisionProvider } from './decision-only.js';
 import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
@@ -41,6 +42,7 @@ import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
 import { VarosityProvider } from './varosity.js';
 import { RimeProvider } from './rime.js';
+import { FreeTtsProvider } from './freetts.js';
 import { FreeAiProvider } from './freeai.js';
 import { BlazeProvider } from './blaze.js';
 import { LucidityProvider } from './lucidity.js';
@@ -128,6 +130,7 @@ register(new ClodProvider());
 register(new SpeechifyProvider());
 register(new VarosityProvider());
 register(new RimeProvider());
+register(new FreeTtsProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
 // Five more OpenAI-compatible gateways. Each pins the response model to the
@@ -264,6 +267,7 @@ register(new LinkupProvider());
 register(new ParallelProvider());
 // Keyless: public endpoint by default, the keyed endpoint with a real key.
 register(new KeenableProvider());
+register(new OutcrawlProvider());
 
 // Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
 register(new CloudflareProvider());
