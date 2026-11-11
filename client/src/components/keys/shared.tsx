@@ -51,6 +51,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
   { value: 'varosity', label: 'Varosity (shared media credits)', url: 'https://varosity.ai/app/keys/api-keys' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
+  { value: 'freetts', label: 'FreeTTS (personal use only; watermarked TTS)', url: 'https://freetts.org/dashboard?section=api-keys' },
   { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
   { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
@@ -104,6 +105,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // CATALOG-ANYAPI-SMOKE-2026-08-10 in the ops repo). No quota claim until
   // their free tier demonstrably works.
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
+  // Free: glm-4.7-flash $0/1M in+out (0 Credits) on Models UI, 2026-10-22.
+  { value: 'powertokens', label: 'PowerTokens (free: glm-4.7-flash)', url: 'https://www.powertokens.ai' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name
@@ -133,6 +136,8 @@ export const CUSTOM_MODEL_KIND_LABEL: Record<ApiKeyModel['kind'], string> = {
   image: 'keys.customTypeImage',
   audio: 'keys.customTypeAudio',
   transcription: 'keys.customTypeTranscription',
+  search: 'keys.customTypeSearch',
+  decision: 'keys.customTypeDecision',
 }
 
 export function customModelDeleteKey(model: ApiKeyModel): string {

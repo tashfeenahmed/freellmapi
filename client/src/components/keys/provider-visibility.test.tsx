@@ -46,6 +46,8 @@ it('omits Waterfall and ACLIDE from the add-key provider picker', async () => {
   const options = [...container.querySelectorAll('option')].map(option => option.value)
   expect(options).toContain('groq')
   expect(options).toContain('rime')
+  expect(options).toContain('freetts')
+  expect(PLATFORMS.find(p => p.value === 'freetts')?.label).toMatch(/personal use only.*watermarked/i)
   expect(options).not.toContain('waterfall')
   expect(options).not.toContain('aclide')
 })

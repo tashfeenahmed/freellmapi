@@ -106,6 +106,9 @@ interface DecisionModelRow {
   enabled: number;
   quota_label: string;
   meta_json: string | null;
+  /** The endpoint key a custom row is bound to; null for catalog rows, which
+   *  draw from any healthy key of their platform. */
+  key_id: number | null;
 }
 
 interface DecisionModelMeta {
@@ -125,7 +128,7 @@ function parseMeta(raw: string | null): DecisionModelMeta {
 
 function allDecisionRows(): DecisionModelRow[] {
   return getDb()
-    .prepare(`SELECT id, platform, model_id, display_name, priority, enabled, quota_label, meta_json
+    .prepare(`SELECT id, platform, model_id, display_name, priority, enabled, quota_label, meta_json, key_id
                 FROM media_models WHERE modality = ? ORDER BY priority, id`)
     .all(DECISION_MODALITY) as DecisionModelRow[];
 }
@@ -385,11 +388,129 @@ const ADAPTERS: Record<string, Adapter> = {
     if (json?.error) throw new DecisionError(`openrouter: ${json.error.message ?? 'error'}`, 502);
     return { answers: answersOf(json?.answers, 'openrouter'), usage: usageOf(json?.usage) };
   },
+  // Custom/local decision endpoint (#1777). Proposed generic contract, not a
+  // maintainer-declared standard: no existing provider shares a wire shape,
+  // so the endpoint speaks POST {base_url}/decide with
+  // { model, prompt, choices, context } and answers
+  // { decision, confidence, reasoning }. One call per question — a single
+  // decision value cannot answer several distinct questions — and each
+  // answer is validated against its question the way the built-in adapters
+  // validate theirs. Auth mirrors the custom search relay (Bearer key; the
+  // stored sentinel for keyless endpoints). SSRF is inherited: upstream()
+  // goes through proxyFetch and the url-guard (#440).
+  custom: async (cred, modelId, body, signal) => {
+    if (!cred.baseUrl) throw new DecisionError('custom decision endpoint has no base URL', 502);
+    const stateText = typeof body.state === 'string' ? body.state : JSON.stringify(body.state) ?? '';
+    const answers: Record<string, unknown> = {};
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for (const [id, question] of Object.entries(body.questions)) {
+      const choices = customDecisionChoices(id, question);
+      const instructions = typeof question.instructions === 'string'
+        ? question.instructions
+        : JSON.stringify(question.instructions) ?? '';
+      const json = await upstream(`${cred.baseUrl}/decide`, 'custom', {
+        method: 'POST', redirect: 'error',
+        headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelId,
+          prompt: stateText ? `${instructions}\n\nState: ${stateText}` : instructions,
+          choices,
+          context: body.state,
+        }),
+      }, signal) as { decision?: unknown; confidence?: unknown; reasoning?: unknown; usage?: unknown; error?: unknown } | null;
+      const usage = usageOf(json?.usage);
+      inputTokens += usage.input_tokens;
+      outputTokens += usage.output_tokens;
+      answers[id] = customDecisionAnswer(id, question, json);
+    }
+    return { answers, usage: { input_tokens: inputTokens, output_tokens: outputTokens } };
+  },
 };
 
 /** Platforms with a decision adapter. catalog-sync gates decisionModels rows
  *  on this, the way SEARCH_ENGINE_PLATFORMS gates search rows. */
 export const DECISION_PLATFORMS = new Set(Object.keys(ADAPTERS));
+
+/** Catalog-only decision platforms. Custom rows are user-registered, not
+ *  catalog rows, so catalog-sync must never insert or prune them — the same
+ *  exclusion SEARCH_ENGINE_PLATFORMS applies to custom search relays. */
+export const CATALOG_DECISION_PLATFORMS = new Set([...DECISION_PLATFORMS].filter(p => p !== 'custom'));
+
+/** The options a custom decision endpoint chooses from, per question type. */
+function customDecisionChoices(id: string, question: DecisionQuestion): string[] {
+  if (question.type === 'choice') {
+    if (!question.criteria || typeof question.criteria !== 'object' || Array.isArray(question.criteria)) {
+      throw new DecisionError(`Custom decision question '${id}' needs a criteria map of options`, 400);
+    }
+    const choices = Object.keys(question.criteria);
+    if (choices.length === 0) throw new DecisionError(`Custom decision question '${id}' needs at least one option`, 400);
+    return choices;
+  }
+  if (question.type === 'noul') return ['yes', 'no'];
+  if (!Array.isArray(question.criteria) || question.criteria.length === 0) {
+    throw new DecisionError(`Custom decision question '${id}' needs an ordered criteria array of score levels`, 400);
+  }
+  return question.criteria.map((_, i) => String(i));
+}
+
+function customDecisionConfidence(json: { confidence?: unknown }): number {
+  if (json.confidence === undefined) return 1;
+  if (typeof json.confidence !== 'number' || !Number.isFinite(json.confidence) || json.confidence < 0 || json.confidence > 1) {
+    throw new DecisionError('custom decision endpoint returned an invalid confidence', 502);
+  }
+  return json.confidence;
+}
+
+/** Split the leftover probability evenly over the options the endpoint did
+ *  not pick. The wire shape carries a single decision + confidence, not a
+ *  full distribution, so this is the honest reconstruction of one. */
+function spreadProbabilities(options: string[], chosen: string, confidence: number): Record<string, number> {
+  if (options.length === 1) return { [chosen]: 1 };
+  // Round the split so (1 - 0.9) reads 0.1, not 0.09999999999999998.
+  const rest = Math.round(((1 - confidence) / (options.length - 1)) * 1e6) / 1e6;
+  return Object.fromEntries(options.map(o => [o, o === chosen ? confidence : rest]));
+}
+
+/** Validate one endpoint answer against its question, mirroring
+ *  checkedDecisionResult for the built-ins: a decision outside the options,
+ *  a wrong type, or a missing decision is a 502, never a fabricated answer. */
+function customDecisionAnswer(
+  id: string,
+  question: DecisionQuestion,
+  json: { decision?: unknown; confidence?: unknown; reasoning?: unknown; error?: unknown } | null,
+): Record<string, unknown> {
+  if (!json || typeof json !== 'object' || Array.isArray(json) || json.error !== undefined) {
+    throw new DecisionError('custom decision endpoint returned an error or no answer', 502);
+  }
+  const decision = typeof json.decision === 'string' ? json.decision
+    : typeof json.decision === 'number' && Number.isFinite(json.decision) ? String(json.decision)
+    : null;
+  if (decision === null || decision.length === 0) {
+    throw new DecisionError(`custom decision endpoint returned no decision for '${id}'`, 502);
+  }
+  const confidence = customDecisionConfidence(json);
+  const reasoning = typeof json.reasoning === 'string' && json.reasoning.length > 0 ? { reasoning: json.reasoning } : {};
+  if (question.type === 'choice') {
+    const choices = customDecisionChoices(id, question);
+    if (!choices.includes(decision)) {
+      throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', which is not one of its options`, 502);
+    }
+    return { type: 'choice', choice: decision, probabilities: spreadProbabilities(choices, decision, confidence), confidence, ...reasoning };
+  }
+  if (question.type === 'noul') {
+    if (decision !== 'yes' && decision !== 'no') {
+      throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', expected 'yes' or 'no'`, 502);
+    }
+    return { type: 'noul', noul: decision === 'yes' ? confidence : 1 - confidence, confidence, ...reasoning };
+  }
+  const levels = customDecisionChoices(id, question);
+  const score = Number(decision);
+  if (!Number.isInteger(score) || score < 0 || score >= levels.length) {
+    throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', expected a level 0–${levels.length - 1}`, 502);
+  }
+  return { type: 'score', score, probabilities: spreadProbabilities(levels, String(score), confidence), confidence, ...reasoning };
+}
 
 function checkedDecisionResult(raw: unknown, platform: string, model: string, body: DecisionRequest): AdapterResult {
   const json = raw as { model?: unknown; error?: unknown; answers?: unknown; usage?: unknown; model_version?: unknown } | null;
@@ -477,9 +598,20 @@ function hasUsableKey(platform: string): boolean {
     .get(platform);
 }
 
-/** True when at least one enabled decision model has a usable key. */
+/** True when at least one enabled decision model has a usable key. A custom
+ *  row is bound to its own endpoint key (like search's custom relays), not to
+ *  any key of platform 'custom', so it checks that key specifically. */
 export function decisionsAvailable(): boolean {
-  return allDecisionRows().some(r => r.enabled === 1 && r.model_id !== CLAIRIC_MODEL && ADAPTERS[r.platform] && hasUsableKey(r.platform));
+  return allDecisionRows().some(r => {
+    if (r.enabled !== 1 || r.model_id === CLAIRIC_MODEL || !ADAPTERS[r.platform]) return false;
+    if (r.platform === 'custom') {
+      if (r.key_id == null) return false;
+      return !!getDb()
+        .prepare("SELECT 1 FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')")
+        .get(r.key_id);
+    }
+    return hasUsableKey(r.platform);
+  });
 }
 
 function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, extraction = false): DecisionModelRow[] {
@@ -514,8 +646,10 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
     const tried = new Set<number>();
     for (;;) {
       if (opts.signal?.aborted) throw new DecisionError('decision cancelled by the client', 499);
+      // Custom rows are bound to their own endpoint key; catalog rows draw
+      // from any healthy key of their platform (key_id null there).
       const { credential, budgetBlocked } = reserveProviderCredential(
-        { platform: row.platform, key_id: null },
+        { platform: row.platform, key_id: row.key_id },
         ESTIMATED_TOKENS,
         keyId => tried.has(keyId) || isOnCooldown(row.platform, row.model_id, keyId),
       );

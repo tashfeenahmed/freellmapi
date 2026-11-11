@@ -22,7 +22,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
 import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
-import { extractApiToken, getStickyModel, setStickyModel, providerSafeStop } from './proxy.js';
+import { extractApiToken, getStickyModel, setStickyModel, providerSafeStop, sessionIdentityMessages } from './proxy.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue } from '../lib/header-value.js';
 import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
@@ -496,7 +496,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
 
   const parsed = messagesSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5).join(', ');
     console.warn(`[anthropic] 400 invalid /v1/messages request: ${detail}`);
@@ -540,6 +540,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   const messageHasCacheControl = body.messages.some(message =>
     Array.isArray(message.content)
     && message.content.some(block => block && typeof block === 'object' && 'cache_control' in block));
+  // Session identity before compression can rewrite the first user turn (#1889).
+  const sessionMessages = sessionIdentityMessages(messages);
   const compressionResult = compressRequest(messages, {
     header: req.headers['x-freellm-compress'],
     tools,
@@ -687,11 +689,11 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     // The strict chain already fixes the model; the only preference left is
     // which member served this session last. Passing a non-member would make
     // routeRequest splice an off-group model into the chain and break the pin.
-    const sticky = getStickyModel(messages, sessionId, stickyScope);
+    const sticky = getStickyModel(sessionMessages, sessionId, stickyScope);
     preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
   }
   if (preferredModel == null && !groupChain) {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionId, strategyKey), resolvedChain?.chain);
+    preferredModel = resolveStickyPreference(getStickyModel(sessionMessages, sessionId, strategyKey), resolvedChain?.chain);
   }
 
   // Thin adapter over the shared fallback loop (lib/fallback-loop.ts): the
@@ -756,7 +758,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
         try {
           await streamCompletion(res, route, messages, routeOptions, {
             start, attempt, attemptLog, clientGone: () => clientGone, requestedModel, estimatedInputTokens, tools, pinnedModelId,
-            sessionId, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, state,
+            sessionId, sessionMessages, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, state,
           });
           return 'done';
         } catch (err: any) {
@@ -837,7 +839,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
       // Remember this model for the rest of the auto-routed session. A pin used
       // to make this a no-op (the pin fixed the model); a group pin still has a
       // provider choice to remember, recorded under the group's own scope.
-      if (!resolved.pinned || stickyScope) setStickyModel(messages, route.modelDbId, sessionId, stickyScope ?? strategyKey);
+      if (!resolved.pinned || stickyScope) setStickyModel(sessionMessages, route.modelDbId, sessionId, stickyScope ?? strategyKey);
 
       const anthropicResponse: AnthropicMessageResponse = {
         id: newMessageId(),
@@ -893,6 +895,8 @@ interface StreamCtx {
   tools?: ChatToolDefinition[];
   pinnedModelId: string | null;
   sessionId?: string;
+  /** Pre-compression messages that key the sticky session (#1889). */
+  sessionMessages: ChatMessage[];
   pinned: boolean;
   // Sticky bucket for a group-pinned request; undefined for auto routing.
   stickyScope?: string;
@@ -1219,7 +1223,7 @@ async function streamCompletion(
     res.end();
 
     recordUpstreamSuccess(route, upstreamUsage?.total_tokens ?? inputTokens + outputTokens, ctx.state);
-    if (!ctx.pinned || ctx.stickyScope) setStickyModel(messages, route.modelDbId, ctx.sessionId, ctx.stickyScope ?? ctx.strategyKey);
+    if (!ctx.pinned || ctx.stickyScope) setStickyModel(ctx.sessionMessages, route.modelDbId, ctx.sessionId, ctx.stickyScope ?? ctx.strategyKey);
     logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens, Date.now() - ctx.start, null, null, ctx.pinnedModelId, null, 'http');
   } catch (err: any) {
     if (err instanceof StreamAlreadyStarted) throw err;

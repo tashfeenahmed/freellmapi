@@ -185,6 +185,13 @@ export interface ChainRow {
    * answering on score alone would be a silent substitution (#651).
    */
   match_tier?: number;
+  /**
+   * The routing preset this row's chain carries (profiles.routing_strategy), or
+   * null/absent to inherit the global strategy. Selected together with the chain
+   * rows so routeRequest can rank by the chain's own preset without a second
+   * query, and without widening routeRequest's signature.
+   */
+  profile_strategy?: string | null;
 }
 
 export interface RouteResult {
@@ -1340,18 +1347,21 @@ function getActiveChain(db: Db): ChainRow[] {
   if (profileId != null) {
     rows = db.prepare(`
       SELECT pm.model_db_id, pm.priority, pm.enabled,
+             p.routing_strategy AS profile_strategy,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
              m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+      JOIN profiles p ON p.id = pm.profile_id
       WHERE pm.profile_id = ?
       ORDER BY pm.priority ASC
     `).all(profileId) as ChainRow[];
   } else {
     rows = db.prepare(`
       SELECT fc.model_db_id, fc.priority, fc.enabled,
+             NULL AS profile_strategy,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
@@ -1371,12 +1381,14 @@ function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
 
   return db.prepare(`
     SELECT pm.model_db_id, pm.priority, pm.enabled,
+           p.routing_strategy AS profile_strategy,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
            m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
     FROM profile_models pm
     JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+    JOIN profiles p ON p.id = pm.profile_id
     WHERE pm.profile_id = ?
     ORDER BY pm.priority ASC
   `).all(profile.id) as ChainRow[];
@@ -2207,15 +2219,21 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
 export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', strategyOverride?: PresetStrategy): RouteResult {
   const db = getDb();
 
-  // The alias's axis wins for this request (#1628): scoring the prefetched
-  // chain under the global strategy silently discarded what `auto:smart` /
-  // `auto:fast` asked for. Absent an override, whatever this request routes
-  // with governs — the operator's setting, or the preset the 'decision' model
-  // picked (#1354).
-  const strategy = strategyOverride ?? effectiveRoutingStrategy();
+  const rawChain = prefetchedChain ?? getActiveChain(db);
+  // A chain may carry its own routing preset (profiles.routing_strategy, #1696).
+  // Precedence for THIS request: an `auto:<axis>` alias (#1628) first, then the
+  // chain's own preset, then whatever the request otherwise routes with (the
+  // operator's setting, or the preset the 'decision' model picked, #1354).
+  // Ranking still goes through orderChain, so the reliability floor and the
+  // rate-limit/failure penalties keep applying; only the base preset changes.
+  const chainPreset = rawChain.find(e => e.profile_strategy)?.profile_strategy;
+  const strategy = strategyOverride
+    ?? ((chainPreset && VALID_STRATEGIES.includes(chainPreset as RoutingStrategy))
+      ? (chainPreset as RoutingStrategy)
+      : effectiveRoutingStrategy());
   if (strategy !== 'priority') refreshStatsCache(db);
 
-  const chain = (prefetchedChain ?? getActiveChain(db)).filter(e => e.enabled);
+  const chain = rawChain.filter(e => e.enabled);
 
   const sortedChain = orderChain(chain, strategy, true, task);
 

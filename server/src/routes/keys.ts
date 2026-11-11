@@ -35,6 +35,7 @@ import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
+import { isLoopbackRequest } from '../lib/loopback.js';
 
 export const keysRouter = Router();
 
@@ -72,6 +73,7 @@ const PLATFORMS = [
   'novai',
   'varosity',
   'rime',
+  'freetts',
   'freeinference',
   'freemodel',
   'beatapi',
@@ -80,13 +82,14 @@ const PLATFORMS = [
   'iteracompute',
   'serpsearch',
   'brave',
+  'outcrawl',
   'halx',
   'aisense',
   'freeai',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
 ] as const;
 
@@ -580,16 +583,11 @@ keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
   res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
-// Is the caller connecting from this machine? Read from the real socket peer
-// address, NOT req.ip or X-Forwarded-For: those are caller-controlled, so
-// trusting them here would let a remote caller claim to be local.
-function isLoopbackRemote(req: Request): boolean {
-  let addr = req.socket?.remoteAddress ?? '';
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
+// Is the caller connecting from this machine? The socket peer decides, and a
+// same-host reverse proxy's own X-Forwarded-For hop can withdraw locality but
+// never grant it (lib/loopback.ts, #1884). Reading the socket alone made every
+// request through such a proxy look local.
+const isLoopbackRemote = (req: Request): boolean => isLoopbackRequest(req);
 
 // #786: the desktop build has no user-set password (its machine user's password
 // is random and never shown), so re-verification would lock desktop users out of
@@ -765,7 +763,7 @@ keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
 keysRouter.post('/', (req: Request, res: Response) => {
   const parsed = addKeySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1085,7 +1083,7 @@ const discoverModelsSchema = z.object({
 keysRouter.post('/custom/discover-models', async (req: Request, res: Response) => {
   const parsed = discoverModelsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1216,7 +1214,7 @@ const registerDiscoveredSchema = z.object({
 keysRouter.post('/discovered-models', (req: Request, res: Response) => {
   const parsed = registerDiscoveredSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   const key = builtinKeyRow(parsed.data.keyId);
@@ -1253,7 +1251,7 @@ keysRouter.post('/discovered-models', (req: Request, res: Response) => {
 keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
   const parsed = discoverModelsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1346,7 +1344,7 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
 keysRouter.post('/custom', async (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1695,7 +1693,7 @@ keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) =>
 keysRouter.post('/import-selected', async (req: Request, res: Response) => {
   const parsed = z.object({ keys: z.array(importKeySchema).max(100) }).safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1904,7 +1902,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
 
   const parsed = updateKeySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
