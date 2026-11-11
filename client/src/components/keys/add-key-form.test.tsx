@@ -75,6 +75,21 @@ describe.each<Platform>(['kilo', 'ovh', 'aihorde'])('adding a %s key (key option
   })
 })
 
+// #1804: HAL-X and AI SENSE are keyless decision providers. They were missing
+// from the client's platform list, so the checklist chip opened a form that
+// demanded a key and offered no docs link.
+describe.each<Platform>(['halx', 'aisense'])('adding a %s key (keyless decisions)', platform => {
+  it('activates anonymous access with a blank key and links to the provider docs', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform={platform} />)
+    expect(keyInput().placeholder).toBe('Optional')
+    expect(container.querySelector('a[href^="https://"]')).not.toBeNull()
+    expect(container.querySelector('button[type="submit"]')?.textContent).toBe('Enable')
+    await submit()
+    expect(posted()).toEqual({ platform, key: '' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
+})
+
 it('still requires a key for a provider that needs one', async () => {
   mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="groq" />)
   await submit()
