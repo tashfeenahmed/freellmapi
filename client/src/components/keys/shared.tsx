@@ -51,6 +51,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
   { value: 'varosity', label: 'Varosity (shared daily media credits)', url: 'https://varosity.ai/app/keys/api-keys' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
+  { value: 'freetts', label: 'FreeTTS (personal use only; watermarked TTS)', url: 'https://freetts.org/dashboard?section=api-keys' },
   { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
   { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },

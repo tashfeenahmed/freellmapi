@@ -74,6 +74,8 @@ export const PREFIX_MAP: Record<string, string> = {
   NOVAI_: 'novai',
   VAROSITY_: 'varosity',
   RIME_: 'rime',
+  FREETTS_: 'freetts',
+  FREE_TTS_: 'freetts',
   FREEINFERENCE_: 'freeinference',
   FREEMODEL_: 'freemodel',
   GOOGLE_: 'google',
@@ -120,6 +122,7 @@ export const PREFIX_MAP: Record<string, string> = {
   LINKUP_: 'linkup',
   PARALLEL_: 'parallel',
   KEENABLE_: 'keenable',
+  OUTCRAWL_: 'outcrawl',
   CLOUDFLARE_: 'cloudflare',
   ZHIPU_: 'zhipu',
   OLLAMA_: 'ollama',
@@ -204,6 +207,8 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   varosity: 'varosity',
   rime: 'rime',
   'rime.ai': 'rime',
+  freetts: 'freetts',
+  'freetts.org': 'freetts',
   'varosity.ai': 'varosity',
   freeinference: 'freeinference',
   'freeinference.org': 'freeinference',
@@ -288,6 +293,7 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   linkup: 'linkup',
   parallel: 'parallel',
   keenable: 'keenable',
+  outcrawl: 'outcrawl',
 };
 
 export function detectPlatform(prefix: string): string | null {

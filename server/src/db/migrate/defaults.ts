@@ -48,6 +48,8 @@ import * as removeAurayProvider from '../migrations/20261019_000001_remove_auray
 import * as keyLastHealthyAt from '../migrations/20261020_000001_key_last_healthy_at.js';
 import * as customMediaEndpointIdentity from '../migrations/20261028_000001_custom_media_endpoint_identity.js';
 import * as cloudflareNeuronUsage from '../migrations/20261104_000001_cloudflare_neuron_usage.js';
+import * as modelMonthlyUsage from '../migrations/20261111_000001_model_monthly_usage.js';
+import * as profileRoutingStrategy from '../migrations/20261111_000002_profile_routing_strategy.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -107,6 +109,8 @@ export const REQUEST_FAILURE_ATTRIBUTION_FILENAME = '20261017_233153_request_fai
 export const REMOVE_AURAY_PROVIDER_FILENAME = '20261019_000001_remove_auray_provider.ts';
 export const KEY_LAST_HEALTHY_AT_FILENAME = '20261020_000001_key_last_healthy_at.ts';
 export const CLOUDFLARE_NEURON_USAGE_FILENAME = '20261104_000001_cloudflare_neuron_usage.ts';
+export const MODEL_MONTHLY_USAGE_FILENAME = '20261111_000001_model_monthly_usage.ts';
+export const PROFILE_ROUTING_STRATEGY_FILENAME = '20261111_000002_profile_routing_strategy.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -158,4 +162,6 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: KEY_LAST_HEALTHY_AT_FILENAME, module: keyLastHealthyAt },
   { filename: '20261028_000001_custom_media_endpoint_identity.ts', module: customMediaEndpointIdentity },
   { filename: CLOUDFLARE_NEURON_USAGE_FILENAME, module: cloudflareNeuronUsage },
+  { filename: MODEL_MONTHLY_USAGE_FILENAME, module: modelMonthlyUsage },
+  { filename: PROFILE_ROUTING_STRATEGY_FILENAME, module: profileRoutingStrategy },
 ];

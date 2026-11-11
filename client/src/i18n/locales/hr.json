@@ -109,6 +109,8 @@
     "sectionAdvanced": "Napredno",
     "sectionPreview": "Pregled",
     "generalDescription": "Jezik i izgled ove nadzorne ploče.",
+    "startAtLogin": "Pokreni pri pokretanju sustava",
+    "startAtLoginHelp": "Automatski pokrenite FreeLLMAPI prilikom prijave na računalo.",
     "advancedDescription": "Pragovi i sigurnosne sklopke kompresijskog lanca.",
     "compressionTitle": "Kompresija promptova",
     "compressionDescription": "Smanjite veličinu zahtjeva prije usmjeravanja uz očuvanje koda, grešaka, putanja, brojeva i definicija alata.",
@@ -1260,7 +1262,15 @@
     "renameHint": "Preimenuj ovaj lanac",
     "renameConfirm": "Preimenovati lanac \"{oldName}\" u \"{name}\"? Klijenti koji zovu auto:{oldName} moraju prijeći na auto:{name}.",
     "renamePlaceholder": "Novi naziv lanca",
-    "renameFailed": "Nije moguće preimenovati lanac."
+    "renameFailed": "Nije moguće preimenovati lanac.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Dostupna je verzija {version}",

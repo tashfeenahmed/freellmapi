@@ -28,12 +28,13 @@ import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
+import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
 import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -96,6 +97,7 @@ async function nativeMediaResult<T>(work: Promise<T>): Promise<T> {
   catch (error) {
     if (error instanceof VarosityMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
     if (error instanceof RimeMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    if (error instanceof FreeTtsMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
     throw error;
   }
 }
@@ -857,6 +859,8 @@ async function callSpeechProvider(
     }
     case 'rime':
       return nativeMediaResult(rimeSpeech(row.model_id, key, p));
+    case 'freetts':
+      return nativeMediaResult(freeTtsSpeech(row.model_id, key, p));
     case 'varosity':
       return nativeMediaResult(varositySpeech(row.model_id, key, p));
     case 'freeai': {
@@ -1644,7 +1648,7 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
       } catch (err: any) {
         const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
         logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-        if (row.platform === 'custom' && e.status === 429 && credential.id != null) {
+        if ((row.platform === 'custom' || row.platform === 'freetts') && e.status === 429 && credential.id != null) {
           setCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
         }
         lastError = e;

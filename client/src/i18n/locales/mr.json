@@ -109,6 +109,8 @@
     "sectionAdvanced": "प्रगत",
     "sectionPreview": "पूर्वावलोकन",
     "generalDescription": "या डॅशबोर्डची भाषा आणि स्वरूप.",
+    "startAtLogin": "सिस्टम स्टार्टअपवर सुरू करा",
+    "startAtLoginHelp": "तुम्ही तुमच्या संगणकावर साइन इन केल्यावर FreeLLMAPI आपोआप लाँच करा.",
     "advancedDescription": "कॉम्प्रेशन पाइपलाइनसाठी मर्यादा आणि सुरक्षा स्विच.",
     "compressionTitle": "प्रॉम्प्ट कॉम्प्रेशन",
     "compressionDescription": "कोड, त्रुटी, पाथ, संख्या आणि टूल व्याख्या जपून ठेवत राउटिंगपूर्वी विनंतीचा आकार कमी करा.",
@@ -1260,7 +1262,15 @@
     "renameHint": "या साखळीचे नाव बदला",
     "renameConfirm": "साखळी \"{oldName}\" चे नाव \"{name}\" करावे? auto:{oldName} हा कॉल करणारे क्लायंट्स auto:{name} वर जावे लागेल.",
     "renamePlaceholder": "नवीन साखळी नाव",
-    "renameFailed": "साखळीचे नाव बदलता आले नाही."
+    "renameFailed": "साखळीचे नाव बदलता आले नाही.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "आवृत्ती {version} उपलब्ध आहे",
