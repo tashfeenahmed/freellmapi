@@ -258,6 +258,24 @@ function restoreSessionReasoning(messages: ChatMessage[], reasoning: string, pla
   return restored ?? messages;
 }
 
+/**
+ * The messages that identify a conversation for sticky routing, context
+ * handoff and reasoning replay. Take it BEFORE compression: the aging and
+ * budget engines rewrite or drop old user turns, and the session key hashes
+ * the first one, so a compressed request would otherwise look like a new
+ * conversation (#1889). The first user turn is snapshotted as text so an
+ * in-place rewrite of its content cannot change the key either.
+ */
+export function sessionIdentityMessages(messages: ChatMessage[]): ChatMessage[] {
+  const out = messages.slice();
+  const firstUserIndex = out.findIndex(message => message.role === 'user');
+  if (firstUserIndex !== -1) {
+    const firstUser = out[firstUserIndex]!;
+    out[firstUserIndex] = { ...firstUser, content: contentToString(firstUser.content ?? '') };
+  }
+  return out;
+}
+
 function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): string {
   if (sessionIdHeader) {
     return strategyKey ? `hdr:${sessionIdHeader}::${strategyKey}` : `hdr:${sessionIdHeader}`;
@@ -1991,6 +2009,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     };
   });
 
+  // Session identity must come from the caller's conversation, before an
+  // aging or budget engine can rewrite or remove its first user turn (#1889).
+  const sessionMessages = sessionIdentityMessages(messages);
+
   let cacheControlPrefixLength = 0;
   parsed.data.messages.forEach((message, index) => {
     const content = message.content;
@@ -2374,7 +2396,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // be semantically wrong.
   const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
   const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
-  const sessionKey = handoffMode !== 'off' ? getSessionKey(messages, sessionIdHeader, strategyKey) : '';
+  const sessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
   if (handoffMode !== 'off' && sessionKey) {
     recordIncomingMessages(sessionKey, messages);
   }
@@ -2391,7 +2413,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // shared here: two conversations opening with identical text share a key, so
   // the same-model + field-actually-missing gates below are what keep a
   // mis-keyed restore from reaching a payload it does not belong in.
-  const reasoningSessionKey = getSessionKey(messages, sessionIdHeader, strategyKey);
+  const reasoningSessionKey = getSessionKey(sessionMessages, sessionIdHeader, strategyKey);
   // A handoff can only fire when a prior model is on record for this session.
   // Check after recordIncomingMessages, which clears the prior model on a
   // fresh conversation. Stable across the retry loop (the prior model only
@@ -2417,10 +2439,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     // empty tier falls through to plain auto, as on /v1/messages.
     groupChain = aliasTierChain;
     stickyStrategyKey = `tier:${aliasTierChain[0]!.model_db_id}`;
-    const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+    const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
     preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
   } else if (isAutoModel(requestedModel)) {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader, strategyKey), resolvedChain?.chain);
+    preferredModel = resolveStickyPreference(getStickyModel(sessionMessages, sessionIdHeader, strategyKey), resolvedChain?.chain);
   } else if (requestedModel) {
     const db = getDb();
     // Unify ON: a requested id (canonical slug OR any provider's model_id) maps
@@ -2459,7 +2481,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         return;
       }
       stickyStrategyKey = requestedModel;
-      const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+      const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
       // Only prefer the sticky member if it's actually IN this group — passing a
       // non-member as preferredModelDbId would make routeRequest inject an
       // off-group model and break strict pinning.
@@ -2484,7 +2506,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     }
   } else {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader, strategyKey), resolvedChain?.chain);
+    preferredModel = resolveStickyPreference(getStickyModel(sessionMessages, sessionIdHeader, strategyKey), resolvedChain?.chain);
   }
 
   // For analytics: the model id the client pinned, null when auto-routed
@@ -3030,7 +3052,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             });
           }
 
-          setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
+          setStickyModel(sessionMessages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
           // #797: remember this turn's thinking trace so the next request from
           // the same session can restore it (clients strip it on replay).
@@ -3238,7 +3260,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // from (set to the requested model id at the top of the loop). Matches the
         // streaming success path; without it, "prefer last successful provider"
         // is lost for non-streaming group-pinned sessions. (#341 review)
-        setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
+        setStickyModel(sessionMessages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
         if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
 
         res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
