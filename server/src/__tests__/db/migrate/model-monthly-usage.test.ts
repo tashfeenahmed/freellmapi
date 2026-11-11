@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { up, down } from '../../../db/migrations/20261031_000001_model_monthly_usage.js';
+import { up, down } from '../../../db/migrations/20261111_000001_model_monthly_usage.js';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
