@@ -13,6 +13,7 @@ describe.each([
 ])('$platform credentials', ({ platform, provider }) => {
   it('registers and imports explicitly named keys', () => {
     expect(getProvider(platform)).toBeInstanceOf(provider.constructor);
+    expect(getProvider(platform)!.supportsChat).toBe(platform === 'beatapi');
     expect(parseKeysFromFile(`${platform.toUpperCase()}_API_KEY=unit-test-only`, 'keys.env').keys[0].platform).toBe(platform);
     expect(AUTH_JSON_PROVIDER_MAP[platform]).toBe(platform);
   });

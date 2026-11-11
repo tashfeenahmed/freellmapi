@@ -9,6 +9,7 @@ export const SPEECHIFY_VERSION = '2026-09-08';
 export class SpeechifyProvider extends BaseProvider {
   readonly platform = 'speechify' as const;
   readonly name = 'Speechify';
+  readonly supportsChat = false;
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     const response = await this.fetchWithTimeout(`${SPEECHIFY_BASE_URL}/workspaces/current/entitlements`, {

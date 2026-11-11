@@ -3,6 +3,7 @@ import type { MockedFunction } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { resolveFamily, getDefaultFamily, runEmbeddings } from '../../services/embeddings.js';
+import { clearCooldownsForKey, setCooldown } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -51,6 +52,23 @@ describe('embeddings service', () => {
     vi.restoreAllMocks();
   });
 
+  it('returns the remaining cooldown when every custom embedding key is cooling down', async () => {
+    const keyId = addCustomKey('https://embeddings.example/v1');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)
+      VALUES ('cooling-embed', 'custom', 'cooling-embed', 'Local', 2, 1, 1, '', ?)`).run(keyId);
+    setCooldown('custom', 'cooling-embed', keyId, 120_000);
+    const fetchMock = mockFetch(vi.fn());
+    try {
+      const err = await runEmbeddings('cooling-embed', ['hello']).catch(e => e);
+      expect(err.status).toBe(429);
+      expect(err.retryAfterMs).toBeGreaterThan(119_000);
+      expect(err.retryAfterMs).toBeLessThanOrEqual(120_000);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      clearCooldownsForKey(keyId);
+    }
+  });
+
   it('routes JamAI embeddings with project-scoped auth, native payload and fixed vectors', async () => {
     addKey('jamai', 'proj_example:jamai_pat_testsecret');
     getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label)
@@ -79,7 +97,10 @@ describe('embeddings service', () => {
   });
 
   it('reserves the shared monthly budget across concurrent embeddings and releases failures', async () => {
-    const keyId = addCustomKey('https://embeddings.example/v1');
+    // Fetch is mocked, but the custom-provider SSRF guard runs before it.
+    // Use a TEST-NET literal so public DNS latency cannot race waitFor's 1s
+    // deadline. Keep the real URL guard and budget reservation path intact.
+    const keyId = addCustomKey('https://203.0.113.10/v1');
     const db = getDb();
     db.prepare('UPDATE api_keys SET monthly_request_cap = 1 WHERE id = ?').run(keyId);
     db.prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)
@@ -96,6 +117,23 @@ describe('embeddings service', () => {
     db.prepare('DELETE FROM requests').run();
     await expect(runEmbeddings('budget-embed', ['hello'])).rejects.toMatchObject({ status: 429, code: 'quota_exceeded' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('tries sibling endpoint keys after an embedding authentication failure', async () => {
+    const keyId = addCustomKey('https://embeddings.example/v1', 'first-key');
+    addCustomKey('https://embeddings.example/v1', 'second-key');
+    addCustomKey('https://other.example/v1', 'other-key');
+    getDb().prepare(`INSERT INTO embedding_models (family, platform, model_id, display_name, dimensions, priority, enabled, quota_label, key_id)
+      VALUES ('local-embed', 'custom', 'local-embed', 'Local', 2, 1, 1, '', ?)`).run(keyId);
+    let count = 0;
+    const fetchMock = mockFetch(async () => ++count === 1 ? new Response('invalid key', { status: 401 }) : okEmbeddingResponse(2));
+    await expect(runEmbeddings('local-embed', ['hello'])).resolves.toMatchObject({ dimensions: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Set(fetchMock.mock.calls.map(c => new Headers(c[1]?.headers).get('Authorization'))))
+      .toEqual(new Set(['Bearer first-key', 'Bearer second-key']));
+    expect(fetchMock.mock.calls.map(c => String(c[0]))).toEqual([
+      'https://embeddings.example/v1/embeddings', 'https://embeddings.example/v1/embeddings',
+    ]);
   });
 
   describe('migration seed', () => {

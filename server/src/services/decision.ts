@@ -9,6 +9,7 @@ import { proxyFetch } from '../lib/proxy.js';
 import { recordMonthlyUsage, secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
+import { meterCloudflare, roughTokens, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
 
@@ -175,6 +176,10 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
   return res.json();
 }
 
+function capAsDecisionError(e: CloudflareNeuronCapError): DecisionError {
+  return new DecisionError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000);
+}
+
 function usageOf(raw: unknown): AdapterResult['usage'] {
   const u = (raw ?? {}) as { input_tokens?: unknown; output_tokens?: unknown };
   return {
@@ -338,16 +343,22 @@ const ADAPTERS: Record<string, Adapter> = {
   cloudflare: async (cred, modelId, body, signal) => {
     const { accountId, token } = cloudflareKey(cred.key);
     const selector = modelId.split('/').pop() ?? modelId;
-    const json = await upstream(
-      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${modelId}`,
-      'cloudflare',
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: selector, state: body.state, questions: body.questions }),
-      },
-      signal,
-    ) as { success?: boolean; result?: { answers?: unknown; usage?: unknown }; errors?: Array<{ message?: string }> };
+    const payload = JSON.stringify({ model: selector, state: body.state, questions: body.questions });
+    const json = await meterCloudflare(
+      cred.key, modelId, { inputTokens: roughTokens(payload) },
+      () => upstream(
+        `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${modelId}`,
+        'cloudflare',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: payload,
+        },
+        signal,
+      ) as Promise<{ success?: boolean; result?: { answers?: unknown; usage?: unknown }; errors?: Array<{ message?: string }> }>,
+      j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
+      capAsDecisionError,
+    );
     if (json?.success === false || !json?.result) {
       throw new DecisionError(`cloudflare: ${json?.errors?.[0]?.message ?? 'no result'}`, 502);
     }
@@ -401,10 +412,16 @@ function checkedDecisionResult(raw: unknown, platform: string, model: string, bo
  * Text + numeric fields are the live-tested subset exposed here. */
 async function extractClairic(cred: ReservedProviderCredential, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
   const { accountId, token } = cloudflareKey(cred.key);
-  const json = await upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${CLAIRIC_MODEL}`, 'cloudflare', {
-    method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'clairic', state: body.state, fields: body.fields }),
-  }, signal) as { success?: boolean; result?: { model?: unknown; answers?: unknown; usage?: unknown; truncated?: boolean } } | null;
+  const payload = JSON.stringify({ model: 'clairic', state: body.state, fields: body.fields });
+  const json = await meterCloudflare(
+    cred.key, CLAIRIC_MODEL, { inputTokens: roughTokens(payload) },
+    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${CLAIRIC_MODEL}`, 'cloudflare', {
+      method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: payload,
+    }, signal) as Promise<{ success?: boolean; result?: { model?: unknown; answers?: unknown; usage?: unknown; truncated?: boolean } } | null>,
+    j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
+    capAsDecisionError,
+  );
   if (!json?.success || json.result?.model !== 'clairic') throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
   const answers = answersOf(json.result.answers, 'cloudflare');
   for (const [id, field] of Object.entries(body.fields)) {
