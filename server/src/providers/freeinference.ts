@@ -1,5 +1,6 @@
 import type { ChatCompletionChunk, ChatCompletionResponse, ChatMessage } from '@freellmapi/shared/types.js';
 import type { CompletionOptions, KeyValidationResult, ProviderFetchOptions } from './base.js';
+import { providerRequestError } from './base.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 
@@ -8,7 +9,7 @@ const TESTED_CHAT_MODELS = new Set(['qwen3.6-35b', 'deepseek-v4-flash']);
 
 function checkRequest(key: string, model: string): void {
   if (!key.trim() || key === 'no-key') throw Object.assign(new Error('FreeInference API key is required'), { status: 401 });
-  if (!TESTED_CHAT_MODELS.has(model)) throw Object.assign(new Error('FreeInference chat supports only tested free chat routes'), { status: 400 });
+  if (!TESTED_CHAT_MODELS.has(model)) throw providerRequestError('FreeInference chat supports only tested free chat routes', 'model');
 }
 
 function checkIdentity(requested: string, returned: unknown): void {

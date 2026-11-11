@@ -115,7 +115,10 @@ const customMediaSchema = z.object({
   // 'search' registers a custom web search relay (Tavily wire shape at
   // POST {base_url}/search), listed on the Search page and tried first by
   // POST /v1/search (#1174).
-  modality: z.enum(['image', 'audio', 'transcription', 'search']),
+  // 'decision' registers a custom decision endpoint (proposed generic
+  // contract at POST {base_url}/decide — see services/decision.ts), listed
+  // on the Decision page and runnable by POST /v1/decisions (#1777).
+  modality: z.enum(['image', 'audio', 'transcription', 'search', 'decision']),
   apiKey: z.string().optional(),
   label: z.string().optional(),
   quotaLabel: z.string().optional(),
@@ -124,7 +127,7 @@ const customMediaSchema = z.object({
 mediaRouter.post('/custom', (req: Request, res: Response) => {
   const parsed = customMediaSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 

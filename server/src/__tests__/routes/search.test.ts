@@ -191,4 +191,44 @@ describe('search routes', () => {
     const engines = await call(app, 'GET', '/api/search/engines');
     expect(engines.body.find((e: any) => e.engineId === 'my-searxng')).toMatchObject({ isCustom: true, keyCount: 1 });
   });
+
+  it('serves POST /v1/search from a registered custom relay before any catalog engine (#1777)', async () => {
+    // A catalog engine with a key is present on purpose: the custom relay
+    // must win the chain, so Tavily must never be called at all.
+    addKey('tavily');
+    const created = await call(app, 'POST', '/api/media/custom', {
+      body: { baseUrl: 'https://relay.example.com/v1', model: 'my-relay', modality: 'search', apiKey: 'relay-secret' },
+    });
+    expect(created.status).toBe(201);
+
+    const upstreamCalls: Array<{ url: string; body: any; auth: string | null }> = [];
+    globalThis.fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const urlStr = String(url);
+      if (!urlStr.startsWith('https://relay.example.com')) {
+        throw new Error(`unexpected upstream call to ${urlStr} — the custom relay should have answered first`);
+      }
+      upstreamCalls.push({
+        url: urlStr,
+        body: JSON.parse(String(init.body)),
+        auth: new Headers(init.headers).get('Authorization'),
+      });
+      return new Response(JSON.stringify({
+        results: [{ title: 'Paris', url: 'https://paris.example', content: 'Capital of France.', score: 0.9 }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+
+    const { status, body } = await call(app, 'POST', '/v1/search', { body: { query: 'capital of France', max_results: 2 } });
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      query: 'capital of France',
+      results: [{ title: 'Paris', url: 'https://paris.example', content: 'Capital of France.', score: 0.9 }],
+      provider: 'custom',
+      engine: 'my-relay',
+    });
+    // Exactly one upstream call, Tavily-shaped, to the relay — and only the relay.
+    expect(upstreamCalls).toHaveLength(1);
+    expect(upstreamCalls[0].url).toBe('https://relay.example.com/v1/search');
+    expect(upstreamCalls[0].body).toMatchObject({ query: 'capital of France', max_results: 2 });
+    expect(upstreamCalls[0].auth).toBe('Bearer relay-secret');
+  });
 });

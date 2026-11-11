@@ -41,9 +41,11 @@ import {
   isKeyAuthError,
   isDailyQuotaExhaustedError,
   isProviderLevelError,
+  isModelScopedOverloadError,
   newClientAbortError,
 } from '../../lib/error-classify.js';
 import { invalidToolArgumentsError } from '../../lib/tool-validate.js';
+import { providerHttpError, providerRequestError } from '../../providers/base.js';
 import { getAllPenalties } from '../../services/router.js';
 import type { RouteResult } from '../../services/router.js';
 
@@ -459,6 +461,25 @@ describe('exhaustedRetryError attempt trail + auth exhaustion', () => {
   });
 });
 
+describe('runFallbackLoop: provider-side 400', () => {
+  it.each([
+    ['upstream', providerHttpError(new Response(null, { status: 400 }), 'JamAI HTTP 400')],
+    ['unsupported request', providerRequestError('Gizmo does not support tools', 'request')],
+    ['unsupported model', providerRequestError('Unsupported model route', 'model')],
+  ])('moves to another route after an %s rejection', async (_name, rejection) => {
+    const routes = [fakeRoute(), fakeRoute()];
+    const dispatch = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce('done');
+    const onFatal = vi.fn();
+    const attemptLog: AttemptRecord[] = [];
+    await runFallbackLoop(hooksSkeleton({
+      route: attempt => routes[attempt], dispatch, onFatal, attemptLog,
+    }));
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(onFatal).not.toHaveBeenCalled();
+    expect(attemptLog[0].errorClass).toBe(_name === 'unsupported model' ? 'model_not_found' : 'provider_bad_request');
+  });
+});
+
 describe('runFallbackLoop: auth rotation (401 is key-fatal, not request-fatal)', () => {
   it('rotates past a 401 key, benches it, and fires an immediate revalidation', async () => {
     const badRoute = fakeRoute();
@@ -792,6 +813,26 @@ describe('runFallbackLoop: a provider-level failure skips the whole platform (#7
     expect(state.skipPlatforms.has('alpha')).toBe(true);
   });
 
+  it('skips sibling keys of an overloaded model but still tries a sibling model', async () => {
+    const state = newFallbackState();
+    const dispatch = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('This model is currently experiencing high demand.'), { status: 503 }))
+      .mockResolvedValueOnce('done');
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, state, route: miniRouter(state), dispatch }));
+
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const second = dispatch.mock.calls[1][0] as RouteResult;
+    expect(second.platform).toBe('alpha');
+    expect(second.modelId).toBe('alpha-small');
+    expect(state.skipModels.has(CANDIDATES[0].modelDbId)).toBe(true);
+    expect(state.skipPlatforms.has('alpha')).toBe(false);
+  });
+
+  it.each([undefined, 400, 429])('does not infer model overload from wording without a 5xx status (%s)', status => {
+    expect(isModelScopedOverloadError(Object.assign(new Error('This model is overloaded.'), { status }))).toBe(false);
+  });
+
   it('a 401 on alpha key1 still rotates to alpha key2 (key-scoped, not provider-scoped)', async () => {
     const state = newFallbackState();
     const dispatch = vi.fn()
@@ -976,5 +1017,17 @@ describe('runFallbackLoop: routing-exhaustion diagnostics belong to the loop', (
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe('retryable quota errors with token counts', () => {
+  it('does not skip models or their platform because a count contains 404', () => {
+    const state = newFallbackState();
+    const routes = [fakeRoute(), fakeRoute(), fakeRoute()];
+    for (const route of routes) {
+      recordRetryableFailure(route, Object.assign(new Error('Rate limit: requested 14041 tokens'), { status: 429 }), state);
+      expect(state.skipModels.has(route.modelDbId)).toBe(false);
+    }
+    expect(state.skipPlatforms.has('fake')).toBe(false);
   });
 });

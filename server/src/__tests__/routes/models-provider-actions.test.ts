@@ -53,6 +53,14 @@ describe('Model Provider Actions API', () => {
   });
 
   describe('POST /api/models', () => {
+    it('explains why an existing non-chat model cannot be tested as chat', async () => {
+      const row = getDb().prepare(`INSERT INTO models(platform,model_id,display_name,intelligence_rank,speed_rank,enabled)
+        VALUES ('speechify','legacy-speech','Speech',1,1,1)`).run();
+      const result = await post(app, `/api/models/${Number(row.lastInsertRowid)}/test`);
+      expect(result.body.success).toBe(false);
+      expect(result.body.error).toContain('does not support chat');
+    });
+
     it('rejects unauthenticated requests', async () => {
       const server = app.listen(0, '127.0.0.1');
       if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
