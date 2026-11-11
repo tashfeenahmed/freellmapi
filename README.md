@@ -175,6 +175,8 @@ Open http://localhost:3001, add your provider keys on the **Keys** page, reorder
 
 On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** (below). On Android, see the experimental [Termux guide](docs/en/install/02-android-termux.md).
 
+Running from a source checkout? Use `Start.cmd` on Windows or `Start.command` on macOS to install the locked dependencies when needed and start local development. See [source checkout launchers](docs/en/install/01-install.md#source-checkout-launchers) for prerequisites and configuration.
+
 Everything else — Docker Compose, local development, declarative startup config, production builds, LAN access, and backups — is in **[docs/en/install/01-install.md](docs/en/install/01-install.md)**.
 
 ## Desktop app

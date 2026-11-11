@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names server,client \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:lan": "concurrently --kill-others-on-fail --names server,client \"npm run dev -w server\" \"npm run dev -w client -- --host\"",
-    "test": "npm run test:bootstrap && npm run test:hooks && npm run test -w server && npm run test -w cli && npm run test -w client --if-present",
+    "test": "npm run test:start && npm run test:bootstrap && npm run test:hooks && npm run test -w server && npm run test -w cli && npm run test -w client --if-present",
+    "test:start": "node --test scripts/dev-start.test.mjs",
     "test:bootstrap": "node --test scripts/dev-bootstrap.test.mjs",
     "test:hooks": "node --test .claude/hooks/contributing-check.test.mjs",
     "build": "npm run build -w server && npm run build -w cli && npm run build -w client",
