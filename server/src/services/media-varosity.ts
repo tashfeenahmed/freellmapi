@@ -6,7 +6,7 @@ import { parseRetryAfterMs } from '../providers/base.js';
 import { VAROSITY_BASE_URL } from '../providers/varosity.js';
 import type { ImageParams, SpeechParams, VideoParams } from './media.js';
 
-/** Only the ten live-tested routes. All share the account's daily credits;
+/** Only the ten live-tested routes. All share the account's credits;
  * this is not a promise of free unlimited use or an allowance per model. */
 const IMAGES = new Set(['flux-3-klein', 'flux-2-pro', 'qwen-image-3.0', 'gpt-image-2.5-flare']);
 const VOICES: Record<string, string> = {
@@ -172,7 +172,7 @@ export async function varositySpeech(model: string, key: string | null, p: Speec
 
 export async function varosityVideo(model: string, key: string | null, p: VideoParams, clientSignal?: AbortSignal): Promise<{ video: Buffer; contentType: string }> {
   if (model !== 'grok-imagine-video') throw new VarosityMediaError('Varosity video model is not a tested route', 400);
-  // One second costs less than the shared daily grant. Never silently use the
+  // One second keeps each clip cheap (about 7 cents). Never silently use the
   // provider's more expensive multi-second default or a BYOK billing fallback.
   if ((p.duration !== undefined && p.duration !== 1) || (p.aspectRatio && p.aspectRatio !== '16:9') || p.image || p.seed !== undefined || p.audio === false) throw new VarosityMediaError('Varosity video supports one-second landscape text-to-video with audio through this adapter', 400);
   const work = session(key, 'video', clientSignal);
