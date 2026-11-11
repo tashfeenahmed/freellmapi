@@ -16,7 +16,8 @@
     "modelsMenu": "Model turlarini ko'rib chiqing",
     "agents": "Agentlar",
     "logs": "Jurnal",
-    "analyticsMenu": "Analitika sahifalari"
+    "analyticsMenu": "Analitika sahifalari",
+    "codeAgent": "Code Agent"
   },
   "auth": {
     "createYourAccount": "Hisob qaydnomangizni yarating",

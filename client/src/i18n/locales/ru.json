@@ -16,7 +16,8 @@
     "modelsMenu": "Просмотр типов моделей",
     "agents": "Агенты",
     "logs": "Журнал",
-    "analyticsMenu": "Страницы аналитики"
+    "analyticsMenu": "Страницы аналитики",
+    "codeAgent": "Code Agent"
   },
   "auth": {
     "createYourAccount": "Создайте свою учетную запись",

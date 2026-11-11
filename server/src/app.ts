@@ -35,6 +35,7 @@ import { ollamaRouter } from './routes/ollama.js';
 import { urlTokenRouter } from './routes/url-tokens.js';
 import { updateRouter } from './routes/update.js';
 import { moderationRouter } from './routes/moderation.js';
+import { codeAgentRouter } from './routes/code-agent.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createHostGuard } from './middleware/allowed-hosts.js';
 import { createProxyRateLimiter, createAdminRateLimiter } from './middleware/rateLimit.js';
@@ -282,6 +283,7 @@ export function createApp(config?: Config) {
   app.use('/api/cache', requireAuth, cacheRouter);
   app.use('/api/compression', requireAuth, compressionRouter);
   app.use('/api/update', requireAuth, updateRouter);
+  app.use('/api/code-agent', requireAuth, codeAgentRouter);
 
   // Health check — no auth required.
   app.get('/api/ping', (_req, res) => {
