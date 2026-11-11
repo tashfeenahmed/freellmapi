@@ -14,6 +14,14 @@ import {
 } from '../../lib/key-parser.js';
 
 describe('key parser', () => {
+  it('imports FreeTTS credentials by environment name and provider alias', () => {
+    expect(detectPlatform('FREETTS_')).toBe('freetts');
+    expect(detectPlatform('FREE_TTS_')).toBe('freetts');
+    expect(AUTH_JSON_PROVIDER_MAP['freetts.org']).toBe('freetts');
+    expect(parseKeysFromFile('FREETTS_API_KEY=ft_live_synthetic_not_a_real_key', '.env').keys).toEqual([
+      expect.objectContaining({ platform: 'freetts', rawKey: 'FREETTS_API_KEY=ft_live_synthetic_not_a_real_key' }),
+    ]);
+  });
   it('imports Varosity keys by environment name or provider alias', () => {
     expect(detectPlatform('VAROSITY_')).toBe('varosity');
     expect(detectPlatform('RIME_')).toBe('rime');
