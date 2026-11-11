@@ -591,6 +591,16 @@ function readForeignKeysPragma(db: Db): boolean {
 /* Auto-backup scheduler                                              */
 /* ------------------------------------------------------------------ */
 
+/** The calendar day on the operator's own clock. The configured time is local
+ *  wall clock, so the day that gates `intervalDays` must come from the same
+ *  clock: reading it off `toISOString()` (UTC) made the scheduler fire a second
+ *  time when UTC midnight passed inside a local day, and thereafter at that
+ *  hour instead of the configured one (#1888). */
+function localDayString(now: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export function startBackupScheduler(scheduler: Scheduler): () => void {
   let lastRunDay: string | null = getSetting(LAST_RUN_SETTING) ?? null;
 
@@ -602,7 +612,7 @@ export function startBackupScheduler(scheduler: Scheduler): () => void {
     const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     if (hhmm < schedule.time) return;
 
-    const today = now.toISOString().slice(0, 10);
+    const today = localDayString(now);
     if (lastRunDay === today) return;
 
     const intervalDays = Math.max(1, schedule.intervalDays);
