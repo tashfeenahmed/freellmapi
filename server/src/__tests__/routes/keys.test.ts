@@ -234,6 +234,15 @@ describe('Keys API', () => {
     expect(status).toBe(400);
   });
 
+  it('accepts a local FreeTTS key without seeding chat or tier-gated audio rows', async () => {
+    const { status, body } = await request(app, 'POST', '/api/keys', {
+      platform: 'freetts', key: 'ft_live_synthetic_key_not_real', label: 'Personal TTS',
+    });
+    expect(status).toBe(201); expect(body.platform).toBe('freetts'); expect(body.modelsAvailable).toBe(0);
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM models WHERE platform='freetts'").get()).toEqual({ n: 0 });
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM media_models WHERE platform='freetts'").get()).toEqual({ n: 0 });
+  });
+
   it('DELETE /api/keys/:id removes a key', async () => {
     const { body: created } = await request(app, 'POST', '/api/keys', {
       platform: 'groq',

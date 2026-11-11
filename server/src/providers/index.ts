@@ -41,6 +41,7 @@ import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
 import { VarosityProvider } from './varosity.js';
 import { RimeProvider } from './rime.js';
+import { FreeTtsProvider } from './freetts.js';
 import { FreeAiProvider } from './freeai.js';
 import { BlazeProvider } from './blaze.js';
 import { LucidityProvider } from './lucidity.js';
@@ -128,6 +129,7 @@ register(new ClodProvider());
 register(new SpeechifyProvider());
 register(new VarosityProvider());
 register(new RimeProvider());
+register(new FreeTtsProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
 // Five more OpenAI-compatible gateways. Each pins the response model to the
