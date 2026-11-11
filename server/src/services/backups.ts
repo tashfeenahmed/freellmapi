@@ -591,6 +591,17 @@ function readForeignKeysPragma(db: Db): boolean {
 /* Auto-backup scheduler                                              */
 /* ------------------------------------------------------------------ */
 
+/** `YYYY-MM-DD` on the server's local calendar. The schedule HH:MM is local
+ *  wall time, so the day key and the intervalDays span have to use that same
+ *  clock. A UTC date rolls over at a different hour, and the backup then runs
+ *  at that hour — twice on the first local day (#1888). Stored values are
+ *  already `YYYY-MM-DD`, so an existing backup_last_run_day still compares. */
+function localDayKey(now: Date): string {
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export function startBackupScheduler(scheduler: Scheduler): () => void {
   let lastRunDay: string | null = getSetting(LAST_RUN_SETTING) ?? null;
 
@@ -602,7 +613,7 @@ export function startBackupScheduler(scheduler: Scheduler): () => void {
     const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     if (hhmm < schedule.time) return;
 
-    const today = now.toISOString().slice(0, 10);
+    const today = localDayKey(now);
     if (lastRunDay === today) return;
 
     const intervalDays = Math.max(1, schedule.intervalDays);

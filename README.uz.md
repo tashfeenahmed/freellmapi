@@ -15,7 +15,7 @@ O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladiga
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 474 ta model oilasi, 635 ta bepul endpoint
 
-[English](README.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha**
 
 Bu tarjima ortda qolishi mumkin. Eng so'nggi ma'lumot uchun inglizcha README'ga qarang.
 

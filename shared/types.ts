@@ -106,8 +106,15 @@ export type Platform =
   | 'nabh'
   // Daily-free video route; signed catalog only.
   | 'novai'
+  | 'varosity'
+  // Native TTS and transcription; one shared renewable monthly credit grant.
+  | 'rime'
+  // Local personal BYOK TTS; shared monthly characters, watermarked Free audio.
+  | 'freetts'
   // Research API; chat and embeddings share a daily quota. Requests are logged.
   | 'freeinference'
+  // Personal BYOK client; shared monthly account allowance, Telegram verification.
+  | 'freemodel'
   // Hosted gateways; model rows are delivered by the signed catalog only.
   // ElectronHub renews weekly credits; Experiential renews monthly credits.
   | 'electronhub'
@@ -136,6 +143,10 @@ export type Platform =
   // published. Catalog rows live in the hosted catalog (premium now, free after
   // 30 days).
   | 'anyapi'
+  // PowerTokens — OpenAI-compatible gateway (api.powertokens.ai). Free model
+  // glm-4.7-flash ($0 / 1M in+out, 0 Credits). RPM/RPD unpublished. Hosted
+  // catalog only (no migration seed), same as the anyapi/bai gateways.
+  | 'powertokens'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
@@ -159,6 +170,7 @@ export type Platform =
   | 'halx'
   | 'aisense'
   | 'brave'
+  | 'outcrawl'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'
@@ -289,7 +301,7 @@ export type Platform =
  *  web_search tools), never chat. Search engine rows arrive through the
  *  catalog's `searchEngines` registry. The server keeps its own runtime copy in
  *  server/src/lib/search-platforms.ts (shared is type-only on the server). */
-export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave'] as const;
+export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave', 'outcrawl'] as const;
 export type SearchPlatform = (typeof SEARCH_PLATFORMS)[number];
 
 export function isSearchPlatform(platform: string): platform is SearchPlatform {
@@ -362,6 +374,8 @@ export interface ApiKeyModel {
  *  and enabled yet still skipped by the router because of these. */
 export interface ApiKeyCooldown {
   modelId: string;
+  /** Why this route is benched; 'checkin' means APINex daily website visit required. */
+  source?: 'heuristic' | 'authoritative' | 'credit' | 'tier' | 'checkin';
   expiresAtMs: number;
   remainingMs: number;
 }
@@ -578,6 +592,9 @@ export interface ChatCompletionResponse {
     platform: Platform;
     model: string;
   };
+  // Anthropic auto-mode classifier results, when the upstream supplied them
+  // (#1589). Never synthesized here; absent when the upstream sends none.
+  safeguard_results?: unknown;
 }
 
 export interface ChatCompletionChunk {
@@ -596,6 +613,10 @@ export interface ChatCompletionChunk {
     finish_reason: string | null;
   }[];
   usage?: TokenUsage;
+  // Anthropic auto-mode classifier results carried on a stream chunk, when
+  // the upstream supplied them (#1589). Same rule as the non-streaming
+  // response: passed through verbatim, never synthesized.
+  safeguard_results?: unknown;
 }
 
 // ---- Analytics Types ----
