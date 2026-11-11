@@ -44,6 +44,7 @@ import {
   newClientAbortError,
 } from '../../lib/error-classify.js';
 import { invalidToolArgumentsError } from '../../lib/tool-validate.js';
+import { providerHttpError, providerRequestError } from '../../providers/base.js';
 import { getAllPenalties } from '../../services/router.js';
 import type { RouteResult } from '../../services/router.js';
 
@@ -456,6 +457,25 @@ describe('exhaustedRetryError attempt trail + auth exhaustion', () => {
     expect(classifyAttemptError(new Error('empty completion from X'))).toBe('empty_completion');
     expect(classifyAttemptError(new Error('429 Too Many Requests'))).toBe('rate_limited');
     expect(classifyAttemptError(Object.assign(new Error('Bad Gateway'), { status: 502 }))).toBe('upstream_error');
+  });
+});
+
+describe('runFallbackLoop: provider-side 400', () => {
+  it.each([
+    ['upstream', providerHttpError(new Response(null, { status: 400 }), 'JamAI HTTP 400')],
+    ['unsupported request', providerRequestError('Gizmo does not support tools', 'request')],
+    ['unsupported model', providerRequestError('Unsupported model route', 'model')],
+  ])('moves to another route after an %s rejection', async (_name, rejection) => {
+    const routes = [fakeRoute(), fakeRoute()];
+    const dispatch = vi.fn().mockRejectedValueOnce(rejection).mockResolvedValueOnce('done');
+    const onFatal = vi.fn();
+    const attemptLog: AttemptRecord[] = [];
+    await runFallbackLoop(hooksSkeleton({
+      route: attempt => routes[attempt], dispatch, onFatal, attemptLog,
+    }));
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(onFatal).not.toHaveBeenCalled();
+    expect(attemptLog[0].errorClass).toBe(_name === 'unsupported model' ? 'model_not_found' : 'provider_bad_request');
   });
 });
 

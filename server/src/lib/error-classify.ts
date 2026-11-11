@@ -5,6 +5,7 @@
 
 export function isRetryableError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
+  if (err?.status === 400 && (err?.providerRejection === 'upstream' || err?.providerRejection === 'request' || err?.providerRejection === 'model')) return true;
   // Trust the upstream HTTP status the provider attached to the error first
   // (providerHttpError in providers/base.ts sets err.status on every adapter).
   // This structured check is the robust primary signal; the message-substring
@@ -15,8 +16,8 @@ export function isRetryableError(err: any): boolean {
   // the chain — because the old code matched specific substrings and ignored
   // err.status for every code except 403. 408 (request timeout), 409 (conflict),
   // 410 (model pulled upstream), 429 (rate limit) and all 5xx are transient or
-  // fail-over-able; 400/401 stay fatal (status 0 here, handled by the absence of a
-  // matching rule) and 403 is handled by isModelAccessForbiddenError below.
+  // fail-over-able. Bare 400 and 401 stay fatal; explicitly marked provider-side
+  // 400s may fail over. 403 is handled by isModelAccessForbiddenError below.
   // 422 (notably Mistral's strict validation) is a provider-side request-shape
   // rejection: fail over to another provider, but if the whole chain rejects it
   // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
@@ -63,8 +64,8 @@ export function isRetryableError(err: any): boolean {
     || isModelAccessForbiddenError(err)
     // 400: one provider may reject parameters another accepts (e.g. max_tokens
     // limits, unsupported params). The matching pattern is "api error 400"
-    // which comes from the OpenAI-compat provider's error formatting, not
-    // a bare "400" which is deliberately non-retryable for validation errors.
+    // which comes from the OpenAI-compat provider's error formatting. Marked
+    // provider rejections are handled above; bare validation 400s stay fatal.
     || msg.includes('api error 400')
     // 422: Mistral and other strict OpenAI-compatible endpoints use
     // Unprocessable Entity for request-shape validation. Rotate to a provider
@@ -482,7 +483,7 @@ export function isProviderBadRequestError(err: any): boolean {
   if (isProviderDegradedError(err)) return false;
   const status = typeof err?.status === 'number' ? err.status : 0;
   const msg = (err?.message ?? '').toLowerCase();
-  if (status === 400) return msg.includes('api error 400');
+  if (status === 400) return err?.providerRejection === 'upstream' || err?.providerRejection === 'request' || msg.includes('api error 400');
   if (status === 422) return msg.includes('api error 422') || msg.includes('unprocessable entity');
   if (status !== 0) return false;
   return msg.includes('api error 400') || msg.includes('api error 422') || msg.includes('unprocessable entity');
@@ -614,7 +615,8 @@ export function isModelNotFoundError(err: any): boolean {
     // "not supported for chat completions" is MODEL-level too: the id is real
     // but this platform cannot serve it on the endpoint we use, and a sibling
     // key would be told the same. Route it out for the request like a 404.
-    || msg.includes('not supported for chat completions');
+    || msg.includes('not supported for chat completions')
+    || (err?.status === 400 && err?.providerRejection === 'model');
 }
 
 
