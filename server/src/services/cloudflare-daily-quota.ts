@@ -42,7 +42,16 @@ export function benchCloudflareAccount(
   if (!isCloudflareNeuronsExhausted(err)) return 0;
   const account = cloudflareAccountId(apiKey);
   if (!account) return 0;
+  return benchCloudflareAccountId(account, durationMs, source);
+}
 
+/**
+ * Bench every enabled Cloudflare model on every key of `account` (lowercase
+ * account id). Shared by the 429 path above and the local neuron meter
+ * (cloudflare-neurons.ts), which benches until midnight UTC once the account
+ * reaches its daily neuron cap. Returns the number of cooldowns written.
+ */
+export function benchCloudflareAccountId(account: string, durationMs: number, source: CooldownSource): number {
   const db = getDb();
   const keys = db.prepare(
     "SELECT id, encrypted_key, iv, auth_tag FROM api_keys WHERE platform = 'cloudflare' AND enabled = 1",

@@ -81,6 +81,39 @@ it('still requires a key for a provider that needs one', async () => {
   expect(posted()).toBeUndefined()
 })
 
+describe('FreeInference key setup', () => {
+  it('offers the provider with its research logging notice and requires a key', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freeinference" />)
+    expect(container.textContent).toContain('FreeInference (research; requests logged)')
+    expect(container.querySelector('a[href="https://freeinference.org"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+  it('saves a masked provider key without requiring a custom endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freeinference" />)
+    enter(keyInput(), 'hyi-test-key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'freeinference', key: 'hyi-test-key' })
+  })
+})
+
+describe('FreeModel personal BYOK setup', () => {
+  it('shows Telegram verification and requires an API key', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freemodel" />)
+    expect(container.textContent).toContain('FreeModel (monthly allowance; Telegram verification)')
+    expect(container.querySelector('a[href="https://freemodel.in/dashboard"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+  it('sends the masked key to the existing encrypted key endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freemodel" />)
+    enter(keyInput(), 'fm_test_key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'freemodel', key: 'fm_test_key' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
+})
+
 describe('JamAI project-scoped PAT', () => {
   it('requires both fields, masks the PAT, and does not offer bulk paste', async () => {
     mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="jamai" />)

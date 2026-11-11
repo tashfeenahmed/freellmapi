@@ -94,7 +94,7 @@ describe('NovAI video', () => {
     const fetch = vi.spyOn(global, 'fetch'), provider = new NovaiProvider();
     expect(provider.supportsKeyValidation).toBe(false);
     await expect(provider.validateKey('test')).rejects.toThrow('unknown');
-    await expect(provider.chatCompletion()).rejects.toMatchObject({ status: 400 });
+    await expect(provider.chatCompletion('test-key', [], 'cogvideox-flash')).rejects.toMatchObject({ status: 400 });
     await expect(provider.streamChatCompletion().next()).rejects.toMatchObject({ status: 400 });
     expect(fetch).not.toHaveBeenCalled();
   });

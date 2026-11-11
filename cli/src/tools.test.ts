@@ -22,6 +22,7 @@ vi.mock('./detect.js', () => ({
 // output is stable everywhere.
 beforeEach(() => {
   vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('XDG_DATA_HOME', '');
   vi.stubEnv('MIMOCODE_HOME', '');
   vi.stubEnv('DSH_HOME', '');
   vi.stubEnv('OPENCLAW_HOME', '');
@@ -281,6 +282,52 @@ describe('tool generators', () => {
         supports_attachments: false,
       });
     }
+  });
+
+  it('stores the OpenCode key in auth.json, not as an env placeholder in the config', () => {
+    // An `{env:FREELLMAPI_API_KEY}` placeholder only works when the process
+    // making the request inherits the variable; unset, it resolves to an empty
+    // key that also overrides a key stored with `/connect`. The key belongs in
+    // OpenCode's credential store instead.
+    const { files } = tools.find(tool => tool.id === 'opencode')!.generate(context);
+    const [config, auth] = files;
+    expect(asPosix(config.path)).toBe('/home/tester/.config/opencode/opencode.json');
+    expect(asPosix(auth.path)).toBe('/home/tester/.local/share/opencode/auth.json');
+    expect(auth.sensitive).toBe(true);
+    expect(auth.value).toEqual({ freellmapi: { type: 'api', key: 'freellmapi-test-key' } });
+    expect(config.sensitive).toBeFalsy();
+    expect(JSON.stringify(config.value)).not.toContain('freellmapi-test-key');
+
+    // Re-running over a config an older CLI wrote retires the placeholder and
+    // leaves the user's other providers and settings alone.
+    const previous = JSON.stringify({
+      theme: 'dark',
+      provider: {
+        other: { options: { apiKey: 'keep-me' } },
+        freellmapi: { options: { baseURL: 'http://old/v1', apiKey: '{env:FREELLMAPI_API_KEY}' } },
+      },
+    });
+    const merged = JSON.parse(renderFile(config, previous));
+    expect(merged.theme).toBe('dark');
+    expect(merged.provider.other.options.apiKey).toBe('keep-me');
+    expect(merged.provider.freellmapi.options).toEqual({ baseURL: 'http://localhost:3000/v1' });
+
+    // auth.json is shared with every provider OpenCode has credentials for.
+    const existingAuth = JSON.stringify({ anthropic: { type: 'oauth', refresh: 'r' } });
+    expect(JSON.parse(renderFile(auth, existingAuth))).toEqual({
+      anthropic: { type: 'oauth', refresh: 'r' },
+      freellmapi: { type: 'api', key: 'freellmapi-test-key' },
+    });
+  });
+
+  it('puts the OpenCode files under XDG_CONFIG_HOME / XDG_DATA_HOME when set', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/xdg/config');
+    vi.stubEnv('XDG_DATA_HOME', '/xdg/data');
+    const { files } = tools.find(tool => tool.id === 'opencode')!.generate(context);
+    expect(files.map(file => asPosix(file.path))).toEqual([
+      '/xdg/config/opencode/opencode.json',
+      '/xdg/data/opencode/auth.json',
+    ]);
   });
 
   it('keeps `auto` in the OpenCode, Crush and Goose rosters when it is the default', () => {
