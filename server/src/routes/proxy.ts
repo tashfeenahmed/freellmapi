@@ -258,6 +258,24 @@ function restoreSessionReasoning(messages: ChatMessage[], reasoning: string, pla
   return restored ?? messages;
 }
 
+/**
+ * The messages that identify a conversation for sticky routing, context
+ * handoff and reasoning replay. Take it BEFORE compression: the aging and
+ * budget engines rewrite or drop old user turns, and the session key hashes
+ * the first one, so a compressed request would otherwise look like a new
+ * conversation (#1889). The first user turn is snapshotted as text so an
+ * in-place rewrite of its content cannot change the key either.
+ */
+export function sessionIdentityMessages(messages: ChatMessage[]): ChatMessage[] {
+  const out = messages.slice();
+  const firstUserIndex = out.findIndex(message => message.role === 'user');
+  if (firstUserIndex !== -1) {
+    const firstUser = out[firstUserIndex]!;
+    out[firstUserIndex] = { ...firstUser, content: contentToString(firstUser.content ?? '') };
+  }
+  return out;
+}
+
 function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): string {
   if (sessionIdHeader) {
     return strategyKey ? `hdr:${sessionIdHeader}::${strategyKey}` : `hdr:${sessionIdHeader}`;
@@ -1992,13 +2010,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
 
   // Session identity must come from the caller's conversation, before an
-  // aging or budget engine can rewrite or remove its first user turn.
-  const sessionMessages = messages.slice();
-  const firstUserIndex = sessionMessages.findIndex(message => message.role === 'user');
-  if (firstUserIndex !== -1) {
-    const firstUser = sessionMessages[firstUserIndex];
-    sessionMessages[firstUserIndex] = { ...firstUser, content: contentToString(firstUser.content ?? '') };
-  }
+  // aging or budget engine can rewrite or remove its first user turn (#1889).
+  const sessionMessages = sessionIdentityMessages(messages);
 
   let cacheControlPrefixLength = 0;
   parsed.data.messages.forEach((message, index) => {

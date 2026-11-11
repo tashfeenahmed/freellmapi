@@ -235,6 +235,49 @@ describe('Model unification (group the same model across providers)', () => {
     },
   );
 
+  it.each([
+    ['/v1/messages', (model: string, msgs: { role: string; content: string }[]) => ({ model, max_tokens: 64, messages: msgs })],
+    ['/v1/responses', (model: string, msgs: { role: string; content: string }[]) => ({ model, input: msgs })],
+  ] as const)('keeps the sticky group member on %s when compression ages the first user turn', async (path, body) => {
+    setCompressionConfig({ mode: 'aggressive' });
+    const db = getDb();
+    const groq = db.prepare("SELECT id FROM models WHERE model_id = 'tum-groq'").get() as { id: number };
+    const cerebras = db.prepare("SELECT id FROM models WHERE model_id = 'tum-cerebras'").get() as { id: number };
+    const setPriority = (id: number, priority: number) =>
+      db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?').run(priority, id);
+    const originalFetch = global.fetch;
+    const upstreamBodies: any[] = [];
+    const served: string[] = [];
+    vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+      const u = String(url);
+      if (u.includes('api.groq.com') || u.includes('api.cerebras.ai')) {
+        upstreamBodies.push(JSON.parse(init.body));
+        served.push(u.includes('api.groq.com') ? 'groq' : 'cerebras');
+        return completion(u.includes('api.groq.com') ? 'tum-groq' : 'tum-cerebras', 'answer');
+      }
+      return originalFetch(url, init);
+    });
+    const first = `I need help with ${path} session routing.\n${'Extra background about the work. '.repeat(80)}`;
+    setPriority(cerebras.id, 1);
+    setPriority(groq.id, 2);
+    const start = await request(app, 'POST', path, body('test-unify-model', [{ role: 'user', content: first }]), authHeaders());
+    expect(start.status).toBe(200);
+    // Whichever member served the opener is the sticky one; now make the other
+    // member the preferred route so only stickiness can keep the session put.
+    const stuck = served.at(-1)!;
+    expect(['groq', 'cerebras']).toContain(stuck);
+    setPriority(stuck === 'groq' ? cerebras.id : groq.id, -100);
+    setPriority(stuck === 'groq' ? groq.id : cerebras.id, 100);
+    const conversation = [{ role: 'user', content: first }];
+    for (let i = 0; i < 8; i += 1) {
+      conversation.push({ role: 'assistant', content: 'answer' }, { role: 'user', content: 'continue' });
+    }
+    const next = await request(app, 'POST', path, body('test-unify-model', conversation), authHeaders());
+    expect(next.status).toBe(200);
+    expect(JSON.stringify(upstreamBodies.at(-1).messages)).toContain('[compressed older turn]');
+    expect(served.at(-1)).toBe(stuck);
+  });
+
   it('retains the handoff when compression changes the first user turn and the model switches', async () => {
     vi.stubEnv('FREELLMAPI_CONTEXT_HANDOFF', 'on_model_switch');
     setCompressionConfig({ mode: 'aggressive' });
