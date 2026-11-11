@@ -28,7 +28,7 @@ npm install
 npm install --prefix desktop  # install desktop dependencies
 npm run desktop:dist          # macOS → desktop/dist-electron/FreeLLMAPI-…-macos-arm64.dmg
 npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-macos-x64.dmg
-npm run desktop:dist:win      # Windows → desktop/dist-electron/FreeLLMAPI-…-x64 installer
+npm run desktop:dist:win      # Windows → desktop/dist-electron/FreeLLMAPI-Setup-….exe
 ```
 
 Both Mac commands also produce a ZIP. Prefer building on the matching Mac
