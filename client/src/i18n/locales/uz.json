@@ -109,6 +109,8 @@
     "sectionAdvanced": "Kengaytirilgan",
     "sectionPreview": "Oldindan ko'rish",
     "generalDescription": "Ushbu boshqaruv panelining tili va ko'rinishi.",
+    "startAtLogin": "Tizim ishga tushganda ishga tushirish",
+    "startAtLoginHelp": "Kompyuteringizga kirganingizda FreeLLMAPI avtomatik ravishda ishga tushsin.",
     "advancedDescription": "Siqish jarayoni uchun chegaralar va xavfsizlik kalitlari.",
     "compressionTitle": "Promptni siqish",
     "compressionDescription": "Kod, xatolar, yo'llar, raqamlar va vosita ta'riflarini saqlagan holda marshrutlashdan oldin so'rov hajmini kamaytiring.",

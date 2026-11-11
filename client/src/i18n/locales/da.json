@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avanceret",
     "sectionPreview": "Forhåndsvisning",
     "generalDescription": "Sprog og udseende for dette dashboard.",
+    "startAtLogin": "Start ved systemstart",
+    "startAtLoginHelp": "Start FreeLLMAPI automatisk, når du logger på din computer.",
     "advancedDescription": "Tærskler og sikkerhedskontakter for komprimeringspipelinen.",
     "compressionTitle": "Promptkomprimering",
     "compressionDescription": "Reducer forespørgslens størrelse før routing, mens kode, fejl, stier, tal og værktøjsdefinitioner bevares.",

@@ -109,6 +109,8 @@
     "sectionAdvanced": "Lisäasetukset",
     "sectionPreview": "Esikatselu",
     "generalDescription": "Tämän hallintapaneelin kieli ja ulkoasu.",
+    "startAtLogin": "Käynnistä järjestelmän käynnistyessä",
+    "startAtLoginHelp": "Käynnistä FreeLLMAPI automaattisesti, kun kirjaudut tietokoneelle.",
     "advancedDescription": "Pakkausputken raja-arvot ja turvakytkimet.",
     "compressionTitle": "Promptien pakkaus",
     "compressionDescription": "Pienennä pyynnön kokoa ennen reititystä säilyttäen koodin, virheet, polut, numerot ja työkalumääritykset.",

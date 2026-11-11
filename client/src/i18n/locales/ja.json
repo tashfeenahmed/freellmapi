@@ -109,6 +109,8 @@
     "sectionAdvanced": "詳細設定",
     "sectionPreview": "プレビュー",
     "generalDescription": "このダッシュボードの言語と外観。",
+    "startAtLogin": "システム起動時に開始",
+    "startAtLoginHelp": "コンピューターにサインインすると FreeLLMAPI を自動的に起動します。",
     "advancedDescription": "圧縮パイプラインのしきい値と安全スイッチ。",
     "compressionTitle": "プロンプト圧縮",
     "compressionDescription": "コード、エラー、パス、数値、ツール定義を保持したまま、ルーティング前にリクエストサイズを削減します。",

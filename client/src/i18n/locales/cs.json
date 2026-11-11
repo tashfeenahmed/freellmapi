@@ -109,6 +109,8 @@
     "sectionAdvanced": "Pokročilé",
     "sectionPreview": "Náhled",
     "generalDescription": "Jazyk a vzhled tohoto panelu.",
+    "startAtLogin": "Spustit při startu systému",
+    "startAtLoginHelp": "Po přihlášení k počítači automaticky spustí FreeLLMAPI.",
     "advancedDescription": "Prahové hodnoty a pojistky kompresního řetězce.",
     "compressionTitle": "Komprese promptů",
     "compressionDescription": "Zmenšete velikost požadavku před směrováním se zachováním kódu, chyb, cest, čísel a definic nástrojů.",

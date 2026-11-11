@@ -109,6 +109,8 @@
     "sectionAdvanced": "高级",
     "sectionPreview": "预览",
     "generalDescription": "此仪表盘的语言与外观。",
+    "startAtLogin": "系统启动时启动",
+    "startAtLoginHelp": "在您登录计算机时自动启动 FreeLLMAPI。",
     "advancedDescription": "压缩流程的阈值与安全开关。",
     "compressionTitle": "提示词压缩",
     "compressionDescription": "在路由前减小请求大小，同时保留代码、错误信息、路径、数字和工具定义。",

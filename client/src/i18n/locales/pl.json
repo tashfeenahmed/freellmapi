@@ -109,6 +109,8 @@
     "sectionAdvanced": "Zaawansowane",
     "sectionPreview": "Podgląd",
     "generalDescription": "Język i wygląd tego panelu.",
+    "startAtLogin": "Uruchamiaj przy starcie systemu",
+    "startAtLoginHelp": "Automatycznie uruchamiaj FreeLLMAPI po zalogowaniu się do komputera.",
     "advancedDescription": "Progi i zabezpieczenia potoku kompresji.",
     "compressionTitle": "Kompresja promptów",
     "compressionDescription": "Zmniejszaj rozmiar żądań przed routingiem, zachowując kod, błędy, ścieżki, liczby i definicje narzędzi.",

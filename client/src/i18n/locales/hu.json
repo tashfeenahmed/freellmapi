@@ -109,6 +109,8 @@
     "sectionAdvanced": "Speciális",
     "sectionPreview": "Előnézet",
     "generalDescription": "A vezérlőpult nyelve és megjelenése.",
+    "startAtLogin": "Indítás rendszerindításkor",
+    "startAtLoginHelp": "Automatikusan indítsa el a FreeLLMAPI-t, amikor bejelentkezik a számítógépére.",
     "advancedDescription": "A tömörítési folyamat küszöbértékei és biztonsági kapcsolói.",
     "compressionTitle": "Prompt-tömörítés",
     "compressionDescription": "Csökkenti a kérés méretét az útválasztás előtt, megőrizve a kódot, a hibákat, az elérési utakat, a számokat és az eszközdefiníciókat.",

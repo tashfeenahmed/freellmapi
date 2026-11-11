@@ -109,6 +109,8 @@
     "sectionAdvanced": "Gelişmiş",
     "sectionPreview": "Önizleme",
     "generalDescription": "Bu panonun dili ve görünümü.",
+    "startAtLogin": "Sistem başlangıcında başlat",
+    "startAtLoginHelp": "Bilgisayarınızda oturum açtığınızda FreeLLMAPI'yi otomatik olarak başlatın.",
     "advancedDescription": "Sıkıştırma hattı için eşikler ve güvenlik ayarları.",
     "compressionTitle": "İstem sıkıştırma",
     "compressionDescription": "Kod, hatalar, yollar, sayılar ve araç tanımlarını koruyarak yönlendirmeden önce istek boyutunu azaltın.",

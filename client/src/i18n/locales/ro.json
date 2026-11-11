@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avansat",
     "sectionPreview": "Previzualizare",
     "generalDescription": "Limba și aspectul acestui panou.",
+    "startAtLogin": "Pornește la pornirea sistemului",
+    "startAtLoginHelp": "Lansați automat FreeLLMAPI când vă conectați la computer.",
     "advancedDescription": "Praguri și comutatoare de siguranță pentru lanțul de comprimare.",
     "compressionTitle": "Comprimarea prompturilor",
     "compressionDescription": "Reduce dimensiunea cererilor înainte de rutare, păstrând codul, erorile, căile, numerele și definițiile instrumentelor.",

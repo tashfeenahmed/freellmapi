@@ -109,6 +109,8 @@
     "sectionAdvanced": "ایڈوانسڈ",
     "sectionPreview": "پیش منظر",
     "generalDescription": "اس ڈیش بورڈ کی زبان اور ظاہری شکل۔",
+    "startAtLogin": "سسٹم اسٹارٹ اپ پر شروع کریں",
+    "startAtLoginHelp": "جب آپ اپنے کمپیوٹر میں سائن ان کرتے ہیں تو FreeLLMAPI کو خودکار طور پر لانچ کریں۔",
     "advancedDescription": "کمپریشن پائپ لائن کے لیے حدود اور حفاظتی سوئچز۔",
     "compressionTitle": "پرامپٹ کمپریشن",
     "compressionDescription": "کوڈ، ایررز، پاتھز، نمبرز اور ٹول ڈیفینیشنز کو محفوظ رکھتے ہوئے روٹنگ سے پہلے درخواست کا سائز کم کریں۔",

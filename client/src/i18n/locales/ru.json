@@ -109,6 +109,8 @@
     "sectionAdvanced": "Дополнительно",
     "sectionPreview": "Предпросмотр",
     "generalDescription": "Язык и внешний вид этой панели.",
+    "startAtLogin": "Запускать при запуске системы",
+    "startAtLoginHelp": "Автоматически запускать FreeLLMAPI при входе в систему.",
     "advancedDescription": "Пороги и предохранители конвейера сжатия.",
     "compressionTitle": "Сжатие промптов",
     "compressionDescription": "Уменьшает размер запросов перед маршрутизацией, сохраняя код, ошибки, пути, числа и определения инструментов.",

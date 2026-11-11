@@ -109,6 +109,8 @@
     "sectionAdvanced": "Lanjutan",
     "sectionPreview": "Pratonton",
     "generalDescription": "Bahasa dan penampilan papan pemuka ini.",
+    "startAtLogin": "Mula semasa permulaan sistem",
+    "startAtLoginHelp": "Lancarkan FreeLLMAPI secara automatik apabila anda log masuk ke komputer anda.",
     "advancedDescription": "Ambang dan suis keselamatan untuk saluran pemampatan.",
     "compressionTitle": "Pemampatan prompt",
     "compressionDescription": "Kurangkan saiz permintaan sebelum penghalaan sambil mengekalkan kod, ralat, laluan, nombor, dan definisi alat.",

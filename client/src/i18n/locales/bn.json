@@ -109,6 +109,8 @@
     "sectionAdvanced": "উন্নত",
     "sectionPreview": "প্রিভিউ",
     "generalDescription": "এই ড্যাশবোর্ডের ভাষা ও চেহারা।",
+    "startAtLogin": "সিস্টেম স্টার্টআপে শুরু করুন",
+    "startAtLoginHelp": "কম্পিউটারে সাইন ইন করলে স্বয়ংক্রিয়ভাবে FreeLLMAPI চালু করুন।",
     "advancedDescription": "কম্প্রেশন পাইপলাইনের সীমা ও নিরাপত্তা সুইচ।",
     "compressionTitle": "প্রম্পট কম্প্রেশন",
     "compressionDescription": "কোড, ত্রুটি, পাথ, সংখ্যা এবং টুল সংজ্ঞা সংরক্ষণ করে রাউটিংয়ের আগে অনুরোধের আকার কমান।",

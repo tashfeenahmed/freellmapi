@@ -109,6 +109,8 @@
     "sectionAdvanced": "پیشرفته",
     "sectionPreview": "پیش‌نمایش",
     "generalDescription": "زبان و ظاهر این داشبورد.",
+    "startAtLogin": "شروع با شروع سیستم",
+    "startAtLoginHelp": "با ورود به رایانه، FreeLLMAPI را به‌طور خودکار راه‌اندازی کنید.",
     "advancedDescription": "آستانه‌ها و کلیدهای ایمنی خط فشرده‌سازی.",
     "compressionTitle": "فشرده‌سازی پرامپت",
     "compressionDescription": "حجم درخواست را قبل از مسیریابی کاهش دهید و در عین حال کد، خطاها، مسیرها، اعداد و تعاریف ابزار حفظ شوند.",

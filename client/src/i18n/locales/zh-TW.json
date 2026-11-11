@@ -109,6 +109,8 @@
     "sectionAdvanced": "進階",
     "sectionPreview": "預覽",
     "generalDescription": "此儀表板的語言與外觀。",
+    "startAtLogin": "系統啟動時啟動",
+    "startAtLoginHelp": "在您登入電腦時自動啟動 FreeLLMAPI。",
     "advancedDescription": "壓縮流程的門檻值與安全開關。",
     "compressionTitle": "提示詞壓縮",
     "compressionDescription": "在路由前縮減請求大小，同時保留程式碼、錯誤、路徑、數字與工具定義。",

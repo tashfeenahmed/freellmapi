@@ -109,6 +109,8 @@
     "sectionAdvanced": "Avancerat",
     "sectionPreview": "Förhandsvisning",
     "generalDescription": "Språk och utseende för den här instrumentpanelen.",
+    "startAtLogin": "Starta vid systemstart",
+    "startAtLoginHelp": "Starta FreeLLMAPI automatiskt när du loggar in på datorn.",
     "advancedDescription": "Tröskelvärden och säkerhetsreglage för komprimeringspipelinen.",
     "compressionTitle": "Promptkomprimering",
     "compressionDescription": "Minska förfrågningsstorleken före routing samtidigt som kod, fel, sökvägar, siffror och verktygsdefinitioner bevaras.",

@@ -109,6 +109,8 @@
     "sectionAdvanced": "અદ્યતન",
     "sectionPreview": "પ્રીવ્યૂ",
     "generalDescription": "આ ડેશબોર્ડની ભાષા અને દેખાવ.",
+    "startAtLogin": "સિસ્ટમ સ્ટાર્ટઅપ પર શરૂ કરો",
+    "startAtLoginHelp": "તમે તમારા કમ્પ્યુટર પર સાઇન ઇન કરો ત્યારે FreeLLMAPI ને આપમેળે લૉન્ચ કરો.",
     "advancedDescription": "કમ્પ્રેશન પાઇપલાઇન માટે મર્યાદાઓ અને સલામતી સ્વિચ.",
     "compressionTitle": "પ્રોમ્પ્ટ કમ્પ્રેશન",
     "compressionDescription": "કોડ, ભૂલો, પાથ, સંખ્યાઓ અને ટૂલ વ્યાખ્યાઓ સાચવીને રાઉટિંગ પહેલાં વિનંતીનું કદ ઘટાડો.",

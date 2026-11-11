@@ -109,6 +109,8 @@
     "sectionAdvanced": "Napredno",
     "sectionPreview": "Pregled",
     "generalDescription": "Jezik i izgled ove nadzorne ploče.",
+    "startAtLogin": "Pokreni pri pokretanju sustava",
+    "startAtLoginHelp": "Automatski pokrenite FreeLLMAPI prilikom prijave na računalo.",
     "advancedDescription": "Pragovi i sigurnosne sklopke kompresijskog lanca.",
     "compressionTitle": "Kompresija promptova",
     "compressionDescription": "Smanjite veličinu zahtjeva prije usmjeravanja uz očuvanje koda, grešaka, putanja, brojeva i definicija alata.",
