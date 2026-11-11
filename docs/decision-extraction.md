@@ -9,7 +9,7 @@ Provider contracts: [HAL-X](https://api.hal-x.ai/docs), [AI SENSE](https://www.a
 
 ## Custom decision endpoints (#1777)
 
-You can also point decisions at your own endpoint instead of a catalog provider: register it with `POST /api/media/custom` and `modality: "decision"`, giving the endpoint's `baseUrl`, a `model` id, and an optional `apiKey` (omit it for a keyless local endpoint). It then appears on the Decision page and in `GET /v1/decisions/models`, and `POST /v1/decisions` runs it like any other decision model.
+You can also point decisions at your own endpoint instead of a catalog provider. In the dashboard, open **Keys → Add key → Custom provider** and pick **Decision**; or register it with `POST /api/media/custom` and `modality: "decision"`, giving the endpoint's `baseUrl`, a `model` id, and an optional `apiKey` (omit it for a keyless local endpoint). It then appears on the Decision page and in `GET /v1/decisions/models`, and `POST /v1/decisions` runs it like any other decision model.
 
 The endpoint speaks a proposed generic contract — one call per question, since a single decision value cannot answer several distinct questions:
 
