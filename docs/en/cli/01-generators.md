@@ -25,7 +25,7 @@ Every generator (`cli/src/tools.ts:52-622`) fetches the live catalog, resolves `
 | `setup-cline` | `~/.config/Code/User/settings.json` | OpenAI Chat | Cline VS Code extension |
 | `setup-continue` | `~/.continue/config.json` | OpenAI Chat | Continue ghost-text autocomplete |
 | `setup-aider` | `~/.aider.conf.yml` | OpenAI Chat | Aider pair-programmer |
-| `setup-opencode` | `~/.config/opencode/config.json` | OpenAI Chat | OpenCode agent |
+| `setup-opencode` | `~/.config/opencode/opencode.json` + key in `~/.local/share/opencode/auth.json` | OpenAI Chat | OpenCode agent |
 | `setup-goose` | `~/.config/goose/config.yaml` | OpenAI Chat | Goose agent |
 | `setup-qwen` | `~/.qwen/settings.json` | OpenAI/Gemini | Qwen Code, `/v1` or native `/v1beta` |
 | `setup-roo` | `~/.config/roo/config.json` | OpenAI Chat | Roo Code |

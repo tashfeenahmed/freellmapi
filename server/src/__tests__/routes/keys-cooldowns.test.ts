@@ -69,6 +69,52 @@ describe('Key cooldown visibility and clearing', () => {
     expect(key.status).not.toBe('cooling');
   });
 
+  it('surfaces APINex check-in cooldown provenance without marking the key unhealthy', async () => {
+    const id = await createKey(app, 'apinex', 'api-test-key-value123456');
+    setCooldown('apinex', 'free/gemini-3.8-flash', id, 15 * 60_000, 'checkin');
+    const { status, body } = await request(app, 'GET', '/api/keys');
+    const key = body.find((k: any) => k.id === id);
+    expect(status).toBe(200);
+    expect(key.cooldowns).toEqual([expect.objectContaining({
+      modelId: 'free/gemini-3.8-flash', source: 'checkin',
+    })]);
+  });
+
+  it('APINex check-in recovery removes only check-in holds, not credit or rate limits', async () => {
+    const id = await createKey(app, 'apinex', 'api-test-key-value123456');
+    const sibling = await createKey(app, 'apinex', 'api-test-key-value654321');
+    setCooldown('apinex', 'free/gemini-3.8-flash', id, 15 * 60_000, 'checkin');
+    setCooldown('apinex', 'free/qwen3', id, 15 * 60_000, 'checkin');
+    setCooldown('apinex', 'free/deepseek', id, 60 * 60_000, 'credit');
+    setCooldown('apinex', 'free/llama', id, 60 * 60_000, 'authoritative');
+    setCooldown('apinex', 'free/gemini-3.8-flash', sibling, 15 * 60_000, 'checkin');
+
+    const { status, body } = await request(app, 'DELETE', `/api/keys/${id}/cooldowns/checkin`);
+    expect(status).toBe(200);
+    expect(body.cleared).toBe(2);
+    expect(isOnCooldown('apinex', 'free/gemini-3.8-flash', id)).toBe(false);
+    expect(isOnCooldown('apinex', 'free/qwen3', id)).toBe(false);
+    expect(isOnCooldown('apinex', 'free/deepseek', id)).toBe(true);
+    expect(isOnCooldown('apinex', 'free/llama', id)).toBe(true);
+    expect(isOnCooldown('apinex', 'free/gemini-3.8-flash', sibling)).toBe(true);
+
+    const after = await request(app, 'GET', '/api/keys');
+    const key = after.body.find((k: any) => k.id === id);
+    expect(key.cooldowns.map((c: any) => c.source).sort()).toEqual(['authoritative', 'credit']);
+
+    const repeated = await request(app, 'DELETE', `/api/keys/${id}/cooldowns/checkin`);
+    expect(repeated.body.cleared).toBe(0);
+  });
+
+  it('APINex check-in recovery rejects unrelated providers and unknown keys', async () => {
+    const groq = await createKey(app, 'groq', 'gsk_testkeyvalue123456');
+    setCooldown('groq', 'llama-3.3-70b', groq, 60 * 60_000, 'credit');
+    expect((await request(app, 'DELETE', `/api/keys/${groq}/cooldowns/checkin`)).status).toBe(400);
+    expect(isOnCooldown('groq', 'llama-3.3-70b', groq)).toBe(true);
+    expect((await request(app, 'DELETE', '/api/keys/987654/cooldowns/checkin')).status).toBe(404);
+    expect((await request(app, 'DELETE', '/api/keys/abc/cooldowns/checkin')).status).toBe(400);
+  });
+
   it('DELETE /api/keys/:id/cooldowns clears them and reports the count', async () => {
     const id = await createKey(app, 'groq', 'gsk_testkeyvalue123456');
     setCooldown('groq', 'llama-3.3-70b', id, 60 * 60_000);

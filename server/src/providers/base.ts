@@ -19,6 +19,7 @@ import { extractThinkTagsFromStream } from '../lib/think-tags.js';
 export interface ProviderHttpError extends Error {
   status?: number;
   retryAfterMs?: number;
+  providerRejection?: 'upstream' | 'request' | 'model';
   /** Explicit daily-window violation from structured upstream quota details. */
   dailyQuotaExhausted?: boolean;
 }
@@ -152,9 +153,15 @@ function safeStringify(value: unknown): string {
 export function providerHttpError(res: Response, message: string, body?: unknown): ProviderHttpError {
   const err = new Error(message) as ProviderHttpError;
   err.status = res.status;
+  err.providerRejection = 'upstream';
   const retryAfterMs = parseRetryAfterMs(res.headers?.get('retry-after')) ?? parseStatedRetryMs(body);
   if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
   return err;
+}
+
+/** An adapter cannot serve this request or model, though another route may. */
+export function providerRequestError(message: string, kind: 'request' | 'model'): ProviderHttpError {
+  return Object.assign(new Error(message), { status: 400, providerRejection: kind });
 }
 
 // Extended sampling knobs (top_k, seed, penalties, logit_bias, logprobs,
@@ -186,6 +193,19 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
    * finish. Composed with the per-attempt timeout in fetchWithTimeout; never
    * serialized into the request body. */
   signal?: AbortSignal;
+  /**
+   * Anthropic compatibility metadata from a `/v1/messages` caller (#1589):
+   * the request's `safeguards` field and `anthropic-beta` header, carried
+   * with the request through the routing loop so a future Anthropic-native
+   * upstream adapter can forward them. OpenAI-compatible adapters MUST NOT
+   * serialize this into the outbound body — strict upstreams 400 on unknown
+   * top-level fields — so it is kept out of the request payload by
+   * construction (providers build the body from known fields only).
+   */
+  anthropicCompat?: {
+    safeguards?: unknown;
+    anthropicBeta?: string;
+  };
 }
 
 /** Per-call abort/timeout wiring for fetchWithTimeout. */

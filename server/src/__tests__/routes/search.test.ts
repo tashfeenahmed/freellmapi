@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
-import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
+import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { clearAllCooldowns, setCooldown } from '../../services/ratelimit.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { seedSearchEngines } from '../helpers/search-engines.js';
 
@@ -66,6 +66,37 @@ describe('search routes', () => {
   it('POST /v1/search requires the gateway key', async () => {
     const { status } = await call(app, 'POST', '/v1/search', { body: { query: 'q' }, auth: null });
     expect(status).toBe(401);
+  });
+
+  it('authenticates dashboard search diagnostics', async () => {
+    expect((await call(app, 'GET', '/api/search/status', { auth: null })).status).toBe(401);
+  });
+
+  it('distinguishes missing engines from missing keys without making upstream calls', async () => {
+    addKey('parallel'); addKey('keenable');
+    setSetting('catalog_applied_tier', 'monthly'); setSetting('catalog_applied_version', 'test-free');
+    setSetting('catalog_last_error', 'catalog signature verification failed');
+    const upstream = vi.fn(); globalThis.fetch = upstream;
+    const response = await call(app, 'GET', '/api/search/status');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.body).toMatchObject({ status: 'needs_configuration', missing_from_catalog: ['parallel', 'keenable'],
+      catalog: { appliedTier: 'monthly', appliedVersion: 'test-free', lastError: 'catalog signature verification failed' } });
+    expect(response.body.engines.every((e: any) => e.state === 'needs_key')).toBe(true);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM media_models WHERE platform IN ('parallel','keenable')").get()).toEqual({ n: 0 });
+  });
+
+  it('updates readiness after key add, cooldown, disable and delete', async () => {
+    const key = addKey('tavily');
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('ready');
+    setCooldown('tavily', 'tavily-search', key, 60_000);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('cooling_down');
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+    getDb().prepare('UPDATE api_keys SET enabled=0 WHERE id=?').run(key);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('needs_configuration');
+    getDb().prepare('DELETE FROM api_keys WHERE id=?').run(key);
+    expect((await call(app, 'GET', '/api/search/status')).body.status).toBe('needs_configuration');
   });
 
   it('POST /v1/search returns a 503 with a code when no search key exists', async () => {
@@ -159,5 +190,45 @@ describe('search routes', () => {
     expect(created.status).toBe(201);
     const engines = await call(app, 'GET', '/api/search/engines');
     expect(engines.body.find((e: any) => e.engineId === 'my-searxng')).toMatchObject({ isCustom: true, keyCount: 1 });
+  });
+
+  it('serves POST /v1/search from a registered custom relay before any catalog engine (#1777)', async () => {
+    // A catalog engine with a key is present on purpose: the custom relay
+    // must win the chain, so Tavily must never be called at all.
+    addKey('tavily');
+    const created = await call(app, 'POST', '/api/media/custom', {
+      body: { baseUrl: 'https://relay.example.com/v1', model: 'my-relay', modality: 'search', apiKey: 'relay-secret' },
+    });
+    expect(created.status).toBe(201);
+
+    const upstreamCalls: Array<{ url: string; body: any; auth: string | null }> = [];
+    globalThis.fetch = vi.fn(async (url: string, init: RequestInit) => {
+      const urlStr = String(url);
+      if (!urlStr.startsWith('https://relay.example.com')) {
+        throw new Error(`unexpected upstream call to ${urlStr} — the custom relay should have answered first`);
+      }
+      upstreamCalls.push({
+        url: urlStr,
+        body: JSON.parse(String(init.body)),
+        auth: new Headers(init.headers).get('Authorization'),
+      });
+      return new Response(JSON.stringify({
+        results: [{ title: 'Paris', url: 'https://paris.example', content: 'Capital of France.', score: 0.9 }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+
+    const { status, body } = await call(app, 'POST', '/v1/search', { body: { query: 'capital of France', max_results: 2 } });
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      query: 'capital of France',
+      results: [{ title: 'Paris', url: 'https://paris.example', content: 'Capital of France.', score: 0.9 }],
+      provider: 'custom',
+      engine: 'my-relay',
+    });
+    // Exactly one upstream call, Tavily-shaped, to the relay — and only the relay.
+    expect(upstreamCalls).toHaveLength(1);
+    expect(upstreamCalls[0].url).toBe('https://relay.example.com/v1/search');
+    expect(upstreamCalls[0].body).toMatchObject({ query: 'capital of France', max_results: 2 });
+    expect(upstreamCalls[0].auth).toBe('Bearer relay-secret');
   });
 });

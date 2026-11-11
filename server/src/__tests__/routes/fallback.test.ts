@@ -104,6 +104,12 @@ describe('Fallback API', () => {
       modelId: target.model_id,
       used: 168,
     });
+
+    // Retention removes raw request rows, not this month's consumed tokens.
+    db.prepare('DELETE FROM requests WHERE platform = ? AND model_id = ?').run(target.platform, target.model_id);
+    const afterPrune = await request(app, 'GET', '/api/fallback/token-usage');
+    expect(afterPrune.body.totalUsed).toBe(168);
+    expect(afterPrune.body.models.find((m: any) => m.modelDbId === target.id).used).toBe(168);
   });
 
   // The budget bar's legend follows this payload's order. Chain priority is
