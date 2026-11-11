@@ -8,7 +8,7 @@ import {
   listDecisionModels,
   setDecisionModelEnabled,
   decisionsAvailable,
-  DECISION_PLATFORMS,
+  DECISION_PLATFORMS, CATALOG_DECISION_PLATFORMS,
 } from '../../services/decision.js';
 import { listAllMediaModels } from '../../services/media.js';
 import { seedDecisionModels } from '../helpers/decision-models.js';
@@ -64,7 +64,9 @@ describe('decision service', () => {
   });
 
   it('has adapters for the supported decision platforms', () => {
-    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'halx', 'openrouter']);
+    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'custom', 'halx', 'openrouter']);
+    // Custom endpoints are user-registered (#1777): the catalog never adds or prunes them.
+    expect([...CATALOG_DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'halx', 'openrouter']);
   });
 
   function seed(platform: string, model: string) {

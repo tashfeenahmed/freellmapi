@@ -364,7 +364,7 @@ export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unkn
 
 export interface ApiKeyModel {
   id: number;
-  kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription';
+  kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription' | 'search' | 'decision';
   modelId: string;
   displayName: string;
   family?: string | null;
