@@ -27,8 +27,8 @@ describe('detectChatGptClient', () => {
     vi.spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as fs.Stats);
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     const found = detectChatGptClient('linux');
-    // executableOnPath() joins with the host path module, so the expected
-    // separator differs on Windows even though the stubbed PATH is POSIX.
+    // `executableOnPath` joins with the host separator, so the expectation has
+    // to join the same way; a POSIX literal fails on Windows runners.
     expect(found).toEqual({ kind: 'cli', cliPath: path.join('/opt/tools/bin', 'codex') });
   });
 

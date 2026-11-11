@@ -81,6 +81,7 @@ const PLATFORMS = [
   'iteracompute',
   'serpsearch',
   'brave',
+  'outcrawl',
   'halx',
   'aisense',
   'freeai',
