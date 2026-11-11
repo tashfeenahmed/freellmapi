@@ -109,6 +109,8 @@ export type Platform =
   | 'varosity'
   // Native TTS and transcription; one shared renewable monthly credit grant.
   | 'rime'
+  // Local personal BYOK TTS; shared monthly characters, watermarked Free audio.
+  | 'freetts'
   // Research API; chat and embeddings share a daily quota. Requests are logged.
   | 'freeinference'
   // Personal BYOK client; shared monthly account allowance, Telegram verification.

@@ -72,6 +72,7 @@ const PLATFORMS = [
   'novai',
   'varosity',
   'rime',
+  'freetts',
   'freeinference',
   'freemodel',
   'beatapi',
