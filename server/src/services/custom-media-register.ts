@@ -1,5 +1,6 @@
 import type { Db } from '../db/types.js';
 import { customEndpointKeyIds } from './custom-endpoint.js';
+import { endpointScopeOfKey } from '../lib/endpoint-scope.js';
 
 // ── Shared custom MEDIA-model registration (#1051) ───────────────────────────
 //
@@ -28,9 +29,8 @@ export interface RegisteredCustomMediaModel {
 
 /**
  * Upsert one media model row against an ALREADY-resolved endpoint key, inside
- * the caller's transaction. media_models identity is (platform, model_id) with
- * no endpoint_scope — a model already on this endpoint keeps the key it has;
- * only a move to a different endpoint re-binds it (#619 semantics).
+ * the caller's transaction. A model already on this endpoint keeps its key;
+ * the same model on another endpoint gets a separate row.
  */
 export function registerCustomMediaModel(
   db: Db,
@@ -38,15 +38,16 @@ export function registerCustomMediaModel(
   entry: CustomMediaEntry,
 ): RegisteredCustomMediaModel {
   const endpointKeyIds = customEndpointKeyIds(db, keyId);
+  const endpointScope = endpointScopeOfKey(db, keyId);
   const modelId = entry.modelId;
   const quotaLabel = entry.quotaLabel?.trim() || 'custom endpoint';
 
   const existingModel = db.prepare(`
     SELECT id, modality, priority, key_id
       FROM media_models
-     WHERE platform = 'custom' AND model_id = ?
+     WHERE platform = 'custom' AND model_id = ? AND endpoint_scope = ?
      LIMIT 1
-  `).get(modelId) as { id: number; modality: string; priority: number; key_id: number | null } | undefined;
+  `).get(modelId, endpointScope) as { id: number; modality: string; priority: number; key_id: number | null } | undefined;
   const bindKeyId = existingModel?.key_id != null && endpointKeyIds.has(existingModel.key_id)
     ? existingModel.key_id
     : keyId;
@@ -71,8 +72,8 @@ export function registerCustomMediaModel(
 
   const model = db.prepare(`
     INSERT INTO media_models
-      (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id)
-    VALUES ('custom', ?, ?, ?, ?, 1, ?, ?)
-  `).run(modelId, entry.displayName ?? modelId, entry.modality, priority, quotaLabel, bindKeyId);
+      (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id, endpoint_scope)
+    VALUES ('custom', ?, ?, ?, ?, 1, ?, ?, ?)
+  `).run(modelId, entry.displayName ?? modelId, entry.modality, priority, quotaLabel, bindKeyId, endpointScope);
   return { modelDbId: Number(model.lastInsertRowid), model: modelId, modality: entry.modality, created: true };
 }

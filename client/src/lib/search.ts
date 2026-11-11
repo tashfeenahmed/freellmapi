@@ -4,6 +4,7 @@
 // Models tabs all treat them as their own group.
 
 import type { SearchPlatform as SharedSearchPlatform } from '@freellmapi/shared/types'
+import type { QueryClient } from '@tanstack/react-query'
 
 // Mirrors SEARCH_PLATFORMS in shared/types.ts. The client only imports types
 // from shared, so the list is repeated here; the two assertions below fail the
@@ -54,6 +55,32 @@ export interface SearchEngine {
   keyCount: number
   healthyKeyCount: number
   searchesThisMonth: number
+}
+
+export interface SearchReadiness {
+  status: 'ready' | 'cooling_down' | 'needs_configuration'
+  engines: Array<{ engine: string; platform: string; state: 'ready' | 'cooling_down' | 'needs_key' | 'key_error' | 'disabled' }>
+  missing_from_catalog: string[]
+  catalog: { appliedVersion: string | null; appliedTier: string | null; lastSyncMs: number | null; lastError: string | null }
+}
+
+/** These queries contain key counts as well as engine rows. Key mutations
+ * must invalidate both, including while the Playground is unmounted. */
+export function invalidateSearchQueries(client: QueryClient): void {
+  void client.invalidateQueries({ queryKey: ['search-engines'] })
+  void client.invalidateQueries({ queryKey: ['search-status'] })
+}
+
+export function searchReadinessHint(data: SearchReadiness | undefined, failed: boolean, loading: boolean,
+  t: (key: string, vars?: Record<string, string | number>) => string): string {
+  if (failed) return t('search.readinessError')
+  if (loading || !data) return t('common.loading')
+  if (data.missing_from_catalog.length) return t('search.catalogMissing', { providers: data.missing_from_catalog.map(searchProviderName).join(', ') })
+  if (data.catalog.lastError) return t('premium.lastSyncProblem', { error: data.catalog.lastError })
+  if (!data.engines.length) return t('search.empty')
+  if (data.engines.every(e => e.state === 'disabled')) return t('search.enginesDisabled')
+  if (data.status === 'cooling_down') return t('search.keysCoolingDown')
+  return t('search.keysNotReady')
 }
 
 /** GET /api/analytics/search response. */
