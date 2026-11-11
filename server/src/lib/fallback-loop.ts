@@ -533,6 +533,15 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
   }
+  // An adapter's own "cannot serve this" rejection (#1876: Gizmo asked for
+  // tools or images, a catalog id outside an adapter's tested allow-list) is a
+  // fact about the request or the model id, not the key's health. Skip the
+  // model for this request only: no cooldown, so the same key keeps serving
+  // ordinary requests.
+  if (err?.providerRejection === 'request' || err?.providerRejection === 'model') {
+    state.skipModels.add(route.modelDbId);
+    return false;
+  }
   // Too big for this model is a fact about the REQUEST, not the model's
   // health: it still serves every smaller request. Skip it for this request
   // (above) and learn the reported ceiling so the router sizes it out next
