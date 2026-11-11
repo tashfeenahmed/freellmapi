@@ -18,6 +18,7 @@ import { getRegisteredEngines } from './registry.js';
 import { recordCompressionStats } from './stats.js';
 import type {
   CompressRequestOptions,
+  CompressionEngineConfig,
   CompressionMode,
   CompressionRequestStats,
   CompressionResult,
@@ -164,7 +165,7 @@ export function compressRequest(
         : new Set([...stableFrozen, ...cacheFrozen]);
       const result = engine.apply({
         messages: current,
-        config: validated.data,
+        config: validated.data as CompressionEngineConfig,
         context: {
           mode,
           tools: options.tools,
