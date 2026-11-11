@@ -186,6 +186,19 @@ export interface CompletionOptions extends ExtendedSamplingOptions {
    * finish. Composed with the per-attempt timeout in fetchWithTimeout; never
    * serialized into the request body. */
   signal?: AbortSignal;
+  /**
+   * Anthropic compatibility metadata from a `/v1/messages` caller (#1589):
+   * the request's `safeguards` field and `anthropic-beta` header, carried
+   * with the request through the routing loop so a future Anthropic-native
+   * upstream adapter can forward them. OpenAI-compatible adapters MUST NOT
+   * serialize this into the outbound body — strict upstreams 400 on unknown
+   * top-level fields — so it is kept out of the request payload by
+   * construction (providers build the body from known fields only).
+   */
+  anthropicCompat?: {
+    safeguards?: unknown;
+    anthropicBeta?: string;
+  };
 }
 
 /** Per-call abort/timeout wiring for fetchWithTimeout. */
@@ -234,6 +247,14 @@ export abstract class BaseProvider {
    * the platform "configured", and the provider omits the Authorization header
    * on outgoing requests. Defaults to false; set by subclasses. */
   keyless = false;
+
+  /** Whether this built-in platform can serve chat completions (#1741). Search,
+   * speech and decision integrations register so their keys pool and
+   * health-check like every other platform, but their adapters refuse chat.
+   * False lets POST /api/models reject chat registrations up front and keeps
+   * the router from walking a chain entry that can only ever fail. Defaults to
+   * true; overridden by subclasses. */
+  readonly supportsChat: boolean = true;
 
   abstract chatCompletion(
     apiKey: string,

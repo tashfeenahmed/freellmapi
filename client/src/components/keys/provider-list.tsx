@@ -34,6 +34,7 @@ import {
   statusLabelKey,
 } from './shared'
 import { balanceByKey } from './quota-balance'
+import { ApinexCheckinNotice } from './apinex-checkin-notice'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -44,7 +45,7 @@ import { ModelScopeDialog } from './model-scope-dialog'
 import { TestModelsDialog } from './test-models-dialog'
 import { AddModelDialog } from './add-model-dialog'
 import { groupHandle } from '@/lib/endpoint-groups'
-import { SEARCH_PROVIDERS, isSearchPlatform } from '@/lib/search'
+import { invalidateSearchQueries, SEARCH_PROVIDERS, isSearchPlatform } from '@/lib/search'
 
 type StatusFilter = 'all' | 'healthy' | 'issues' | 'disabled'
 
@@ -135,6 +136,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     mutationFn: (id: number) => apiFetch(`/api/keys/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       // Deleting the last key of a platform flips it back to unconfigured in
       // the checklist strip.
@@ -146,11 +148,23 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
     mutationFn: (model: ApiKeyModel) => apiFetch(customModelDeletePath(model), { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       queryClient.invalidateQueries({ queryKey: ['media'] })
+    },
+  })
+
+  // Operator-controlled recovery after APINex daily website visit.
+  // Only APINex check-in cooldowns are cleared; actual quotas remain enforced.
+  const resumeCheckinKey = useMutation({
+    mutationFn: (keyId: number) => apiFetch<{ cleared: number }>(`/api/keys/${keyId}/cooldowns/checkin`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
+      queryClient.invalidateQueries({ queryKey: ['health'] })
     },
   })
 
@@ -162,6 +176,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       if (keys.find(k => k.id === keyId)?.autoHealthCheck === false) toast.info(t('keys.noAutoCheckHint'))
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
     },
   })
 
@@ -181,7 +196,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         body: JSON.stringify({ keyId }),
       }),
     onSuccess: (data) => {
-      for (const key of ['keys', 'health', 'fallback']) {
+      for (const key of ['keys', 'health', 'fallback', 'search-engines', 'search-status']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] })
@@ -209,6 +224,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
@@ -220,6 +236,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       apiFetch(`/api/keys/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
@@ -250,6 +267,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }
     },
     onSuccess: ({ action, done, failed }) => {
+      invalidateSearchQueries(queryClient)
       for (const key of ['keys', 'health', 'fallback']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
@@ -279,6 +297,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       }
     },
     onSuccess: ({ done, failed }) => {
+      invalidateSearchQueries(queryClient)
       for (const key of ['keys', 'health', 'fallback', 'models', 'embeddings', 'media']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
@@ -635,6 +654,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                       const hasCustomModels = customModels.length > 0
                       const isExpanded = expandedKeyIds.has(k.id)
                       const isChecking = checkKey.isPending && checkKey.variables === k.id
+                      const checkinRequired = k.platform === 'apinex' && k.cooldowns?.some(c => c.source === 'checkin')
                       return (
                         <div key={k.id} className="bg-card">
                           <div className="group/krow flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
@@ -901,6 +921,13 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                 {k.modelsAvailable === 0 && <> {t('keys.noModelsYetHint')}</>}
                               </span>
                             </div>
+                          )}
+                          {checkinRequired && (
+                            <ApinexCheckinNotice
+                              disabled={resumeCheckinKey.isPending}
+                              resuming={resumeCheckinKey.isPending && resumeCheckinKey.variables === k.id}
+                              onResume={() => resumeCheckinKey.mutate(k.id)}
+                            />
                           )}
                           {lastHealthError && (
                             <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-destructive" role="status">
