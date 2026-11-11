@@ -21,22 +21,23 @@ export function isRetryableError(err: any): boolean {
   // rejection: fail over to another provider, but if the whole chain rejects it
   // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status === 408 || status === 409 || status === 410 || status === 422 || status === 429 || status >= 500) return true;
-  return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
+  if (status === 404 || status === 408 || status === 409 || status === 410 || status === 413 || status === 422 || status === 429 || status >= 500) return true;
+  const codeInMessage = status === 0 && /\b(?:404|410|413|429|500|503)\b/.test(msg);
+  return codeInMessage || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
     || msg.includes('aborted') || msg.includes('timeout') || msg.includes('etimedout')
     || msg.includes('econnrefused') || msg.includes('econnreset')
     || msg.includes('fetch failed')    // undici transport error (proxy down, DNS, TLS, etc.)
-    || msg.includes('503') || msg.includes('unavailable')
+    || msg.includes('unavailable')
     // Provider marks the hosted deployment itself as sick (NVIDIA NIM's
     // "DEGRADED function cannot be invoked" arrives as a 400, #522). The
     // 'api error 400' rule below already catches the NIM shape; this keeps
     // degraded conditions retryable even when a provider words it differently.
     || msg.includes('degraded')
-    || msg.includes('500') || msg.includes('internal server error')
+    || msg.includes('internal server error')
     // 413: this model's payload limit is too small for the request, but another
     // provider in the fallback chain may have a larger limit. Same reasoning as 503.
-    || msg.includes('413') || msg.includes('payload too large') || msg.includes('request body too large')
+    || msg.includes('payload too large') || msg.includes('request body too large')
     || msg.includes('request entity too large') || msg.includes('content too large')
     // Context/prompt-too-large in all its provider wordings (Anthropic "prompt
     // is too long", Google "input token count ... exceeds", OpenAI "maximum
@@ -47,13 +48,13 @@ export function isRetryableError(err: any): boolean {
     // 404: model deprecated/removed upstream (e.g. OpenRouter's "no endpoints found"
     // for a model that's been pulled). Rotate to the next model in the chain —
     // setCooldown + the health checker will avoid this model on subsequent requests.
-    || msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
+    || msg.includes('not found') || msg.includes('no endpoints found')
     // 410: the model/endpoint was permanently removed upstream (e.g. Ollama Cloud
     // "API error 410: Gone", #339). Like a 404 it won't return on this provider, so
     // rotate to the next route; isModelNotFoundError benches the whole model. The
     // structured status check above already catches the 410 when the provider
     // attaches err.status — this is the text fallback for errors that don't.
-    || msg.includes('410') || msg.includes('gone')
+    || msg.includes('gone')
     // 403: the key is valid (it passed validateKey, and the health checker
     // disables truly-forbidden keys) but this specific model is off-limits to
     // the key's tier — e.g. gpt-4o on GitHub Models' free tier, subscription-only
@@ -591,8 +592,8 @@ export function isModelNotFoundError(err: any): boolean {
   // added for #339 (Ollama Cloud "Gone"); prefer the structured status when present.
   if (err?.status === 404 || err?.status === 410) return true;
   const msg = (err?.message ?? '').toLowerCase();
-  return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
-    || msg.includes('410') || msg.includes('gone')
+  return ((typeof err?.status !== 'number' || err.status === 0) && /\b(?:404|410)\b/.test(msg))
+    || msg.includes('not found') || msg.includes('no endpoints found') || msg.includes('gone')
     // Some aggregators report a removed/stale model with a 400 (not a 404) whose
     // body reads "No model found: <id>", "model not found", "unknown model" or
     // "model does not exist" (#: Routeway 400 "No model found: llama-3.3-70b-instruct:free").

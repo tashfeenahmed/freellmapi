@@ -978,3 +978,15 @@ describe('runFallbackLoop: routing-exhaustion diagnostics belong to the loop', (
     }
   });
 });
+
+describe('retryable quota errors with token counts', () => {
+  it('does not skip models or their platform because a count contains 404', () => {
+    const state = newFallbackState();
+    const routes = [fakeRoute(), fakeRoute(), fakeRoute()];
+    for (const route of routes) {
+      recordRetryableFailure(route, Object.assign(new Error('Rate limit: requested 14041 tokens'), { status: 429 }), state);
+      expect(state.skipModels.has(route.modelDbId)).toBe(false);
+    }
+    expect(state.skipPlatforms.has('fake')).toBe(false);
+  });
+});
