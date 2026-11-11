@@ -109,6 +109,8 @@
     "sectionAdvanced": "ایڈوانسڈ",
     "sectionPreview": "پیش منظر",
     "generalDescription": "اس ڈیش بورڈ کی زبان اور ظاہری شکل۔",
+    "startAtLogin": "سسٹم اسٹارٹ اپ پر شروع کریں",
+    "startAtLoginHelp": "جب آپ اپنے کمپیوٹر میں سائن ان کرتے ہیں تو FreeLLMAPI کو خودکار طور پر لانچ کریں۔",
     "advancedDescription": "کمپریشن پائپ لائن کے لیے حدود اور حفاظتی سوئچز۔",
     "compressionTitle": "پرامپٹ کمپریشن",
     "compressionDescription": "کوڈ، ایررز، پاتھز، نمبرز اور ٹول ڈیفینیشنز کو محفوظ رکھتے ہوئے روٹنگ سے پہلے درخواست کا سائز کم کریں۔",
@@ -1260,7 +1262,15 @@
     "renameHint": "اس چین کا نام تبدیل کریں",
     "renameConfirm": "چین \"{oldName}\" کا نام \"{name}\" کریں؟ auto:{oldName} کال کرنے والے کلائنٹس کو auto:{name} پر جانا ہوگا۔",
     "renamePlaceholder": "نیا چین نام",
-    "renameFailed": "چین کا نام تبدیل نہیں ہو سکا۔"
+    "renameFailed": "چین کا نام تبدیل نہیں ہو سکا۔",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "ورژن {version} دستیاب ہے",

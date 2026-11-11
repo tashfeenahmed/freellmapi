@@ -109,6 +109,8 @@
     "sectionAdvanced": "மேம்பட்டவை",
     "sectionPreview": "முன்னோட்டம்",
     "generalDescription": "இந்த டாஷ்போர்டின் மொழி மற்றும் தோற்றம்.",
+    "startAtLogin": "கணினி துவக்கத்தில் தொடங்கவும்",
+    "startAtLoginHelp": "உங்கள் கணினியில் உள்நுழையும்போது FreeLLMAPI ஐ தானாகத் தொடங்கவும்.",
     "advancedDescription": "சுருக்கப் பைப்லைனுக்கான வரம்புகள் மற்றும் பாதுகாப்பு சுவிட்சுகள்.",
     "compressionTitle": "ப்ராம்ட் சுருக்கம்",
     "compressionDescription": "குறியீடு, பிழைகள், பாதைகள், எண்கள் மற்றும் கருவி வரையறைகளைப் பாதுகாத்தபடி ரூட்டிங்கிற்கு முன் கோரிக்கை அளவைக் குறைக்கவும்.",
@@ -1260,7 +1262,15 @@
     "renameHint": "இந்த சங்கிலியின் பெயரிடவும்",
     "renameConfirm": "\"{oldName}\" சங்கிலியை \"{name}\" என மறுபெயரிடவா? auto:{oldName} அழைக்கும் கிளையண்டுகள் auto:{name} க்கு மாற வேண்டும்.",
     "renamePlaceholder": "புதிய சங்கிலி பெயர்",
-    "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை."
+    "renameFailed": "சங்கிலிக்கு மறுபெயரிட முடியவில்லை.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "பதிப்பு {version} கிடைக்கிறது",
