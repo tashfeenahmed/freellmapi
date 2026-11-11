@@ -1194,16 +1194,30 @@ function persistCooldown(
   expiresAtMs: number,
   source: CooldownSource,
   setAtMs: number,
-) {
-  withDb(db => {
-    db.prepare(`
+): boolean | undefined {
+  // Same shape as the check-in guard. An expired row is free to replace. An
+  // unexpired row is replaced only when the new bench is at least as long, and
+  // a heuristic guess must not take over authoritative, credit or tier
+  // provenance (#1877). A missing row is not a hold: callers that delete the
+  // row (and the check-in path, which has its own statement) still insert.
+  return withDb(db => {
+    const result = db.prepare(`
       INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms, source, set_at_ms)
       VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(platform, model_id, key_id)
-      DO UPDATE SET expires_at_ms = excluded.expires_at_ms,
-                    source = excluded.source,
-                    set_at_ms = excluded.set_at_ms
+      ON CONFLICT(platform, model_id, key_id) DO UPDATE SET
+        expires_at_ms = excluded.expires_at_ms,
+        source = excluded.source,
+        set_at_ms = excluded.set_at_ms
+      WHERE rate_limit_cooldowns.expires_at_ms <= excluded.set_at_ms
+         OR (
+           excluded.expires_at_ms >= rate_limit_cooldowns.expires_at_ms
+           AND (
+             excluded.source != 'heuristic'
+             OR rate_limit_cooldowns.source IN ('heuristic', 'checkin')
+           )
+         )
     `).run(platform, modelId, keyId, expiresAtMs, source, setAtMs);
+    return Number(result.changes ?? 0) > 0;
   });
 }
 
@@ -1278,8 +1292,21 @@ export function setCooldown(
     if (written) cooldowns.set(key, expiresAtMs);
     return;
   }
-  cooldowns.set(key, expiresAtMs);
-  persistCooldown(platform, modelId, keyId, expiresAtMs, source, now);
+  // Never shorten an unexpired bench, and never let a heuristic guess replace
+  // an authoritative, credit or tier hold (#1877). Update memory only when
+  // the row accepted the write. If the database is down, keep any longer
+  // in-memory hold and do not let a heuristic relabel it; a fresh bench with
+  // nothing held still lands in memory so routing backs off without the row.
+  const written = persistCooldown(platform, modelId, keyId, expiresAtMs, source, now);
+  if (written) {
+    cooldowns.set(key, expiresAtMs);
+    return;
+  }
+  if (written === undefined) {
+    const current = cooldowns.get(key) ?? 0;
+    if (current > now && (expiresAtMs <= current || source === 'heuristic')) return;
+    cooldowns.set(key, expiresAtMs);
+  }
 }
 
 export function isOnCooldown(platform: string, modelId: string, keyId: number): boolean {
