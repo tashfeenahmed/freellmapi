@@ -5,6 +5,8 @@ import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { setUnifyEnabled, setUnifyOverrides } from '../../services/model-groups.js';
 import { setRoutingStrategy } from '../../services/router.js';
+import { setCompressionConfig } from '../../services/compression/config.js';
+import { _clearStoreForTesting } from '../../services/context-handoff.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 let dashToken = '';
@@ -66,6 +68,9 @@ function completion(model: string, content: string) {
 // the 'priority' strategy, which lets us exercise cross-provider failover.)
 describe('Model unification (group the same model across providers)', () => {
   let app: Express;
+  let temporarilyDisabledModels: number[] = [];
+  let addedProfileModelIds: number[] = [];
+  let addedModels: number[] = [];
 
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
@@ -92,6 +97,18 @@ describe('Model unification (group the same model across providers)', () => {
   });
 
   afterEach(() => {
+    for (const id of addedProfileModelIds) getDb().prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(id);
+    addedProfileModelIds = [];
+    for (const id of addedModels) {
+      getDb().prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(id);
+      getDb().prepare('DELETE FROM models WHERE id = ?').run(id);
+    }
+    addedModels = [];
+    for (const id of temporarilyDisabledModels) getDb().prepare('UPDATE models SET enabled = 1 WHERE id = ?').run(id);
+    temporarilyDisabledModels = [];
+    setCompressionConfig({ mode: 'off' });
+    _clearStoreForTesting();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -172,6 +189,141 @@ describe('Model unification (group the same model across providers)', () => {
     }, sess);
     expect(turn2.status).toBe(200);
     expect(turn2.headers.get('x-routed-via')).toContain('cerebras');
+  });
+
+  it.each([undefined, 'compression-session-header'])(
+    'keeps the sticky group member when compression ages the first user turn (header %s)',
+    async (sessionId) => {
+      setCompressionConfig({ mode: 'aggressive' });
+      const db = getDb();
+      const groq = db.prepare("SELECT id FROM models WHERE model_id = 'tum-groq'").get() as { id: number };
+      const cerebras = db.prepare("SELECT id FROM models WHERE model_id = 'tum-cerebras'").get() as { id: number };
+      const setPriority = (id: number, priority: number) =>
+        db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?').run(priority, id);
+      const originalFetch = global.fetch;
+      const upstreamBodies: any[] = [];
+      vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+        const u = String(url);
+        if (u.includes('api.groq.com') || u.includes('api.cerebras.ai')) {
+          upstreamBodies.push(JSON.parse(init.body));
+          return completion(u.includes('api.groq.com') ? 'tum-groq' : 'tum-cerebras', 'answer');
+        }
+        return originalFetch(url, init);
+      });
+      const headers = { ...authHeaders(), ...(sessionId ? { 'x-session-id': sessionId } : {}) };
+      const first = `I need help with ${sessionId ?? 'headerless'} session routing.\n${'Extra background about the work. '.repeat(80)}`;
+      setPriority(cerebras.id, 1);
+      setPriority(groq.id, 2);
+      const start = await request(app, 'POST', '/v1/chat/completions', {
+        model: 'test-unify-model', messages: [{ role: 'user', content: first }],
+      }, headers);
+      expect(start.status).toBe(200);
+      expect(start.headers.get('x-routed-via')).toContain('cerebras');
+
+      setPriority(groq.id, 1);
+      setPriority(cerebras.id, 2);
+      const conversation = [{ role: 'user', content: first }];
+      for (let i = 0; i < 8; i += 1) {
+        conversation.push({ role: 'assistant', content: 'answer' }, { role: 'user', content: 'continue' });
+      }
+      const next = await request(app, 'POST', '/v1/chat/completions', {
+        model: 'test-unify-model', messages: conversation,
+      }, headers);
+      expect(next.status).toBe(200);
+      expect(upstreamBodies.at(-1).messages[0].content).toContain('[compressed older turn]');
+      expect(next.headers.get('x-routed-via')).toContain('cerebras');
+    },
+  );
+
+  it('retains the handoff when compression changes the first user turn and the model switches', async () => {
+    vi.stubEnv('FREELLMAPI_CONTEXT_HANDOFF', 'on_model_switch');
+    setCompressionConfig({ mode: 'aggressive' });
+    const db = getDb();
+    const cerebras = db.prepare("SELECT id FROM models WHERE model_id = 'tum-cerebras'").get() as { id: number };
+    const groq = db.prepare("SELECT id FROM models WHERE model_id = 'tum-groq'").get() as { id: number };
+    temporarilyDisabledModels = (db.prepare('SELECT id FROM models WHERE enabled = 1 AND id NOT IN (?, ?)').all(cerebras.id, groq.id) as { id: number }[]).map(row => row.id);
+    db.prepare('UPDATE models SET enabled = 0 WHERE id NOT IN (?, ?)').run(cerebras.id, groq.id);
+    addedProfileModelIds = [cerebras.id, groq.id];
+    const addToProfiles = db.prepare('INSERT INTO profile_models (profile_id, model_db_id, priority, enabled) SELECT id, ?, ?, 1 FROM profiles');
+    addToProfiles.run(cerebras.id, 1);
+    addToProfiles.run(groq.id, 2);
+    db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?').run(-10, cerebras.id);
+    db.prepare('UPDATE fallback_config SET priority = ? WHERE model_db_id = ?').run(-9, groq.id);
+    const originalFetch = global.fetch;
+    let secondTurn = false;
+    let fallbackBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+      const u = String(url);
+      if (u.includes('api.cerebras.ai')) {
+        return secondTurn
+          ? new Response(JSON.stringify({ error: { message: 'rate limited' } }), { status: 429 })
+          : completion('tum-cerebras', 'answer');
+      }
+      if (u.includes('api.groq.com')) {
+        fallbackBody = JSON.parse(init.body);
+        return completion('tum-groq', 'fallback answer');
+      }
+      return originalFetch(url, init);
+    });
+    const first = `I need help with a handoff after compression.\n${'Background about the work. '.repeat(80)}`;
+    const start = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto', messages: [{ role: 'user', content: first }],
+    }, authHeaders());
+    expect(start.status).toBe(200);
+    expect(start.headers.get('x-routed-via')).toContain('cerebras');
+
+    const conversation = [{ role: 'user', content: first }];
+    for (let i = 0; i < 8; i += 1) {
+      conversation.push({ role: 'assistant', content: 'answer' }, { role: 'user', content: 'continue' });
+    }
+    secondTurn = true;
+    const next = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'auto', messages: conversation,
+    }, authHeaders());
+    expect(next.status).toBe(200);
+    expect(next.headers.get('x-routed-via')).toContain('groq');
+    expect(fallbackBody.messages.some((message: any) =>
+      message.role === 'user' && message.content.startsWith('[compressed older turn]'))).toBe(true);
+    expect(fallbackBody.messages.some((message: any) =>
+      message.role === 'system' && message.content.startsWith('FreeLLMAPI context handoff:'))).toBe(true);
+  });
+
+  it('restores remembered reasoning after compression ages the session opener', async () => {
+    setCompressionConfig({ mode: 'aggressive' });
+    const model = addModel('opencode', 'compression-reasoning-model', 'Compression Reasoning Model', 1);
+    addedModels.push(model);
+    addKey('opencode');
+    const originalFetch = global.fetch;
+    let turn = 0;
+    let nextBody: any;
+    vi.spyOn(global, 'fetch').mockImplementation(async (url: any, init?: any) => {
+      if (String(url).includes('opencode.ai')) {
+        turn += 1;
+        if (turn === 2) nextBody = JSON.parse(init.body);
+        return new Response(JSON.stringify({
+          id: 'chatcmpl-reasoning', object: 'chat.completion', created: 1, model: 'compression-reasoning-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'answer', ...(turn === 1 ? { reasoning_content: 'remembered trace' } : {}) }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url, init);
+    });
+    const first = `I need help preserving a reasoning trace.\n${'Background about the work. '.repeat(80)}`;
+    const start = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'opencode:compression-reasoning-model', messages: [{ role: 'user', content: first }],
+    }, authHeaders());
+    expect(start.status).toBe(200);
+
+    const conversation = [{ role: 'user', content: first }];
+    for (let i = 0; i < 8; i += 1) {
+      conversation.push({ role: 'assistant', content: 'answer' }, { role: 'user', content: 'continue' });
+    }
+    const next = await request(app, 'POST', '/v1/chat/completions', {
+      model: 'opencode:compression-reasoning-model', messages: conversation,
+    }, authHeaders());
+    expect(next.status).toBe(200);
+    expect(nextBody.messages[0].content).toContain('[compressed older turn]');
+    expect(nextBody.messages.filter((message: any) => message.role === 'assistant').at(-1).reasoning_content).toBe('remembered trace');
   });
 
   it('an old per-provider model_id still routes and now fails over within the group', async () => {
