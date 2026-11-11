@@ -50,9 +50,21 @@ describe.each(cases)('$provider.name key validation', ({ provider, url, method }
     expect(await provider.validateKey('k')).toBe(true);
   });
 
-  it('reports 5xx as inconclusive', async () => {
+  it('reports 5xx as inconclusive by throwing, never as an invalid key', async () => {
+    // #1717: a returned {valid:false} is persisted as status='invalid', and
+    // disabled keys are skipped by later health passes, so a 5xx used to bench
+    // a working key permanently. Inconclusive cases must throw (#1298).
     respond(503);
-    expect(await provider.validateKey('k')).toMatchObject({ valid: false });
+    await expect(provider.validateKey('k')).rejects.toThrow(/inconclusive/i);
+  });
+
+  it('reports a probe timeout as inconclusive by throwing (#1717)', async () => {
+    // The reported case: a search key whose 10 s probe timed out was marked
+    // invalid and disabled 15 minutes after it was healthy.
+    globalThis.fetch = vi.fn(async () => {
+      throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    }) as unknown as typeof fetch;
+    await expect(provider.validateKey('k')).rejects.toThrow(/inconclusive/i);
   });
 
   it('refuses chat completions with a 422', async () => {

@@ -46,6 +46,9 @@ export interface ParseResult {
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
   SPEKA_: 'speka',
+  KENARI_: 'kenari',
+  KIOSAPI_: 'kiosapi',
+  KIOS_: 'kiosapi',
   BEATAPI_: 'beatapi',
   APINEX_: 'apinex',
   ONOMEO_: 'onomeo',
@@ -66,6 +69,15 @@ export const PREFIX_MAP: Record<string, string> = {
   GIZMO_: 'gizmo',
   BLOCKRUN_: 'blockrun',
   MOONDREAM_: 'moondream',
+  JAMAI_: 'jamai',
+  NABH_: 'nabh',
+  NOVAI_: 'novai',
+  VAROSITY_: 'varosity',
+  RIME_: 'rime',
+  FREETTS_: 'freetts',
+  FREE_TTS_: 'freetts',
+  FREEINFERENCE_: 'freeinference',
+  FREEMODEL_: 'freemodel',
   GOOGLE_: 'google',
   GEMINI_: 'google',
   GROQ_: 'groq',
@@ -145,6 +157,8 @@ export const PREFIX_MAP: Record<string, string> = {
   MODEL_SCOPE_: 'modelscope',
   ANYAPI_: 'anyapi',
   ANY_API_: 'anyapi',
+  POWERTOKENS_: 'powertokens',
+  POWER_TOKENS_: 'powertokens',
   AIHORDE_: 'aihorde',
   QIANFAN_: 'qianfan',
   BAIDU_: 'qianfan',
@@ -166,6 +180,9 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   sail: 'sail',
   aclide: 'aclide',
   speka: 'speka',
+  kenari: 'kenari',
+  kiosapi: 'kiosapi',
+  kios: 'kiosapi',
   beatapi: 'beatapi',
   apinex: 'apinex',
   onomeo: 'onomeo',
@@ -183,6 +200,21 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   gizmo: 'gizmo',
   blockrun: 'blockrun',
   moondream: 'moondream',
+  jamai: 'jamai',
+  nabh: 'nabh',
+  novai: 'novai',
+  varosity: 'varosity',
+  rime: 'rime',
+  'rime.ai': 'rime',
+  freetts: 'freetts',
+  'freetts.org': 'freetts',
+  'varosity.ai': 'varosity',
+  freeinference: 'freeinference',
+  'freeinference.org': 'freeinference',
+  freemodel: 'freemodel',
+  'freemodel.in': 'freemodel',
+  'aiapi-pro.com': 'novai',
+  'nabh.cloud': 'nabh',
   'sail-research': 'sail',
   sailresearch: 'sail',
   electronhub: 'electronhub',
@@ -241,6 +273,8 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   'model-scope': 'modelscope',
   anyapi: 'anyapi',
   'any-api': 'anyapi',
+  powertokens: 'powertokens',
+  'power-tokens': 'powertokens',
   qianfan: 'qianfan',
   baidu: 'qianfan',
   ernie: 'qianfan',
@@ -765,7 +799,13 @@ function toParsedKeys(pairs: KeyPair[]): ParseResult {
   const keys: ParsedKey[] = [];
   const skipped: string[] = [];
 
-  for (const { key, value, platform: statedPlatform, baseUrl, label, models } of pairs) {
+  const project = pairs.find(pair => pair.key.toUpperCase() === 'JAMAI_PROJECT_ID')?.value.trim();
+  for (const { key, value: rawValue, platform: statedPlatform, baseUrl, label, models } of pairs) {
+    // Project metadata is not itself a credential. Support the SDK's paired
+    // environment fields as well as our encrypted/exported composite value.
+    if (key.toUpperCase() === 'JAMAI_PROJECT_ID') continue;
+    const value = project && /^JAMAI_(API_KEY|PAT|KEY)$/i.test(key) && !rawValue.includes(':')
+      ? `${project}:${rawValue.trim()}` : rawValue;
     const prefix = extractPrefix(key);
     const platform = statedPlatform ?? detectPlatform(prefix);
     // The name before `=` becomes the stored label (splitRawKey in the import

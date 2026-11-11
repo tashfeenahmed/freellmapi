@@ -172,5 +172,16 @@ describe('per-chain routing strategy', () => {
     // again, so the chain head wins without the column being touched.
     setChain(null);
     expect(route()).toBe(firstId);
+
+    // An `auto:<axis>` alias names its preset per request (#1628), so it beats
+    // the chain's own preset: the chain says manual order, the request says
+    // smartest, and the smart model must win.
+    setChain('priority');
+    const overridden = (): number =>
+      routeRequest(1000, undefined, undefined, false, false, undefined,
+        resolveRoutingChain('auto:ranked').chain, false, undefined, 0, undefined, 'smartest').modelDbId;
+    const counts = new Map<number, number>();
+    for (let i = 0; i < 25; i++) { const id = overridden(); counts.set(id, (counts.get(id) ?? 0) + 1); }
+    expect([...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]).toBe(brightId);
   });
 });

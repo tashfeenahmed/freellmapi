@@ -1,15 +1,14 @@
-import type { ChatCompletionChunk, ChatCompletionResponse } from '@freellmapi/shared/types.js';
-import { BaseProvider, providerHttpError, type KeyValidationResult } from './base.js';
+import { providerHttpError, type KeyValidationResult } from './base.js';
+import { OpenAICompatProvider } from './openai-compat.js';
 
 export const BEATAPI_BASE_URL = 'https://api.beatapi.io/v1';
 
-/** Decision-only integration. Model availability and promotional terms live
- * in the signed catalog, not bundled seeds or the chat router. */
-export class BeatApiProvider extends BaseProvider {
-  readonly platform = 'beatapi' as const;
-  readonly name = 'BeatAPI';
+export class BeatApiProvider extends OpenAICompatProvider {
+  constructor() {
+    super({ platform: 'beatapi', name: 'BeatAPI', baseUrl: BEATAPI_BASE_URL });
+  }
 
-  async validateKey(apiKey: string): Promise<KeyValidationResult> {
+  override async validateKey(apiKey: string): Promise<KeyValidationResult> {
     const res = await this.fetchWithTimeout(`${BEATAPI_BASE_URL}/models`, {
       method: 'GET', redirect: 'error', headers: { Authorization: `Bearer ${apiKey}` },
     }, 10_000, { timeoutBounds: 'request' });
@@ -20,14 +19,5 @@ export class BeatApiProvider extends BaseProvider {
       throw Object.assign(new Error('BeatAPI returned an invalid model list'), { status: 502 });
     }
     return true;
-  }
-
-  async chatCompletion(): Promise<ChatCompletionResponse> {
-    throw Object.assign(new Error('BeatAPI integration supports /v1/decisions, not chat completions'), { status: 422 });
-  }
-
-  // eslint-disable-next-line require-yield
-  async *streamChatCompletion(): AsyncGenerator<ChatCompletionChunk> {
-    throw Object.assign(new Error('BeatAPI integration supports /v1/decisions, not chat completions'), { status: 422 });
   }
 }

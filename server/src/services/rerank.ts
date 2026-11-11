@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { parseRetryAfterMs } from '../providers/base.js';
+import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { checkMonthlyBudget, reserveMonthlyBudget, secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { markKeyHealthyFromRequest } from './health.js';
@@ -35,6 +36,14 @@ interface RerankCandidate {
   platform: string;
   key: string;
   baseUrl: string | null;
+  /** Parsed api_keys.model_scope_json (#657) — null = unscoped, serves any rerank model. */
+  scope: Set<string> | null;
+}
+
+/** The model a candidate actually calls for a requested model (same resolution
+ *  as callProvider), so the scope gate checks the id the key really serves. */
+function effectiveModel(cand: Pick<RerankCandidate, 'platform'>, model?: string): string {
+  return model || (cand.platform === 'cohere' ? 'rerank-v3.5' : 'rerank');
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -42,13 +51,13 @@ const MAX_DOCUMENTS = 100;
 
 function candidates(): RerankCandidate[] {
   const rows = getDb().prepare(
-    "SELECT id, platform, base_url, encrypted_key, iv, auth_tag FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') AND platform IN ('cohere', 'custom') ORDER BY platform, created_at",
-  ).all() as { id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string }[];
+    "SELECT id, platform, base_url, encrypted_key, iv, auth_tag, model_scope_json FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') AND platform IN ('cohere', 'custom') ORDER BY platform, created_at",
+  ).all() as { id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string; model_scope_json: string | null }[];
   const out: RerankCandidate[] = [];
   for (const row of rows) {
     if (row.platform === 'custom' && !row.base_url) continue;
     try {
-      out.push({ id: row.id, platform: row.platform, key: decrypt(row.encrypted_key, row.iv, row.auth_tag), baseUrl: row.base_url });
+      out.push({ id: row.id, platform: row.platform, key: decrypt(row.encrypted_key, row.iv, row.auth_tag), baseUrl: row.base_url, scope: parseModelScope(row.model_scope_json) });
     } catch { /* undecryptable row is not a candidate */ }
   }
   // Custom endpoints (the operator's explicit rerank relays) go first.
@@ -117,7 +126,12 @@ export async function runRerank(model: string | undefined, query: string, docume
   if (documents.length > MAX_DOCUMENTS) {
     throw new RerankError(`Too many documents: ${documents.length} (max ${MAX_DOCUMENTS})`, 400);
   }
-  const chain = candidates();
+  // Per-key model scope (#657), the same wall the chat router and search key
+  // pools honour: a relay key scoped to a model group must never be picked to
+  // serve a model outside its list. Filter up front so a pool where every key
+  // is scoped out reports "no capable key configured" (503) instead of
+  // pretending the providers were tried and failed (502).
+  const chain = candidates().filter(c => scopeAllows(c.scope, effectiveModel(c, model)));
   if (chain.length === 0) {
     throw new RerankError('No rerank-capable key configured. Add a Cohere key or a custom rerank endpoint.', 503);
   }

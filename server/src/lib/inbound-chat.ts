@@ -202,6 +202,7 @@ export async function runInboundChat(
   // (#956 review).
   const outputReserve = routingReserveTokens(maxTokens);
   const estimatedTotal = estimatedInputTokens + outputReserve;
+  state.estimatedTotalTokens = estimatedTotal;
   const schemas = toolSchemaMap(input.tools);
   let clientGone = false;
   const clientAbort = new AbortController();

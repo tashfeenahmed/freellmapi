@@ -118,6 +118,7 @@ FreeLLMAPI 从 `.env` 读取的全部变量，按主题分组。默认值和说�
 | `FREEAPI_DB_BACKUP_TOKEN` | 未设置 | 向 `FREEAPI_DB_BACKUP_URL` 上传时可选的 bearer 令牌。 |
 | `FREEAPI_DB_BACKUP_KEY` | 省略时使用 `ENCRYPTION_KEY` | 备份信封专用的 64 位十六进制密钥，可与主密钥分开。 |
 | `FREEAPI_DB_BACKUP_INTERVAL_MS` | `300000`（5 分钟） | 后台备份之间的间隔。 |
+| `AUTO_BACKUP_DUMP_RETENTION` | `10` | Backups 页面自动转储文件的数量上限（#1675）：保留来源为 `scheduled` 或 `pre-update` 的最新 N 个转储，在下次写入转储时删除更早的文件及其记录。手动与 pre-restore 转储永不被自动删除。`0` 表示禁用清理（永久保留所有自动转储）。 |
 | `FREEAPI_CONFIG_PATH` | 未设置 | 可选的声明式启动配置：指向一个 JSON 文件的路径，每次启动都会在迁移之后幂等地应用。示例：`/app/server/data/freellmapi.config.json`。 |
 | `FREEAPI_CONFIG_JSON` | 未设置 | 同样的声明式配置，以内联方式而非文件给出，例如 `{"keys":[{"platform":"groq","key":"gsk_...","label":"main"}],"routing":{"strategy":"balanced"}}`。 |
 | `FREELLMAPI_UPDATE_CHECK` | 启用 | 手动的应用更新检查器。设为 `off` 可把它从设置页隐藏，并阻止 Git 发现和对外发出的更新检查请求。这也会一并关掉自动版本提醒——那是另一个独立的仪表盘设置项（设置 > 通用），在被打开之前始终保持关闭。 |

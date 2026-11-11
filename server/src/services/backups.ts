@@ -10,6 +10,25 @@ import type { Scheduler } from '../lib/scheduler.js';
 const SCHEDULE_SETTING = 'backup_schedule';
 const LAST_RUN_SETTING = 'backup_last_run_day';
 
+// #1675: the automatic dump sources — the background scheduler and the
+// desktop updater's pre-update snapshot — write a full dump each time they
+// fire and nothing ever removed one. A single-user desktop install that
+// updated a few times a month accumulated 60-70 MB per update indefinitely.
+// Manual dumps are the operator's own intent and pre-restore snapshots are
+// the only undo for a restore, so neither is ever auto-deleted; only the two
+// sources the software creates by itself are bounded, by count. `0` disables
+// the prune (the "documented opt-out" the issue asks for).
+const DEFAULT_AUTO_DUMP_RETENTION = 10;
+export const AUTO_DUMP_SOURCES: ReadonlySet<string> = new Set(['scheduled', 'pre-update']);
+
+export function getAutoDumpRetention(): number {
+  const raw = process.env.AUTO_BACKUP_DUMP_RETENTION;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_AUTO_DUMP_RETENTION;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) return DEFAULT_AUTO_DUMP_RETENTION;
+  return parsed;
+}
+
 /** Bumped whenever the on-disk dump layout changes in a way an older restore
  *  path would misread. Restore refuses anything it does not know. */
 const DUMP_FORMAT = 1;
@@ -304,7 +323,58 @@ export function createBackup(
     'INSERT INTO backups (filename, filepath, filesize, is_full, source, created_at, tables_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
   ).run(filename, filepath, filesize, isFull ? 1 : 0, source, createdAt, JSON.stringify(tables));
 
+  // #1675: writing a dump is the one moment we know the auto-dump pile needs
+  // re-checking. Runs after the insert so the fresh row counts toward the
+  // bound, and never fails the backup that just succeeded.
+  try {
+    pruneAutoDumps(db);
+  } catch (err) {
+    console.error('[backups] auto-dump retention sweep failed:', err);
+  }
+
   return { id: Number(result.lastInsertRowid), filename, filesize, isFull, source, createdAt, tables };
+}
+
+/**
+ * Bound the pile of automatic dumps (#1675).
+ *
+ * The scheduler and the desktop updater append a full dump each and nothing
+ * removed them, so disk usage grew forever (the reporter's `backups/` held
+ * 60-70 MB per app update). Keeps the newest `AUTO_BACKUP_DUMP_RETENTION`
+ * auto dumps per source-agnostic count; `0` keeps every dump (opt-out).
+ * Manual and pre-restore dumps are never touched: one is operator intent,
+ * the other is the only undo for a restore.
+ *
+ * Deleting the row reuses deleteBackup's path re-check (a stale or hand-edited
+ * row may point outside the data directory; that dump is left alone rather
+ * than unlinking an arbitrary file) — so a dump whose file is already gone
+ * still loses its index row, which is the half that mattered for the listing.
+ */
+export function pruneAutoDumps(db: Db, keep = getAutoDumpRetention()): number {
+  if (keep <= 0) return 0;
+  const stale = db.prepare(`
+    SELECT id FROM backups
+    WHERE source IN (${[...AUTO_DUMP_SOURCES].map(() => '?').join(', ')})
+      AND id NOT IN (
+        SELECT id FROM backups
+        WHERE source IN (${[...AUTO_DUMP_SOURCES].map(() => '?').join(', ')})
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      )
+    ORDER BY id ASC
+  `).all(...AUTO_DUMP_SOURCES, ...AUTO_DUMP_SOURCES, keep) as { id: number }[];
+
+  let deleted = 0;
+  for (const row of stale) {
+    try {
+      deleteBackup(db, row.id);
+      deleted += 1;
+    } catch {
+      // Path outside the data directory (or row vanished mid-sweep): not ours
+      // to delete; the next sweep tries again, same as today's behaviour.
+    }
+  }
+  return deleted;
 }
 
 /* ------------------------------------------------------------------ */

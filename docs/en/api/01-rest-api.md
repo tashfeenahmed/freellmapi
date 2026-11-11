@@ -197,6 +197,9 @@ curl "http://localhost:3001/v1beta/models/gemini-2.5-flash:generateContent" \
 
 Gemini model names like `gemini-2.5-flash` resolve through the Gemini family map (Keys → Gemini model mapping) rather than the catalog directly, so they route to Auto or whichever catalog model each family is pinned to. Catalog ids work verbatim too.
 
+A client-profile key (`sk-cp-…`) authenticates the `/v1beta` generate/stream routes as
+well, with its enforced prompt injected ahead of `systemInstruction`.
+
 `contents` text, inline data, function calls/responses, system instructions,
 function declarations, structured JSON output, generation controls, and
 thinking budgets translate into the same internal chat/fallback pipeline.
@@ -361,7 +364,29 @@ curl http://localhost:3001/v1/messages \
   }'
 ```
 
+A **client-profile key** (`sk-cp-…`, see the dashboard's Profiles page) authenticates
+`/v1/messages` too: the profile's server-enforced system prompt is injected ahead of the
+caller's `system` turn, exactly as on `/v1/chat/completions`.
+
 Claude model names map to your free pool on the **Keys → Anthropic** tab: each family (`default`, `opus`, `sonnet`, `haiku`) routes to `auto` (the router picks a free model) or a model you pin. `POST /v1/messages/count_tokens` and a content-negotiated `GET /v1/models` (Anthropic shape when `anthropic-version` is sent) are implemented too. Streaming, system prompts, tool use, and image input all translate across the same router as the OpenAI endpoints.
+
+**Claude Code auto-mode classifier compatibility (related to #1589).** Upstream-supplied `safeguard_results` are preserved unchanged in the JSON response and streaming `message_delta`. When an upstream sends none, the field stays absent; FreeLLMAPI never fabricates classifier verdicts.
+
+The client's `safeguards` body field and `anthropic-beta` header are accepted as internal request metadata, but **neither is forwarded to the current OpenAI-compatible upstreams**. Those APIs may reject unsupported fields. There is no native Anthropic upstream adapter here, so this response-metadata support does **not** establish eligibility for Anthropic's no-charge server-side classifier. An eligible native gateway must forward the request field and header together, as described in the [official gateway requirements](https://code.claude.com/docs/en/auto-mode-classifier-billing#make-the-session-eligible).
+
+For a gateway that cannot provide server-side checks, Anthropic documents a temporary setting to use Claude Code's own classifier requests without repeatedly asking for server-side eligibility. Set it **before** starting Claude Code:
+
+```bash
+export CLAUDE_CODE_AUTO_MODE_SERVER=0
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:CLAUDE_CODE_AUTO_MODE_SERVER = "0"
+```
+
+This does **not** disable auto-mode safety checks or permissions. Claude Code still makes its own classifier requests, which consume your configured provider's usage/allowance; it does not make those requests free.
 
 **Claude Code** — point it at your server and start it:
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { getDb, getUnifiedApiKey, getSetting } from '../db/index.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
-import { runSearch } from '../services/search.js';
+import { runSearch, searchStatus } from '../services/search.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { getRoutingScores, getRoutingStrategy, setRoutingStrategy } from '../services/router.js';
@@ -386,6 +386,9 @@ function healthcheck(): unknown {
     available_models: availableModels,
     configured_providers: providerRows.length,
     healthy_providers: healthyProviders,
+    // Separate from inference readiness: models can be ready while search
+    // has nothing to run on. Local state only, so no search quota is spent.
+    search: searchStatus(),
     checked_at: new Date().toISOString(),
   };
 }
@@ -463,7 +466,7 @@ const TOOLS: Record<string, McpTool> = {
   },
   healthcheck: {
     title: 'Check FreeLLMAPI readiness',
-    description: 'Check whether FreeLLMAPI is ready for ChatGPT calls, including MCP state, configured/healthy providers, available models, and the default MCP inference model. This does not spend provider quota.',
+    description: 'Check whether FreeLLMAPI is ready for ChatGPT calls, including MCP state, configured/healthy providers, available models, the default MCP inference model, and web search readiness per engine (search.status, search.engines, search.missing_from_catalog). This does not spend provider or search quota.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: READ_ONLY_LOCAL,
     run: () => healthcheck(),

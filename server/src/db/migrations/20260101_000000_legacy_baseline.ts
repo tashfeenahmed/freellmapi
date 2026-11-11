@@ -4,6 +4,47 @@ import type { Db } from '../types.js';
 import { initEncryptionKey } from '../../lib/crypto.js';
 import { applyModelPricing } from '../model-pricing.js';
 
+/**
+ * Rename a model id, collision-safely (#1603).
+ *
+ * Every rename in this file is an in-place UPDATE of `model_id`, and the
+ * baseline can legitimately run against a DB whose `models` rows were written
+ * by an older code path (a pre-migrator install that gets adopted, a restore
+ * whose `migrations` table predates a rename, a catalog-sync that already
+ * carried the new id). When the target (platform, model_id) row ALREADY
+ * exists, a bare UPDATE used to die with `UNIQUE constraint failed:
+ * models.platform, models.models_id` and boot crashed (#1603).
+ *
+ * The merge rule is: the existing target row wins (it is the fresher identity,
+ * often catalog-sync-owned and already in the fallback chain); the stale old
+ * row loses its chain entry and is deleted. This makes every rename idempotent:
+ * a second pass finds no old row and no-ops.
+ */
+function renameModel(
+  db: Db,
+  platform: string,
+  fromModelId: string,
+  toModelId: string,
+  apply: (db: Db) => void,
+): void {
+  const src = db
+    .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
+    .get(platform, fromModelId) as { id: number } | undefined;
+  if (!src) return;
+  const dst = db
+    .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
+    .get(platform, toModelId) as { id: number } | undefined;
+  if (dst) {
+    // The rename already happened once (or the catalog shipped the new id
+    // first). Drop the stale row rather than crash on the UNIQUE index.
+    db.prepare('DELETE FROM fallback_config WHERE model_db_id = ?').run(src.id);
+    db.prepare('DELETE FROM profile_models WHERE model_db_id = ?').run(src.id);
+    db.prepare('DELETE FROM models WHERE id = ?').run(src.id);
+    return;
+  }
+  apply(db);
+}
+
 export function up(db: Db): void {
   createTables(db);
   initEncryptionKey(db);
@@ -363,18 +404,30 @@ function seedModels(db: Db) {
  */
 function migrateModels(db: Db) {
   // 1) Replace outdated models in-place (preserves fallback_config & any references)
-  const renameStmt = db.prepare(`
-    UPDATE models
-       SET model_id = ?, display_name = ?, intelligence_rank = ?,
-           monthly_token_budget = ?, rpd_limit = COALESCE(?, rpd_limit),
-           context_window = COALESCE(?, context_window),
-           size_label = COALESCE(?, size_label)
-     WHERE platform = ? AND model_id = ?
-  `);
+  const rename = (platform: string, from: string, to: string, apply: (db: Db) => void) =>
+    renameModel(db, platform, from, to, apply);
   // DeepSeek R1 (free) -> DeepSeek V3.1 (free)
-  renameStmt.run('deepseek/deepseek-v3.1:free', 'DeepSeek V3.1 (free)', 2, '~6M', 200, 131072, 'Frontier', 'openrouter', 'deepseek/deepseek-r1:free');
+  rename('openrouter', 'deepseek/deepseek-r1:free', 'deepseek/deepseek-v3.1:free', (d) => {
+    d.prepare(`
+      UPDATE models
+         SET model_id = 'deepseek/deepseek-v3.1:free', display_name = 'DeepSeek V3.1 (free)', intelligence_rank = 2,
+             monthly_token_budget = '~6M', rpd_limit = COALESCE(200, rpd_limit),
+             context_window = COALESCE(131072, context_window),
+             size_label = COALESCE('Frontier', size_label)
+       WHERE platform = 'openrouter' AND model_id = 'deepseek/deepseek-r1:free'
+    `).run();
+  });
   // GitHub GPT-4o -> GPT-5
-  renameStmt.run('openai/gpt-5', 'GPT-5 (GitHub)', 1, '~18M', null, 128000, 'Frontier', 'github', 'gpt-4o');
+  rename('github', 'gpt-4o', 'openai/gpt-5', (d) => {
+    d.prepare(`
+      UPDATE models
+         SET model_id = 'openai/gpt-5', display_name = 'GPT-5 (GitHub)', intelligence_rank = 1,
+             monthly_token_budget = '~18M',
+             context_window = COALESCE(128000, context_window),
+             size_label = COALESCE('Frontier', size_label)
+       WHERE platform = 'github' AND model_id = 'gpt-4o'
+    `).run();
+  });
 
   // 2) Correct stale limits / budgets on existing rows
   db.prepare(`UPDATE models SET rpd_limit = 20, monthly_token_budget = '~3M' WHERE platform = 'google' AND model_id = 'gemini-2.5-flash'`).run();
@@ -466,18 +519,18 @@ function migrateModelsV2(db: Db) {
 
   // GitHub: gpt-5 is in the model catalog but returns "unavailable_model" on free tier
   // inference. Revert to gpt-4o which works. This only runs if the gpt-5 row exists.
-  db.prepare(`
+  renameModel(db, 'github', 'openai/gpt-5', 'gpt-4o', (d) => d.prepare(`
     UPDATE models
        SET model_id = 'gpt-4o', display_name = 'GPT-4o', intelligence_rank = 5,
            size_label = 'Large', context_window = 8000, monthly_token_budget = '~18M'
      WHERE platform = 'github' AND model_id = 'openai/gpt-5'
-  `).run();
+  `).run());
 
   // Groq: scout requires the meta-llama/ publisher prefix
-  db.prepare(`
+  renameModel(db, 'groq', 'llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-scout-17b-16e-instruct', (d) => d.prepare(`
     UPDATE models SET model_id = 'meta-llama/llama-4-scout-17b-16e-instruct'
      WHERE platform = 'groq' AND model_id = 'llama-4-scout-17b-16e-instruct'
-  `).run();
+  `).run());
 
   // Add real OpenRouter :free models that exist in the live catalog
   const insert = db.prepare(`
@@ -591,13 +644,13 @@ function migrateModelsV4(db: Db) {
   applyRemovals();
 
   // 2) Cloudflare: replace Llama 3.1 70B with the current-gen 3.3 70B fp8-fast
-  db.prepare(`
+  renameModel(db, 'cloudflare', '@cf/meta/llama-3.1-70b-instruct', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', (d) => d.prepare(`
     UPDATE models
        SET model_id = '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
            display_name = 'Llama 3.3 70B fp8-fast (CF)',
            context_window = 131072
      WHERE platform = 'cloudflare' AND model_id = '@cf/meta/llama-3.1-70b-instruct'
-  `).run();
+  `).run());
 
   // 3) Field corrections verified via primary sources + live probe
   db.prepare(`UPDATE models SET tpm_limit = 12000 WHERE platform = 'groq' AND model_id = 'llama-3.3-70b-versatile'`).run();
@@ -1018,10 +1071,10 @@ function migrateModelsV10(db: Db) {
 function migrateModelsV11(db: Db) {
   // 1) Rename cerebras qwen3-235b → qwen-3-235b-a22b-instruct-2507 if the
   //    old id still exists on this DB. Safe to re-run because of the WHERE.
-  db.prepare(`
+  renameModel(db, 'cerebras', 'qwen3-235b', 'qwen-3-235b-a22b-instruct-2507', (d) => d.prepare(`
     UPDATE models SET model_id = 'qwen-3-235b-a22b-instruct-2507'
      WHERE platform = 'cerebras' AND model_id = 'qwen3-235b'
-  `).run();
+  `).run());
 
   // 2) Re-enable NVIDIA NIM (still has 1,000+ starter credits free-tier).
   db.prepare(`

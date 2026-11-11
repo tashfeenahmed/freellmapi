@@ -241,8 +241,22 @@ function aider(ctx: GenerateContext): Generation {
 // at the front. And a provider entry alone is inert: without a top-level
 // `model` OpenCode keeps whatever it used before (or nothing on a fresh
 // install), so the generated config names the default too.
+//
+// The key goes into OpenCode's own credential store, auth.json under its data
+// dir (`$XDG_DATA_HOME/opencode`, else `~/.local/share/opencode` — on Windows
+// too), keyed by the provider id. It used to travel as `{env:FREELLMAPI_API_KEY}`
+// in the config, which only works when the process making the request inherits
+// that variable: a PowerShell `$env:` lasts one window, and the OpenCode desktop
+// app never sees a shell export at all. Worse, the unset placeholder resolves to
+// an empty `apiKey` that overrides a key the user stored with `/connect`, so the
+// gateway answered "Invalid API key" with a perfectly valid key on hand. The
+// config therefore carries no `apiKey`, and an explicit `undefined` retires the
+// placeholder an earlier run wrote. The config dir follows XDG_CONFIG_HOME the
+// same way, since that is where OpenCode reads it from.
 function opencode(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const configHome = process.env.XDG_CONFIG_HOME?.trim() || path.join(ctx.homeDir, '.config');
+  const dataHome = process.env.XDG_DATA_HOME?.trim() || path.join(ctx.homeDir, '.local', 'share');
   const roster = catalogModels(ctx.models);
   const modelEntries = Object.fromEntries(
     [model, ...roster.filter(entry => entry.id !== model.id)].map(entry => [entry.id, {
@@ -251,27 +265,37 @@ function opencode(ctx: GenerateContext): Generation {
     }]),
   );
   return {
-    files: [{
-      path: path.join(ctx.homeDir, '.config', 'opencode', 'opencode.json'),
-      format: 'json',
-      value: {
-        $schema: 'https://opencode.ai/config.json',
-        model: `freellmapi/${model.id}`,
-        provider: {
-          freellmapi: {
-            npm: '@ai-sdk/openai-compatible',
-            name: 'FreeLLMAPI',
-            options: {
-              baseURL: v1Url(ctx.url),
-              apiKey: '{env:FREELLMAPI_API_KEY}',
+    files: [
+      {
+        path: path.join(configHome, 'opencode', 'opencode.json'),
+        format: 'json',
+        value: {
+          $schema: 'https://opencode.ai/config.json',
+          model: `freellmapi/${model.id}`,
+          provider: {
+            freellmapi: {
+              npm: '@ai-sdk/openai-compatible',
+              name: 'FreeLLMAPI',
+              options: {
+                baseURL: v1Url(ctx.url),
+                apiKey: undefined,
+              },
+              models: modelEntries,
             },
-            models: modelEntries,
           },
         },
       },
-    }],
+      {
+        path: path.join(dataHome, 'opencode', 'auth.json'),
+        format: 'json',
+        sensitive: true,
+        value: {
+          freellmapi: { type: 'api', key: ctx.apiKey },
+        },
+      },
+    ],
     notes: [
-      'Export FREELLMAPI_API_KEY before starting OpenCode.',
+      'The key is stored in OpenCode\'s auth.json, so no environment variable is needed (CLI or desktop app).',
       `freellmapi/${model.id} is now the default model.`,
     ],
   };
@@ -1080,29 +1104,30 @@ function cursor(_ctx: GenerateContext): Generation {
 function atomcode(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   const configDir = path.join(ctx.homeDir, '.atomcode');
-  // AtomCode picks its provider by name: a root `default_provider` key names
-  // one `[providers.<id>]` table, and `type = "openai"` is what makes that
-  // table speak the OpenAI-compatible wire. Root key first, table second, so
-  // mergeToml can slot the key above any tables already in the file.
+  // default_model takes precedence over legacy default_provider settings.
+  // Keep the selector above tables so mergeToml writes it at the root.
   return {
     files: [{
       path: path.join(configDir, 'config.toml'),
       format: 'toml',
       sensitive: true,
       content: [
-        'default_provider = "freellmapi"',
+        'default_model = "freellmapi"',
         '',
-        '[providers.freellmapi]',
-        'type = "openai"',
+        '[provider_accounts.freellmapi]',
+        'provider = "openai"',
         `base_url = ${JSON.stringify(v1Url(ctx.url))}`,
         `api_key = ${JSON.stringify(ctx.apiKey)}`,
+        '',
+        '[models.freellmapi]',
+        'account = "freellmapi"',
         `model = ${JSON.stringify(model.id)}`,
         `context_window = ${contextWindow(model)}`,
       ].join('\n'),
     }],
     notes: [
-      'AtomCode reads ~/.atomcode/config.toml; other [providers.*] tables in it are kept.',
-      `default_provider now points at [providers.freellmapi] with ${model.id} as its model.`,
+      'AtomCode reads ~/.atomcode/config.toml; unrelated accounts, models and legacy providers are kept.',
+      `default_model now points at [models.freellmapi] with ${model.id} via [provider_accounts.freellmapi].`,
       'Point base_url at the unified /v1 endpoint; api_key is the unified key shown on the Agents page.',
       'One-shot check: atomcode -p "Say hello" (telemetry is on by default: atomcode telemetry disable).',
     ],

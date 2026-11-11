@@ -5,6 +5,14 @@ import { OpenAICompatProvider } from './openai-compat.js';
 
 export const ONOMEO_BASE_URL = 'https://onomeo.com/v1';
 
+// Retired IDs can return HTTP 200 with a different model (observed 2026-10-24).
+// Fail over instead of attributing that answer to the requested catalog route.
+function checkModelIdentity(requested: string, returned: unknown): void {
+  if (typeof returned !== 'string' || !returned || returned !== requested) {
+    throw Object.assign(new Error('onomeo returned a different or missing model identity'), { status: 502 });
+  }
+}
+
 // Free-tier answers end with this line (verified live 2026-10-21: every text
 // reply, streamed as its own final delta "\n\n— via onomeo.com"; tool-call
 // turns carry none). It is provider branding, not model output, so it must not
@@ -66,6 +74,7 @@ export class OnomeoProvider extends OpenAICompatProvider {
     options?: CompletionOptions, quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
     const response = await super.chatCompletion(apiKey, messages, modelId, options, quotaContext);
+    checkModelIdentity(modelId, response.model);
     for (const choice of response.choices ?? []) {
       if (typeof choice.message?.content === 'string') {
         choice.message.content = stripOnomeoSignature(choice.message.content);
@@ -83,6 +92,9 @@ export class OnomeoProvider extends OpenAICompatProvider {
     let held = '';
     let lastChunk: ChatCompletionChunk | null = null;
     for await (const chunk of super.streamChatCompletion(apiKey, messages, modelId, options, quotaContext)) {
+      // Check every frame, including role/tool/finish frames, before yielding
+      // or retaining any of its content. Never rewrite the upstream identity.
+      checkModelIdentity(modelId, chunk.model);
       lastChunk = chunk;
       const delta = chunk.choices?.[0]?.delta;
       if (typeof delta?.content !== 'string') {

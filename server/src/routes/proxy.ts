@@ -37,7 +37,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, type NormalizedModel } from '../services/model-listing.js';
+import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
@@ -405,14 +405,14 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
                    AND (m.key_id IS NULL OR k.id = m.key_id)
                )
            ) AS usable,
-           (SELECT MAX(m2.context_window)
+           (SELECT json_group_array(m2.context_window)
             FROM profile_models pm2
             JOIN models m2 ON m2.id = pm2.model_db_id AND m2.enabled = 1
-            WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS max_ctx
+            WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS ctxs
     FROM profiles p
     WHERE p.type = 'custom'
     ORDER BY p.sort_order, p.id
-  `).all() as { id: number; name: string; usable: number; max_ctx: number | null }[];
+  `).all() as { id: number; name: string; usable: number; ctxs: string | null }[];
 
   // Claude-family discovery entries (#880). The Anthropic-shaped GET /v1/models
   // in routes/anthropic.ts already lists one id per Claude family so clients
@@ -486,17 +486,20 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
       unavailable_reason: autoContextWindow != null ? null : 'no_models',
     },
     ...claudeFamilyEntries,
-    ...profileRows.map(p => ({
-      id: `auto:${p.name.toLowerCase()}`,
-      object: 'model',
-      created: 0,
-      owned_by: 'freellmapi',
-      name: `Auto: ${p.name} (named fallback chain)`,
-      context_window: p.max_ctx,
-      context_length: p.max_ctx,
-      available: p.usable === 1,
-      unavailable_reason: p.usable === 1 ? null : 'no_models',
-    })),
+    ...profileRows.map(p => {
+      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      return {
+        id: `auto:${p.name.toLowerCase()}`,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: `Auto: ${p.name} (named fallback chain)`,
+        context_window: ctx,
+        context_length: ctx,
+        available: p.usable === 1,
+        unavailable_reason: p.usable === 1 ? null : 'no_models',
+      };
+    }),
     ...esFiltered.map(m => ({
       id: m.id,
       object: 'model',
@@ -743,7 +746,7 @@ const toolChoiceSchema = z.union([
 
 const stopSchema = z.union([z.string(), z.array(z.string()).min(1).max(64)]);
 
-function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
+export function providerSafeStop(stop: string | string[] | undefined): string | string[] | undefined {
   if (!Array.isArray(stop)) return stop;
   return stop.slice(0, 4);
 }
@@ -978,8 +981,15 @@ const DecisionBody = z.object({
   model: z.string().min(1).optional(),
   state: z.unknown().refine(v => v !== undefined && v !== null && v !== '', { message: 'state is required' }),
   questions: z.record(z.string().min(1).max(100), DecisionQuestionBody)
-    .refine(q => Object.keys(q).length >= 1 && Object.keys(q).length <= 64, { message: 'questions must hold 1 to 64 entries' }),
-});
+    .refine(q => Object.keys(q).length >= 1 && Object.keys(q).length <= 64, { message: 'questions must hold 1 to 64 entries' }).optional(),
+  fields: z.record(z.string().min(1).max(100), z.object({
+    type: z.enum(['text', 'number']),
+    instructions: z.string().max(2000).optional(),
+    decimals: z.number().int().min(0).max(10).optional(),
+    unit: z.string().max(100).optional(),
+  }).strict()).refine(f => Object.keys(f).length >= 1 && Object.keys(f).length <= 64, { message: 'fields must hold 1 to 64 entries' }).optional(),
+}).refine(b => (b.questions !== undefined) !== (b.fields !== undefined), { message: 'Send either questions or fields' })
+  .refine(b => !b.fields || typeof b.state === 'string', { message: 'Extraction requires text state' });
 
 async function handleDecision(req: Request, res: Response): Promise<void> {
   if (!requireInferenceAuth(req, res)) return;
@@ -992,9 +1002,9 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
   const abort = new AbortController();
   res.on('close', () => { if (!res.writableFinished) abort.abort(); });
   try {
-    const { model, state, questions } = parsed.data;
+    const { model, state, questions, fields } = parsed.data;
     const result = await runDecision(
-      { state, questions: questions as Parameters<typeof runDecision>[0]['questions'] },
+      fields ? { state: state as string, fields } : { state, questions: questions as NonNullable<Parameters<typeof runDecision>[0]['questions']> },
       { model, signal: abort.signal },
     );
     res.json({
@@ -1003,6 +1013,8 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       provider: result.provider,
       answers: result.answers,
       usage: result.usage,
+      ...(result.modelVersion ? { model_version: result.modelVersion } : {}),
+      ...(result.truncated !== undefined ? { truncated: result.truncated } : {}),
     });
   } catch (err: any) {
     if (res.headersSent || abort.signal.aborted) return;
@@ -1493,6 +1505,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
   const pinnedModelId = requestedModel && !isAutoModel(requestedModel) ? requestedModel : null;
   const state = newFallbackState();
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Client-disconnect fan-out: the flag stops the loop before the NEXT
   // attempt; the AbortController (threaded to the provider as
@@ -1539,6 +1552,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
         false,
         state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        resolvedChain?.strategyOverride,
       );
     },
     dispatch: async (route, attempt, ctx) => {
@@ -2156,7 +2171,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         const hasFinalToolCalls = Array.isArray(finalToolCalls) && finalToolCalls.length > 0;
         if (hasFinalToolCalls) {
           writeFrame({ ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-          writeFrame({ ...base, choices: [{ index: 0, delta: { tool_calls: finalToolCalls }, finish_reason: null }] });
+          writeFrame({ ...base, choices: [{ index: 0, delta: { tool_calls: finalToolCalls.map((call, index) => ({ ...call, index })) }, finish_reason: null }] });
           writeFrame({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: response.usage });
         } else {
           if (!answerStarted) {
@@ -2237,7 +2252,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // store and replayed as SSE rather than JSON (see below).
   const cacheKey = (cacheActive(cacheDirective) && isCacheableTemperature(temperature))
     ? computeCacheKey({
-        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice,
+        model: requestedModel, messages, temperature, top_p, max_tokens, tools, tool_choice, parallel_tool_calls,
         // Normalized stop (providerSafeStop), i.e. what is actually forwarded.
         stop,
         // The knobs below are NOT in chatCompletionSchema, so zod strips them
@@ -2249,8 +2264,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         response_format: req.body?.response_format ?? undefined,
         n: req.body?.n ?? undefined,
         seed: req.body?.seed ?? undefined,
+        top_k: req.body?.top_k ?? undefined,
+        min_p: req.body?.min_p ?? undefined,
         presence_penalty: req.body?.presence_penalty ?? undefined,
         frequency_penalty: req.body?.frequency_penalty ?? undefined,
+        repetition_penalty: req.body?.repetition_penalty ?? undefined,
         logit_bias: req.body?.logit_bias ?? undefined,
         logprobs: req.body?.logprobs ?? undefined,
         top_logprobs: req.body?.top_logprobs ?? undefined,
@@ -2483,6 +2501,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const state = newFallbackState();
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
@@ -2493,7 +2512,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
   // this turn routes with. Skipped when the client pinned a model or the
   // conversation is sticky to one. Any doubt routes as Balanced.
-  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, signal: clientAbort.signal });
+  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, preset: resolvedChain?.strategyOverride, signal: clientAbort.signal });
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
@@ -2515,7 +2534,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       // header; otherwise a bounded rule derives it (tools present / code
       // markers). undefined keeps the preset weights untouched.
       const taskType = resolveTaskType(req, tools, messages);
-      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingEstimate, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, samplingParams.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride);
     },
     dispatch: async (route, attempt, ctx) => {
     const contextBudget = routeOutputBudget(route, estimatedInputTokens);

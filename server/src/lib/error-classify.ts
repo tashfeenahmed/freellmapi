@@ -378,6 +378,19 @@ export function isProviderDegradedError(err: any): boolean {
   return msg.includes('degraded');
 }
 
+// A 5xx whose body blames ONE model's load, not the provider: Google answers
+// `503 "This model is currently experiencing high demand"` for a busy Gemini
+// model while its siblings on the same key keep serving. Ruling the whole
+// platform out on it left `auto` with nothing to try when that platform was
+// the only one configured. Narrow on purpose: the wording must name "this
+// model" / "the model", so a generic "service overloaded" stays provider-level.
+const MODEL_SCOPED_OVERLOAD = /\b(?:this|the) model is (?:currently )?(?:experiencing high demand|overloaded)\b/;
+
+export function isModelScopedOverloadError(err: any): boolean {
+  return typeof err?.status === 'number' && err.status >= 500
+    && MODEL_SCOPED_OVERLOAD.test((err?.message ?? '').toLowerCase());
+}
+
 // #788: provider-level failures — 5xx, timeouts, transport/network errors, a
 // degraded deployment — are symptoms of the PROVIDER being sick, not of this
 // particular key. Retrying the same provider with a sibling key would fail
@@ -403,7 +416,7 @@ export function isProviderLevelError(err: any): boolean {
   // the text is not.
   if (err?.skipModelForRequest === true) return false;
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status >= 500) return true;
+  if (status >= 500) return !isModelScopedOverloadError(err);
   // A DEGRADED hosted deployment (NVIDIA NIM, #522) is provider health wearing
   // a 400 — same source of truth as everywhere else, not a second substring.
   if (isProviderDegradedError(err)) return true;
@@ -520,6 +533,11 @@ export function isContextTooLargeError(err: any): boolean {
     || /input[^.]*longer than (the )?(max|maximum)/.test(msg)
     || msg.includes('exceeds the maximum number of tokens')
     || msg.includes('request too large')
+    // BazaarLink: 400 "This request is too large for a free tier" (#1717).
+    // No window named, but it is a size rejection: without this it was
+    // bucketed as provider_bad_request and the next candidate got the same
+    // oversized payload.
+    || msg.includes('request is too large')
     || msg.includes('payload too large')
     || msg.includes('request entity too large')
     || msg.includes('request body too large')

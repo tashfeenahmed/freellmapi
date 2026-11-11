@@ -41,6 +41,7 @@ import {
   isKeyAuthError,
   isDailyQuotaExhaustedError,
   isProviderLevelError,
+  isModelScopedOverloadError,
   newClientAbortError,
 } from '../../lib/error-classify.js';
 import { invalidToolArgumentsError } from '../../lib/tool-validate.js';
@@ -708,6 +709,17 @@ describe('isProviderLevelError (#788: the PROVIDER is sick, not this key)', () =
     expect(isProviderLevelError(Object.assign(new Error("Function id 'x': DEGRADED function cannot be invoked"), { status: 400 }))).toBe(true);
   });
 
+  it('keeps a 5xx that blames one busy model scoped to that model, not the platform', () => {
+    // Google's per-model load shedding: sibling Gemini models on the same key
+    // still serve, so `auto` must be able to fail over within the platform.
+    expect(isProviderLevelError(Object.assign(new Error(
+      'Google API error 503: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.',
+    ), { status: 503 }))).toBe(false);
+    expect(isProviderLevelError(Object.assign(new Error('API error 503: The model is overloaded. Please try again later.'), { status: 503 }))).toBe(false);
+    // Generic overload wording that does not single out a model stays provider-level.
+    expect(isProviderLevelError(Object.assign(new Error('API error 503: Service temporarily overloaded'), { status: 503 }))).toBe(true);
+  });
+
   it('does not misfire on digits or wording that merely LOOK like a 5xx', () => {
     // The whole point of the structured-status rule: these all carry '500'/'503'
     // /'unavailable' in their text, and condemning the platform on any of them
@@ -779,6 +791,26 @@ describe('runFallbackLoop: a provider-level failure skips the whole platform (#7
     // wholesale, so failover spends its budget on the NEXT provider.
     expect(platformsTried(dispatch)).toEqual(['alpha', 'beta']);
     expect(state.skipPlatforms.has('alpha')).toBe(true);
+  });
+
+  it('skips sibling keys of an overloaded model but still tries a sibling model', async () => {
+    const state = newFallbackState();
+    const dispatch = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('This model is currently experiencing high demand.'), { status: 503 }))
+      .mockResolvedValueOnce('done');
+
+    await runFallbackLoop(hooksSkeleton({ maxRetries: 20, state, route: miniRouter(state), dispatch }));
+
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const second = dispatch.mock.calls[1][0] as RouteResult;
+    expect(second.platform).toBe('alpha');
+    expect(second.modelId).toBe('alpha-small');
+    expect(state.skipModels.has(CANDIDATES[0].modelDbId)).toBe(true);
+    expect(state.skipPlatforms.has('alpha')).toBe(false);
+  });
+
+  it.each([undefined, 400, 429])('does not infer model overload from wording without a 5xx status (%s)', status => {
+    expect(isModelScopedOverloadError(Object.assign(new Error('This model is overloaded.'), { status }))).toBe(false);
   });
 
   it('a 401 on alpha key1 still rotates to alpha key2 (key-scoped, not provider-scoped)', async () => {

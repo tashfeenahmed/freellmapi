@@ -11,7 +11,7 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { verifyCredentials } from '../services/auth.js';
-import { getActiveCooldownsForKeys, clearCooldownsForKey } from '../services/ratelimit.js';
+import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
@@ -38,12 +38,15 @@ import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUr
 
 export const keysRouter = Router();
 
-// Providers that stopped offering free API access but keep their adapter so
-// existing keys still work if the catalog re-enables them. The setup
+// Providers whose free signup/key creation is unavailable keep their adapter
+// and catalog models so existing keys continue working. The setup
 // checklist stops suggesting them to anyone who has no key yet; the dashboard
 // pickers hide them through `hidden` in client/src/components/keys/shared.tsx.
-// Empty since Auray was removed outright (#1583).
-const UNLISTED_PLATFORMS = new Set<string>();
+// ACLIDE: its dashboard has returned 500 since mid-October, so new users
+// cannot create a key (#1565, #1768). The API still serves existing keys.
+// Waterfall: users report being unable to create new keys (#1768). A working
+// public site/models endpoint does not establish that key creation works.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
@@ -54,6 +57,8 @@ const UNLISTED_PLATFORMS = new Set<string>();
 const PLATFORMS = [
   'aclide',
   'speka',
+  'kenari',
+  'kiosapi',
   'typhoon',
   'plugsky',
   'inferbase',
@@ -62,17 +67,27 @@ const PLATFORMS = [
   'gizmo',
   'blockrun',
   'moondream',
+  'jamai',
+  'nabh',
+  'novai',
+  'varosity',
+  'rime',
+  'freetts',
+  'freeinference',
+  'freemodel',
   'beatapi',
   'apinex',
   'onomeo',
   'iteracompute',
   'serpsearch',
   'brave',
+  'halx',
+  'aisense',
   'freeai',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
 ] as const;
 
@@ -98,6 +113,24 @@ const upload = multer({
 // string would be stored, encrypted, and only surface as a failed dispatcher
 // at request time, one attempt at a time. '' = no override (global proxy).
 const proxyUrlSchema = z.string().max(KEY_PROXY_URL_MAX).refine(isValidKeyProxyUrl, { message: KEY_PROXY_URL_ERROR });
+
+// A label is free text, and two formats read it back as STRUCTURE: the .env
+// export writes it as a `# label` comment line (a label carrying a newline
+// injects a real `GOOGLE_KEY=...` line that the importer then loads as a
+// key), and the CSV export writes it as one cell (the formula guard quotes the
+// cell but cannot stop a newline from splitting the record). So a label is one
+// line of text, full stop: line breaks and other control characters collapse
+// to a space, and it is trimmed and bounded like every other operator label
+// (groupLabel is trim().max(80)).
+const LABEL_MAX = 200;
+function sanitizeLabel(label: string): string {
+  // eslint-disable-next-line no-control-regex -- collapsing control chars is the point.
+  return label.replace(/[\r\n\t\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, LABEL_MAX);
+}
+// Defensive read for exports: rows stored by older builds can still hold a
+// newline, and an export must never write one into a label position.
+const labelForExport = (label: string | null | undefined): string =>
+  label == null ? '' : sanitizeLabel(label);
 
 const addKeySchema = z.object({
   platform: z.enum(PLATFORMS),
@@ -494,6 +527,7 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       modelDiscovery: canDiscover(row.platform),
       cooldowns: cooldowns.map(c => ({
         modelId: c.modelId,
+        source: c.source,
         expiresAtMs: c.expiresAtMs,
         remainingMs: c.remainingMs,
       })),
@@ -522,6 +556,29 @@ keysRouter.delete('/:id/cooldowns', (req: Request, res: Response) => {
 
   const cleared = clearCooldownsForKey(id);
   res.json({ cleared });
+});
+
+// Resume APINex after a manual website check-in without clearing unrelated
+// credit, tier, or rate-limit cooldowns on the same key.
+keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: 'Invalid key id' });
+    return;
+  }
+
+  const row = getDb().prepare('SELECT platform FROM api_keys WHERE id = ?')
+    .get(id) as { platform: string } | undefined;
+  if (!row) {
+    res.status(404).json({ error: 'Key not found' });
+    return;
+  }
+  if (row.platform !== 'apinex') {
+    res.status(400).json({ error: 'Check-in recovery is only supported for APINex keys' });
+    return;
+  }
+
+  res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
 // Is the caller connecting from this machine? Read from the real socket peer
@@ -611,7 +668,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
       if (k.platform === 'custom' && k.baseUrl) {
         customIndex++;
         return [
-          `# ${k.label || `custom endpoint ${customIndex}`}`,
+          `# ${labelForExport(k.label) || `custom endpoint ${customIndex}`}`,
           `CUSTOM_${customIndex}_BASE_URL=${k.baseUrl}`,
           `CUSTOM_${customIndex}_KEY=${k.key}`,
         ].join('\n');
@@ -619,7 +676,8 @@ keysRouter.get('/export', (req: Request, res: Response) => {
       const n = (seenPerPlatform.get(k.platform) ?? 0) + 1;
       seenPerPlatform.set(k.platform, n);
       const envKey = `${k.platform.toUpperCase()}_KEY${n > 1 ? `_${n}` : ''}=${k.key}`;
-      return k.label ? `# ${k.label}\n${envKey}` : envKey;
+      const comment = labelForExport(k.label);
+      return comment ? `# ${comment}\n${envKey}` : envKey;
     });
     const content = lines.join('\n\n') + '\n';
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -646,7 +704,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
     // written by older builds still load.
     const header = 'platform,key,label,base_url';
     const lines = decryptedKeys.map(k =>
-      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(k.label)), escCsv(neutralize(k.baseUrl ?? ''))].join(',')
+      [escCsv(k.platform), escCsv(k.key), escCsv(neutralize(labelForExport(k.label))), escCsv(neutralize(k.baseUrl ?? ''))].join(',')
     );
     const content = [header, ...lines].join('\n') + '\n';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -712,7 +770,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
-  const { platform, label } = parsed.data;
+  const { platform } = parsed.data;
+  const label = parsed.data.label === undefined ? undefined : sanitizeLabel(parsed.data.label);
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
@@ -1897,7 +1956,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   }
   if (label !== undefined) {
     updates.push('label = ?');
-    values.push(label);
+    values.push(sanitizeLabel(label));
   }
   // #590: stored encrypted (credentials), so a change rewrites all three
   // columns; '' clears them to NULL.

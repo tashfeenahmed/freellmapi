@@ -200,6 +200,20 @@ describe('Response cache (proxy integration)', () => {
     expect(counter.calls).toBe(4);
   });
 
+  it('requests differing only in top_k, min_p, repetition_penalty, or parallel_tool_calls never collide', async () => {
+    const counter = mockGroq('sampler-sensitive');
+    await chat(); // plain → MISS, populates
+    const topK = await chat({ top_k: 1 });
+    expect(topK.headers.get('x-freellm-cache')).toBe('MISS');
+    await chat({ min_p: 0.2 });
+    await chat({ repetition_penalty: 1.3 });
+    await chat({ parallel_tool_calls: false });
+    expect(counter.calls).toBe(5);
+    const repeat = await chat({ top_k: 1 });
+    expect(repeat.headers.get('x-freellm-cache')).toBe('HIT');
+    expect(counter.calls).toBe(5);
+  });
+
   it('X-FreeLLM-Cache: off bypasses the cache on both read and write', async () => {
     const counter = mockGroq('bypassed');
     await chat({}, { 'X-FreeLLM-Cache': 'off' });

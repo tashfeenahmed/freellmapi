@@ -50,6 +50,7 @@ describe('provider-quota: pool inference', () => {
     expect(inferQuotaPoolKey('septor', 'qwen3-coder-free')).toBe('septor::daily-free');
     expect(inferQuotaPoolKey('septor', 'minimax-m2.5-free')).toBe('septor::daily-free');
     for (const model of ['first-model', 'another-model']) {
+      expect(inferQuotaPoolKey('varosity', model)).toBe('varosity::account-credit');
       expect(inferQuotaPoolKey('aclide', model)).toBe('aclide::monthly-credit');
       expect(inferQuotaPoolKey('speka', model)).toBe('speka::monthly-credit');
       expect(inferQuotaPoolKey('plugsky', model)).toBe('plugsky::fair-use');
@@ -143,6 +144,22 @@ describe('provider-quota: record + read round-trip', () => {
     const left = db.prepare('SELECT id FROM provider_quota_observations ORDER BY created_at DESC').all() as { id: string }[];
     expect(left.map(r => r.id)).toEqual(['obs-5', 'obs-6']);
     expect(readState('groq', 7, 'groq::account', 'tokens')?.remaining).toBe(10);
+  });
+
+  it('keeps only a week of observations by default (#1675)', () => {
+    const db = getDb();
+    const now = Date.UTC(2026, 8, 1);
+    const stamp = (days: number) => new Date(now - days * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
+    const insert = db.prepare(`
+      INSERT INTO provider_quota_observations
+        (id, platform, key_id, quota_pool_key, metric, observed_at, created_at)
+      VALUES (?, 'groq', 7, 'groq::account', 'tokens', ?, ?)
+    `);
+    insert.run('old', stamp(10), stamp(10));
+    insert.run('fresh', stamp(1), stamp(1));
+
+    expect(pruneQuotaObservations(db, now)).toEqual({ deleted: 1, done: true });
+    expect(db.prepare('SELECT id FROM provider_quota_observations').all()).toEqual([{ id: 'fresh' }]);
   });
 
   it('stops a large sweep at its time budget and reports it unfinished', () => {

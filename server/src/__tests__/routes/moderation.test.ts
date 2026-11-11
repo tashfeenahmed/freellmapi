@@ -30,12 +30,12 @@ async function postModeration(body: unknown, token?: string) {
   return { status: res.status, body: json as any };
 }
 
-function insertKey(platform: string): number {
+function insertKey(platform: string, modelScopeJson?: string): number {
   const { encrypted, iv, authTag } = encrypt('sk-test');
   const result = getDb().prepare(`
-    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
-    VALUES (?, 'test', ?, ?, ?, 'healthy', 1)
-  `).run(platform, encrypted, iv, authTag);
+    INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled, model_scope_json)
+    VALUES (?, 'test', ?, ?, ?, 'healthy', 1, ?)
+  `).run(platform, encrypted, iv, authTag, modelScopeJson ?? null);
   return Number(result.lastInsertRowid);
 }
 
@@ -103,6 +103,27 @@ describe('moderation service — model resolution', () => {
       VALUES ('openai', 'off', ?, ?, ?, 'healthy', 0)
     `).run(encrypted, iv, authTag);
     expect(listModerationModels()).toHaveLength(0);
+  });
+
+  it('skips a key scoped to another model and takes the next key on the platform (#657)', () => {
+    // First key is a relay chat-scope key — moderation must NOT pick it.
+    insertKey('openai', '["gpt-4o-mini"]');
+    const unscoped = insertKey('openai');
+    const models = listModerationModels();
+    expect(models.map(m => m.platform)).toEqual(['openai']);
+    expect(models[0].keyId).toBe(unscoped);
+  });
+
+  it('lists no platform when its only key is scoped out', () => {
+    insertKey('openai', '["gpt-4o-mini"]');
+    expect(listModerationModels()).toHaveLength(0);
+  });
+
+  it('a key scoped exactly to the moderation model serves it', () => {
+    const scoped = insertKey('openai', '["omni-moderation-latest"]');
+    const models = listModerationModels();
+    expect(models.map(m => m.platform)).toEqual(['openai']);
+    expect(models[0].keyId).toBe(scoped);
   });
 
   it('resolveModel maps OpenAI legacy names and unknown models to the default', () => {

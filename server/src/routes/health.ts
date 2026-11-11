@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getDb } from '../db/index.js';
+import { getDb, isKeyStoreDecryptable } from '../db/index.js';
 import { checkKeyHealth, checkAllKeys, pollKeyQuota, supportsQuotaPolling } from '../services/health.js';
 import { getDegradationStatus } from '../services/degradation.js';
 import { runModelProbePass } from '../services/model-probe.js';
@@ -59,6 +59,9 @@ healthRouter.get('/', (_req: Request, res: Response) => {
     })),
     quotaStates: getQuotaStateForKeys(),
     degradation: getDegradationStatus(),
+    // false means the encryption key no longer matches the stored ciphertext,
+    // so every key below fails with a decrypt error for the same reason.
+    keyStore: { decryptable: isKeyStoreDecryptable() },
   });
 });
 

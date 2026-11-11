@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tools } from './tools.js';
+import { renderFile } from './config-files.js';
 import type { GenerateContext } from './types.js';
 
 // Pinning ctx.detectedClient is not enough: tools.ts falls back to a live
@@ -21,6 +22,7 @@ vi.mock('./detect.js', () => ({
 // output is stable everywhere.
 beforeEach(() => {
   vi.stubEnv('XDG_CONFIG_HOME', '');
+  vi.stubEnv('XDG_DATA_HOME', '');
   vi.stubEnv('MIMOCODE_HOME', '');
   vi.stubEnv('DSH_HOME', '');
   vi.stubEnv('OPENCLAW_HOME', '');
@@ -280,6 +282,52 @@ describe('tool generators', () => {
         supports_attachments: false,
       });
     }
+  });
+
+  it('stores the OpenCode key in auth.json, not as an env placeholder in the config', () => {
+    // An `{env:FREELLMAPI_API_KEY}` placeholder only works when the process
+    // making the request inherits the variable; unset, it resolves to an empty
+    // key that also overrides a key stored with `/connect`. The key belongs in
+    // OpenCode's credential store instead.
+    const { files } = tools.find(tool => tool.id === 'opencode')!.generate(context);
+    const [config, auth] = files;
+    expect(asPosix(config.path)).toBe('/home/tester/.config/opencode/opencode.json');
+    expect(asPosix(auth.path)).toBe('/home/tester/.local/share/opencode/auth.json');
+    expect(auth.sensitive).toBe(true);
+    expect(auth.value).toEqual({ freellmapi: { type: 'api', key: 'freellmapi-test-key' } });
+    expect(config.sensitive).toBeFalsy();
+    expect(JSON.stringify(config.value)).not.toContain('freellmapi-test-key');
+
+    // Re-running over a config an older CLI wrote retires the placeholder and
+    // leaves the user's other providers and settings alone.
+    const previous = JSON.stringify({
+      theme: 'dark',
+      provider: {
+        other: { options: { apiKey: 'keep-me' } },
+        freellmapi: { options: { baseURL: 'http://old/v1', apiKey: '{env:FREELLMAPI_API_KEY}' } },
+      },
+    });
+    const merged = JSON.parse(renderFile(config, previous));
+    expect(merged.theme).toBe('dark');
+    expect(merged.provider.other.options.apiKey).toBe('keep-me');
+    expect(merged.provider.freellmapi.options).toEqual({ baseURL: 'http://localhost:3000/v1' });
+
+    // auth.json is shared with every provider OpenCode has credentials for.
+    const existingAuth = JSON.stringify({ anthropic: { type: 'oauth', refresh: 'r' } });
+    expect(JSON.parse(renderFile(auth, existingAuth))).toEqual({
+      anthropic: { type: 'oauth', refresh: 'r' },
+      freellmapi: { type: 'api', key: 'freellmapi-test-key' },
+    });
+  });
+
+  it('puts the OpenCode files under XDG_CONFIG_HOME / XDG_DATA_HOME when set', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/xdg/config');
+    vi.stubEnv('XDG_DATA_HOME', '/xdg/data');
+    const { files } = tools.find(tool => tool.id === 'opencode')!.generate(context);
+    expect(files.map(file => asPosix(file.path))).toEqual([
+      '/xdg/config/opencode/opencode.json',
+      '/xdg/data/opencode/auth.json',
+    ]);
   });
 
   it('keeps `auto` in the OpenCode, Crush and Goose rosters when it is the default', () => {
@@ -666,24 +714,55 @@ describe('tool generators', () => {
     expect(provider.providerName).toBe('FreeLLMAPI (Work Box)');
   });
 
-  it('writes AtomCode as default_provider plus a typed [providers.freellmapi] table', () => {
-    // AtomCode ignores a bare `[provider]` table: it looks up the table named
-    // by the root `default_provider` key, and only a `type = "openai"` table
-    // speaks the OpenAI-compatible wire. `context_window` is its own key.
+  it('writes AtomCode account and model tables with a root default_model', () => {
     const [config] = tools.find(tool => tool.id === 'atomcode')!.generate(context).files;
     expect(asPosix(config.path)).toBe('/home/tester/.atomcode/config.toml');
     expect(config.format).toBe('toml');
     expect(config.sensitive).toBe(true);
     const lines = (config.content ?? '').split('\n');
-    expect(lines[0]).toBe('default_provider = "freellmapi"');
-    expect(lines).toContain('[providers.freellmapi]');
-    expect(lines.indexOf('[providers.freellmapi]')).toBeGreaterThan(0);
-    expect(lines).toContain('type = "openai"');
+    expect(lines[0]).toBe('default_model = "freellmapi"');
+    expect(lines).toContain('[provider_accounts.freellmapi]');
+    expect(lines).toContain('provider = "openai"');
     expect(lines).toContain('base_url = "http://localhost:3000/v1"');
     expect(lines).toContain('api_key = "freellmapi-test-key"');
+    expect(lines).toContain('[models.freellmapi]');
+    expect(lines).toContain('account = "freellmapi"');
     expect(lines).toContain('model = "fast-coder"');
     expect(lines).toContain('context_window = 131072');
-    expect(config.content).not.toContain('[provider]');
+    expect(config.content).not.toContain('default_provider');
+  });
+
+  it('switches an existing AtomCode default without removing unrelated configuration', () => {
+    const [config] = tools.find(tool => tool.id === 'atomcode')!.generate({
+      ...context, requestedModelId: 'reasoning-model', url: 'http://localhost:3000/v1',
+    }).files;
+    const existing = [
+      'default_model = "personal"',
+      'default_provider = "legacy"',
+      '[models.personal]',
+      'account = "personal"',
+      'model = "keep-model"',
+      '[provider_accounts.personal]',
+      'provider = "openai"',
+      'api_key = "keep-key"',
+      '[models.freellmapi]',
+      'model = "stale-model"',
+      '[provider_accounts.freellmapi]',
+      'api_key = "stale-key"',
+    ].join('\n');
+    const merged = renderFile(config, existing);
+    const lines = merged.split('\n');
+    const firstTable = lines.findIndex(line => line.startsWith('['));
+    expect(lines.slice(0, firstTable)).toContain('default_model = "freellmapi"');
+    expect(merged.match(/^default_model =/gm)).toHaveLength(1);
+    expect(merged).toContain('default_provider = "legacy"');
+    expect(merged).toContain('[models.personal]\naccount = "personal"\nmodel = "keep-model"');
+    expect(merged).toContain('[provider_accounts.personal]\nprovider = "openai"\napi_key = "keep-key"');
+    expect(merged).toContain('model = "reasoning-model"');
+    expect(merged).toContain('context_window = 262144');
+    expect(merged).toContain('base_url = "http://localhost:3000/v1"');
+    expect(merged).not.toContain('stale-');
+    expect(renderFile(config, merged)).toBe(merged);
   });
 
   it('uses /v1 for every OpenAI-compatible generated base URL', () => {

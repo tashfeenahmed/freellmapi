@@ -396,7 +396,14 @@ export function toChatMessages(req: ResponsesRequest): ChatMessage[] {
         });
         j++;
       }
-      messages.push({ role: 'assistant', content: null, tool_calls: toolCalls });
+      // A flushed search note, or an assistant message separated from these
+      // calls by a skipped reasoning item, is already the assistant turn.
+      const last = messages[messages.length - 1];
+      if (last?.role === 'assistant' && !last.tool_calls) {
+        last.tool_calls = toolCalls;
+      } else {
+        messages.push({ role: 'assistant', content: null, tool_calls: toolCalls });
+      }
       i = j - 1;
       continue;
     }
@@ -510,6 +517,16 @@ function requestDeclaresToolUse(req: ResponsesRequest): boolean {
 }
 
 // ── Build the final (non-stream) Responses object ─────────────────────────
+/**
+ * Responses-API `incomplete_details.reason` for an upstream chat finish
+ * reason, or undefined when the response ran to completion.
+ */
+export function incompleteReason(finishReason: string | null | undefined): 'max_output_tokens' | 'content_filter' | undefined {
+  if (finishReason === 'length') return 'max_output_tokens';
+  if (finishReason === 'content_filter') return 'content_filter';
+  return undefined;
+}
+
 export function buildResponseObject(opts: {
   id: string;
   model: string;
@@ -518,14 +535,16 @@ export function buildResponseObject(opts: {
   promptTokens: number;
   completionTokens: number;
   reasoningTokens?: number;
+  cachedTokens?: number;
   metadata?: Record<string, string>;
+  incompleteReason?: 'max_output_tokens' | 'content_filter';
 }) {
   const output: any[] = [];
   if (opts.text.length > 0) {
     output.push({
       type: 'message',
       id: newId('msg'),
-      status: 'completed',
+      status: opts.incompleteReason ? 'incomplete' : 'completed',
       role: 'assistant',
       content: [{ type: 'output_text', text: opts.text, annotations: [] }],
     });
@@ -545,13 +564,14 @@ export function buildResponseObject(opts: {
     id: opts.id,
     object: 'response',
     created_at: nowUnix(),
-    status: 'completed',
+    status: opts.incompleteReason ? 'incomplete' : 'completed',
+    ...(opts.incompleteReason ? { incomplete_details: { reason: opts.incompleteReason } } : {}),
     model: opts.model,
     output,
     output_text: opts.text,
     usage: {
       input_tokens: opts.promptTokens,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: opts.cachedTokens ?? 0 },
       output_tokens: opts.completionTokens,
       output_tokens_details: { reasoning_tokens: opts.reasoningTokens ?? 0 },
       total_tokens: opts.promptTokens + opts.completionTokens,
@@ -583,6 +603,7 @@ function buildFusionResponseObject(id: string, result: FusionResult): Record<str
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
     reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
+    cachedTokens: usage?.prompt_tokens_details?.cached_tokens,
     metadata: fusionResponseMetadata(fusionResponse),
   }) as Record<string, unknown>;
 
@@ -918,6 +939,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   const state = newFallbackState();
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Client-disconnect fan-out: the flag stops the loop before the NEXT
   // attempt; the AbortController (threaded to the provider as
@@ -1180,7 +1202,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
   // this turn routes with. Skipped when the client pinned a model or the
   // conversation is sticky to one. Any doubt routes as Balanced.
-  const routingPick = await applyDecisionRouting(messages, { pinned: !isAutoModel(routedModel) || preferredModel != null, signal: clientAbort.signal });
+  const routingPick = await applyDecisionRouting(messages, { pinned: !isAutoModel(routedModel) || preferredModel != null, preset: resolvedChain?.strategyOverride, signal: clientAbort.signal });
   if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
@@ -1197,7 +1219,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       // size latched onto state so the existing size gates in router.ts skip
       // low-TPM / small-context models on retry.
       const routingTotal = fallbackRoutingTokens(state, estimatedTotal, outputReserve);
-      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType);
+      return routeRequest(routingTotal, state.skipKeys.size > 0 ? state.skipKeys : undefined, preferredModel, hasImage, wantsTools, state.skipModels.size > 0 ? state.skipModels : undefined, groupChain ?? resolvedChain?.chain, completionOpts.response_format !== undefined, state.skipPlatforms.size > 0 ? state.skipPlatforms : undefined, outputReserve, taskType, resolvedChain?.strategyOverride);
     },
     dispatch: async (route, attempt, ctx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);
@@ -1241,6 +1263,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
         let heldText = '';
         let upstreamFinish: string | null = null;
+        let upstreamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } } | undefined;
 
         // Commit point: headers + the response.created/in_progress skeleton go
         // out only when the first MEANINGFUL output item is about to be emitted
@@ -1334,6 +1357,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             if (anyChunk.error && !anyChunk.choices) {
               throw new Error(`in-band provider error from ${route.displayName}: ${anyChunk.error.message ?? 'provider error'}`);
             }
+
+            // Usage comes on its own choice-less frame or on the last choice
+            // frame, as on /chat/completions.
+            if (anyChunk.usage) upstreamUsage = anyChunk.usage;
 
             const choice0 = chunk.choices?.[0];
             if (choice0?.finish_reason) upstreamFinish = choice0.finish_reason;
@@ -1471,11 +1498,15 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             );
           }
 
+          // A truncated or filtered turn ends as `incomplete`, not `completed`,
+          // so clients don't take a cut-off answer as the whole answer.
+          const incomplete = incompleteReason(upstreamFinish);
+
           // Finalize any open text item.
           if (msgItemId !== null) {
             sse('response.output_text.done', { item_id: msgItemId, output_index: textOutputIndex, content_index: 0, text: msgText });
             sse('response.content_part.done', { item_id: msgItemId, output_index: textOutputIndex, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
-            sse('response.output_item.done', { output_index: textOutputIndex, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
+            sse('response.output_item.done', { output_index: textOutputIndex, item: { id: msgItemId, type: 'message', status: incomplete ? 'incomplete' : 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
           }
           // Finalize tool-call items. Arguments are repaired against the tool's
           // parameter schema at this point (after the full string accumulated):
@@ -1502,15 +1533,18 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: repairedArgs } });
           }
 
+          const inputTokens = upstreamUsage?.prompt_tokens ?? estimatedInputTokens;
+          const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const finalResponse = buildResponseObject({
             id: responseId, model: route.modelId, text: msgText,
-            toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
-            reasoningTokens: totalReasoningTokens,
+            toolCalls: finalToolCalls, promptTokens: inputTokens, completionTokens: outputTokens,
+            reasoningTokens: upstreamUsage?.completion_tokens_details?.reasoning_tokens ?? totalReasoningTokens,
+            incompleteReason: incomplete,
           });
-          sse('response.completed', { response: finalResponse });
+          sse(incomplete ? 'response.incomplete' : 'response.completed', { response: finalResponse });
           res.end();
 
-          recordUpstreamSuccess(route, estimatedInputTokens + totalOutputTokens, state);
+          recordUpstreamSuccess(route, upstreamUsage?.total_tokens ?? inputTokens + outputTokens, state);
           setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           traceRouteEvent('Responses', {
             event: 'ok',
@@ -1519,10 +1553,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             platform: route.platform,
             model: route.modelId,
             latencyMs: Date.now() - start,
-            inputTokens: estimatedInputTokens,
-            outputTokens: totalOutputTokens,
+            inputTokens,
+            outputTokens,
           });
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
+          logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
@@ -1651,6 +1685,8 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       res.json(buildResponseObject({
         id: responseId, model: route.modelId, text, toolCalls,
         promptTokens, completionTokens, reasoningTokens,
+        cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
+        incompleteReason: incompleteReason(result.choices[0]?.finish_reason),
       }));
 
       traceRouteEvent('Responses', {

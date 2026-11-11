@@ -9,6 +9,7 @@ import { FirecrawlProvider } from './firecrawl.js';
 import { LinkupProvider } from './linkup.js';
 import { ParallelProvider } from './parallel.js';
 import { KeenableProvider } from './keenable.js';
+import { KeylessDecisionProvider } from './decision-only.js';
 import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
 import { ModelScopeProvider } from './modelscope.js';
@@ -17,6 +18,8 @@ import { ZhipuProvider } from './zhipu.js';
 import { SailProvider } from './sail.js';
 import { AclideProvider } from './aclide.js';
 import { SpekaProvider } from './speka.js';
+import { KenariProvider } from './kenari.js';
+import { KiosAPIProvider } from './kiosapi.js';
 import { TyphoonProvider } from './typhoon.js';
 import { PlugskyProvider } from './plugsky.js';
 import { InferbaseProvider } from './inferbase.js';
@@ -25,12 +28,20 @@ import { LlmtrProvider } from './llmtr.js';
 import { GizmoProvider } from './gizmo.js';
 import { BlockRunProvider } from './blockrun.js';
 import { MoondreamProvider } from './moondream.js';
+import { JamaiProvider } from './jamai.js';
+import { NabhProvider } from './nabh.js';
+import { NovaiProvider } from './novai.js';
+import { FreeInferenceProvider } from './freeinference.js';
+import { FreeModelProvider } from './freemodel.js';
 import { ElectronHubProvider } from './electronhub.js';
 import { ExperientialProvider } from './experiential.js';
 import { Router9Provider } from './router9.js';
 import { SeptorProvider } from './septor.js';
 import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
+import { VarosityProvider } from './varosity.js';
+import { RimeProvider } from './rime.js';
+import { FreeTtsProvider } from './freetts.js';
 import { FreeAiProvider } from './freeai.js';
 import { BlazeProvider } from './blaze.js';
 import { LucidityProvider } from './lucidity.js';
@@ -55,6 +66,8 @@ function register(provider: BaseProvider) {
 // cold start; the default 15s false-flags them as broken. 60s covers the
 // bulk; per-call overrides via CompletionOptions.timeoutMs still win.
 register(new GoogleProvider({ timeoutMs: 60_000 }));
+register(new KeylessDecisionProvider('halx', 'HAL-X'));
+register(new KeylessDecisionProvider('aisense', 'AI SENSE'));
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
@@ -79,6 +92,8 @@ register(new OpenAICompatProvider({
 register(new SailProvider());
 register(new AclideProvider());
 register(new SpekaProvider());
+register(new KenariProvider());
+register(new KiosAPIProvider());
 register(new TyphoonProvider());
 register(new PlugskyProvider());
 register(new InferbaseProvider());
@@ -87,6 +102,11 @@ register(new LlmtrProvider());
 register(new GizmoProvider());
 register(new BlockRunProvider());
 register(new MoondreamProvider());
+register(new JamaiProvider());
+register(new NabhProvider());
+register(new NovaiProvider());
+register(new FreeInferenceProvider());
+register(new FreeModelProvider());
 register(new BeatApiProvider());
 register(new ApinexProvider());
 register(new OnomeoProvider());
@@ -107,6 +127,9 @@ register(new Router9Provider());
 register(new SeptorProvider());
 register(new ClodProvider());
 register(new SpeechifyProvider());
+register(new VarosityProvider());
+register(new RimeProvider());
+register(new FreeTtsProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
 // Five more OpenAI-compatible gateways. Each pins the response model to the
@@ -144,6 +167,22 @@ register(new OpenAICompatProvider({
   platform: 'anyapi',
   name: 'AnyAPI',
   baseUrl: 'https://api.anyapi.ai/v1',
+}));
+
+// PowerTokens — OpenAI-compatible gateway (https://api.powertokens.ai/v1).
+// Free model glm-4.7-flash: $0 / 1M in + out (0 Credits) on the Models UI
+// (contributor-verified 2026-10-22). Re-tested 2026-11-10 with an unrestricted
+// key: authenticated GET /v1/models lists it (84 ids), non-streaming chat 200
+// in ~2.6s, streaming SSE 200 in ~3.6s. Upstream returns 429 code 1305
+// ("temporarily overloaded") under load; the router's normal 429 cooldown
+// handles it. Keys can be restricted per model in the PowerTokens dashboard,
+// which surfaces as 403 token_model_forbidden. RPM/RPD/TPD unpublished, so the
+// row lives only in the hosted catalog (premium now, free after 30 days), the
+// same pattern as anyapi/bai. Default 60s timeout is enough.
+register(new OpenAICompatProvider({
+  platform: 'powertokens',
+  name: 'PowerTokens',
+  baseUrl: 'https://api.powertokens.ai/v1',
 }));
 
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible

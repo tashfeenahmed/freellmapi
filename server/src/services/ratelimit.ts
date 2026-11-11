@@ -861,7 +861,9 @@ const cooldowns = new Map<string, number>(); // key -> expiry timestamp
 //                     no evidence the account was topped up, so never probed.
 //   'tier'          — 403 model-not-on-tier. Same reasoning: the key validates
 //                     fine while the model stays gated, so never probed.
-export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier';
+//   'checkin'       — APINex daily website check-in. Operator-resumable, but
+//                     never allowed to overwrite a provider-confirmed hold.
+export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier' | 'checkin';
 
 // Escalating cooldown: track hits per key over a rolling 24h window so a
 // daily-quota exhaustion (OpenRouter free: 50/day, Cohere free: 33/day, etc.)
@@ -1249,6 +1251,33 @@ export function setCooldown(
   const key = `${platform}:${modelId}:${keyId}:cooldown`;
   const now = Date.now();
   const expiresAtMs = now + durationMs;
+  if (source === 'checkin') {
+    // The account-wide check-in bench also visits sibling routes that may
+    // already have real credit, tier or Retry-After holds. Preserve their
+    // provenance AND expiry, otherwise "Resume key" would clear those facts.
+    // Write and check atomically; if persistence fails, do not relabel an
+    // in-memory hold whose source we cannot establish.
+    const written = withDb(db => db.transaction(() => {
+      const stored = db.prepare(`
+        SELECT 1 FROM rate_limit_cooldowns
+         WHERE platform = ? AND model_id = ? AND key_id = ?
+      `).get(platform, modelId, keyId);
+      if (!stored && (cooldowns.get(key) ?? 0) > now) return false;
+      const result = db.prepare(`
+        INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms, source, set_at_ms)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(platform, model_id, key_id) DO UPDATE SET
+          expires_at_ms = excluded.expires_at_ms,
+          source = excluded.source,
+          set_at_ms = excluded.set_at_ms
+        WHERE rate_limit_cooldowns.expires_at_ms <= excluded.set_at_ms
+           OR rate_limit_cooldowns.source IN ('heuristic', 'checkin')
+      `).run(platform, modelId, keyId, expiresAtMs, source, now);
+      return Number(result.changes ?? 0) > 0;
+    })());
+    if (written) cooldowns.set(key, expiresAtMs);
+    return;
+  }
   cooldowns.set(key, expiresAtMs);
   persistCooldown(platform, modelId, keyId, expiresAtMs, source, now);
 }
@@ -1276,7 +1305,19 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
   return true;
 }
 
+/** Why an active model/key is benched. Used only after the existing cooldown gate rejects a route. */
+export function getCooldownSource(platform: string, modelId: string, keyId: number): CooldownSource | null {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT source FROM rate_limit_cooldowns
+       WHERE platform = ? AND model_id = ? AND key_id = ? AND expires_at_ms > ?
+    `).get(platform, modelId, keyId, Date.now()) as { source: CooldownSource } | undefined;
+    return row?.source ?? null;
+  }) ?? null;
+}
+
 export interface ActiveCooldown {
+  source: CooldownSource;
   platform: string;
   modelId: string;
   keyId: number;
@@ -1302,16 +1343,17 @@ export function getActiveCooldownsForKeys(
 
   const placeholders = unique.map(() => '?').join(', ');
   const rows = withDb(db => db.prepare(`
-    SELECT platform, model_id, key_id, expires_at_ms
+    SELECT platform, model_id, key_id, expires_at_ms, source
       FROM rate_limit_cooldowns
      WHERE expires_at_ms > ?
        AND key_id IN (${placeholders})
      ORDER BY expires_at_ms ASC
-  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number }[]) ?? [];
+  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number; source: CooldownSource }[]) ?? [];
 
   for (const row of rows) {
     const list = grouped.get(row.key_id) ?? [];
     list.push({
+      source: row.source,
       platform: row.platform,
       modelId: row.model_id,
       keyId: row.key_id,
@@ -1351,6 +1393,38 @@ export function clearCooldownsForKey(keyId: number): number {
   }
 
   return Math.max(cleared, memoryCleared);
+}
+
+/**
+ * Remove only APINex daily website-check-in cooldowns for a key.
+ * The existing all-sources clear remains available to operators; this scoped
+ * recovery must not lift credit, tier, or provider-confirmed rate limits.
+ * Read the persisted source before touching in-memory state, so an unknown
+ * source is never cleared optimistically when the database is unavailable.
+ */
+export function clearApinexCheckinCooldownsForKey(keyId: number): number {
+  if (!Number.isInteger(keyId)) return 0;
+
+  const removed = withDb(db => db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT model_id FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).all(keyId) as { model_id: string }[];
+
+    const result = db.prepare(`
+      DELETE FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).run(keyId);
+    return { modelIds: rows.map(row => row.model_id), count: Number(result.changes ?? 0) };
+  })());
+
+  if (!removed) return 0;
+  for (const modelId of removed.modelIds) {
+    const key = `apinex:${modelId}:${keyId}`;
+    cooldowns.delete(`${key}:cooldown`);
+    cooldownHits.delete(key);
+  }
+  return removed.count;
 }
 
 /**
@@ -1561,6 +1635,20 @@ const CONTEXT_WINDOW_PATTERNS: RegExp[] = [
 // would size the model out of nearly every request until the next catalog sync.
 export const MIN_LEARNED_CONTEXT_WINDOW = 1024;
 
+// Share of a refused request's size recorded as the window when the provider
+// names none. Below 1 so the next request of the same size is sized out too,
+// even though the token estimate is approximate.
+const UNKNOWN_WINDOW_FRACTION = 0.9;
+// Per-minute / per-day wording marks a throughput ceiling, not a window.
+const THROUGHPUT_REJECTION = /per (minute|day)|\btp[md]\b|rate.?limit/i;
+
+function windowFromRefusedSize(message: string | undefined | null, requestTokens: number | undefined): number | null {
+  if (requestTokens == null || !Number.isFinite(requestTokens)) return null;
+  if (message && THROUGHPUT_REJECTION.test(message)) return null;
+  const window = Math.floor(requestTokens * UNKNOWN_WINDOW_FRACTION);
+  return window >= MIN_LEARNED_CONTEXT_WINDOW ? window : null;
+}
+
 /** The context window a provider names when it rejects a prompt as too long,
  *  or null when the message names none. */
 export function parseProviderContextWindow(message: string | undefined | null): number | null {
@@ -1580,9 +1668,21 @@ export function parseProviderContextWindow(message: string | undefined | null): 
  * or lower one that was too high, never raise it. The router's context gates
  * then size the model out of prompts it cannot hold before they dispatch.
  * Returns the learned window when the row changed, else null.
+ *
+ * When the rejection names no window (BazaarLink: "This request is too large
+ * for a free tier", #1717) but the caller knows the size of the request that
+ * was refused, the window is learned as UNKNOWN_WINDOW_FRACTION of that size:
+ * the model provably cannot hold it, so later requests that big route
+ * elsewhere instead of being re-shipped to it. Throughput rejections (Groq's
+ * per-minute "Request too large ... TPM") are a tpm_limit, not a window, and
+ * are left to learnLimitFromError.
  */
-export function learnContextWindowFromError(modelDbId: number, err: { message?: string }): number | null {
-  const window = parseProviderContextWindow(err?.message);
+export function learnContextWindowFromError(
+  modelDbId: number,
+  err: { message?: string },
+  requestTokens?: number,
+): number | null {
+  const window = parseProviderContextWindow(err?.message) ?? windowFromRefusedSize(err?.message, requestTokens);
   if (window == null) return null;
   const result = withDb(db =>
     db.prepare(

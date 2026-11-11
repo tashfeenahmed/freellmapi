@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns, isOnCooldown } from '../../services/ratelimit.js';
+import { clearAllCooldowns, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
+import { getProvider } from '../../providers/index.js';
 import { BraveProvider } from '../../providers/brave.js';
 import {
   runSearch,
@@ -11,6 +12,9 @@ import {
   searchAnalytics,
   searchAvailable,
   decodeEntities,
+  searchStatus,
+  noSearchMessage,
+  SEARCH_PLATFORM_INFO,
 } from '../../services/search.js';
 import { SEARCH_PLATFORMS as SHARED_SEARCH_PLATFORMS } from '../../../../shared/types.js';
 import { SEARCH_PLATFORMS } from '../../lib/search-platforms.js';
@@ -170,6 +174,9 @@ describe('search service', () => {
       expect(`${url.origin}${url.pathname}`).toBe('https://api.search.brave.com/res/v1/web/search');
       expect(url.searchParams.get('q')).toBe('cats & dogs');
       expect(url.searchParams.get('count')).toBe('3');
+      // Brave decorates matched terms with <strong> unless asked not to;
+      // without this the hits carry raw markup every other engine never emits.
+      expect(url.searchParams.get('text_decorations')).toBe('false');
       expect(new Headers(calls(fn)[0][1].headers).get('x-subscription-token')).toBe('brave-test-key');
       expect(out).toMatchObject({ provider: 'brave', engine: 'brave-search', results: [{ title: 'A & B', url: 'https://a', content: 'alpha', score: 1 }] });
 
@@ -483,5 +490,82 @@ describe('decodeEntities', () => {
     expect(decodeEntities('Tom &amp; Jerry &quot;live&quot; &#x2014; &nbsp;ok')).toBe('Tom & Jerry "live" \u2014  ok');
     expect(decodeEntities('&bogus; stays')).toBe('&bogus; stays');
     expect(decodeEntities('plain')).toBe('plain');
+  });
+  it('leaves lone-surrogate entities verbatim instead of corrupting the string', () => {
+    // Obfuscated-email bait on scraped pages renders as a lone surrogate
+    // entity. String.fromCodePoint happily "decodes" it, producing a string
+    // that is not valid UTF-16: JSON.stringify turns it into U+FFFD escapes
+    // and strict encoders/serialisers choke on it. The entity must survive
+    // untouched, exactly like the out-of-range case (&#x110000;).
+    expect(decodeEntities('contact &#xD800; us')).toBe('contact &#xD800; us');
+    expect(decodeEntities('tail &#xDFFF; end')).toBe('tail &#xDFFF; end');
+    expect(decodeEntities('&#65533;?')).toBe('\uFFFD?'); // real replacement char still decodes
+    expect(decodeEntities('&#x110000; too big')).toBe('&#x110000; too big');
+    expect(decodeEntities('&#x1F600; emoji')).toBe('\u{1F600} emoji');
+  });
+});
+
+describe('search status and the no-engine message', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    seedSearchEngines();
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+  });
+
+  const addEngine = (platform: string, engineId: string, enabled = 1) => getDb().prepare(`
+    INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+    VALUES (?, ?, ?, 'search', 10, ?, 'free')
+  `).run(platform, engineId, engineId, enabled);
+
+  it('covers every search platform and matches each provider\'s keyless flag', () => {
+    expect(Object.keys(SEARCH_PLATFORM_INFO).sort()).toEqual([...SEARCH_PLATFORMS].sort());
+    for (const p of SEARCH_PLATFORMS) {
+      expect(Boolean(SEARCH_PLATFORM_INFO[p]!.keyless), p).toBe(Boolean(getProvider(p)?.keyless));
+    }
+  });
+
+  it('separates keyless keys whose engine is missing from the installed catalog', async () => {
+    // Free catalog without Parallel or Keenable rows, both set up keyless.
+    addKey('parallel', 'no-key');
+    addKey('keenable', 'no-key');
+    const s = searchStatus();
+    expect(s.status).toBe('needs_configuration');
+    expect(s.missing_from_catalog).toEqual(['parallel', 'keenable']);
+    expect(s.engines.map(e => e.state)).toEqual(['needs_key', 'needs_key', 'needs_key', 'needs_key']);
+    const msg = noSearchMessage(s);
+    expect(msg).toContain('Parallel and Keenable are set up on the Keys page, but the installed catalog has no engines for them yet');
+    expect(msg).toContain('add a Tavily, Exa, Firecrawl or Linkup key');
+    expect(msg).not.toContain('no key needed');
+    await expect(runSearch('q')).rejects.toMatchObject({ status: 503, code: 'no_search_keys', message: msg });
+  });
+
+  it('offers a keyless engine only when the installed catalog has it', () => {
+    addEngine('keenable', 'keenable-search');
+    expect(noSearchMessage()).toContain('add Keenable (no key needed), or add a Tavily, Exa, Firecrawl or Linkup key on the Keys page');
+    expect(searchStatus().missing_from_catalog).toEqual([]);
+  });
+
+  it('reports failed keys, turned-off engines and cooldowns per engine', () => {
+    const exa = addKey('exa');
+    getDb().prepare("UPDATE api_keys SET status = 'invalid' WHERE platform = 'exa'").run();
+    addKey('linkup');
+    getDb().prepare("UPDATE media_models SET enabled = 0 WHERE platform = 'linkup'").run();
+    const tavily = addKey('tavily');
+    setCooldown('tavily', 'tavily-search', tavily, 60_000);
+    const s = searchStatus();
+    expect(Object.fromEntries(s.engines.map(e => [e.platform, e.state]))).toEqual({
+      tavily: 'cooling_down', exa: 'key_error', firecrawl: 'needs_key', linkup: 'disabled',
+    });
+    expect(s.status).toBe('cooling_down');
+    const msg = noSearchMessage(s);
+    expect(msg).toContain('The Exa key failed its last check');
+    expect(msg).toContain('Turned off under Models → Search: Linkup.');
+    expect(exa).toBeGreaterThan(0);
+  });
+
+  it('is ready once one engine has a usable key', () => {
+    addKey('firecrawl');
+    expect(searchStatus().status).toBe('ready');
   });
 });
