@@ -109,6 +109,8 @@
     "sectionAdvanced": "Na ci gaba",
     "sectionPreview": "Samfoti",
     "generalDescription": "Harshe da kamanni na wannan dashboard.",
+    "startAtLogin": "Fara a farawar tsarin",
+    "startAtLoginHelp": "ƙaddamar da FreeLLMAPI ta atomatik lokacin shiga kwamfutarka.",
     "advancedDescription": "Iyaka da maɓallan tsaro na tsarin matsawa.",
     "compressionTitle": "Matsawar prompt",
     "compressionDescription": "Rage girman buƙata kafin turawa yayin da ake kiyaye kod, kurakurai, hanyoyi, lambobi da ma'anonin kayan aiki.",
@@ -1260,7 +1262,15 @@
     "renameHint": "Sauya sunan wannan sarƙa",
     "renameConfirm": "Sauya sunan sarƙa \"{oldName}\" zuwa \"{name}\"? Abokan cinikin da ke kira auto:{oldName} dole su koma auto:{name}.",
     "renamePlaceholder": "Sabon sunan sarƙa",
-    "renameFailed": "Ba a iya sauya sunan sarƙar ba."
+    "renameFailed": "Ba a iya sauya sunan sarƙar ba.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Sigar {version} tana nan",

@@ -37,7 +37,7 @@ export const DEFAULT_COMPRESSION_CONFIG: CompressionConfig = {
 
 const storedConfigSchema = z.object({
   mode: z.enum(COMPRESSION_MODES).default('off'),
-  engines: z.record(enabledSchema).default({}),
+  engines: z.record(z.string(), enabledSchema).default({}),
   autoTriggerEstTokens: z.number().int().positive().optional(),
   targetTokens: z.number().int().positive().optional(),
   trustProjectFilters: z.boolean().default(false),
@@ -46,7 +46,7 @@ const storedConfigSchema = z.object({
 
 export const compressionUpdateSchema = z.object({
   mode: z.enum(COMPRESSION_MODES).optional(),
-  engines: z.record(z.record(z.unknown())).optional(),
+  engines: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   autoTriggerEstTokens: z.number().int().positive().nullable().optional(),
   targetTokens: z.number().int().positive().nullable().optional(),
   trustProjectFilters: z.boolean().optional(),

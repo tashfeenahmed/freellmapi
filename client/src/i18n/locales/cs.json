@@ -109,6 +109,8 @@
     "sectionAdvanced": "Pokročilé",
     "sectionPreview": "Náhled",
     "generalDescription": "Jazyk a vzhled tohoto panelu.",
+    "startAtLogin": "Spustit při startu systému",
+    "startAtLoginHelp": "Po přihlášení k počítači automaticky spustí FreeLLMAPI.",
     "advancedDescription": "Prahové hodnoty a pojistky kompresního řetězce.",
     "compressionTitle": "Komprese promptů",
     "compressionDescription": "Zmenšete velikost požadavku před směrováním se zachováním kódu, chyb, cest, čísel a definic nástrojů.",
@@ -1260,7 +1262,15 @@
     "renameHint": "Přejmenovat tento řetězec",
     "renameConfirm": "Přejmenovat řetězec \"{oldName}\" na \"{name}\"? Klienti volající auto:{oldName} musí přejít na auto:{name}.",
     "renamePlaceholder": "Nový název řetězce",
-    "renameFailed": "Řetězec se nepodařilo přejmenovat."
+    "renameFailed": "Řetězec se nepodařilo přejmenovat.",
+    "strategy": "Routing strategy",
+    "strategyHint": "How this chain ranks its models. Inherit uses the global setting.",
+    "strategyInherit": "Inherit global",
+    "strategyPriority": "Manual order",
+    "strategyBalanced": "Balanced",
+    "strategySmartest": "Smartest",
+    "strategyFastest": "Fastest",
+    "strategyReliable": "Most reliable"
   },
   "updates": {
     "versionAvailable": "Je k dispozici verze {version}",

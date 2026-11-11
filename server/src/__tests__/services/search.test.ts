@@ -226,6 +226,49 @@ describe('search service', () => {
     });
   });
 
+  describe('Outcrawl', () => {
+    beforeEach(() => {
+      getDb().prepare(`
+        INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label, meta_json)
+        VALUES ('outcrawl', 'outcrawl-search', 'Outcrawl Search', 'search', -1, 1, '1,000 credits/month', '{}')
+      `).run();
+    });
+
+    it('searches with the bearer key and maps hits in rank order', async () => {
+      addKey('outcrawl');
+      const fn = mockFetch(() => json({
+        hits: [
+          { url: 'https://a', title: 'A &amp; B', snippet: 'alpha', rank: 1 },
+          { title: 'no url', snippet: 'x', rank: 2 },
+          { url: 'https://b', title: '', snippet: 'beta', rank: 3 },
+        ],
+        usage: { credits: '1.5' },
+      }));
+      const out = await runSearch('cats & dogs', { maxResults: 3, topic: 'news' });
+      expect(calls(fn)[0][0]).toBe('https://api.outcrawl.ai/v1/search');
+      expect(new Headers(calls(fn)[0][1].headers).get('authorization')).toBe('Bearer outcrawl-test-key');
+      expect(bodyOf(calls(fn)[0])).toEqual({ query: 'cats & dogs', limit: 3 });
+      expect(out).toMatchObject({ provider: 'outcrawl', engine: 'outcrawl-search' });
+      expect(out.results).toEqual([
+        { title: 'A & B', url: 'https://a', content: 'alpha', score: 1 },
+        { title: 'https://b', url: 'https://b', content: 'beta', score: 0.5 },
+      ]);
+    });
+
+    it('benches a rejected key and parks a key that is out of credits', async () => {
+      const key = addKey('outcrawl');
+      mockFetch(() => json({ code: 'unauthorized', message: 'Unauthorized' }, 401));
+      await expect(runSearch('q', { engine: 'outcrawl-search' })).rejects.toBeInstanceOf(SearchError);
+      expect(isOnCooldown('outcrawl', 'outcrawl-search', key)).toBe(true);
+
+      clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+      mockFetch(() => json({ code: 'quota_exceeded', message: 'Out of credits' }, 402));
+      await expect(runSearch('q', { engine: 'outcrawl-search' })).rejects.toBeInstanceOf(SearchError);
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60 * 60_000);
+      expect(isOnCooldown('outcrawl', 'outcrawl-search', key)).toBe(true);
+    });
+  });
+
   describe('Parallel (keyless)', () => {
     function seedParallel(): void {
       getDb().prepare(`
