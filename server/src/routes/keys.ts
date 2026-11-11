@@ -35,6 +35,7 @@ import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
+import { isLoopbackRequest } from '../lib/loopback.js';
 
 export const keysRouter = Router();
 
@@ -582,16 +583,11 @@ keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
   res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
-// Is the caller connecting from this machine? Read from the real socket peer
-// address, NOT req.ip or X-Forwarded-For: those are caller-controlled, so
-// trusting them here would let a remote caller claim to be local.
-function isLoopbackRemote(req: Request): boolean {
-  let addr = req.socket?.remoteAddress ?? '';
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
+// Is the caller connecting from this machine? The socket peer decides, and a
+// same-host reverse proxy's own X-Forwarded-For hop can withdraw locality but
+// never grant it (lib/loopback.ts, #1884). Reading the socket alone made every
+// request through such a proxy look local.
+const isLoopbackRemote = (req: Request): boolean => isLoopbackRequest(req);
 
 // #786: the desktop build has no user-set password (its machine user's password
 // is random and never shown), so re-verification would lock desktop users out of

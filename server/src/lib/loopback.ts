@@ -16,7 +16,9 @@ export const isLoopbackAddress = (value: string | undefined): boolean => {
   // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
   if (address.startsWith('::ffff:')) address = address.slice(7);
   if (address === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(address);
+  // Only a real 127.0.0.0/8 address: four decimal octets, each 0-255.
+  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address);
+  return octets !== null && octets.slice(1).every(octet => Number(octet) <= 255);
 };
 
 // The hop appended by the nearest proxy, or '' when the header carries no hop.
