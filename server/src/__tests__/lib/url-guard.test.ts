@@ -60,6 +60,8 @@ describe('classifyIp', () => {
   it('classifies NAT64, IPv4-compatible, and alternate-spelling metadata addresses', () => {
     expect(classifyIp('64:ff9b::a9fe:a9fe')).toBe('metadata'); // NAT64 → 169.254.169.254
     expect(classifyIp('64:ff9b::808:808')).toBe('public'); // NAT64 → 8.8.8.8
+    expect(classifyIp('64:ff9b:1::a9fe:a9fe')).toBe('metadata'); // NAT64 local-use prefix → 169.254.169.254
+    expect(classifyIp('64:ff9b:1::808:808')).toBe('public'); // NAT64 local-use prefix → 8.8.8.8
     expect(classifyIp('::a9fe:a9fe')).toBe('metadata'); // deprecated v4-compatible form
     expect(classifyIp('192.0.0.192')).toBe('metadata'); // Oracle Cloud legacy IMDS
     expect(classifyIp('fd00:0ec2:0:0:0:0:0:0254')).toBe('metadata'); // AWS IMDS, uncompressed
@@ -75,6 +77,23 @@ describe('assessProviderUrl', () => {
     const gcp = await assessProviderUrl('http://metadata.google.internal/computeMetadata/v1/');
     expect(gcp.allowed).toBe(false);
     expect(gcp.reason).toMatch(/metadata/);
+  });
+
+  it('blocks metadata hostnames written with a trailing dot, even when DNS fails', async () => {
+    const dnsDown = async (): Promise<string[]> => {
+      throw new Error('lookup failed');
+    };
+    for (const host of ['metadata.google.internal.', 'metadata.goog.']) {
+      const verdict = await assessProviderUrl(`http://${host}/computeMetadata/v1/`, { resolve: dnsDown });
+      expect(verdict.allowed, host).toBe(false);
+      expect(verdict.reason, host).toMatch(/metadata/);
+    }
+  });
+
+  it('blocks the NAT64 local-use metadata literal end to end', async () => {
+    const verdict = await assessProviderUrl('http://[64:ff9b:1::a9fe:a9fe]/latest/meta-data/');
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toMatch(/metadata/);
   });
 
   it('blocks decimal-encoded metadata IPs (URL canonicalisation)', async () => {
