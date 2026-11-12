@@ -41,6 +41,7 @@ import {
   couldBecomeDialectMarker,
   rescueInlineToolCalls,
   startsWithDialectMarker,
+  type DialectHoldMode,
 } from './tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from './error-redaction.js';
 import { newClientAbortError, isUpstreamClassificationOutput } from './error-classify.js';
@@ -357,7 +358,7 @@ export async function runInboundChat(
       let finishReason: string | null = null;
       let outputTokens = 0;
       const toolAcc = new Map<number, { id?: string; name: string; args: string; thoughtSignature?: string }>();
-      let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+      let dialectMode: DialectHoldMode = 'undecided';
       let heldText = '';
       // Thinking deltas held until something commit-worthy arrives (#1184) —
       // the same buffer the Anthropic surface keeps: a stream that produces

@@ -6,7 +6,7 @@ import { runSearch } from '../services/search.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { getRoutingScores, getRoutingStrategy, setRoutingStrategy } from '../services/router.js';
-import type { RoutingStrategy } from '../services/scoring.js';
+import { ROUTING_STRATEGIES, type RoutingStrategy } from '../services/scoring.js';
 import { getCacheStats, clearCache } from '../services/cache.js';
 import { getCompressionStats } from '../services/compression/stats.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
@@ -216,8 +216,6 @@ function routingInfo(): unknown {
       .map(s => ({ model: s.modelId, platform: s.platform, score: Math.round(s.score * 1000) / 1000 })),
   };
 }
-
-const ROUTING_STRATEGIES = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'] as const;
 
 function setStrategy(args: Record<string, unknown>): unknown {
   const strategy = args.strategy;

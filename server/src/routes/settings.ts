@@ -9,7 +9,7 @@ import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, ge
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
 import { getGeminiModelMap, setGeminiModelMap } from '../services/gemini-map.js';
-import { getOllamaEmulationMode } from './ollama.js';
+import { getOllamaEmulationMode, OLLAMA_EMULATION_MODES } from './ollama.js';
 import { UPDATE_CHECK_SETTING, isAutoUpdateCheckEnabled } from './update.js';
 import { listUrlTokens, mintUrlToken, revokeUrlToken } from '../services/url-tokens.js';
 import {
@@ -189,7 +189,7 @@ settingsRouter.put('/gemini-map', (req: Request, res: Response) => {
 });
 
 const compatibilitySchema = z.object({
-  ollamaEmulation: z.enum(['off', 'open-loopback', 'key-required']).optional(),
+  ollamaEmulation: z.enum(OLLAMA_EMULATION_MODES).optional(),
   exposeClaudeDiscoveryAliases: z.boolean().optional(),
 }).strict();
 

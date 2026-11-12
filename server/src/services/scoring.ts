@@ -28,10 +28,16 @@ export interface RoutingWeights {
   intelligence: number;
 }
 
+import type { RoutingStrategy } from '@freellmapi/shared/types.js';
+
+export type { RoutingStrategy };
+
 // Strategy is either the legacy manual chain ('priority'), one of the bandit
 // presets, or 'custom' (a user-tuned weight vector persisted in settings — see
 // router.ts). Each is just a weight vector — the engine is identical.
-export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom';
+export const ROUTING_STRATEGIES = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'] as const satisfies readonly RoutingStrategy[];
+// Fails to compile when shared RoutingStrategy gains a member this list lacks.
+const _everyStrategyListed: Record<Exclude<RoutingStrategy, (typeof ROUTING_STRATEGIES)[number]>, never> = {};
 
 // How the router picks BETWEEN several keys of one platform, once a model has
 // been chosen. Deliberately not a RoutingStrategy: model ranking and key
