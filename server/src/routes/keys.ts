@@ -70,6 +70,7 @@ const PLATFORMS = [
   'moondream',
   'jamai',
   'nabh',
+  'zro',
   'novai',
   'varosity',
   'rime',

@@ -434,6 +434,7 @@ export const platformColors: Record<string, string> = {
   moondream:   '#6d5dfc',
   jamai:       '#24a19c',
   nabh:        '#0ea5e9',
+  zro:         '#4f46e5',
   novai:       '#8b5cf6',
   varosity:    '#a855f7',
   rime:        '#e96847',

@@ -52,6 +52,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'moondream', label: 'Moondream ($5 shared monthly credits)', url: 'https://moondream.ai/c/cloud/api-keys' },
   { value: 'jamai', label: 'JamAI Base (monthly ELLM allowance)', url: 'https://cloud.jamaibase.com' },
   { value: 'nabh', label: 'nabh.cloud (50 shared monthly credits)', url: 'https://app.nabh.cloud' },
+  { value: 'zro', label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys' },
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
   { value: 'varosity', label: 'Varosity (one-time $1.50 starter credit)', url: 'https://varosity.ai/app/keys/api-keys' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },

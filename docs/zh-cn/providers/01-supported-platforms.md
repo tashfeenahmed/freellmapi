@@ -17,6 +17,7 @@
 | `google` | Google Gemini | 带密钥 | 原生（`GoogleProvider`） | Gemini 线上格式；默认超时 60s，因为 Gemma 推理变体冷启动要花 20–60 秒。 |
 | `groq` | Groq | 带密钥 | OpenAI 兼容 | `api.groq.com/openai/v1` 的标准兼容端点。 |
 | `cerebras` | Cerebras | 带密钥 | OpenAI 兼容 | `api.cerebras.ai/v1`。 |
+| `zro` | Zro (MoonMath.ai) | 带密钥 | OpenAI 兼容子类 | 指定模型共享每日免费额度，并非每月现金赠金；模型仅由托管目录发布，保留现有 30 天规则。[设置与额度说明（英文）](../../en/providers/zro.md)。 |
 | `bai` | B.AI | 带密钥 | OpenAI 兼容 | #918 加入的网关；目录里唯一的一行是限时 0 额度促销，保留在托管目录中。 |
 | `anyapi` | AnyAPI | 带密钥 | OpenAI 兼容 | 免费档 $0 / 无需信用卡 / 不循环扣费，上限为「免费和基础」模型每日 10 万词元；未公布 RPM/RPD（#772）。模型 id 经由目录同步送达，绝不盲目播种。 |
 | `powertokens` | PowerTokens | 带密钥 | OpenAI 兼容 | 免费模型 `glm-4.7-flash`（Models 详情：$0 / 1M 输入+输出，0 Credits）；2026-11-10 复测 chat 与流式均 200（约 3 秒）。上游高负载时返回 429（代码 `1305`），由常规冷却处理。限定了其他模型的密钥会返回 403 `token_model_forbidden`。模型行仅托管目录（RPM/RPD 未公布）：付费版即时获得，免费版 30 天后获得。 |
