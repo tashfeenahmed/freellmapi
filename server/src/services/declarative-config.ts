@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Db } from '../db/types.js';
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
+import { KEY_FRESH_START_SQL, resetInvalidStreak } from './key-state.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
 import { ensureModelInProfiles } from './profile-models.js';
@@ -200,9 +201,10 @@ function upsertApiKey(db: Db, input: z.infer<typeof keySchema>): number {
     if (existing) {
       db.prepare(`
         UPDATE api_keys
-           SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, enabled = ?, status = 'unknown'
+           SET label = ?, encrypted_key = ?, iv = ?, auth_tag = ?, enabled = ?, ${KEY_FRESH_START_SQL}
          WHERE id = ?
       `).run(label, key.encrypted, key.iv, key.authTag, enabled, existing.id);
+      resetInvalidStreak(existing.id);
       return existing.id;
     }
     const inserted = db.prepare(`
@@ -217,9 +219,10 @@ function upsertApiKey(db: Db, input: z.infer<typeof keySchema>): number {
   if (existing) {
     db.prepare(`
       UPDATE api_keys
-         SET encrypted_key = ?, iv = ?, auth_tag = ?, enabled = ?, status = 'unknown'
+         SET encrypted_key = ?, iv = ?, auth_tag = ?, enabled = ?, ${KEY_FRESH_START_SQL}
        WHERE id = ?
     `).run(key.encrypted, key.iv, key.authTag, enabled, existing.id);
+    resetInvalidStreak(existing.id);
     return existing.id;
   }
   const inserted = db.prepare(`

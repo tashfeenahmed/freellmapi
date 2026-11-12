@@ -14,6 +14,7 @@ import {
   LOW_BALANCE_ABSOLUTE_MIN_LIMIT,
 } from '../services/quota-forecast.js';
 import { openapiSpec } from '../docs/openapi.js';
+import { USABLE_STATUS_SQL } from '../services/key-state.js';
 
 // Machine-readable operational endpoints for meta-gateways / orchestrators that
 // run this proxy as one upstream lane (LibreChat, LiteLLM Proxy, OmniRoute — see
@@ -71,7 +72,7 @@ statusRouter.get('/readyz', (_req: Request, res: Response) => {
   const agg = db.prepare(`
     SELECT
       COUNT(*) AS enabled_keys,
-      COUNT(DISTINCT CASE WHEN status IN ('healthy', 'unknown') THEN platform END) AS ready_upstreams
+      COUNT(DISTINCT CASE WHEN ${USABLE_STATUS_SQL} THEN platform END) AS ready_upstreams
     FROM api_keys
     WHERE enabled = 1
   `).get() as { enabled_keys: number; ready_upstreams: number };

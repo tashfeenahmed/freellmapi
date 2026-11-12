@@ -18,6 +18,7 @@ import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
+import { USABLE_KEY_SQL, isUsableKey } from '../services/key-state.js';
 
 export const fallbackRouter = Router();
 
@@ -246,7 +247,7 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
   // from the same key set everywhere (a disabled or invalid key adds no capacity).
   const keyCounts = db.prepare(`
     SELECT platform, COUNT(*) as count
-    FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')
+    FROM api_keys WHERE ${USABLE_KEY_SQL}
     GROUP BY platform
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
@@ -509,7 +510,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
 
   const keyCountMap = new Map(
-    (db.prepare("SELECT platform, COUNT(*) as count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+    (db.prepare(`SELECT platform, COUNT(*) as count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`).all() as { platform: string; count: number }[])
       .map(k => [k.platform, k.count])
   );
 
@@ -623,7 +624,7 @@ fallbackRouter.get('/rate-limit-usage', (_req: Request, res: Response) => {
   const baseUrlByKeyId = new Map(allKeys.map(k => [k.id, k.base_url]));
   const routableByPlatform = new Map<string, Array<{ id: number; baseUrl: string | null; scope: Set<string> | null }>>();
   for (const k of allKeys) {
-    if (k.enabled !== 1 || (k.status !== 'healthy' && k.status !== 'unknown')) continue;
+    if (!isUsableKey(k)) continue;
     const list = routableByPlatform.get(k.platform) ?? [];
     list.push({ id: k.id, baseUrl: k.base_url, scope: parseModelScope(k.model_scope_json) });
     routableByPlatform.set(k.platform, list);

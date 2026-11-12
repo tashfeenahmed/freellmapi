@@ -6,6 +6,7 @@ import { proxyFetch } from '../lib/proxy.js';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
 
 // Decision models over the key pool.
 //
@@ -235,7 +236,7 @@ function coolDown(row: DecisionModelRow, keyId: number, e: DecisionError): void 
 
 function hasUsableKey(platform: string): boolean {
   return !!getDb()
-    .prepare("SELECT 1 FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1")
+    .prepare(`SELECT 1 FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL} LIMIT 1`)
     .get(platform);
 }
 
@@ -362,7 +363,7 @@ export function listDecisionModels(): DecisionModelView[] {
     SELECT platform, enabled, status FROM api_keys
      WHERE platform IN (${platforms.map(() => '?').join(', ')})
   `).all(...platforms) as { platform: string; enabled: number; status: string }[];
-  const healthy = (k: { enabled: number; status: string }) => k.enabled === 1 && (k.status === 'healthy' || k.status === 'unknown');
+  const healthy = (k: { enabled: number; status: string }) => isUsableKey(k);
   const monthCounts = new Map(
     (db.prepare(`
       SELECT platform, model_id, COUNT(*) AS n FROM decision_requests

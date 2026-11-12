@@ -43,6 +43,7 @@ import { getKeyQuotaHeadroom, inferQuotaPoolKey } from './provider-quota.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 
 class RouteError extends Error {
   status: number;
@@ -1019,7 +1020,7 @@ function usableKeyCountsByPlatform(db: Db): Map<string, number> {
     return keyCountsCache.map;
   }
   const rows = db.prepare(
-    "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
+    `SELECT platform, COUNT(*) AS count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`
   ).all() as { platform: string; count: number }[];
   const map = new Map(rows.map(r => [r.platform, r.count]));
   keyCountsCache = { db, at: Date.now(), map };
@@ -1530,7 +1531,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   const provider = getProvider(entry.platform as Platform)!;
 
   const allKeys = db.prepare(
-    "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT * FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(entry.platform) as KeyRow[];
   if (allKeys.length === 0) {
     diag?.push(`${label}: no enabled+healthy key for platform`);
@@ -1694,7 +1695,7 @@ export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, ski
 
   const limits = { rpm: m.rpm_limit, rpd: m.rpd_limit, tpm: m.tpm_limit, tpd: m.tpd_limit };
   const keys = db.prepare(
-    "SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(m.platform) as { id: number; model_scope_json: string | null }[];
 
   // Keys of the model's own custom endpoint (#212, #619); a key belonging to a
@@ -1751,7 +1752,7 @@ export function routableKeyIdsForModel(modelDbId: number): number[] {
   if (!m) return [];
 
   const keys = db.prepare(
-    "SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(m.platform) as { id: number; model_scope_json: string | null }[];
 
   const endpointKeyIds = m.platform === 'custom' && m.key_id != null
@@ -1969,7 +1970,7 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
   // misleading "no available key for model". Passing a placeholder token count
   // here made both size gates no-ops.
   const usableKeys = db.prepare(
-    "SELECT id, platform, model_scope_json FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, platform, model_scope_json FROM api_keys WHERE ${USABLE_KEY_SQL}`
   ).all() as { id: number; platform: string; model_scope_json: string | null }[];
   // Scope parsed once per key row (#657); the servable filter below re-checks
   // membership per model.

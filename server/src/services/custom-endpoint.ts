@@ -1,5 +1,6 @@
 import { encrypt, decrypt } from '../lib/crypto.js';
 import type { Db } from '../db/types.js';
+import { KEY_FRESH_START_SQL, resetInvalidStreak } from './key-state.js';
 
 // ── Custom OpenAI-compatible endpoints: keys per endpoint ────────────────────
 // A custom endpoint is identified by its base_url and can hold SEVERAL
@@ -49,8 +50,9 @@ function plaintextOf(row: StoredKeyRow): string | null {
 }
 
 function touch(db: Db, id: number, label: string | undefined): void {
-  db.prepare("UPDATE api_keys SET label = COALESCE(?, label), status = 'unknown', enabled = 1 WHERE id = ?")
+  db.prepare(`UPDATE api_keys SET label = COALESCE(?, label), ${KEY_FRESH_START_SQL}, enabled = 1 WHERE id = ?`)
     .run(label ?? null, id);
+  resetInvalidStreak(id);
 }
 
 /**
@@ -164,9 +166,10 @@ export function resolveCustomEndpointKey(
     db.prepare(`
       UPDATE api_keys
          SET label = COALESCE(?, label), encrypted_key = ?, iv = ?, auth_tag = ?,
-             status = 'unknown', enabled = 1
+             ${KEY_FRESH_START_SQL}, enabled = 1
        WHERE id = ?
     `).run(label ?? null, encrypted, iv, authTag, target.id);
+    resetInvalidStreak(target.id);
     return { keyId: target.id, storedKey: providedKey, created: false };
   }
 
