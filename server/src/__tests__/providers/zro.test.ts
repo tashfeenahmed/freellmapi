@@ -142,4 +142,15 @@ describe('Zro completions', () => {
     await expect(new ZroProvider().streamChatCompletion('sk-test-key', messages, model).next()).rejects.toMatchObject({ status });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it.each([false, true])('rejects an HTTP-200 SSE error, including after a valid role frame (%s)', async withRole => {
+    const role = { id: 'test', object: 'chat.completion.chunk', created: 1, model,
+      choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+    const body = (withRole ? `data: ${JSON.stringify(role)}\n\n` : '') +
+      `data: ${JSON.stringify({ error: { message: 'Free quota exhausted' } })}\n\n` + 'data: [DONE]\n\n';
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }));
+    const result = new ZroProvider().streamChatCompletion('sk-test-key', messages, model);
+    if (withRole) await result.next();
+    await expect(result.next()).rejects.toMatchObject({ status: 502 });
+  });
 });

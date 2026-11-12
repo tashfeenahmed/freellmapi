@@ -57,6 +57,9 @@ export class ZroProvider extends OpenAICompatProvider {
     options?: CompletionOptions, quotaContext?: QuotaObservationContext): AsyncGenerator<ChatCompletionChunk> {
     let identified = false;
     for await (const chunk of super.streamChatCompletion(apiKey, messages, modelId, options, quotaContext)) {
+      if ('error' in chunk || !Array.isArray(chunk.choices)) {
+        throw Object.assign(new Error('Zro returned an upstream stream error or malformed event'), { status: 502 });
+      }
       // Usage-only events can omit model; content/tool/reasoning events cannot.
       if (chunk.model || chunk.choices?.length || !identified) {
         checkModel(modelId, chunk.model);
