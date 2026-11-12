@@ -4,7 +4,7 @@
 
 [← Back to README](../../../README.md) · [Documentation index](../README.md) · [Deep-dive domain](OVERVIEW.md)
 
-FreeLLMAPI is a self-hosted OpenAI-compatible gateway that stacks the free tiers of ~34 providers behind a single `freellmapi-…` bearer token. An Express proxy exposes `/v1/chat/completions` (plus `/v1/responses`, `/v1/messages`, `/v1/completions`, `/v1/embeddings` and `/v1/models`) and, per request, the router selects the best healthy model that is under all of its rate limits, decrypts its upstream key in memory, and streams the response back.
+FreeLLMAPI is a self-hosted OpenAI-compatible gateway that stacks the free tiers of ~87 providers behind a single `freellmapi-…` bearer token. An Express proxy exposes `/v1/chat/completions` (plus `/v1/responses`, `/v1/messages`, `/v1/completions`, `/v1/embeddings` and `/v1/models`) and, per request, the router selects the best healthy model that is under all of its rate limits, decrypts its upstream key in memory, and streams the response back.
 
 Because no single free tier is generous enough to live on, the router treats the catalog as a pooled fallback chain: it scores live reliability, speed, capability and headroom via a Thompson-sampling bandit, enforces RPM/RPD/TPM/TPD and provider-wide caps with a persistent ledger, and fails over across up to 20 attempts within a wall-clock budget. When the top of the chain exhausts its daily caps the endpoint gracefully degrades to the next healthy tier and resets at UTC midnight.
 
@@ -37,7 +37,7 @@ See [OVERVIEW.md](OVERVIEW.md) for deep-dives.
                                           │
    ┌──────────────┬────────────┬──────────┴─────────┬─────────────┬──────────┐
    ▼              ▼            ▼                    ▼             ▼          ▼
- Google         Groq        Cerebras           OpenRouter        HF       …29 more
+ Google         Groq        Cerebras           OpenRouter        HF       …82 more
 ```
 
 - **Router** (`server/src/services/router.ts`) — picks a model per request.
