@@ -24,7 +24,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
-import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
+import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
@@ -34,6 +34,7 @@ import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
+import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -1466,16 +1467,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             flushHeaders();
             res.write(`data: ${JSON.stringify(frame)}\n\n`);
           }
-
-          // Disconnect before the commit point: the break above fired with no
-          // text seen, which is indistinguishable from an empty completion
-          // below — but it is CLIENT behavior, not a provider failure. Without
-          // this check every Ctrl-C during a reasoning model's TTFB window
-          // benched the healthy model+key for 90s and logged a provider error.
-          if (clientGone && !headerSent && !sawText) {
-            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-            return 'committed';
-          }
+          // The client left mid-pump: CLIENT behavior, not a provider failure.
+          // Without this, a Ctrl-C before the first token fell into the
+          // empty-completion throw below (benching a healthy model+key), and one
+          // after it reached the success path. One 'canceled' row instead.
+          throwIfAbandoned(clientGone);
 
           if (!sawText) {
             // finish_reason 'length' means the model spent the whole output
@@ -1505,18 +1501,18 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId, null, 'http');
           return 'done';
         } catch (streamErr: any) {
-          // Client abort mid-stream: the pump's own `if (clientGone) break`
-          // can lose the race against the fetch-signal rejection, so the
-          // abort may surface here instead. Rethrow — the shared loop's
-          // client-abort branch stops the ladder without benching or an
-          // error log row (the socket is gone; nothing to render).
-          if (isClientAbortError(streamErr)) throw streamErr;
+          switch (failedStreamPhase(streamErr, res, headerSent)) {
+          // abandoned: client abort mid-stream — rethrow; the shared loop's
+          // client-abort branch logs one 'canceled' row and stops without
+          // benching. held: headers never sent — fail over.
+          case 'abandoned':
+          case 'held':
+            throw streamErr;
           // Ended already: post-end bookkeeping failed (see /chat/completions).
-          if (res.writableEnded) {
+          case 'finished':
             console.error(`[Proxy] Bookkeeping after a completed legacy stream from ${route.displayName} failed:`, streamErr.message);
             return 'done';
-          }
-          if (headerSent) {
+          case 'committed': {
             console.error(`[Proxy] Mid-stream legacy completion error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
@@ -1533,7 +1529,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http');
             return 'committed';
           }
-          throw streamErr;
+          }
         }
       }
 
@@ -2606,6 +2602,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
             // else: still a strict prefix of a marker — keep holding.
           }
+          // The client left mid-pump. Nothing below may run for it: a dead
+          // dialect turn or empty completion would bench a healthy model+key,
+          // and the success path would log 'success' and cache a truncated
+          // answer. One 'canceled' row instead, whichever phase it left in.
+          throwIfAbandoned(clientGone);
 
           // — Stream ended cleanly (provider saw [DONE] or a finish_reason) —
 
@@ -2655,17 +2656,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           if (isToolArgumentValidationEnabled() && !headerSent && completedCalls.length > 0) {
             const invalid = invalidToolCallReasons(completedCalls, schemas);
             if (invalid.length > 0) throw invalidToolArgumentsError(route.displayName, invalid);
-          }
-
-          // Disconnect before the commit point: nothing usable was (or will
-          // be) delivered, and that is CLIENT behavior, not a provider
-          // failure — do not let it fall through to the empty-completion
-          // throw below, which would bench a healthy model+key for 90s and
-          // log a provider error for every Ctrl-C during a reasoning model's
-          // TTFB window.
-          if (clientGone && !headerSent && heldText.trim().length === 0 && completedCalls.length === 0) {
-            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-            return 'committed';
           }
 
           const hasText = headerSent || heldText.trim().length > 0;
@@ -2813,22 +2803,27 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }), 'http');
           return 'done';
         } catch (streamErr: any) {
-          // Client abort mid-stream: the pump's own `if (clientGone) break`
-          // can lose the race against the fetch-signal rejection, so the
-          // abort may surface here instead. Rethrow — the shared loop's
-          // client-abort branch stops the ladder without benching or an
-          // error log row (the socket is gone; nothing to render).
-          if (isClientAbortError(streamErr)) throw streamErr;
+          switch (failedStreamPhase(streamErr, res, headerSent)) {
+          // abandoned: client abort mid-stream (the fetch-signal rejection, or
+          // throwIfAbandoned after the pump). Rethrow — the shared loop's
+          // client-abort branch logs one 'canceled' row and stops the ladder
+          // without benching (the socket is gone; nothing to render).
+          // held: headers never sent — bubble to the shared loop, which
+          // cooldowns this model+key and tries the next one. Covers upstream
+          // HTTP errors, in-band error frames, abrupt EOF, stalls, empty
+          // completions, and unparseable dialect turns alike.
+          case 'abandoned':
+          case 'held':
+            throw streamErr;
           // res.end() already ran: the client has the whole answer, and this
           // came from the bookkeeping after it (cache store, sticky model,
           // request log). An error frame now would raise ERR_STREAM_WRITE_AFTER_END
           // on `res` with no listener, which the process safety net treats as
           // fatal, and an 'error' row would blame a provider that delivered.
-          if (res.writableEnded) {
+          case 'finished':
             console.error(`[Proxy] Bookkeeping after a completed stream from ${route.displayName} failed:`, streamErr.message);
             return 'done';
-          }
-          if (headerSent) {
+          case 'committed': {
             // Mid-stream error after real payload reached the client — finish
             // the SSE response honestly instead of leaving the client hanging.
             console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
@@ -2847,11 +2842,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http');
             return 'committed';
           }
-          // Headers never sent — bubble to the shared loop, which cooldowns this
-          // model+key and tries the next one. Covers upstream HTTP errors, in-band
-          // error frames, abrupt EOF, stalls, empty completions, and unparseable
-          // dialect turns alike.
-          throw streamErr;
+          }
         }
       } else {
         const result = await route.provider.chatCompletion(

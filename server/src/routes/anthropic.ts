@@ -19,7 +19,8 @@ import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValida
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
-import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
+import { newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
+import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
 import { logRequest } from '../lib/request-log.js';
 import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState } from '../lib/fallback-loop.js';
@@ -968,6 +969,10 @@ async function streamCompletion(
         // else: still a strict prefix of a marker — keep holding.
       }
     }
+    // The client left mid-pump: CLIENT behavior, not a provider failure.
+    // Without this, a Ctrl-C before message_start was swallowed with no row,
+    // and one after it reached the success path. One 'canceled' row instead.
+    throwIfAbandoned(ctx.clientGone());
 
     // Assemble buffered tool calls: synthesize missing ids, repair args against
     // the request schemas, drop any that still aren't valid JSON.
@@ -1026,15 +1031,6 @@ async function streamCompletion(
     // Nothing usable came out — fail over (message_start was never sent, so the
     // client never saw this attempt).
     if (!messageStarted && completedCalls.length === 0) {
-      // Disconnect before the commit point: the pump loop broke with nothing
-      // accumulated because the CLIENT left, not because the provider failed —
-      // benching a healthy model+key for it was wrong. StreamAlreadyStarted
-      // maps to 'committed' in the dispatcher: stop, no failover, no
-      // exhaustion render (the socket is gone anyway).
-      if (ctx.clientGone()) {
-        console.log(`[Anthropic] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-        throw new StreamAlreadyStarted();
-      }
       // finish_reason 'length' = the model spent the whole output budget on
       // hidden reasoning before any visible text: fail over, but skip the
       // cooldown/penalty (not a provider-health signal).
@@ -1079,30 +1075,30 @@ async function streamCompletion(
     logRequest(route.platform, route.modelId, route.keyId, 'success', ctx.estimatedInputTokens, outputTokens, Date.now() - ctx.start, null, null, ctx.pinnedModelId, null, 'http');
   } catch (err: any) {
     if (err instanceof StreamAlreadyStarted) throw err;
-    // Client abort mid-stream: the pump's own `if (ctx.clientGone()) break`
-    // can lose the race against the fetch-signal rejection, so the abort may
-    // surface here instead. Rethrow — the shared loop's client-abort branch
-    // stops the ladder without benching or an error log row (the socket is
-    // gone; nothing to render).
-    if (isClientAbortError(err)) throw err;
+    switch (failedStreamPhase(err, res, messageStarted)) {
+    // abandoned: client abort mid-stream (the fetch-signal rejection, or
+    // throwIfAbandoned after the pump). Rethrow — the shared loop's
+    // client-abort branch logs one 'canceled' row and stops without benching
+    // (the socket is gone; nothing to render).
+    // held: headers never sent — bubble to the outer loop for failover.
+    case 'abandoned':
+    case 'held':
+      throw err;
     // message_stop and res.end() already went out, so this came from the
     // bookkeeping after them. An error event now would raise
     // ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal under the
     // process safety net) and log an error for a turn the client has in full.
-    if (res.writableEnded) {
+    case 'finished':
       console.error(`[Anthropic] Bookkeeping after a completed stream from ${route.displayName} failed:`, err.message);
       return;
-    }
-    if (messageStarted) {
-      // Real payload already reached the client — finish the SSE response
-      // honestly instead of leaving Claude Code hanging, and stop the retry loop.
+    // Real payload already reached the client — finish the SSE response
+    // honestly instead of leaving Claude Code hanging, and stop the retry loop.
+    case 'committed':
       writeSse(res, 'error', { type: 'error', error: { type: 'api_error', message: `Provider error (${route.displayName}): stream interrupted` } });
       try { res.end(); } catch { /* socket gone */ }
       logRequest(route.platform, route.modelId, route.keyId, 'error', ctx.estimatedInputTokens, outputChars, Date.now() - ctx.start, sanitizeProviderErrorMessage(err.message), null, ctx.pinnedModelId, null, 'http');
       throw new StreamAlreadyStarted();
     }
-    // Headers never sent — bubble to the outer loop for failover.
-    throw err;
   }
 }
 
