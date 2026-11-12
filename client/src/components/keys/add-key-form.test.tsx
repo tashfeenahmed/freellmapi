@@ -96,6 +96,23 @@ it('still requires a key for a provider that needs one', async () => {
   expect(posted()).toBeUndefined()
 })
 
+describe('Zro key setup', () => {
+  it('requires a key and links to the MoonMath key dashboard', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="zro" />)
+    expect(container.textContent).toContain('shared daily free usage')
+    expect(container.querySelector('a[href="https://zro.moonmath.ai/api-keys"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+
+  it('submits only the selected provider and credential', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="zro" />)
+    enter(keyInput(), 'sk-zro-test-key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'zro', key: 'sk-zro-test-key' })
+  })
+})
+
 describe('FreeInference key setup', () => {
   it('offers the provider with its research logging notice and requires a key', async () => {
     mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freeinference" />)

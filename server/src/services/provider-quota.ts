@@ -119,6 +119,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'aclide') return 'aclide::monthly-credit';
   if (platform === 'speka') return 'speka::monthly-credit';
   if (platform === 'nabh') return 'nabh::monthly-credit';
+  if (platform === 'zro') return 'zro::daily-free';
   if (platform === 'novai') return 'novai::daily-free';
   if (platform === 'varosity') return 'varosity::account-credit';
   if (platform === 'rime') return 'rime::monthly-credit';
