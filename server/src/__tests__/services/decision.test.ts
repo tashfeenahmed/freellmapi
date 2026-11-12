@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns, isOnCooldown } from '../../services/ratelimit.js';
+import { clearAllCooldowns, getProbeableCooldowns, isOnCooldown } from '../../services/ratelimit.js';
 import {
   runDecision,
   DecisionError,
@@ -99,6 +99,8 @@ describe('decision service', () => {
     expect(out.provider).toBe('openrouter');
     expect(calls(fn)).toHaveLength(2);
     expect(isOnCooldown('cloudflare', '@cf/cloudflare/clef-flash', cfKey)).toBe(true);
+    // The provider said when to come back: a fact, so the prober never clears it early.
+    expect(getProbeableCooldowns().some(c => c.keyId === cfKey)).toBe(false);
     expect(logRows().map(r => r.status)).toEqual(['error', 'ok']);
   });
 

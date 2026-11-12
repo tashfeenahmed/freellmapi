@@ -13,7 +13,7 @@ import { isAnonymousCredential } from '../lib/credential.js';
 import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
 
 // Web search over the key pool (#1174).
 //
@@ -393,7 +393,7 @@ function logSearch(row: SearchEngineRow, keyId: number | null, status: 'ok' | 'e
 /** Bench this key for this engine according to what the upstream said. */
 function coolDown(row: SearchEngineRow, keyId: number, e: SearchError): void {
   if (row.platform === 'custom') {
-    if (e.status === 429) setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    if (e.status === 429) setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
     return;
   }
   if (e.status === 401 || e.status === 403) {
@@ -403,7 +403,7 @@ function coolDown(row: SearchEngineRow, keyId: number, e: SearchError): void {
     // the key's credits are spent.
     setCooldown(row.platform, row.model_id, keyId, NO_CREDIT_COOLDOWN_MS, 'credit');
   } else if (e.status === 429) {
-    setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
   }
 }
 

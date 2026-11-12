@@ -16,7 +16,7 @@ import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { isOnCooldown, setRetryAfterCooldown } from './ratelimit.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
@@ -914,7 +914,7 @@ export async function runVideoGeneration(
     } catch (err: any) {
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      if (e.status === 429 && credential.id != null) setCooldown(row.platform, row.model_id, credential.id);
+      if (e.status === 429 && credential.id != null) setRetryAfterCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
       lastError = e;
       hints.record(e.status, e.retryAfterMs);
       // A caller that hung up gets no second generation charged to its account.
@@ -1211,7 +1211,7 @@ export async function runTranscription(model: string | undefined, p: Transcripti
       const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
       logMedia(logRow, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
       if (e.status === 429 && credential.id != null) {
-        setCooldown(m.platform, m.modelId, credential.id);
+        setRetryAfterCooldown(m.platform, m.modelId, credential.id, e.retryAfterMs);
       }
       lastError = e;
       hints.record(e.status, e.retryAfterMs);

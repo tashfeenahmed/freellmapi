@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { clearAllCooldowns, getProbeableCooldowns } from '../../services/ratelimit.js';
 import {
   runSearch,
   SearchError,
@@ -228,12 +228,14 @@ describe('search service', () => {
   });
 
   it('cools a rate-limited key down and fails over to the next engine', async () => {
-    addKey('tavily');
+    const tavilyKey = addKey('tavily');
     addKey('exa');
     const fn = mockFetch(url => url.includes('tavily')
       ? json({ detail: 'slow down' }, 429, { 'retry-after': '120' })
       : json({ results: [{ title: 'E', url: 'https://e', text: 'x' }] }));
     expect((await runSearch('q')).provider).toBe('exa');
+    // Retry-After is the provider's own retry time, so the prober never clears it early.
+    expect(getProbeableCooldowns().some(c => c.keyId === tavilyKey)).toBe(false);
     // The benched Tavily key is skipped on the next search.
     await runSearch('q2');
     expect(calls(fn).map(c => new URL(c[0]).host)).toEqual(['api.tavily.com', 'api.exa.ai', 'api.exa.ai']);
