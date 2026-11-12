@@ -543,6 +543,14 @@ export async function runInboundChat(
         );
         return 'done';
       } catch (error: any) {
+        // finishStream already ended the response, so this came from the
+        // bookkeeping after it. A stream-error frame now would raise
+        // ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal under the
+        // process safety net) and log an error for an answer delivered in full.
+        if (res.writableEnded) {
+          console.error(`[InboundChat] Bookkeeping after a completed stream from ${route.displayName} failed:`, error.message);
+          return 'done';
+        }
         if (!committed) throw error;
         wire.sendStreamError?.(res, sanitizeProviderErrorMessage(error.message));
         if (!res.writableEnded) res.end();

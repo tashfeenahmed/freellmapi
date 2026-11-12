@@ -1085,6 +1085,14 @@ async function streamCompletion(
     // stops the ladder without benching or an error log row (the socket is
     // gone; nothing to render).
     if (isClientAbortError(err)) throw err;
+    // message_stop and res.end() already went out, so this came from the
+    // bookkeeping after them. An error event now would raise
+    // ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal under the
+    // process safety net) and log an error for a turn the client has in full.
+    if (res.writableEnded) {
+      console.error(`[Anthropic] Bookkeeping after a completed stream from ${route.displayName} failed:`, err.message);
+      return;
+    }
     if (messageStarted) {
       // Real payload already reached the client — finish the SSE response
       // honestly instead of leaving Claude Code hanging, and stop the retry loop.
