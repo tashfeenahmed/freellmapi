@@ -16,6 +16,7 @@ import {
   desktopSessionToken,
 } from '../services/auth.js';
 import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
+import { isLocalRequest } from '../lib/loopback.js';
 import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/reset-code.js';
 
 export const authRouter = Router();
@@ -101,37 +102,6 @@ function bearer(req: Request): string | undefined {
     ?? (req.headers['x-dashboard-token'] as string | undefined);
 }
 
-function isLoopbackAddress(value: string | undefined): boolean {
-  let addr = (value ?? '').trim();
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
-
-// Is the caller connecting from the local machine? The socket peer address is
-// the authority, NOT req.ip: forwarded headers are attacker-controlled, so
-// letting one of them ASSERT locality would hand a remote caller the setup
-// code exemption outright.
-//
-// But the socket peer alone is not sufficient either, because the reverse-proxy
-// deployment this project documents (docs/en/proxy/OVERVIEW.md, and
-// docs/en/troubleshooting/01-common-issues.md on TRUST_PROXY) puts Caddy/nginx/
-// Traefik on the SAME host: every request then arrives from 127.0.0.1 and the
-// socket test is true for the entire internet. So a forwarded hop can never
-// grant locality, but it can withdraw it — exactly the treatment the Ollama
-// open-loopback mode already applies in routes/ollama.ts:25-38.
-function isLoopbackRemote(req: Request): boolean {
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request rather than silently widening the
-  // no-code first-run path through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
-}
-
 // ── Desktop sign-in (#1399) ───────────────────────────────────────────────
 // The desktop app's account is a hidden machine user with a random password
 // nobody knows. Its own window gets sessions over IPC, but the same dashboard
@@ -143,7 +113,7 @@ function isLoopbackRemote(req: Request): boolean {
 // Guards, all required:
 //  - FREEAPI_DESKTOP=1: only the desktop embedder sets it; web/Docker installs
 //    keep their login.
-//  - Loopback socket with no remote forwarded hop (isLoopbackRemote), so LAN
+//  - Loopback socket with no remote forwarded hop (isLocalRequest), so LAN
 //    access mode and a local reverse proxy never hand out sessions.
 //  - A localhost Host header: a DNS-rebinding page (evil.example resolving to
 //    127.0.0.1) is same-origin to the browser but still sends its own name.
@@ -178,7 +148,7 @@ function isCrossSite(req: Request): boolean {
 
 export function desktopSignInAllowed(req: Request): boolean {
   if (process.env.FREEAPI_DESKTOP !== '1') return false;
-  if (!isLoopbackRemote(req)) return false;
+  if (!isLocalRequest(req)) return false;
   const host = hostnameOf(req.headers.host);
   if (!host || !LOCAL_HOSTNAMES.has(host)) return false;
   return !isCrossSite(req);
@@ -218,7 +188,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
   // claim the dashboard without any code. A remote caller must present the
   // one-time setup code logged at boot, so an exposed fresh install can't be
   // claimed by a stranger who finds it first.
-  if (!isLoopbackRemote(req) && !setupCodeMatches((req.body ?? {}).setupCode)) {
+  if (!isLocalRequest(req) && !setupCodeMatches((req.body ?? {}).setupCode)) {
     res.status(403).json({
       error: {
         message: 'A setup code is required to create the first account from a remote device. ' +

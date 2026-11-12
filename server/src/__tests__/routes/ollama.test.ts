@@ -148,6 +148,8 @@ describe('Ollama emulation', () => {
     expect(isLoopback(peer('10.0.0.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '203.0.113.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1'))).toBe(true);
+    // An appending proxy puts the real client last; a spoofed first hop must not win.
+    expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5'))).toBe(false);
   });
 
   it('emits Ollama-compatible NDJSON chat frames', async () => {
