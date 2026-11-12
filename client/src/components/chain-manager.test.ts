@@ -99,8 +99,9 @@ describe('chains reach the rest of the dashboard (#1021)', () => {
     expect(fallbackPage).toContain("queryKey: ['profiles', 'active']")
     expect(fallbackPage).toContain("queryKey: ['fallback', 'chain', activeProfileId]")
     // Staged edits remember which chain they were made against instead of
-    // following whichever one happens to be active at save time.
-    expect(fallbackPage).toMatch(/staged\.profileId === activeProfileId/)
+    // following whichever one happens to be active at save time (the scope
+    // rule itself is covered in hooks/use-draft.test.tsx).
+    expect(fallbackPage).toMatch(/useDraft\(entries, activeProfileId\)/)
   })
 
   it('offers every custom chain in the playground picker as auto:<name>', () => {
