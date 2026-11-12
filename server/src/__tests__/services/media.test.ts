@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -436,6 +437,67 @@ describe('media service', () => {
       globalThis.fetch = vi.fn(async () => new Response('bad prompt', { status: 400 })) as any;
       await expect(runVideoGeneration('nova-reel', { prompt: 'x' }))
         .rejects.toMatchObject({ status: 400 });
+    });
+
+    // The job is already submitted (and billed) when the status poll runs. One
+    // transient 5xx there used to abort it, and the chain then paid for a
+    // second generation on the next provider.
+    describe('Hugging Face: status-poll errors on a submitted job', () => {
+      const submitUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095?_subdomain=queue';
+      const jobUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095/requests/job-1?_subdomain=queue';
+      const statusUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095/requests/job-1/status?_subdomain=queue';
+
+      function setup(pollFailure: () => Response | Promise<Response>) {
+        // A 429 arms an in-memory cooldown that outlives the per-test DB.
+        clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+        addMedia('huggingface', 'Lightricks/LTX-Video-0.9.5', 'video', 1, null,
+          JSON.stringify({ providerModelId: 'fal-ai/ltx-video-v095' }));
+        addMedia('pollinations', 'nova-reel', 'video', 2);
+        addKey('huggingface', 'hf_test_token');
+        addKey('pollinations', 'sk_pollinations_test');
+        let polls = 0;
+        const fetchMock = vi.fn(async (input: string | URL | Request) => {
+          const url = String(input);
+          if (url === submitUrl) {
+            return jsonResponse({
+              request_id: 'job-1',
+              status: 'IN_QUEUE',
+              response_url: 'https://queue.fal.run/fal-ai/ltx-video-v095/requests/job-1',
+            });
+          }
+          if (url === statusUrl) return ++polls === 1 ? pollFailure() : jsonResponse({ status: 'COMPLETED' });
+          if (url === jobUrl) return jsonResponse({ video: { url: 'https://cdn.example.test/video.mp4' } });
+          if (url === 'https://cdn.example.test/video.mp4') {
+            return new Response(Buffer.from('HFVIDEO'), { status: 200, headers: { 'content-type': 'video/mp4' } });
+          }
+          return new Response(Buffer.from('SECOND-PROVIDER'), { status: 200, headers: { 'content-type': 'video/mp4' } });
+        });
+        globalThis.fetch = fetchMock as any;
+        return fetchMock;
+      }
+      const calledUrls = (m: ReturnType<typeof vi.fn>) => m.mock.calls.map(c => String(c[0]));
+
+      it.each([
+        ['a 503', () => new Response('busy', { status: 503 })],
+        ['a 429', () => new Response('slow down', { status: 429 })],
+        ['a network error', () => { throw new TypeError('fetch failed'); }],
+      ])('keeps polling the same job after %s', async (_label, failure) => {
+        const fetchMock = setup(failure);
+        const result = await runVideoGeneration('auto', { prompt: 'x' });
+
+        expect(result.platform).toBe('huggingface');
+        expect(result.video.toString()).toBe('HFVIDEO');
+        expect(calledUrls(fetchMock).filter(u => u === submitUrl)).toHaveLength(1);
+        expect(calledUrls(fetchMock).some(u => u.includes('pollinations'))).toBe(false);
+      });
+
+      it('still gives up on the job when the status poll answers 4xx', async () => {
+        const fetchMock = setup(() => new Response('no such job', { status: 404 }));
+        const result = await runVideoGeneration('auto', { prompt: 'x' });
+
+        expect(result.platform).toBe('pollinations');
+        expect(calledUrls(fetchMock).filter(u => u === statusUrl)).toHaveLength(1);
+      });
     });
 
     it('Hugging Face: refuses a result URL that points at a blocked address class', async () => {
