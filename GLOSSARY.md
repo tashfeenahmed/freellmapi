@@ -84,6 +84,26 @@ dive wins; fix this file.
   no key yet; `KEYED-NO-ROWS` = key stored but zero routable rows;
   `serving` = key + rows + traffic.
 
+## State machines
+
+- **State machine**: a value that moves through named phases on events,
+  where some moves are illegal (e.g. `ready` before `downloading`).
+  House pattern, no library: one discriminated union
+  (`{ phase: 'idle' } | { phase: 'downloading'; version; percent } | …`),
+  one place that changes it, and guards such as
+  `if (state.phase !== 'available') return state`. Reference:
+  `desktop/src/updater.ts`.
+- **Implicit state machine**: the same thing spread over loose flags
+  (`busy`, `error`, `done`, a `let` per step). Impossible combinations
+  compile, and that is where the bugs live. Prefer the union.
+- **Not a machine**: a mode (a setting that does not move on its own)
+  or a value derived from other state. TanStack Query's
+  `isPending` / `isError` already own client fetch state; don't
+  duplicate them.
+- Documented machines: per-attempt streaming in
+  `docs/en/architecture/03-streaming-pipeline.md`; degraded mode in
+  `docs/en/architecture/04-degraded-mode-and-failover.md` §1.
+
 ## Repo map
 
 - `server/` — Express proxy (`:3001`), router, quota, providers, DB.
