@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**Ayda 7,4 milyar token. 34 ücretsiz LLM sağlayıcısı. 635 ücretsiz model uç noktası. OpenAI uyumlu tek bir uç nokta.**
+**Ayda 10,1 milyar token. 87 ücretsiz LLM sağlayıcısı. 1.313 ücretsiz model uç noktası. OpenAI uyumlu tek bir uç nokta.**
 
 Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu sohbet, gömme (embedding), görüntü ve ses uç noktalarını tek bir `/v1` API’sinde birleştirin. Anahtarlar şifreli saklanır. Yönlendirici, her istek için kullanılabilir en iyi modeli seçer; bir sağlayıcı hız sınırına ulaştığında sıradakine geçer ve ücretsiz kotaları aşmamak için kullanımı anahtar bazında izler.
 
@@ -13,7 +13,7 @@ Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-blue)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · tüm kataloğa göz atın: 474 model ailesi, 635 ücretsiz uç nokta
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · tüm kataloğa göz atın: 736 model ailesi, 1.313 ücretsiz uç nokta
 
 [English](README.md) · **Türkçe** · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md)
 
@@ -60,13 +60,13 @@ Yönlendiriciniz model kataloğunu imzalı bir akıştan kendisi günceller: yen
 
 ## Neden geliştirildi?
 
-Günümüzde önde gelen yapay zekâ laboratuvarları ayda birkaç milyon token, günde birkaç bin istek sunan ücretsiz planlar sağlıyor. Tek başlarına sınırlı olsalar da bir araya geldiklerinde, küçük ve hızlı modellerden oldukça yetenekli modellere kadar **474 model ailesi / 635 sağlayıcı uç noktası** üzerinden **ayda yaklaşık 7,4 milyar token** çıkarım kapasitesine ulaşıyorlar.
+Günümüzde önde gelen yapay zekâ laboratuvarları ayda birkaç milyon token, günde birkaç bin istek sunan ücretsiz planlar sağlıyor. Tek başlarına sınırlı olsalar da bir araya geldiklerinde, küçük ve hızlı modellerden oldukça yetenekli modellere kadar **736 model ailesi / 1.313 sağlayıcı uç noktası** üzerinden **ayda yaklaşık 10,1 milyar token** çıkarım kapasitesine ulaşıyorlar.
 
-Bunları elle birleştirmek zahmetli: otuz dört farklı SDK, otuz dört farklı hız sınırı ve bir isteğin başarısız olabileceği otuz dört ayrı yer. FreeLLMAPI hepsini OpenAI uyumlu tek bir uç noktada toplar. Herhangi bir OpenAI istemci kitaplığını yerel sunucunuza yönlendirin; istekler, anahtar eklediğiniz sağlayıcılar arasında istemciye yansımadan yönlendirilir.
+Bunları elle birleştirmek zahmetli: seksen yedi farklı SDK, seksen yedi farklı hız sınırı ve bir isteğin başarısız olabileceği seksen yedi ayrı yer. FreeLLMAPI hepsini OpenAI uyumlu tek bir uç noktada toplar. Herhangi bir OpenAI istemci kitaplığını yerel sunucunuza yönlendirin; istekler, anahtar eklediğiniz sağlayıcılar arasında istemciye yansımadan yönlendirilir.
 
 Ücretsiz planlar da her hafta değişiyor: sağlayıcılar yeni modeller çıkarıyor, eskilerini kaldırıyor ve kotaları haber vermeden değiştiriyor. FreeLLMAPI bunları sizin için takip eder. Yönlendirici, imzalı model kataloğunu [freellmapi.co](https://freellmapi.co) üzerinden kendisi alır; kurulumunuz `git pull` gerekmeden güncel kalır. Güncellemelerin ne kadar hızlı geldiği için [Premium (canlı katalog)](#premium-live-catalog) bölümüne bakın.
 
-![Ücretsiz planlar bir arada — 34 sağlayıcıdan ayda yaklaşık 7,4 milyar token](repo-assets/i18n/tr/free-tier.png)
+![Ücretsiz planlar bir arada — 87 sağlayıcıdan ayda yaklaşık 10,1 milyar token](repo-assets/i18n/tr/free-tier.png)
 
 <a id="supported-providers"></a>
 
@@ -96,7 +96,7 @@ Bunları elle birleştirmek zahmetli: otuz dört farklı SDK, otuz dört farklı
 </tr>
 </table>
 
-<i>… ve 22 ücretsiz sağlayıcı daha</i>
+<i>… ve 75 ücretsiz sağlayıcı daha</i>
 
 </div>
 
@@ -232,7 +232,7 @@ Tam dil listesi [`client/src/i18n/locale-config.ts`](./client/src/i18n/locale-co
 
 Yönlendirici model kataloğunu kendisi güncel tutar: günde iki kez [freellmapi.co](https://freellmapi.co) üzerinden imzalı kataloğu alır, yeni modelleri, kota değişikliklerini ve sağlayıcılara özgü uyumluluk düzeltmelerini yerel veritabanınıza uygular. Etkinleştirme/devre dışı bırakma seçimleriniz ve özel sağlayıcılarınız değişmez. Her indirme uygulanmadan önce sabitlenmiş Ed25519 anahtarıyla doğrulanır.
 
-Katalog şu anda **34 sağlayıcı**, **474 model ailesi**, **635 ücretsiz sağlayıcı/model uç noktası** (584 sohbet, 41 gömme, 7 ses dökümü, 3 video) ve listelenen ücretsiz planlarda **ayda yaklaşık 7,4 milyar token** kapasitesini izler. Tam liste: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
+Katalog şu anda **87 sağlayıcı**, **736 model ailesi**, **1.313 ücretsiz sağlayıcı/model uç noktası** (1.137 sohbet, 29 görsel, 41 ses, 68 gömme, 19 ses dökümü, 6 video, 13 karar) ve listelenen ücretsiz planlarda **ayda yaklaşık 10,1 milyar token** kapasitesini izler. Tam liste: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
 
 Ücretsiz kurulumlar aynı imzalı kataloğun aylık anlık görüntüsünü alır. Bir model, canlı akışa eklendikten 30 gün sonra bu görüntüye katılır; bu nedenle ücretsiz sürüm şu anda yaklaşık 303 model geridedir. Hiçbir şeyin süresi dolmaz ve hiçbir özellik kısıtlanmaz; modeller yalnızca daha geç gelir.
 
