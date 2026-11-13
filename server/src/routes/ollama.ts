@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type {
   ChatMessage,
   ChatToolDefinition,
+  OllamaEmulationMode,
 } from '@freellmapi/shared/types.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
@@ -15,7 +16,11 @@ import { isLocalRequest } from '../lib/loopback.js';
 
 export const ollamaRouter = Router();
 
-export type OllamaEmulationMode = 'off' | 'open-loopback' | 'key-required';
+export type { OllamaEmulationMode };
+
+export const OLLAMA_EMULATION_MODES = ['off', 'open-loopback', 'key-required'] as const satisfies readonly OllamaEmulationMode[];
+// Fails to compile when shared OllamaEmulationMode gains a member this list lacks.
+const _everyModeListed: Record<Exclude<OllamaEmulationMode, (typeof OLLAMA_EMULATION_MODES)[number]>, never> = {};
 
 export function getOllamaEmulationMode(): OllamaEmulationMode {
   const stored = getSetting('ollama_emulation');

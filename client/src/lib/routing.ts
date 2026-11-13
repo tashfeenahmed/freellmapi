@@ -56,7 +56,8 @@ export interface FallbackEntry {
   groupLabel?: string
 }
 
-export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom'
+export type { RoutingStrategy } from '@freellmapi/shared/types'
+import type { RoutingStrategy } from '@freellmapi/shared/types'
 
 // How the gateway picks between several keys of ONE platform, once a model has
 // been chosen (#919). Separate from RoutingStrategy, which ranks models: the

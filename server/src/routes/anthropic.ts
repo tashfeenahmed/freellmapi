@@ -16,7 +16,7 @@ import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker, type DialectHoldMode } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
 import { newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
@@ -854,7 +854,7 @@ async function streamCompletion(
   // first MEANINGFUL content, so a stream that opens with a dialect marker and
   // then turns out unparseable fails over invisibly (previously this surface
   // committed on the first non-empty text and had no dialect rescue at all).
-  let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+  let dialectMode: DialectHoldMode = 'undecided';
   let heldText = '';
 
   const ensureMessageStart = () => {

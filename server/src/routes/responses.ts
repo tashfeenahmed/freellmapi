@@ -19,7 +19,7 @@ import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker, type DialectHoldMode } from '../lib/tool-call-rescue.js';
 import {
   extractApiToken,
   getRequestGroupId,
@@ -1217,7 +1217,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         // either matches a tool-call dialect marker (held to the end and
         // rescued into function_call items) or provably cannot (flushed and
         // streamed normally). Mirrors the /chat/completions stream loop.
-        let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+        let dialectMode: DialectHoldMode = 'undecided';
         let heldText = '';
         let upstreamFinish: string | null = null;
 
