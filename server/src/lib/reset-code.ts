@@ -4,20 +4,25 @@ import { createOneTimeCode } from './one-time-code.js';
 //
 // POST /api/auth/forgot-password mints a reset code and logs it. The operator
 // reads the code from the server logs and enters it on the reset form to set a
-// new password without an active session. Requesting a new code invalidates any
-// previous one. The code is cleared after a successful reset.
+// new password without an active session. Requesting a code while one is live
+// prints the same code again, and only an expired code is replaced: the route
+// is unauthenticated, so replacing it on every request let anyone void the
+// code the operator was typing. The code is cleared after a successful reset.
 
 const _code = createOneTimeCode();
 const RESET_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 let mintedAtMs = 0;
 
-// Mint a fresh reset code and log it prominently, with the account email: the
-// operator who forgot the password may have forgotten which email signs in
-// too (#1477), and whoever can read this log can already reset the account.
-// Returns the code.
+// Log the live reset code (minting one if none is live) prominently, with the
+// account email: the operator who forgot the password may have forgotten which
+// email signs in too (#1477), and whoever can read this log can already reset
+// the account. Returns the code.
 export function generateResetCode(accountEmail?: string | null): string {
-  const code = _code.generate();
-  mintedAtMs = Date.now();
+  let code = _code.get();
+  if (!code || Date.now() - mintedAtMs > RESET_CODE_TTL_MS) {
+    code = _code.generate();
+    mintedAtMs = Date.now();
+  }
   console.log('');
   console.log('  Password-reset code: ' + code);
   if (accountEmail) console.log('  Account email: ' + accountEmail);

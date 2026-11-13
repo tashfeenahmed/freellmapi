@@ -362,9 +362,10 @@ flow is a one-time code printed to the server log:
 
 3. Type it into the reset form together with your new password.
 
-The code is valid for **15 minutes**, and requesting a new one invalidates the
-previous code. Requests are rate-limited, so ask for one code and wait for it
-rather than clicking repeatedly.
+The code is valid for **15 minutes**. Asking again while it is valid prints the
+same code again, so no one else's request can void it; a new code is minted only
+once it expires. Requests are rate-limited per client IP, so ask for one code
+and wait for it rather than clicking repeatedly.
 
 ### Where are the logs?
 

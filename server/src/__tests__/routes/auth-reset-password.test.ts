@@ -29,18 +29,20 @@ function jump(ms: number) {
 
 function makeApp(): Express {
   const app = express();
+  // So a test can speak for another machine with X-Forwarded-For.
+  app.set('trust proxy', true);
   app.use(express.json());
   app.use('/api/auth', authRouter);
   return app;
 }
 
-async function post(app: Express, path: string, body?: unknown) {
+async function post(app: Express, path: string, body?: unknown, headers: Record<string, string> = {}) {
   const server = app.listen(0, '127.0.0.1');
   if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
   const addr = server.address() as { port: number };
   const res = await fetch(`http://127.0.0.1:${addr.port}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body ?? {}),
   });
   const data = await res.json().catch(() => null);
@@ -175,16 +177,36 @@ describe('password reset by log code', () => {
     expect((await post(app, '/api/auth/login', { email: EMAIL, password: 'first-reset-pw' })).status).toBe(200);
   });
 
-  it('invalidates the previous code when a new one is requested', async () => {
+  // /forgot-password is unauthenticated. When each request minted a new code,
+  // anyone could void the code the operator was typing, every ten seconds.
+  it('keeps the live code when another one is requested', async () => {
     await forgot(app);
     const first = getResetCode() as string;
     await forgot(app);
-    const second = getResetCode() as string;
     expect(first).toBeTruthy();
+    expect(getResetCode()).toBe(first);
+
+    expect((await post(app, '/api/auth/reset-password', { resetCode: first, newPassword: 'pw-via-live-code' })).status).toBe(200);
+  });
+
+  it('mints a fresh code once the live one has expired', async () => {
+    await forgot(app);
+    const first = getResetCode() as string;
+    jump(TTL_MS + 1_000);
+    await forgot(app);
+    const second = getResetCode() as string;
+    expect(second).toBeTruthy();
     expect(second).not.toBe(first);
 
-    expect((await post(app, '/api/auth/reset-password', { resetCode: first, newPassword: 'pw-via-stale-code' })).status).toBe(403);
     expect((await post(app, '/api/auth/reset-password', { resetCode: second, newPassword: 'pw-via-fresh-code' })).status).toBe(200);
+  });
+
+  // One shared cooldown let a single anonymous caller 429 the operator forever.
+  it('throttles reset-code requests per client IP, not for everyone', async () => {
+    jump(COOLDOWN_MS + 1_000);
+    expect((await post(app, '/api/auth/forgot-password', {}, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
+    expect((await post(app, '/api/auth/forgot-password', {}, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(429);
+    expect((await post(app, '/api/auth/forgot-password', {}, { 'X-Forwarded-For': '198.51.100.7' })).status).toBe(200);
   });
 
   it('rate-limits back-to-back reset-code requests', async () => {
