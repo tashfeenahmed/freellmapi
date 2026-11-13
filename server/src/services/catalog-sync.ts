@@ -966,12 +966,42 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
   return counts;
 }
 
+// The run in flight, and the forced run queued behind it (M11). Several
+// callers (the 12 h tick, POST /api/premium/sync, key add/remove, declarative
+// license config) used to start runs side by side, each reading the applied
+// version before the other wrote it, so both could apply.
+let inFlight: Promise<SyncResult> | null = null;
+let queuedForce: Promise<SyncResult> | null = null;
+
 /**
  * Fetch the catalog, verify its signature, and apply it if it moves us forward.
  * `force` skips the `since` short-circuit — used right after a license key is
  * added or removed, where the tier can change without the version changing.
+ *
+ * At most one run at a time: a caller that arrives during a run shares its
+ * result. A forced caller instead gets one fresh forced run queued after it
+ * (shared by every forced caller that arrives meanwhile), because the run in
+ * flight read the license key from before the change that prompted the force.
  */
-export async function syncCatalog(force = false): Promise<SyncResult> {
+export function syncCatalog(force = false): Promise<SyncResult> {
+  if (!inFlight) return startSync(force);
+  if (!force) return inFlight;
+  queuedForce ??= inFlight.then(() => {
+    queuedForce = null;
+    return startSync(true);
+  });
+  return queuedForce;
+}
+
+function startSync(force: boolean): Promise<SyncResult> {
+  const run = runSync(force).finally(() => {
+    if (inFlight === run) inFlight = null;
+  });
+  inFlight = run;
+  return run;
+}
+
+async function runSync(force: boolean): Promise<SyncResult> {
   const db = getDb();
   const key = getSetting(SETTING_LICENSE_KEY);
   const applied = getSetting(SETTING_APPLIED_VERSION);
