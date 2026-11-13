@@ -115,6 +115,7 @@ export function CommandPalette() {
       { id: 'p-embeddings', group: 'pages', label: t('models.embeddingsTab'), keywords: 'models embeddings vectors', icon: Layers, run: go('/models/embeddings') },
       { id: 'p-decision', group: 'pages', label: t('decision.tab'), keywords: 'models decision classify choice yes no score clef mercury', icon: Scale, run: go('/models/decision') },
       { id: 'p-search', group: 'pages', label: t('search.tab'), keywords: 'models search web tavily exa firecrawl linkup parallel', icon: Globe, run: go('/models/search') },
+      { id: 'p-iterative-critique', group: 'pages', label: t('iterativeCritique.tab'), keywords: 'models iterative critique generator critic debate', icon: Zap, run: go('/models/iterative-critique') },
       { id: 'p-fusion', group: 'pages', label: t('models.fusionTab'), keywords: 'models fusion synthesis panel judge', icon: Zap, run: go('/models/fusion') },
       { id: 'p-playground', group: 'pages', label: t('nav.playground'), keywords: 'playground test chat try', icon: SquareTerminal, run: go('/playground') },
       { id: 'p-keys', group: 'pages', label: t('nav.keys'), keywords: 'keys providers api tokens', icon: KeyRound, run: go('/keys') },

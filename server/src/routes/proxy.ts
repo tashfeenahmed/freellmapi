@@ -24,6 +24,7 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
+import { isIterativeCritiqueModel, runIterativeCritique, iterativeCritiqueConfigSchema, ITERATIVE_CRITIQUE_MODEL_ID } from '../services/iterative-critique.js';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
@@ -435,6 +436,17 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
         available: autoContextWindow != null,
         unavailable_reason: autoContextWindow != null ? null : 'no_models',
       },
+      {
+        id: ITERATIVE_CRITIQUE_MODEL_ID,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: 'Iterative Critique (a generator and a critic from different providers loop until the critic accepts, then one answer is synthesized)',
+        context_window: autoContextWindow,
+        context_length: autoContextWindow,
+        available: autoContextWindow != null,
+        unavailable_reason: autoContextWindow != null ? null : 'no_models',
+      },
       ...claudeFamilyEntries,
       ...profileRows.map(p => ({
         id: `auto:${p.name.toLowerCase()}`,
@@ -629,6 +641,8 @@ const chatCompletionSchema = z.object({
   // Fusion config — only meaningful when `model` is the virtual "fusion" id.
   // Ignored for every other model. See services/fusion.ts.
   fusion: fusionConfigSchema.optional(),
+  // Same idea for the virtual "iterative-critique" model. See services/iterative-critique.ts.
+  iterative_critique: iterativeCritiqueConfigSchema.optional(),
   // Extended sampling + structured-output params (top_k, seed, penalties,
   // logit_bias, logprobs, response_format, max_completion_tokens…), forwarded
   // per the platform policy in lib/sampling-params.ts.
@@ -2037,6 +2051,54 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         });
       } else {
         res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' }, execution_id: requestGroupId });
+      }
+    }
+    return;
+  }
+
+  // ── Iterative critique: generator <-> critic loop, then synthesis ──────────
+  // Text-only: tools/images are not supported. Streaming returns the finished
+  // answer as one chunk (the loop needs every round before it can synthesize).
+  if (isIterativeCritiqueModel(requestedModel)) {
+    const fail = (status: number, message: string, type: string, code?: string) => {
+      if (stream) {
+        try { res.setHeader('Content-Type', 'text/event-stream'); res.write(`data: ${JSON.stringify({ error: { message, type, ...(code ? { code } : {}) } })}\n\ndata: [DONE]\n\n`); res.end(); } catch { /* socket gone */ }
+      } else {
+        res.status(status).json({ error: { message, type, ...(code ? { code } : {}) }, execution_id: requestGroupId });
+      }
+    };
+    if (hasImage || (tools?.length ?? 0) > 0) {
+      fail(400, 'iterative-critique does not support images or tools; use "fusion" or a pinned model.', 'invalid_request_error');
+      return;
+    }
+    try {
+      const { response, routedVia } = await runIterativeCritique({
+        messages,
+        config: parsed.data.iterative_critique ?? {},
+        options: { signal: clientAbort.signal },
+        estimatedTokens: estimatedTotal,
+      });
+      if (stream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        const base = { id: response.id, object: 'chat.completion.chunk', created: response.created, model: ITERATIVE_CRITIQUE_MODEL_ID };
+        const text = contentToString(response.choices[0]?.message?.content ?? '');
+        for (const f of [
+          { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },
+          { ...base, choices: [{ index: 0, delta: { content: text }, finish_reason: null }] },
+          { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: response.usage },
+        ]) res.write(`data: ${JSON.stringify(f)}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } else {
+        res.setHeader('X-Routed-Via', safeHeaderValue(routedVia));
+        res.json({ ...response, execution_id: requestGroupId });
+      }
+    } catch (err: any) {
+      if (err instanceof FusionError) {
+        fail(err.status, err.message, err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error', err.code);
+      } else {
+        fail(502, `iterative-critique error: ${sanitizeProviderErrorMessage(err?.message)}`, 'server_error');
       }
     }
     return;

@@ -22,6 +22,7 @@ export function ModelsTabs() {
       <NavLink to="/models/decision" className={({ isActive }) => tab(isActive)}>{t('decision.tab')}</NavLink>
       <NavLink to="/models/search" className={({ isActive }) => tab(isActive)}>{t('search.tab')}</NavLink>
       <NavLink to="/models/fusion" className={({ isActive }) => tab(isActive)}>{t('models.fusionTab')}</NavLink>
+      <NavLink to="/models/iterative-critique" className={({ isActive }) => tab(isActive)}>{t('iterativeCritique.tab')}</NavLink>
     </div>
   )
 }
