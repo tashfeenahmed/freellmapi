@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Copy } from 'lucide-react'
 import { Dialog, DialogPopup, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import { useReauthSecret } from '@/hooks/use-reauth-secret'
 
 // #786: the desktop build has no user-set password (its machine user's
 // password is random and never shown), so the re-verification dialog would
@@ -36,59 +37,40 @@ export function CopyKeyDialog({
 }) {
   const { t } = useI18n()
   // Mounted only while open, so the field starts empty every time and the
-  // password never outlives the dialog.
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  // password never outlives the dialog. Closing or unmounting aborts the
+  // reveal in flight: otherwise the key still reached the clipboard, with a
+  // "copied" toast, after Cancel. A wrong password is fixed in place.
+  const { password, setPassword, error, setError, busy, run, cancel } = useReauthSecret()
   // Only set when the clipboard refused: the key is on screen for a manual
   // copy, and disappears again with the dialog.
   const [revealed, setRevealed] = useState<string | null>(null)
-  // The reveal in flight. Closing the dialog aborts it: otherwise the key
-  // still reached the clipboard, with a "copied" toast, after Cancel.
-  const reveal = useRef<AbortController | null>(null)
-  useEffect(() => () => reveal.current?.abort(), [])
 
   function close(open: boolean) {
-    if (!open) reveal.current?.abort()
+    if (!open) cancel()
     onOpenChange(open)
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    reveal.current?.abort()
-    const controller = new AbortController()
-    reveal.current = controller
-    setBusy(true)
-    setError(null)
-    try {
-      const { key } = await apiFetch<{ key: string }>(`/api/keys/${keyId}/reveal`, {
-        method: 'POST',
-        // The desktop server skips re-auth for this local request (#786); the
-        // web build still needs it.
-        headers: isDesktopApp ? undefined : { 'x-reauth-password': password },
-        signal: controller.signal,
-      })
-      if (controller.signal.aborted) return
-      // A plain-HTTP LAN origin has no Clipboard API at all, so this falls back
-      // to execCommand rather than throwing (#734). If even that fails the key
-      // has already been revealed — show it instead of discarding it, or the
-      // password round trip was for nothing.
-      if (!await copyText(key)) {
-        setRevealed(key)
-        setError(t('common.copyFailed'))
-        return
-      }
-      toast.success(t('keys.copiedKey'))
-      onOpenChange(false)
-    } catch (err) {
-      if (controller.signal.aborted) return
-      // A wrong password lands here; it is worth fixing in place rather than
-      // behind a closed dialog.
-      setError((err as Error).message)
-      setPassword('')
-    } finally {
-      if (reveal.current === controller) setBusy(false)
+    const result = await run((signal, pw) => apiFetch<{ key: string }>(`/api/keys/${keyId}/reveal`, {
+      method: 'POST',
+      // The desktop server skips re-auth for this local request (#786); the
+      // web build still needs it.
+      headers: isDesktopApp ? undefined : { 'x-reauth-password': pw },
+      signal,
+    }))
+    if (!result.ok) return
+    // A plain-HTTP LAN origin has no Clipboard API at all, so this falls back
+    // to execCommand rather than throwing (#734). If even that fails the key
+    // has already been revealed — show it instead of discarding it, or the
+    // password round trip was for nothing.
+    if (!await copyText(result.value.key)) {
+      setRevealed(result.value.key)
+      setError(t('common.copyFailed'))
+      return
     }
+    toast.success(t('keys.copiedKey'))
+    onOpenChange(false)
   }
 
   return (
