@@ -4,6 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
+import { logRequest } from '../lib/request-log.js';
 import { resolveProvider, getAllProviders } from '../providers/index.js';
 import { OpenAICompatProvider, isAnonymousCredential } from '../providers/openai-compat.js';
 import { getSyncState } from '../services/catalog-sync.js';
@@ -1203,10 +1204,10 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
     // Only a successful probe records a sample. The row mirrors what the proxy
     // writes on a real request so the decay-weighted stats cache picks it up.
     if (endpoint.keyId != null) {
-      getDb().prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, ttfb_ms, request_type)
-        VALUES ('custom', ?, ?, 'success', ?, ?, ?, ?, 'chat')
-      `).run(probe.modelId, endpoint.keyId, probe.inputTokens, probe.outputTokens, probe.latencyMs, probe.latencyMs);
+      // Through logRequest so the sample also reaches request_hourly and the
+      // lifetime totals, like every other request row.
+      logRequest('custom', probe.modelId, endpoint.keyId, 'success', probe.inputTokens, probe.outputTokens,
+        probe.latencyMs, null, probe.latencyMs);
 
       // A real completion just succeeded, which is stronger evidence than any
       // health ping — lift whatever cooldown was still holding the key back.

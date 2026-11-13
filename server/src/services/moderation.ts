@@ -12,7 +12,7 @@
  * platforms is small and the endpoint is always /v1/moderations.
  */
 import { getDb } from '../db/index.js';
-import { getClientContext } from '../lib/client-context.js';
+import { logRequest } from '../lib/request-log.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { USABLE_KEY_SQL } from './key-state.js';
@@ -153,15 +153,10 @@ function logModerationRequest(
   latencyMs: number,
   error: string | null,
 ): void {
-  try {
-    const client = getClientContext();
-    getDb().prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-      VALUES (?, ?, ?, ?, 0, 0, ?, ?, 'moderation', ?, ?, ?)
-    `).run(row.platform, row.modelId, row.keyId, status, latencyMs, error, client.ip, client.userAgent, client.agent);
-  } catch (e) {
-    console.error('Failed to log moderation request:', e);
-  }
+  // Through logRequest so the row also reaches request_hourly and the lifetime
+  // totals; it swallows its own DB errors.
+  logRequest(row.platform, row.modelId, row.keyId, status, 0, 0, latencyMs, error,
+    null, null, null, null, 'moderation');
 }
 
 /* ------------------------------------------------------------------ */
