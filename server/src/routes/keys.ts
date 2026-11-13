@@ -10,7 +10,7 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
-import { verifyCredentials } from '../services/auth.js';
+import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
@@ -601,20 +601,40 @@ function skipsReauth(req: Request): boolean {
   return process.env.FREEAPI_DESKTOP === '1' && isLoopbackRemote(req);
 }
 
+// Re-verify the dashboard password for a plaintext-key endpoint (export,
+// reveal). Wrong guesses count toward the shared strike limit, so a stolen
+// session cannot be used to test passwords until one works (#1885): the third
+// wrong password signs the session out. Returns true when the request may go on;
+// otherwise the response has been sent.
+function passesReauth(req: Request, res: Response, action: string): boolean {
+  if (skipsReauth(req)) return true;
+  const user = (req as any).user as { userId: number; email: string };
+  const password = req.headers['x-reauth-password'] as string | undefined;
+  if (!password) {
+    res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });
+    return false;
+  }
+  if (!verifyCredentials(user.email, password)) {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+      ?? (req.headers['x-dashboard-token'] as string | undefined);
+    if (recordReauthFailure(user.userId, token)) {
+      res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+    } else {
+      res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });
+    }
+    return false;
+  }
+  clearReauthFailures(user.userId);
+  return true;
+}
+
 // Export keys — returns plaintext keys in the requested format.
 // GET /api/keys/export?format=json|env|csv&healthy=true
 // The response is the raw file download (Content-Type varies by format).
 // Password re-verification via x-reauth-password header is required, except for
 // a local request on the desktop build (see skipsReauth).
 keysRouter.get('/export', (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!skipsReauth(req)) {
-    const password = req.headers['x-reauth-password'] as string | undefined;
-    if (!password || !verifyCredentials(user.email, password)) {
-      res.status(403).json({ error: { message: 'Password verification required to export keys', type: 'authentication_error' } });
-      return;
-    }
-  }
+  if (!passesReauth(req, res, 'export keys')) return;
   const db = getDb();
   const format = (req.query.format as string) ?? 'json';
   const healthyOnly = req.query.healthy === 'true';
@@ -731,14 +751,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
 // local request on the desktop build, which has no password to re-enter (see
 // skipsReauth; a LAN client of that same desktop server still needs one).
 keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!skipsReauth(req)) {
-    const password = req.headers['x-reauth-password'] as string | undefined;
-    if (!password || !verifyCredentials(user.email, password)) {
-      res.status(403).json({ error: { message: 'Password verification required to reveal a key', type: 'authentication_error' } });
-      return;
-    }
-  }
+  if (!passesReauth(req, res, 'reveal a key')) return;
 
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -1059,7 +1072,7 @@ async function registerImportedModels(
 // too when FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is set. Re-checked at request
 // time in proxyFetch for URLs already in the DB.
 async function rejectUnsafeBaseUrl(baseUrl: string, res: Response): Promise<boolean> {
-  const verdict = await assessProviderUrl(baseUrl);
+  const verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
   if (verdict.allowed) return false;
   res.status(400).json({ error: { message: `baseUrl rejected: ${verdict.reason}` } });
   return true;
@@ -1579,7 +1592,7 @@ keysRouter.post('/import', (req: Request, res: Response, next: NextFunction) => 
           // just as capable of naming a cloud metadata address.
           let verdict = urlVerdicts.get(baseUrl);
           if (!verdict) {
-            verdict = await assessProviderUrl(baseUrl);
+            verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
             urlVerdicts.set(baseUrl, verdict);
           }
           if (!verdict.allowed) {
@@ -1732,7 +1745,7 @@ keysRouter.post('/import-selected', async (req: Request, res: Response) => {
       // manual add form can (#440), so it gets the same guard.
       let verdict = urlVerdicts.get(baseUrl);
       if (!verdict) {
-        verdict = await assessProviderUrl(baseUrl);
+        verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
         urlVerdicts.set(baseUrl, verdict);
       }
       if (!verdict.allowed) {

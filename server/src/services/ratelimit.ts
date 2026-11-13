@@ -81,8 +81,11 @@ let nextLeaseId = 1;
 // nor the recorded usage, and both could pass RPM, TPM, the daily cap and the
 // concurrency cap. So the age comes from the platform's own timeout, with a
 // floor and a margin, and a platform configured with no timeout at all
-// (PROVIDER_TIMEOUT_<PLATFORM>=0) is never aged out.
-const LEASE_BACKSTOP_FLOOR_MS = 10 * MINUTE;
+// (PROVIDER_TIMEOUT_<PLATFORM>=0) is never aged out. The floor is 30 minutes
+// because the timeout read here is the env override or a 120s default, not a
+// provider's built-in value: AMD Radeon is built with a 600s timeout for long
+// reasoning calls, and a stream runs on past that first-byte deadline.
+const LEASE_BACKSTOP_FLOOR_MS = 30 * MINUTE;
 const LEASE_BACKSTOP_MARGIN_MS = 2 * MINUTE;
 const DEFAULT_PROVIDER_TIMEOUT_MS = 120 * 1000;
 

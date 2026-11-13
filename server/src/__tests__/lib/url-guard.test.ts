@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { classifyIp, assessProviderUrl, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
+import { classifyIp, assessProviderUrl, assertProviderUrlAllowed, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
 
 // SSRF guard for user-supplied custom-provider base URLs (#440). Metadata and
 // link-local targets must never be reachable; loopback/private stay allowed by
@@ -152,11 +152,42 @@ describe('assessProviderUrl', () => {
     expect((await assessProviderUrl('not a url')).allowed).toBe(false);
   });
 
-  it('lets unresolvable hostnames through (checked again at request time)', async () => {
+  it('lets an unresolvable hostname be saved when the caller opts in (offline LAN box)', async () => {
+    const verdict = await assessProviderUrl('http://my-offline-box.lan:11434/v1', {
+      resolve: async () => { throw new Error('ENOTFOUND'); },
+      allowUnresolved: true,
+    });
+    expect(verdict.allowed).toBe(true);
+  });
+
+  // #1875: the request-time check used to fail open, so a lookup failure let
+  // fetch() resolve the name itself with nothing classified.
+  it('blocks an unresolvable hostname by default (request time)', async () => {
     const verdict = await assessProviderUrl('http://my-offline-box.lan:11434/v1', {
       resolve: async () => { throw new Error('ENOTFOUND'); },
     });
-    expect(verdict.allowed).toBe(true);
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toMatch(/could not resolve/);
+  });
+
+  it('blocks a hostname whose lookup returns no addresses by default', async () => {
+    const verdict = await assessProviderUrl('http://empty.example/v1', { resolve: async () => [] });
+    expect(verdict.allowed).toBe(false);
+    const saved = await assessProviderUrl('http://empty.example/v1', { resolve: async () => [], allowUnresolved: true });
+    expect(saved.allowed).toBe(true);
+  });
+
+  it('still blocks a metadata address on the save path even with allowUnresolved', async () => {
+    const verdict = await assessProviderUrl('http://evil.example/v1', {
+      resolve: async () => ['169.254.169.254'],
+      allowUnresolved: true,
+    });
+    expect(verdict.allowed).toBe(false);
+  });
+
+  it('assertProviderUrlAllowed throws for a name that cannot resolve', async () => {
+    // .invalid is reserved (RFC 6761) and never resolves.
+    await expect(assertProviderUrlAllowed('http://nothing-here.invalid/v1')).rejects.toThrow(/could not resolve/);
   });
 });
 
