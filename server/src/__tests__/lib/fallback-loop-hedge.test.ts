@@ -60,8 +60,18 @@ function stalledDispatch(hedgeAbort: AbortController) {
   };
 }
 
+// Fake timers drive the loop: the budget (Date.now) and the hedge (setTimeout)
+// then run on the test's clock, so a loaded machine cannot stretch the 30ms
+// failures past the 100ms budget and skip the attempt under test.
+async function run(h: Parameters<typeof runFallbackLoop>[0]) {
+  const done = runFallbackLoop(h);
+  await vi.runAllTimersAsync();
+  return done;
+}
+
 describe('fallback loop time-budget hedging', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     initDb(':memory:');
     resetLeases();
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -70,6 +80,7 @@ describe('fallback loop time-budget hedging', () => {
   afterEach(() => {
     resetLeases();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('classifies the hedge error as budget-abort, not retryable or client-abort', () => {
@@ -106,7 +117,7 @@ describe('fallback loop time-budget hedging', () => {
       dispatch,
     });
 
-    await runFallbackLoop(h);
+    await run(h);
 
     // The stalled attempt was abandoned mid-flight; the budget is spent, so
     // no fourth attempt starts.
@@ -146,7 +157,7 @@ describe('fallback loop time-budget hedging', () => {
       route: () => leasedRoute().route,
       dispatch,
     });
-    await runFallbackLoop(h);
+    await run(h);
 
     // The two 429s each produced their normal failure bookkeeping (a cooldown
     // row and a skip entry); the hedge abort must NOT add a third of either —
@@ -188,7 +199,7 @@ describe('fallback loop time-budget hedging', () => {
       dispatch,
     });
 
-    await runFallbackLoop(h);
+    await run(h);
 
     // Still a timedOut exhaustion — the render is unchanged.
     expect(h.onExhausted).toHaveBeenCalledTimes(1);
@@ -236,7 +247,7 @@ describe('fallback loop time-budget hedging', () => {
       dispatch,
     });
 
-    await runFallbackLoop(h);
+    await run(h);
 
     expect(dispatch).toHaveBeenCalledTimes(3);
     // The committed attempt outlived the budget and was left alone.
@@ -272,7 +283,7 @@ describe('fallback loop time-budget hedging', () => {
       dispatch,
     });
 
-    await runFallbackLoop(h);
+    await run(h);
 
     expect(abortInFlight).toHaveBeenCalledTimes(1);
     expect(h.onExhausted).toHaveBeenCalledTimes(1);
