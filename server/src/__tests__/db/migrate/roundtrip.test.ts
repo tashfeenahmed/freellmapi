@@ -46,6 +46,7 @@ const CUSTOM_ENDPOINT_GROUP_LABEL_FILENAME = '20260930_000001_custom_endpoint_gr
 const SEARCH_ENGINES_FILENAME = '20261013_000001_search_engines.ts';
 const DECISION_REQUESTS_FILENAME = '20261016_000001_decision_requests.ts';
 const LLMTR_REENABLE_KEYS_FILENAME = '20261017_000001_llmtr_reenable_keys.ts';
+const TOMBSTONE_CHAIN_SNAPSHOT_FILENAME = '20261113_000001_tombstone_chain_snapshot.ts';
 
 interface SchemaRow {
   type: string;
@@ -138,6 +139,7 @@ describe('migration round trip', () => {
         SEARCH_ENGINES_FILENAME,
         DECISION_REQUESTS_FILENAME,
         LLMTR_REENABLE_KEYS_FILENAME,
+        TOMBSTONE_CHAIN_SNAPSHOT_FILENAME,
       ]);
     } finally {
       db.close();
