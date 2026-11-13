@@ -14,7 +14,9 @@ import { pickRecordingMimeType, recordingFilename } from '@/lib/transcription'
 // With no usable transcription model the button still shows, so the feature
 // is discoverable, and a click explains what to add instead of failing.
 
-export type DictationPhase = 'idle' | 'recording' | 'transcribing'
+// 'requesting' covers the browser's permission prompt: the button is disabled
+// so a second click cannot open a second microphone nobody can stop.
+export type DictationPhase = 'idle' | 'requesting' | 'recording' | 'transcribing'
 
 export interface DictationButtonProps {
   /** Whether at least one enabled transcription model has a key. */
@@ -37,13 +39,24 @@ export function DictationButton({ available, model, apiKey, disabled, onText, on
   const [phase, setPhaseState] = useState<DictationPhase>('idle')
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
-  const setPhase = (next: DictationPhase) => { setPhaseState(next); onPhaseChange?.(next) }
+  // False once unmounted: a mic granted or a clip stopped after that is
+  // closed and dropped, never recorded, sent or reported to the parent.
+  const mountedRef = useRef(true)
+  const setPhase = (next: DictationPhase) => {
+    if (!mountedRef.current) return
+    setPhaseState(next)
+    onPhaseChange?.(next)
+  }
 
   // Never leave a microphone open behind an unmounted button.
-  useEffect(() => () => {
-    const rec = recorderRef.current
-    if (rec && rec.state !== 'inactive') rec.stop()
-    rec?.stream.getTracks().forEach(track => track.stop())
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      const rec = recorderRef.current
+      if (rec && rec.state !== 'inactive') rec.stop()
+      rec?.stream.getTracks().forEach(track => track.stop())
+    }
   }, [])
 
   async function start() {
@@ -55,24 +68,41 @@ export function DictationButton({ available, model, apiKey, disabled, onText, on
       toast.error(t('playground.dictationFailed', { reason: 'MediaRecorder is not supported in this browser' }))
       return
     }
+    setPhase('requesting')
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (err: unknown) {
       toast.error(t('playground.dictationFailed', { reason: err instanceof Error ? err.message : String(err) }))
+      setPhase('idle')
+      return
+    }
+    const release = () => stream.getTracks().forEach(track => track.stop())
+    if (!mountedRef.current) {
+      release()
       return
     }
     const mimeType = pickRecordingMimeType(type => MediaRecorder.isTypeSupported(type))
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
-    chunksRef.current = []
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-    recorder.onstop = () => {
-      onStreamChange?.(null)
-      stream.getTracks().forEach(track => track.stop())
-      void transcribe(new Blob(chunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' }))
+    let recorder: MediaRecorder
+    try {
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      chunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        onStreamChange?.(null)
+        release()
+        if (!mountedRef.current) return
+        void transcribe(new Blob(chunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' }))
+      }
+      recorder.start()
+    } catch (err: unknown) {
+      // The mic is already open: close it, or the browser keeps showing it in use.
+      release()
+      toast.error(t('playground.dictationFailed', { reason: err instanceof Error ? err.message : String(err) }))
+      setPhase('idle')
+      return
     }
     recorderRef.current = recorder
-    recorder.start()
     onStreamChange?.(stream)
     setPhase('recording')
   }
@@ -100,7 +130,7 @@ export function DictationButton({ available, model, apiKey, disabled, onText, on
         throw new Error(body?.error?.message || `HTTP ${res.status}`)
       }
       const data = await res.json() as { text?: string }
-      onText(data.text ?? '')
+      if (mountedRef.current) onText(data.text ?? '')
     } catch (err: unknown) {
       toast.error(t('playground.dictationFailed', { reason: err instanceof Error ? err.message : String(err) }))
     } finally {
@@ -121,7 +151,8 @@ export function DictationButton({ available, model, apiKey, disabled, onText, on
       size="icon"
       className={`shrink-0 rounded-full ${phase === 'recording' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'} ${className ?? ''}`}
       onClick={() => (phase === 'recording' ? stop() : void start())}
-      disabled={disabled || phase === 'transcribing'}
+      // A busy composer blocks starting, never stopping: the mic must close.
+      disabled={phase === 'requesting' || phase === 'transcribing' || (disabled && phase !== 'recording')}
       aria-label={label}
       title={label}
       aria-pressed={phase === 'recording'}
