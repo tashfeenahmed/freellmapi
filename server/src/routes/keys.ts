@@ -17,6 +17,7 @@ import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, e
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { isSearchPlatform } from '../lib/search-platforms.js';
+import { isLocalRequest } from '../lib/loopback.js';
 import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
@@ -504,26 +505,16 @@ keysRouter.delete('/:id/cooldowns', (req: Request, res: Response) => {
   res.json({ cleared });
 });
 
-// Is the caller connecting from this machine? Read from the real socket peer
-// address, NOT req.ip or X-Forwarded-For: those are caller-controlled, so
-// trusting them here would let a remote caller claim to be local.
-function isLoopbackRemote(req: Request): boolean {
-  let addr = req.socket?.remoteAddress ?? '';
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
-
 // #786: the desktop build has no user-set password (its machine user's password
 // is random and never shown), so re-verification would lock desktop users out of
 // reading their own keys. The embedder marks the process
 // (desktop/src/server-host.ts) and the two plaintext-key endpoints below skip
 // re-auth for it — but ONLY for a request from this machine. The desktop app can
 // bind 0.0.0.0 through its LAN-access toggle, and a remote viewer on that LAN
-// still has to prove the password before it can lift a key.
+// still has to prove the password before it can lift a key, and so does a caller
+// behind a same-host reverse proxy (lib/loopback.ts).
 function skipsReauth(req: Request): boolean {
-  return process.env.FREEAPI_DESKTOP === '1' && isLoopbackRemote(req);
+  return process.env.FREEAPI_DESKTOP === '1' && isLocalRequest(req);
 }
 
 // Export keys — returns plaintext keys in the requested format.

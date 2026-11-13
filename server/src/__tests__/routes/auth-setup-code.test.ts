@@ -116,6 +116,36 @@ describe('First-run setup code gate (FIX 1)', () => {
     expect(status).toBe(201);
   });
 
+  // nginx's `$proxy_add_x_forwarded_for` APPENDS the real client to whatever
+  // the client sent, so a spoofed `X-Forwarded-For: 127.0.0.1` arrives as
+  // "127.0.0.1, <attacker>". Every hop must be loopback, not just the first.
+  it('rejects a spoofed loopback hop in front of a remote one (appending proxy)', async () => {
+    const { status, body } = await postSetup(
+      appWithRemote('127.0.0.1'),
+      CREDS,
+      { 'X-Forwarded-For': '127.0.0.1, 203.0.113.9' },
+    );
+    expect(status).toBe(403);
+    expect(body.error.type).toBe('setup_code_required');
+    const count = (getDb().prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number }).c;
+    expect(count).toBe(0);
+  });
+
+  it('rejects a loopback socket whose X-Real-IP is remote', async () => {
+    const { status } = await postSetup(appWithRemote('127.0.0.1'), CREDS, { 'X-Real-IP': '203.0.113.9' });
+    expect(status).toBe(403);
+  });
+
+  it('rejects a loopback socket that carries a Forwarded header', async () => {
+    const { status } = await postSetup(appWithRemote('127.0.0.1'), CREDS, { Forwarded: 'for=203.0.113.9' });
+    expect(status).toBe(403);
+  });
+
+  it('still allows a chain of loopback hops', async () => {
+    const { status } = await postSetup(appWithRemote('127.0.0.1'), CREDS, { 'X-Forwarded-For': '127.0.0.1, ::1' });
+    expect(status).toBe(201);
+  });
+
   it('accepts the setup code through a proxy with a remote forwarded hop', async () => {
     const code = getSetupCode();
     expect(code).toBeTruthy();
