@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Copy } from 'lucide-react'
 import { Dialog, DialogPopup, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -43,9 +43,21 @@ export function CopyKeyDialog({
   // Only set when the clipboard refused: the key is on screen for a manual
   // copy, and disappears again with the dialog.
   const [revealed, setRevealed] = useState<string | null>(null)
+  // The reveal in flight. Closing the dialog aborts it: otherwise the key
+  // still reached the clipboard, with a "copied" toast, after Cancel.
+  const reveal = useRef<AbortController | null>(null)
+  useEffect(() => () => reveal.current?.abort(), [])
+
+  function close(open: boolean) {
+    if (!open) reveal.current?.abort()
+    onOpenChange(open)
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    reveal.current?.abort()
+    const controller = new AbortController()
+    reveal.current = controller
     setBusy(true)
     setError(null)
     try {
@@ -54,7 +66,9 @@ export function CopyKeyDialog({
         // The desktop server skips re-auth for this local request (#786); the
         // web build still needs it.
         headers: isDesktopApp ? undefined : { 'x-reauth-password': password },
+        signal: controller.signal,
       })
+      if (controller.signal.aborted) return
       // A plain-HTTP LAN origin has no Clipboard API at all, so this falls back
       // to execCommand rather than throwing (#734). If even that fails the key
       // has already been revealed — show it instead of discarding it, or the
@@ -67,17 +81,18 @@ export function CopyKeyDialog({
       toast.success(t('keys.copiedKey'))
       onOpenChange(false)
     } catch (err) {
+      if (controller.signal.aborted) return
       // A wrong password lands here; it is worth fixing in place rather than
       // behind a closed dialog.
       setError((err as Error).message)
       setPassword('')
     } finally {
-      setBusy(false)
+      if (reveal.current === controller) setBusy(false)
     }
   }
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={close}>
       <DialogPopup maxWidth="max-w-md">
         <DialogTitle>{t('keys.copyFullKey')}</DialogTitle>
         {/* select-all + break-all so the fallback key can be grabbed in one
@@ -105,7 +120,7 @@ export function CopyKeyDialog({
           {isDesktopApp && error && <FieldError error={error} />}
 
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => close(false)}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={(!isDesktopApp && !password) || busy}>
