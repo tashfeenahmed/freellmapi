@@ -2,6 +2,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import type { BaseProvider } from './base.js';
 import { GoogleProvider } from './google.js';
 import { OpenAICompatProvider } from './openai-compat.js';
+import { MixlayerProvider } from './mixlayer.js';
 import { CohereProvider } from './cohere.js';
 import { TavilyProvider } from './tavily.js';
 import { ExaProvider } from './exa.js';
@@ -70,6 +71,9 @@ function register(provider: BaseProvider) {
 register(new GoogleProvider({ timeoutMs: 60_000 }));
 register(new KeylessDecisionProvider('halx', 'HAL-X'));
 register(new KeylessDecisionProvider('aisense', 'AI SENSE'));
+
+// Mixlayer - OpenAI-compatible inference.
+register(new MixlayerProvider());
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
