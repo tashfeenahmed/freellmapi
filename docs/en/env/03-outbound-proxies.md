@@ -156,6 +156,6 @@ Despite the shared “proxy” name, these two variables throttle *inbound* traf
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PROXY_RATE_LIMIT_RPM` | `120` | Max `/v1` proxy requests per minute per client IP. `0` disables. |
-| `ADMIN_RATE_LIMIT_RPM` | `600` | Max `/api` dashboard requests per minute per client IP — a flood guard; login has its own per-email lockout and key export its own much tighter cap. `0` disables. |
+| `ADMIN_RATE_LIMIT_RPM` | `600` | Max `/api` dashboard requests per minute per client IP — a flood guard; login has its own per-email lockout, key export its own 10/min cap and key reveal its own 60/min cap. `0` disables. |
 
 Full descriptions live in [01-variables.md](01-variables.md#rate-limits).

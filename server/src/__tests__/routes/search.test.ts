@@ -6,6 +6,10 @@ import { encrypt } from '../../lib/crypto.js';
 import { clearAllCooldowns, setCooldown } from '../../services/ratelimit.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { seedSearchEngines } from '../helpers/search-engines.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 // HTTP surface of web search (#1174): POST /v1/search and GET
 // /v1/search/engines for API callers, /api/search/engines and

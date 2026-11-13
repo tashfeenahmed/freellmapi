@@ -10,6 +10,7 @@ import type {
 import { BaseProvider, providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { contentToString } from '../lib/content.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { assessProviderUrl } from '../lib/url-guard.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs, streamStallTimeoutMs } from '../lib/provider-timeout.js';
 import { sanitizeForGemini } from '../lib/gemini-wire.js';
@@ -342,11 +343,40 @@ function extractImageUrl(block: unknown): string | undefined {
   return undefined;
 }
 
+const MAX_IMAGE_REDIRECTS = 3;
+const IMAGE_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+// Fetch a caller-supplied image URL with the same address policy custom
+// providers get (#1881): every hop, the first URL and each redirect target, is
+// classified before it is requested, so an image URL (or a public host that
+// redirects) cannot reach cloud metadata or link-local addresses, or private
+// ones when FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is set. Redirects are followed
+// by hand for that reason, a few hops at most, since image hosts and CDNs often
+// redirect. Returns null when blocked or failed.
+async function fetchImageChecked(rawUrl: string): Promise<Response | null> {
+  let url = rawUrl;
+  const signal = AbortSignal.timeout(30_000);
+  for (let hop = 0; hop <= MAX_IMAGE_REDIRECTS; hop++) {
+    if (!(await assessProviderUrl(url)).allowed) return null;
+    // 30s cap so a stalled image host cannot hang the whole request;
+    // classified as `image` for triage.
+    const res = await proxyFetch(url, { signal, redirect: 'manual' }, 'google', 'image', 30_000);
+    if (!IMAGE_REDIRECT_STATUSES.has(res.status)) return res;
+    const location = res.headers.get('location');
+    if (!location) return null;
+    try {
+      url = new URL(location, url).href;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // Convert an image URL to a Gemini inlineData part. Handles base64 `data:` URLs
 // directly; for `http(s)` URLs we fetch and inline because the Gemini API does
-// not fetch external URLs itself. Fetching a user-supplied URL is a minor SSRF
-// surface, acceptable for a single-user self-hosted proxy; we still restrict to
-// http/https and cap the size. Returns null (part skipped) on any failure.
+// not fetch external URLs itself. The fetch goes through fetchImageChecked
+// above, and the size is capped. Returns null (part skipped) on any failure.
 async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; data: string } | null> {
   const dataMatch = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(url);
   if (dataMatch) {
@@ -360,12 +390,10 @@ async function imageUrlToInlineData(url: string): Promise<{ mimeType: string; da
   }
   if (/^https?:\/\//i.test(url)) {
     try {
-      // Internal helper that turns an image URL into inline data for the
-      // Gemini request body. No formal timeout — relies on the platform's
-      // own default. Use a 30s cap to avoid hanging the whole request when
-      // an image host stalls; classify as `image` for triage.
-      const res = await proxyFetch(url, { signal: AbortSignal.timeout(30_000) }, 'google', 'image', 30_000);
-      if (!res.ok) return null;
+      const res = await fetchImageChecked(url);
+      if (!res || !res.ok) return null;
+      const declared = Number(res.headers.get('content-length'));
+      if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null;
       const mimeType = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';

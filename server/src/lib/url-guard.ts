@@ -190,6 +190,13 @@ export interface AssessOptions {
   resolve?: (hostname: string) => Promise<string[]>;
   // Overrides the env flag; when true, loopback/private addresses are blocked.
   blockPrivate?: boolean;
+  // What to do when the hostname cannot be resolved (lookup error or no
+  // addresses). Defaults to blocking: a request-time check that cannot classify
+  // the target must not let the fetch go ahead and resolve it on its own
+  // (#1875). Only the save-time checks in routes/keys.ts pass true, so a LAN
+  // host that is offline right now can still be stored; every request to it is
+  // checked again, and blocked until it resolves.
+  allowUnresolved?: boolean;
 }
 
 async function defaultResolve(hostname: string): Promise<string[]> {
@@ -235,11 +242,13 @@ export async function assessProviderUrl(rawUrl: string, opts: AssessOptions = {}
     try {
       addresses = await (opts.resolve ?? defaultResolve)(hostname);
     } catch {
-      // Unresolvable now may resolve later (device not on the LAN yet, DNS
-      // hiccup). Saving is harmless — the request-time check runs again.
-      return { allowed: true };
+      addresses = [];
     }
-    if (addresses.length === 0) return { allowed: true };
+    if (addresses.length === 0) {
+      return opts.allowUnresolved
+        ? { allowed: true }
+        : { allowed: false, reason: `could not resolve ${hostname}, so its address could not be checked` };
+    }
   }
 
   const blockPrivate = opts.blockPrivate ?? blockPrivateEnabled();

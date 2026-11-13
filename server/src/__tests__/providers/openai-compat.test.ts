@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import dns from 'node:dns';
 import { OpenAICompatProvider, inBandCreditsError } from '../../providers/openai-compat.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 describe('OpenAICompatProvider', () => {
   let provider: OpenAICompatProvider;

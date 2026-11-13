@@ -80,9 +80,9 @@ export function createProxyRateLimiter(rpmLimit?: number) {
 // Per-IP fixed-window rate limiter for the /api/* admin surface.
 //
 // This is a flood guard, not the brute-force guard: dashboard login already has
-// its own per-email lockout (routes/auth.ts), and the one admin endpoint that
-// verifies a password — GET /api/keys/export — gets its own much tighter
-// limiter mounted in app.ts. The broad cap therefore has to clear normal
+// its own per-email lockout (routes/auth.ts), and the admin endpoints that
+// re-verify a password — GET /api/keys/export and POST /api/keys/:id/reveal —
+// get their own much tighter limiters mounted in app.ts. The broad cap therefore has to clear normal
 // dashboard traffic with room to spare. Opening the dashboard fans out across
 // keys, health, models, analytics, settings and profiles, and several of those
 // poll, so a single user legitimately spends dozens of requests a minute.

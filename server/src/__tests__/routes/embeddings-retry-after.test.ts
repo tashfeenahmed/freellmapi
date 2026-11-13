@@ -10,6 +10,10 @@ import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 const realFetch = globalThis.fetch;
 

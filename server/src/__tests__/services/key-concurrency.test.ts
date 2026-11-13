@@ -64,6 +64,13 @@ describe('in-flight leases', () => {
     expect(inFlightForKey('groq', 1)).toBe(1);
   });
 
+  it('keeps a lease for a ten-minute call (AMD Radeon is built with a 600s timeout)', () => {
+    vi.useFakeTimers();
+    acquireLease('radeon', 'some-reasoning-model', 1, 100);
+    vi.advanceTimersByTime(12 * 60 * 1000);
+    expect(inFlightForKey('radeon', 1)).toBe(1);
+  });
+
   it('never ages out a lease for a platform configured with no timeout', () => {
     vi.useFakeTimers();
     process.env.PROVIDER_TIMEOUT_GROQ = '0';
@@ -78,8 +85,8 @@ describe('in-flight leases', () => {
     acquireLease('groq', 'llama-3.3-70b', 1, 100);
     expect(inFlightForKey('groq', 1)).toBe(1);
 
-    // Past the backstop age (10 min floor for a 120s platform timeout).
-    vi.advanceTimersByTime(11 * 60 * 1000);
+    // Past the backstop age (30 min floor for a 120s platform timeout).
+    vi.advanceTimersByTime(31 * 60 * 1000);
     expect(inFlightForKey('groq', 1)).toBe(0);
   });
 });

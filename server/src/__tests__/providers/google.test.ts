@@ -69,6 +69,76 @@ describe('GoogleProvider', () => {
     expect(parts).toContainEqual({ inlineData: { mimeType: 'image/png', data: 'iVBORw0KGgo=' } });
   });
 
+  // #1881: caller-supplied image URLs get the custom-provider address policy,
+  // on the first URL and on every redirect hop.
+  describe('image URL fetches (#1881)', () => {
+    const geminiOk = () => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const png = () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } });
+    const redirect = (to: string) => new Response(null, { status: 302, headers: { location: to } });
+
+    async function send(url: string, fetchImpl: (u: string) => Response) {
+      const seen: string[] = [];
+      const spy = vi.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const u = String(input);
+        if (u.includes('generativelanguage.googleapis.com')) return geminiOk();
+        seen.push(u);
+        return fetchImpl(u);
+      });
+      await provider.chatCompletion('test-key', [
+        { role: 'user', content: [
+          { type: 'text', text: 'what is this?' },
+          { type: 'image_url', image_url: { url } },
+        ] as any },
+      ], 'gemini-2.5-flash');
+      const geminiCall = spy.mock.calls.find(c => String(c[0]).includes('generativelanguage.googleapis.com'))!;
+      const parts = JSON.parse((geminiCall[1] as any).body).contents[0].parts;
+      return { seen, parts };
+    }
+
+    it('never requests a metadata address and skips the image', async () => {
+      const { seen, parts } = await send('http://169.254.169.254/latest/meta-data/', png);
+      expect(seen).toEqual([]);
+      expect(parts.some((p: any) => p.inlineData)).toBe(false);
+    });
+
+    it('does not follow a redirect from a public host to a metadata address', async () => {
+      const { seen, parts } = await send('http://203.0.113.5/cat.png', (u) =>
+        u.startsWith('http://203.0.113.5') ? redirect('http://169.254.169.254/latest/meta-data/') : png());
+      expect(seen).toEqual(['http://203.0.113.5/cat.png']);
+      expect(parts.some((p: any) => p.inlineData)).toBe(false);
+    });
+
+    it('asks fetch not to follow redirects itself', async () => {
+      const spy = vi.spyOn(global, 'fetch');
+      await send('http://203.0.113.5/cat.png', png);
+      const imageCall = spy.mock.calls.find(c => String(c[0]) === 'http://203.0.113.5/cat.png')!;
+      expect((imageCall[1] as any).redirect).toBe('manual');
+    });
+
+    it('follows a redirect to another public host and inlines the image', async () => {
+      const { seen, parts } = await send('http://203.0.113.5/cat.png', (u) =>
+        u.startsWith('http://203.0.113.5') ? redirect('http://198.51.100.7/cdn/cat.png') : png());
+      expect(seen).toEqual(['http://203.0.113.5/cat.png', 'http://198.51.100.7/cdn/cat.png']);
+      expect(parts).toContainEqual({ inlineData: { mimeType: 'image/png', data: Buffer.from([1, 2, 3]).toString('base64') } });
+    });
+
+    it('gives up after too many redirects', async () => {
+      let n = 0;
+      const { seen, parts } = await send('http://203.0.113.5/a', () => redirect(`http://203.0.113.5/r${++n}`));
+      expect(seen.length).toBe(4);
+      expect(parts.some((p: any) => p.inlineData)).toBe(false);
+    });
+
+    it('skips an image whose declared size is over the cap without reading it', async () => {
+      const { parts } = await send('http://203.0.113.5/huge.png', () =>
+        new Response(new Uint8Array([1]), { status: 200, headers: { 'content-type': 'image/png', 'content-length': String(9 * 1024 * 1024) } }));
+      expect(parts.some((p: any) => p.inlineData)).toBe(false);
+    });
+  });
+
   it('should throw on API error', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: false,

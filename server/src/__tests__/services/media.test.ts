@@ -4,6 +4,10 @@ import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription } from '../../services/media.js';
 import { registerCustomMediaModel } from '../../services/custom-media-register.js';
 import { clearCooldownsForKey, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 const realFetch = globalThis.fetch;
 
