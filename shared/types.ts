@@ -64,6 +64,7 @@ export type Platform =
   | 'google'
   | 'groq'
   | 'cerebras'
+  | 'mixlayer'
   // Sail Research — native Responses API provider. $5 in free credits refreshes
   // monthly when a payment method is attached; usage beyond the grant is
   // pay-as-you-go. Background polling is required for its flex-only models.

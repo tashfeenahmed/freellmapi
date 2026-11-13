@@ -46,6 +46,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'plugsky', label: 'Plugsky (free chat aliases)', url: 'https://plugsky.com/dashboard' },
   { value: 'inferbase', label: 'Inferbase (shared monthly and daily allowance)', url: 'https://inferbase.ai' },
   { value: 'simplellm', label: 'SimpleLLM (shared hourly and daily free quota)', url: 'https://app.simplellm.eu' },
+  { value: 'mixlayer', label: 'Mixlayer', url: 'https://console.mixlayer.com' },
   { value: 'llmtr', label: 'LLMTR (daily free-model quotas)', url: 'https://llmtr.com' },
   { value: 'gizmo', label: 'Gizmo (monthly free-model requests)', url: 'https://gizmoplatforms.com/developers' },
   { value: 'blockrun', label: 'BlockRun (zero-priced models)', url: 'https://user.blockrun.ai/dashboard/keys' },
@@ -159,7 +160,7 @@ export const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
   rate_limited: 'bg-amber-500',
   invalid: 'bg-rose-500',
-  error: 'bg-rose-500',
+   error: 'bg-rose-500',
   unknown: 'bg-muted-foreground/40',
 }
 

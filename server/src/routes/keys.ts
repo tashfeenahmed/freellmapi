@@ -64,6 +64,7 @@ const PLATFORMS = [
   'plugsky',
   'inferbase',
   'simplellm',
+  'mixlayer',
   'llmtr',
   'gizmo',
   'blockrun',
