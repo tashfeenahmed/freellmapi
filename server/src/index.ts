@@ -3,7 +3,7 @@ import { createApp } from './app.js';
 import { initDb, getDb } from './db/index.js';
 import { startHealthChecker, checkAllKeys } from './services/health.js';
 import { restoreProxySettings, flushProxyCache } from './lib/proxy.js';
-import { startWakeDetect } from './lib/wake-detect.js';
+import { startWakeDetect, stopWakeDetect } from './lib/wake-detect.js';
 import { startCatalogSync } from './services/catalog-sync.js';
 import { startCooldownProbe } from './services/cooldown-probe.js';
 import { startCustomModelSync } from './services/custom-model-sync.js';
@@ -126,7 +126,12 @@ async function main() {
   const server = app.listen(Number(PORT), HOST, onReady(HOST));
   tuneKeepAlive(server);
   const servers = [server];
-  installGracefulShutdown({ servers: () => servers.filter(s => s.listening), closeDb: () => getDb().close?.() });
+  installGracefulShutdown({
+    servers: () => servers.filter(s => s.listening),
+    // Every job is on the scheduler except the wake heartbeat.
+    stopJobs: () => { scheduler.stopAll(); stopWakeDetect(); },
+    closeDb: () => getDb().close?.(),
+  });
   server.on('error', (err: NodeJS.ErrnoException) => {
     // The default '::' bind fails where IPv6 is disabled (kernel
     // ipv6.disable=1 and the like) — retry IPv4-only rather than dying.

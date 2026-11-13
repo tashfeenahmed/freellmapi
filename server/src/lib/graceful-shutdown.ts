@@ -10,6 +10,9 @@ import type { Server } from 'node:http';
 export function installGracefulShutdown(options: {
   servers: () => Server[];
   closeDb: () => void;
+  /** Stops background jobs (health checks, syncs, backups) so none fires
+   *  during the drain and starts work against a database about to close. */
+  stopJobs?: () => void;
   graceMs?: number;
   proc?: Pick<NodeJS.Process, 'once' | 'exit'>;
   logger?: Pick<Console, 'log' | 'error'>;
@@ -19,12 +22,28 @@ export function installGracefulShutdown(options: {
   const graceMs = options.graceMs ?? 8_000;
   let stopping = false;
 
+  const closeDb = () => {
+    try {
+      options.closeDb();
+    } catch (err) {
+      logger.error(`[server] closing the database failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   const shutdown = (signal: string) => {
     if (stopping) return;
     stopping = true;
     logger.log(`[server] ${signal} received — finishing in-flight requests and shutting down`);
+    try {
+      options.stopJobs?.();
+    } catch (err) {
+      logger.error(`[server] stopping background jobs failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
     const force = setTimeout(() => {
       logger.error(`[server] still busy after ${graceMs} ms — exiting anyway`);
+      // Exit follows synchronously, so no stuck request runs against the
+      // closed handle; closing checkpoints the WAL instead of abandoning it.
+      closeDb();
       proc.exit(1);
     }, graceMs);
     force.unref?.();
@@ -32,11 +51,7 @@ export function installGracefulShutdown(options: {
     const servers = options.servers();
     let open = servers.length;
     const finish = () => {
-      try {
-        options.closeDb();
-      } catch (err) {
-        logger.error(`[server] closing the database failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      closeDb();
       clearTimeout(force);
       proc.exit(0);
     };

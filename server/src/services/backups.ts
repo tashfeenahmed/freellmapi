@@ -532,7 +532,9 @@ export function startBackupScheduler(scheduler: Scheduler): () => void {
     const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     if (hhmm < schedule.time) return;
 
-    const today = now.toISOString().slice(0, 10);
+    // The local date, matching the local hh:mm above. The UTC date rolled over
+    // mid-day east of UTC, and the same local day got a second backup (M39).
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     if (lastRunDay === today) return;
 
     const intervalDays = Math.max(1, schedule.intervalDays);
