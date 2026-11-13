@@ -47,7 +47,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -1410,21 +1410,30 @@ async function callTranscriptionProvider(
     }
     case 'freeai':
     case 'cohere':
+    case 'electronhub':
     case 'ovh': {
+      if (m.platform === 'electronhub' && !['voxtral-mini-2602', 'deepgram-nova-3'].includes(m.modelId)) throw new MediaError('Unknown ElectronHub transcription model', 400);
       if (m.platform === 'freeai' && m.modelId !== 'whisper') throw new MediaError('Unknown Free.ai transcription model', 400);
       if (m.platform === 'ovh' && !['whisper-large-v3', 'whisper-large-v3-turbo'].includes(m.modelId)) throw new MediaError('Unknown OVH transcription model', 400);
       const url = m.platform === 'freeai' ? `${FREEAI_BASE_URL}/v1/stt/transcribe/`
         : m.platform === 'cohere' ? 'https://api.cohere.com/v2/audio/transcriptions'
+          : m.platform === 'electronhub' ? `${ELECTRONHUB_BASE_URL}/audio/transcriptions`
           : 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/audio/transcriptions';
       const form = new FormData();
       // Cohere parses metadata before the upload; it requires a language.
       form.append('model', m.modelId);
+      if (m.platform === 'electronhub') {
+        form.append('response_format', 'json');
+        if (p.prompt) form.append('prompt', p.prompt);
+        if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
+      }
       if (m.platform === 'cohere' || p.language) form.append('language', p.language || 'en');
       form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
       const r = await mediaFetch(url, m.platform, 'transcription', {
         method: 'POST', redirect: 'error', headers: m.platform === 'ovh' ? {} : bearerAuthHeader(key), body: form,
       });
-      const j = await r.json() as { text?: unknown; language?: unknown; duration?: unknown; segments?: unknown; error?: unknown } | null;
+      const j = await r.json() as { model?: unknown; text?: unknown; language?: unknown; duration?: unknown; segments?: unknown; error?: unknown } | null;
+      if (m.platform === 'electronhub' && j?.model !== undefined && j.model !== m.modelId) throw new MediaError('ElectronHub returned a substituted transcription model', 502);
       if (j?.error || typeof j?.text !== 'string') throw new MediaError(`${m.platform} returned no transcription text`, 502);
       return { text: j.text, language: typeof j.language === 'string' ? j.language : undefined,
         duration: typeof j.duration === 'number' ? j.duration : undefined, segments: Array.isArray(j.segments) ? j.segments : undefined };

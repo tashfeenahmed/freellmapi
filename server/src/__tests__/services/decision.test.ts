@@ -64,9 +64,9 @@ describe('decision service', () => {
   });
 
   it('has adapters for the supported decision platforms', () => {
-    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'custom', 'halx', 'openrouter']);
+    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'custom', 'google', 'halx', 'openrouter']);
     // Custom endpoints are user-registered (#1777): the catalog never adds or prunes them.
-    expect([...CATALOG_DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'halx', 'openrouter']);
+    expect([...CATALOG_DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'google', 'halx', 'openrouter']);
   });
 
   function seed(platform: string, model: string) {
