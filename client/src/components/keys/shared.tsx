@@ -112,6 +112,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
   // Free: glm-4.7-flash $0/1M in+out (0 Credits) on Models UI, 2026-10-22.
   { value: 'powertokens', label: 'PowerTokens (free: glm-4.7-flash)', url: 'https://www.powertokens.ai' },
+  // Free during the beta with no rate limit, then 5K in + 1K out tokens/hour, 2026-11-10.
+  { value: 'cheapllm', label: 'cheapllm.shop (free: DeepSeek V4.1 Flash)', url: 'https://cheapllm.shop/signup' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name

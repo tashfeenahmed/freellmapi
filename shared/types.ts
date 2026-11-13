@@ -150,6 +150,11 @@ export type Platform =
   // glm-4.7-flash ($0 / 1M in+out, 0 Credits). RPM/RPD unpublished. Hosted
   // catalog only (no migration seed), same as the anyapi/bai gateways.
   | 'powertokens'
+  // cheapllm.shop - OpenAI-compatible host for one model, DeepSeek V4.1 Flash
+  // 1017. Free with no rate limit during its beta; afterwards a permanent free
+  // tier of at least 5,000 input + 1,000 output tokens per hour per account.
+  // Email sign-up, no card. Hosted catalog only (no migration seed).
+  | 'cheapllm'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
