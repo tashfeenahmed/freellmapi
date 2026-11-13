@@ -24,14 +24,23 @@ function bridge(): DesktopUpdaterBridge | null {
   return (window as { __FREEAPI_UPDATER__?: DesktopUpdaterBridge }).__FREEAPI_UPDATER__ ?? null
 }
 
-/** True when this page runs in a desktop build with the updater bridge. */
-export function hasDesktopUpdater(): boolean {
-  return bridge() !== null
-}
-
-/** Starts a desktop update check; the new state arrives through the hook. */
-export function checkDesktopUpdates(): Promise<DesktopUpdateState> | null {
-  return bridge()?.check() ?? null
+/**
+ * Starts a desktop update check (the new state arrives through the hook) and
+ * resolves true, or resolves false with nothing started: in a browser, in a
+ * desktop build that cannot replace itself, and when the bridge does not
+ * answer. The preload exposes the bridge on every desktop build, so its mere
+ * presence is not enough — on false the caller asks the server instead (M37).
+ */
+export async function startDesktopUpdateCheck(): Promise<boolean> {
+  const updater = bridge()
+  if (!updater) return false
+  try {
+    if ((await updater.state()).phase === 'unsupported') return false
+  } catch {
+    return false
+  }
+  void updater.check()
+  return true
 }
 
 /**
@@ -46,7 +55,8 @@ export function useDesktopUpdater() {
   useEffect(() => {
     if (!updater) return
     let cancelled = false
-    void updater.state().then(next => { if (!cancelled) setState(next) })
+    // A bridge that cannot report leaves the state null: callers fall back.
+    updater.state().then(next => { if (!cancelled) setState(next) }, () => {})
     const unsubscribe = updater.subscribe(next => setState(next))
     return () => {
       cancelled = true

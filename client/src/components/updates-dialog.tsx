@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { CopyButton } from '@/components/copy-button'
 import { UPDATE_CHECK_CHANGED_EVENT } from '@/components/update-reminder'
 import { apiFetch } from '@/lib/api'
-import { checkDesktopUpdates, hasDesktopUpdater, useDesktopUpdater } from '@/lib/desktop-updater'
+import { startDesktopUpdateCheck, useDesktopUpdater } from '@/lib/desktop-updater'
 import { useDockerUpdate } from '@/lib/docker-update'
 import { RELEASES_URL } from '@/lib/updates'
 import { useI18n } from '@/i18n'
@@ -65,13 +65,14 @@ function UpdatesContent() {
   // Runs on open and on every retry; state is only set once answers are back.
   useEffect(() => {
     let cancelled = false
-    if (hasDesktopUpdater()) {
-      void checkDesktopUpdates()
-    } else {
+    // A desktop build that cannot update itself (dev, portable zip, deb/rpm)
+    // still has the bridge; it gets the server's answer instead of a spinner.
+    void startDesktopUpdateCheck().then(started => {
+      if (started || cancelled) return
       apiFetch<CheckResult>('/api/update/check')
         .then(r => { if (!cancelled) setResult(r) }, () => { if (!cancelled) setFailed(true) })
         .finally(() => { if (!cancelled) setChecking(false) })
-    }
+    })
     return () => { cancelled = true }
   }, [attempt])
 
