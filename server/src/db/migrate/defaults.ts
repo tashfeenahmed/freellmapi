@@ -41,6 +41,7 @@ import * as customEndpointGroupLabel from '../migrations/20260930_000001_custom_
 import * as searchEngines from '../migrations/20261013_000001_search_engines.js';
 import * as decisionRequests from '../migrations/20261016_000001_decision_requests.js';
 import * as llmtrReenableKeys from '../migrations/20261017_000001_llmtr_reenable_keys.js';
+import * as tombstoneChainSnapshot from '../migrations/20261113_000001_tombstone_chain_snapshot.js';
 
 export interface MigrationModule {
   up(db: Db): void;
@@ -94,6 +95,7 @@ export const QUOTA_SNAPSHOT_FRESHNESS_FILENAME = '20260915_000001_quota_snapshot
 export const SEARCH_ENGINES_FILENAME = '20261013_000001_search_engines.ts';
 export const DECISION_REQUESTS_FILENAME = '20261016_000001_decision_requests.ts';
 export const LLMTR_REENABLE_KEYS_FILENAME = '20261017_000001_llmtr_reenable_keys.ts';
+export const TOMBSTONE_CHAIN_SNAPSHOT_FILENAME = '20261113_000001_tombstone_chain_snapshot.ts';
 
 export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: LEGACY_BASELINE_FILENAME, module: legacyBaseline },
@@ -138,4 +140,5 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: SEARCH_ENGINES_FILENAME, module: searchEngines },
   { filename: DECISION_REQUESTS_FILENAME, module: decisionRequests },
   { filename: LLMTR_REENABLE_KEYS_FILENAME, module: llmtrReenableKeys },
+  { filename: TOMBSTONE_CHAIN_SNAPSHOT_FILENAME, module: tombstoneChainSnapshot },
 ];
