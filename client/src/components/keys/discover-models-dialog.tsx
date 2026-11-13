@@ -101,7 +101,13 @@ export function DiscoverModelsDialog({
           ...(endpoint.keyId === undefined ? { baseUrl: endpoint.baseUrl } : { keyId: endpoint.keyId }),
           ...(endpoint.apiKey ? { apiKey: endpoint.apiKey } : {}),
           ...(endpoint.groupLabel?.trim() ? { groupLabel: endpoint.groupLabel.trim() } : {}),
-          models: [...selected],
+          // #1506: forward each picked model's discovered kind so the server
+          // registers generic-id media/embedding models in the right table
+          // instead of re-classifying by id and dropping them to chat.
+          models: [...selected].map(id => {
+            const discovered = models.find(m => m.id === id)
+            return discovered?.kind ? { model: id, kind: discovered.kind } : id
+          }),
         }),
       }),
     onSuccess: (data) => {

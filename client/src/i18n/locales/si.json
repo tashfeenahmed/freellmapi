@@ -347,7 +347,25 @@
     "scoreColumn": "ලකුණු",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "රවුටරයේ පීඩනය",
@@ -524,6 +542,8 @@
     "providerActions": "සපයන්නාගේ ක්රියාවන්",
     "routeViaProxy": "ප්‍රොක්සි හරහා ගමන් කරන්න",
     "checkNow": "දැන් පරීක්ෂා කරන්න",
+    "lastWorkedHint": "Last worked: {when}",
+    "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "මෙම සපයන්නා ස්වයංක්‍රීය යතුරු පරීක්ෂා කිරීමට ඉඩ නොදේ. පළමු ඉල්ලීම සපුරාලීමෙන් පසු යතුර නිරෝගී වේ.",
     "noModelsYetHint": "ඔබේ නාමාවලියේ තවමත් මෙම සපයන්නාගේ ආකෘති නොමැති බැවින් සපුරාලීමට කිසිවක් නැත.",
     "proxyEnvHintBefore": "හරහා ද වින්‍යාසගත කළ හැක",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "මෙම යතුර දැන්ම පිටපත් කරන්න — එය නැවත නොපෙන්වයි.",
     "cpEnabledAria": "පැතිකඩ සක්‍රීයයි",
     "selectKey": "මෙම යතුර තෝරන්න",
+    "selectModel": "මෙම ආකෘතිය තෝරන්න",
     "bulkSelected": "{count} තෝරා ඇත",
     "bulkEnable": "සියල්ල සබල කරන්න",
     "bulkDisable": "සියල්ල අබල කරන්න",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "මාසික ටෝකන් සීමාව",
     "capUnlimitedPlaceholder": "සීමා රහිත",
     "capEditHint": "සීමාවන් සෑම මාසයකම 1 වන දා 00:00 UTC ට යළි සකසයි. සීමා රහිතට හිස්ව තබන්න.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "මෙම මාසය ඉල්ලීම් {requests}, ටෝකන් {tokens}",
     "quotaBalanceHint": "{limit} {metric} න් {remaining} ඉතිරියි",
-    "quotaBalanceLeft": "{remaining} ඉතිරියි"
-,
+    "quotaBalanceLeft": "{remaining} ඉතිරියි",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "සේවාදායකය ලියන පරිදි ඇතුළත් කිරීම් මෙහි දිස්වේ. ප්‍රතිදානයක් අපේක්ෂා කළේ නම් මට්ටම, සපයන්නා හෝ සෙවුම් පෙරහන් පුළුල් කරන්න.",
     "noLevelsTitle": "මට්ටම් තෝරා නැත",
     "noLevelsDescription": "ලොග ප්‍රතිදානය බැලීමට අවම වශයෙන් එක් මට්ටමක් සක්‍රීය කරන්න.",
-    "loadFailed": "සේවාදායක ලොගය පූරණය කළ නොහැකි විය."
+    "loadFailed": "සේවාදායක ලොගය පූරණය කළ නොහැකි විය.",
+    "eventFilter": "සිදුවීම",
+    "allEvents": "සිදුවීම් සියල්ල"
   },
   "playground": {
     "title": "ක්රීඩා පිටිය",
@@ -1163,7 +1192,8 @@
       "openclaw": "ඔබේම යන්ත්‍රයෙන් WhatsApp, Telegram, Discord සහ තවත් ඒවායේ පිළිතුරු දෙන, සැමවිටම ක්‍රියාත්මක පුද්ගලික සහායකයෙක්.",
       "hermes": "Nous Research හි ස්වයං-වැඩිදියුණු වන ඒජන්තය, ස්ථිර මතකය සහ කුසලතා සමඟ, ටර්මිනලයේ හෝ චැට් යෙදුම්වල.",
       "pi": "ඔබේම දිගු, කුසලතා සහ prompt සැකිලි සමඟ හැඩගස්වන අවම ටර්මිනල් ඒජන්තයක්.",
-      "reasonix": "DeepSeek සඳහා සාදන ලද ටර්මිනල් කේතන නියෝජිතයෙක්; දිගු සැසි ලාභදායීව තබා ගැනීමට prefix caching මත ගොඩනගා ඇත."
+      "reasonix": "DeepSeek සඳහා සාදන ලද ටර්මිනල් කේතන නියෝජිතයෙක්; දිගු සැසි ලාභදායීව තබා ගැනීමට prefix caching මත ගොඩනගා ඇත.",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

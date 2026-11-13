@@ -425,6 +425,36 @@ export function isProviderLevelError(err: any): boolean {
     || msg.includes('fetch failed');   // undici transport error (DNS/TLS/proxy down)
 }
 
+// #1347 (PR 1): provider-moment failures — the "provider had a bad minute"
+// class: a 429, a 5xx, a degraded deployment, a timeout, a transport drop
+// (including a mid-stream reset / truncated SSE), or rate-limit wording on a
+// response that carried no structured status. This is evidence about the
+// provider's minute, not the model's quality: when failure attribution is
+// enabled such failures still steer the key (the cooldown ladder is
+// untouched) but are excluded from the model-level books — the reliability
+// stats and the failure penalties. Deliberately NOT in this class: auth
+// (401/403), quota (402), model-not-found (404/410), context-too-large,
+// empty completions and model-scoped 400s, which keep their existing
+// key/model-scoped handling.
+export function isProviderMomentFailure(err: any): boolean {
+  // A canceled request (client hang-up, time-budget hedge) is the gateway's
+  // own doing. isTransportError already treats those as non-transport, but
+  // the timeout-marker text check below could still match an abort message.
+  if (isClientAbortError(err) || isHedgeAbortError(err)) return false;
+  if (err?.skipModelForRequest === true) return false;
+  const status = typeof err?.status === 'number' ? err.status : 0;
+  if (status === 429 || status >= 500) return true;
+  if (isProviderDegradedError(err)) return true;
+  if (isTransportError(err)) return true;
+  if (isStreamTruncatedError(err)) return true;
+  const msg = (err?.message ?? '').toLowerCase();
+  if (isTimeoutErrorText(msg)) return true;
+  // Rate-limit wording without a structured status: some gateways answer a
+  // throttled request with a 200/500 body that only says "rate limit".
+  if (status === 0 && (msg.includes('rate limit') || msg.includes('too many requests'))) return true;
+  return false;
+}
+
 // #809: kilo's free relay occasionally answers with a bare classification
 // word ("safe" / "unsafe") instead of a real reply — an upstream content
 // filter, not the requested model. Such a turn is a dead turn: treat it like
@@ -501,6 +531,11 @@ export function isContextTooLargeError(err: any): boolean {
     || /input[^.]*longer than (the )?(max|maximum)/.test(msg)
     || msg.includes('exceeds the maximum number of tokens')
     || msg.includes('request too large')
+    // BazaarLink: 400 "This request is too large for a free tier" (#1717).
+    // No window named, but it is a size rejection: without this it was
+    // bucketed as provider_bad_request and the next candidate got the same
+    // oversized payload.
+    || msg.includes('request is too large')
     || msg.includes('payload too large')
     || msg.includes('request entity too large')
     || msg.includes('request body too large')

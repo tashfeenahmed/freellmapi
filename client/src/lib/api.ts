@@ -54,7 +54,11 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     // Surface the HTTP status and the machine-readable error type on the thrown
     // Error so callers can branch on them (e.g. the setup form reveals a code
     // field on a `setup_code_required` 403). `.message` behaviour is unchanged.
-    const err = new Error(body.error?.message ?? `HTTP ${res.status}`) as ApiError;
+    // Most routes send { error: { message, type } }; some (e.g. /api/premium)
+    // send { error: '...' }. Without the string case those users only saw
+    // "HTTP 502".
+    const message = typeof body.error === 'string' ? body.error : body.error?.message;
+    const err = new Error(message || `HTTP ${res.status}`) as ApiError;
     err.status = res.status;
     err.code = body.error?.type;
     throw err;

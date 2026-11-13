@@ -46,7 +46,7 @@ import { customModelSyncFreePatterns, customModelSyncIntervalMs } from './custom
  *  zero rows, enabled or disabled, in the signed live catalog (checked against
  *  2026.09.27). Remove a platform here in the same change that adds it to the
  *  catalog; managedPlatforms in the catalog covers binaries already shipped. */
-export const BUILTIN_DISCOVERY_PLATFORMS: readonly Platform[] = ['github', 'longcat', 'siliconflow'];
+export const BUILTIN_DISCOVERY_PLATFORMS: readonly Platform[] = ['longcat', 'siliconflow'];
 
 /** `BUILTIN_MODEL_DISCOVERY`: 'manual' (default) keeps only the dashboard's
  *  Fetch models action, so nothing is registered without the operator picking

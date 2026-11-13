@@ -14,9 +14,12 @@
 import { getDb } from '../db/index.js';
 import { logRequest } from '../lib/request-log.js';
 import { decrypt } from '../lib/crypto.js';
+import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { USABLE_KEY_SQL } from './key-state.js';
 import { runFailoverChain } from '../lib/failover-chain.js';
+import { checkMonthlyBudget, secondsUntilNextMonth } from './key-budget.js';
+import { markKeyHealthyFromRequest } from './health.js';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -40,9 +43,17 @@ export interface ModerationResult {
 
 export class ModerationError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  retryAfterMs?: number;
+  /** Seconds the caller should wait before retrying (429 exhaustion). */
+  retryAfterSec?: number;
+  // Same shape as the other failover-chain errors (lib/failover-chain.ts).
+  constructor(message: string, status: number, code?: string, retryAfterMs?: number) {
     super(message);
     this.status = status;
+    this.code = code;
+    this.retryAfterMs = retryAfterMs;
+    this.retryAfterSec = retryAfterMs === undefined ? undefined : retryAfterMs / 1000;
   }
 }
 
@@ -72,14 +83,18 @@ export function listModerationModels(): ModerationModelRow[] {
   const rows: ModerationModelRow[] = [];
   for (const platform of PLATFORM_ORDER) {
     const ep = MODERATION_MODELS[platform];
-    const key = db.prepare(`
-      SELECT id, encrypted_key, iv, auth_tag
+    const keys = db.prepare(`
+      SELECT id, encrypted_key, iv, auth_tag, model_scope_json
         FROM api_keys
        WHERE platform = ?
          AND ${USABLE_KEY_SQL}
        ORDER BY id
-       LIMIT 1
-    `).get(platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
+    `).all(platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string; model_scope_json: string | null }[];
+    // Per-key model scope (#657): a relay key scoped to a chat model group must
+    // never be picked to serve the moderation model — the same wall the chat
+    // router and search pools honour. Walk the platform's keys in the old
+    // first-key order and take the first one the scope admits.
+    const key = keys.find(k => scopeAllows(parseModelScope(k.model_scope_json), ep.modelId));
     if (key) {
       rows.push({
         platform,
@@ -156,7 +171,7 @@ function logModerationRequest(
   // Through logRequest so the row also reaches request_hourly and the lifetime
   // totals; it swallows its own DB errors.
   logRequest(row.platform, row.modelId, row.keyId, status, 0, 0, latencyMs, error,
-    null, null, null, null, 'moderation');
+    null, null, null, null, null, 'moderation');
 }
 
 /* ------------------------------------------------------------------ */
@@ -192,6 +207,11 @@ export async function runModerations(
     throw new ModerationError(`No enabled providers for moderation model '${resolved}'.`, 503);
   }
 
+  // #1158: a moderation call spends real provider quota, so a key at its
+  // monthly cap must not serve one. Every other inference surface checks the
+  // caps before dispatch (router, embeddings, media, search). A capped key is
+  // reported after the chain with the month-reset Retry-After.
+  let budgetBlocked = false;
   const res = await runFailoverChain({
     rows: chain,
     signal: clientSignal,
@@ -199,15 +219,26 @@ export async function runModerations(
     route: row => ({ platform: row.platform, modelId: row.modelId }),
     reserve: (row, skip) => {
       if (skip(row.keyId)) return { credential: null, budgetBlocked: false };
+      let key: string;
       try {
-        return { credential: { id: row.keyId, key: decrypt(row.encryptedKey, row.iv, row.authTag) }, budgetBlocked: false };
+        key = decrypt(row.encryptedKey, row.iv, row.authTag);
       } catch {
         return { credential: null, budgetBlocked: false };
       }
+      if (!checkMonthlyBudget(row.keyId, 0).allowed) {
+        budgetBlocked = true;
+        return { credential: null, budgetBlocked: false };
+      }
+      return { credential: { id: row.keyId, key }, budgetBlocked: false };
     },
     attempt: (row, credential) => callProvider(row, credential.key, inputs, clientSignal),
-    log: (row, _keyId, o) =>
-      logModerationRequest(row, o.kind, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null),
+    log: (row, _keyId, o) => {
+      // A served moderation is the evidence the key works, the same as a
+      // served chat request (#1493): it stamps last_healthy_at and lifts an
+      // 'unknown' or 'error' key.
+      if (o.kind === 'success') markKeyHealthyFromRequest(row.keyId);
+      logModerationRequest(row, o.kind, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null);
+    },
   });
   if (res.ok) {
     return {
@@ -218,8 +249,22 @@ export async function runModerations(
   }
 
   const { lastError } = res;
+  // A monthly-cap exhaustion outranks a transport failure in the reply: the
+  // caller needs the month-reset Retry-After, not a "try another provider" 502.
+  if (budgetBlocked && (!lastError || lastError.status === 429)) {
+    const exhausted = new ModerationError(
+      'Monthly key budget exhausted.',
+      429,
+      'quota_exceeded',
+      secondsUntilNextMonth() * 1000,
+    );
+    throw exhausted;
+  }
+
   throw new ModerationError(
     `All moderation providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,
+    lastError?.code,
+    lastError?.retryAfterMs,
   );
 }

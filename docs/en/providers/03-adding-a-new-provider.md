@@ -48,7 +48,8 @@ Env-tunable timeouts come automatically via `PROVIDER_TIMEOUT_<PLATFORM>` (#547)
 `validateKey` returns a boolean or `{ valid: false, error }`. Use the inherited `validationResult(res)` helper to turn 401/403 into a diagnostic failure carrying the upstream reason. Two hard rules learned in production:
 
 1. **Never trust a public models endpoint as proof of a valid key** (pollinations #608, modelscope): if `GET /v1/models` answers 200 unauthenticated, probe something authenticated instead.
-2. **If validation consumes metered quota, cache it or find a free probe** — see [#882](02-quotas-and-cooldowns.md#health-checks-must-not-burn-metered-quota-882). Health runs every ~5 minutes against every stored key.
+2. **If validation consumes metered quota, cache it or find a free probe** — see [#882](02-quotas-and-cooldowns.md#health-checks-must-not-burn-metered-quota-882). Health runs every ~5 minutes against every stored key (`HEALTH_CHECK_INTERVAL_MS` changes that for the whole install).
+3. **If the only check is a malformed request to the billed endpoint** (an empty search, a body the API rejects), override `supportsKeyPolling` to return `false` so the health pass sends it once per key instead of every pass. Providers read repeated malformed requests as abuse: SerpSearch revoked an account over it ([#1599](02-quotas-and-cooldowns.md#health-checks-must-not-burn-metered-quota-882)).
 
 ## 5. Seed the catalog deliberately
 

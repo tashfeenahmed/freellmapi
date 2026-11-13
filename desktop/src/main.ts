@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, dialog, ipcMain, clipboard, nativeTheme, screen, shell, type Tray } from 'electron';
-import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl } from './server.mjs';
+import { app, dialog, ipcMain, clipboard, nativeTheme, net, screen, shell, type Tray } from 'electron';
+import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl, setCatalogFallbackFetch } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale } from './tray.js';
@@ -286,6 +286,11 @@ if (!app.requestSingleInstanceLock()) {
       },
       getLocale: () => locale,
     });
+
+    // License activation and catalog sync retry through Chromium's network
+    // stack (OS certificate store + system proxy) when Node's fetch can't
+    // reach api.freellmapi.co, which some Windows PCs hit as "HTTP 502".
+    setCatalogFallbackFetch((input, init) => net.fetch(String(input), init));
 
     try {
       const { port } = await startServer({

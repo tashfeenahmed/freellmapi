@@ -264,6 +264,44 @@ describe('POST /v1/responses (#96)', () => {
     expect(completed).toContain('"output_text":"Hello"');
   });
 
+  it('stream: a turn cut off at the token limit ends as response.incomplete', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() { throw new Error('should not be called'); },
+      async *streamChatCompletion() {
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { role: 'assistant', content: 'Partial answ' }, finish_reason: null }] };
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: {}, finish_reason: 'length' }] };
+      },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: true }, key);
+    expect(status).toBe(200);
+    expect(text).not.toContain('event: response.completed');
+    const terminal = JSON.parse(text.split('event: response.incomplete\ndata: ')[1].split('\n')[0]);
+    expect(terminal.response).toMatchObject({
+      status: 'incomplete',
+      incomplete_details: { reason: 'max_output_tokens' },
+      output_text: 'Partial answ',
+    });
+    expect(terminal.response.output[0].status).toBe('incomplete');
+  });
+
+  it('non-stream: a turn cut off at the token limit is incomplete', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() {
+        return {
+          id: 'x', object: 'chat.completion', created: 0, model: 'fake-model',
+          choices: [{ index: 0, message: { role: 'assistant', content: 'Partial answ' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+        };
+      },
+      async *streamChatCompletion() { /* unused */ },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: false }, key);
+    expect(status).toBe(200);
+    expect(JSON.parse(text)).toMatchObject({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } });
+  });
+
   it('stream: records ttfb on the first reasoning token, not the first visible text (#764)', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() { throw new Error('should not be called'); },

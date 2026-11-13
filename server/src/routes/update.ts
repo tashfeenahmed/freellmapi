@@ -239,10 +239,22 @@ function decodeXmlText(value: string): string {
     quot: '"',
   };
   return value.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|apos|gt|lt|quot));/gi, (entity, decimal, hex, name) => {
-    if (decimal) return String.fromCodePoint(Number.parseInt(decimal, 10));
-    if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+    if (decimal) return safeCodePoint(Number.parseInt(decimal, 10), entity);
+    if (hex) return safeCodePoint(Number.parseInt(hex, 16), entity);
     return named[String(name).toLowerCase()] ?? entity;
   });
+}
+
+// String.fromCodePoint THROWS RangeError on anything outside 0..0x10FFFF, and
+// a lone surrogate code point produces a broken string. The input here is a
+// remote Atom feed's <title>, so a single hostile or merely malformed numeric
+// entity (&#1114112;) used to crash the whole update check. Leave the entity
+// verbatim instead — it is display text, not a hard parse dependency.
+function safeCodePoint(code: number, entity: string): string {
+  if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return entity;
+  // Lone surrogates are not valid scalar values.
+  if (code >= 0xd800 && code <= 0xdfff) return entity;
+  return String.fromCodePoint(code);
 }
 
 /**

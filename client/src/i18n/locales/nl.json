@@ -347,7 +347,25 @@
     "scoreColumn": "Partituur",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Routerdruk",
@@ -524,6 +542,8 @@
     "providerActions": "Acties van aanbieders",
     "routeViaProxy": "Route via proxy",
     "checkNow": "Controleer nu",
+    "lastWorkedHint": "Laatst gewerkt: {when}",
+    "lastWorkedNever": "Heeft nog geen verzoek dienden lopen noch een controle doorstaan",
     "noAutoCheckHint": "Deze provider staat geen automatische sleutelcontroles toe. De sleutel wordt gezond nadat hij zijn eerste verzoek heeft afgehandeld.",
     "noModelsYetHint": "Je catalogus heeft nog geen modellen van deze provider, dus er valt niets af te handelen.",
     "proxyEnvHintBefore": "Ook configureerbaar via de",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Kopieer deze sleutel nu — hij wordt niet opnieuw getoond.",
     "cpEnabledAria": "Profiel ingeschakeld",
     "selectKey": "Selecteer deze sleutel",
+    "selectModel": "Dit model selecteren",
     "bulkSelected": "{count} geselecteerd",
     "bulkEnable": "Alles inschakelen",
     "bulkDisable": "Alles uitschakelen",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Maandelijke limiet tokens",
     "capUnlimitedPlaceholder": "Onbeperkt",
     "capEditHint": "Limieten worden op de 1e om 00:00 UTC gereset. Laat leeg voor onbeperkt.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} verzoeken, {tokens} tokens deze maand",
     "quotaBalanceHint": "{remaining} van {limit} {metric} over",
-    "quotaBalanceLeft": "{remaining} over"
-,
+    "quotaBalanceLeft": "{remaining} over",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Regels verschijnen hier zodra de server ze schrijft. Verruim de filters voor niveau, aanbieder of zoekopdracht als je uitvoer verwachtte.",
     "noLevelsTitle": "Geen niveaus geselecteerd",
     "noLevelsDescription": "Zet minstens één niveau aan om loguitvoer te zien.",
-    "loadFailed": "Kan het serverlog niet laden."
+    "loadFailed": "Kan het serverlog niet laden.",
+    "eventFilter": "Gebeurtenis",
+    "allEvents": "Alle gebeurtenissen"
   },
   "playground": {
     "title": "Speeltuin",
@@ -1163,7 +1192,8 @@
       "openclaw": "Een altijd actieve persoonlijke assistent die vanaf je eigen machine antwoordt op WhatsApp, Telegram, Discord en meer.",
       "hermes": "De zelfverbeterende agent van Nous Research met blijvend geheugen en skills, in de terminal of in chat-apps.",
       "pi": "Een minimalistische terminal-agent die je vormgeeft met je eigen extensies, skills en promptsjablonen.",
-      "reasonix": "Een terminal-codeeragent gebouwd voor DeepSeek, rond prefix-caching, zodat lange sessies goedkoop blijven."
+      "reasonix": "Een terminal-codeeragent gebouwd voor DeepSeek, rond prefix-caching, zodat lange sessies goedkoop blijven.",
+      "zcode": "De codeeragent van Z.ai voor zijn GLM-modellen, verbindt met elke OpenAI-compatibele endpoint via een providerregister."
     }
   },
   "update": {

@@ -38,6 +38,7 @@
 </tr>
 <tr>
 <td align="center"><img src="../../../repo-assets/agents/reasonix.png" width="44" alt="Reasonix"><br/><b>Reasonix</b></td>
+<td align="center"><img src="../../../repo-assets/agents/zcode.png" width="44" alt="ZCode"><br/><b>ZCode</b></td>
 </tr>
 </table>
 </div>
@@ -75,6 +76,7 @@ Agents page in the dashboard shows the same commands with your key filled in.
 | Hermes Agent | `setup-hermes` | `/v1` |
 | Pi | `setup-pi` | `/v1` |
 | Reasonix | `setup-reasonix` | `/v1` |
+| ZCode | `setup-zcode` | `/v1` |
 | Zed, JetBrains AI | [Ollama emulation](01-agent-clients.md#ollama-clients) | Ollama `/api` |
 | Cursor | `setup-cursor` prints the guide | public `https://…/v1` |
 | Anything else | `setup-generic` prints a ready block | `/v1` |

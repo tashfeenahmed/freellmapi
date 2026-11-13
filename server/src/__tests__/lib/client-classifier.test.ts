@@ -96,6 +96,30 @@ describe('client agent classification', () => {
     }))).not.toBe('reasonix');
   });
 
+  it('recognizes ZCode by the headers it sends on every model request', () => {
+    // Captured from ZCode runtime 0.16.9 (zcode-app-cli 3.15.3).
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'ai-sdk/provider-utils/4.0.39 runtime/node.js/24',
+      'x-title': 'Z Code@cli',
+      'x-zcode-app-version': '3.15.3',
+      'x-session-id': 'ea7290ee-62cb-44dd-9798-c48282157f69',
+    }))).toBe('zcode');
+    // Its x-session-id must not make an Anthropic-wire ZCode request Claude Code.
+    expect(classifyClientAgent(request('/v1/messages', {
+      'x-title': 'Z Code@desktop',
+      'x-session-id': 'ea7290ee-62cb-44dd-9798-c48282157f69',
+    }))).toBe('zcode');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'zcode ai-sdk/provider-utils/4.0.39 runtime/node.js/24',
+    }))).toBe('zcode');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'zcode-cli/3.14.5',
+    }))).toBe('zcode');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'my-api-client/1.0',
+    }))).not.toBe('zcode');
+  });
+
   it('separates MiMo Code from the OpenCode it derives from', () => {
     expect(classifyClientAgent(request('/v1/chat/completions', {
       'user-agent': 'mimo/0.4.0',

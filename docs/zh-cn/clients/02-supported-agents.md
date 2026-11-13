@@ -38,6 +38,7 @@
 </tr>
 <tr>
 <td align="center"><img src="../../../repo-assets/agents/reasonix.png" width="44" alt="Reasonix"><br/><b>Reasonix</b></td>
+<td align="center"><img src="../../../repo-assets/agents/zcode.png" width="44" alt="ZCode"><br/><b>ZCode</b></td>
 </tr>
 </table>
 </div>
@@ -73,6 +74,7 @@ npx freellmapi setup-<agent> --url http://localhost:3001 --api-key <unified-key>
 | Hermes Agent | `setup-hermes` | `/v1` |
 | Pi | `setup-pi` | `/v1` |
 | Reasonix | `setup-reasonix` | `/v1` |
+| ZCode | `setup-zcode` | `/v1` |
 | Zed, JetBrains AI | [Ollama 模拟](01-agent-clients.md#ollama-客户端) | Ollama `/api` |
 | Cursor | `setup-cursor` 输出配置指南 | 公网 `https://…/v1` |
 | 其他客户端 | `setup-generic` 输出可直接使用的配置 | `/v1` |

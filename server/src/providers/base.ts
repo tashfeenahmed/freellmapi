@@ -47,10 +47,12 @@ export function parseRetryAfterMs(value: string | null | undefined): number | un
  *  digits, an optional fraction, then a literal `s` ("17s", "1.5s", "0.25s"). */
 const PROTOBUF_DURATION = /^(\d+(?:\.\d+)?)s$/;
 
-/** "Please try again in 7.66s" / "retry after 30 seconds" / "try again in 2m".
- *  Anchored on an explicit retry phrase so an unrelated number in an error
- *  message can never be mistaken for a back-off. */
-const PROSE_RETRY = /(?:try again|retry)\s+(?:in|after)\s+(\d+(?:\.\d+)?)\s*(ms|s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hour|hours)\b/i;
+/** "Please try again in 7.66s" / "retry after 30 seconds" / "try again in 2m",
+ *  and compound Go-style durations like Groq's "try again in 1m26s" or
+ *  "6m0.512s". Anchored on an explicit retry phrase so an unrelated number in
+ *  an error message can never be mistaken for a back-off. */
+const PROSE_RETRY = /(?:try again|retry)\s+(?:in|after)\s+(\d+(?:\.\d+)?\s*[a-z]+(?:\s*\d+(?:\.\d+)?\s*[a-z]+)*)/i;
+const DURATION_PART = /(\d+(?:\.\d+)?)\s*([a-z]+)/gi;
 
 const UNIT_MS: Record<string, number> = {
   ms: 1,
@@ -118,8 +120,13 @@ export function parseStatedRetryMs(body: unknown): number | undefined {
   const text = typeof body === 'string' ? body : safeStringify(body);
   const prose = text ? PROSE_RETRY.exec(text) : null;
   if (prose) {
-    const unit = UNIT_MS[prose[2].toLowerCase()];
-    if (unit) return clampRetryMs(Number(prose[1]) * unit);
+    let total: number | undefined;
+    for (const [, amount, unitName] of prose[1].matchAll(DURATION_PART)) {
+      const unit = UNIT_MS[unitName.toLowerCase()];
+      if (!unit) break; // "try again in 5 or so" — stop at the first non-unit word
+      total = (total ?? 0) + Number(amount) * unit;
+    }
+    if (total !== undefined) return clampRetryMs(total);
   }
   return undefined;
 }
@@ -276,6 +283,19 @@ export abstract class BaseProvider {
    * keys, and a key is promoted to healthy by the first request it serves
    * (markKeyHealthyFromRequest) instead of by a probe. */
   get supportsKeyValidation(): boolean {
+    return true;
+  }
+
+  /** Whether the scheduled health pass may re-validate this provider's keys
+   * every few minutes (#1599). A provider whose only key check is a malformed
+   * request to its billed endpoint (Exa and keyed Parallel send a search with
+   * no query) returns false: to the provider those requests look like a script
+   * firing empty searches all day. SerpSearch revoked free accounts over them
+   * and now sends no key check at all (supportsKeyValidation === false). The scheduled pass then validates such a key once, when
+   * it has never been checked, re-asks about a key parked at 'error' at most
+   * every NO_POLL_ERROR_REPROBE_MS, and leaves the rest to real traffic. The
+   * cooldown probe never validates it; "Check now" and "Check all" still do. */
+  get supportsKeyPolling(): boolean {
     return true;
   }
 

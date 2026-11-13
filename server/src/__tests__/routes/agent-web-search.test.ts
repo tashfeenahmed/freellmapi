@@ -302,6 +302,19 @@ describe('agent web search served from the search pool', () => {
       expect(seq).toEqual([...seq].sort((a, b) => a - b));
     });
 
+    it('keeps a final answer cut off at the token limit incomplete', async () => {
+      addSearchKey();
+      const cut = answer('Version 9 shi');
+      cut.choices[0].finish_reason = 'length';
+      mockGroq([searchCall('version 9 release'), cut]);
+      const { text } = await post('/v1/responses', request({ stream: true }), bearer());
+
+      const names = sseEvents(text).map(e => e.event);
+      expect(names).not.toContain('response.completed');
+      const final = sseEvents(text).find(e => e.event === 'response.incomplete')!.data.response;
+      expect(final).toMatchObject({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } });
+    });
+
     it('drops the tool as before when no search key is configured', async () => {
       const bodies = mockGroq([answer('Plain answer.')]);
       const { status, body } = await post('/v1/responses', request(), bearer());

@@ -136,15 +136,6 @@ describe('built-in model discovery (#1348)', () => {
       expect(builtinDiscoveryEligibility(getDb(), 'longcat')).toMatchObject({ eligible: false, reason: 'catalog_managed' });
     });
 
-    it('is off limits while the bundled baseline still holds catalog rows for the platform', () => {
-      // A fresh DB seeds github rows until the first catalog sync prunes them.
-      const github = rows('github');
-      expect(github.length).toBeGreaterThan(0);
-      expect(builtinDiscoveryEligibility(getDb(), 'github')).toMatchObject({ eligible: false, reason: 'catalog_managed' });
-      getDb().exec("DELETE FROM fallback_config WHERE model_db_id IN (SELECT id FROM models WHERE platform = 'github'); DELETE FROM models WHERE platform = 'github'; DELETE FROM embedding_models WHERE platform = 'github';");
-      expect(builtinDiscoveryEligibility(getDb(), 'github').eligible).toBe(true);
-    });
-
     it('can be switched off', () => {
       process.env.BUILTIN_MODEL_DISCOVERY = 'off';
       expect(builtinDiscoveryEligibility(getDb(), 'siliconflow')).toMatchObject({ eligible: false, reason: 'disabled' });

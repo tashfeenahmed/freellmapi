@@ -66,7 +66,7 @@ headerSent = false
    - `undecided` + `!wantsTools` OR `!couldBecomeDialectMarker` OR `heldText > 256` → `passthrough`, flush headers, stream
    - `passthrough` → forward immediately (strip tool_calls from delta, re-emit complete at end)
    - `dialect` → keep buffering
-9. **Empty chunks** (role/keep-alive/reasoning-only): held in `preamble` until flush.
+9. **Empty chunks** (role/keep-alive/reasoning-only): held in `preamble` until flush. Reasoning that runs past `REASONING_HOLD_MAX_MS` (15s) flushes headers early and then streams live, so idle-watchdog clients stay connected (#1642); a failure after that is a mid-stream error.
 
 **Stream end (clean):**
 
@@ -231,7 +231,6 @@ Thin adapter over shared fallback loop:
 | `rememberReasoning(sessionKey, modelKey, reasoning)` | Store per-session trace |
 | `rescueInlineToolCalls(text, tools)` | Convert inline dialect → structured `tool_calls` |
 | `repairToolArguments(args, schemas)` | Fix double-encoded JSON against request schemas |
-| `truncateMessagesForGithub(messages)` | Trim history to GitHub Models input ceiling |
 | `normalizeOutboundContent(chunk)` | Provider-specific response normalization |
 | `sanitizeResponse(chunk)` | Redact secrets from streamed frames |
 

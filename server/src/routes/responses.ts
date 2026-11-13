@@ -9,7 +9,7 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -32,6 +32,7 @@ import {
 } from './proxy.js';
 import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, setFallbackHeaders, exhaustionErrorPayload, setExhaustionHeaders, type AttemptRecord } from '../lib/fallback-loop.js';
 import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
+import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
@@ -49,6 +50,8 @@ import {
   runFusion,
   type FusionResult,
 } from '../services/fusion.js';
+import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
+import { resolveListedClaudeAlias } from '../services/anthropic-map.js';
 
 export const responsesRouter = Router();
 
@@ -508,6 +511,16 @@ function requestDeclaresToolUse(req: ResponsesRequest): boolean {
 }
 
 // ── Build the final (non-stream) Responses object ─────────────────────────
+/**
+ * Responses-API `incomplete_details.reason` for an upstream chat finish
+ * reason, or undefined when the response ran to completion.
+ */
+export function incompleteReason(finishReason: string | null | undefined): 'max_output_tokens' | 'content_filter' | undefined {
+  if (finishReason === 'length') return 'max_output_tokens';
+  if (finishReason === 'content_filter') return 'content_filter';
+  return undefined;
+}
+
 export function buildResponseObject(opts: {
   id: string;
   model: string;
@@ -517,13 +530,14 @@ export function buildResponseObject(opts: {
   completionTokens: number;
   reasoningTokens?: number;
   metadata?: Record<string, string>;
+  incompleteReason?: 'max_output_tokens' | 'content_filter';
 }) {
   const output: any[] = [];
   if (opts.text.length > 0) {
     output.push({
       type: 'message',
       id: newId('msg'),
-      status: 'completed',
+      status: opts.incompleteReason ? 'incomplete' : 'completed',
       role: 'assistant',
       content: [{ type: 'output_text', text: opts.text, annotations: [] }],
     });
@@ -543,7 +557,8 @@ export function buildResponseObject(opts: {
     id: opts.id,
     object: 'response',
     created_at: nowUnix(),
-    status: 'completed',
+    status: opts.incompleteReason ? 'incomplete' : 'completed',
+    ...(opts.incompleteReason ? { incomplete_details: { reason: opts.incompleteReason } } : {}),
     model: opts.model,
     output,
     output_text: opts.text,
@@ -810,6 +825,12 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     ?? req.headers['x-session-id'];
   const sessionIdHeader = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
   const requestedModelLabel = reqData.model ?? 'auto';
+  // What routing acts on. Usually the id the client sent; a Claude alias from
+  // GET /v1/models routes through the Claude family map instead (a pinned
+  // model, auto, or a tier pool), the same as on /v1/messages.
+  const claudeAlias = resolveListedClaudeAlias(reqData.model);
+  const routedModel = claudeAlias?.kind === 'model' ? claudeAlias.modelId : claudeAlias ? 'auto' : requestedModelLabel;
+  const aliasTierChain = claudeAlias?.kind === 'tier' ? resolveModelGroupCandidates(claudeAlias.dbIds) : [];
 
   // Explicit `model` field pins routing. If the catalog has no enabled row
   // matching the requested id, return 400 — silently auto-routing to a
@@ -823,9 +844,15 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // stays on the unscoped key so existing session affinity is unchanged.
   let stickyStrategyKey: string | undefined;
 
-  if (isAutoModel(requestedModelLabel)) {
+  if (aliasTierChain.length > 0) {
+    // Strict over the tier's pool; an empty tier falls through to plain auto.
+    groupChain = aliasTierChain;
+    stickyStrategyKey = `tier:${aliasTierChain[0]!.model_db_id}`;
+    const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+    preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
+  } else if (isAutoModel(routedModel)) {
     try {
-      resolvedChain = resolveRoutingChain(requestedModelLabel);
+      resolvedChain = resolveRoutingChain(routedModel);
     } catch (err: any) {
       if (err?.status === 400) {
         res.status(400).json({
@@ -840,12 +867,12 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       getStickyModel(messages, sessionIdHeader, stickyStrategyKey),
       resolvedChain.chain,
     );
-  } else if (isFusionModel(requestedModelLabel)) {
+  } else if (isFusionModel(routedModel)) {
     // Fusion is a virtual model, not a row in the catalog. Its panel and
     // judge each resolve through the normal router inside runFusion below.
   } else {
     const db = getDb();
-    const resolved = isUnifyEnabled() ? resolveRequestedIdForDispatch(requestedModelLabel, getModelGroups()) : null;
+    const resolved = isUnifyEnabled() ? resolveRequestedIdForDispatch(routedModel, getModelGroups()) : null;
     const members = resolved?.memberDbIds ?? null;
     if (members && members.length > 0) {
       groupChain = resolveModelGroupCandidates(members, resolved!.demotedDbIds);
@@ -855,25 +882,25 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         const reason = anyEnabled ? 'has no providers with an enabled key' : 'is disabled';
         res.status(400).json({
           error: {
-            message: `Model '${requestedModelLabel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            message: `Model '${routedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
             type: 'invalid_request_error',
             code: 'model_not_found',
           },
         });
         return;
       }
-      const sticky = getStickyModel(messages, sessionIdHeader, requestedModelLabel);
+      const sticky = getStickyModel(messages, sessionIdHeader, routedModel);
       preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
     } else {
-      const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(requestedModelLabel) as { id: number } | undefined;
+      const enabled = db.prepare('SELECT id FROM models WHERE model_id = ? AND enabled = 1').get(routedModel) as { id: number } | undefined;
       if (enabled) {
         preferredModel = enabled.id;
       } else {
-        const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(requestedModelLabel) as { id: number } | undefined;
+        const disabled = db.prepare('SELECT id FROM models WHERE model_id = ?').get(routedModel) as { id: number } | undefined;
         const reason = disabled ? 'is disabled' : 'is not in the catalog';
         res.status(400).json({
           error: {
-            message: `Model '${requestedModelLabel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
+            message: `Model '${routedModel}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`,
             type: 'invalid_request_error',
             code: 'model_not_found',
           },
@@ -904,6 +931,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   const state = newFallbackState();
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Client-disconnect fan-out: the flag stops the loop before the NEXT
   // attempt; the AbortController (threaded to the provider as
@@ -930,7 +958,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // virtual id before normal model dispatch; do the same here after the common
   // Responses translation/guardrails so Codex and other Responses clients can
   // opt into the exact same panel + judge behavior.
-  if (isFusionModel(requestedModelLabel)) {
+  if (isFusionModel(routedModel)) {
     const fusionConfig = reqData.fusion ?? {};
     const fusionOptions = { ...dispatchOpts };
 
@@ -1162,6 +1190,13 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     res.write(`data: ${JSON.stringify({ type: event, sequence_number: seq++, ...payload })}\n\n`);
   };
 
+  // Decision routing (#1354): with the 'decision' strategy on, a decision
+  // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
+  // this turn routes with. Skipped when the client pinned a model or the
+  // conversation is sticky to one. Any doubt routes as Balanced.
+  const routingPick = await applyDecisionRouting(messages, { pinned: !isAutoModel(routedModel) || preferredModel != null, signal: clientAbort.signal });
+  if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
+
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
     state,
@@ -1230,11 +1265,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         const commit = () => {
           if (streamStarted) return;
           if (ttfbMs === null) ttfbMs = Date.now() - start;
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-          res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
-          setFallbackHeaders(res, attempt, attemptLog);
+          sendSseHeaders();
           const skeleton = {
             id: responseId, object: 'response', created_at: nowUnix(),
             status: 'in_progress', model: route.modelId, output: [], output_text: '',
@@ -1246,6 +1277,34 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // longer cancel this attempt (it could not fail over now anyway).
           ctx.disarmHedge();
         };
+
+        // Send the SSE headers once. Split out of commit so the #1642
+        // keep-alive can commit the response with a content-free ping while
+        // the hold window is still open, without sending the event skeleton
+        // early.
+        let headersSentEarly = false;
+        const sendSseHeaders = () => {
+          if (headersSentEarly) return;
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
+          setFallbackHeaders(res, attempt, attemptLog);
+          headersSentEarly = true;
+        };
+
+        // #1642: optional heartbeat for the silent reasoning window. A bare
+        // SSE comment resets client idle watchdogs without committing content.
+        let streamSettled = false;
+        const keepaliveStop = startStreamKeepalive(streamKeepaliveMs(),
+          () => streamSettled,
+          () => {
+            sendSseHeaders();
+            // Bytes on the wire = the response can no longer fail over
+            // invisibly; stop the retry budget from cancelling it.
+            ctx.disarmHedge();
+            res.write(': keepalive\n\n');
+          });
 
         // Open the text output item and stream `text` as its first delta.
         // The text item takes the next free output index (it is NOT always 0 —
@@ -1422,11 +1481,15 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             );
           }
 
+          // A truncated or filtered turn ends as `incomplete`, not `completed`,
+          // so clients don't take a cut-off answer as the whole answer.
+          const incomplete = incompleteReason(upstreamFinish);
+
           // Finalize any open text item.
           if (msgItemId !== null) {
             sse('response.output_text.done', { item_id: msgItemId, output_index: textOutputIndex, content_index: 0, text: msgText });
             sse('response.content_part.done', { item_id: msgItemId, output_index: textOutputIndex, content_index: 0, part: { type: 'output_text', text: msgText, annotations: [] } });
-            sse('response.output_item.done', { output_index: textOutputIndex, item: { id: msgItemId, type: 'message', status: 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
+            sse('response.output_item.done', { output_index: textOutputIndex, item: { id: msgItemId, type: 'message', status: incomplete ? 'incomplete' : 'completed', role: 'assistant', content: [{ type: 'output_text', text: msgText, annotations: [] }] } });
           }
           // Finalize tool-call items. Arguments are repaired against the tool's
           // parameter schema at this point (after the full string accumulated):
@@ -1456,9 +1519,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           const finalResponse = buildResponseObject({
             id: responseId, model: route.modelId, text: msgText,
             toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
-            reasoningTokens: totalReasoningTokens,
+            reasoningTokens: totalReasoningTokens, incompleteReason: incomplete,
           });
-          sse('response.completed', { response: finalResponse });
+          sse(incomplete ? 'response.incomplete' : 'response.completed', { response: finalResponse });
           res.end();
 
           recordUpstreamSuccess(route, estimatedInputTokens + totalOutputTokens, state);
@@ -1476,7 +1539,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
           return 'done';
         } catch (streamErr: any) {
-          switch (failedStreamPhase(streamErr, res, streamStarted)) {
+          // streamStarted = real events went out. headersSentEarly also counts: a
+          // #1642 keep-alive ping flushed the SSE headers, so this attempt is on
+          // the wire and can no longer fail over invisibly.
+          switch (failedStreamPhase(streamErr, res, streamStarted || headersSentEarly)) {
           // abandoned: client abort mid-stream — rethrow; the shared loop's
           // client-abort branch logs one 'canceled' row and stops without
           // benching (the socket is gone; nothing to render).
@@ -1505,12 +1571,17 @@ export async function handleResponses(req: Request, res: Response): Promise<void
               latencyMs: Date.now() - start,
               error: safe,
             });
-            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safe, ttfbMs, null, null, 'http');
+            logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, safe, ttfbMs, null, null, 'http', failureAttributionFor(streamErr));
             sse('response.failed', { response: { id: responseId, object: 'response', status: 'failed', error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } } });
             res.end();
             return 'committed';
           }
           }
+        } finally {
+          // #1642: this attempt is over whichever path it left by — the
+          // keep-alive interval must not outlive it.
+          streamSettled = true;
+          keepaliveStop();
         }
       }
 
@@ -1603,6 +1674,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       res.json(buildResponseObject({
         id: responseId, model: route.modelId, text, toolCalls,
         promptTokens, completionTokens, reasoningTokens,
+        incompleteReason: incompleteReason(result.choices[0]?.finish_reason),
       }));
 
       traceRouteEvent('Responses', {
@@ -1630,7 +1702,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         latencyMs: latency,
         error: safeError,
       });
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, null, null, 'http');
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, latency, safeError, null, null, null, 'http', failureAttributionFor(err));
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);

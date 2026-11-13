@@ -113,6 +113,78 @@ describe('parseModelCatalog tolerance (#488)', () => {
     });
   });
 
+  it.each([0, '0.000', '0e-400', '0e400'])('preserves explicit zero pricing (%s)', zero => {
+    expect(parseModelCatalog({
+      data: [{ id: 'zero', pricing: { prompt: zero, completion: zero, request: zero, image: zero } }],
+    })).toEqual([{ id: 'zero', ownedBy: null, priceNote: 'free', isFree: true }]);
+  });
+
+  it.each([
+    ['request', '0.000001', '$0.000001/request'],
+    ['image', '0.005', '$0.005/image'],
+  ])('keeps a positive %s charge in its advertised unit', (component, price, priceNote) => {
+    expect(parseModelCatalog({
+      data: [{ id: 'charged', pricing: { prompt: '0', completion: '0', [component]: price } }],
+    })).toEqual([{ id: 'charged', ownedBy: null, priceNote, isFree: false }]);
+  });
+
+  it('preserves a positive request-only price without token pricing', () => {
+    expect(parseModelCatalog({
+      data: [{ id: 'per-request', pricing: { request: 0.01 } }],
+    })).toEqual([{ id: 'per-request', ownedBy: null, priceNote: '$0.01/request', isFree: false }]);
+  });
+
+  it.each(['request', 'image'])('does not let a literal free alias hide an advertised %s charge', component => {
+    for (const [freeKey, pricingKey] of [['price', 'pricing'], ['pricing', 'price']]) {
+      expect(parseModelCatalog({
+        data: [{ id: 'charged', [freeKey]: 'Free', [pricingKey]: { prompt: '0', completion: '0', [component]: '0.01' } }],
+      })).toEqual([{ id: 'charged', ownedBy: null, priceNote: `$0.01/${component}`, isFree: false }]);
+    }
+  });
+
+  it.each([
+    ['incomplete token prices', { prompt: '0' }],
+    ['invalid completion', { prompt: '0', completion: 'unknown' }],
+    ['boolean pricing', false],
+    ['numeric pricing', 0],
+    ['null pricing', null],
+    ['array pricing', []],
+    ['blank pricing', ' '],
+    ['empty pricing', {}],
+  ])('leaves a free hint with conflicting %s unknown', (_name, pricing) => {
+    for (const [freeKey, pricingKey] of [['price', 'pricing'], ['pricing', 'price']]) {
+      expect(parseModelCatalog({
+        data: [{ id: 'unknown', [freeKey]: 'Free', [pricingKey]: pricing }],
+      })).toEqual([{ id: 'unknown', ownedBy: null }]);
+    }
+  });
+
+  it.each([
+    ['request underflow', { prompt: '0', completion: '0', request: '1e-400' }],
+    ['negative completion underflow', { prompt: '0', completion: '-1e-400' }],
+  ])('leaves %s unknown instead of accepting a rounded zero', (_name, pricing) => {
+    expect(parseModelCatalog({ data: [{ id: 'unknown', pricing }] })).toEqual([
+      { id: 'unknown', ownedBy: null },
+    ]);
+  });
+
+  it.each([
+    ['missing completion', { prompt: '0' }],
+    ['invalid completion', { prompt: '0', completion: 'unknown' }],
+    ['null completion', { prompt: '0', completion: null }],
+    ['blank completion', { prompt: '0', completion: ' ' }],
+    ['negative completion', { prompt: '0', completion: -1 }],
+    ['nonfinite completion', { prompt: '0', completion: Infinity }],
+    ['boolean completion', { prompt: '0', completion: false }],
+    ['missing prompt', { completion: '0' }],
+    ['invalid extra charge', { prompt: '0', completion: '0', request: 'unknown' }],
+    ['unsupported extra charge', { prompt: '0', completion: '0', web_search: '0.01' }],
+  ])('leaves %s pricing unknown instead of claiming free', (_name, pricing) => {
+    expect(parseModelCatalog({ data: [{ id: 'unknown', pricing }] })).toEqual([
+      { id: 'unknown', ownedBy: null },
+    ]);
+  });
+
   it('accepts a relay that ships ctx_len and a plain "free" price string (#685)', () => {
     // A generic relay, not Ollama: real /api/tags ships neither field.
     const [m] = parseModelCatalog({
@@ -314,6 +386,30 @@ describe('non-chat kind inferred from the model id (#1051)', () => {
     expect(m.kind).toBe('image');
     const [n] = parseModelCatalog({ data: [{ id: 'plain-9', object: 'embedding' }] });
     expect(n.kind).toBe('embedding');
+  });
+
+  it('classifies bare "audio" and "image" type metadata (#1506)', () => {
+    // OpenRouter and similar OpenAI-compatible relays use bare `type` values.
+    // A model whose id carries no keyword at all must still be classified by
+    // its metadata, not silently fall through to chat and 404 every chain.
+    const [a] = parseModelCatalog({ data: [{ id: 'generic-model-7b', type: 'audio' }] });
+    expect(a.kind).toBe('audio');
+    const [i] = parseModelCatalog({ data: [{ id: 'generic-model-3b', type: 'image' }] });
+    expect(i.kind).toBe('image');
+    // The same bare value on a different metadata key classifies the same way.
+    const [m] = parseModelCatalog({ data: [{ id: 'm1', model_type: 'audio' }] });
+    expect(m.kind).toBe('audio');
+    const [n] = parseModelCatalog({ data: [{ id: 'm2', object: 'image' }] });
+    expect(n.kind).toBe('image');
+  });
+
+  it('keeps vision-chat task metadata as chat, not image or audio generation (#1506)', () => {
+    // Hugging Face style tasks name an input modality; only the bare values
+    // above mean a generation model.
+    for (const type of ['image-text-to-text', 'image-to-text', 'audio-text-to-text', 'any-to-any']) {
+      const [m] = parseModelCatalog({ data: [{ id: 'generic-model-9b', type }] });
+      expect(m.kind, type).toBeUndefined();
+    }
   });
 
   it("ignores OpenAI's uninformative object:'model'", () => {

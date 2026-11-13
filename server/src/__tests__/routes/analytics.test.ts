@@ -846,5 +846,19 @@ describe('Analytics API', () => {
         expect(res.status).toBe(400);
       }
     });
+
+    it('takes the FIRST value of a repeated provider/status param instead of crashing', async () => {
+      // Express hands back an ARRAY for a repeated query param. The provider
+      // shape check then dies on `provider.startsWith(...)` — arrays have no
+      // such method — and the dashboard's recent-calls panel shows a 500 for
+      // what is at worst a client bug. Same contract as routes/logs.ts:
+      // first value wins, repeated params are not two filters.
+      const dup = await request(app, '/api/analytics/requests?range=24h&provider=groq&provider=openrouter');
+      expect(dup.status).toBe(200);
+      const badSecond = await request(app, '/api/analytics/requests?range=24h&provider=groq&provider=' + encodeURIComponent('has spaces'));
+      expect(badSecond.status).toBe(200);
+      const dupStatus = await request(app, '/api/analytics/requests?range=24h&status=success&status=error');
+      expect(dupStatus.status).toBe(200);
+    });
   });
 });

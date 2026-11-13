@@ -329,6 +329,29 @@ describe('Update API', () => {
       );
     });
 
+    it('survives out-of-range numeric XML entities in Atom titles', async () => {
+      // String.fromCodePoint throws RangeError on code points beyond
+      // 0x10FFFF; the old decoder let a remote <title> like "&#1114112;" crash
+      // the entire update check. It must degrade to leaving the entity as
+      // literal text instead.
+      const newestSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(response({ message: 'API rate limit exceeded' }, 403))
+        .mockResolvedValueOnce(atomResponse([
+          { sha: newestSha, message: 'Fix &#1114112; and &#x110000; and &#xD800; but keep &#65;', date: '2026-07-28T13:00:00Z' },
+          { sha: LOCAL_SHA, message: 'Installed commit', date: '2026-07-28T11:00:00Z' },
+        ]));
+      const { app } = createTestApp({ fetch: fetchMock });
+
+      const result = await httpGet(app, '/api/update/check');
+
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({
+        status: 'available',
+        remoteMessage: 'Fix &#1114112; and &#x110000; and &#xD800; but keep A',
+      });
+    });
+
     it('uses the Atom fallback to recognize the current build', async () => {
       const fetchMock = vi.fn()
         .mockResolvedValueOnce(response(undefined, 401))

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GITHUB_MAX_INPUT_TOKENS, contentToString, estimateInputTokens, flattenMessageContent, messageHasImage, normalizeOutboundContent, sanitizeResponse, stripImagesFromMessages, truncateMessagesForGithub } from '../../lib/content.js';
+import { contentToString, estimateInputTokens, flattenMessageContent, messageHasImage, normalizeOutboundContent, sanitizeResponse, stripImagesFromMessages } from '../../lib/content.js';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 
 describe('contentToString', () => {
@@ -201,73 +201,6 @@ describe('sanitizeResponse', () => {
     expect(() => sanitizeResponse({ usage: { prompt_tokens: 1 } })).not.toThrow();
     expect(() => sanitizeResponse(null as unknown)).not.toThrow();
     expect(() => sanitizeResponse({} as unknown)).not.toThrow();
-  });
-});
-
-describe('truncateMessagesForGithub', () => {
-  const msg = (role: ChatMessage['role'], content: string): ChatMessage => ({ role, content });
-  // ~4000 tokens each under the chars/4 estimate the gateway uses everywhere.
-  const big = (c: string) => c.repeat(16000);
-
-  it('returns the same array when the request already fits', () => {
-    const messages = [msg('system', 'be brief'), msg('user', 'hi')];
-    expect(truncateMessagesForGithub(messages)).toBe(messages);
-  });
-
-  it('leaves an empty list alone', () => {
-    const messages: ChatMessage[] = [];
-    expect(truncateMessagesForGithub(messages)).toBe(messages);
-  });
-
-  it('drops the oldest turns, keeping the system prompt and the newest context', () => {
-    const messages = [
-      msg('system', 'be brief'),
-      msg('user', big('a')),
-      msg('assistant', big('b')),
-      msg('user', big('c')),
-      msg('user', 'the actual question'),
-    ];
-    const out = truncateMessagesForGithub(messages);
-    expect(out).not.toBe(messages);
-    expect(out[0]).toBe(messages[0]);
-    expect(out[out.length - 1].content).toBe('the actual question');
-    // Only one of the ~4000-token turns fits alongside the newest question.
-    expect(out.map(m => m.content)).not.toContain(big('a'));
-    expect(out.map(m => m.content)).toContain(big('c'));
-    const total = out.reduce((sum, m) => sum + Math.ceil(String(m.content).length / 4), 0);
-    expect(total).toBeLessThanOrEqual(GITHUB_MAX_INPUT_TOKENS);
-  });
-
-  it('keeps the system prompt verbatim wherever it sits in the list', () => {
-    const system = msg('system', 'be brief');
-    const messages = [msg('user', big('a')), system, msg('user', big('b'))];
-    const out = truncateMessagesForGithub(messages);
-    expect(out[0]).toBe(system);
-  });
-
-  it('truncates a single oversized message instead of sending nothing', () => {
-    const out = truncateMessagesForGithub([msg('user', big('y').repeat(3))]);
-    expect(out).toHaveLength(1);
-    expect(String(out[0].content).length).toBe(GITHUB_MAX_INPUT_TOKENS * 4);
-  });
-
-  it('reserves the system prompt budget when truncating the newest message', () => {
-    const system = msg('system', 'x'.repeat(400)); // 100 tokens
-    const out = truncateMessagesForGithub([system, msg('user', big('z').repeat(3))]);
-    expect(out[0]).toBe(system);
-    expect(String(out[1].content).length).toBe((GITHUB_MAX_INPUT_TOKENS - 100) * 4);
-  });
-
-  it('honours a caller-supplied budget', () => {
-    const messages = [msg('user', 'one'), msg('user', 'two'), msg('user', 'the newest')];
-    const out = truncateMessagesForGithub(messages, 3); // 12 chars of room
-    expect(out.map(m => m.content)).toEqual(['the newest']);
-  });
-
-  it('never rewrites multimodal content, only drops whole messages', () => {
-    const image: ChatMessage = { role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:x' } }] } as ChatMessage;
-    const out = truncateMessagesForGithub([msg('user', big('a')), image], 1);
-    expect(out).toEqual([image]);
   });
 });
 

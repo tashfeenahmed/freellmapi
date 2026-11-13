@@ -73,9 +73,13 @@ describe('Keys API — per-key proxy override (#590)', () => {
       expect(row.proxy_iv).toBeTruthy();
       expect(row.proxy_auth_tag).toBeTruthy();
       // Nothing recognisable survives in the column: not the password, not the
-      // username, not the host, not even the scheme.
+      // username, not the host, not even the scheme. Every string here must
+      // contain at least one non-hex character: the column is lowercase hex,
+      // so a pure-digit fragment like the port "1080" can appear in the
+      // ciphertext by chance (~1 in 700 runs) without being a leak — asserting
+      // it made this test flaky (CI reroll on PR #1601).
       const stored = String(row.proxy_encrypted);
-      for (const secret of ['hunter2', 'alice', 'proxy.internal', 'socks5h', '1080']) {
+      for (const secret of ['hunter2', 'alice', 'proxy.internal', 'socks5h']) {
         expect(stored).not.toContain(secret);
       }
       // ...and it round-trips.

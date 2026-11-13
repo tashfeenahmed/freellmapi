@@ -54,6 +54,22 @@ function executionStatusFor(modelDbIds: number[], available: number): 'ready' | 
   return modelDbIds.some(id => hasUsableKeyForModel(id)) ? 'ready' : 'exhausted';
 }
 
+/**
+ * The context window to ADVERTISE for an entry the router can serve from
+ * several models (auto, fusion, a named chain, a unify group): the largest
+ * window that most of those models hold, i.e. the upper median, not the max.
+ * Clients size their context to this number (OpenClaw compacts against it),
+ * and advertising the single biggest window meant one 1M model made `auto`
+ * claim 1M, so sessions grew until every request carried 500k+ tokens that
+ * most of the pool rejects (#1717). Larger requests still route: the router's
+ * size gates send them to the models that can hold them.
+ */
+export function servableContextWindow(windows: readonly (number | null | undefined)[]): number | null {
+  const known = windows.filter((w): w is number => typeof w === 'number' && w > 0).sort((a, b) => b - a);
+  if (known.length === 0) return null;
+  return known[Math.floor(known.length / 2)]!;
+}
+
 export function buildModelListing(): ModelListing {
   const availableExpr = `
     (CASE WHEN m.enabled = 1 AND EXISTS (
@@ -78,7 +94,6 @@ export function buildModelListing(): ModelListing {
     const byId = new Map(rows.map(r => [r.id, r]));
     allListed = getModelGroups().map(g => {
       const infos = g.members.map(m => byId.get(m.model_db_id)).filter(Boolean) as AvailRow[];
-      const ctxs = infos.map(i => i.context_window).filter((c): c is number => c != null);
       const available = infos.some(i => i.available === 1) ? 1 : 0;
       return {
         id: g.canonicalId,
@@ -86,7 +101,7 @@ export function buildModelListing(): ModelListing {
         ownedBy: 'freellmapi',
         available,
         enabled: infos.some(i => i.enabled === 1) ? 1 : 0,
-        contextWindow: ctxs.length ? Math.max(...ctxs) : null,
+        contextWindow: servableContextWindow(infos.map(i => i.context_window)),
         intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
         platforms: [...new Set(infos.map(i => i.platform))],
         supportsTools: infos.some(i => i.supports_tools === 1),
@@ -126,12 +141,9 @@ export function buildModelListing(): ModelListing {
   allListed.sort((a, b) =>
     (b.available - a.available) || (b.enabled - a.enabled) || (a.intel - b.intel) || a.name.localeCompare(b.name));
 
-  const availableContextWindows = allListed
-    .filter(m => m.available === 1 && m.contextWindow != null)
-    .map(m => m.contextWindow as number);
-  const autoContextWindow = availableContextWindows.length > 0
-    ? Math.max(...availableContextWindows)
-    : null;
+  const autoContextWindow = servableContextWindow(
+    allListed.filter(m => m.available === 1).map(m => m.contextWindow),
+  );
 
   return { models: allListed, autoContextWindow };
 }

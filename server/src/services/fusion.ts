@@ -3,7 +3,7 @@ import type { ChatMessage, ChatCompletionChoice, ChatCompletionResponse, ChatToo
 import {
   routePinnedModel, routeRequest, getOrderedFusionChain, resolveFusionCandidate,
   pinnedModelFitsRequestSize,
-  recordRateLimitHit, recordSuccess, type RouteResult, type FusionCandidate,
+  recordRateLimitHit, recordSuccess, failureAttributionFor, type RouteResult, type FusionCandidate,
 } from './router.js';
 import {
   recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit,
@@ -286,6 +286,8 @@ export function addUsage(a: TokenUsage, b: TokenUsage | undefined): TokenUsage {
  * WHICH model is tried: a pinned-model closure for a panel slot (never
  * substitutes), or the auto-router for the judge (falls over across the chain).
  */
+// Exported for the attribution regression test: the panel/judge retry path is
+// the fusion mirror of lib/fallback-loop.ts's recordRetryableFailure.
 export async function runModelCall(
   getRoute: (skipKeys: Set<string>, skipModels: Set<number>) => RouteResult | null,
   messages: ChatMessage[],
@@ -353,7 +355,13 @@ export async function runModelCall(
       };
     } catch (err: any) {
       const safe = sanitizeProviderErrorMessage(err?.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0, Date.now() - startedAt, safe, null, FUSION_TAG, null, 'http');
+      // #1347: mirror the fallback loop — with provider-moment attribution on,
+      // a 429/5xx/timeout/transport failure on a fusion panel slot is the
+      // provider's bad minute, not model evidence: the key still cools down,
+      // but the model's rate-limit penalty is skipped and the log row is
+      // tagged so the stats cache excludes it.
+      const attribution = failureAttributionFor(err);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0, Date.now() - startedAt, safe, null, FUSION_TAG, null, 'http', attribution);
       lastError = safe;
       failure = mergeCallFailure(failure, classifyCallFailure(err));
 
@@ -373,7 +381,7 @@ export async function runModelCall(
           ? { durationMs: getModelForbiddenCooldownMs(), source: 'tier' as const }
           : getCooldownDecisionForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }, err.retryAfterMs, { quotaSignal: isRateLimitSignal(err) });
         setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
-        recordRateLimitHit(route.modelDbId);
+        if (attribution !== 'provider_moment') recordRateLimitHit(route.modelDbId);
         continue;
       }
       // Non-retryable (auth, validation) — this slot/judge is done.
@@ -454,7 +462,9 @@ async function runJudgeStreaming(
       return { ok: true, route, text, usage };
     } catch (err: any) {
       const safe = sanitizeProviderErrorMessage(err?.message);
-      logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0, Date.now() - startedAt, safe, null, FUSION_TAG, null, 'http');
+      // #1347: same attribution as the panel path above.
+      const attribution = failureAttributionFor(err);
+      logRequest(route.platform, route.modelId, route.keyId, 'error', 0, 0, Date.now() - startedAt, safe, null, FUSION_TAG, null, 'http', attribution);
       lastError = safe;
       // Already streamed bytes — can't fail over without duplicating output.
       // Keep whatever the client already received.
@@ -479,7 +489,7 @@ async function runJudgeStreaming(
           ? { durationMs: getModelForbiddenCooldownMs(), source: 'tier' as const }
           : getCooldownDecisionForLimit(route.platform, route.modelId, route.keyId, { rpd: route.rpdLimit, tpd: route.tpdLimit }, err.retryAfterMs, { quotaSignal: isRateLimitSignal(err) });
         setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
-        recordRateLimitHit(route.modelDbId);
+        if (attribution !== 'provider_moment') recordRateLimitHit(route.modelDbId);
         continue;
       }
       break;

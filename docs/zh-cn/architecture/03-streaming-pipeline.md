@@ -231,7 +231,6 @@ Codex CLI 和 Agents SDK 说 **Responses API**（有状态、`previous_response_
 | `rememberReasoning(sessionKey, modelKey, reasoning)` | 按会话存轨迹 |
 | `rescueInlineToolCalls(text, tools)` | 内联方言 → 结构化 `tool_calls` |
 | `repairToolArguments(args, schemas)` | 对请求 schema 修双重编码 JSON |
-| `truncateMessagesForGithub(messages)` | 裁历史到 GitHub Models 输入天花板 |
 | `normalizeOutboundContent(chunk)` | 提供方专属响应归一化 |
 | `sanitizeResponse(chunk)` | 从流式帧脱敏机密 |
 

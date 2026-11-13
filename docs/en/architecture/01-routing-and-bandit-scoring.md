@@ -13,7 +13,7 @@ base = w_rel·reliability + w_speed·speed + w_intel·intelligence   (convex, we
 effective = base × headroomFactor × rateLimitFactor               (guardrail multipliers ∈ [floor, 1])
 ```
 
-The **weights** come from a selectable strategy (`balanced` / `smartest` / `fastest` / `reliable` / `custom` / `priority`). The default is `balanced` (0.5 / 0.25 / 0.25). Operators can switch strategies from the dashboard or via `PUT /api/fallback/routing`.
+The **weights** come from a selectable strategy (`balanced` / `smartest` / `fastest` / `reliable` / `custom` / `priority` / `decision`). The default is `balanced` (0.5 / 0.25 / 0.25). Operators can switch strategies from the dashboard or via `PUT /api/fallback/routing`.
 
 Key selection within a model is driven by a separate `KeySelectionStrategy` (`auto` / `least-remaining`), independent of the model-ranking bandit so the two concerns don't interfere (#919, #930).
 
@@ -249,6 +249,17 @@ When enabled, logical models (e.g. `glm-4.7`) collapse multiple providers into o
 | reliable | 0.70 | 0.15 | 0.15 |
 | custom   | user-tuned (normalized) | | |
 | priority | manual order + 429 penalty (dense rank + penalty) | | |
+| decision | one of the four presets above, picked per request by a decision model | | |
+
+### Decision Routing (opt-in, #1354)
+
+With `decision` selected, a decision model (Models → Decision: Clef on Cloudflare, Mercury Decide on OpenRouter) reads each request and answers one `choice` question: which of `smartest` / `fastest` / `balanced` / `reliable` serves it best. That preset's weights score the chain for that one request. Nothing else changes: capability gates, guardrails and the keep-trying failover walk are the same as under any preset.
+
+- **What it reads:** the opening of the system prompt (400 chars) and the latest user message (1,600 chars). Never the whole conversation.
+- **When it asks:** once per user turn. The answer is cached on the text it judged (30 min), so an agent's tool-call loop inside one turn costs one decision. Requests that pin a model, or that a sticky session already maps to one, are never asked about.
+- **When in doubt, Balanced:** the top probability is below the minimum confidence (`routing_decision_min_probability`, default 0.5), the decision takes longer than 1.5 s, no decision model has a usable key, or the call fails.
+- **Which model decides:** `routing_decision_model`, `auto` by default (first enabled decision model with a key). `auto` skips BeatAPI's free JEV routes, whose 1 request/minute cannot keep up with chat traffic; pinning one explicitly still works.
+- **Visibility:** each routed response carries `X-FreeLLM-Routing-Strategy: <preset>` (or `balanced; fallback=<reason>`), decisions are logged under Models → Decision with client `freellmapi-router`, and `GET /api/fallback/routing` returns `decision: { model, minProbability, ready, counts, fallbacks, recent }`.
 
 ### Key Selection Strategy (#919, #930)
 

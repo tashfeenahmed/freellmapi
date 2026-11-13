@@ -26,10 +26,18 @@ export function GetKeyLink({ url }: { url: string }) {
 // one (#1331): the key field is optional, a blank submit stores a sentinel so
 // routing treats the platform as configured and calls go out anonymously, and
 // a real key is stored and sent like any other.
-export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean }[] = [
+// `hidden: true` providers stopped offering free API access: they are no longer
+// offered to new users (add/import/add-model pickers, setup checklist), but an
+// existing key still shows with its label so it can be edited or removed.
+export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean; hidden?: boolean }[] = [
   { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys' },
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
-  { value: 'auray', label: 'Auray (50 shared monthly credits)', url: 'https://app.auray.ai' },
+  { value: 'kenari', label: 'Kenari (shared daily free chat and images)', url: 'https://kenari.id' },
+  { value: 'kiosapi', label: 'KiosAPI (shared daily free chat)', url: 'https://kiosapi.id/dashboard/keys' },
+  { value: 'beatapi', label: 'BeatAPI (JEV decisions; temporary free offer)', url: 'https://beatapi.io' },
+  { value: 'apinex', label: 'APINex (shared daily free chat and decisions)', url: 'https://apinex.bond/keys' },
+  { value: 'onomeo', label: 'onomeo (30 free calls / 5 hours, shared)', url: 'https://onomeo.com/dashboard' },
+  { value: 'iteracompute', label: 'IteraCompute (30M free tokens / month, shared)', url: 'https://iteracompute.com/free/' },
   { value: 'typhoon', label: 'Typhoon (free research API)', url: 'https://playground.opentyphoon.ai' },
   { value: 'plugsky', label: 'Plugsky (free chat aliases)', url: 'https://plugsky.com/dashboard' },
   { value: 'inferbase', label: 'Inferbase (shared monthly and daily allowance)', url: 'https://inferbase.ai' },
@@ -60,7 +68,6 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'nvidia', label: 'NVIDIA NIM', url: 'https://build.nvidia.com/settings/api-keys' },
   { value: 'mistral', label: 'Mistral', url: 'https://console.mistral.ai/api-keys/' },
   { value: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/keys' },
-  { value: 'github', label: 'GitHub Models', url: 'https://github.com/settings/tokens' },
   { value: 'cohere', label: 'Cohere', url: 'https://dashboard.cohere.com/api-keys' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI', url: 'https://dash.cloudflare.com' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
@@ -101,6 +108,9 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'longcat', label: 'LongCat (free daily, email signup ok)', url: 'https://longcat.chat/platform' },
   { value: 'xfyun', label: 'iFlytek Spark (free Lite, needs cn real-name)', url: 'https://console.xfyun.cn' },
 ]
+
+/** Providers a new user can pick (`hidden` ones only stay for existing keys). */
+export const LISTED_PLATFORMS = PLATFORMS.filter(p => !p.hidden)
 
 // 'custom' is configured through its own form (base URL + model), not the
 // generic key dropdown — but it still appears in the grouped provider list.
@@ -157,6 +167,6 @@ export interface HealthPlatform {
 
 export interface HealthData {
   platforms: HealthPlatform[]
-  keys: { id: number; platform: string; status: string; lastCheckedAt: string | null; lastHealthError: string | null }[]
+  keys: { id: number; platform: string; status: string; lastCheckedAt: string | null; lastHealthyAt?: string | null; lastHealthError: string | null }[]
   quotaStates: ProviderQuotaState[]
 }

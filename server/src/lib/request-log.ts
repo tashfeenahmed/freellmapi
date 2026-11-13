@@ -1,6 +1,7 @@
 import type { RequestStatus } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
+import { noteBudgetAlerts } from '../services/budget-alerts.js';
 import { getClientContext } from './client-context.js';
 import { noteRequestRowId, type RequestTrace } from './attempt-trace.js';
 
@@ -107,6 +108,11 @@ export function logRequest(
   // without a migration. NULL for call sites that pass no caller — notably
   // the shared fallback loop's 'canceled' row, which is surface-agnostic.
   caller: string | null = null,
+  // #1347 (PR 1): 'provider_moment' when a failed attempt is attributed to
+  // the provider's minute (429 / 5xx / timeout / transport) instead of the
+  // model — written only when the failure-attribution setting is on; NULL
+  // everywhere else, including every success row and every historical row.
+  failureAttribution: string | null = null,
   // 'chat' for every chat surface; embeddings, moderation and media pass
   // 'embedding' / 'moderation' / their modality. Only chat rows resolve a
   // models.id: the other kinds live in their own tables, so a chat models row
@@ -121,9 +127,9 @@ export function logRequest(
     const tx = db.transaction(() => {
       const modelDbId = requestType === 'chat' ? resolveModelDbId(db, platform, modelId, keyId) : null;
       const insert = db.prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, request_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, modelDbId, requestType);
+        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, failure_attribution, request_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, modelDbId, failureAttribution, requestType);
 
       // Report the row id back to the fallback loop's attempt trace (if one is
       // active): the LAST id noted during a loop run is the terminal row the
@@ -156,6 +162,11 @@ export function logRequest(
     tx();
 
     pruneRequestAnalytics({ db });
+
+    // Soft budget alerts (#1158 follow-on): after the ledger trigger committed,
+    // compare this key's month usage to its caps and log a threshold event
+    // (80%/100%, once each per month). Never throws.
+    if (status === 'success' && keyId != null) noteBudgetAlerts(keyId);
   } catch (e) {
     console.error('Failed to log request:', e);
   }

@@ -39,7 +39,8 @@ export interface DiscoveredModel {
    *  (OpenRouter's context_length, Ollama's ctx_len, max_model_len, ...). */
   contextWindow?: number;
   /** Human-readable price hint ("free", "$1.25/M in $2/M out") when the
-   *  upstream ships one — normalized to USD per MILLION tokens (#685). */
+   *  upstream ships one. Token prices are normalized to USD per MILLION
+   *  tokens (#685); request/image charges retain their per-unit prices. */
   priceNote?: string;
   /** True when every price component the upstream advertises is zero, or it
    *  plainly says "free". Set only alongside priceNote, and the only thing the
@@ -136,15 +137,26 @@ function firstNumber(record: Record<string, unknown>, keys: readonly string[]): 
   return undefined;
 }
 
+/** A finite nonnegative price, in the unit the upstream advertised. */
+function priceValue(raw: unknown): number | null {
+  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
+  if (typeof raw === 'string' && raw.trim().length === 0) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return null;
+  // Number() can round a nonzero string to zero through underflow. Only an
+  // explicit decimal zero is evidence of a free price component.
+  if (value === 0 && typeof raw === 'string'
+    && !/^[+-]?(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?$/i.test(raw.trim())) return null;
+  return value;
+}
+
 /** One price component in USD per MILLION tokens, or null when the upstream
  *  did not ship a usable figure. OpenRouter quotes strings ("0.00000125"),
  *  others quote numbers, and a few already quote per-million — so parse
  *  string-or-number and scale by magnitude rather than by source. */
 function perMillionTokens(raw: unknown): number | null {
-  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
-  if (typeof raw === 'string' && raw.trim().length === 0) return null;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0) return null;
+  const value = priceValue(raw);
+  if (value === null) return null;
   return value > 0 && value < PER_TOKEN_CEILING ? value * 1_000_000 : value;
 }
 
@@ -164,29 +176,44 @@ function capNote(note: string): string {
  *  plain `price: "free"` string, plus the free/not-free verdict the picker
  *  badges on. Anything unrecognizable is left alone — no chip at all. */
 function priceHintOf(record: Record<string, unknown>): { note: string; isFree: boolean } | undefined {
+  let hasFreePrice = false;
+  let hasUnknownPrice = false;
   for (const key of PRICE_KEYS) {
     const value = record[key];
     if (typeof value === 'string') {
       const text = value.trim();
-      if (text.length === 0) continue;
+      if (text.length === 0) { hasUnknownPrice = true; continue; }
       // Only the literal word counts as free — never a pattern over the note,
       // which is how "$10/M in" ends up painted green.
-      if (text.toLowerCase() === 'free') return { note: 'free', isFree: true };
+      if (text.toLowerCase() === 'free') { hasFreePrice = true; continue; }
       return { note: capNote(text), isFree: false };
     }
     const pricing = asRecord(value);
-    if (!pricing) continue;
+    if (!pricing) {
+      if (value !== undefined) hasUnknownPrice = true;
+      continue;
+    }
     const prompt = perMillionTokens(pricing.prompt);
     const completion = perMillionTokens(pricing.completion);
-    if (prompt === null && completion === null) continue;
-    // OpenRouter's ":free" slugs ship a flat {"prompt":"0","completion":"0"}.
-    if ((prompt ?? 0) === 0 && (completion ?? 0) === 0) return { note: 'free', isFree: true };
+    const request = priceValue(pricing.request);
+    const image = priceValue(pricing.image);
     const parts: string[] = [];
     if (prompt) parts.push(`${formatUsd(prompt)}/M in`);
     if (completion) parts.push(`${formatUsd(completion)}/M out`);
-    return { note: capNote(parts.join(' ')), isFree: false };
+    // Request and image charges are per unit, never per million tokens.
+    if (request) parts.push(`$${request}/request`);
+    if (image) parts.push(`$${image}/image`);
+    if (parts.length > 0) return { note: capNote(parts.join(' ')), isFree: false };
+
+    // Missing or invalid token prices are unknown, not zero. Any additional
+    // advertised component must also be explicitly zero before claiming free.
+    if (prompt === 0 && completion === 0 && Object.values(pricing).every(raw => priceValue(raw) === 0)) {
+      hasFreePrice = true;
+    } else {
+      hasUnknownPrice = true;
+    }
   }
-  return undefined;
+  return hasFreePrice && !hasUnknownPrice ? { note: 'free', isFree: true } : undefined;
 }
 
 /** Image input out of a modality array (["text", "image"]) or a modality
@@ -279,9 +306,9 @@ const KIND_METADATA_KEYS = ['type', 'task', 'object', 'model_type', 'modelType']
 const KIND_METADATA_VALUES: ReadonlyArray<readonly [DiscoveredModelKind, RegExp]> = [
   ['embedding', /embedding/],
   ['transcription', /(speech-?to-?text|transcri|asr\b|\bstt\b)/],
-  ['audio', /(text-?to-?speech|\btts\b|speech-?synthesis)/],
+  ['audio', /(text-?to-?speech|\btts\b|speech-?synthesis|^audio$)/],
   ['video', /video/],
-  ['image', /(text-?to-?image|image-?generation|diffusion)/],
+  ['image', /(text-?to-?image|image-?generation|diffusion|^images?$)/],
 ];
 
 /** The model's kind read off its id, for upstreams that advertise no usable

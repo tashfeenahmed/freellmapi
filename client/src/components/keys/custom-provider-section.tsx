@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ListPlus } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   const baseUrlError = !baseUrl.trim()
     ? t('validation.required')
     : !isHttpUrl(baseUrl)
-      ? t('validation.url')
+      ? `${t('validation.url')} (http://localhost:8080/v1)`
       : null
   const modelError = models.length === 0 ? t('validation.required') : null
 
@@ -183,14 +184,16 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
           <div className="flex items-center justify-between gap-2">
             <Label className="text-xs">{customType === 'chat' ? t('keys.customModels') : t('keys.customModel')}</Label>
             {customType === 'chat' && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => setDiscoverOpen(true)}
                 disabled={!!baseUrlError}
-                className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:pointer-events-none disabled:opacity-50"
               >
+                <ListPlus data-icon="inline-start" />
                 {t('keys.discoverModels')}
-              </button>
+              </Button>
             )}
           </div>
           <Textarea

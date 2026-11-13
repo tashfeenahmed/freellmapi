@@ -16,8 +16,7 @@
 // Forward-by-default: most OpenAI-compatible providers ignore unknown body
 // fields, so the default is to send everything and let the per-platform
 // droplist name the documented exceptions (Mistral 422s on unknown keys,
-// Groq 400s on the logprobs family, Azure-backed GitHub Models rejects
-// non-Azure knobs). A provider that still 400s fails over like any other
+// Groq 400s on the logprobs family). A provider that still 400s fails over like any other
 // provider-invalid request and shows up in the attempt trail — and its
 // droplist entry is one line to add.
 
@@ -233,11 +232,6 @@ export interface PlatformParamPolicy {
   maxTokensCap?: number;
 }
 
-/** GitHub Models' own output-token ceiling: asking for more 400s ("max_tokens
- *  is too large"), so the request never reaches the model. Wired into the
- *  github policy below as maxTokensCap. */
-export const GITHUB_MAX_OUTPUT_TOKENS = 400;
-
 // Keyed by Platform (not string) so a typo'd platform id fails tsc instead of
 // silently no-op'ing the policy; the string-typed accessors below cast at the
 // boundary since routes carry platform ids as plain strings.
@@ -273,18 +267,15 @@ export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPoli
     rename: { seed: 'random_seed' },
   },
   // Groq documents logprobs / top_logprobs / logit_bias as unsupported and
-  // rejects requests that include them.
-  groq: { drop: ['logprobs', 'top_logprobs', 'logit_bias'] },
-  // GitHub Models sits on Azure OpenAI, which 400s "Unrecognized request
-  // argument" for knobs outside the OpenAI set. Its reasoning_effort enum is
-  // the older low/medium/high one, so 'none'/'minimal' are clamped rather
-  // than sent. Its free tier also refuses any max_tokens above
-  // GITHUB_MAX_OUTPUT_TOKENS, so the cap is clamped here instead of being
-  // spent as a wasted fallback hop.
-  github: {
-    drop: ['top_k', 'min_p', 'repetition_penalty'],
+  // rejects requests that include them. Its reasoning_effort enum is the plain
+  // low/medium/high one: 'none' and 'minimal' are rejected with a 400
+  // ("must be one of low, medium, or high", observed on openai/gpt-oss-120b),
+  // which cost the request a fallback hop onto another platform's copy of the
+  // same model. Clamped rather than dropped so the knob still arrives, at the
+  // weakest setting Groq accepts.
+  groq: {
+    drop: ['logprobs', 'top_logprobs', 'logit_bias'],
     reasoningEfforts: ['low', 'medium', 'high'],
-    maxTokensCap: GITHUB_MAX_OUTPUT_TOKENS,
   },
   // Gemini's generationConfig has no equivalents for these; the adapter
   // translates the rest natively (topK, seed, penalties, responseSchema, and
@@ -448,12 +439,6 @@ export function platformDropsResponseFormat(platform: string): boolean {
 export function supportedParametersFor(platform: string, caps: { tools?: boolean } = {}): string[] {
   // Unlike the generic base set, Moondream has neither stop nor tools.
   if (platform === 'moondream') return ['temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stream', 'reasoning_effort'];
-  // Auray accepts sampling knobs for client compatibility but does not apply
-  // them. Advertise only controls its built-in models actually honor.
-  if (platform === 'auray') return [
-    'max_tokens', 'max_completion_tokens', 'stream', 'response_format', 'reasoning_effort',
-    ...(caps.tools ? ['tools', 'tool_choice'] : []),
-  ];
   const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
   const dropped = new Set<string>(policy?.drop ?? []);
   const params = [

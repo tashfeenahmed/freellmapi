@@ -494,11 +494,11 @@ async function toGeminiContents(messages: ChatMessage[]): Promise<{
   };
 }
 
-function extractToolCalls(parts: GeminiPart[] | undefined): ChatToolCall[] {
+function extractToolCalls(parts: GeminiPart[] | undefined, firstIndex = 0): ChatToolCall[] {
   const calls: ChatToolCall[] = [];
   if (!parts) return calls;
 
-  let fallbackIndex = 0;
+  let fallbackIndex = firstIndex;
   for (const part of parts) {
     if (!part.functionCall?.name) continue;
 
@@ -704,6 +704,10 @@ export class GoogleProvider extends BaseProvider {
     let sawToolCalls = false;
 
     const seenToolCallKeys = new Set<string>();
+    // Stream position of the next tool call. Routes assemble streamed calls by
+    // `index`, so every call needs its own, including parallel calls that
+    // arrive in one chunk.
+    let nextToolIndex = 0;
 
     // Same mid-stream inactivity watchdog as readSseStream (#553): this adapter
     // parses Gemini's own frame format, so it reads the body itself and used to
@@ -771,12 +775,12 @@ export class GoogleProvider extends BaseProvider {
 
           const text = extractText(parts);
           const reasoningContent = extractReasoningContent(parts);
-          const toolCalls = extractToolCalls(parts).filter(call => {
+          const toolCalls = extractToolCalls(parts, nextToolIndex).filter(call => {
             const key = `${call.id}:${call.function.name}:${call.function.arguments}`;
             if (seenToolCallKeys.has(key)) return false;
             seenToolCallKeys.add(key);
             return true;
-          });
+          }).map(call => ({ ...call, index: nextToolIndex++ }));
 
           if ((text && text.length > 0) || (reasoningContent && reasoningContent.length > 0) || toolCalls.length > 0) {
             sawToolCalls = sawToolCalls || toolCalls.length > 0;

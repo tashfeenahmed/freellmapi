@@ -35,7 +35,7 @@ export const openapiSpec = {
   tags: [
     { name: 'Chat', description: 'OpenAI-compatible chat and completion endpoints' },
     { name: 'Media', description: 'Image generation and text-to-speech' },
-    { name: 'Search', description: 'Web search over Parallel (keyless) and your Tavily, Exa, Firecrawl and Linkup keys' },
+    { name: 'Search', description: 'Web search over Parallel and Keenable (keyless) and your Tavily, Exa, Firecrawl and Linkup keys' },
     { name: 'Decisions', description: 'Decision models (choice, yes/no, score) over your Cloudflare and OpenRouter keys' },
     { name: 'Responses', description: 'OpenAI Responses API (Codex CLI wire format)' },
     { name: 'Anthropic', description: 'Anthropic Messages API (Claude Code and the Anthropic SDKs)' },
@@ -179,7 +179,7 @@ export const openapiSpec = {
         operationId: 'createSearch',
         summary: 'Search the web',
         description:
-          'Web search routed over the search engines in the catalog (Parallel, Tavily, Exa, Firecrawl, Linkup) and any ' +
+          'Web search routed over the search engines in the catalog (Parallel, Tavily, Exa, Firecrawl, Linkup, Keenable) and any ' +
           'custom search relay. Omit `engine` (or set `auto`) to fail over across engines that have a key; ' +
           'rate-limited or out-of-credit keys cool down and the next one is tried.',
         requestBody: {
@@ -621,6 +621,58 @@ export const openapiSpec = {
             },
           },
           '401': { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/v1/models/{id}': {
+      get: {
+        tags: ['Models'],
+        operationId: 'retrieveModel',
+        summary: 'Retrieve a single model (OpenAI models.retrieve)',
+        description:
+          'Returns one catalog entry by id in the OpenAI model shape, so ' +
+          'OpenAI-SDK clients (``client.models.retrieve(id)``) can resolve a ' +
+          'model before routing. Includes the virtual `auto` and `fusion` ids ' +
+          'and any catalog id with a slash (URL-encode the slash). Served from ' +
+          'the same builder as the list, so the two never disagree.',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Model id (e.g. `auto`, or `vendor/model` — slash URL-encoded).',
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'The model.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Model' },
+              },
+            },
+          },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { description: 'No model with this id (OpenAI error shape: `model_not_found`).' },
+        },
+      },
+    },
+    '/v1/usage': {
+      get: {
+        tags: ['Models'],
+        operationId: 'getUsage',
+        summary: 'Month-to-date consumption for this gateway',
+        description:
+          'Unified API key only (client-profile keys get 403). ' +
+          'Returns the current calendar month\'s successful requests and tokens, split by provider ' +
+          'platform, plus the UTC instant when the monthly window resets. Read from the same ledger ' +
+          'the per-key monthly caps enforce, so these numbers always agree with a 429 quota_exceeded ' +
+          'response. Mirrors OpenRouter GET /api/v1/auth/key and LiteLLM /key/info.',
+        responses: {
+          '200': { description: 'Usage roll-up: month, resetsAt, requests, tokens, byPlatform[], byKey[] (per provider key: label, enabled, requests, tokens, requestCap, tokenCap; null cap = unlimited).' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '403': { description: 'Called with a client-profile key; usage is install-wide, so only the unified key may read it.' },
         },
       },
     },

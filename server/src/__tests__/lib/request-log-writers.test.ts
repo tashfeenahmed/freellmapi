@@ -64,7 +64,7 @@ describe('every request writer feeds the durable aggregates', () => {
   it('a non-chat row is never attributed to a chat models row that shares its id', () => {
     getDb().prepare(`INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, enabled)
       VALUES ('groq', 'same-id', 'same-id', 1, 1, 'Small', 1)`).run();
-    logRequest('groq', 'same-id', null, 'success', 0, 0, 1, null, null, null, null, null, 'embedding');
+    logRequest('groq', 'same-id', null, 'success', 0, 0, 1, null, null, null, null, null, null, 'embedding');
     const row = getDb().prepare('SELECT request_type, model_db_id FROM requests').get() as { request_type: string; model_db_id: number | null };
     expect(row).toEqual({ request_type: 'embedding', model_db_id: null });
   });

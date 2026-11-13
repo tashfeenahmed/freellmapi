@@ -347,7 +347,25 @@
     "scoreColumn": "النتيجة",
     "minReliabilityFloor": "الحد الأدنى للموثوقية",
     "minReliabilityFloorHint": "يستبعد النموذج من التوجيه عندما تنخفض نسبة نجاحه المرصودة دون هذه القيمة. 0.8 تعني 80٪. اتركه فارغًا للتعطيل — تُحفظ دائمًا النماذج ذات السجلّ القليل حتى تظل النماذج الجديدة قابلة للتجربة. لا يُفرِّغ السلسلة كاملة أبدًا.",
-    "minReliabilityFloorOff": "معطّل"
+    "minReliabilityFloorOff": "معطّل",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "ضغط جهاز التوجيه",
@@ -524,6 +542,8 @@
     "providerActions": "إجراءات المزود",
     "routeViaProxy": "الطريق عبر الوكيل",
     "checkNow": "تحقق الآن",
+    "lastWorkedHint": "آخر عمل: {when}",
+    "lastWorkedNever": "لم يقدّم أي طلب ولم يجتز أي فحص بعد",
     "noAutoCheckHint": "لا يسمح هذا المزوّد بالفحص الآلي للمفاتيح. يصبح المفتاح سليمًا بعد أن يخدم أول طلب له.",
     "noModelsYetHint": "لا يحتوي الكتالوج لديك على نماذج من هذا المزوّد بعد، لذا لا يوجد ما يخدمه.",
     "proxyEnvHintBefore": "يمكن تكوينه أيضًا عبر",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "انسخ هذا المفتاح الآن — لن يظهر مرة أخرى.",
     "cpEnabledAria": "الملف مفعّل",
     "selectKey": "حدد هذا المفتاح",
+    "selectModel": "اختر هذا الطراز",
     "bulkSelected": "تم تحديد {count}",
     "bulkEnable": "تمكين الكل",
     "bulkDisable": "تعطيل الكل",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "الحد الشهري للرموز",
     "capUnlimitedPlaceholder": "غير محدود",
     "capEditHint": "تُصفَّر الحدود في 1 من الشهر 00:00 بتوقيت UTC. اتركه فارغًا بلا حد.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} طلبًا، {tokens} رمز هذا الشهر",
     "quotaBalanceHint": "متبقٍ {remaining} من {limit} {metric}",
-    "quotaBalanceLeft": "متبقٍ {remaining}"
-,
+    "quotaBalanceLeft": "متبقٍ {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "تظهر الإدخالات هنا فور كتابتها من الخادم. إذا كنت تتوقع مخرجات، فوسّع مرشّحات المستوى أو المزوّد أو البحث.",
     "noLevelsTitle": "لم يتم تحديد أي مستوى",
     "noLevelsDescription": "فعّل مستوى واحدًا على الأقل لعرض مخرجات السجل.",
-    "loadFailed": "تعذّر تحميل سجل الخادم."
+    "loadFailed": "تعذّر تحميل سجل الخادم.",
+    "eventFilter": "حدث",
+    "allEvents": "جميع الأحداث"
   },
   "playground": {
     "title": "ملعب",
@@ -1163,7 +1192,8 @@
       "openclaw": "مساعد شخصي يعمل على مدار الساعة ويرد على WhatsApp وTelegram وDiscord وغيرها من جهازك الخاص.",
       "hermes": "وكيل Nous Research ذاتي التحسين، بذاكرة دائمة ومهارات، في الطرفية أو على تطبيقات الدردشة.",
       "pi": "إطار وكيل بسيط في الطرفية تُشكّله بإضافاتك ومهاراتك وقوالب أوامرك الخاصة.",
-      "reasonix": "وكيل برمجة للطرفية مصمّم أصلًا لـ DeepSeek، مبني حول التخزين المؤقت للبادئات لتبقى الجلسات الطويلة رخيصة."
+      "reasonix": "وكيل برمجة للطرفية مصمّم أصلًا لـ DeepSeek، مبني حول التخزين المؤقت للبادئات لتبقى الجلسات الطويلة رخيصة.",
+      "zcode": "وكيل البرمجة من Z.ai لنماذج GLM الخاصة به، ويتصل بأي نقطة نهاية متوافقة مع OpenAI عبر سجل المزودات."
     }
   },
   "update": {

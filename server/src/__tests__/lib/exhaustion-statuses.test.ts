@@ -125,6 +125,15 @@ describe('isContextTooLargeError', () => {
     expect(classifyAttemptError(agnes)).toBe('context_too_large');
   });
 
+  it('flags BazaarLink "request is too large for a free tier" 400s (#1717)', () => {
+    const bazaar = Object.assign(
+      new Error('BazaarLink API error 400: This request is too large for a free tier'),
+      { status: 400 },
+    );
+    expect(isContextTooLargeError(bazaar)).toBe(true);
+    expect(classifyAttemptError(bazaar)).toBe('context_too_large');
+  });
+
   it('flags "input … longer than the max/maximum" wordings', () => {
     expect(isContextTooLargeError(new Error('Input is longer than the maximum allowed'))).toBe(true);
     expect(isContextTooLargeError(new Error('The input is longer than the max token limit'))).toBe(true);

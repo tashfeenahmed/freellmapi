@@ -12,7 +12,7 @@ Docker 之外的安装路径（一行命令脚本、本地开发、桌面应用�
 
 | 文件 | 说明 |
 | --- | --- |
-| [01-docker.md](01-docker.md) | 镜像本身（基于 `node:20-bookworm-slim` 的多阶段构建）、Compose 快速开始、端口与局域网访问、卷与持久化、健康检查、非 root 运行时、原生 `better-sqlite3` 编译缘由，以及为什么容器够不着宿主机能到达的提供方（#733）。 |
+| [01-docker.md](01-docker.md) | 镜像本身（基于 `node:24-bookworm-slim` 的多阶段构建）、Compose 快速开始、端口与局域网访问、卷与持久化、健康检查、非 root 运行时、原生 `better-sqlite3` 编译缘由，以及为什么容器够不着宿主机能到达的提供方（#733）。 |
 | [02-updates-and-backup.md](02-updates-and-backup.md) | 升级流程（`docker compose pull && docker compose up -d`）、仪表盘更新检查器（#635/#703）、SQLite 数据卷的备份，以及声明式配置/目录控制项（#f4cd7b4）。 |
 
 ## 速览

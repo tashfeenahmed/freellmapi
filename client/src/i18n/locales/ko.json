@@ -347,7 +347,25 @@
     "scoreColumn": "점수",
     "minReliabilityFloor": "최소 신뢰성 기준",
     "minReliabilityFloorHint": "관측된 성공률이 이 값 아래로 떨어지면 해당 모델을 라우팅에서 제외합니다. 0.8은 80%를 의미합니다. 비워 두면 비활성화됩니다 — 기록이 너무 적은 모델은 항상 유지되어 새 모델도 계속 시도할 수 있습니다. 전체 체인을 비우지는 않습니다.",
-    "minReliabilityFloorOff": "비활성"
+    "minReliabilityFloorOff": "비활성",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "라우터 압력",
@@ -524,6 +542,8 @@
     "providerActions": "공급자 작업",
     "routeViaProxy": "프록시를 통한 라우팅",
     "checkNow": "지금 확인하세요",
+    "lastWorkedHint": "마지막 작동: {when}",
+    "lastWorkedNever": "아직 요청을 처리하거나 점검을 통과하지 않았습니다",
     "noAutoCheckHint": "이 공급자는 자동 키 확인을 허용하지 않습니다. 키는 첫 요청을 처리한 뒤 정상 상태가 됩니다.",
     "noModelsYetHint": "카탈로그에 아직 이 공급자의 모델이 없어 처리할 요청이 없습니다.",
     "proxyEnvHintBefore": "또한 다음을 통해 구성할 수 있습니다.",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "지금 이 키를 복사하세요. 다시 표시되지 않습니다.",
     "cpEnabledAria": "프로필 활성화됨",
     "selectKey": "이 키 선택",
+    "selectModel": "이 모델 선택",
     "bulkSelected": "{count}개 선택됨",
     "bulkEnable": "모두 활성화",
     "bulkDisable": "모두 비활성화",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "월 토큰 한도",
     "capUnlimitedPlaceholder": "무제한",
     "capEditHint": "한도는 매월 1일 00:00 UTC에 초기화됩니다. 무제한이려면 비워 두세요.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "이번 달 요청 {requests}회, 토큰 {tokens}",
     "quotaBalanceHint": "{limit} {metric} 중 {remaining} 남음",
-    "quotaBalanceLeft": "{remaining} 남음"
-,
+    "quotaBalanceLeft": "{remaining} 남음",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "서버가 기록하는 대로 항목이 여기에 표시됩니다. 출력이 있어야 한다면 수준, 제공업체 또는 검색 필터를 넓혀 보세요.",
     "noLevelsTitle": "선택된 수준이 없습니다",
     "noLevelsDescription": "로그 출력을 보려면 수준을 하나 이상 켜세요.",
-    "loadFailed": "서버 로그를 불러오지 못했습니다."
+    "loadFailed": "서버 로그를 불러오지 못했습니다.",
+    "eventFilter": "이벤트",
+    "allEvents": "모든 이벤트"
   },
   "playground": {
     "title": "놀이터",
@@ -1163,7 +1192,8 @@
       "openclaw": "내 컴퓨터에서 WhatsApp, Telegram, Discord 등으로 응답하는 상시 가동 개인 비서입니다.",
       "hermes": "Nous Research의 자기 개선형 에이전트. 지속되는 메모리와 스킬을 갖추고 터미널이나 채팅 앱에서 사용할 수 있습니다.",
       "pi": "직접 만든 확장, 스킬, 프롬프트 템플릿으로 다듬어 쓰는 미니멀한 터미널 에이전트.",
-      "reasonix": "DeepSeek 네이티브 터미널 코딩 에이전트로, 프리픽스 캐싱을 중심으로 설계되어 긴 세션도 저렴하게 유지됩니다."
+      "reasonix": "DeepSeek 네이티브 터미널 코딩 에이전트로, 프리픽스 캐싱을 중심으로 설계되어 긴 세션도 저렴하게 유지됩니다.",
+      "zcode": "Z.ai의 GLM 모델용 코딩 에이전트. 제공자 레지스트리를 통해 OpenAI 호환 엔드포인트를 사용할 수 있습니다."
     }
   },
   "update": {

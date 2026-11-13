@@ -20,6 +20,13 @@ export function freeAiAudioUrl(body: unknown): string | null {
 export class FreeAiProvider extends BaseProvider {
   readonly platform = 'freeai' as const;
   readonly name = 'Free.ai';
+
+  // No published endpoint distinguishes genuine from bogus keys. Skip
+  // scheduled health probes instead of persisting an inconclusive error.
+  override get supportsKeyValidation(): boolean {
+    return false;
+  }
+
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     if (!apiKey.trim()) return { valid: false, error: 'Free.ai API key is required' };
     // Live controls (2026-10-11): /models, invalid-model errors and even Kokoro

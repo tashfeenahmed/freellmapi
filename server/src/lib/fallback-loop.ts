@@ -1,4 +1,5 @@
 import { nextMonthResetAt } from '../services/key-budget.js';
+import { benchCloudflareAccount } from '../services/cloudflare-daily-quota.js';
 // One shared provider retry/fallback loop for every OpenAI-, Responses- and
 // Anthropic-shaped chat surface (routes/proxy.ts legacy /completions and
 // /chat/completions, routes/responses.ts, routes/anthropic.ts). Each surface
@@ -17,7 +18,7 @@ import { nextMonthResetAt } from '../services/key-budget.js';
 // the fire-and-forget key revalidation kicked off on an upstream 401 (below).
 
 import type { RouteResult } from '../services/router.js';
-import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta } from '../services/router.js';
+import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
 import {
   recordRequest,
@@ -47,6 +48,7 @@ import {
   isProviderBadRequestError,
   isProviderDegradedError,
   isProviderLevelError,
+  isProviderMomentFailure,
   isContextTooLargeError,
   isTimeoutErrorText,
   isStreamTruncatedError,
@@ -169,6 +171,14 @@ function benchKeyAcrossPlatform(
 // Precedence mirrors the response cache: the settings-table value wins when
 // present (runtime-tunable), then the env var, then the default.
 export const DEFAULT_FALLBACK_TIME_BUDGET_MS = 45_000;
+
+// #1642: streaming surfaces hold reasoning-only output uncommitted so a dead
+// attempt fails over invisibly, but the client hears nothing meanwhile and
+// idle-watchdog clients (Claude Code) hang up. Once an attempt has been
+// reasoning this long it has proven alive, so it commits (headers, status and
+// X-Routed-Via for THIS attempt) and keeps the stream audibly alive; a later
+// failure takes the surface's normal mid-stream error path.
+export const REASONING_HOLD_MAX_MS = 15_000;
 // Share of the wall-clock budget an aborted attempt must have been silent for
 // before the hedge abort counts as provider health rather than bad luck. An
 // attempt late in a ladder inherits only the scraps of the budget its
@@ -215,6 +225,10 @@ export interface FallbackState {
   // reading is the same request, not a smaller one.
   observedTotalTokens?: number;
   observedInputTokens?: number;
+  // The surface's own size estimate for this request (input + output reserve).
+  // Set right after newFallbackState(); lets a size rejection that names no
+  // window still teach the model's ceiling (#1717).
+  estimatedTotalTokens?: number;
   // The request carries `tools` (#1230). Set by the surface right after
   // newFallbackState(); lets the failure/success paths learn which models
   // reject tool calls in practice. Unset means "not a tool request".
@@ -509,7 +523,8 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // model it touched, so later ordinary requests found the pool rate limited.
   if (isContextTooLargeError(err)) {
     learnLimitFromError(route.modelDbId, err);
-    learnContextWindowFromError(route.modelDbId, err);
+    const refusedTokens = Math.max(state.estimatedTotalTokens ?? 0, state.observedTotalTokens ?? 0, state.observedInputTokens ?? 0);
+    learnContextWindowFromError(route.modelDbId, err, refusedTokens > 0 ? refusedTokens : undefined);
     return false;
   }
   // A max_tokens above this model's output ceiling (Claude Code asks for
@@ -532,6 +547,9 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
+  // Workers AI's daily neurons pool is per ACCOUNT: bench every model on every
+  // token of the same account with this route's own duration and provenance.
+  if (route.platform === 'cloudflare') benchCloudflareAccount(route.apiKey, err, decision.durationMs, decision.source);
   // A truncated stream (200 + partial SSE, no [DONE]/finish_reason) on the
   // SAME route repeatedly is a sick edge, not bad luck — but a single one is
   // common enough on flaky free gateways that benching on first sight would
@@ -588,11 +606,20 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // different wallet and may well have credits, so only THIS key is out.
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'is out of credits (402)');
   }
-  // Model-level failure benching: a model failing across keys (or repeatedly on
-  // one key) must sink out of routing instead of being re-picked every request.
-  noteModelFailure(route, now);
+  // #1347 (PR 1): a provider-moment failure (429 / 5xx / timeout / transport)
+  // is the provider's bad minute, not model evidence. When attribution is
+  // enabled it still steers the key via the cooldown above, but leaves the
+  // model's books (failure window, penalties) untouched — so one slow minute
+  // stops sinking a healthy model out of routing.
+  const providerMoment = isProviderMomentAttributionEnabled() && isProviderMomentFailure(err);
+  if (!providerMoment) {
+    // Model-level failure benching: a model failing across keys (or repeatedly
+    // on one key) must sink out of routing instead of being re-picked every
+    // request.
+    noteModelFailure(route, now);
+  }
   // Model-level penalty only when no sibling key can still serve (#454).
-  if (!hasOtherUsableKey(route.modelDbId, route.keyId, state.skipKeys)) {
+  if (!providerMoment && !hasOtherUsableKey(route.modelDbId, route.keyId, state.skipKeys)) {
     // Hard limit signals (429/402) carry the heavier demotion; ordinary
     // upstream failures (5xx/timeout/empty stream) get a lighter one so the
     // model sinks gradually instead of being banished on a single blip.

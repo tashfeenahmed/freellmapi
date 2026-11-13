@@ -53,6 +53,7 @@ npx freellmapi setup-dsh --url http://localhost:3001 --api-key <统一密钥>
 | **Hermes Agent** | `setup-hermes` | `http://localhost:3001/v1` | OpenAI Chat（`provider: custom`） |
 | **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
 | **Reasonix** | `setup-reasonix` | `http://localhost:3001/v1` | OpenAI Chat（`kind = "openai"`） |
+| **ZCode** | `setup-zcode` | `http://localhost:3001/v1` | OpenAI Chat（`openai-chat-completions`） |
 | **QwenPaw** | 手动配置 | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` 打印指引 | 公共 `https://…/v1` | OpenAI Chat |
 | **其他** | `setup-generic` 打印现成配置块 | `http://localhost:3001/v1` | OpenAI Chat |
@@ -119,6 +120,16 @@ reasonix -p "Say hello"
 ```
 
 目录中的每个模型都会以 `freellmapi/<id>` 出现在 `/model` 中。`--profile <name>` 改为添加 `freellmapi-<name>` 条目——用 `reasonix --model freellmapi-<name>/<model>` 选择——不改动默认模型；`--model <id>` 固定默认模型。设置了 `[desktop].provider_access` 时，Reasonix Studio 只列出其中的 provider，请把 `"freellmapi"` 加进去（或在 设置 → 模型 → 访问 中添加）。Reasonix 的 User-Agent 为 `Reasonix/<version>`，Agents 页面的"最近出现"徽章据此识别。
+
+### ZCode（`zcode`）
+
+[ZCode](https://zcode.z.ai) 是 Z.ai 为其 GLM 模型打造的编程智能体。桌面端和 CLI 共用同一个 provider 注册表 `~/.zcode/v2/provider_config.json`（可用 `ZCODE_PERSONAL_PROVIDER_CONFIG_FILE` 改变位置）。`setup-zcode` 会在其中添加一个 `freellmapi` provider：`api-key` 访问配置、指向网关 `/v1` 的 `openai-chat-completions` 端点，以及目录中每个模型的一条模型规则（含上下文和输出上限），并把 `freellmapi/auto` 设为默认模型。其他 provider、它们的模型规则和 provider 顺序都会保留，重复运行只替换 `freellmapi` 的条目。ZCode 对自定义 provider 不做环境变量查找，因此密钥保存在该文件中；写入前会先备份，并以 `0600` 权限保护。
+
+```bash
+npx freellmapi setup-zcode --url http://localhost:3001 --api-key <统一密钥>
+```
+
+运行前请退出 ZCode 桌面端，以免它把内存中的注册表写回该文件。可在模型选择器（或 CLI 的 `/model`）中选择其他 `freellmapi/<model>`。`--profile <name>` 改为添加第二个 `freellmapi-<name>` provider。ZCode 的每个请求都带有自己的 `x-zcode-app-version` 和 `x-title: Z Code@…` 请求头，Agents 页面的"最近出现"徽章据此识别。旧的 `~/.zcode/v2/config.json` 和 `~/.zcode/cli/config.json` 只在迁移时读取一次，修改它们不会生效。
 
 ### QwenPaw
 

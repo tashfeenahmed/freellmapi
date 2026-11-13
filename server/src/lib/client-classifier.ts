@@ -19,6 +19,7 @@ export const CLIENT_AGENTS = [
   'hermes-agent',
   'pi',
   'reasonix',
+  'zcode',
   'cursor',
   'gemini-cli',
   'zed',
@@ -48,6 +49,11 @@ export function classifyClientAgent(req: Request): ClientAgent {
 
   // Strongest signal first: the dedicated session header only Claude Code sets.
   if (header(req, 'x-claude-code-session-id')) return 'claude-code';
+  // ZCode (Desktop and CLI) stamps every model request with its own headers:
+  // `x-zcode-app-version: 3.15.3`, `x-title: Z Code@cli`. It also sends
+  // x-session-id, so this must run before the /v1/messages fallback below
+  // that reads that header as Claude Code.
+  if (header(req, 'x-zcode-app-version') || header(req, 'x-title').startsWith('z code')) return 'zcode';
 
   // UA signals must beat wire-format fallbacks: Qwen Code speaks the Gemini
   // wire on /v1beta, and a plain openai SDK can call /v1/responses — neither
@@ -80,6 +86,8 @@ export function classifyClientAgent(req: Request): ClientAgent {
   if (/\bpi-coding-agent\b|^pi\/\d/.test(ua)) return 'pi';
   // Reasonix sends `Reasonix/<version>` to every endpoint on its own.
   if (/^reasonix\//.test(ua)) return 'reasonix';
+  // A ZCode build without the x-zcode-* headers still leads its UA with `zcode`.
+  if (/\bzcode\b/.test(ua)) return 'zcode';
   if (/opencode/.test(ua)) return 'opencode';
   if (/\bcline\b/.test(ua)) return 'cline';
   // The Roo Code extension and CLI send `RooCode/<version>`.

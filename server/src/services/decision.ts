@@ -1,12 +1,17 @@
 import { getDb } from '../db/index.js';
-import { parseRetryAfterMs } from '../providers/base.js';
+import { BEATAPI_BASE_URL } from '../providers/beatapi.js';
+import { APINEX_BASE_URL } from '../providers/apinex.js';
+import { BLOCKRUN_BASE_URL } from '../providers/blockrun.js';
+import { parseRetryAfterMs, parseStatedRetryMs } from '../providers/base.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
 import { proxyFetch } from '../lib/proxy.js';
-import { secondsUntilNextMonth } from './key-budget.js';
+import { recordMonthlyUsage, secondsUntilNextMonth } from './key-budget.js';
+import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
 import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
 import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
+import { markKeyHealthyFromRequest } from './health.js';
 
 // Decision models over the key pool.
 //
@@ -76,6 +81,10 @@ export interface DecisionOptions {
   signal?: AbortSignal;
   /** Overrides the request-scoped client agent (tests, internal callers). */
   clientAgent?: string | null;
+  /** With 'auto', leave these platforms out of the chain. Decision routing
+   *  (#1354) asks once per chat turn, which BeatAPI's free 1 request/minute
+   *  cannot keep up with. A pinned model is never skipped. */
+  skipPlatforms?: ReadonlySet<string>;
 }
 
 interface DecisionModelRow {
@@ -120,6 +129,16 @@ interface AdapterResult {
 
 type Adapter = (cred: ReservedProviderCredential, modelId: string, body: DecisionRequest, signal?: AbortSignal) => Promise<AdapterResult>;
 
+/** A back-off stated inside an error body: JSON first (RetryInfo-shaped), the
+ *  raw text as prose otherwise. Mirrors buildUpstreamError in providers/base.ts. */
+function statedBodyRetryMs(text: string): number | undefined {
+  try {
+    return parseStatedRetryMs(JSON.parse(text));
+  } catch {
+    return parseStatedRetryMs(text);
+  }
+}
+
 async function upstream(url: string, platform: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> {
   const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const res = await proxyFetch(
@@ -131,11 +150,15 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
   );
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    // Same rule as the chat path (providers/base.ts buildUpstreamError): a
+    // header Retry-After wins, then a back-off stated in the error BODY
+    // (Gemini RetryInfo, prose "try again in 45 seconds"). Dropping the body
+    // hint demotes an exact promise to the 60s heuristic and to no hint.
     throw new DecisionError(
       `${platform} ${res.status}: ${text.slice(0, 200)}`,
       res.status,
       undefined,
-      parseRetryAfterMs(res.headers?.get('retry-after') ?? null),
+      parseRetryAfterMs(res.headers?.get('retry-after') ?? null) ?? statedBodyRetryMs(text),
     );
   }
   return res.json();
@@ -164,6 +187,117 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  // The modern BlockRun endpoint uses input + named questions, not the
+  // System One wire shape. Keep this free decision route out of chat.
+  // Contract: https://blockrun.ai/docs/api-reference/decisions
+  blockrun: async (cred, modelId, body, signal) => {
+    if (modelId !== 'gpt-6-luna') throw new DecisionError('Unsupported BlockRun free decision model', 400);
+    const text = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value) ?? '';
+    const questions = Object.entries(body.questions).map(([name, question]) => {
+      const base = { name, instructions: text(question.instructions) };
+      if (question.type === 'noul') {
+        return { ...base, type: 'predicate', ...(question.criteria === undefined ? {} :
+          { instructions: `${base.instructions}\nCriteria: ${text(question.criteria)}` }) };
+      }
+      if (question.type === 'choice') {
+        if (!question.criteria || typeof question.criteria !== 'object' || Array.isArray(question.criteria)) {
+          throw new DecisionError('BlockRun choice requires a criteria map', 400);
+        }
+        const choices = Object.entries(question.criteria).map(([value, description]) => ({ value, description: description == null ? value : text(description) }));
+        if (!choices.length) throw new DecisionError('BlockRun choice requires options', 400);
+        return { ...base, type: 'choice', choices };
+      }
+      if (!Array.isArray(question.criteria) || !question.criteria.length) {
+        throw new DecisionError('BlockRun score requires an ordered criteria array', 400);
+      }
+      return { ...base, type: 'score', levels: question.criteria.map((level, i) => ({ label: String(i), description: text(level) })) };
+    });
+    const json = await upstream(`${BLOCKRUN_BASE_URL}/decisions`, 'blockrun', {
+      method: 'POST', redirect: 'error',
+      headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, input: text(body.state), questions }),
+    }, signal) as { model?: unknown; answers?: unknown; usage?: unknown; error?: unknown } | null;
+    if (!json || json.error || ![modelId, `openai/${modelId}`].includes(String(json.model)) || !Array.isArray(json.answers)) {
+      throw new DecisionError('blockrun returned an error, invalid answers or a different decision model', 502);
+    }
+    const probability = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+    const answers = new Map<string, unknown>();
+    for (const raw of json.answers) {
+      if (!raw || typeof raw !== 'object') throw new DecisionError('blockrun returned an invalid answer', 502);
+      const a = raw as Record<string, unknown>;
+      if (typeof a.name !== 'string' || !Object.hasOwn(body.questions, a.name) || answers.has(a.name)) {
+        throw new DecisionError('blockrun returned an unexpected or duplicate answer', 502);
+      }
+      const q = body.questions[a.name];
+      if (q.type === 'noul') {
+        if (a.type !== 'predicate' || !probability(a.probability)) throw new DecisionError('blockrun returned an invalid predicate', 502);
+        answers.set(a.name, { type: 'noul', noul: a.probability });
+        continue;
+      }
+      if (a.type !== q.type || !probability(a.confidence) || !Array.isArray(a.probabilities)) {
+        throw new DecisionError('blockrun returned an invalid typed answer', 502);
+      }
+      const allowed = q.type === 'choice' ? Object.keys(q.criteria as object) : (q.criteria as unknown[]).map((_, i) => String(i));
+      const probabilities = new Map<string, number>();
+      for (const p of a.probabilities) {
+        if (!p || !['string', 'number'].includes(typeof p.value) || !allowed.includes(String(p.value)) ||
+            probabilities.has(String(p.value)) || !probability(p.probability)) {
+          throw new DecisionError('blockrun returned invalid answer probabilities', 502);
+        }
+        probabilities.set(String(p.value), p.probability);
+      }
+      if (probabilities.size !== allowed.length) throw new DecisionError('blockrun omitted answer probabilities', 502);
+      if (q.type === 'choice' ? typeof a.choice !== 'string' || !allowed.includes(a.choice) :
+        typeof a.score !== 'number' || !Number.isFinite(a.score) || a.score < 0 || a.score > allowed.length - 1) {
+        throw new DecisionError('blockrun returned an out-of-range answer', 502);
+      }
+      answers.set(a.name, { type: q.type, [q.type]: a[q.type], probabilities: Object.fromEntries(probabilities), confidence: a.confidence });
+    }
+    if (answers.size !== questions.length) throw new DecisionError('blockrun omitted requested answers', 502);
+    return { answers: Object.fromEntries(answers), usage: usageOf(json.usage) };
+  },
+  apinex: async (cred, modelId, body, signal) => {
+    const json = await upstream(`${APINEX_BASE_URL}/decisions`, 'apinex', {
+      method: 'POST', redirect: 'error',
+      headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, state: body.state, questions: body.questions }),
+    }, signal) as { model?: string; answers?: unknown; usage?: unknown; error?: unknown } | null;
+    if (!json || json.error || json.model !== modelId) {
+      throw new DecisionError('apinex returned an error or a different decision model', 502);
+    }
+    const answers = answersOf(json.answers, 'apinex');
+    for (const [id, question] of Object.entries(body.questions)) {
+      const answer = answers[id] as { type?: unknown; choice?: unknown; noul?: unknown; score?: unknown } | null;
+      const value = answer?.[question.type];
+      if (!answer || answer.type !== question.type || (question.type === 'choice'
+        ? typeof value !== 'string'
+        : typeof value !== 'number' || !Number.isFinite(value))) {
+        throw new DecisionError('apinex returned a missing or invalid typed answer', 502);
+      }
+    }
+    return { answers, usage: usageOf(json.usage) };
+  },
+  beatapi: async (cred, modelId, body, signal) => {
+    const json = await upstream(`${BEATAPI_BASE_URL}/systemone`, 'beatapi', {
+      method: 'POST', redirect: 'error',
+      headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, state: body.state, questions: body.questions }),
+    }, signal) as { model?: string; answers?: unknown; usage?: unknown; error?: unknown } | null;
+    if (!json || json.error || json.model !== modelId) {
+      throw new DecisionError('beatapi returned an error or a different decision model', 502);
+    }
+    const answers = answersOf(json.answers, 'beatapi');
+    for (const [id, question] of Object.entries(body.questions)) {
+      const answer = answers[id] as { type?: unknown; choice?: unknown; noul?: unknown; score?: unknown } | null;
+      const value = answer?.[question.type];
+      if (!answer || answer.type !== question.type || (question.type === 'choice'
+        ? typeof value !== 'string'
+        : typeof value !== 'number' || !Number.isFinite(value))) {
+        throw new DecisionError('beatapi returned a missing or invalid typed answer', 502);
+      }
+    }
+    return { answers, usage: usageOf(json.usage) };
+  },
   // Workers AI runs Clef through ai/run, with a short `model` selector
   // ("clef-flash") inside the body. Response: { result: { answers, usage } }.
   cloudflare: async (cred, modelId, body, signal) => {
@@ -222,6 +356,20 @@ function logDecision(row: DecisionModelRow, keyId: number | null, status: 'ok' |
   } catch (e) {
     console.error('Failed to log decision request:', e);
   }
+  // The per-key monthly caps (#1158) and GET /v1/usage read the
+  // key_monthly_usage ledger. Chat, embeddings, media, rerank, moderation and
+  // search settle into it through their `requests` rows; decisions log to
+  // decision_requests, so a served decision settles its spend directly here.
+  // Not a `requests` row: decisions fire every routing turn, and one there
+  // would double every chat turn in the dashboard's request analytics.
+  if (status === 'ok' && keyId != null) {
+    try {
+      recordMonthlyUsage(keyId, inputTokens);
+      noteBudgetAlerts(keyId);
+    } catch (e) {
+      console.error('Failed to settle decision spend:', e);
+    }
+  }
 }
 
 function coolDown(row: DecisionModelRow, keyId: number, e: DecisionError): void {
@@ -245,9 +393,9 @@ export function decisionsAvailable(): boolean {
   return allDecisionRows().some(r => r.enabled === 1 && ADAPTERS[r.platform] && hasUsableKey(r.platform));
 }
 
-function decisionChain(model: string | undefined): DecisionModelRow[] {
+function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>): DecisionModelRow[] {
   const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform]);
-  if (!model || model === 'auto') return enabled;
+  if (!model || model === 'auto') return skipPlatforms ? enabled.filter(r => !skipPlatforms.has(r.platform)) : enabled;
   const pinned = enabled.filter(r => r.model_id === model);
   if (pinned.length === 0) {
     const known = allDecisionRows().some(r => r.model_id === model);
@@ -262,7 +410,7 @@ function decisionChain(model: string | undefined): DecisionModelRow[] {
 }
 
 export async function runDecision(body: DecisionRequest, opts: DecisionOptions = {}): Promise<DecisionResponse> {
-  const chain = decisionChain(opts.model);
+  const chain = decisionChain(opts.model, opts.skipPlatforms);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   const questionCount = Object.keys(body.questions).length;
 
@@ -291,6 +439,11 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
       try {
         const out = await ADAPTERS[row.platform]!(credential, row.model_id, body, opts.signal);
         logDecision(row, credential.id, 'ok', Date.now() - started, questionCount, out.usage.input_tokens, clientAgent, null);
+        // A served decision is evidence the key works, the same as a served
+        // chat request (#1493) or search (#1612). Decision routing fires every
+        // turn, so a decision key that serves fine but once got demoted to
+        // 'error' by a blip had no way back into the pool.
+        markKeyHealthyFromRequest(credential.id);
         return { model: row.model_id, provider: row.platform, answers: out.answers, usage: out.usage };
       } catch (err: any) {
         // The caller hung up: not the model's failure, so no 'error' row to drag

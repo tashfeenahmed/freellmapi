@@ -38,5 +38,9 @@ export default defineConfig({
   esbuild: { jsx: 'automatic' },
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // jsdom 27 delegates Storage to Node's experimental webstorage, which is
+    // undefined without --experimental-webstorage; the setup file installs a
+    // memory Storage only where the native one is missing. See the file.
+    setupFiles: ['./vitest.setup-storage.ts'],
   },
 })

@@ -347,7 +347,25 @@
     "scoreColumn": "分數",
     "minReliabilityFloor": "最低可靠性門檻",
     "minReliabilityFloorHint": "模型實際成功率低於此值時不再參與路由。0.8 表示 80%。留空表示關閉——歷史樣本太少的模型始終保留，以便新模型仍有機會被嘗試。不會清空整條候選鏈。",
-    "minReliabilityFloorOff": "關閉"
+    "minReliabilityFloorOff": "關閉",
+    "providerMomentAttribution": "把限流失敗歸因到渠道",
+    "providerMomentAttributionHint": "開啟後，429、5xx、逾時和連接中斷會被視為「渠道這一刻不行」：仍會冷卻對應的 key，但不再計入模型的可靠性評分。預設關閉——關閉即保持現有評分行為。",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "路由壓力",
@@ -528,6 +546,8 @@
     "providerActions": "提供者操作",
     "routeViaProxy": "經由代理伺服器轉發",
     "checkNow": "立即檢查",
+    "lastWorkedHint": "上次可用：{when}",
+    "lastWorkedNever": "尚未處理請求，也尚未通過檢查",
     "noAutoCheckHint": "此供應商不允許自動檢查金鑰。金鑰在處理完第一個請求後會變為正常。",
     "noModelsYetHint": "你的目錄中還沒有此供應商的模型，因此暫時沒有可處理的請求。",
     "proxyEnvHintBefore": "也可透過 ",
@@ -618,6 +638,7 @@
     "cpKeyOnce": "請立即複製此金鑰——之後將不會再顯示。",
     "cpEnabledAria": "設定檔已啟用",
     "selectKey": "選擇此金鑰",
+    "selectModel": "選擇此模型",
     "bulkSelected": "已選擇 {count} 個金鑰",
     "bulkEnable": "批次啟用",
     "bulkDisable": "批次停用",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "每月 Token 上限",
     "capUnlimitedPlaceholder": "無限制",
     "capEditHint": "配額在每月 1 日 00:00 UTC 重設。留空表示無限制。",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "本月 {requests} 次請求，{tokens} tokens",
     "quotaBalanceHint": "剩餘 {remaining} / {limit} {metric}",
-    "quotaBalanceLeft": "剩餘 {remaining}"
-,
+    "quotaBalanceLeft": "剩餘 {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "伺服器寫入日誌時，項目會顯示在這裡。若預期會有輸出，請放寬等級、提供者或搜尋篩選條件。",
     "noLevelsTitle": "未選擇等級",
     "noLevelsDescription": "至少開啟一個等級才能看到日誌輸出。",
-    "loadFailed": "無法載入伺服器日誌。"
+    "loadFailed": "無法載入伺服器日誌。",
+    "eventFilter": "事件",
+    "allEvents": "全部事件"
   },
   "playground": {
     "title": "遊樂場",
@@ -1163,7 +1192,8 @@
       "openclaw": "一個常駐運作的個人助理，從你自己的機器上透過 WhatsApp、Telegram、Discord 等回應。",
       "hermes": "Nous Research 的自我改進代理，具備持久記憶與技能，可在終端機或聊天應用程式中使用。",
       "pi": "一個極簡的終端機代理，用你自己的擴充功能、技能與提示詞範本來塑造它。",
-      "reasonix": "為 DeepSeek 原生打造的終端程式設計代理，圍繞前綴快取設計，長時間工作階段也能維持低成本。"
+      "reasonix": "為 DeepSeek 原生打造的終端程式設計代理，圍繞前綴快取設計，長時間工作階段也能維持低成本。",
+      "zcode": "Z.ai 為其 GLM 模型打造的編程智能體，可透過提供方註冊表連線任何 OpenAI 相容端點。"
     }
   },
   "update": {

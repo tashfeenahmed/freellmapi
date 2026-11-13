@@ -48,7 +48,7 @@ npm run check:i18n -w client      # scripts/check-i18n.mjs
 
 ## CI summary
 
-[`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) runs on `ubuntu-24.04`, on pushes and PRs targeting `main`, as a single `test` job across a Node matrix of **20 and 22** — both ends of the supported engines range (`>=20.18 <25`). Node 20 is the baseline that historically caught crashes newer local Node hid; 22 is the LTS most contributors run. Steps, in order:
+[`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) runs on `ubuntu-24.04`, on pushes and PRs targeting `main`, as a single `test` job across a Node matrix of **20, 22 and 24**, the supported engines range (`>=20.18 <25`). Node 20 is the baseline that historically caught crashes newer local Node hid; 22 is the LTS most contributors run; 24 is what the Docker image ships. Steps, in order:
 
 1. checkout + setup-node (with npm cache)
 2. `npm install`

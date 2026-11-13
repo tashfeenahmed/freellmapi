@@ -25,6 +25,15 @@ const ENDPOINT_ID_SQL = "COALESCE(rtrim(trim(k.base_url), '/'), '')";
 const toSqliteDateTime = (timestamp: number) =>
     new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ');
 
+// First value only — Express hands back an array for a repeated query param,
+// and a repeated filter is a client bug, not two filters. Same contract as
+// routes/logs.ts.
+function firstParam(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
 // Return the rolling cutoff timestamp for the selected analytics range.
 function getSinceTimestamp(range: string): string {
   const now = Date.now();
@@ -616,9 +625,11 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 100, 1), 500);
   const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-  // Optional filters. All are validated (whitelist / shape) and applied as
-  // bound parameters; absent filters keep the default behavior identical.
-  const status = req.query.status as string | undefined;
+  // First value only, like routes/logs.ts: Express hands back an ARRAY for a
+  // repeated query param, and the provider shape check below dies on
+  // `provider.startsWith(...)` — arrays have no such method — turning a client
+  // bug into a 500 on the dashboard's recent-calls panel.
+  const status = firstParam(req.query.status);
   if (status !== undefined && status !== 'success' && status !== 'error' && status !== 'canceled') {
     res.status(400).json({ error: "invalid status filter (expected 'success', 'error' or 'canceled')" });
     return;
@@ -629,8 +640,8 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
   // endpoint's base_url is what actually selects one). The legacy `platform`
   // param still works for old clients. Both are bound parameters, never
   // interpolated, so the only validation needed is shape.
-  const provider = req.query.provider as string | undefined;
-  const platform = req.query.platform as string | undefined;
+  const provider = firstParam(req.query.provider);
+  const platform = firstParam(req.query.platform);
   let providerFilterSql = '';
   const providerFilterParams: string[] = [];
   if (provider !== undefined) {

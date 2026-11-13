@@ -6,8 +6,22 @@ const ORIGINAL_RETENTION_DAYS = process.env.REQUEST_ANALYTICS_RETENTION_DAYS;
 const ORIGINAL_MAX_ROWS = process.env.REQUEST_ANALYTICS_MAX_ROWS;
 const ORIGINAL_SEARCH_LOGS_RETENTION_DAYS = process.env.SEARCH_LOGS_RETENTION_DAYS;
 const ORIGINAL_SEARCH_LOGS_MAX_ROWS = process.env.SEARCH_LOGS_MAX_ROWS;
+const ORIGINAL_DECISION_LOGS_RETENTION_DAYS = process.env.DECISION_LOGS_RETENTION_DAYS;
+const ORIGINAL_DECISION_LOGS_MAX_ROWS = process.env.DECISION_LOGS_MAX_ROWS;
 
 function restoreEnv() {
+  if (ORIGINAL_DECISION_LOGS_RETENTION_DAYS === undefined) {
+    delete process.env.DECISION_LOGS_RETENTION_DAYS;
+  } else {
+    process.env.DECISION_LOGS_RETENTION_DAYS = ORIGINAL_DECISION_LOGS_RETENTION_DAYS;
+  }
+
+  if (ORIGINAL_DECISION_LOGS_MAX_ROWS === undefined) {
+    delete process.env.DECISION_LOGS_MAX_ROWS;
+  } else {
+    process.env.DECISION_LOGS_MAX_ROWS = ORIGINAL_DECISION_LOGS_MAX_ROWS;
+  }
+
   if (ORIGINAL_SEARCH_LOGS_RETENTION_DAYS === undefined) {
     delete process.env.SEARCH_LOGS_RETENTION_DAYS;
   } else {
@@ -164,6 +178,28 @@ describe('request analytics retention', () => {
     expect((db.prepare("SELECT COUNT(*) AS n FROM response_cache WHERE cache_key = 'cache-live'").get() as { n: number }).n).toBe(1);
   });
 
+  it('sweeps expired dashboard sessions on the prune pass', () => {
+    // Expired session rows used to be uncollectable: validateSession only
+    // deletes the row it is validating, and an expired token is never re-sent,
+    // while every login mints a fresh row. Seed one of each and require the
+    // prune to take only the expired half.
+    const db = getDb();
+    const now = new Date('2026-05-31T00:00:00Z').getTime();
+    const userId = db
+      .prepare("INSERT INTO users (email, password_hash) VALUES ('prune@example.com', 'x')")
+      .run().lastInsertRowid as number;
+    const session = db.prepare(
+      'INSERT INTO sessions (token_hash, user_id, expires_at_ms) VALUES (?, ?, ?)',
+    );
+    session.run('hash-expired-session', userId, now - 1000);
+    session.run('hash-live-session', userId, now + 3600_000);
+
+    const result = pruneRequestAnalytics({ db, force: true, now: new Date(now) });
+    expect(result.deleted).toBe(1);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE token_hash = 'hash-expired-session'").get() as { n: number }).n).toBe(0);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE token_hash = 'hash-live-session'").get() as { n: number }).n).toBe(1);
+  });
+
   it('bounds the web-search attempt log by age and count', () => {
     process.env.SEARCH_LOGS_RETENTION_DAYS = '7';
     process.env.SEARCH_LOGS_MAX_ROWS = '2';
@@ -197,5 +233,40 @@ describe('request analytics retention', () => {
 
     pruneRequestAnalytics({ db, force: true, now: new Date('2026-05-08T12:00:00Z') });
     expect((db.prepare('SELECT COUNT(*) AS n FROM search_requests').get() as { n: number }).n).toBe(1);
+  });
+
+  it('bounds the decision-model attempt log by age and count', () => {
+    process.env.DECISION_LOGS_RETENTION_DAYS = '7';
+    process.env.DECISION_LOGS_MAX_ROWS = '2';
+    const db = getDb();
+    const insert = db.prepare(`
+      INSERT INTO decision_requests (model_id, platform, status, latency_ms, created_at)
+      VALUES ('clef-flash', 'cloudflare', 'ok', 10, ?)
+    `);
+    insert.run('2026-05-01 00:00:00'); // older than 7d from May 8
+    insert.run('2026-05-07 00:00:00');
+    insert.run('2026-05-07 23:00:00');
+    insert.run('2026-05-08 00:00:00');
+
+    const result = pruneRequestAnalytics({
+      db,
+      force: true,
+      now: new Date('2026-05-08T12:00:00Z'),
+    });
+    // Age prune drops May 1; the count cap then trims the rest to the newest 2.
+    expect(result.deleted).toBe(2);
+    const remaining = db.prepare(`SELECT created_at FROM decision_requests ORDER BY created_at`).all() as Array<{ created_at: string }>;
+    expect(remaining.map(r => r.created_at)).toEqual(['2026-05-07 23:00:00', '2026-05-08 00:00:00']);
+  });
+
+  it('keeps decision rows when both knobs are 0', () => {
+    process.env.DECISION_LOGS_RETENTION_DAYS = '0';
+    process.env.DECISION_LOGS_MAX_ROWS = '0';
+    const db = getDb();
+    db.prepare(`INSERT INTO decision_requests (model_id, platform, status, latency_ms, created_at)
+      VALUES ('clef-flash', 'cloudflare', 'ok', 10, '2020-01-01 00:00:00')`).run();
+
+    pruneRequestAnalytics({ db, force: true, now: new Date('2026-05-08T12:00:00Z') });
+    expect((db.prepare('SELECT COUNT(*) AS n FROM decision_requests').get() as { n: number }).n).toBe(1);
   });
 });

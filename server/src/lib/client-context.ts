@@ -1,11 +1,15 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import type { NextFunction, Request, Response } from 'express';
 import { classifyClientAgent, type ClientAgent } from './client-classifier.js';
+import type { PresetStrategy } from '../services/scoring.js';
 
 export interface ClientContext {
   ip: string | null;
   userAgent: string | null;
   agent: ClientAgent | null;
+  /** The preset a decision model picked for this request (#1354), read by the
+   *  router while the 'decision' strategy is active. Unset = Balanced. */
+  routingStrategy?: PresetStrategy;
 }
 
 // Request-scoped caller identity, readable from anywhere below the middleware
@@ -47,4 +51,11 @@ export function clientContextMiddleware(req: Request, _res: Response, next: Next
 
 export function getClientContext(): ClientContext {
   return storage.getStore() ?? { ip: null, userAgent: null, agent: null };
+}
+
+/** Record this request's decision-picked preset (#1354). A no-op outside a
+ *  request scope (tests, background work), which then routes as Balanced. */
+export function setRequestRoutingStrategy(strategy: PresetStrategy | undefined): void {
+  const store = storage.getStore();
+  if (store) store.routingStrategy = strategy;
 }

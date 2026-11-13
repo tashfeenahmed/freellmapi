@@ -63,11 +63,14 @@ function rangeOf(values: (number | undefined)[]): { min: number; max: number } |
   return { min: Math.min(...nums), max: Math.max(...nums) }
 }
 
-// A group's axis as a min–max band across its providers, collapsing to the
-// plain single-value bar when the providers agree (or there is only one).
-// Groups show the true spread instead of silently promoting the best member's
-// number to the whole group (#580).
-function AxisRangeBar({ values, color }: { values: (number | undefined)[]; color: string }) {
+// A group's axis across its providers, collapsing to the plain single-value bar
+// when the providers agree (or there is only one). Groups show the true spread
+// instead of silently promoting the best member's number to the whole group
+// (#580). Drawn as a solid fill up to the weakest provider plus a faded
+// stretch up to the strongest, so it lines up with the filled single-provider
+// bars around it: a band floating mid-track (or a 4% sliver for a narrow
+// spread) read as a broken bar.
+export function AxisRangeBar({ values, color }: { values: (number | undefined)[]; color: string }) {
   const range = rangeOf(values)
   if (range === null) return <AxisBar value={undefined} color={color} />
   const lo = Math.round(range.min * 100)
@@ -77,8 +80,14 @@ function AxisRangeBar({ values, color }: { values: (number | undefined)[]; color
     <div className="flex items-center gap-1.5">
       <div className="relative h-1.5 w-12 rounded-full bg-muted overflow-hidden">
         <div
-          className="absolute inset-y-0 rounded-full"
-          style={{ left: `${lo}%`, width: `${Math.max(4, hi - lo)}%`, backgroundColor: color }}
+          data-part="spread"
+          className="absolute inset-y-0 left-0 rounded-full opacity-35"
+          style={{ width: `${hi}%`, backgroundColor: color }}
+        />
+        <div
+          data-part="floor"
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${lo}%`, backgroundColor: color }}
         />
       </div>
       <span className="font-mono text-[11px] text-muted-foreground tabular-nums min-w-7 text-right whitespace-nowrap">

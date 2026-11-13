@@ -309,6 +309,18 @@ const brands: Record<string, Brand> = {
       </g>
     ),
   },
+  // ZCode (Z.ai): its app icon is a white Z on a near-black rounded square,
+  // drawn here as the square with the Z knocked out so it reads on both tiles.
+  zcode: {
+    tint: '[--mk:#2B2B2B] dark:[--mk:#E5E5E5]',
+    art: (
+      <path
+        fill="var(--mk, currentColor)"
+        fillRule="evenodd"
+        d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4ZM7 7v2.4h6.6L7 14.6V17h10v-2.4h-6.6L17 9.4V7Z"
+      />
+    ),
+  },
   // Any other OpenAI-compatible client: our own terminal glyph, not a brand
   // mark, so it keeps the page foreground colour on both tiles.
   generic: {

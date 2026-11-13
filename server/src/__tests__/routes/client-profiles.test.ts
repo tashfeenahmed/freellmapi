@@ -237,4 +237,75 @@ describe('client profiles (#411)', () => {
       expect(sent[1]).toMatchObject({ role: 'system', content: 'caller instructions' });
     });
   });
+
+  describe('the Anthropic surface (/v1/messages) honors profile keys', () => {
+    const anthropicBody = {
+      model: 'auto',
+      max_tokens: 64,
+      system: 'caller instructions',
+      messages: [{ role: 'user', content: 'hi' }],
+    };
+
+    it('accepts a profile key on x-api-key and injects the enforced prompt first', async () => {
+      const created = await createProfile('anthropic-bot', 'ENFORCED PROMPT');
+      const { status } = await request(app, 'POST', '/v1/messages', {
+        token: created.key, body: anthropicBody,
+      });
+      expect(status).toBe(200);
+      const sent = seenMessages[0];
+      // Same ordering contract as /v1/chat/completions: enforced first, the
+      // caller's system turn survives after it.
+      expect(sent[0]).toMatchObject({ role: 'system', content: 'ENFORCED PROMPT' });
+      expect(sent.some(m => m.role === 'system' && m.content === 'caller instructions')).toBe(true);
+    });
+
+    it('the unified key injects nothing on /v1/messages', async () => {
+      const { status } = await request(app, 'POST', '/v1/messages', {
+        token: unifiedKey, body: anthropicBody,
+      });
+      expect(status).toBe(200);
+      expect(seenMessages[0][0]).toMatchObject({ role: 'system', content: 'caller instructions' });
+    });
+
+    it('a disabled profile key gets 401 on /v1/messages too', async () => {
+      const created = await createProfile('anthropic-off', 'x');
+      await request(app, 'PATCH', `/api/client-profiles/${created.id}`, {
+        token: dashToken, body: { enabled: false },
+      });
+      const { status } = await request(app, 'POST', '/v1/messages', {
+        token: created.key, body: anthropicBody,
+      });
+      expect(status).toBe(401);
+    });
+  });
+
+  describe('the Gemini surface (/v1beta) honors profile keys', () => {
+    const geminiBody = {
+      contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
+      systemInstruction: { parts: [{ text: 'caller instructions' }] },
+    };
+    const geminiPath = '/v1beta/models/gemini-2.5-flash:generateContent';
+
+    it('accepts a profile key and injects the enforced prompt first', async () => {
+      const created = await createProfile('gemini-bot', 'ENFORCED PROMPT');
+      const { status } = await request(app, 'POST', geminiPath, {
+        token: created.key, body: geminiBody,
+      });
+      expect(status).toBe(200);
+      const sent = seenMessages[0];
+      expect(sent[0]).toMatchObject({ role: 'system', content: 'ENFORCED PROMPT' });
+      expect(sent.some(m => m.role === 'system' && m.content === 'caller instructions')).toBe(true);
+    });
+
+    it('a disabled profile key gets 401 on /v1beta too', async () => {
+      const created = await createProfile('gemini-off', 'x');
+      await request(app, 'PATCH', `/api/client-profiles/${created.id}`, {
+        token: dashToken, body: { enabled: false },
+      });
+      const { status } = await request(app, 'POST', geminiPath, {
+        token: created.key, body: geminiBody,
+      });
+      expect(status).toBe(401);
+    });
+  });
 });

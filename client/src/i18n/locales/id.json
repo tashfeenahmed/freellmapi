@@ -347,7 +347,25 @@
     "scoreColumn": "Skor",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Tekanan router",
@@ -524,6 +542,8 @@
     "providerActions": "Tindakan penyedia",
     "routeViaProxy": "Rute melalui proxy",
     "checkNow": "Periksa sekarang",
+    "lastWorkedHint": "Terakhir berfungsi: {when}",
+    "lastWorkedNever": "Belum pernah melayani permintaan atau lolos pemeriksaan",
     "noAutoCheckHint": "Penyedia ini tidak mengizinkan pemeriksaan kunci otomatis. Kunci menjadi sehat setelah melayani permintaan pertamanya.",
     "noModelsYetHint": "Katalog Anda belum memiliki model dari penyedia ini, jadi belum ada yang bisa dilayani.",
     "proxyEnvHintBefore": "Juga dapat dikonfigurasi melalui",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Salin kunci ini sekarang — tidak akan ditampilkan lagi.",
     "cpEnabledAria": "Profil aktif",
     "selectKey": "Pilih kunci ini",
+    "selectModel": "Pilih model ini",
     "bulkSelected": "{count} dipilih",
     "bulkEnable": "Aktifkan semua",
     "bulkDisable": "Nonaktifkan semua",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Batas token bulanan",
     "capUnlimitedPlaceholder": "Tanpa batas",
     "capEditHint": "Batas disetel ulang pada tanggal 1 pukul 00:00 UTC. Kosongkan untuk tanpa batas.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} permintaan, {tokens} token bulan ini",
     "quotaBalanceHint": "Tersisa {remaining} dari {limit} {metric}",
-    "quotaBalanceLeft": "Tersisa {remaining}"
-,
+    "quotaBalanceLeft": "Tersisa {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Entri muncul di sini saat server menuliskannya. Perlebar filter level, penyedia, atau pencarian jika Anda mengharapkan ada keluaran.",
     "noLevelsTitle": "Tidak ada level yang dipilih",
     "noLevelsDescription": "Aktifkan setidaknya satu level untuk melihat keluaran log.",
-    "loadFailed": "Tidak dapat memuat log server."
+    "loadFailed": "Tidak dapat memuat log server.",
+    "eventFilter": "Event",
+    "allEvents": "Semua event"
   },
   "playground": {
     "title": "Taman bermain",
@@ -1163,7 +1192,8 @@
       "openclaw": "Asisten pribadi yang selalu aktif dan menjawab di WhatsApp, Telegram, Discord, dan lainnya dari mesin Anda sendiri.",
       "hermes": "Agen dari Nous Research yang terus memperbaiki diri, dengan memori persisten dan keterampilan, di terminal atau di aplikasi chat.",
       "pi": "Agen terminal minimalis yang Anda bentuk dengan ekstensi, keterampilan, dan templat prompt Anda sendiri.",
-      "reasonix": "Agen coding terminal yang dibuat khusus untuk DeepSeek, dibangun di sekitar prefix caching agar sesi panjang tetap murah."
+      "reasonix": "Agen coding terminal yang dibuat khusus untuk DeepSeek, dibangun di sekitar prefix caching agar sesi panjang tetap murah.",
+      "zcode": "Agen kode Z.ai untuk model GLM-nya, terhubung ke endpoint apa pun yang kompatibel dengan OpenAI melalui registri penyedia."
     }
   },
   "update": {

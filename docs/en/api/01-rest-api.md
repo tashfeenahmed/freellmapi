@@ -22,6 +22,7 @@ Any OpenAI-compatible client works (Anthropic / Claude clients too — see [Anth
 - [Response headers](#response-headers)
 - [Embeddings](#embeddings)
 - [Anthropic / Claude clients](#anthropic--claude-clients)
+- [Usage API (`GET /v1/usage`)](#usage-api-get-v1usage)
 - [Free-tier budget API](#free-tier-budget-api)
 - [Backups API](#backups-api)
 
@@ -162,7 +163,7 @@ final = client.chat.completions.create(
 print(final.choices[0].message.content)
 ```
 
-Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, Mistral, OpenRouter, GitHub Models, HuggingFace, Cloudflare, Cohere compat) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
+Works with `stream=True` as well — you'll get `delta.tool_calls` chunks followed by a `finish_reason: "tool_calls"` close. Under the hood, OpenAI-compatible providers (Groq, Cerebras, Mistral, OpenRouter, HuggingFace, Cloudflare, Cohere compat) get the request passed through; Gemini requests get translated into Google's `functionDeclarations` / `functionResponse` shape and the response is translated back.
 
 ## Gemini Google Search grounding
 
@@ -195,6 +196,9 @@ curl "http://localhost:3001/v1beta/models/gemini-2.5-flash:generateContent" \
 ```
 
 Gemini model names like `gemini-2.5-flash` resolve through the Gemini family map (Keys → Gemini model mapping) rather than the catalog directly, so they route to Auto or whichever catalog model each family is pinned to. Catalog ids work verbatim too.
+
+A client-profile key (`sk-cp-…`) authenticates the `/v1beta` generate/stream routes as
+well, with its enforced prompt injected ahead of `systemInstruction`.
 
 `contents` text, inline data, function calls/responses, system instructions,
 function declarations, structured JSON output, generation controls, and
@@ -341,8 +345,6 @@ curl http://localhost:3001/v1/embeddings \
 | Family (`model`) | Dims | Providers (failover order) |
 | --- | --- | --- |
 | `gemini-embedding-001` *(default)* | 3072 | Google |
-| `text-embedding-3-large` | 3072 | GitHub Models |
-| `text-embedding-3-small` | 1536 | GitHub Models |
 | `embed-v4.0` | 1536 | Cohere |
 | `bge-m3` | 1024 | Cloudflare → Hugging Face |
 | `qwen3-embedding-0.6b` | 1024 | Cloudflare |
@@ -369,6 +371,10 @@ curl http://localhost:3001/v1/messages \
   }'
 ```
 
+A **client-profile key** (`sk-cp-…`, see the dashboard's Profiles page) authenticates
+`/v1/messages` too: the profile's server-enforced system prompt is injected ahead of the
+caller's `system` turn, exactly as on `/v1/chat/completions`.
+
 Claude model names map to your free pool on the **Keys → Anthropic** tab: each family (`default`, `opus`, `sonnet`, `haiku`) routes to `auto` (the router picks a free model) or a model you pin. `POST /v1/messages/count_tokens` and a content-negotiated `GET /v1/models` (Anthropic shape when `anthropic-version` is sent) are implemented too. Streaming, system prompts, tool use, and image input all translate across the same router as the OpenAI endpoints.
 
 **Claude Code** — point it at your server and start it:
@@ -388,6 +394,40 @@ claude
 ```
 
 > Use `ANTHROPIC_AUTH_TOKEN` (sent as a Bearer token), **not** `ANTHROPIC_API_KEY` — Claude Code treats a set `ANTHROPIC_API_KEY` as a conflicting first-party credential and refuses to start.
+
+## Usage API (`GET /v1/usage`)
+
+`GET /v1/usage` answers "what has this gateway actually burned this month?" from
+the durable `key_monthly_usage` ledger — the same numbers the monthly key caps
+enforce, so it never drifts from what a `429 quota_exceeded` was computed from.
+Authenticate with your unified proxy key (the same `Authorization: Bearer`
+every `/v1` route takes).
+
+```bash
+curl http://localhost:3001/v1/usage -H "Authorization: Bearer $FREELLMAPI_KEY"
+```
+
+```json
+{
+  "month": "2026-10",
+  "resetsAt": "2026-11-01T00:00:00.000Z",
+  "requests": 152,
+  "tokens": 104000000,
+  "byPlatform": [{ "platform": "opencode", "requests": 90, "tokens": 80000000 }],
+  "byKey": [
+    { "keyId": 3, "platform": "opencode", "label": "work laptop", "enabled": true,
+      "requests": 90, "tokens": 80000000, "requestCap": null, "tokenCap": 50000000 }
+  ]
+}
+```
+
+`byKey` is the per-provider-key breakdown — the row you need when one machine's
+agent config ate the month while the rest of the pool is untouched. `requestCap`
+/ `tokenCap` are the caps from [Monthly provider-key budgets](#monthly-provider-key-budgets)
+(`null` = unlimited); spend is **not** clamped at the cap, so a key can report
+above it — that is what trips the next request to `429`. Keys deleted since the
+month began report under platform `removed` with no caps. Only the **unified**
+proxy key may call this route; client-profile keys get `403`.
 
 ## Free-tier budget API
 
@@ -483,6 +523,16 @@ pointing to the next UTC month. OpenAI-compatible endpoints also return
 `error.code: "quota_exceeded"`; other protocol adapters preserve their native
 error format. Fusion subcalls obey the caps but retain Fusion's aggregate error
 format. If another key has capacity, normal fallback can use it.
+
+Crossing 80% and again 100% of either cap logs a soft budget alert — a
+structured `key_budget_threshold` event in the dashboard's Logs page (the same
+viewer as provider logs), naming the key, the cap kind, the usage and the reset
+time. Each threshold fires once per key per UTC month, so a key cannot flood the
+log. This mirrors LiteLLM's budget alerts and OpenRouter's per-key spend-limit
+alert: the warning arrives while requests still flow, before the hard `429`.
+Set `BUDGET_ALERT_WEBHOOK_URL` to also POST each alert as JSON
+(`type: freellmapi.key_budget_threshold`) to a webhook, such as a Slack or
+Discord workflow.
 
 Embeddings additionally relay the upstream providers' own back-off. A provider
 that answers `429` is simply skipped for the next one in the family; only when

@@ -64,6 +64,12 @@ vi.mock('../../../server/src/services/cooldown-probe.js', () => ({
   }),
 }));
 
+vi.mock('../../../server/src/services/model-probe.js', () => ({
+  startModelProbe: vi.fn(() => {
+    calls.push('startModelProbe');
+  }),
+}));
+
 vi.mock('../../../server/src/services/backups.js', () => ({
   startBackupScheduler: vi.fn(() => {
     calls.push('startBackupScheduler');
@@ -174,6 +180,7 @@ describe('desktop server boot sequence (#949)', () => {
       'startHealthChecker',
       'startCatalogSync',
       'startCooldownProbe',
+      'startModelProbe',
       'startBackupScheduler',
       'startCustomModelSync',
       'startBuiltinModelDiscovery',

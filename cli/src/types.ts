@@ -1,3 +1,5 @@
+import type { DetectedClient } from './detect.js';
+
 export interface CatalogModel {
   id: string;
   name?: string;
@@ -14,7 +16,14 @@ export interface GeneratedFile {
   /** Literal text, merged as a marked `# freellmapi:start/end` block (toml, yaml, env). */
   content?: string;
   sensitive?: boolean;
+  /** json only: arrays merged item by item instead of replaced whole, keyed by
+   *  the array's dotted path. `ownedBy` drops the existing items whose fields
+   *  all match it, then appends the patch's items; `union` keeps the existing
+   *  values and appends the patch's missing ones. */
+  arrays?: Record<string, JsonArrayMerge>;
 }
+
+export type JsonArrayMerge = { ownedBy: Record<string, string> } | { union: true };
 
 export interface GenerateContext {
   url: string;
@@ -25,6 +34,11 @@ export interface GenerateContext {
   /** An explicit `--model`. Overrides each generator's default-model
    *  heuristic; validated against the unfiltered catalog by the caller. */
   requestedModelId?: string;
+  /** Result of `detectChatGptClient()`. Injected by the CLI entry point;
+   *  when the property is absent generators probe the real machine, which
+   *  golden-output tests must avoid (the snapshot must not depend on the
+   *  host's installed clients). */
+  detectedClient?: DetectedClient;
 }
 
 export interface Generation {

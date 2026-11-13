@@ -36,6 +36,7 @@
 | `levels` | `csv`（可选） | 逗号分隔的级别过滤：`trace,debug,info,warn,error`。未知级别返回 `400`。 |
 | `q` | `string`（可选） | 跨 `message`、`provider`、`source`、`event` 的大小写不敏感文本搜索。 |
 | `provider` | `string`（可选） | 精确提供方名过滤（如 `openai`、`anthropic`）。 |
+| `event` | `string`（可选） | 精确结构化事件名过滤（如 `key_invalid`、`key_budget_threshold`），可与 `provider` 组合。 |
 | `limit` | `integer`（可选） | 钳制在 `[1, 500]`，默认 `200`。 |
 
 **响应：**

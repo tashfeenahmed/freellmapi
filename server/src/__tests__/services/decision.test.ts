@@ -63,8 +63,8 @@ describe('decision service', () => {
     vi.restoreAllMocks();
   });
 
-  it('has adapters for exactly the launch platforms', () => {
-    expect([...DECISION_PLATFORMS].sort()).toEqual(['cloudflare', 'openrouter']);
+  it('has adapters for the supported decision platforms', () => {
+    expect([...DECISION_PLATFORMS].sort()).toEqual(['apinex', 'beatapi', 'blockrun', 'cloudflare', 'openrouter']);
   });
 
   it('calls Cloudflare ai/run with the account from the key and the short model selector', async () => {
@@ -102,6 +102,24 @@ describe('decision service', () => {
     // The provider said when to come back: a fact, so the prober never clears it early.
     expect(getProbeableCooldowns().some(c => c.keyId === cfKey)).toBe(false);
     expect(logRows().map(r => r.status)).toEqual(['error', 'ok']);
+  });
+
+  it('honours a back-off stated in the error body when there is no header', async () => {
+    addKey('cloudflare', 'acct:tok');
+    // A Gemini-shaped RetryInfo in the body with no Retry-After header: the
+    // chat path (buildUpstreamError) already reads it; the decision chain must too.
+    mockFetch(() => json({ error: { message: 'busy', retry_delay: '45s' } }, 429));
+    const err = await runDecision(REQUEST, { model: '@cf/cloudflare/clef-flash', clientAgent: null }).catch(e => e);
+    expect(err).toBeInstanceOf(DecisionError);
+    expect(err.status).toBe(429);
+    expect(err.retryAfterMs).toBe(45_000);
+  });
+
+  it('prefers a header Retry-After over a body hint', async () => {
+    addKey('cloudflare', 'acct:tok');
+    mockFetch(() => json({ error: { message: 'busy', retry_delay: '45s' } }, 429, { 'retry-after': '12' }));
+    const err = await runDecision(REQUEST, { model: '@cf/cloudflare/clef-flash', clientAgent: null }).catch(e => e);
+    expect(err.retryAfterMs).toBe(12_000);
   });
 
   it('skips models whose platform has no key', async () => {

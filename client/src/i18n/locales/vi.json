@@ -347,7 +347,25 @@
     "scoreColumn": "Điểm",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Áp lực bộ định tuyến",
@@ -524,6 +542,8 @@
     "providerActions": "Hành động của nhà cung cấp",
     "routeViaProxy": "Định tuyến qua proxy",
     "checkNow": "Kiểm tra ngay",
+    "lastWorkedHint": "Lần hoạt động gần nhất: {when}",
+    "lastWorkedNever": "Chưa phục vụ yêu cầu nào và chưa qua lần kiểm tra nào",
     "noAutoCheckHint": "Nhà cung cấp này không cho phép kiểm tra khóa tự động. Khóa sẽ chuyển sang trạng thái tốt sau khi phục vụ yêu cầu đầu tiên.",
     "noModelsYetHint": "Danh mục của bạn chưa có mô hình nào từ nhà cung cấp này, nên chưa có gì để phục vụ.",
     "proxyEnvHintBefore": "Cũng có thể cấu hình thông qua",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Sao chép khóa này ngay — nó sẽ không được hiển thị lại.",
     "cpEnabledAria": "Hồ sơ đang bật",
     "selectKey": "Chọn khóa này",
+    "selectModel": "Chọn mô hình này",
     "bulkSelected": "{count} đã chọn",
     "bulkEnable": "Bật tất cả",
     "bulkDisable": "Tắt tất cả",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Giới hạn token hàng tháng",
     "capUnlimitedPlaceholder": "Không giới hạn",
     "capEditHint": "Giới hạn đặt lại vào ngày 1 lúc 00:00 UTC. Để trống để không giới hạn.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} yêu cầu, {tokens} token tháng này",
     "quotaBalanceHint": "Còn {remaining}/{limit} {metric}",
-    "quotaBalanceLeft": "Còn {remaining}"
-,
+    "quotaBalanceLeft": "Còn {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Các mục sẽ xuất hiện ở đây khi máy chủ ghi nhật ký. Hãy nới rộng bộ lọc mức, nhà cung cấp hoặc tìm kiếm nếu bạn mong có kết quả.",
     "noLevelsTitle": "Chưa chọn mức nào",
     "noLevelsDescription": "Bật ít nhất một mức để xem nội dung nhật ký.",
-    "loadFailed": "Không thể tải nhật ký máy chủ."
+    "loadFailed": "Không thể tải nhật ký máy chủ.",
+    "eventFilter": "Sự kiện",
+    "allEvents": "Tất cả sự kiện"
   },
   "playground": {
     "title": "Sân chơi",
@@ -1163,7 +1192,8 @@
       "openclaw": "Trợ lý cá nhân luôn sẵn sàng, trả lời trên WhatsApp, Telegram, Discord và nhiều nền tảng khác ngay từ máy của bạn.",
       "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat.",
       "pi": "Một tác nhân dòng lệnh tối giản mà bạn định hình bằng tiện ích mở rộng, kỹ năng và mẫu prompt của riêng mình.",
-      "reasonix": "Tác tử lập trình trên terminal dành riêng cho DeepSeek, xây dựng quanh bộ nhớ đệm tiền tố để các phiên dài vẫn rẻ."
+      "reasonix": "Tác tử lập trình trên terminal dành riêng cho DeepSeek, xây dựng quanh bộ nhớ đệm tiền tố để các phiên dài vẫn rẻ.",
+      "zcode": "Tác nhân lập trình của Z.ai cho các mô hình GLM, kết nối mọi endpoint tương thích OpenAI qua sổ đăng ký nhà cung cấp."
     }
   },
   "update": {

@@ -141,7 +141,7 @@ final = client.chat.completions.create(
 print(final.choices[0].message.content)
 ```
 
-配合 `stream=True` 也可以，你会先收到一串 `delta.tool_calls` 分块，然后是一个 `finish_reason: "tool_calls"` 收尾。底层实现上，兼容 OpenAI 的提供方（Groq、Cerebras、Mistral、OpenRouter、GitHub Models、HuggingFace、Cloudflare、Cohere 兼容模式）会直接透传请求；发往 Gemini 的请求会被翻译成 Google 的 `functionDeclarations` / `functionResponse` 结构，响应再翻译回来。
+配合 `stream=True` 也可以，你会先收到一串 `delta.tool_calls` 分块，然后是一个 `finish_reason: "tool_calls"` 收尾。底层实现上，兼容 OpenAI 的提供方（Groq、Cerebras、Mistral、OpenRouter、HuggingFace、Cloudflare、Cohere 兼容模式）会直接透传请求；发往 Gemini 的请求会被翻译成 Google 的 `functionDeclarations` / `functionResponse` 结构，响应再翻译回来。
 
 ## Gemini 的 Google 搜索接地
 
@@ -174,6 +174,8 @@ curl "http://localhost:3001/v1beta/models/gemini-2.5-flash:generateContent" \
 ```
 
 像 `gemini-2.5-flash` 这样的 Gemini 模型名，是通过 Gemini 系列映射（密钥 → Gemini 模型映射）解析的，而不是直接查目录，所以它们会路由到 Auto，或者路由到你为每个系列固定的那个目录模型。直接写目录里的 id 也一样能用。
+
+客户端档案密钥（`sk-cp-…`）同样可以通过 `/v1beta` 的生成/流式路由鉴权，其强制提示词会注入在 `systemInstruction` 之前。
 
 `contents` 里的文本、内联数据、函数调用与响应、系统指令、函数声明、结构化 JSON 输出、生成控制参数和思考额度，都会翻译进同一套内部的聊天与回退流程。Bearer 认证同样可用。Gemini 的 `?key=` 查询参数只在 `/v1beta` 下被接受；建议优先用请求头，因为写在 URL 里的凭据会泄漏到历史记录和日志中。
 
@@ -251,8 +253,6 @@ curl http://localhost:3001/v1/embeddings \
 | 系列（`model`） | 维度 | 提供方（故障转移顺序） |
 | --- | --- | --- |
 | `gemini-embedding-001` *（默认）* | 3072 | Google |
-| `text-embedding-3-large` | 3072 | GitHub Models |
-| `text-embedding-3-small` | 1536 | GitHub Models |
 | `embed-v4.0` | 1536 | Cohere |
 | `bge-m3` | 1024 | Cloudflare → Hugging Face |
 | `qwen3-embedding-0.6b` | 1024 | Cloudflare |
@@ -278,6 +278,8 @@ curl http://localhost:3001/v1/messages \
     "messages": [{"role": "user", "content": "hi"}]
   }'
 ```
+
+**客户端档案密钥**（`sk-cp-…`，见仪表盘的档案页）同样可以通过 `/v1/messages` 鉴权：档案的服务端强制系统提示词会注入在调用方 `system` 轮之前，与 `/v1/chat/completions` 上的行为完全一致。
 
 Claude 的模型名在 **密钥 → Anthropic** 标签页里映射到你的免费池：每个系列（`default`、`opus`、`sonnet`、`haiku`）可以路由到 `auto`（由路由器挑一个免费模型），也可以固定到你指定的模型。`POST /v1/messages/count_tokens` 和一个按内容协商的 `GET /v1/models`（发送了 `anthropic-version` 时返回 Anthropic 的结构）也都实现了。流式、系统提示词、工具使用和图像输入，都经由和 OpenAI 端点相同的那套路由翻译。
 

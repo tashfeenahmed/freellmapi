@@ -27,6 +27,12 @@ const DEFAULT_QUOTA_OBSERVATIONS_MAX_ROWS = 200_000;
 // window is 90d, so the default age bound matches the `requests` table.
 const DEFAULT_SEARCH_RETENTION_DAYS = 90;
 const DEFAULT_SEARCH_MAX_ROWS = 100_000;
+// decision_requests (#1537) is the per-attempt decision-model log behind the
+// Models → Decision page. Same shape as search_requests: an append-only
+// attempt log whose only reader is a month-scoped count, so older rows are
+// pure disk growth. Bounded like the search log.
+const DEFAULT_DECISION_RETENTION_DAYS = 90;
+const DEFAULT_DECISION_MAX_ROWS = 100_000;
 
 type RetentionDb = ReturnType<typeof getDb>;
 
@@ -96,6 +102,19 @@ export function getSearchLogRetentionConfig(): SearchLogRetentionConfig {
   return {
     retentionDays: readNonNegativeInt('SEARCH_LOGS_RETENTION_DAYS', DEFAULT_SEARCH_RETENTION_DAYS),
     maxRows: readNonNegativeInt('SEARCH_LOGS_MAX_ROWS', DEFAULT_SEARCH_MAX_ROWS),
+  };
+}
+
+export interface DecisionLogRetentionConfig {
+  retentionDays: number;
+  maxRows: number;
+}
+
+/** Same env convention as the pairs above; 0 on either knob disables that half. */
+export function getDecisionLogRetentionConfig(): DecisionLogRetentionConfig {
+  return {
+    retentionDays: readNonNegativeInt('DECISION_LOGS_RETENTION_DAYS', DEFAULT_DECISION_RETENTION_DAYS),
+    maxRows: readNonNegativeInt('DECISION_LOGS_MAX_ROWS', DEFAULT_DECISION_MAX_ROWS),
   };
 }
 
@@ -219,25 +238,34 @@ export function pruneServerLogs(db: RetentionDb, nowMs: number): number {
 }
 
 /**
- * Sweep expired rows from the two short-lived replay stores.
+ * Sweep expired rows from the short-lived replay stores and the session table.
  *
- * Both tables are write-once with a TTL that readers already filter on
- * (`expires_at_ms > now`), and both are indexed on `expires_at_ms`. Neither
- * had a sweeper: `storeIdempotencyResult` only deletes expired rows for the
- * SAME key hash it is about to overwrite, so a claim whose hash never repeats
- * — the common case, since clients send a fresh UUID per request — sat in the
- * DB forever with its full response JSON. A busy install replaying
- * Idempotency-Key traffic grew this table monotonically. `response_cache`
- * swept expired rows only at startup, so a long-running server accumulated
- * them between restarts too.
+ * idempotency_claims and response_cache are write-once with a TTL that readers
+ * already filter on (`expires_at_ms > now`), and both are indexed on
+ * `expires_at_ms`. Neither had a sweeper: `storeIdempotencyResult` only deletes
+ * expired rows for the SAME key hash it is about to overwrite, so a claim
+ * whose hash never repeats — the common case, since clients send a fresh UUID
+ * per request — sat in the DB forever with its full response JSON. A busy
+ * install replaying Idempotency-Key traffic grew this table monotonically.
+ * `response_cache` swept expired rows only at startup, so a long-running
+ * server accumulated them between restarts too.
  *
- * The deletes are plain index-range walks over `expires_at_ms`, so cost scales
- * with what is actually expired. Guarded against the tables being absent the
- * same way every other prune here is.
+ * `sessions` joins the sweep for the same reason (#1510-era retention series):
+ * validateSession only deletes a row when its OWN token is checked again — and
+ * an expired token is by definition never re-sent — while login mints a new
+ * row per sign-in (30-day TTL). Desktop installs that mint a session on every
+ * dashboard load leak one row per load. Expired rows are dead weight for every
+ * reader (validateSession filters on expires_at_ms), so deleting them is safe.
+ * sessions has no index on expires_at_ms; the delete is a scan of a table that
+ * is at most a few hundred rows on any install, once per prune gate.
+ *
+ * The claims/cache deletes are plain index-range walks over `expires_at_ms`,
+ * so cost scales with what is actually expired. Guarded against the tables
+ * being absent the same way every other prune here is.
  */
 export function pruneExpiredClaims(db: RetentionDb, nowMs: number): number {
   let deleted = 0;
-  for (const table of ['idempotency_claims', 'response_cache'] as const) {
+  for (const table of ['idempotency_claims', 'response_cache', 'sessions'] as const) {
     const present = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
       .get(table);
@@ -284,6 +312,44 @@ export function pruneSearchLogs(db: RetentionDb, nowMs: number): number {
   return deleted;
 }
 
+/**
+ * Age- and count-bound the decision-model attempt log (#1537).
+ *
+ * decision_requests grew on every POST /v1/decisions attempt (and every failed
+ * one — a cooling-down key still logs) with no prune of any kind. Its only
+ * reader is the month-scoped count on the Decision page, so the 90d default
+ * matches the other attempt logs. Guarded against the table being absent like
+ * every other prune here.
+ */
+export function pruneDecisionLogs(db: RetentionDb, nowMs: number): number {
+  const hasTable = !!db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='decision_requests'")
+    .get();
+  if (!hasTable) return 0;
+
+  const { retentionDays, maxRows } = getDecisionLogRetentionConfig();
+  let deleted = 0;
+
+  if (retentionDays > 0) {
+    const cutoff = toSqliteTimestamp(new Date(nowMs - retentionDays * DAY_MS));
+    deleted += db.prepare('DELETE FROM decision_requests WHERE created_at < ?').run(cutoff).changes;
+  }
+
+  if (maxRows > 0) {
+    deleted += db.prepare(`
+      DELETE FROM decision_requests
+      WHERE id IN (
+        SELECT id
+        FROM decision_requests
+        ORDER BY created_at DESC, id DESC
+        LIMIT -1 OFFSET ?
+      )
+    `).run(maxRows).changes;
+  }
+
+  return deleted;
+}
+
 export function pruneRequestAnalytics(options: {
   db?: RetentionDb;
   force?: boolean;
@@ -321,11 +387,14 @@ export function pruneRequestAnalytics(options: {
   // Persisted server logs, on the same 60s gate as the requests prune above.
   deleted += pruneServerLogs(db, nowMs);
 
-  // Expired idempotency claims and cache rows, on the same 60s gate. Both are
-  // TTL'd replay stores with no reader past expiry and no other sweeper.
+  // Expired idempotency claims, cache rows and dashboard sessions, on the
+  // same 60s gate. All are TTL'd stores with no reader past expiry and no
+  // other sweeper.
   deleted += pruneExpiredClaims(db, nowMs);
   // Web-search attempt log, same gate (see pruneSearchLogs).
   deleted += pruneSearchLogs(db, nowMs);
+  // Decision-model attempt log, same gate (see pruneDecisionLogs).
+  deleted += pruneDecisionLogs(db, nowMs);
 
   // Hourly aggregate prune (gated once per day). The UI's widest window is
   // 30d, so we keep at most 30 days of hourly buckets (~720 rows). The table

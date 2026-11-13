@@ -347,7 +347,25 @@
     "scoreColumn": "மதிப்பெண்",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "திசைவி அழுத்தம்",
@@ -524,6 +542,8 @@
     "providerActions": "வழங்குநர் நடவடிக்கைகள்",
     "routeViaProxy": "ப்ராக்ஸி வழியாக வழி",
     "checkNow": "இப்போது சரிபார்க்கவும்",
+    "lastWorkedHint": "கடைசியாக வேலை செய்தது: {when}",
+    "lastWorkedNever": "இதுவரை கோரிக்கைகளை பணியாற்றவில்லை; சோதனையும் தேறவில்லை",
     "noAutoCheckHint": "இந்த வழங்குநர் தானியங்கி விசை சரிபார்ப்பை அனுமதிப்பதில்லை. முதல் கோரிக்கையை நிறைவேற்றிய பிறகு விசை ஆரோக்கியமாகும்.",
     "noModelsYetHint": "உங்கள் பட்டியலில் இன்னும் இந்த வழங்குநரின் மாதிரிகள் இல்லை, எனவே நிறைவேற்ற எதுவும் இல்லை.",
     "proxyEnvHintBefore": "வழியாகவும் கட்டமைக்க முடியும்",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "இந்தச் சாவியை இப்போதே நகலெடுக்கவும் — இது மீண்டும் காட்டப்படாது.",
     "cpEnabledAria": "சுயவிவரம் இயக்கத்தில்",
     "selectKey": "இந்த விசையைத் தேர்ந்தெடு",
+    "selectModel": "இந்த மாதிரியைத் தேர்ந்தெடுக்கவும்",
     "bulkSelected": "{count} தேர்ந்தெடுக்கப்பட்டது",
     "bulkEnable": "அனைத்தையும் இயக்கு",
     "bulkDisable": "அனைத்தையும் முடக்கு",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "மாத டோக்கன் வரம்பு",
     "capUnlimitedPlaceholder": "வரம்பற்றது",
     "capEditHint": "ஒவ்வொரு மாதம் 1ஆம் தேதி 00:00 UTC-ல் வரம்புகள் மீட்டமைக்கப்படும். வரம்பற்றதாக வெறியே விடவும்.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "இந்த மாதம் {requests} கோரிக்கைகள், {tokens} டோக்கன்கள்",
     "quotaBalanceHint": "{limit} {metric}-இல் {remaining} மீதம்",
-    "quotaBalanceLeft": "{remaining} மீதம்"
-,
+    "quotaBalanceLeft": "{remaining} மீதம்",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "சேவையகம் எழுதும்போது பதிவுகள் இங்கே தோன்றும். வெளியீட்டை எதிர்பார்த்திருந்தால் நிலை, வழங்குபவர் அல்லது தேடல் வடிப்பான்களை விரிவுபடுத்தவும்.",
     "noLevelsTitle": "நிலை எதுவும் தேர்ந்தெடுக்கப்படவில்லை",
     "noLevelsDescription": "பதிவு வெளியீட்டைப் பார்க்க குறைந்தது ஒரு நிலையையாவது இயக்கவும்.",
-    "loadFailed": "சேவையகப் பதிவை ஏற்ற முடியவில்லை."
+    "loadFailed": "சேவையகப் பதிவை ஏற்ற முடியவில்லை.",
+    "eventFilter": "நிகழ்வு",
+    "allEvents": "அனைத்து நிகழ்வுகள்"
   },
   "playground": {
     "title": "விளையாட்டு மைதானம்",
@@ -1163,7 +1192,8 @@
       "openclaw": "உங்கள் சொந்த கணினியிலிருந்து WhatsApp, Telegram, Discord மற்றும் பலவற்றில் பதிலளிக்கும், எப்போதும் இயங்கும் தனிப்பட்ட உதவியாளர்.",
       "hermes": "Nous Research-இன் தன்னை மேம்படுத்திக்கொள்ளும் ஏஜென்ட், நிலையான நினைவகம் மற்றும் திறன்களுடன், டெர்மினலில் அல்லது சாட் ஆப்ஸில்.",
       "pi": "உங்கள் சொந்த நீட்டிப்புகள், திறன்கள் மற்றும் ப்ராம்ப்ட் வார்ப்புருக்களால் வடிவமைக்கும் எளிய டெர்மினல் ஏஜென்ட்.",
-      "reasonix": "DeepSeek-க்காக உருவாக்கப்பட்ட டெர்மினல் கோடிங் ஏஜென்ட்; நீண்ட அமர்வுகளும் மலிவாக இருக்க prefix caching-ஐ மையமாகக் கொண்டு கட்டப்பட்டது."
+      "reasonix": "DeepSeek-க்காக உருவாக்கப்பட்ட டெர்மினல் கோடிங் ஏஜென்ட்; நீண்ட அமர்வுகளும் மலிவாக இருக்க prefix caching-ஐ மையமாகக் கொண்டு கட்டப்பட்டது.",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

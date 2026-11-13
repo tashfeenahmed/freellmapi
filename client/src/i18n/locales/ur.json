@@ -347,7 +347,25 @@
     "scoreColumn": "سکور",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "راؤٹر کا دباؤ",
@@ -524,6 +542,8 @@
     "providerActions": "فراہم کنندہ کے اعمال",
     "routeViaProxy": "پراکسی کے ذریعے راستہ",
     "checkNow": "ابھی چیک کریں۔",
+    "lastWorkedHint": "آخرین کامیاب: {when}",
+    "lastWorkedNever": "ابھی تک کوئی درخواست پیش نہیں کی اور نہ ہی جانچ پاس کی",
     "noAutoCheckHint": "یہ فراہم کنندہ خودکار کلید جانچ کی اجازت نہیں دیتا۔ پہلی درخواست پوری کرنے کے بعد کلید درست ہو جاتی ہے۔",
     "noModelsYetHint": "آپ کے کیٹلاگ میں ابھی اس فراہم کنندہ کا کوئی ماڈل نہیں، اس لیے پورا کرنے کو کچھ نہیں۔",
     "proxyEnvHintBefore": "کے ذریعے بھی قابل ترتیب",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "یہ کلید ابھی کاپی کریں — یہ دوبارہ نہیں دکھائی جائے گی۔",
     "cpEnabledAria": "پروفائل فعال",
     "selectKey": "یہ کلید منتخب کریں۔",
+    "selectModel": "یہ ماڈل منتخب کریں",
     "bulkSelected": "{count} منتخب",
     "bulkEnable": "سب فعال کریں۔",
     "bulkDisable": "سب غیر فعال کریں۔",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "ماہانہ ٹوکن کی حد",
     "capUnlimitedPlaceholder": "لامحدود",
     "capEditHint": "حدیں ہر مہینے کی 1 تاریخ کو 00:00 UTC پر ری سیٹ ہوتی ہیں۔ لامحدود کے لیے خالی چھوڑیں۔",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "اس مہینے {requests} درخواستیں، {tokens} ٹوکن",
     "quotaBalanceHint": "{limit} {metric} میں سے {remaining} باقی",
-    "quotaBalanceLeft": "{remaining} باقی"
-,
+    "quotaBalanceLeft": "{remaining} باقی",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "سرور جیسے جیسے لکھتا ہے، اندراجات یہاں ظاہر ہوتے جائیں گے۔ اگر آپ کو آؤٹ پٹ کی توقع تھی تو لیول، فراہم کنندہ یا تلاش کے فلٹرز کا دائرہ بڑھائیں۔",
     "noLevelsTitle": "کوئی لیول منتخب نہیں",
     "noLevelsDescription": "لاگ آؤٹ پٹ دیکھنے کے لیے کم از کم ایک لیول آن کریں۔",
-    "loadFailed": "سرور لاگ لوڈ نہیں ہو سکا۔"
+    "loadFailed": "سرور لاگ لوڈ نہیں ہو سکا۔",
+    "eventFilter": "واقعہ",
+    "allEvents": "تمام واقعات"
   },
   "playground": {
     "title": "کھیل کا میدان",
@@ -1163,7 +1192,8 @@
       "openclaw": "ایک ہمیشہ فعال ذاتی معاون جو آپ کی اپنی مشین سے WhatsApp، Telegram، Discord اور دیگر پر جواب دیتا ہے۔",
       "hermes": "Nous Research کا خود کو بہتر بنانے والا ایجنٹ، مستقل میموری اور مہارتوں کے ساتھ، ٹرمینل میں یا چیٹ ایپس پر۔",
       "pi": "ایک سادہ ٹرمینل ایجنٹ، جسے آپ اپنی ایکسٹینشنز، مہارتوں اور پرامپٹ ٹیمپلیٹس سے ڈھالتے ہیں۔",
-      "reasonix": "DeepSeek کے لیے بنایا گیا ٹرمینل کوڈنگ ایجنٹ، جو پریفکس کیشنگ کے گرد بنا ہے تاکہ لمبے سیشن بھی سستے رہیں۔"
+      "reasonix": "DeepSeek کے لیے بنایا گیا ٹرمینل کوڈنگ ایجنٹ، جو پریفکس کیشنگ کے گرد بنا ہے تاکہ لمبے سیشن بھی سستے رہیں۔",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

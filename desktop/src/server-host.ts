@@ -15,6 +15,7 @@ import { restoreProxySettings, flushProxyCache, getProxyMode, getProxyUrl, isPro
 import { startHealthChecker, checkAllKeys } from '../../server/src/services/health.js';
 import { startCatalogSync } from '../../server/src/services/catalog-sync.js';
 import { startCooldownProbe } from '../../server/src/services/cooldown-probe.js';
+import { startModelProbe } from '../../server/src/services/model-probe.js';
 import { startCustomModelSync } from '../../server/src/services/custom-model-sync.js';
 import { startBuiltinModelDiscovery } from '../../server/src/services/builtin-model-discovery.js';
 import { startBackupScheduler, createBackup } from '../../server/src/services/backups.js';
@@ -48,6 +49,9 @@ export interface StartOptions {
   host: string;
   preferredPort: number;
 }
+
+// main.ts registers Electron's net.fetch here (see setCatalogFallbackFetch).
+export { setCatalogFallbackFetch } from '../../server/src/services/catalog-sync.js';
 
 export interface ServerHandle {
   server: Server;
@@ -151,6 +155,7 @@ export async function startServer(opts: StartOptions): Promise<ServerHandle> {
   startHealthChecker(scheduler);
   startCatalogSync(scheduler);
   startCooldownProbe(scheduler);
+  startModelProbe(scheduler);
   startBackupScheduler(scheduler);
   startCustomModelSync(getDb(), scheduler);
   startBuiltinModelDiscovery(getDb(), scheduler);

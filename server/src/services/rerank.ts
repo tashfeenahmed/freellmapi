@@ -1,9 +1,12 @@
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { parseRetryAfterMs } from '../providers/base.js';
-import { secondsUntilNextMonth } from './key-budget.js';
+import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { checkMonthlyBudget, reserveMonthlyBudget, secondsUntilNextMonth } from './key-budget.js';
 import { USABLE_KEY_SQL } from './key-state.js';
 import { runFailoverChain } from '../lib/failover-chain.js';
+import { logRequest } from '../lib/request-log.js';
+import { markKeyHealthyFromRequest } from './health.js';
 
 // Cohere-style rerank over the existing free-tier key pool (#1029). Deliberately
 // narrow first slice: platform='cohere' keys and custom OpenAI-compatible
@@ -34,6 +37,14 @@ interface RerankCandidate {
   platform: string;
   key: string;
   baseUrl: string | null;
+  /** Parsed api_keys.model_scope_json (#657) — null = unscoped, serves any rerank model. */
+  scope: Set<string> | null;
+}
+
+/** The model a candidate actually calls for a requested model (same resolution
+ *  as callProvider), so the scope gate checks the id the key really serves. */
+function effectiveModel(cand: Pick<RerankCandidate, 'platform'>, model?: string): string {
+  return model || (cand.platform === 'cohere' ? 'rerank-v3.5' : 'rerank');
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -41,13 +52,13 @@ const MAX_DOCUMENTS = 100;
 
 function candidates(): RerankCandidate[] {
   const rows = getDb().prepare(
-    `SELECT id, platform, base_url, encrypted_key, iv, auth_tag FROM api_keys WHERE ${USABLE_KEY_SQL} AND platform IN ('cohere', 'custom') ORDER BY platform, created_at`,
-  ).all() as { id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string }[];
+    `SELECT id, platform, base_url, encrypted_key, iv, auth_tag, model_scope_json FROM api_keys WHERE ${USABLE_KEY_SQL} AND platform IN ('cohere', 'custom') ORDER BY platform, created_at`,
+  ).all() as { id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string; model_scope_json: string | null }[];
   const out: RerankCandidate[] = [];
   for (const row of rows) {
     if (row.platform === 'custom' && !row.base_url) continue;
     try {
-      out.push({ id: row.id, platform: row.platform, key: decrypt(row.encrypted_key, row.iv, row.auth_tag), baseUrl: row.base_url });
+      out.push({ id: row.id, platform: row.platform, key: decrypt(row.encrypted_key, row.iv, row.auth_tag), baseUrl: row.base_url, scope: parseModelScope(row.model_scope_json) });
     } catch { /* undecryptable row is not a candidate */ }
   }
   // Custom endpoints (the operator's explicit rerank relays) go first.
@@ -59,9 +70,6 @@ async function upstreamError(r: Response): Promise<RerankError> {
   return new RerankError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status, undefined, retryAfterMs);
 }
 
-const rerankModelId = (cand: RerankCandidate, model: string | undefined) =>
-  model || (cand.platform === 'cohere' ? 'rerank-v3.5' : 'rerank');
-
 async function callProvider(cand: RerankCandidate, model: string | undefined, query: string,
   documents: string[], topN: number, clientSignal?: AbortSignal): Promise<{ modelId: string; results: RerankResult['results'] }> {
   // ponytail: cohere + jina-shaped custom only; per-provider adapters when a
@@ -69,7 +77,7 @@ async function callProvider(cand: RerankCandidate, model: string | undefined, qu
   const url = cand.platform === 'cohere'
     ? 'https://api.cohere.com/v2/rerank'
     : `${cand.baseUrl!.replace(/\/$/, '')}/rerank`;
-  const modelId = rerankModelId(cand, model);
+  const modelId = effectiveModel(cand, model);
   const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     method: 'POST',
@@ -96,24 +104,53 @@ export async function runRerank(model: string | undefined, query: string, docume
   if (documents.length > MAX_DOCUMENTS) {
     throw new RerankError(`Too many documents: ${documents.length} (max ${MAX_DOCUMENTS})`, 400);
   }
-  const chain = candidates();
+  // Per-key model scope (#657), the same wall the chat router and search key
+  // pools honour: a relay key scoped to a model group must never be picked to
+  // serve a model outside its list. Filter up front so a pool where every key
+  // is scoped out reports "no capable key configured" (503) instead of
+  // pretending the providers were tried and failed (502).
+  const chain = candidates().filter(c => scopeAllows(c.scope, effectiveModel(c, model)));
   if (chain.length === 0) {
     throw new RerankError('No rerank-capable key configured. Add a Cohere key or a custom rerank endpoint.', 503);
   }
   const n = topN ?? documents.length;
+  // Rough token estimate (query + documents, ~4 chars/token), the heuristic
+  // embeddings log when upstream reports no usage. It sizes both the request
+  // row and the monthly-budget admission check: rerank spends real provider
+  // quota, so a key at its monthly cap (#1158) must not serve one.
+  const estTokens = Math.ceil((query.length + documents.reduce((s, d) => s + d.length, 0)) / 4);
 
   const res = await runFailoverChain({
     rows: chain,
     signal: clientSignal,
     ErrorClass: RerankError,
-    route: cand => ({ platform: cand.platform, modelId: rerankModelId(cand, model) }),
-    // Candidates are already decrypted; no lease or budget on this surface yet.
-    reserve: (cand, skip) => ({ credential: skip(cand.id) ? null : { id: cand.id }, budgetBlocked: false }),
+    route: cand => ({ platform: cand.platform, modelId: effectiveModel(cand, model) }),
+    // Check-and-reserve (the search/embeddings semantics): an in-flight rerank
+    // holds its estimate so two concurrent reranks can't both pass the gate on
+    // a nearly-spent cap. Released the moment the attempt settles.
+    reserve: (cand, skip) => {
+      if (skip(cand.id)) return { credential: null, budgetBlocked: false };
+      const reservation = reserveMonthlyBudget(cand.id, estTokens);
+      if (!reservation.allowed) return { credential: null, budgetBlocked: true };
+      return { credential: { id: cand.id, release: reservation.release }, budgetBlocked: false };
+    },
     attempt: cand => callProvider(cand, model, query, documents, n, clientSignal),
-    log: () => {},
+    // Rerank used to serve traffic without a requests row: invisible in
+    // analytics, outside retention, no key attribution. request_type 'rerank'.
+    log: (cand, keyId, o) => {
+      // A served rerank is evidence the key works, the same as a served chat
+      // request (#1493) or a served search (#1612).
+      if (o.kind === 'success' && keyId != null) markKeyHealthyFromRequest(keyId);
+      logRequest(cand.platform, o.kind === 'success' ? o.out.modelId : effectiveModel(cand, model), keyId, o.kind,
+        o.kind === 'success' ? estTokens : 0, 0, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null,
+        null, null, null, null, null, 'rerank');
+    },
   });
   if (res.ok) return { platform: res.row.platform, modelId: res.out.modelId, results: res.out.results };
   const { lastError } = res;
+  if (chain.every(c => !checkMonthlyBudget(c.id, estTokens).allowed)) {
+    throw new RerankError('All rerank keys are at their monthly budget.', 429, 'quota_exceeded');
+  }
   throw new RerankError(
     `All rerank providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ''}.`,
     lastError?.status === 429 ? 429 : 502,

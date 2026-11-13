@@ -5,6 +5,7 @@ import {
   SETTING_LICENSE_KEY,
   SETTING_LICENSE_STATUS,
   catalogBaseUrl,
+  catalogFetch,
   getCachedLicenseStatus,
   getSyncState,
   refreshLicenseStatus,
@@ -101,7 +102,7 @@ premiumRouter.post('/portal', async (_req: Request, res: Response) => {
     return;
   }
   try {
-    const r = await fetch(`${catalogBaseUrl()}/v1/portal`, {
+    const r = await catalogFetch(`${catalogBaseUrl()}/v1/portal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key }),

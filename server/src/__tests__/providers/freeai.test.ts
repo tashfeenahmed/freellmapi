@@ -14,6 +14,7 @@ describe('Free.ai', () => {
     expect(hasProvider('freeai')).toBe(true);
     const fetch = vi.spyOn(globalThis, 'fetch');
     const provider = new FreeAiProvider();
+    expect(provider.supportsKeyValidation).toBe(false);
     await expect(provider.chatCompletion()).rejects.toMatchObject({ status: 400 });
     await expect(provider.streamChatCompletion().next()).rejects.toMatchObject({ status: 400 });
     await expect(provider.validateKey('')).resolves.toMatchObject({ valid: false });
@@ -29,16 +30,18 @@ describe('Free.ai', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('keeps an unverified configured key routable during health checks without falsely validating it', async () => {
+  it('skips unverifiable health probes, clears old errors and keeps the key routable', async () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
     const { encrypted, iv, authTag } = encrypt('test-key');
-    const id = Number(getDb().prepare("INSERT INTO api_keys (platform,label,encrypted_key,iv,auth_tag,status,enabled) VALUES ('freeai','test',?,?,?,'unknown',1)").run(encrypted, iv, authTag).lastInsertRowid);
+    const id = Number(getDb().prepare("INSERT INTO api_keys (platform,label,encrypted_key,iv,auth_tag,status,enabled,last_health_error) VALUES ('freeai','test',?,?,?,'unknown',1,'stale validation error')").run(encrypted, iv, authTag).lastInsertRowid);
     const fetch = vi.spyOn(globalThis, 'fetch');
+    const validate = vi.spyOn(FreeAiProvider.prototype, 'validateKey');
     await expect(checkKeyHealth(id)).resolves.toBe('unknown');
     expect(getDb().prepare('SELECT status, enabled, last_health_error FROM api_keys WHERE id=?').get(id)).toMatchObject({
-      status: 'unknown', enabled: 1, last_health_error: expect.stringContaining('key validity is unknown'),
+      status: 'unknown', enabled: 1, last_health_error: null,
     });
+    expect(validate).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
 

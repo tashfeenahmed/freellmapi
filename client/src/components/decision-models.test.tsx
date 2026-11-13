@@ -63,7 +63,7 @@ it('lists the decision models with usage and a no-key badge', async () => {
   expect(text).toContain('inception/mercury-decide:free')
   expect(text).toContain('4 this month')
   expect(text).toContain('POST /v1/decisions')
-  expect(text).toContain('Chat routing never uses these models')
+  expect(text).toContain('Chat routing only uses them when the Decision routing strategy is on')
   expect(container.querySelectorAll('[role="switch"]')).toHaveLength(2)
 })
 

@@ -347,7 +347,25 @@
     "scoreColumn": "အမှတ်",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "ရောတာဖိအား",
@@ -524,6 +542,8 @@
     "providerActions": "ပံ့ပိုးသူ လုပ်ဆောင်ချက်များ",
     "routeViaProxy": "Proxy ဖြင့် လမ်းကြောင်းပြောင်းခြင်း",
     "checkNow": "ယခုစစ်ဆေးပါ",
+    "lastWorkedHint": "Last worked: {when}",
+    "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "ဤဝန်ဆောင်မှုပေးသူသည် key ကို အလိုအလျောက် စစ်ဆေးခြင်းကို ခွင့်မပြုပါ။ ပထမဆုံး တောင်းဆိုမှုကို ဆောင်ရွက်ပြီးနောက် key သည် ကောင်းမွန်သွားပါမည်။",
     "noModelsYetHint": "သင့်ကတ်တလောက်တွင် ဤဝန်ဆောင်မှုပေးသူ၏ မော်ဒယ်များ မရှိသေးသဖြင့် ဆောင်ရွက်စရာ မရှိပါ။",
     "proxyEnvHintBefore": "ထို့အပြင် ပြင်ဆင်နိုင်သော",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "ဤကီးကို ယခုပင် ကူးယူပါ — နောက်ထပ် ပြသမည် မဟုတ်ပါ။",
     "cpEnabledAria": "ပရိုဖိုင် ဖွင့်ထားသည်",
     "selectKey": "ဤသော့ကို ရွေးပါ",
+    "selectModel": "ဤမော်ဒယ်ကို ရွေးပါ",
     "bulkSelected": "{count} ခု ရွေးထားသည်",
     "bulkEnable": "အားလုံး ဖွင့်ပါ",
     "bulkDisable": "အားလုံး ပိတ်ပါ",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "လစဉ်တိုကင်အကန့်အသတ်",
     "capUnlimitedPlaceholder": "အကန့်အသတ်မရှိ",
     "capEditHint": "အကန့်အသတ်များကို လ၏ ပထမရက် ၀၀:၀၀ UTC တွင် ပြန်ချမှတ်သည်။ မရှိလိုပါက ဗလာထားပါ။",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "ယခုလ တောင်းဆိုမှု {requests}၊ တိုကင် {tokens}",
     "quotaBalanceHint": "{limit} {metric} အနက် {remaining} ကျန်သည်",
-    "quotaBalanceLeft": "{remaining} ကျန်သည်"
-,
+    "quotaBalanceLeft": "{remaining} ကျန်သည်",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "ဆာဗာက ရေးသားသည်နှင့်အမျှ အချက်အလက်များ ဤနေရာတွင် ပေါ်လာပါမည်။ ရလဒ်ရှိမည်ဟု မျှော်လင့်ပါက အဆင့်၊ ဝန်ဆောင်မှုပေးသူ သို့မဟုတ် ရှာဖွေမှု စစ်ထုတ်ချက်များကို ကျယ်ပြန့်အောင် ပြင်ပါ။",
     "noLevelsTitle": "အဆင့် တစ်ခုမျှ မရွေးထားပါ",
     "noLevelsDescription": "မှတ်တမ်းများ မြင်ရရန် အနည်းဆုံး အဆင့်တစ်ခု ဖွင့်ပါ။",
-    "loadFailed": "ဆာဗာမှတ်တမ်းကို တင်၍မရပါ။"
+    "loadFailed": "ဆာဗာမှတ်တမ်းကို တင်၍မရပါ။",
+    "eventFilter": "အီးဗင့်",
+    "allEvents": "အီးဗင့်အားလုံး"
   },
   "playground": {
     "title": "ကစားကွင်း",
@@ -1163,7 +1192,8 @@
       "openclaw": "သင့်ကိုယ်ပိုင်စက်မှနေ၍ WhatsApp၊ Telegram၊ Discord နှင့် အခြားနေရာများတွင် ဖြေကြားပေးသော အမြဲအသင့်ရှိနေသည့် ကိုယ်ပိုင်လက်ထောက်။",
       "hermes": "Nous Research ၏ မိမိကိုယ်ကို တိုးတက်အောင်လုပ်နိုင်သော အေးဂျင့်၊ တည်မြဲသည့်မှတ်ဉာဏ်နှင့် ကျွမ်းကျင်မှုများပါဝင်ပြီး terminal တွင်ဖြစ်စေ chat အက်ပ်များတွင်ဖြစ်စေ အသုံးပြုနိုင်သည်။",
       "pi": "သင့်ကိုယ်ပိုင် extension များ၊ ကျွမ်းကျင်မှုများနှင့် prompt template များဖြင့် ပုံဖော်နိုင်သော အနည်းဆုံး terminal အေးဂျင့်။",
-      "reasonix": "DeepSeek အတွက် တည်ဆောက်ထားသော terminal coding agent ဖြစ်ပြီး ရှည်လျားသော session များ စျေးသက်သာစေရန် prefix caching ကို အခြေခံထားသည်။"
+      "reasonix": "DeepSeek အတွက် တည်ဆောက်ထားသော terminal coding agent ဖြစ်ပြီး ရှည်လျားသော session များ စျေးသက်သာစေရန် prefix caching ကို အခြေခံထားသည်။",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

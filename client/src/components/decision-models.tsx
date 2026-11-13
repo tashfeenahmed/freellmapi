@@ -25,7 +25,8 @@ import {
 const AUTO = 'auto'
 
 // One model from the catalog's `decisionModels` section. Decision models are
-// not part of chat routing; the toggle only affects POST /v1/decisions.
+// not part of chat routing unless the Decision routing strategy is on (#1354);
+// the toggle affects POST /v1/decisions and that strategy alike.
 function DecisionModelCard({
   model: m,
   onToggle,

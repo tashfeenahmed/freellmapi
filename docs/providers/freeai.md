@@ -26,10 +26,11 @@ the provider's account history before retrying a queued request.
 Live controls on 2026-10-11 found that the model roster, invalid-payload errors,
 invalid-model errors **and even a successful Kokoro synthesis** returned the same
 status for valid and bogus credentials. Those endpoints cannot prove that a key
-is valid. Automatic health validation therefore stays inconclusive and spends no
-quota. Existing health behavior preserves the key's unknown/healthy status, so
-configured keys remain usable for inference. The supplied key is still sent on
-actual generation requests; this integration does not advertise anonymous access.
+is valid. Automatic health checks therefore skip credential validation entirely without
+spending quota or recording a misleading validation error. Existing `unknown`
+and `healthy` key states remain usable for inference; their status is not proof
+that the credential is valid. The supplied key is still sent on actual
+generation requests; this integration does not advertise anonymous access.
 
 Kokoro generated valid WAV files during live testing. Two tested Qwen aliases
 returned the same backend identity under conflicting advertised names; the other

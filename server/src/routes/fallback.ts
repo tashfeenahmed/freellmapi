@@ -19,6 +19,7 @@ import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
 import { USABLE_KEY_SQL, isUsableKey } from '../services/key-state.js';
+import { getDecisionRoutingStatus, setDecisionRoutingSettings } from '../services/routing-decision.js';
 
 export const fallbackRouter = Router();
 
@@ -40,6 +41,9 @@ fallbackRouter.get('/routing', (_req: Request, res: Response) => {
     peakEndHour: peakHours.endHour,
     peakTimezone: peakHours.timezone,
     cooldownCeilingMs: getCooldownCeilingMs(),
+    // Decision routing (#1354): its settings, whether a decision model is
+    // usable, and since-boot picks. Present whatever the active strategy is.
+    decision: getDecisionRoutingStatus(),
   });
 });
 
@@ -82,6 +86,11 @@ const routingSchema = z.object({
     .min(MIN_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at least ${MIN_COOLDOWN_CEILING_MS} (1 minute)` })
     .max(MAX_COOLDOWN_CEILING_MS, { message: `cooldownCeilingMs must be at most ${MAX_COOLDOWN_CEILING_MS} (24 hours)` })
     .nullable().optional(),
+  // Decision routing (#1354): which decision model picks the preset ('auto' or
+  // a decision model id) and the top probability below which it routes as
+  // Balanced. Saved whatever the strategy, so they can be set before switching.
+  decisionModel: z.string().trim().min(1).max(200).optional(),
+  decisionMinProbability: z.number().min(0).max(1).optional(),
 });
 
 // PUT /routing → switch strategy. Presets are just weight vectors over the three
@@ -113,6 +122,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
   if (parsed.data.cooldownCeilingMs !== undefined) {
     setCooldownCeilingMs(parsed.data.cooldownCeilingMs);
   }
+  setDecisionRoutingSettings({ model: parsed.data.decisionModel, minProbability: parsed.data.decisionMinProbability });
   try {
     setPeakHoursConfig({
       enabled: parsed.data.peakHoursAdjust,
@@ -134,6 +144,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
     strategy: getRoutingStrategy(),
     exploreEnabled: getExploreEnabled(),
     keySelectionStrategy: getKeySelectionStrategy(),
+    decision: getDecisionRoutingStatus(),
     presets: BANDIT_PRESETS,
     weights: active.weights,
     peakAdjusted: active.adjusted,
@@ -413,7 +424,10 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
     allModels.sort((a, b) => monthlyBudgetScore(b) - monthlyBudgetScore(a));
     models = allModels.map(m => ({ id: m.id }));
   } else {
-    const orderBy = SORT_PRESETS[preset];
+    // `Object.hasOwn`, not a bare index: a plain read answers for inherited
+    // members too, so `POST /sort/constructor` used to slip past this guard
+    // (the function object is truthy) and crash `prepare()` with a 500.
+    const orderBy = Object.hasOwn(SORT_PRESETS, preset) ? SORT_PRESETS[preset] : undefined;
     if (!orderBy) {
       res.status(400).json({ error: { message: `Unknown preset: ${preset}. Use: intelligence, speed, budget` } });
       return;

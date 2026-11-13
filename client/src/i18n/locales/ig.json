@@ -347,7 +347,25 @@
     "scoreColumn": "Akara",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Nrụgide rawụta",
@@ -524,6 +542,8 @@
     "providerActions": "Omume ndị na-eweta",
     "routeViaProxy": "Ụzọ site na proxy",
     "checkNow": "Lelee ugbu a",
+    "lastWorkedHint": "Last worked: {when}",
+    "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Onye na-enye ọrụ a anaghị ekwe ka a lelee igodo na-akpaghị aka. Igodo ahụ ga-adị mma mgbe o jesịrị arịrịọ mbụ ya ozi.",
     "noModelsYetHint": "Katalọgụ gị enweghị ụdị ọ bụla sitere n'aka onye na-enye ọrụ a ugbu a, ya mere ọ nweghị ihe ọ ga-eje ozi.",
     "proxyEnvHintBefore": "Ọzọkwa configurable site na",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Detuo igodo a ugbu a — agaghị egosi ya ọzọ.",
     "cpEnabledAria": "Profaịlụ na-arụ ọrụ",
     "selectKey": "Họrọ igodo a",
+    "selectModel": "Họrọ ndelè a",
     "bulkSelected": "{count} ahọpụtara",
     "bulkEnable": "Kwado ha niile",
     "bulkDisable": "Gbanyụọ ha niile",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Oke token ọnwa",
     "capUnlimitedPlaceholder": "Enweghị oke",
     "capEditHint": "A na-ebugharị oke ụbọchị nke 1, 00:00 UTC. Hapụ oghere maka enweghị oke.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "Arịrịọ {requests}, token {tokens} ọnwa a",
     "quotaBalanceHint": "{remaining} n'ime {limit} {metric} fọdụrụ",
-    "quotaBalanceLeft": "{remaining} fọdụrụ"
-,
+    "quotaBalanceLeft": "{remaining} fọdụrụ",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Ihe ndekọ na-apụta ebe a ka sava na-ede ha. Gbasaa nzacha ọkwa, onye na-eweta ma ọ bụ ọchụchọ ma ọ bụrụ na ị tụrụ anya nsonaazụ.",
     "noLevelsTitle": "Ahọrọghị ọkwa ọ bụla",
     "noLevelsDescription": "Gbanye ma ọ dịkarịa ala otu ọkwa ka ị hụ ihe ndekọ.",
-    "loadFailed": "Enweghị ike ibugo ndekọ sava."
+    "loadFailed": "Enweghị ike ibugo ndekọ sava.",
+    "eventFilter": "Ihe omume",
+    "allEvents": "Ihe omume niile"
   },
   "playground": {
     "title": "Ebe egwuregwu",
@@ -1163,7 +1192,8 @@
       "openclaw": "Onye enyemaka nkeonwe na-arụ ọrụ mgbe niile, nke na-aza na WhatsApp, Telegram, Discord na ndị ọzọ site na igwe nke gị.",
       "hermes": "Onye ọrụ Nous Research na-emeziwanye onwe ya, nwere ebe nchekwa na-adịgide na nkà, na terminal ma ọ bụ na ngwa mkparịta ụka.",
       "pi": "Obere onye ọrụ terminal ị na-akpụ site na ndọtị, nkà na ndebiri ajụjụ nke gị.",
-      "reasonix": "Onye nnọchite ide koodu na terminal emere maka DeepSeek, wuru gburugburu prefix caching ka ogologo nnọkọ wee dị ọnụ ala."
+      "reasonix": "Onye nnọchite ide koodu na terminal emere maka DeepSeek, wuru gburugburu prefix caching ka ogologo nnọkọ wee dị ọnụ ala.",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

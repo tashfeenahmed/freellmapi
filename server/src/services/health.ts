@@ -13,10 +13,25 @@ import { providerLog } from '../lib/server-logs.js';
 import { triggerBuiltinModelDiscovery } from './builtin-model-discovery.js';
 import { bumpInvalidStreak, resetInvalidStreak, USABLE_KEY_SQL } from './key-state.js';
 
-const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Floor of 60s: a misconfigured tiny interval turns the health pass into a
+// self-inflicted abuse-shaped flood, which is the exact traffic #553/#1599 are
+// about. Anything below the floor falls back to the default.
+const MIN_CHECK_INTERVAL_MS = 60 * 1000;
 const CONSECUTIVE_FAILURES_TO_DISABLE = 3;
 const DEFAULT_HEALTH_CHECK_CONCURRENCY = 8;
 const DEFAULT_MIN_SPACING_MS = 1000;
+
+/** Base cadence of the scheduled pass (jittered per run, see
+ *  nextHealthCheckDelayMs), tunable via HEALTH_CHECK_INTERVAL_MS (#1593):
+ *  fleets on providers that dislike frequent key checks
+ *  want a slower pass; a fresh install being shaken out wants a faster one.
+ *  Read once at module load — the scheduler re-arms from the same constant. */
+function getCheckIntervalMs(): number {
+  const n = positiveIntEnv(process.env.HEALTH_CHECK_INTERVAL_MS, DEFAULT_CHECK_INTERVAL_MS);
+  return n < MIN_CHECK_INTERVAL_MS ? DEFAULT_CHECK_INTERVAL_MS : n;
+}
+const CHECK_INTERVAL_MS = getCheckIntervalMs();
 
 /** Base cadence of the scheduled pass (jittered per run, see
  *  nextHealthCheckDelayMs). Exported for tests. */
@@ -30,9 +45,15 @@ const CHECK_INTERVAL_JITTER = 0.2;
 
 // A key validated more recently than this is skipped by the scheduled pass:
 // re-asking a provider about a credential it just answered for is exactly the
-// traffic #553 is about. Below the jittered minimum interval (4 minutes) so a
-// short interval can never skip a whole pass' worth of keys.
-export const RECENT_CHECK_SKIP_MS = 3.5 * 60 * 1000;
+// traffic #553 is about. Capped at 70% of the configured interval so a faster
+// HEALTH_CHECK_INTERVAL_MS can never skip a whole pass' worth of keys (the
+// invariant nextHealthCheckDelayMs asserts).
+export const RECENT_CHECK_SKIP_MS = Math.min(3.5 * 60 * 1000, CHECK_INTERVAL_MS * 0.7);
+
+// #1599: how often the scheduled pass re-asks about a key parked at 'error' on
+// a provider that must not be polled (supportsKeyPolling === false). Healthy
+// and invalid keys on those providers are never re-validated on a schedule.
+export const NO_POLL_ERROR_REPROBE_MS = 60 * 60 * 1000;
 
 // Wall-clock ceiling for one pass. Per-provider spacing is compressed rather
 // than allowed to push a pass past this, so a large fleet still finishes well
@@ -285,7 +306,12 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
 
     const status: KeyStatus = isValid ? 'healthy' : 'invalid';
 
-    db.prepare("UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now') WHERE id = ?")
+    // #1493: stamp last_healthy_at only on a VALID verdict. A transport error
+    // (the catch below) refreshes last_checked_at but records no success, so
+    // "checked recently" and "worked recently" stay distinguishable.
+    db.prepare(isValid
+      ? "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now'), last_healthy_at = datetime('now') WHERE id = ?"
+      : "UPDATE api_keys SET status = ?, last_health_error = ?, last_checked_at = datetime('now') WHERE id = ?")
       .run(status, lastError, keyId);
 
     if (isValid) {
@@ -381,6 +407,9 @@ export async function probeKeyValidity(keyId: number): Promise<KeyProbeOutcome> 
     // #1459: no probe for a provider that forbids them; the cooldown simply
     // runs out, as it would after an inconclusive probe.
     if (provider.supportsKeyValidation === false) return 'error';
+    // #1599: the probe would be the same empty search the health pass no
+    // longer sends on a schedule; let the cooldown run out instead.
+    if (provider.supportsKeyPolling === false) return 'error';
 
     const apiKey = decrypt(row.encrypted_key, row.iv, row.auth_tag);
     // Same reasoning as checkKeyHealth: probe through the key's own proxy (#590).
@@ -401,6 +430,21 @@ export async function probeKeyValidity(keyId: number): Promise<KeyProbeOutcome> 
 }
 
 /**
+ * #1493: throttle for the last_healthy_at write from live traffic. The probe
+ * path already writes the column at most once per health pass, but this
+ * function runs on every successful proxied request, and an unthrottled UPDATE
+ * would put a DB write on the hot path. One stamp per key per minute is plenty
+ * for "last worked N ago".
+ */
+const lastHealthyStampedAt = new Map<number, number>();
+const LAST_HEALTHY_STAMP_INTERVAL_MS = 60_000;
+
+/** Test seam: drop the stamp throttle so a test can observe consecutive writes. */
+export function clearLastHealthyStampState(): void {
+  lastHealthyStampedAt.clear();
+}
+
+/**
  * Promote a key out of 'error' or 'unknown' after it successfully served a live
  * request.
  *
@@ -413,6 +457,18 @@ export async function probeKeyValidity(keyId: number): Promise<KeyProbeOutcome> 
  */
 export function markKeyHealthyFromRequest(keyId: number): void {
   try {
+    // #1493: a served request is the strongest "this key works" evidence there
+    // is — stamp last_healthy_at regardless of current status. This is the only
+    // success signal for providers with supportsKeyValidation === false (#1459),
+    // which never get a probe. Throttled in memory, not per request.
+    const now = Date.now();
+    const lastStamp = lastHealthyStampedAt.get(keyId);
+    if (lastStamp === undefined || now - lastStamp >= LAST_HEALTHY_STAMP_INTERVAL_MS) {
+      lastHealthyStampedAt.set(keyId, now);
+      getDb()
+        .prepare("UPDATE api_keys SET last_healthy_at = datetime('now') WHERE id = ?")
+        .run(keyId);
+    }
     getDb()
       .prepare("UPDATE api_keys SET status = 'healthy', last_health_error = NULL WHERE id = ? AND status IN ('error', 'unknown')")
       .run(keyId);
@@ -446,6 +502,10 @@ export interface HealthPassOptions {
    *  Used by the dashboard's "check all" button and the post-wake re-probe,
    *  where the point is an immediate, complete picture. */
   force?: boolean;
+  /** Someone pressed "Check all": also validate keys on providers that must
+   *  not be polled (#1599). The post-wake re-probe is forced but automatic, so
+   *  it leaves them alone. */
+  manual?: boolean;
   /** Test seams: injectable clock, sleep, probe and pool size, mirroring the
    *  cooldown-probe pass so a pacing test needs no real timers. */
   now?: () => number;
@@ -526,6 +586,16 @@ async function runHealthPass(opts: HealthPassOptions): Promise<HealthPassResult>
   const skippedKeyIds: number[] = [];
   const skipMs = opts.force ? 0 : getValidationRateLimitSkipMs();
   const due = rows.filter(row => {
+    // #1599: a provider whose key check is an empty search gets one check per
+    // new key, not one every pass. Applies to forced automatic passes too.
+    if (!opts.manual && resolveProvider(row.platform as Platform, row.base_url)?.supportsKeyPolling === false) {
+      const floorMs = row.status === 'error' ? NO_POLL_ERROR_REPROBE_MS : Infinity;
+      if (row.age_ms !== null && row.age_ms < floorMs) {
+        skippedKeyIds.push(row.id);
+        return false;
+      }
+      return true;
+    }
     if (opts.force) return true;
     // A key the provider just rate-limited stays out until the skip window
     // passes — even one parked at 'error'. A 429 is fresher, more specific

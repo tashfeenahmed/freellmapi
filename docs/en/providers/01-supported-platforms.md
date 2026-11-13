@@ -27,7 +27,6 @@ Of the 43 built-in platforms, **10 use dedicated adapters** and **33 ride `OpenA
 | `mistral` | Mistral | Keyed | OpenAI-compat | `api.mistral.ai/v1`. |
 | `sambanova` | SambaNova | Retired (V23) | Not registered | Free tier permanently gone; kept in the type union for historical key rows. |
 | `openrouter` | OpenRouter | Keyed | OpenAI-compat | Sends `HTTP-Referer`/`X-Title` headers; `:free` model suffix marks zero-cost routes. |
-| `github` | GitHub Models | Keyed | OpenAI-compat | Routes to `models.github.ai/inference`; catalog uses `<publisher>/<model>` ids. |
 | `cohere` | Cohere | Keyed | Native (`CohereProvider`) | Uses Cohere's OpenAI-compatible endpoint. |
 | `cloudflare` | Cloudflare Workers AI | Keyed (`account_id:token`) | Native (`CloudflareProvider`) | Compound credential format parsed by the adapter. |
 | `zhipu` | Zhipu (Z.ai / bigmodel.cn) | Keyed | Native (`ZhipuProvider`) | Console autodetect: a rejected domestic key is re-probed against the global `api.z.ai` host; 60s timeout covers glm-4.7-flash hidden reasoning. |

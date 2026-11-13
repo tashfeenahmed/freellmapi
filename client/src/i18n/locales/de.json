@@ -347,7 +347,25 @@
     "scoreColumn": "Punktzahl",
     "minReliabilityFloor": "Minimale Zuverlässigkeitsschwelle",
     "minReliabilityFloorHint": "Nimmt ein Modell aus dem Routing, sobald seine beobachtete Erfolgsquote unter diesen Wert fällt. 0,8 bedeutet 80 %. Leer lassen zum Deaktivieren – Modelle mit zu wenig Historie bleiben immer erhalten, damit neue Modelle weiter getestet werden können. Leert niemals die gesamte Kette.",
-    "minReliabilityFloorOff": "Deaktiviert"
+    "minReliabilityFloorOff": "Deaktiviert",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Router-Druck",
@@ -524,6 +542,8 @@
     "providerActions": "Anbieteraktionen",
     "routeViaProxy": "Route über Proxy",
     "checkNow": "Jetzt prüfen",
+    "lastWorkedHint": "Zuletzt funktionsfähig: {when}",
+    "lastWorkedNever": "Hat noch keine Anfrage bedient und keine Prüfung bestanden",
     "noAutoCheckHint": "Dieser Anbieter erlaubt keine automatischen Schlüsselprüfungen. Der Schlüssel wird gesund, sobald er seine erste Anfrage bedient hat.",
     "noModelsYetHint": "Dein Katalog enthält noch keine Modelle dieses Anbieters, daher gibt es nichts zu bedienen.",
     "proxyEnvHintBefore": "Auch konfigurierbar über die",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Kopiere diesen Schlüssel jetzt — er wird nicht erneut angezeigt.",
     "cpEnabledAria": "Profil aktiviert",
     "selectKey": "Diesen Schlüssel auswählen",
+    "selectModel": "Dieses Modell auswählen",
     "bulkSelected": "{count} ausgewählt",
     "bulkEnable": "Alle aktivieren",
     "bulkDisable": "Alle deaktivieren",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Monatliches Token-Limit",
     "capUnlimitedPlaceholder": "Unbegrenzt",
     "capEditHint": "Limits werden am 1. um 00:00 UTC zurückgesetzt. Leer lassen für unbegrenzt.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} Anfragen, {tokens} Tokens diesen Monat",
     "quotaBalanceHint": "{remaining} von {limit} {metric} übrig",
-    "quotaBalanceLeft": "{remaining} übrig"
-,
+    "quotaBalanceLeft": "{remaining} übrig",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Einträge erscheinen hier, sobald der Server sie schreibt. Erweitern Sie die Filter für Ebene, Anbieter oder Suche, wenn Sie eine Ausgabe erwartet haben.",
     "noLevelsTitle": "Keine Ebene ausgewählt",
     "noLevelsDescription": "Schalten Sie mindestens eine Ebene ein, um die Protokollausgabe zu sehen.",
-    "loadFailed": "Das Serverprotokoll konnte nicht geladen werden."
+    "loadFailed": "Das Serverprotokoll konnte nicht geladen werden.",
+    "eventFilter": "Ereignis",
+    "allEvents": "Alle Ereignisse"
   },
   "playground": {
     "title": "Spielplatz",
@@ -1163,7 +1192,8 @@
       "openclaw": "Ein ständig verfügbarer persönlicher Assistent, der von deinem eigenen Rechner aus auf WhatsApp, Telegram, Discord und mehr antwortet.",
       "hermes": "Der selbstverbessernde Agent von Nous Research mit dauerhaftem Gedächtnis und Skills, im Terminal oder in Chat-Apps.",
       "pi": "Ein minimaler Terminal-Agent, den du mit eigenen Erweiterungen, Skills und Prompt-Vorlagen formst.",
-      "reasonix": "Ein für DeepSeek gebauter Coding-Agent fürs Terminal, ausgelegt auf Prefix-Caching, damit lange Sitzungen günstig bleiben."
+      "reasonix": "Ein für DeepSeek gebauter Coding-Agent fürs Terminal, ausgelegt auf Prefix-Caching, damit lange Sitzungen günstig bleiben.",
+      "zcode": "Der Coding-Agent von Z.ai für seine GLM-Modelle, der über ein Provider-Verzeichnis jede OpenAI-kompatible Endstelle anspricht."
     }
   },
   "update": {

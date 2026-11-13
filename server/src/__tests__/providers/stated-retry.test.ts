@@ -63,6 +63,19 @@ describe('parseStatedRetryMs — prose', () => {
     expect(parseStatedRetryMs('try again in 500ms')).toBe(500);
   });
 
+  it('sums compound durations the way Groq and OpenAI write them', () => {
+    const body = { error: { message: 'Rate limit reached on requests per day (RPD): Limit 1000, Used 1000, Requested 1. Please try again in 1m26s. Need more requests? Upgrade to Dev Tier today' } };
+    expect(parseStatedRetryMs(body)).toBe(86_000);
+    expect(parseStatedRetryMs('Please try again in 7m12s.')).toBe(432_000);
+    expect(parseStatedRetryMs('Please try again in 6m0.512s.')).toBe(360_512);
+    expect(parseStatedRetryMs('try again in 2h3m')).toBe(7_380_000);
+    expect(parseStatedRetryMs('retry after 2 minutes 30 seconds')).toBe(150_000);
+  });
+
+  it('ignores a number that is not followed by a unit', () => {
+    expect(parseStatedRetryMs('please try again in 5 or so')).toBeUndefined();
+  });
+
   it('requires an explicit retry phrase, so a stray number is never mistaken for a back-off', () => {
     expect(parseStatedRetryMs('You have used 30 seconds of compute')).toBeUndefined();
     expect(parseStatedRetryMs({ error: { message: 'model gpt-4 is 30s slower than usual' } })).toBeUndefined();

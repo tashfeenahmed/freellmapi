@@ -28,6 +28,56 @@ describe('safe config writes', () => {
     expect(merged).toBe('DEEPSEEK_API_KEY=sk-keep\nFREELLMAPI_API_KEY=k\n');
   });
 
+  it('merges keyed JSON arrays per owner instead of replacing them (ZCode)', () => {
+    const existing = JSON.stringify({
+      schemaVersion: 1,
+      config: {
+        providerConfigRules: { providerRules: [
+          { providerId: 'local', providerName: 'Mine' },
+          { providerId: 'freellmapi', providerName: 'Old' },
+        ] },
+        modelConfigRules: {
+          providerModelRules: [{ providerId: 'local', modelId: 'm' }, { providerId: 'freellmapi', modelId: 'gone' }],
+          manualProviderModelRules: [{ providerId: 'freellmapi', modelId: 'fast' }, { providerId: 'local', modelId: 'x' }],
+        },
+        providerOrder: ['local', 'freellmapi'],
+      },
+    }, null, 2);
+    const file = {
+      path: '/unused/provider_config.json',
+      format: 'json' as const,
+      arrays: {
+        'config.providerConfigRules.providerRules': { ownedBy: { providerId: 'freellmapi' } },
+        'config.modelConfigRules.providerModelRules': { ownedBy: { providerId: 'freellmapi' } },
+        'config.modelConfigRules.manualProviderModelRules': { ownedBy: { providerId: 'freellmapi' } },
+        'config.providerOrder': { union: true as const },
+      },
+      value: {
+        config: {
+          providerConfigRules: { providerRules: [{ providerId: 'freellmapi', providerName: 'FreeLLMAPI' }] },
+          modelConfigRules: {
+            providerModelRules: [{ providerId: 'freellmapi', modelId: 'fast' }],
+            manualProviderModelRules: [],
+          },
+          providerOrder: ['freellmapi'],
+        },
+      },
+    };
+    const once = renderFile(file, existing);
+    const merged = parse(once).config;
+    expect(merged.providerConfigRules.providerRules).toEqual([
+      { providerId: 'local', providerName: 'Mine' },
+      { providerId: 'freellmapi', providerName: 'FreeLLMAPI' },
+    ]);
+    expect(merged.modelConfigRules.providerModelRules).toEqual([
+      { providerId: 'local', modelId: 'm' },
+      { providerId: 'freellmapi', modelId: 'fast' },
+    ]);
+    expect(merged.modelConfigRules.manualProviderModelRules).toEqual([{ providerId: 'local', modelId: 'x' }]);
+    expect(merged.providerOrder).toEqual(['local', 'freellmapi']);
+    expect(renderFile(file, once)).toBe(once);
+  });
+
   it('renders a fresh Continue config idempotently', () => {
     const generated = [
       '# freellmapi:start',

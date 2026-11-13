@@ -17,6 +17,7 @@ import {
   advanceCursor,
   buildLogsQuery,
   clampMessage,
+  collectEvents,
   collectProviders,
   DEFAULT_LOG_LEVELS,
   EMPTY_LOG_COUNTS,
@@ -122,6 +123,7 @@ export default function LogsPage() {
 
   const [levels, setLevels] = useState<LogLevel[]>(() => [...DEFAULT_LOG_LEVELS])
   const [provider, setProvider] = useState('all')
+  const [event, setEvent] = useState('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [paused, setPaused] = useState(false)
@@ -132,6 +134,7 @@ export default function LogsPage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [counts, setCounts] = useState<LogCounts>(EMPTY_LOG_COUNTS)
   const [providers, setProviders] = useState<string[]>([])
+  const [events, setEvents] = useState<string[]>([])
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set())
   // Live-tail state for RENDER: whether the reader is parked at the bottom, and
   // (when they are not) the newest id they had already seen when they detached.
@@ -175,7 +178,7 @@ export default function LogsPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput, search, resetStream])
 
-  const filterKey = `${levelsCsv(levels)}|${search}|${provider}`
+  const filterKey = `${levelsCsv(levels)}|${search}|${provider}|${event}`
 
   const query = useQuery({
     queryKey: ['logs', filterKey],
@@ -188,7 +191,7 @@ export default function LogsPage() {
     queryFn: async () => {
       const stream = streamRef.current
       const response = await apiFetch<LogsResponse>(
-        buildLogsQuery({ levels, q: search, provider, sinceId: cursorRef.current, limit: LOG_PAGE_LIMIT }),
+        buildLogsQuery({ levels, q: search, provider, event, sinceId: cursorRef.current, limit: LOG_PAGE_LIMIT }),
       )
       // Filters changed while this was in flight: its rows belong to a query
       // the user has already left, and its cursor to a different stream.
@@ -197,6 +200,7 @@ export default function LogsPage() {
       cursorRef.current = advanceCursor(cursorRef.current, { entries: incoming, nextId: response.nextId })
       setCounts(response.counts ?? EMPTY_LOG_COUNTS)
       setProviders(prev => collectProviders(prev, incoming))
+      setEvents(prev => collectEvents(prev, incoming))
       setEntries(prev => mergeEntries(prev, incoming))
       return response
     },
@@ -215,6 +219,7 @@ export default function LogsPage() {
       resetStream()
       setCounts(EMPTY_LOG_COUNTS)
       setProviders([])
+      setEvents([])
       toast.success(t('logs.cleared'))
       // The cursor is back to null, so the invalidated query refetches from scratch.
       void queryClient.invalidateQueries({ queryKey: ['logs'] })
@@ -340,6 +345,26 @@ export default function LogsPage() {
           <SelectContent>
             <SelectItem value="all">{t('analytics.allProviders')}</SelectItem>
             {providers.map(name => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={event}
+          onValueChange={(value) => {
+            setEvent(value ?? 'all')
+            resetStream()
+          }}
+        >
+          <SelectTrigger size="sm" aria-label={t('logs.eventFilter')}>
+            <SelectValue>
+              {(value: string) => (!value || value === 'all' ? t('logs.allEvents') : value)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('logs.allEvents')}</SelectItem>
+            {events.map(name => (
               <SelectItem key={name} value={name}>{name}</SelectItem>
             ))}
           </SelectContent>

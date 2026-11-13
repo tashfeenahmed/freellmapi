@@ -394,7 +394,10 @@ function sortProfileModels(db: any, profileId: number, preset: string) {
     allModels.sort((a, b) => monthlyBudgetScore(b) - monthlyBudgetScore(a));
     models = allModels.map(m => ({ id: m.id }));
   } else {
-    const orderBy = SORT_PRESETS[preset];
+    // `Object.hasOwn`, not a bare index: a plain read answers for inherited
+    // members too, so `constructor`/`toString` used to slip past this guard
+    // (the function object is truthy) and crash `prepare()` with a 500.
+    const orderBy = Object.hasOwn(SORT_PRESETS, preset) ? SORT_PRESETS[preset] : undefined;
     if (!orderBy) {
       throw new Error(`Unknown preset: ${preset}. Use: intelligence, speed, budget`);
     }

@@ -192,16 +192,13 @@ describe('Migration idempotency', () => {
     ]);
   });
 
-  it('caps GitHub GPT-4.1 at the routable free-tier context window (#426)', () => {
+  it('removes the retired GitHub Models provider (#1557)', () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     const db = initDb(':memory:');
 
-    const row = db.prepare(`
-      SELECT context_window FROM models
-       WHERE platform = 'github' AND model_id = 'openai/gpt-4.1'
-    `).get() as { context_window: number };
-
-    expect(row.context_window).toBe(8000);
+    for (const table of ['models', 'embedding_models', 'api_keys']) {
+      expect((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE platform = 'github'`).get() as { n: number }).n).toBe(0);
+    }
   });
 
   it('V14: cerebras deprecation disables qwen-3-235b and llama3.1-8b but keeps gpt-oss-120b enabled', () => {

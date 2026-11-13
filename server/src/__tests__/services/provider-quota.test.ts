@@ -52,7 +52,6 @@ describe('provider-quota: pool inference', () => {
     for (const model of ['first-model', 'another-model']) {
       expect(inferQuotaPoolKey('aclide', model)).toBe('aclide::monthly-credit');
       expect(inferQuotaPoolKey('speka', model)).toBe('speka::monthly-credit');
-      expect(inferQuotaPoolKey('auray', model)).toBe('auray::monthly-credit');
       expect(inferQuotaPoolKey('plugsky', model)).toBe('plugsky::fair-use');
       expect(inferQuotaPoolKey('clod', model)).toBe('clod::daily-free');
       expect(inferQuotaPoolKey('blaze', model)).toBe('blaze::daily-free');

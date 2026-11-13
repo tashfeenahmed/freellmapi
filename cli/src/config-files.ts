@@ -7,7 +7,7 @@ import {
   type ParseError,
 } from 'jsonc-parser';
 import { Document, isMap, parseDocument } from 'yaml';
-import type { GeneratedFile } from './types.js';
+import type { GeneratedFile, JsonArrayMerge } from './types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value)
@@ -15,7 +15,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     && !Array.isArray(value);
 }
 
-function mergeJson(existing: string, value: Record<string, unknown>): string {
+function mergeJsonArray(current: unknown[], next: unknown[], rule: JsonArrayMerge): unknown[] {
+  if ('union' in rule) {
+    return [...current, ...next.filter(item => !current.some(existing => JSON.stringify(existing) === JSON.stringify(item)))];
+  }
+  const owned = (item: unknown) => isRecord(item)
+    && Object.entries(rule.ownedBy).every(([field, expected]) => item[field] === expected);
+  return [...current.filter(item => !owned(item)), ...next];
+}
+
+function mergeJson(existing: string, value: Record<string, unknown>, arrays: Record<string, JsonArrayMerge> = {}): string {
   let rendered = existing.trim() ? existing : '{}\n';
   const errors: ParseError[] = [];
   const parsed = parse(rendered, errors, {
@@ -43,10 +52,14 @@ function mergeJson(existing: string, value: Record<string, unknown>): string {
         applyPatch(current, next, propertyPath);
         continue;
       }
+      const arrayRule = arrays[propertyPath.join('.')];
+      const merged = arrayRule && Array.isArray(current) && Array.isArray(next)
+        ? mergeJsonArray(current, next, arrayRule)
+        : next;
       rendered = applyEdits(rendered, modify(
         rendered,
         propertyPath,
-        next,
+        merged,
         { formattingOptions },
       ));
     }
@@ -346,7 +359,7 @@ function mergeEnv(existing: string, generated: string): string {
 }
 
 export function renderFile(file: GeneratedFile, existing = ''): string {
-  if (file.format === 'json') return mergeJson(existing, file.value ?? {});
+  if (file.format === 'json') return mergeJson(existing, file.value ?? {}, file.arrays);
   if (file.format === 'env') return mergeEnv(existing, file.content ?? '');
   if (file.format === 'yaml') {
     return file.value

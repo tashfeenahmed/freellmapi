@@ -31,11 +31,23 @@ describe('provider-wide per-minute request cap', () => {
   afterEach(() => {
     delete process.env.PROVIDER_MINUTE_REQUEST_CAP_NVIDIA;
     delete process.env.PROVIDER_MINUTE_REQUEST_CAP_GROQ;
+    delete process.env.PROVIDER_MINUTE_REQUEST_CAP_APINEX;
   });
 
   it('ships a default cap for nvidia and none for a provider without one', () => {
     expect(getProviderMinuteRequestCap('nvidia')).toBe(40);
     expect(getProviderMinuteRequestCap('groq')).toBeNull();
+  });
+
+  it('applies the APINex 5 RPM cap across different free models, per key', () => {
+    const now = Date.now();
+    expect(getProviderMinuteRequestCap('apinex')).toBe(5);
+    seedRequests('apinex', 'free/deepseek-v4.1-flash', keyId, 3, now - 20_000);
+    seedRequests('apinex', 'free/gpt-6-luna', keyId, 2, now - 10_000);
+    expect(providerMinuteRequestCount('apinex', keyId, now)).toBe(5);
+    expect(canUseProviderMinute('apinex', keyId, now)).toBe(false);
+    expect(canUseProviderMinute('apinex', keyId + 1, now)).toBe(true);
+    expect(canUseProviderMinute('apinex', keyId, now + 61_000)).toBe(true);
   });
 
   it('honours an env override and treats 0 as disabled', () => {

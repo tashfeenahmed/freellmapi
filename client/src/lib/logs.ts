@@ -60,6 +60,8 @@ export interface LogQuery {
   q?: string
   /** Provider slug, or 'all'/blank for no provider param. */
   provider?: string
+  /** Structured event name (e.g. 'key_invalid'), or 'all'/blank for no event param. */
+  event?: string
   /** Cursor from the previous response; null/undefined on the first fetch. */
   sinceId?: number | null
   limit?: number
@@ -77,6 +79,8 @@ export function buildLogsQuery(query: LogQuery): string {
   if (q) params.set('q', q)
   const provider = query.provider?.trim()
   if (provider && provider !== 'all') params.set('provider', provider)
+  const event = query.event?.trim()
+  if (event && event !== 'all') params.set('event', event)
   if (query.sinceId != null) params.set('sinceId', String(query.sinceId))
   params.set('limit', String(query.limit ?? LOG_PAGE_LIMIT))
   return `/api/logs?${params.toString()}`
@@ -157,6 +161,28 @@ export function collectProviders(
     const provider = entry.provider?.trim()
     if (!provider || all.has(provider)) continue
     all.add(provider)
+    added = true
+  }
+  if (!added) return known as string[]
+  return [...all].sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Structured events offered by the event filter — the same accumulate-never-
+ * shrink contract as collectProviders. This is how an operator finds the
+ * budget-threshold events (#1158) or key_invalid among the firehose without
+ * typing an exact string into free text.
+ */
+export function collectEvents(
+  known: readonly string[],
+  entries: readonly LogEntry[],
+): string[] {
+  const all = new Set(known)
+  let added = false
+  for (const entry of entries) {
+    const event = entry.event?.trim()
+    if (!event || all.has(event)) continue
+    all.add(event)
     added = true
   }
   if (!added) return known as string[]

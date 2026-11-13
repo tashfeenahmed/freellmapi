@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InferbaseProvider, INFERBASE_BASE_URL } from '../../providers/inferbase.js';
+import { ApinexProvider, APINEX_BASE_URL } from '../../providers/apinex.js';
 import { SimpleLLMProvider, SIMPLELLM_BASE_URL } from '../../providers/simplellm.js';
 import { getProvider } from '../../providers/index.js';
 import { AUTH_JSON_PROVIDER_MAP, parseKeysFromFile } from '../../lib/key-parser.js';
@@ -10,6 +11,7 @@ import { getDb, initDb } from '../../db/index.js';
 
 const json = (body: unknown, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers });
 const configs = [
+  { platform: 'apinex' as const, provider: ApinexProvider, base: APINEX_BASE_URL, validate: `${APINEX_BASE_URL}/balance`, account: { object: 'balance', balance_usd: 0 }, model: 'free/glm-5.3-flashx', returned: 'free/glm-5.3-flashx' },
   { platform: 'inferbase' as const, provider: InferbaseProvider, base: INFERBASE_BASE_URL, validate: 'https://api.inferbase.ai/api/v1/inference/credits', account: { balance_micros: 0 }, model: 'deepseek-v4-flash', returned: 'deepseek-v4-flash' },
   { platform: 'simplellm' as const, provider: SimpleLLMProvider, base: SIMPLELLM_BASE_URL, validate: `${SIMPLELLM_BASE_URL}/rate-limit`, account: { limit_rpm: 1000 }, model: 'free-gemma-4-E4B', returned: 'gemma-4-E4B' },
 ];

@@ -61,6 +61,11 @@ moderationRouter.post('/moderations', async (req: Request, res: Response) => {
   } catch (err: any) {
     if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof ModerationError ? err.status : 502;
+    // #1158: a monthly-cap exhaustion carries the seconds until the reset so a
+    // client backs off to the right moment instead of hammering a bare 429.
+    if (err instanceof ModerationError && err.retryAfterSec !== undefined) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(err.retryAfterSec))));
+    }
     res.status(status >= 400 && status < 600 ? status : 502).json({
       error: {
         message: err?.message ?? 'moderation request failed',

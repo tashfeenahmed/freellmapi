@@ -3,6 +3,7 @@ import {
   advanceCursor,
   buildLogsQuery,
   clampMessage,
+  collectEvents,
   collectProviders,
   formatLogTime,
   isLongMessage,
@@ -43,6 +44,12 @@ describe('buildLogsQuery', () => {
       limit: 200,
     })
     expect(url).toBe('/api/logs?levels=warn%2Cerror&q=rate+limit&provider=groq&sinceId=123&limit=200')
+  })
+
+  it('sends a trimmed event and omits the blank / "all" sentinels', () => {
+    expect(buildLogsQuery({ levels: ['warn'], event: ' key_invalid ' })).toContain('event=key_invalid')
+    expect(buildLogsQuery({ levels: ['warn'], event: 'all' })).not.toContain('event')
+    expect(buildLogsQuery({ levels: ['warn'], event: '   ' })).not.toContain('event')
   })
 
   it('treats sinceId 0 as a real cursor but null as the first fetch', () => {
@@ -144,6 +151,24 @@ describe('collectProviders', () => {
     const known = ['groq']
     expect(collectProviders(known, [entry(1, { provider: 'groq' })])).toBe(known)
     expect(collectProviders(known, [])).toBe(known)
+  })
+})
+
+describe('collectEvents', () => {
+  it('accumulates and sorts, ignoring entries without an event', () => {
+    const events = collectEvents(['key_invalid'], [
+      entry(1, { event: 'cooldown_recovered' }),
+      entry(2),
+      entry(3, { event: 'key_invalid' }),
+      entry(4, { provider: 'groq' }),
+    ])
+    expect(events).toEqual(['cooldown_recovered', 'key_invalid'])
+  })
+
+  it('returns the same array when no new event showed up', () => {
+    const known = ['fail']
+    expect(collectEvents(known, [entry(1, { event: 'fail' })])).toBe(known)
+    expect(collectEvents(known, [])).toBe(known)
   })
 })
 

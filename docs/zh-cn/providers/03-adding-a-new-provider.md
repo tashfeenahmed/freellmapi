@@ -48,7 +48,8 @@ register(new OpenAICompatProvider({
 `validateKey` 返回布尔值或 `{ valid: false, error }`。用继承来的 `validationResult(res)` 助手把 401/403 变成携带上游原因的诊断性失败。两条从生产中学到的铁律：
 
 1. **绝不要把公开的模型列表端点当成密钥有效的证据**（pollinations #608、modelscope）：如果 `GET /v1/models` 未鉴权也返回 200，就改为探测某个需要鉴权的东西。
-2. **如果校验消耗计量额度，就缓存它或找一条免费探测** ——见 [#882](02-quotas-and-cooldowns.md#健康检查不得燃烧计量额度882)。健康检查每约 5 分钟对每条已存密钥跑一轮。
+2. **如果校验消耗计量额度，就缓存它或找一条免费探测** ——见 [#882](02-quotas-and-cooldowns.md#健康检查不得燃烧计量额度882)。健康检查每约 5 分钟对每条已存密钥跑一轮（可用 `HEALTH_CHECK_INTERVAL_MS` 为整个实例调整）。
+3. **如果唯一的校验方式是向计费端点发送一个畸形请求**（空搜索、API 会拒绝的请求体），就把 `supportsKeyPolling` 重写为返回 `false`，让健康检查对每个密钥只发送一次，而不是每轮都发。提供方会把反复出现的畸形请求视为滥用：SerpSearch 曾因此撤销了一个账户（[#1599](02-quotas-and-cooldowns.md#健康检查不得燃烧计量额度882)）。
 
 ## 5. 有意识地播种目录
 

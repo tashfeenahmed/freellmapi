@@ -412,7 +412,7 @@ describe('Keys API', () => {
     expect(storedKey(created.id)).toBe('kilo-real-secret');
   });
 
-  it.each(['kilo', 'ovh', 'aihorde', 'parallel'])('POST /api/keys without a key stores one anonymous %s row', async (platform) => {
+  it.each(['kilo', 'ovh', 'aihorde', 'parallel', 'keenable'])('POST /api/keys without a key stores one anonymous %s row', async (platform) => {
     const first = await request(app, 'POST', '/api/keys', { platform });
     const second = await request(app, 'POST', '/api/keys', { platform, key: '   ' });
 
@@ -425,7 +425,7 @@ describe('Keys API', () => {
     expect(keys[0]).toMatchObject({ platform, keyless: true, keyOptional: true, exportable: false });
   });
 
-  it.each(['kilo', 'ovh', 'aihorde', 'parallel'])('POST /api/keys stores a real %s key encrypted', async (platform) => {
+  it.each(['kilo', 'ovh', 'aihorde', 'parallel', 'keenable'])('POST /api/keys stores a real %s key encrypted', async (platform) => {
     const { status, body } = await request(app, 'POST', '/api/keys', { platform, key: ` ${platform}-secret-123 `, label: 'mine' });
 
     expect(status).toBe(201);

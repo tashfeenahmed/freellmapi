@@ -22,6 +22,25 @@ describe('parseProviderLimit', () => {
     expect(parseProviderLimit('requests per minute and tokens per minute (TPM): Limit 8000')).toEqual({ kind: 'tpm', limit: 8000 });
   });
 
+  // Groq orgs with split per-minute limits name the direction: ITPM counts
+  // prompt tokens only, OTPM counts expected completion tokens only. Neither
+  // is the combined TPM the router gates on (live bodies, org redacted).
+  const GROQ_OTPM = 'Groq API error 429: Request too large for model `qwen/qwen3.8-27b` in organization `org_x` service tier `on_demand` on output tokens per minute (OTPM): Limit 1000, Requested 1838. The request\'s expected output tokens exceed the limit.';
+  const GROQ_ITPM = 'Groq API error 413: Request too large for model `qwen/qwen3.8-27b` in organization `org_x` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Requested 16136, please reduce your message size and try again.';
+
+  it('reads a Groq OTPM body as the output axis, not TPM', () => {
+    expect(parseProviderLimit(GROQ_OTPM)).toEqual({ kind: 'otpm', limit: 1000 });
+  });
+
+  it('reads a Groq ITPM body as the input axis, not TPM', () => {
+    expect(parseProviderLimit(GROQ_ITPM)).toEqual({ kind: 'itpm', limit: 7000 });
+  });
+
+  it('reads bare OTPM / ITPM abbreviations', () => {
+    expect(parseProviderLimit('OTPM: Limit 1000, Requested 1838')).toEqual({ kind: 'otpm', limit: 1000 });
+    expect(parseProviderLimit('ITPM: Limit 7000, Requested 9000')).toEqual({ kind: 'itpm', limit: 7000 });
+  });
+
   it('returns null without a confident axis even when a Limit is present', () => {
     expect(parseProviderLimit('Some limit: 9999 was exceeded')).toBeNull();
   });
@@ -85,5 +104,25 @@ describe('learnLimitFromError (persistence)', () => {
     learnLimitFromError(id, { message: 'requests per minute (RPM): Limit 20, Requested 21' });
     const rpm = (getDb().prepare('SELECT rpm_limit FROM models WHERE id = ?').get(id) as { rpm_limit: number | null }).rpm_limit;
     expect(rpm).toBe(20);
+  });
+
+  it('never writes an OTPM (output-only) ceiling into tpm_limit', () => {
+    const id = insertModel({ tpm: 7000 });
+    const r = learnLimitFromError(id, { message: 'on output tokens per minute (OTPM): Limit 1000, Requested 1838' });
+    expect(r).toBeNull();
+    expect(tpmCol(id)).toBe(7000);
+  });
+
+  it('leaves a NULL tpm_limit alone on an OTPM rejection', () => {
+    const id = insertModel({ tpm: null });
+    learnLimitFromError(id, { message: 'on output tokens per minute (OTPM): Limit 1000, Requested 1838' });
+    expect(tpmCol(id)).toBeNull();
+  });
+
+  it('lowers tpm_limit to an ITPM ceiling (input is part of every request, so it is a safe bound)', () => {
+    const id = insertModel({ tpm: 70000 });
+    const r = learnLimitFromError(id, { message: 'on input tokens per minute (ITPM): Limit 7000, Requested 16136' });
+    expect(r).toEqual({ kind: 'itpm', limit: 7000 });
+    expect(tpmCol(id)).toBe(7000);
   });
 });

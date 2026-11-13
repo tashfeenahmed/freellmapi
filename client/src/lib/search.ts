@@ -8,7 +8,7 @@ import type { SearchPlatform as SharedSearchPlatform } from '@freellmapi/shared/
 // Mirrors SEARCH_PLATFORMS in shared/types.ts. The client only imports types
 // from shared, so the list is repeated here; the two assertions below fail the
 // typecheck if either side gains a platform the other lacks.
-export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel'] as const
+export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave'] as const
 export type SearchPlatform = (typeof SEARCH_PLATFORMS)[number]
 const sharedCoversClient: SharedSearchPlatform = '' as SearchPlatform
 const clientCoversShared: SearchPlatform = '' as SharedSearchPlatform
@@ -28,6 +28,9 @@ export const SEARCH_PROVIDERS: { value: SearchPlatform; label: string; url: stri
   { value: 'firecrawl', label: 'Firecrawl (1,000 credits/month)', url: 'https://www.firecrawl.dev/app/api-keys' },
   { value: 'linkup', label: 'Linkup (€5 credits/month)', url: 'https://app.linkup.so/api-keys' },
   { value: 'parallel', label: 'Parallel (no key needed)', url: 'https://platform.parallel.ai', keyless: true },
+  { value: 'serpsearch', label: 'SerpSearch (1,000 searches/month)', url: 'https://serpsearch.com/dashboard/api-keys' },
+  { value: 'keenable', label: 'Keenable (no key needed)', url: 'https://keenable.ai', keyless: true },
+  { value: 'brave', label: 'Brave Search (free monthly credits)', url: 'https://api-dashboard.search.brave.com/app/keys' },
 ]
 
 /** Short provider name for chips and badges ("Tavily", not the full label). */

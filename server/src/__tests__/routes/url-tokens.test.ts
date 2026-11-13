@@ -116,4 +116,24 @@ describe('revocable URL-token aliases', () => {
     const response = await request(app, 'GET', `/v1/t/${getUnifiedApiKey()}/models`);
     expect(response.status).toBe(401);
   });
+
+  it('does not let a URL token read the unified-only /v1/usage ledger', async () => {
+    const minted = await request(app, 'POST', '/api/settings/url-tokens', { label: 'widget' }, {
+      Authorization: `Bearer ${dashboardToken}`,
+    });
+    expect(minted.status).toBe(201);
+
+    // The middleware injects the unified key for headerless clients — the
+    // usage route must not treat that injection as the real unified key.
+    const viaToken = await request(app, 'GET', `/v1/t/${minted.body.token}/usage`);
+    expect(viaToken.status).toBe(403);
+    expect(viaToken.body.error?.type).toBe('permission_error');
+
+    // The genuine unified key keeps its read.
+    const viaUnified = await request(app, 'GET', '/v1/usage', undefined, {
+      Authorization: `Bearer ${getUnifiedApiKey()}`,
+    });
+    expect(viaUnified.status).toBe(200);
+    expect(typeof viaUnified.body.requests).toBe('number');
+  });
 });

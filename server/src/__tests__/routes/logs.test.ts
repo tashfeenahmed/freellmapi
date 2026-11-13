@@ -300,6 +300,18 @@ describe('server log viewer', () => {
       expect((await fetchLogs('?provider=gro')).body.entries).toHaveLength(0);
     });
 
+    it('filters by exact event', async () => {
+      const { body } = await fetchLogs('?event=key_invalid');
+      expect(body.entries.map(e => e.message)).toEqual(['[Health] key benched']);
+      // Exact like the provider filter: a prefix is not a match, and a
+      // provider value must never match the event axis.
+      expect((await fetchLogs('?event=key_invali')).body.entries).toHaveLength(0);
+      expect((await fetchLogs('?event=groq')).body.entries).toHaveLength(0);
+      // Composable with the provider filter.
+      expect((await fetchLogs('?provider=groq&event=key_invalid')).body.entries).toHaveLength(1);
+      expect((await fetchLogs('?provider=cerebras&event=key_invalid')).body.entries).toHaveLength(0);
+    });
+
     it('returns only entries newer than sinceId', async () => {
       const first = await fetchLogs();
       const cursor = first.body.nextId;

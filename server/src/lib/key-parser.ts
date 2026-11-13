@@ -46,7 +46,18 @@ export interface ParseResult {
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
   SPEKA_: 'speka',
-  AURAY_: 'auray',
+  KENARI_: 'kenari',
+  KIOSAPI_: 'kiosapi',
+  KIOS_: 'kiosapi',
+  BEATAPI_: 'beatapi',
+  APINEX_: 'apinex',
+  ONOMEO_: 'onomeo',
+  ITERACOMPUTE_: 'iteracompute',
+  BEAT_API_: 'beatapi',
+  SERPSEARCH_: 'serpsearch',
+  SERP_SEARCH_: 'serpsearch',
+  BRAVE_SEARCH_: 'brave',
+  BRAVE_: 'brave',
   TYPHOON_: 'typhoon',
   PLUGSKY_: 'plugsky',
   INFERBASE_: 'inferbase',
@@ -95,13 +106,13 @@ export const PREFIX_MAP: Record<string, string> = {
   NVIDIA_: 'nvidia',
   MISTRAL_: 'mistral',
   OPENROUTER_: 'openrouter',
-  GITHUB_: 'github',
   COHERE_: 'cohere',
   TAVILY_: 'tavily',
   EXA_: 'exa',
   FIRECRAWL_: 'firecrawl',
   LINKUP_: 'linkup',
   PARALLEL_: 'parallel',
+  KEENABLE_: 'keenable',
   CLOUDFLARE_: 'cloudflare',
   ZHIPU_: 'zhipu',
   OLLAMA_: 'ollama',
@@ -158,7 +169,15 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   sail: 'sail',
   aclide: 'aclide',
   speka: 'speka',
-  auray: 'auray',
+  kenari: 'kenari',
+  kiosapi: 'kiosapi',
+  kios: 'kiosapi',
+  beatapi: 'beatapi',
+  apinex: 'apinex',
+  onomeo: 'onomeo',
+  iteracompute: 'iteracompute',
+  serpsearch: 'serpsearch',
+  brave: 'brave',
   typhoon: 'typhoon',
   plugsky: 'plugsky',
   inferbase: 'inferbase',
@@ -244,6 +263,7 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   firecrawl: 'firecrawl',
   linkup: 'linkup',
   parallel: 'parallel',
+  keenable: 'keenable',
 };
 
 export function detectPlatform(prefix: string): string | null {
@@ -259,6 +279,9 @@ export function parseDotEnv(content: string): Array<{ key: string; value: string
   for (let line of text.split('\n')) {
     line = line.trim();
     if (!line || line.startsWith('#')) continue;
+    // A shell-sourced .env writes `export NAME=value`; the name is NAME, not
+    // `export NAME`, or the provider prefix is never recognised.
+    line = line.replace(/^export\s+/, '');
 
     const eqIndex = line.indexOf('=');
     if (eqIndex === -1) continue;
@@ -278,6 +301,12 @@ export function parseDotEnv(content: string): Array<{ key: string; value: string
       const commentIndex = value.indexOf(' #');
       if (commentIndex !== -1) value = value.slice(0, commentIndex);
       value = value.trimEnd();
+      // A dropped closing quote (`KEY="sk-abc`, typically from editor auto-
+      // quoting or a truncated paste) left the `"` glued to the credential,
+      // and every request with it failed upstream 401 with a message that
+      // never mentions the stray quote. No API key starts with a quote
+      // character, so dropping the opener is always safe.
+      if (quote) value = value.slice(1);
     }
 
     result.set(key, value);
@@ -517,9 +546,10 @@ export function parseCsv(content: string): KeyPair[] {
     const platform = (fields[0] ?? '').trim();
     const key = (fields[1] ?? '').trim();
     // Undo the export's CSV formula guard (a leading ' before =, +, -, @, tab
-    // or CR) so a guarded label comes back as the user typed it.
-    const label = (fields[2] ?? '').trim().replace(/^'(?=[=+\-@\t\r])/, '');
-    const baseUrl = (fields[3] ?? '').trim();
+    // or CR) so a guarded label or base_url comes back as the user typed it.
+    const unguard = (v: string) => v.replace(/^'(?=[=+\-@\t\r])/, '');
+    const label = unguard((fields[2] ?? '').trim());
+    const baseUrl = unguard((fields[3] ?? '').trim());
 
     if (!key || !platform) continue;
 

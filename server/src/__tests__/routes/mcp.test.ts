@@ -206,6 +206,12 @@ describe('MCP server (/mcp, stateless Streamable HTTP)', () => {
     }
   });
 
+  it('healthcheck reports search readiness separately from inference', async () => {
+    const { body } = await rpc({ jsonrpc: '2.0', id: 71, method: 'tools/call', params: { name: 'healthcheck' } });
+    const health = toolResultJson(body);
+    expect(health.search).toEqual({ status: 'needs_configuration', engines: [], missing_from_catalog: [] });
+  });
+
   it('validates ask_freellmapi arguments as a tool-level error', async () => {
     const { body } = await rpc({
       jsonrpc: '2.0', id: 70, method: 'tools/call',

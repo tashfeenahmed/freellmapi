@@ -9,8 +9,9 @@ import type {
   ChatToolChoice,
   ChatContentBlock,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, resolveModelGroupCandidates, resolveRoutingChain, resolveStickyPreference, routingReserveTokens, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
-import { getSetting, getUnifiedApiKey } from '../db/index.js';
+import { routeRequest, resolveModelGroupCandidates, resolveRoutingChain, resolveStickyPreference, routingReserveTokens, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { getSetting } from '../db/index.js';
+import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
 import { contentToString, estimateInputTokens } from '../lib/content.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
@@ -22,9 +23,10 @@ import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic
 import { newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
 import { logRequest } from '../lib/request-log.js';
-import { extractApiToken, timingSafeStringEqual, getStickyModel, setStickyModel } from './proxy.js';
-import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState } from '../lib/fallback-loop.js';
+import { extractApiToken, getStickyModel, setStickyModel } from './proxy.js';
+import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstreamSuccess, type ExhaustionBody, setFallbackHeaders, setExhaustionHeaders, type AttemptRecord, type FallbackState, REASONING_HOLD_MAX_MS } from '../lib/fallback-loop.js';
 import { routedViaValue } from '../lib/header-value.js';
+import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { resolveAnthropicModel, claudeFamilyDiscoveryEntries } from '../services/anthropic-map.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -33,6 +35,7 @@ import { buildModelListing } from '../services/model-listing.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 import { maybeServeAnthropicWebSearch, serverToolUseToText, webSearchResultToText } from '../lib/anthropic-web-search.js';
+import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
 
 // Anthropic-compatible Messages API (`POST /v1/messages`). This is a thin
 // translation layer over the SAME router/fallback/analytics machinery the
@@ -204,14 +207,17 @@ function newMessageId(): string {
 }
 
 // ── Auth (shared with the OpenAI route) ─────────────────────────────────────
-function authenticate(req: Request, res: Response): boolean {
-  const token = extractApiToken(req);
-  const unifiedKey = getUnifiedApiKey();
-  if (!token || !timingSafeStringEqual(token, unifiedKey)) {
+// Resolves both credential kinds (#411): the unified key behaves exactly as
+// before; a client-profile key (sk-cp-*) authenticates inference only and
+// carries its server-enforced system prompt. A disabled/unknown profile fails
+// like a bad key so a revoked client learns nothing extra.
+function authenticate(req: Request, res: Response): ResolvedAuth | null {
+  const auth = resolveAuth(extractApiToken(req));
+  if (!auth) {
     sendError(res, 401, 'authentication_error', 'Invalid API key');
-    return false;
+    return null;
   }
-  return true;
+  return auth;
 }
 
 // ── Request translation: Anthropic → internal (OpenAI-shaped) ───────────────
@@ -460,7 +466,8 @@ anthropicRouter.post('/messages', async (req: Request, res: Response) => {
 
 export async function handleMessages(req: Request, res: Response): Promise<void> {
   const start = Date.now();
-  if (!authenticate(req, res)) return;
+  const auth = authenticate(req, res);
+  if (!auth) return;
 
   const parsed = messagesSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -518,6 +525,12 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   });
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
+
+  // Server-enforced system prompt (#411): injected AFTER compression so it is
+  // never compressed away, and FIRST in the list so a caller-supplied system
+  // turn follows it and cannot override it. Neutral no-op for the unified key
+  // and for profiles without a prompt.
+  messages = prependSystemPrompt(messages, auth.systemPrompt);
 
   const estimatedInputTokens = estimateInputTokens(messages, tools);
   const imageCount = messages.reduce((n, m) =>
@@ -593,7 +606,11 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   //
   // Only the pinned paths change. A Claude family alias mapped to 'auto' (the
   // default for opus/sonnet/haiku/default) resolves to no model at all and
-  // keeps auto-routing over the full chain exactly as before.
+  // keeps auto-routing over the full chain exactly as before. A tier selector
+  // (`tier:pro|mid|normal`) resolves to the tier's whole enabled pool and
+  // routes over it as a chain, so the tier acts as a capability band the
+  // router scores inside — failover stays within the band instead of falling
+  // off to an unrelated model.
   let groupChain: ChainRow[] | undefined;
   // Sticky scope for a group-pinned request: bucket by the pinned catalog id so
   // the session prefers its last successful provider of THIS model without
@@ -611,6 +628,16 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
         groupChain = chain;
         stickyScope = resolved.modelId;
       }
+    }
+  } else if (resolved.tierDbIds && resolved.tierDbIds.length > 0) {
+    const chain = resolveModelGroupCandidates(resolved.tierDbIds);
+    if (chain.length > 0) {
+      groupChain = chain;
+      // Scoped per tier, not per model: a session on tier:sonnet keeps its
+      // provider affinity when the operator re-points the family at another
+      // tier selector only if the scope follows the tier. Use the family's
+      // first tier id — stable per tier selector, distinct from any model id.
+      stickyScope = `tier:${resolved.tierDbIds[0]}`;
     }
   }
 
@@ -636,6 +663,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   const state = newFallbackState();
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
+  state.estimatedTotalTokens = estimatedTotal;
   const attemptLog: AttemptRecord[] = [];
   // Client-disconnect fan-out: the flag stops the loop before the NEXT
   // attempt; the AbortController (threaded to the provider as
@@ -656,6 +684,13 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     }
   });
   const dispatchOptions = { ...completionOptions, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
+
+  // Decision routing (#1354): with the 'decision' strategy on, a decision
+  // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
+  // this turn routes with. Skipped when the client pinned a model or the
+  // conversation is sticky to one. Any doubt routes as Balanced.
+  const routingPick = await applyDecisionRouting(messages, { pinned: pinnedModelId != null || preferredModel != null, signal: clientAbort.signal });
+  if (routingPick && !res.headersSent) res.setHeader('X-FreeLLM-Routing-Strategy', routingStrategyHeader(routingPick));
 
   await runFallbackLoop({
     maxRetries: MAX_RETRIES,
@@ -781,7 +816,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
       return 'done';
     },
     logFailure: (route, err) => {
-      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, sanitizeProviderErrorMessage(err.message), null, pinnedModelId, null, 'http');
+      logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, 0, Date.now() - start, sanitizeProviderErrorMessage(err.message), null, pinnedModelId, null, 'http', failureAttributionFor(err));
     },
     onFatal: (route, err, attempt) => {
       setFallbackHeaders(res, attempt, attemptLog);
@@ -859,11 +894,7 @@ async function streamCompletion(
 
   const ensureMessageStart = () => {
     if (messageStarted) return;
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
-    setFallbackHeaders(res, ctx.attempt, ctx.attemptLog);
+    sendSseHeaders();
     // Committed: the answer is on its way, so the retry budget must no longer
     // cancel this attempt (it could not fail over now anyway).
     ctx.disarmHedge();
@@ -878,6 +909,37 @@ async function streamCompletion(
     messageStarted = true;
   };
 
+  // Send the SSE headers once. Split out of ensureMessageStart so the
+  // #1642 keep-alive can commit the response with the protocol's own content-
+  // free `ping` event while the reasoning buffer is still filling, without
+  // sending message_start early.
+  let headersSentEarly = false;
+  const sendSseHeaders = () => {
+    if (headersSentEarly) return;
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
+    setFallbackHeaders(res, ctx.attempt, ctx.attemptLog);
+    headersSentEarly = true;
+  };
+
+  // #1642: optional heartbeat for the silent reasoning window. The Anthropic
+  // streaming protocol carries a native ping event, so no fake frame is
+  // needed. Once it fires the attempt is committed to the wire and can no
+  // longer fail over invisibly — that is the trade STREAM_KEEPALIVE_MS opts
+  // into (off by default).
+  let streamSettled = false;
+  const keepaliveStop = startStreamKeepalive(streamKeepaliveMs(),
+    () => streamSettled,
+    () => {
+      sendSseHeaders();
+      // Bytes on the wire = the response can no longer fail over invisibly;
+      // stop the retry budget from cancelling it.
+      ctx.disarmHedge();
+      writeSse(res, 'ping', { type: 'ping' });
+    });
+
   // Reasoning output (delta.reasoning_content from providers / the <think>
   // extractor, delta.reasoning from Ollama-style upstreams) is buffered and
   // emitted as one complete thinking block right before the first text/tool
@@ -885,6 +947,7 @@ async function streamCompletion(
   // point where it was: a stream that produces ONLY reasoning and dies still
   // fails over invisibly, exactly like the OpenAI surface's preamble hold.
   let reasoningBuf = '';
+  let quietSince = Date.now(); // last time the client heard from this attempt
   const flushThinking = () => {
     if (reasoningBuf.length === 0) return;
     const idx = nextIndex++;
@@ -923,7 +986,7 @@ async function streamCompletion(
         if (!messageStarted) throw new Error(`in-band provider error from ${route.displayName}: ${msg}`);
         writeSse(res, 'error', { type: 'error', error: { type: 'api_error', message: `Provider error (${route.displayName}): ${sanitizeProviderErrorMessage(String(msg))}` } });
         res.end();
-        logRequest(route.platform, route.modelId, route.keyId, 'error', ctx.estimatedInputTokens, outputChars, Date.now() - ctx.start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, null, ctx.pinnedModelId, null, 'http');
+        logRequest(route.platform, route.modelId, route.keyId, 'error', ctx.estimatedInputTokens, outputChars, Date.now() - ctx.start, `in-band error frame: ${sanitizeProviderErrorMessage(String(msg))}`, null, ctx.pinnedModelId, null, 'http', failureAttributionFor({ message: String(msg) }));
         throw new StreamAlreadyStarted();
       }
 
@@ -948,6 +1011,12 @@ async function streamCompletion(
       // `reasoning`); the shared <think> extractor emits reasoning_content.
       const reasoningDelta = choice.delta?.reasoning_content ?? choice.delta?.reasoning;
       if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) reasoningBuf += reasoningDelta;
+      // #1642: long reasoning with nothing streamed yet: commit and ping.
+      if (reasoningBuf.length > 0 && !textBlockOpen && Date.now() - quietSince >= REASONING_HOLD_MAX_MS) {
+        ensureMessageStart();
+        writeSse(res, 'ping', { type: 'ping' });
+        quietSince = Date.now();
+      }
 
       const text = typeof choice.delta?.content === 'string' ? choice.delta.content : '';
       if (text.length === 0) continue;
@@ -1017,10 +1086,11 @@ async function streamCompletion(
     // Opt-in schema verdict, same rule as the non-streaming surface above and
     // as /chat/completions: this is the surface the silent failure hurt most,
     // and Claude Code streams. Placed after the dialect rescue so a rescued
-    // call is judged too, and gated on `!messageStarted` — once message_start
-    // has gone out there is no failing over, and tearing the SSE stream down
-    // would be worse for the client than a tool_use the schema dislikes.
-    if (isToolArgumentValidationEnabled() && !messageStarted && completedCalls.length > 0) {
+    // call is judged too, and gated on `!textBlockOpen`: once text has gone
+    // out there is no failing over, and tearing the SSE stream down would be
+    // worse for the client than a tool_use the schema dislikes. A #1642 early
+    // commit sent only pings, so a bad call there ends in the catch's error event.
+    if (isToolArgumentValidationEnabled() && !textBlockOpen && completedCalls.length > 0) {
       const invalid = invalidToolCallReasons(
         completedCalls.map(c => ({ function: { name: c.name, arguments: c.arguments } })),
         schemas,
@@ -1028,9 +1098,10 @@ async function streamCompletion(
       if (invalid.length > 0) throw invalidToolArgumentsError(route.displayName, invalid);
     }
 
-    // Nothing usable came out — fail over (message_start was never sent, so the
-    // client never saw this attempt).
-    if (!messageStarted && completedCalls.length === 0) {
+    // Nothing usable came out — fail over (normally message_start was never sent,
+    // so the client never saw this attempt; after a #1642 early commit the
+    // catch below turns this into the mid-stream error event).
+    if (!textBlockOpen && completedCalls.length === 0) {
       // finish_reason 'length' = the model spent the whole output budget on
       // hidden reasoning before any visible text: fail over, but skip the
       // cooldown/penalty (not a provider-health signal).
@@ -1075,7 +1146,10 @@ async function streamCompletion(
     logRequest(route.platform, route.modelId, route.keyId, 'success', ctx.estimatedInputTokens, outputTokens, Date.now() - ctx.start, null, null, ctx.pinnedModelId, null, 'http');
   } catch (err: any) {
     if (err instanceof StreamAlreadyStarted) throw err;
-    switch (failedStreamPhase(err, res, messageStarted)) {
+    // messageStarted = real content went out. headersSentEarly also counts: a
+    // #1642 keep-alive ping flushed the SSE headers, so this attempt is on the
+    // wire and can no longer fail over invisibly.
+    switch (failedStreamPhase(err, res, messageStarted || headersSentEarly)) {
     // abandoned: client abort mid-stream (the fetch-signal rejection, or
     // throwIfAbandoned after the pump). Rethrow — the shared loop's
     // client-abort branch logs one 'canceled' row and stops without benching
@@ -1096,9 +1170,14 @@ async function streamCompletion(
     case 'committed':
       writeSse(res, 'error', { type: 'error', error: { type: 'api_error', message: `Provider error (${route.displayName}): stream interrupted` } });
       try { res.end(); } catch { /* socket gone */ }
-      logRequest(route.platform, route.modelId, route.keyId, 'error', ctx.estimatedInputTokens, outputChars, Date.now() - ctx.start, sanitizeProviderErrorMessage(err.message), null, ctx.pinnedModelId, null, 'http');
+      logRequest(route.platform, route.modelId, route.keyId, 'error', ctx.estimatedInputTokens, outputChars, Date.now() - ctx.start, sanitizeProviderErrorMessage(err.message), null, ctx.pinnedModelId, null, 'http', failureAttributionFor(err));
       throw new StreamAlreadyStarted();
     }
+  } finally {
+    // #1642: this attempt is over whichever path it left by — the keep-alive
+    // interval must not outlive it.
+    streamSettled = true;
+    keepaliveStop();
   }
 }
 

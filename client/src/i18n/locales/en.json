@@ -323,6 +323,8 @@
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
     "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
     "guardrails": "Guardrails",
     "guardrailsTooltip": "Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.",
     "scoreTooltip": "Final routing score = weighted average of the three axes, multiplied by the guardrails. Higher routes first.",
@@ -347,7 +349,23 @@
     "weightSpeed": "Speed",
     "weightIntelligence": "Intelligence",
     "weightRequired": "At least one weight must be above zero.",
-    "scoreColumn": "Score"
+    "scoreColumn": "Score",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Router pressure",
@@ -569,6 +587,8 @@
     "providerActions": "Provider actions",
     "routeViaProxy": "Route via proxy",
     "checkNow": "Check now",
+    "lastWorkedHint": "Last worked: {when}",
+    "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "This provider doesn't allow automated key checks. The key turns healthy after it serves its first request.",
     "noModelsYetHint": "Your catalog has no models from this provider yet, so there's nothing for it to serve.",
     "proxyEnvHintBefore": "Also configurable via the ",
@@ -635,6 +655,7 @@
     "cpKeyOnce": "Copy this key now — it won't be shown again.",
     "cpEnabledAria": "Profile enabled",
     "selectKey": "Select this key",
+    "selectModel": "Select this model",
     "bulkSelected": "{count} selected",
     "bulkEnable": "Enable all",
     "bulkDisable": "Disable all",
@@ -700,9 +721,16 @@
     "monthlyTokenCapLabel": "Monthly token cap",
     "capUnlimitedPlaceholder": "Unlimited",
     "capEditHint": "Caps reset on the 1st, 00:00 UTC. Leave blank for unlimited.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} requests, {tokens} tokens this month",
     "quotaBalanceHint": "{remaining} of {limit} {metric} left",
-    "quotaBalanceLeft": "{remaining} left"
+    "quotaBalanceLeft": "{remaining} left",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -781,7 +809,8 @@
       "openclaw": "An always-on personal assistant that answers on WhatsApp, Telegram, Discord and more from your own machine.",
       "hermes": "Nous Research's self-improving agent with persistent memory and skills, in the terminal or on chat apps.",
       "pi": "A minimal terminal harness you shape with your own extensions, skills and prompt templates.",
-      "reasonix": "A DeepSeek-native terminal coding agent, built around prefix caching so long sessions stay cheap."
+      "reasonix": "A DeepSeek-native terminal coding agent, built around prefix caching so long sessions stay cheap.",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "analytics": {
@@ -888,7 +917,9 @@
     "emptyDescription": "Entries appear here as the server writes them. Widen the level, provider or search filters if you expected output.",
     "noLevelsTitle": "No levels selected",
     "noLevelsDescription": "Turn on at least one level to see log output.",
-    "loadFailed": "Couldn't load the server log."
+    "loadFailed": "Couldn't load the server log.",
+    "eventFilter": "Event",
+    "allEvents": "All events"
   },
   "playground": {
     "title": "Playground",
@@ -1277,7 +1308,7 @@
     "tab": "Decision",
     "pageDesc": "Decision models answer a question about your text with a choice, a yes or no, or a score, and say how confident they are. They run on your Cloudflare and OpenRouter keys.",
     "endpointHint": "Call via",
-    "notRoutingHint": "— separate from chat. Chat routing never uses these models.",
+    "notRoutingHint": "— separate from chat. Chat routing only uses them when the Decision routing strategy is on.",
     "empty": "No decision models yet. They sync from the catalog.",
     "thisMonth": "{count} this month",
     "tryTitle": "Try it",

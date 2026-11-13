@@ -33,11 +33,16 @@ import type { RoutingStrategy } from '@freellmapi/shared/types.js';
 export type { RoutingStrategy };
 
 // Strategy is either the legacy manual chain ('priority'), one of the bandit
-// presets, or 'custom' (a user-tuned weight vector persisted in settings — see
-// router.ts). Each is just a weight vector — the engine is identical.
-export const ROUTING_STRATEGIES = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'] as const satisfies readonly RoutingStrategy[];
+// presets, 'custom' (a user-tuned weight vector persisted in settings — see
+// router.ts) or 'decision' (#1354: a decision model picks one of the four
+// presets per request — see services/routing-decision.ts). Each resolves to a
+// weight vector — the engine is identical.
+export const ROUTING_STRATEGIES = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom', 'decision'] as const satisfies readonly RoutingStrategy[];
 // Fails to compile when shared RoutingStrategy gains a member this list lacks.
 const _everyStrategyListed: Record<Exclude<RoutingStrategy, (typeof ROUTING_STRATEGIES)[number]>, never> = {};
+
+/** The presets a decision model may choose between, per request. */
+export type PresetStrategy = 'balanced' | 'smartest' | 'fastest' | 'reliable';
 
 // How the router picks BETWEEN several keys of one platform, once a model has
 // been chosen. Deliberately not a RoutingStrategy: model ranking and key
@@ -47,7 +52,7 @@ const _everyStrategyListed: Record<Exclude<RoutingStrategy, (typeof ROUTING_STRA
 // 'least-remaining' additionally ranks by observed remaining quota (#919).
 export type KeySelectionStrategy = 'auto' | 'least-remaining';
 
-export const BANDIT_PRESETS: Record<Exclude<RoutingStrategy, 'priority' | 'custom'>, RoutingWeights> = {
+export const BANDIT_PRESETS: Record<PresetStrategy, RoutingWeights> = {
   // Reliability leads; speed and intelligence split the rest evenly.
   balanced: { reliability: 0.5, speed: 0.25, intelligence: 0.25 },
   // Intelligence leads, but reliability still carries real weight so a smart

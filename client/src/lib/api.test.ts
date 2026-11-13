@@ -77,3 +77,38 @@ describe('apiFetch 401 handling', () => {
     expect(events).toHaveLength(0)
   })
 })
+
+describe('apiFetch error messages', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', makeStorage())
+    vi.stubGlobal('window', { dispatchEvent: () => true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('shows a plain-string error body instead of the bare status (Premium activation)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(502, {
+      error: 'Could not reach the license service. Check your connection and try again.',
+    })))
+    const { apiFetch } = await import('./api')
+    await expect(apiFetch('/api/premium/key', { method: 'POST', body: '{}' })).rejects.toMatchObject({
+      status: 502,
+      message: 'Could not reach the license service. Check your connection and try again.',
+    })
+  })
+
+  it('still reads { error: { message } } bodies', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(400, { error: { message: 'Bad input', type: 'invalid_request_error' } })))
+    const { apiFetch } = await import('./api')
+    await expect(apiFetch('/api/keys')).rejects.toMatchObject({ status: 400, message: 'Bad input', code: 'invalid_request_error' })
+  })
+
+  it('falls back to the HTTP status when the body has no message', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(500, {})))
+    const { apiFetch } = await import('./api')
+    await expect(apiFetch('/api/keys')).rejects.toMatchObject({ status: 500, message: 'HTTP 500' })
+  })
+})

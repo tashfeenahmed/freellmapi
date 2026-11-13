@@ -47,6 +47,7 @@ const analyticsIds: Record<string, string> = {
   hermes: 'hermes-agent',
   pi: 'pi',
   reasonix: 'reasonix',
+  zcode: 'zcode',
   cursor: 'cursor',
 }
 

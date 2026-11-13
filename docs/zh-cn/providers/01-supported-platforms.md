@@ -23,7 +23,6 @@
 | `mistral` | Mistral | 带密钥 | OpenAI 兼容 | `api.mistral.ai/v1`。 |
 | `sambanova` | SambaNova | 已退役（V23） | 未注册 | 免费额度永久消失；因历史密钥行而保留在类型联合中。 |
 | `openrouter` | OpenRouter | 带密钥 | OpenAI 兼容 | 发送 `HTTP-Referer`/`X-Title` 头；`:free` 模型后缀标记零成本路由。 |
-| `github` | GitHub Models | 带密钥 | OpenAI 兼容 | 路由到 `models.github.ai/inference`；目录使用 `<publisher>/<model>` 形式的 id。 |
 | `cohere` | Cohere | 带密钥 | 原生（`CohereProvider`） | 使用 Cohere 的 OpenAI 兼容端点。 |
 | `cloudflare` | Cloudflare Workers AI | 带密钥（`account_id:token`） | 原生（`CloudflareProvider`） | 复合凭据格式由适配器解析。 |
 | `zhipu` | Zhipu (Z.ai / bigmodel.cn) | 带密钥 | 原生（`ZhipuProvider`） | 控制台自动探测：国内密钥被拒后会改向全球 `api.z.ai` 主机重新探测；60s 超时覆盖 glm-4.7-flash 的隐藏推理。 |

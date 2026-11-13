@@ -347,7 +347,25 @@
     "scoreColumn": "प्राप्ताङ्क",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "राउटरको चाप",
@@ -524,6 +542,8 @@
     "providerActions": "प्रदायक कार्यहरू",
     "routeViaProxy": "प्रोक्सी हुँदै मार्ग",
     "checkNow": "अहिले जाँच गर्नुहोस्",
+    "lastWorkedHint": "Last worked: {when}",
+    "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "यो प्रदायकले स्वचालित कुञ्जी जाँचलाई अनुमति दिँदैन। पहिलो अनुरोध पूरा गरेपछि कुञ्जी स्वस्थ हुन्छ।",
     "noModelsYetHint": "तपाईंको क्याटलगमा अझै यो प्रदायकको कुनै मोडेल छैन, त्यसैले पूरा गर्ने केही छैन।",
     "proxyEnvHintBefore": "मार्फत पनि कन्फिगर गर्न सकिने",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "यो कुञ्जी अहिल्यै कपी गर्नुहोस् — यो फेरि देखाइने छैन।",
     "cpEnabledAria": "प्रोफाइल सक्षम",
     "selectKey": "यो कुञ्जी चयन गर्नुहोस्",
+    "selectModel": "यो मोडेल छान्नुहोस्",
     "bulkSelected": "{count} चयन गरिएको",
     "bulkEnable": "सबै सक्षम पार्नुहोस्",
     "bulkDisable": "सबै अक्षम पार्नुहोस्",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "मासिक टोकन सीमा",
     "capUnlimitedPlaceholder": "असीमित",
     "capEditHint": "सीमा हरेक महिनाको १ गते ००:०० UTC मा रिसेट हुन्छ। असीमितका लागि खाली राख्नुहोस्।",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "यस महिना {requests} अनुरोध, {tokens} टोकन",
     "quotaBalanceHint": "{limit} {metric} मध्ये {remaining} बाँकी",
-    "quotaBalanceLeft": "{remaining} बाँकी"
-,
+    "quotaBalanceLeft": "{remaining} बाँकी",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "सर्भरले लेख्दै जाँदा प्रविष्टिहरू यहाँ देखिनेछन्। आउटपुटको अपेक्षा गर्नुभएको थियो भने स्तर, प्रदायक वा खोज फिल्टरको दायरा बढाउनुहोस्।",
     "noLevelsTitle": "कुनै स्तर चयन गरिएको छैन",
     "noLevelsDescription": "लग आउटपुट हेर्न कम्तीमा एउटा स्तर चालु गर्नुहोस्।",
-    "loadFailed": "सर्भर लग लोड गर्न सकिएन।"
+    "loadFailed": "सर्भर लग लोड गर्न सकिएन।",
+    "eventFilter": "इभेन्ट",
+    "allEvents": "सबै इभेन्ट"
   },
   "playground": {
     "title": "खेल मैदान[सम्पादन गर्ने]",
@@ -1163,7 +1192,8 @@
       "openclaw": "तपाईंको आफ्नै मेसिनबाट WhatsApp, Telegram, Discord र अन्यमा जवाफ दिने, सधैं चालु रहने व्यक्तिगत सहायक।",
       "hermes": "Nous Research को आफैं सुधारिने एजेन्ट, स्थायी मेमोरी र सीपहरूसहित, टर्मिनलमा वा च्याट एपहरूमा।",
       "pi": "एक न्यूनतम टर्मिनल एजेन्ट, जसलाई तपाईं आफ्नै एक्सटेन्सन, सीप र प्रम्प्ट टेम्प्लेटले आकार दिनुहुन्छ।",
-      "reasonix": "DeepSeek का लागि बनाइएको टर्मिनल कोडिङ एजेन्ट, लामा सत्रहरू सस्तो रहून् भनेर प्रिफिक्स क्यासिङको वरिपरि निर्माण गरिएको।"
+      "reasonix": "DeepSeek का लागि बनाइएको टर्मिनल कोडिङ एजेन्ट, लामा सत्रहरू सस्तो रहून् भनेर प्रिफिक्स क्यासिङको वरिपरि निर्माण गरिएको।",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

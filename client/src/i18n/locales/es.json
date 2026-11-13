@@ -347,7 +347,25 @@
     "scoreColumn": "Puntuación",
     "minReliabilityFloor": "Umbral mínimo de fiabilidad",
     "minReliabilityFloorHint": "Excluye un modelo del enrutamiento cuando su tasa de éxito observada cae por debajo de este valor. 0,8 significa 80 %. Déjelo vacío para desactivarlo: los modelos con poco historial siempre se conservan para que los nuevos modelos sigan probándose. Nunca vacía toda la cadena.",
-    "minReliabilityFloorOff": "Desactivado"
+    "minReliabilityFloorOff": "Desactivado",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Presión del router",
@@ -524,6 +542,8 @@
     "providerActions": "Acciones del proveedor",
     "routeViaProxy": "Enrutar por proxy",
     "checkNow": "Comprobar ahora",
+    "lastWorkedHint": "Último funcionamiento: {when}",
+    "lastWorkedNever": "Aún no ha atendido solicitudes ni pasado una comprobación",
     "noAutoCheckHint": "Este proveedor no permite comprobaciones automáticas de claves. La clave pasa a estar sana cuando atiende su primera solicitud.",
     "noModelsYetHint": "Tu catálogo aún no tiene modelos de este proveedor, así que no tiene nada que atender.",
     "proxyEnvHintBefore": "También configurable mediante la variable de entorno ",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Copia esta clave ahora: no se volverá a mostrar.",
     "cpEnabledAria": "Perfil habilitado",
     "selectKey": "Seleccionar esta clave",
+    "selectModel": "Seleccionar este modelo",
     "bulkSelected": "{count} seleccionadas",
     "bulkEnable": "Habilitar todas",
     "bulkDisable": "Deshabilitar todas",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Límite mensual de tokens",
     "capUnlimitedPlaceholder": "Ilimitado",
     "capEditHint": "Los límites se reinician el día 1 a las 00:00 UTC. Déjelo en blanco para ilimitado.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} solicitudes, {tokens} tokens este mes",
     "quotaBalanceHint": "Quedan {remaining} de {limit} {metric}",
-    "quotaBalanceLeft": "Quedan {remaining}"
-,
+    "quotaBalanceLeft": "Quedan {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Las entradas aparecen aquí a medida que el servidor las escribe. Amplía los filtros de nivel, proveedor o búsqueda si esperabas ver algo.",
     "noLevelsTitle": "Ningún nivel seleccionado",
     "noLevelsDescription": "Activa al menos un nivel para ver el registro.",
-    "loadFailed": "No se pudo cargar el registro del servidor."
+    "loadFailed": "No se pudo cargar el registro del servidor.",
+    "eventFilter": "Evento",
+    "allEvents": "Todos los eventos"
   },
   "playground": {
     "title": "Entorno de pruebas",
@@ -1163,7 +1192,8 @@
       "openclaw": "Un asistente personal siempre activo que responde en WhatsApp, Telegram, Discord y más desde tu propia máquina.",
       "hermes": "El agente de Nous Research que se mejora a sí mismo, con memoria persistente y habilidades, en la terminal o en apps de chat.",
       "pi": "Un agente de terminal minimalista que moldeas con tus propias extensiones, habilidades y plantillas de prompts.",
-      "reasonix": "Un agente de programación para la terminal nativo de DeepSeek, diseñado en torno a la caché de prefijos para que las sesiones largas sigan siendo baratas."
+      "reasonix": "Un agente de programación para la terminal nativo de DeepSeek, diseñado en torno a la caché de prefijos para que las sesiones largas sigan siendo baratas.",
+      "zcode": "El agente de código de Z.ai para sus modelos GLM, compatible con cualquier endpoint OpenAI mediante un registro de proveedores."
     }
   },
   "update": {

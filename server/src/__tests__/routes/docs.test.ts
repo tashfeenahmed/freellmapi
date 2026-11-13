@@ -72,11 +72,12 @@ describe('OpenAPI docs routes', () => {
     }
   });
 
-  // Guard against re-introducing the stale fork endpoint: the fork's spec
-  // documented GET /v1/usage, which has never existed on this router.
-  it('does not expose a phantom /v1/usage endpoint', async () => {
+  // GET /v1/usage used to be a phantom inherited from the fork's spec. It is
+  // real now (#1568): an authenticated route, so it must answer 401 without a
+  // key and must never 404.
+  it('serves /v1/usage instead of 404ing on it', async () => {
     const { status } = await request(app, 'GET', '/v1/usage');
-    expect(status).toBe(404);
+    expect(status).not.toBe(404);
   });
 
   it('has internally consistent $ref pointers', () => {

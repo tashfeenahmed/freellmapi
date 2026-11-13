@@ -23,3 +23,6 @@ export function getUnifiedApiKey(): string;
 export function isAutoUpdateCheckEnabled(): boolean;
 export function backupBeforeUpdate(): string;
 export function outboundProxyUrl(): string;
+export function setCatalogFallbackFetch(
+  fn: ((input: string | URL, init?: RequestInit) => Promise<Response>) | null,
+): void;

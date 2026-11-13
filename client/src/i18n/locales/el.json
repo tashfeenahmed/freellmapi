@@ -347,7 +347,25 @@
     "scoreColumn": "Σκορ",
     "minReliabilityFloor": "Minimum reliability floor",
     "minReliabilityFloorHint": "Drop a model from routing once its observed success rate falls below this. 0.8 means 80%. Leave blank to disable — models with too little history are always kept so new models can still be tried. Never empties the whole chain.",
-    "minReliabilityFloorOff": "Disabled"
+    "minReliabilityFloorOff": "Disabled",
+    "providerMomentAttribution": "Attribute rate-limit failures to the provider",
+    "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "decision": "Decision",
+    "decisionBlurb": "A decision model reads each request and picks Smartest, Fastest, Balanced or Most reliable for it. When it is unsure, slow or unavailable, the request routes as Balanced. Needs a Cloudflare or OpenRouter key.",
+    "decisionSettings": "Decision routing",
+    "decisionSettingsHelp": "For each request, a decision model picks the strategy that fits it best. Requests that pin a model are never asked about.",
+    "decisionNotReady": "No decision model is ready, so every request routes as Balanced. Add a Cloudflare or OpenRouter key and turn on a model under Models → Decision.",
+    "decisionModel": "Decision model",
+    "decisionModelAuto": "Auto (first available)",
+    "decisionMinConfidence": "Minimum confidence",
+    "decisionMinConfidenceHelp": "Below this, the request routes as Balanced.",
+    "decisionPicks": "Picks since restart ({total})",
+    "decisionFallbacks": "{count} routed as Balanced (unsure, slow or unavailable)",
+    "decisionSetupTitle": "Add a free key to use Decision",
+    "decisionSetupHelp": "Decision routing asks a free decision model which strategy fits each request. It needs a key for one of these providers. Both have a free tier, no card needed.",
+    "decisionAddKey": "Add {provider} key",
+    "decisionNoModels": "No decision model is turned on yet. Turn one on under Models → Decision.",
+    "decisionOpenModels": "Open decision models"
   },
   "penaltyInspector": {
     "title": "Πίεση δρομολογητή",
@@ -524,6 +542,8 @@
     "providerActions": "Ενέργειες παρόχου",
     "routeViaProxy": "Δρομολόγηση μέσω διακομιστή μεσολάβησης",
     "checkNow": "Ελέγξτε τώρα",
+    "lastWorkedHint": "Τελευταία λειτουργία: {when}",
+    "lastWorkedNever": "Δεν έχει εξυπηρετήσει ακόμη κανένα αίτημα ούτε περάσει έλεγχο",
     "noAutoCheckHint": "Αυτός ο πάροχος δεν επιτρέπει αυτόματους ελέγχους κλειδιών. Το κλειδί γίνεται υγιές αφού εξυπηρετήσει το πρώτο του αίτημα.",
     "noModelsYetHint": "Ο κατάλογός σας δεν έχει ακόμη μοντέλα από αυτόν τον πάροχο, οπότε δεν υπάρχει τίποτα να εξυπηρετήσει.",
     "proxyEnvHintBefore": "Μπορεί επίσης να διαμορφωθεί μέσω του",
@@ -614,6 +634,7 @@
     "cpKeyOnce": "Αντιγράψτε αυτό το κλειδί τώρα — δεν θα εμφανιστεί ξανά.",
     "cpEnabledAria": "Προφίλ ενεργό",
     "selectKey": "Επιλογή αυτού του κλειδιού",
+    "selectModel": "Επιλογή αυτού του μοντέλου",
     "bulkSelected": "{count} επιλεγμένα",
     "bulkEnable": "Ενεργοποίηση όλων",
     "bulkDisable": "Απενεργοποίηση όλων",
@@ -693,17 +714,23 @@
     "monthlyTokenCapLabel": "Μηνιαίο όριο tokens",
     "capUnlimitedPlaceholder": "Απεριόριστο",
     "capEditHint": "Τα όρια μηδενίζονται την 1η στις 00:00 UTC. Αφήστε κενό για απεριόριστο.",
+    "keyProxyLabel": "Proxy for this key",
+    "keyProxyHint": "Leave blank to keep the current setting. Requests made with this key use this proxy instead of the global one; local and LAN addresses still connect directly.",
+    "keyProxyRemoved": "The proxy is removed when you save, and this key goes back to the global proxy.",
+    "keyProxyUndo": "Undo",
     "monthlyUsageLine": "{requests} αιτήματα, {tokens} tokens αυτόν τον μήνα",
     "quotaBalanceHint": "Απομένουν {remaining} από {limit} {metric}",
-    "quotaBalanceLeft": "Απομένουν {remaining}"
-,
+    "quotaBalanceLeft": "Απομένουν {remaining}",
     "groupLabel": "Group",
     "groupLabelPlaceholder": "e.g. Relays, Work…",
     "groupLabelHint": "Optional: endpoints in the same group are listed together, and a request can stay inside the group with custom:<model>#<group>. Leave blank for the default Custom group.",
     "groupHandleHint": "Add #{handle} after a model id to route only to this group, e.g. custom:<model>#{handle}",
     "copyGroupHandle": "Copy group handle",
     "groupHandleCopied": "Copied {handle}",
-    "groupHandleCopyFailed": "Couldn't copy to the clipboard"
+    "groupHandleCopyFailed": "Couldn't copy to the clipboard",
+    "capUsagePercent": "{used} of {cap} ({pct}%)",
+    "capWarning80": "Over 80% of this cap — the server logs a budget alert at this point.",
+    "capExhaustedWarning": "Cap reached — new requests are rejected until the monthly reset."
   },
   "backups": {
     "title": "Backups",
@@ -851,7 +878,9 @@
     "emptyDescription": "Οι εγγραφές εμφανίζονται εδώ καθώς τις γράφει ο διακομιστής. Διευρύνετε τα φίλτρα επιπέδου, παρόχου ή αναζήτησης αν περιμένατε αποτελέσματα.",
     "noLevelsTitle": "Δεν έχει επιλεγεί επίπεδο",
     "noLevelsDescription": "Ενεργοποιήστε τουλάχιστον ένα επίπεδο για να δείτε τις καταγραφές.",
-    "loadFailed": "Δεν ήταν δυνατή η φόρτωση του αρχείου καταγραφής του διακομιστή."
+    "loadFailed": "Δεν ήταν δυνατή η φόρτωση του αρχείου καταγραφής του διακομιστή.",
+    "eventFilter": "Γεγονός",
+    "allEvents": "Όλα τα γεγονότα"
   },
   "playground": {
     "title": "Παιδική χαρά",
@@ -1163,7 +1192,8 @@
       "openclaw": "Ένας πάντα διαθέσιμος προσωπικός βοηθός που απαντά σε WhatsApp, Telegram, Discord και άλλα από το δικό σας μηχάνημα.",
       "hermes": "Ο αυτοβελτιούμενος πράκτορας της Nous Research με μόνιμη μνήμη και δεξιότητες, στο τερματικό ή σε εφαρμογές συνομιλίας.",
       "pi": "Ένας μινιμαλιστικός πράκτορας τερματικού που διαμορφώνετε με δικές σας επεκτάσεις, δεξιότητες και πρότυπα προτροπών.",
-      "reasonix": "Πράκτορας προγραμματισμού για το τερματικό, φτιαγμένος για το DeepSeek γύρω από την προσωρινή αποθήκευση προθεμάτων, ώστε οι μεγάλες συνεδρίες να μένουν φθηνές."
+      "reasonix": "Πράκτορας προγραμματισμού για το τερματικό, φτιαγμένος για το DeepSeek γύρω από την προσωρινή αποθήκευση προθεμάτων, ώστε οι μεγάλες συνεδρίες να μένουν φθηνές.",
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
     }
   },
   "update": {

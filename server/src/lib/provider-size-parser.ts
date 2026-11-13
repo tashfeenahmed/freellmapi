@@ -66,8 +66,13 @@ export function parseProviderReportedSize(platform: string, message: string | nu
   if (typeof message !== 'string' || message === '') return null;
   const re = PATTERNS[platform];
   if (!re) return null;
+  // A Groq OTPM rejection's "Requested N" is the EXPECTED OUTPUT, not the
+  // request's size; latching it would size out models on prompt length for a
+  // completion-side limit. An ITPM rejection's N is the prompt alone.
+  if (platform === 'groq' && /output\s+tokens?\s*per\s*min|\botpm\b/i.test(message)) return null;
   const tokens = pullFirstInt(message, re);
   if (tokens == null) return null;
-  const inputOnly = platform === 'cloudflare' && /contains\s+at\s+least\s+[\d,]+\s+input\s+tokens/i.test(message);
+  const inputOnly = (platform === 'cloudflare' && /contains\s+at\s+least\s+[\d,]+\s+input\s+tokens/i.test(message))
+    || (platform === 'groq' && /input\s+tokens?\s*per\s*min|\bitpm\b/i.test(message));
   return { tokens, kind: inputOnly ? 'input' : 'total' };
 }

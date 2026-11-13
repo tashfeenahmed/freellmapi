@@ -20,6 +20,12 @@ export class ParallelProvider extends SearchOnlyProvider {
   readonly name = 'Parallel';
   keyless = true;
 
+  /** #1599: validation is an empty search, so the health pass checks a key
+   * once instead of every few minutes. */
+  override get supportsKeyPolling(): boolean {
+    return false;
+  }
+
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     if (isAnonymousCredential(apiKey)) {
       return this.probe(PARALLEL_MCP_URL, {

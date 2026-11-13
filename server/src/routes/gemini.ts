@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing, type NormalizedModel } from '../services/model-listing.js';
-import { extractApiToken, timingSafeStringEqual } from './proxy.js';
+import { extractApiToken } from './proxy.js';
+import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
 import { runInboundChat, type InboundChatWire } from '../lib/inbound-chat.js';
 import {
   effortFromGeminiThinking,
@@ -44,7 +44,10 @@ function sendError(res: Response, status: number, message: string, code = 'INVAL
   });
 }
 
-function authenticate(req: Request, res: Response): boolean {
+// Resolves both credential kinds (#411): unified key as before; a
+// client-profile key (sk-cp-*) authenticates inference only and carries its
+// server-enforced system prompt (injected by handleGenerate below).
+function authenticate(req: Request, res: Response): ResolvedAuth | null {
   const queryKey = typeof req.query.key === 'string' ? req.query.key.trim() : '';
   if (queryKey) {
     // Query credentials are a Gemini compatibility escape hatch and are
@@ -52,12 +55,12 @@ function authenticate(req: Request, res: Response): boolean {
     // shell history, reverse-proxy logs, and referrer telemetry.
     console.warn('[Gemini] API key supplied in ?key=; prefer x-goog-api-key to avoid URL leakage');
   }
-  const token = extractApiToken(req) ?? queryKey;
-  if (!token || !timingSafeStringEqual(token, getUnifiedApiKey())) {
+  const auth = resolveAuth(extractApiToken(req) ?? queryKey);
+  if (!auth) {
     sendError(res, 401, 'Invalid API key', 'UNAUTHENTICATED');
-    return false;
+    return null;
   }
-  return true;
+  return auth;
 }
 
 function modelShape(model: NormalizedModel | null, autoContextWindow: number | null, id = 'auto') {
@@ -185,7 +188,8 @@ function streamWire(altSse: boolean): InboundChatWire {
 }
 
 async function handleGenerate(req: Request, res: Response, stream: boolean): Promise<void> {
-  if (!authenticate(req, res)) return;
+  const auth = authenticate(req, res);
+  if (!auth) return;
   const body = parseGenerateBody(req, res);
   if (!body) return;
   const generation = body.generationConfig;
@@ -198,7 +202,10 @@ async function handleGenerate(req: Request, res: Response, stream: boolean): Pro
   const tools = geminiToolsToChatTools(body.tools);
   await runInboundChat(req, res, {
     model: resolveGeminiModel(model),
-    messages: geminiContentsToMessages(body),
+    // Server-enforced system prompt (#411): enforced prompt FIRST so the
+    // caller's systemInstruction follows it and cannot override it. Neutral
+    // no-op for the unified key and for profiles without a prompt.
+    messages: prependSystemPrompt(geminiContentsToMessages(body), auth.systemPrompt),
     stream,
     // Gemini CLI never sends maxOutputTokens; the shared 1024-token default
     // would truncate every response, so match Gemini's own model default.

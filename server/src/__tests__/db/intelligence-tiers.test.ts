@@ -43,7 +43,6 @@ describe('intelligence tier audit (migrateModelsV17)', () => {
 
   it('demotes lapped models down from Large', () => {
     expect(tier('google', 'gemini-2.5-flash')).toBe('Medium');   // AA 21
-    expect(tier('github', 'gpt-4o')).toBe('Medium');             // AA 17
     expect(tier('cohere', 'command-a-03-2025')).toBe('Medium');  // AA 13
     expect(tier('ollama', 'devstral-2:123b')).toBe('Medium');    // AA 22
   });

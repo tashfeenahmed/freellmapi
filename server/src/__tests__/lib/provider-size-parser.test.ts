@@ -7,6 +7,16 @@ import { parseProviderReportedSize } from '../../lib/provider-size-parser.js';
 // forces a parser update.
 describe('parseProviderReportedSize', () => {
   describe('groq', () => {
+    it('does not read an OTPM "Requested N" (expected output) as the request size', () => {
+      const msg = 'Groq API error 429: Request too large for model `qwen/qwen3.8-27b` in organization `org_x` service tier `on_demand` on output tokens per minute (OTPM): Limit 1000, Requested 1838. The request\'s expected output tokens exceed the limit.';
+      expect(parseProviderReportedSize('groq', msg)).toBeNull();
+    });
+
+    it('reads an ITPM "Requested N" as an input-only size', () => {
+      const msg = 'Groq API error 413: Request too large for model `qwen/qwen3.8-27b` in organization `org_x` service tier `on_demand` on input tokens per minute (ITPM): Limit 7000, Requested 16136, please reduce your message size and try again.';
+      expect(parseProviderReportedSize('groq', msg)).toEqual({ tokens: 16136, kind: 'input' });
+    });
+
     it('extracts Requested N from a TPM 413', () => {
       const msg = 'Groq API error 413: Request too large for model `openai/gpt-oss-120b` in organization `org_01kptjck7bejta1btzc11cccy2` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 36532, please reduce your message size and try again.';
       expect(parseProviderReportedSize('groq', msg)).toEqual({ tokens: 36532, kind: 'total' });
