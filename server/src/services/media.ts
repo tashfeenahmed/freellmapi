@@ -287,6 +287,77 @@ async function mediaFetch(
   return r;
 }
 
+const MEDIA_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_MEDIA_DOWNLOAD_REDIRECTS = 3;
+
+/**
+ * Download a media file from a URL named by an upstream response (#1880). The
+ * address is classified before every hop, and redirects are followed by hand
+ * (a few at most) so a public result URL cannot bounce the request to a
+ * metadata, link-local or (with FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS) private
+ * address. The body is read up to maxBytes and no further. No credentials are
+ * sent.
+ */
+async function downloadCheckedMedia(
+  rawUrl: string,
+  platform: string,
+  modality: MediaModality,
+  maxBytes: number,
+  remaining: () => number,
+  clientSignal?: AbortSignal,
+): Promise<{ body: Buffer; contentType: string | null }> {
+  let url = rawUrl;
+  for (let hop = 0; ; hop++) {
+    const verdict = await assessProviderUrl(url);
+    if (!verdict.allowed) {
+      throw new MediaError(`${platform} returned an unusable ${modality} URL: ${verdict.reason}`, 502);
+    }
+    const timeoutMs = remaining();
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = clientSignal ? AbortSignal.any([timeoutSignal, clientSignal]) : timeoutSignal;
+    const res = await proxyFetch(url, { method: 'GET', redirect: 'manual', signal }, platform, modality, timeoutMs);
+    if (MEDIA_REDIRECT_STATUSES.has(res.status)) {
+      await res.body?.cancel().catch(() => {});
+      const location = res.headers.get('location');
+      if (!location || hop >= MAX_MEDIA_DOWNLOAD_REDIRECTS) {
+        throw new MediaError(`${platform} ${modality} download redirected too many times or without a location`, 502);
+      }
+      try {
+        url = new URL(location, url).href;
+      } catch {
+        throw new MediaError(`${platform} ${modality} download redirected to an invalid URL`, 502);
+      }
+      continue;
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new MediaError(`${platform} ${res.status}: ${text.slice(0, 200)}`, res.status, undefined,
+        parseRetryAfterMs(res.headers?.get('retry-after') ?? null));
+    }
+    if (!res.body || Number(res.headers.get('content-length')) > maxBytes) {
+      await res.body?.cancel().catch(() => {});
+      throw new MediaError(`${platform} ${modality} output is missing or too large`, 502);
+    }
+    const reader = res.body.getReader();
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        remaining();
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > maxBytes) {
+          await reader.cancel();
+          throw new MediaError(`${platform} ${modality} output is too large`, 502);
+        }
+        chunks.push(Buffer.from(value));
+      }
+    } finally { reader.releaseLock(); }
+    return { body: Buffer.concat(chunks), contentType: res.headers.get('content-type') };
+  }
+}
+
 function parseSize(size?: string): [number, number] {
   if (size && /^\d+x\d+$/.test(size)) {
     const [w, h] = size.split('x').map(Number);
@@ -666,19 +737,15 @@ async function callHuggingFaceVideo(
   if (!videoUrl) throw new MediaError('huggingface returned no video URL', 502);
   // Every other URL this adapter contacts is built from constants; this one
   // comes out of an upstream JSON body, which is exactly the shape #440's
-  // guard exists for. Refuse anything that is not plain http(s) on a routable
-  // address before spending a request on it — a result URL pointing at cloud
-  // metadata or a link-local address would otherwise be fetched and streamed
-  // straight back to the caller.
-  const verdict = await assessProviderUrl(videoUrl);
-  if (!verdict.allowed) {
-    throw new MediaError(`huggingface returned an unusable video URL: ${verdict.reason}`, 502);
-  }
-  const downloaded = await mediaFetch(videoUrl, 'huggingface', 'video', { method: 'GET' }, remaining(), clientSignal);
-  const video = Buffer.from(await downloaded.arrayBuffer());
+  // guard exists for. downloadCheckedMedia classifies it, and every redirect
+  // target, before requesting it (#1880): a result URL pointing at cloud
+  // metadata or a link-local address, directly or through a redirect, would
+  // otherwise be fetched and streamed straight back to the caller. Capped at
+  // 100 MB like the NovAI video download.
+  const downloaded = await downloadCheckedMedia(videoUrl, 'huggingface', 'video', 100 * 1024 * 1024, remaining, clientSignal);
   return {
-    video,
-    contentType: downloaded.headers.get('content-type') ?? result.video?.content_type ?? 'video/mp4',
+    video: downloaded.body,
+    contentType: downloaded.contentType ?? result.video?.content_type ?? 'video/mp4',
   };
 }
 
