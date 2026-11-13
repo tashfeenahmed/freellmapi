@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb, initDb } from '../../db/index.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 import { encrypt } from '../../lib/crypto.js';
 import { EMBEDDING_PLATFORMS, runEmbeddings } from '../../services/embeddings.js';
 import { applyCatalog } from '../../services/catalog-sync.js';
@@ -19,7 +20,8 @@ function seed() {
 }
 
 describe('LLMTR catalog-managed embeddings', () => {
-  beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); });
+  // clearAllCooldowns: a 429 benches the key, and the in-memory bench outlives the DB reset.
+  beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); clearAllCooldowns(); });
   afterEach(() => { vi.restoreAllMocks(); getDb().close(); });
 
   it.each(models)('routes $id with exact model identity, dimensions and usage', async model => {

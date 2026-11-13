@@ -35,6 +35,7 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -685,8 +686,9 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     return;
   }
   const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
+  const clientSignal = clientAbortSignal(res);
   try {
-    const result = await runEmbeddings(parsed.data.model, inputs, parsed.data.dimensions);
+    const result = await runEmbeddings(parsed.data.model, inputs, parsed.data.dimensions, clientSignal);
     res.json({
       object: 'list',
       data: result.vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
@@ -695,6 +697,7 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
       usage: { prompt_tokens: result.inputTokens, total_tokens: result.inputTokens },
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
@@ -719,8 +722,9 @@ proxyRouter.post('/rerank', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `query` and `documents` are required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
-    const result = await runRerank(parsed.data.model, parsed.data.query, parsed.data.documents, parsed.data.top_n);
+    const result = await runRerank(parsed.data.model, parsed.data.query, parsed.data.documents, parsed.data.top_n, clientSignal);
     res.json({
       results: result.results.map(r => ({
         index: r.index,
@@ -731,6 +735,7 @@ proxyRouter.post('/rerank', async (req: Request, res: Response) => {
       provider: result.platform,
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof RerankError ? err.status : 502;
     if (err instanceof RerankError) {
       const retryAfter = rerankRetryAfterSec(err);
@@ -760,15 +765,14 @@ proxyRouter.post('/search', async (req: Request, res: Response) => {
     return;
   }
   // A departed client drops the upstream search instead of spending a credit.
-  const abort = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runSearch(parsed.data.query, {
       maxResults: parsed.data.max_results,
       topic: parsed.data.topic,
       includeAnswer: parsed.data.include_answer,
       engine: parsed.data.engine,
-      signal: abort.signal,
+      signal: clientSignal,
     });
     res.json({
       query: result.query,
@@ -778,7 +782,7 @@ proxyRouter.post('/search', async (req: Request, res: Response) => {
       engine: result.engine,
     });
   } catch (err: any) {
-    if (res.headersSent || abort.signal.aborted) return;
+    if (res.headersSent || clientSignal.aborted) return;
     const status = err instanceof SearchError ? err.status : 502;
     if (err instanceof SearchError) {
       const retryAfter = searchRetryAfterSec(err);
@@ -840,13 +844,12 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: { message: `Invalid request: ${detail}`, type: 'invalid_request_error' } });
     return;
   }
-  const abort = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+  const clientSignal = clientAbortSignal(res);
   try {
     const { model, state, questions } = parsed.data;
     const result = await runDecision(
       { state, questions: questions as Parameters<typeof runDecision>[0]['questions'] },
-      { model, signal: abort.signal },
+      { model, signal: clientSignal },
     );
     res.json({
       object: 'decision',
@@ -856,7 +859,7 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       usage: result.usage,
     });
   } catch (err: any) {
-    if (res.headersSent || abort.signal.aborted) return;
+    if (res.headersSent || clientSignal.aborted) return;
     const status = err instanceof DecisionError ? err.status : 502;
     if (err instanceof DecisionError) {
       const retryAfter = decisionRetryAfterSec(err);
@@ -929,10 +932,11 @@ proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `prompt` is required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runImageGeneration(parsed.data.model, {
       prompt: parsed.data.prompt, n: parsed.data.n, size: parsed.data.size,
-    });
+    }, clientSignal);
     res.json({
       created: Math.floor(Date.now() / 1000),
       data: result.images,
@@ -940,6 +944,7 @@ proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
       provider: result.platform,
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -975,12 +980,8 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
   // A video job runs for minutes, so a caller that hangs up must actually stop
   // the work: without this the gateway would keep polling the provider and then
   // fail over to a second one, both charged to the operator, for a response
-  // nobody is waiting for. 'close' also fires on normal completion, which
-  // writableEnded distinguishes.
-  const clientAbort = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) clientAbort.abort();
-  });
+  // nobody is waiting for.
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runVideoGeneration(parsed.data.model, {
       prompt: parsed.data.prompt,
@@ -989,7 +990,7 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
       image: parsed.data.image,
       seed: parsed.data.seed,
       audio: parsed.data.audio,
-    }, clientAbort.signal);
+    }, clientSignal);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
@@ -997,7 +998,7 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
     res.send(result.video);
   } catch (err: any) {
     // Nothing to report to a socket that is already gone.
-    if (clientAbort.signal.aborted || res.writableEnded) return;
+    if (clientSignal.aborted || res.writableEnded) return;
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1023,14 +1024,16 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runSpeech(parsed.data.model, {
       input: parsed.data.input, voice: parsed.data.voice, format: parsed.data.response_format,
-    });
+    }, clientSignal);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
     res.send(result.audio);
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1122,6 +1125,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
   const language = typeof req.body?.language === 'string' && req.body.language.trim() ? req.body.language.trim() : undefined;
   const prompt = typeof req.body?.prompt === 'string' && req.body.prompt ? req.body.prompt : undefined;
 
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runTranscription(model, {
       file: file.buffer,
@@ -1131,7 +1135,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
       prompt,
       temperature,
       responseFormat,
-    });
+    }, clientSignal);
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
     res.setHeader('X-Model', safeHeaderValue(result.modelId));
     if (responseFormat === 'text') {
@@ -1154,6 +1158,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
     }
     res.json({ text: result.text });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;

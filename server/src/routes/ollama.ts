@@ -11,6 +11,7 @@ import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 import { validateSession } from '../services/auth.js';
 import { isLocalRequest } from '../lib/loopback.js';
 
@@ -560,11 +561,13 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
   }
   const rawInput = parsed.data.input ?? parsed.data.prompt ?? '';
   const inputs = Array.isArray(rawInput) ? rawInput : [rawInput];
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runEmbeddings(
       parsed.data.model?.replace(/:latest$/i, ''),
       inputs,
       parsed.data.dimensions,
+      clientSignal,
     );
     if (legacy) {
       res.json({ embedding: result.vectors[0] ?? [] });
@@ -578,6 +581,7 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
       });
     }
   } catch (error: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = error instanceof EmbeddingsError ? error.status : 502;
     if (error instanceof EmbeddingsError) {
       const retrySec = embeddingsRetryAfterSec(error);

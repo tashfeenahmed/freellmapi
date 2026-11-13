@@ -51,6 +51,7 @@ const PURE_MODULES = [
   'tool-args.ts',
   'tool-call-rescue.ts',
   // Type-only imports today; listed so they stay that way.
+  'client-abort.ts',
   'client-classifier.ts',
   'content.ts',
   'think-tags.ts',

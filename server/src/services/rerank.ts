@@ -3,6 +3,7 @@ import { decrypt } from '../lib/crypto.js';
 import { parseRetryAfterMs } from '../providers/base.js';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { USABLE_KEY_SQL } from './key-state.js';
+import { runFailoverChain } from '../lib/failover-chain.js';
 
 // Cohere-style rerank over the existing free-tier key pool (#1029). Deliberately
 // narrow first slice: platform='cohere' keys and custom OpenAI-compatible
@@ -58,20 +59,23 @@ async function upstreamError(r: Response): Promise<RerankError> {
   return new RerankError(`upstream ${r.status}: ${(await r.text()).slice(0, 200)}`, r.status, undefined, retryAfterMs);
 }
 
+const rerankModelId = (cand: RerankCandidate, model: string | undefined) =>
+  model || (cand.platform === 'cohere' ? 'rerank-v3.5' : 'rerank');
+
 async function callProvider(cand: RerankCandidate, model: string | undefined, query: string,
-  documents: string[], topN: number): Promise<{ modelId: string; results: RerankResult['results'] }> {
+  documents: string[], topN: number, clientSignal?: AbortSignal): Promise<{ modelId: string; results: RerankResult['results'] }> {
   // ponytail: cohere + jina-shaped custom only; per-provider adapters when a
   // provider needs a different wire shape.
   const url = cand.platform === 'cohere'
     ? 'https://api.cohere.com/v2/rerank'
     : `${cand.baseUrl!.replace(/\/$/, '')}/rerank`;
-  const modelId = model
-    || (cand.platform === 'cohere' ? 'rerank-v3.5' : 'rerank');
+  const modelId = rerankModelId(cand, model);
+  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${cand.key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: modelId, query, documents, top_n: topN }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    signal: clientSignal ? AbortSignal.any([timeout, clientSignal]) : timeout,
   });
   if (!res.ok) throw await upstreamError(res);
   const body = await res.json() as { results?: { index?: number; relevance_score?: number; document?: { text?: string } | string }[] };
@@ -88,7 +92,7 @@ async function callProvider(cand: RerankCandidate, model: string | undefined, qu
 }
 
 export async function runRerank(model: string | undefined, query: string, documents: string[],
-  topN?: number): Promise<RerankResult> {
+  topN?: number, clientSignal?: AbortSignal): Promise<RerankResult> {
   if (documents.length > MAX_DOCUMENTS) {
     throw new RerankError(`Too many documents: ${documents.length} (max ${MAX_DOCUMENTS})`, 400);
   }
@@ -98,15 +102,18 @@ export async function runRerank(model: string | undefined, query: string, docume
   }
   const n = topN ?? documents.length;
 
-  let lastError: RerankError | null = null;
-  for (const cand of chain) {
-    try {
-      const out = await callProvider(cand, model, query, documents, n);
-      return { platform: cand.platform, modelId: out.modelId, results: out.results };
-    } catch (err: any) {
-      lastError = err instanceof RerankError ? err : new RerankError(String(err?.message ?? err), 502);
-    }
-  }
+  const res = await runFailoverChain({
+    rows: chain,
+    signal: clientSignal,
+    ErrorClass: RerankError,
+    route: cand => ({ platform: cand.platform, modelId: rerankModelId(cand, model) }),
+    // Candidates are already decrypted; no lease or budget on this surface yet.
+    reserve: (cand, skip) => ({ credential: skip(cand.id) ? null : { id: cand.id }, budgetBlocked: false }),
+    attempt: cand => callProvider(cand, model, query, documents, n, clientSignal),
+    log: () => {},
+  });
+  if (res.ok) return { platform: res.row.platform, modelId: res.out.modelId, results: res.out.results };
+  const { lastError } = res;
   throw new RerankError(
     `All rerank providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ''}.`,
     lastError?.status === 429 ? 429 : 502,

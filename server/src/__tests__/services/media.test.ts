@@ -45,6 +45,8 @@ describe('media service', () => {
   beforeEach(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
+    // A 429 benches the key, and the in-memory bench outlives the DB reset.
+    clearAllCooldowns();
   });
 
   afterEach(() => {
