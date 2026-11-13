@@ -1511,6 +1511,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           // client-abort branch stops the ladder without benching or an
           // error log row (the socket is gone; nothing to render).
           if (isClientAbortError(streamErr)) throw streamErr;
+          // Ended already: post-end bookkeeping failed (see /chat/completions).
+          if (res.writableEnded) {
+            console.error(`[Proxy] Bookkeeping after a completed legacy stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
+          }
           if (headerSent) {
             console.error(`[Proxy] Mid-stream legacy completion error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
@@ -2814,6 +2819,15 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // client-abort branch stops the ladder without benching or an
           // error log row (the socket is gone; nothing to render).
           if (isClientAbortError(streamErr)) throw streamErr;
+          // res.end() already ran: the client has the whole answer, and this
+          // came from the bookkeeping after it (cache store, sticky model,
+          // request log). An error frame now would raise ERR_STREAM_WRITE_AFTER_END
+          // on `res` with no listener, which the process safety net treats as
+          // fatal, and an 'error' row would blame a provider that delivered.
+          if (res.writableEnded) {
+            console.error(`[Proxy] Bookkeeping after a completed stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
+          }
           if (headerSent) {
             // Mid-stream error after real payload reached the client — finish
             // the SSE response honestly instead of leaving the client hanging.

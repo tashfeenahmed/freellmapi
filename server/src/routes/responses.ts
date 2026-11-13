@@ -1485,6 +1485,14 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // client-abort branch stops the ladder without benching or an
           // error log row (the socket is gone; nothing to render).
           if (isClientAbortError(streamErr)) throw streamErr;
+          // response.completed and res.end() already went out, so this came
+          // from the bookkeeping after them. A response.failed event now would
+          // raise ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal
+          // under the process safety net) and log an error the client never saw.
+          if (res.writableEnded) {
+            console.error(`[Responses] Bookkeeping after a completed stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
+          }
           // A committed stream can't fail over (bytes already sent) — surface a
           // response.failed event honestly and stop. A pre-commit failure throws
           // through to the shared loop for cooldown + failover.
