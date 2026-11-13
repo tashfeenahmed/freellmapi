@@ -206,6 +206,30 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  // Gemini Decisions uses input (not System One's state) and reports usage
+  // under total_input_tokens. It is not a generateContent/chat model.
+  google: async (cred, modelId, body, signal) => {
+    if (modelId !== 'gemini-decision-1') throw new DecisionError('Unsupported Google decision model', 400);
+    const json = await upstream('https://generativelanguage.googleapis.com/v1beta/decisions', 'google', {
+      method: 'POST', redirect: 'error',
+      headers: { 'x-goog-api-key': cred.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, input: typeof body.state === 'string' ? body.state : JSON.stringify(body.state), questions: body.questions }),
+    }, signal) as { model?: unknown; answers?: unknown; error?: unknown; usage?: { total_input_tokens?: unknown; total_output_tokens?: unknown } } | null;
+    if (!json || json.error || (json.model !== undefined && json.model !== modelId) ||
+        typeof json.usage?.total_input_tokens !== 'number' || !Number.isFinite(json.usage.total_input_tokens) || json.usage.total_input_tokens < 0 || json.usage.total_output_tokens !== 0) {
+      throw new DecisionError('Google returned an invalid decision response', 502);
+    }
+    // Google's documented response omits model; the pinned endpoint request
+    // is the identity here. Reject a conflicting identity if one is supplied.
+    const checked = checkedDecisionResult({ ...json, model: modelId, usage: { input_tokens: json.usage.total_input_tokens, output_tokens: 0 } }, 'google', modelId, body);
+    for (const answer of Object.values(checked.answers)) {
+      const confidence = (answer as { confidence?: unknown }).confidence;
+      if (typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+        throw new DecisionError('Google returned an invalid decision confidence', 502);
+      }
+    }
+    return checked;
+  },
   // HAL-X uses `question`, not System One's `instructions`.
   halx: async (_cred, modelId, body, signal) => {
     if (modelId !== 'THX-01') throw new DecisionError('Unsupported HAL-X model', 400);

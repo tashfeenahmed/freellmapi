@@ -223,6 +223,35 @@ async function freeInferenceEmbed(row: EmbeddingModelRow, key: string, inputs: s
   return { vectors: data.map(d => d.embedding!), inputTokens: typeof tokens === 'number' && Number.isFinite(tokens) && tokens >= 0 ? tokens : null };
 }
 
+/** EmbeddingGemma 2 uses the native input schema, not ai/v1/embeddings.
+ * Never fall back to the retired 300M model: its vectors are a different family. */
+async function cloudflareEmbeddingGemma2(row: EmbeddingModelRow, accountId: string, token: string, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
+  if (row.dimensions !== 768 || (dimensions !== undefined && dimensions !== 768)) {
+    throw new EmbeddingsError('EmbeddingGemma 2 supports 768 dimensions', 400);
+  }
+  const r = await proxyFetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/google/embeddinggemma-2`, {
+    method: 'POST', redirect: 'error',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: inputs }), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  }, 'cloudflare', 'embedding', FETCH_TIMEOUT_MS);
+  if (!r.ok) throw new EmbeddingsError(`Cloudflare embeddings error (HTTP ${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
+  const json = await r.json() as {
+    success?: boolean; errors?: unknown[];
+    result?: { model?: string; data?: { index?: number; embedding?: number[] }[]; usage?: { prompt_tokens?: number } };
+  };
+  const data = json.result?.data;
+  if (json.success === false || json.errors?.length || json.result?.model !== row.model_id || !Array.isArray(data) || data.length !== inputs.length ||
+      data.some(d => !d || !Number.isInteger(d.index))) {
+    throw new EmbeddingsError('Cloudflare returned mismatched or malformed embeddings', 502);
+  }
+  const ordered = [...data].sort((a, b) => a.index! - b.index!);
+  if (ordered.some((d, i) => d.index !== i || !Array.isArray(d.embedding) || d.embedding.length !== 768 || d.embedding.some(v => !Number.isFinite(v)))) {
+    throw new EmbeddingsError('Cloudflare returned mismatched or malformed embeddings', 502);
+  }
+  const tokens = json.result?.usage?.prompt_tokens;
+  return { vectors: ordered.map(d => d.embedding!), inputTokens: typeof tokens === 'number' && Number.isFinite(tokens) && tokens >= 0 ? tokens : null };
+}
+
 export async function probeEmbeddingDimensions(baseUrl: string, key: string, modelId: string): Promise<number> {
   const out = await openAiStyleEmbed(`${baseUrl.trim().replace(/\/+$/, '')}/embeddings`, 'custom', key, modelId, ['dimension probe']);
   const vector = out.vectors[0];
@@ -355,7 +384,9 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return meterCloudflare(
         key, row.model_id,
         { inputTokens: inputs.reduce((sum, text) => sum + roughTokens(text), 0) },
-        () => openAiStyleEmbed(
+        () => row.model_id === '@cf/google/embeddinggemma-2'
+          ? cloudflareEmbeddingGemma2(row, accountId, token, inputs, dimensions)
+          : openAiStyleEmbed(
           `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/embeddings`,
           row.platform, token, row.model_id, inputs, {},
         ),
