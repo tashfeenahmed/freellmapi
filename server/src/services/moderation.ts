@@ -15,6 +15,7 @@ import { getDb } from '../db/index.js';
 import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { runFailoverChain } from '../lib/failover-chain.js';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -116,7 +117,9 @@ async function callProvider(
   row: ModerationModelRow,
   apiKey: string,
   inputs: string[],
+  clientSignal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
+  const timeout = AbortSignal.timeout(30_000);
   const url = `${row.baseUrl}/v1/moderations`;
   const res = await proxyFetch(url, {
     method: 'POST',
@@ -125,7 +128,7 @@ async function callProvider(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({ model: row.modelId, input: inputs.length === 1 ? inputs[0] : inputs }),
-    signal: AbortSignal.timeout(30_000),
+    signal: clientSignal ? AbortSignal.any([timeout, clientSignal]) : timeout,
   }, row.platform, 'moderation');
 
   if (!res.ok) {
@@ -146,7 +149,7 @@ async function callProvider(
 
 function logModerationRequest(
   row: ModerationModelRow,
-  status: 'success' | 'error',
+  status: 'success' | 'error' | 'canceled',
   latencyMs: number,
   error: string | null,
 ): void {
@@ -168,6 +171,7 @@ function logModerationRequest(
 export async function runModerations(
   model: string | undefined,
   inputs: string[],
+  clientSignal?: AbortSignal,
 ): Promise<ModerationResult> {
   const resolved = resolveModel(model);
   if (!resolved) {
@@ -193,30 +197,32 @@ export async function runModerations(
     throw new ModerationError(`No enabled providers for moderation model '${resolved}'.`, 503);
   }
 
-  let lastError: ModerationError | null = null;
-  for (const row of chain) {
-    let apiKey: string;
-    try {
-      apiKey = decrypt(row.encryptedKey, row.iv, row.authTag);
-    } catch {
-      continue;
-    }
-    const started = Date.now();
-    try {
-      const json = await callProvider(row, apiKey, inputs);
-      logModerationRequest(row, 'success', Date.now() - started, null);
-      return {
-        provider: row.platform,
-        model: (json.model as string) ?? row.modelId,
-        result: json,
-      };
-    } catch (err: any) {
-      const e = err instanceof ModerationError ? err : new ModerationError(String(err?.message ?? err), 502);
-      logModerationRequest(row, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-    }
+  const res = await runFailoverChain({
+    rows: chain,
+    signal: clientSignal,
+    ErrorClass: ModerationError,
+    route: row => ({ platform: row.platform, modelId: row.modelId }),
+    reserve: (row, skip) => {
+      if (skip(row.keyId)) return { credential: null, budgetBlocked: false };
+      try {
+        return { credential: { id: row.keyId, key: decrypt(row.encryptedKey, row.iv, row.authTag) }, budgetBlocked: false };
+      } catch {
+        return { credential: null, budgetBlocked: false };
+      }
+    },
+    attempt: (row, credential) => callProvider(row, credential.key, inputs, clientSignal),
+    log: (row, _keyId, o) =>
+      logModerationRequest(row, o.kind, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null),
+  });
+  if (res.ok) {
+    return {
+      provider: res.row.platform,
+      model: (res.out.model as string) ?? res.row.modelId,
+      result: res.out,
+    };
   }
 
+  const { lastError } = res;
   throw new ModerationError(
     `All moderation providers failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech } from '../../services/media.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -44,6 +45,8 @@ describe('media service', () => {
   beforeEach(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
+    // A 429 benches the key, and the in-memory bench outlives the DB reset.
+    clearAllCooldowns();
   });
 
   afterEach(() => {
