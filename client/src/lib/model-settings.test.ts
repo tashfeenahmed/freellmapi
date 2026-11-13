@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   modelSettingsForm,
   parseOptionalCount,
+  parseOptionalFactor,
   parseRank,
   reviewModelSettings,
   type ModelSettingsSource,
@@ -49,6 +50,21 @@ describe('parseOptionalCount (#551)', () => {
   })
 })
 
+describe('parseOptionalFactor', () => {
+  it('reads a blank field as "use the global default"', () => {
+    expect(parseOptionalFactor('')).toBeNull()
+    expect(parseOptionalFactor('  ')).toBeNull()
+  })
+
+  it('accepts positive decimals and rejects zero, negatives and junk', () => {
+    expect(parseOptionalFactor('1.5')).toBe(1.5)
+    expect(parseOptionalFactor(' 1.25 ')).toBe(1.25)
+    for (const input of ['0', '-1', 'abc']) {
+      expect(parseOptionalFactor(input)).toBeUndefined()
+    }
+  })
+})
+
 describe('reviewModelSettings (#551)', () => {
   it('is clean and valid for an untouched form', () => {
     const review = reviewModelSettings(model, modelSettingsForm(model))
@@ -91,5 +107,25 @@ describe('reviewModelSettings (#551)', () => {
   it('treats a missing tpm/tpd on the source as "no limit", not as a change', () => {
     const sparse: ModelSettingsSource = { ...model, tpmLimit: undefined, tpdLimit: undefined }
     expect(reviewModelSettings(sparse, modelSettingsForm(sparse)).dirty).toBe(false)
+  })
+
+  it('sends an edited context safety factor and leaves an untouched one alone', () => {
+    const edited = reviewModelSettings(model, { ...modelSettingsForm(model), contextSafetyFactor: '1.5' })
+    expect(edited.patch).toEqual({ contextSafetyFactor: 1.5 })
+
+    const stored: ModelSettingsSource = { ...model, contextSafetyFactor: 1.5 }
+    expect(reviewModelSettings(stored, modelSettingsForm(stored)).dirty).toBe(false)
+  })
+
+  it('clears the safety factor with an explicit null when the field is emptied', () => {
+    const stored: ModelSettingsSource = { ...model, contextSafetyFactor: 1.5 }
+    expect(reviewModelSettings(stored, { ...modelSettingsForm(stored), contextSafetyFactor: '' }).patch)
+      .toEqual({ contextSafetyFactor: null })
+  })
+
+  it('blocks the save on a non-positive safety factor', () => {
+    const review = reviewModelSettings(model, { ...modelSettingsForm(model), contextSafetyFactor: '0' })
+    expect(review.invalid.contextSafetyFactor).toBe(true)
+    expect(review.patch).toBeNull()
   })
 })
