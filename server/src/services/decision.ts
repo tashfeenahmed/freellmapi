@@ -5,7 +5,7 @@ import { getClientContext } from '../lib/client-context.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
 import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
 
 // Decision models over the key pool.
@@ -230,7 +230,7 @@ function coolDown(row: DecisionModelRow, keyId: number, e: DecisionError): void 
   } else if (e.status === 402) {
     setCooldown(row.platform, row.model_id, keyId, NO_CREDIT_COOLDOWN_MS, 'credit');
   } else if (e.status === 429) {
-    setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
   }
 }
 
