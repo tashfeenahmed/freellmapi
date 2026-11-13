@@ -12,7 +12,7 @@ import { secondsUntilNextMonth } from './key-budget.js';
 import { parseRetryAfterMs } from '../providers/base.js';
 import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runFailoverChain } from '../lib/failover-chain.js';
-import { getClientContext } from '../lib/client-context.js';
+import { logRequest } from '../lib/request-log.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
@@ -365,15 +365,10 @@ function logEmbeddingRequest(
   latencyMs: number,
   error: string | null,
 ): void {
-  try {
-    const client = getClientContext();
-    getDb().prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'embedding', ?, ?, ?)
-    `).run(row.platform, row.model_id, keyId, status, inputTokens, latencyMs, error, client.ip, client.userAgent, client.agent);
-  } catch (e) {
-    console.error('Failed to log embedding request:', e);
-  }
+  // Through logRequest so the row also reaches request_hourly and the lifetime
+  // totals; it swallows its own DB errors.
+  logRequest(row.platform, row.model_id, keyId, status, inputTokens, 0, latencyMs, error,
+    null, null, null, null, 'embedding');
 }
 
 /** Embed `inputs` via the family's provider chain, failing over within the

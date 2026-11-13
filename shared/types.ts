@@ -597,11 +597,16 @@ export interface TimelinePoint {
   failureCount: number;
 }
 
+/** Outcome of one `requests` row (one attempt). 'canceled' = the client hung
+ *  up (#752): it counts toward totals but toward neither success nor error, so
+ *  rates must read success/(success+error), never success/total. */
+export type RequestStatus = 'success' | 'error' | 'canceled';
+
 export interface RequestLog {
   id: number;
   platform: Platform;
   modelId: string;
-  status: 'success' | 'error';
+  status: RequestStatus;
   inputTokens: number;
   outputTokens: number;
   latencyMs: number;

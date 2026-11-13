@@ -11,7 +11,7 @@ import { getDb } from '../db/index.js';
 import { parseRetryAfterMs } from '../providers/base.js';
 import type { RetryHintTracker } from '../lib/retry-hint.js';
 import { runFailoverChain } from '../lib/failover-chain.js';
-import { getClientContext } from '../lib/client-context.js';
+import { logRequest } from '../lib/request-log.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
@@ -813,15 +813,10 @@ function resolveMediaChain(model: string | undefined, modality: MediaModality): 
 type MediaLogRow = Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>;
 
 function logMedia(row: MediaLogRow, keyId: number | null, status: 'success' | 'error' | 'canceled', latencyMs: number, error: string | null): void {
-  try {
-    const client = getClientContext();
-    getDb()
-      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)`)
-      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality, client.ip, client.userAgent, client.agent);
-  } catch (e) {
-    console.error('Failed to log media request:', e);
-  }
+  // Through logRequest so the row also reaches request_hourly and the lifetime
+  // totals; it swallows its own DB errors.
+  logRequest(row.platform, row.model_id, keyId, status, 0, 0, latencyMs, error,
+    null, null, null, null, row.modality);
 }
 
 function chainError(modality: MediaModality, lastError: MediaError | null, hints: RetryHintTracker): MediaError {
