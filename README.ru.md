@@ -15,7 +15,7 @@
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · полный каталог: 736 семейств моделей и 1313 бесплатных эндпоинтов
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · **Русский** · [O'zbekcha](README.uz.md)
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · **Русский** · [O'zbekcha](README.uz.md) · [日本語](README.ja.md)
 
 Русский перевод может обновляться с задержкой. Самую актуальную информацию смотрите в английском [README](README.md).
 
