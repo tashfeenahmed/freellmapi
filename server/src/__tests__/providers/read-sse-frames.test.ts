@@ -109,4 +109,17 @@ describe('readSseFrames data: prefix (issue #1087)', () => {
     expect(err.message).toContain('stream ended unexpectedly');
     expect(err.message).toContain('no [DONE], no finish_reason');
   });
+
+  // M14: the last frame of a body that ends without a trailing newline used to
+  // stay in the line buffer and be dropped, so a complete answer whose finish
+  // chunk came last was reported as truncated and failed over.
+  it('reads a final data: line that has no trailing newline', async () => {
+    const body = `data: ${CONTENT_CHUNK}\n\ndata: ${FINISH_CHUNK}`;
+    const provider = makeProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValue(sseResponse(body));
+
+    const chunks = await collect(provider.streamChatCompletion('k', MESSAGES, 'm'));
+    expect(chunks.map(c => c.choices?.[0]?.delta?.content ?? '')).toContain('hello');
+    expect(chunks.some(c => c.choices?.[0]?.finish_reason === 'stop')).toBe(true);
+  });
 });

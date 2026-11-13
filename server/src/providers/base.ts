@@ -487,11 +487,12 @@ export abstract class BaseProvider {
           ? await this.readWithStallTimeout(() => reader.read(), firstByteMs, this.firstByteTimeoutMessage(firstByteMs))
           : await this.readWithStallTimeout(() => reader.read(), inactivityTimeoutMs);
         awaitingFirstByte = false;
-        if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        // At EOF the buffer still holds the last line when the body did not
+        // end in a newline: that is a frame like any other, not truncation.
+        buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        buffer = done ? '' : lines.pop() ?? '';
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -506,6 +507,7 @@ export abstract class BaseProvider {
             // Skip malformed chunks
           }
         }
+        if (done) break;
       }
     } finally {
       reader.cancel().catch(() => { /* upstream already gone */ });

@@ -148,6 +148,8 @@ interface GeminiCandidate {
 
 interface GeminiResponse {
   candidates?: GeminiCandidate[];
+  /** A failure reported inside a 200 stream, same shape as an HTTP error body. */
+  error?: { code?: number; message?: string; status?: string; details?: unknown[] };
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
@@ -718,11 +720,12 @@ export class GoogleProvider extends BaseProvider {
           ? await this.readWithStallTimeout(() => reader.read(), firstByteMs, this.firstByteTimeoutMessage(firstByteMs))
           : await this.readWithStallTimeout(() => reader.read(), inactivityTimeoutMs);
         awaitingFirstByte = false;
-        if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        // Same EOF flush as readSseStream: a last line without a trailing
+        // newline is still a frame, often the one carrying finishReason.
+        buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        buffer = done ? '' : lines.pop() ?? '';
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -755,6 +758,13 @@ export class GoogleProvider extends BaseProvider {
             chunk = JSON.parse(raw) as GeminiResponse;
           } catch {
             continue;
+          }
+          // Gemini reports some failures (quota, overload) inside the 200
+          // stream. Skipping the frame turned them into a "truncated" stream;
+          // thrown as an HTTP error, a 429 is classified as rate limiting.
+          if (chunk.error) {
+            const status = typeof chunk.error.code === 'number' ? chunk.error.code : 500;
+            throw googleHttpError({ status, statusText: '', headers: res.headers } as Response, chunk);
           }
           const candidate = chunk.candidates?.[0];
           const parts = candidate?.content?.parts ?? [];
@@ -803,6 +813,7 @@ export class GoogleProvider extends BaseProvider {
             return;
           }
         }
+        if (done) break;
       }
     } finally {
       // Runs on normal completion, on the early returns above, AND when the
