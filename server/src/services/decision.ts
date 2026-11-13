@@ -271,7 +271,7 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
   for (const row of chain) {
     const tried = new Set<number>();
     for (;;) {
-      if (opts.signal?.aborted) throw new DecisionError('decision cancelled by the client', 499);
+      if (opts.signal?.aborted) throw new DecisionError('decision canceled by the client', 499);
       const { credential, budgetBlocked } = reserveProviderCredential(
         { platform: row.platform, key_id: null },
         ESTIMATED_TOKENS,
@@ -292,12 +292,15 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
         logDecision(row, credential.id, 'ok', Date.now() - started, questionCount, out.usage.input_tokens, clientAgent, null);
         return { model: row.model_id, provider: row.platform, answers: out.answers, usage: out.usage };
       } catch (err: any) {
+        // The caller hung up: not the model's failure, so no 'error' row to drag
+        // its success rate down and no bench. decision_requests.status is CHECK
+        // ('ok', 'error'), so a canceled attempt writes no row at all.
+        if (opts.signal?.aborted) throw new DecisionError('decision canceled by the client', 499);
         const e = err instanceof DecisionError ? err : new DecisionError(String(err?.message ?? err), 502);
         logDecision(row, credential.id, 'error', Date.now() - started, questionCount, 0, clientAgent, e.message.slice(0, 300));
         coolDown(row, credential.id, e);
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
-        if (opts.signal?.aborted) throw new DecisionError('decision cancelled by the client', 499);
         // A malformed request is the caller's problem, not this key's: move to
         // the next model rather than burning every key on it.
         if (e.status === 400 || e.status === 422) break;

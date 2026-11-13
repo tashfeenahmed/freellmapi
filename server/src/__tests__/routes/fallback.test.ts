@@ -105,6 +105,39 @@ describe('Fallback API', () => {
     });
   });
 
+  // A failed attempt logs the request's ESTIMATED input tokens even when the
+  // provider answered 429/5xx before serving anything. Those tokens were never
+  // billed, so they must not eat the model's monthly budget; an error row that
+  // streamed output first (mid-stream failure) did consume quota and counts.
+  it('GET /api/fallback/token-usage counts only tokens the provider served', async () => {
+    const db = getDb();
+    const target = db.prepare(`
+      SELECT m.id, m.platform, m.model_id FROM fallback_config fc
+        JOIN models m ON m.id = fc.model_db_id
+       WHERE m.enabled = 1 AND m.platform <> 'custom'
+         AND NOT EXISTS (SELECT 1 FROM requests r WHERE r.platform = m.platform AND r.model_id = m.model_id)
+       LIMIT 1
+    `).get() as { id: number; platform: string; model_id: string };
+    const secret = encrypt('billed-usage-key');
+    const keyId = Number(db.prepare(`INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES (?, 'billed', ?, ?, ?, 'healthy', 1)`).run(target.platform, secret.encrypted, secret.iv, secret.authTag).lastInsertRowid);
+    const insert = db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type)
+      VALUES (?, ?, NULL, ?, ?, ?, 10, NULL, 'chat')`);
+    insert.run(target.platform, target.model_id, 'success', 10, 5);   // served: 15
+    insert.run(target.platform, target.model_id, 'error', 900, 0);    // 429 before any output: 0
+    insert.run(target.platform, target.model_id, 'error', 7, 3);      // failed mid-stream: 10
+    insert.run(target.platform, target.model_id, 'canceled', 400, 0); // client left first: 0
+
+    try {
+      const { body } = await request(app, 'GET', '/api/fallback/token-usage');
+      expect(body.models.find((m: any) => m.modelDbId === target.id)).toMatchObject({ used: 25 });
+    } finally {
+      // The suite shares one DB: leave no failure rows for later assertions.
+      db.prepare('DELETE FROM requests WHERE platform = ? AND model_id = ?').run(target.platform, target.model_id);
+      db.prepare('DELETE FROM api_keys WHERE id = ?').run(keyId);
+    }
+  });
+
   // The budget bar's legend follows this payload's order. Chain priority is
   // seeded provider by provider, so ordering by it read as "grouped by
   // provider" on the dashboard (#1243); the legend wants smartest first.

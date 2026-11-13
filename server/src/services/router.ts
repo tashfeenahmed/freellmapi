@@ -785,6 +785,24 @@ const IS_TIMEOUT_SQL = `(status != 'success' AND (${
   TIMEOUT_ERROR_MARKERS.map(m => `LOWER(COALESCE(error, '')) LIKE '%${m}%'`).join(' OR ')
 }))`;
 
+/** Calendar-month chat tokens the provider actually served, per (platform,
+ *  model, key). A failed attempt logs the request's ESTIMATED input tokens even
+ *  when the provider refused it before answering (429/5xx); those were never
+ *  billed, so only success rows and rows that streamed output count. Shared by
+ *  the headroom guardrail and /api/fallback/token-usage so the two agree. The
+ *  per-key monthly budget (key_monthly_usage) stays success-only by contract
+ *  (#1158): it caps what the operator was served, not what the provider spent. */
+export function monthlyChatTokenUsage(db: Db): Array<{ platform: string; model_id: string; key_id: number | null; used: number }> {
+  return db.prepare(`
+    SELECT platform, model_id, key_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
+    FROM requests
+    WHERE created_at >= datetime('now', 'start of month')
+      AND request_type = 'chat'
+      AND (status = 'success' OR output_tokens > 0)
+    GROUP BY platform, model_id, key_id
+  `).all() as Array<{ platform: string; model_id: string; key_id: number | null; used: number }>;
+}
+
 /** api_keys.id → endpoint scope, for every custom credential on record (#651). */
 function customEndpointScopes(db: Db): Map<number, string> {
   const rows = db.prepare("SELECT id, base_url FROM api_keys WHERE platform = 'custom'")
@@ -870,15 +888,8 @@ export function refreshStatsCache(db: Db, force = false): void {
   }
 
   // Calendar-month token usage per model, for the headroom guardrail.
-  const usageRows = db.prepare(`
-    SELECT platform, model_id, key_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-    GROUP BY platform, model_id, key_id
-  `).all() as Array<{ platform: string; model_id: string; key_id: number | null; used: number }>;
   const usageMap = new Map<string, number>();
-  for (const r of usageRows) {
+  for (const r of monthlyChatTokenUsage(db)) {
     const key = modelStatsKey(r.platform, r.model_id, scopeOf(r.platform, r.key_id));
     usageMap.set(key, (usageMap.get(key) ?? 0) + r.used);
   }

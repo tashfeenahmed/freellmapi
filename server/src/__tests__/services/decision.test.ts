@@ -160,3 +160,33 @@ describe('decision service', () => {
     expect(setDecisionModelEnabled(imageId, false)).toBe(false);
   });
 });
+
+describe('decision client hang-up', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    seedDecisionModels();
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  // The caller leaving is not a model failure: no 'error' row (which would
+  // drag the model's success rate down) and no next model is tried.
+  // decision_requests.status is CHECK ('ok', 'error'), so no row is written.
+  it('writes no error row and tries no further model once the client is gone', async () => {
+    addKey('cloudflare', 'acct123:cf-token');
+    addKey('openrouter');
+    const controller = new AbortController();
+    const fn = mockFetch(() => {
+      controller.abort();
+      throw new DOMException('This operation was aborted', 'AbortError');
+    });
+    await expect(runDecision(REQUEST, { clientAgent: null, signal: controller.signal })).rejects.toMatchObject({ status: 499 });
+    expect(calls(fn)).toHaveLength(1);
+    expect(logRows()).toEqual([]);
+  });
+});

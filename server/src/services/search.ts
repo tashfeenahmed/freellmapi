@@ -457,7 +457,7 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
     // key of the same engine before the chain moves to the next engine.
     const tried = new Set<number>();
     for (;;) {
-      if (opts.signal?.aborted) throw new SearchError('search cancelled by the client', 499);
+      if (opts.signal?.aborted) throw new SearchError('search canceled by the client', 499);
       const { credential, budgetBlocked } = reserveProviderCredential(
         row,
         0,
@@ -485,12 +485,15 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
           engine: row.model_id,
         };
       } catch (err: any) {
+        // The caller hung up: not the engine's failure, so no 'error' row to drag
+        // its success rate down and no bench. search_requests.status is CHECK
+        // ('ok', 'error'), so a canceled attempt writes no row at all.
+        if (opts.signal?.aborted) throw new SearchError('search canceled by the client', 499);
         const e = err instanceof SearchError ? err : new SearchError(String(err?.message ?? err), 502);
         logSearch(row, credential.id, 'error', Date.now() - started, 0, clientAgent, e.message.slice(0, 300));
         coolDown(row, credential.id, e);
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
-        if (opts.signal?.aborted) throw new SearchError('search cancelled by the client', 499);
         // A query the engine rejected as malformed is the caller's problem,
         // not this key's: try the next engine rather than every key.
         if (e.status === 400) break;
