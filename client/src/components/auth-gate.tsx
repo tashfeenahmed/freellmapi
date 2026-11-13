@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
@@ -9,6 +9,13 @@ import { Label } from '@/components/ui/label'
 import { isEmail } from '@/lib/validate'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import {
+  deriveGate,
+  DESKTOP_SESSION_TIMEOUT_MS,
+  repairTransition,
+  withTimeout,
+  type AuthStatus,
+} from '@/lib/auth-gate-state'
 
 // Matches the server rule (routes/auth.ts zod schema).
 const PASSWORD_MIN = 8
@@ -37,13 +44,6 @@ function desktopSessionBridge(): (() => Promise<string>) | null {
 async function browserDesktopSession(): Promise<string> {
   const res = await apiFetch<{ token: string }>('/api/auth/desktop-session', { method: 'POST' })
   return res.token
-}
-
-interface AuthStatus {
-  needsSetup: boolean
-  authenticated: boolean
-  email: string | null
-  desktop?: boolean
 }
 
 function Centered({ children }: { children: ReactNode }) {
@@ -457,7 +457,7 @@ export function ChangeCredentialsModal({ mode, onClose }: ChangeCredentialsModal
 export function AuthGate({ children }: { children: ReactNode }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const { data, isLoading, isError, refetch } = useQuery<AuthStatus>({
+  const { data, isLoading, isFetching, refetch } = useQuery<AuthStatus>({
     queryKey: ['auth-status'],
     queryFn: () => apiFetch('/api/auth/status'),
     retry: false,
@@ -469,32 +469,35 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler)
   }, [refetch])
 
-  // Desktop self-repair: one attempt at a time, and none after the shell has
-  // handed back a session the server still rejects — a broken install shows a
-  // message instead of looping.
   const desktopSession = desktopSessionBridge() ?? (data?.desktop ? browserDesktopSession : null)
-  const desktopNeedsSession = !!desktopSession && !!data && (data.needsSetup || !data.authenticated)
+  const [repair, dispatchRepair] = useReducer(repairTransition, 'idle')
+  const gate = deriveGate({ isLoading, status: data, desktopCapable: !!desktopSession, repair })
+
+  // Desktop self-repair: one attempt at a time, and none after the shell has
+  // handed back a session the server still rejects until the user retries — a
+  // broken install shows a message instead of looping. The ref also stops
+  // StrictMode's second effect run from starting a parallel attempt.
   const repairing = useRef(false)
-  const [repairFailed, setRepairFailed] = useState(false)
   useEffect(() => {
-    if (!desktopNeedsSession || !desktopSession || repairing.current || repairFailed) return
+    if (gate !== 'desktopRepairing' || repair !== 'idle' || !desktopSession || repairing.current) return
     repairing.current = true
+    dispatchRepair('start')
     ;(async () => {
       try {
-        const token = await desktopSession()
+        const token = await withTimeout(desktopSession(), DESKTOP_SESSION_TIMEOUT_MS, 'desktop session')
         if (!token) throw new Error('empty session token')
         setToken(token)
         queryClient.invalidateQueries()
         const next = await refetch()
-        if (!next.data?.authenticated) setRepairFailed(true)
+        dispatchRepair(next.data?.authenticated ? 'succeeded' : 'failed')
       } catch (err) {
         console.error('[auth-gate] desktop session repair failed', err)
-        setRepairFailed(true)
+        dispatchRepair('failed')
       } finally {
         repairing.current = false
       }
     })()
-  }, [desktopNeedsSession, desktopSession, repairFailed, queryClient, refetch])
+  }, [gate, repair, desktopSession, queryClient, refetch])
 
   function onAuthed() {
     // New session: drop any cached (unauthenticated) data and re-check status.
@@ -502,41 +505,47 @@ export function AuthGate({ children }: { children: ReactNode }) {
     refetch()
   }
 
-  if (isLoading) {
-    return (
-      <Centered>
-        <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          {t('auth.loading')}
-        </p>
-      </Centered>
-    )
-  }
-  if (isError || !data) {
-    return (
-      <Centered>
-        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-          {t('auth.serverUnreachableBefore')}<code className="font-mono">npm run dev</code>{t('auth.serverUnreachableAfter')}
-        </div>
-      </Centered>
-    )
-  }
-
-  if (desktopNeedsSession) {
-    if (repairFailed) {
+  switch (gate) {
+    case 'loading':
+    case 'desktopRepairing':
+      return (
+        <Centered>
+          <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            {t('auth.loading')}
+          </p>
+        </Centered>
+      )
+    case 'unreachable':
+      return (
+        <Centered>
+          <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+            {t('auth.serverUnreachableBefore')}<code className="font-mono">npm run dev</code>{t('auth.serverUnreachableAfter')}
+          </div>
+          <Button variant="outline" className="mt-3 w-full" disabled={isFetching} onClick={() => { refetch() }}>
+            {isFetching && <Loader2 className="animate-spin" aria-hidden />}
+            {t('errors.tryAgain')}
+          </Button>
+        </Centered>
+      )
+    case 'desktopRepairFailed':
       return (
         <Centered>
           <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
             {t('auth.desktopSessionFailed')}
           </div>
+          <Button variant="outline" className="mt-3 w-full" onClick={() => dispatchRepair('retry')}>
+            {t('errors.tryAgain')}
+          </Button>
         </Centered>
       )
-    }
-    return <Centered><p className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-3.5 animate-spin" aria-hidden />{t('auth.loading')}</p></Centered>
+    // Keyed by mode so a setup form never carries its flags into the login form.
+    case 'setup':
+      return <AuthForm key="setup" mode="setup" onAuthed={onAuthed} />
+    case 'login':
+      return <AuthForm key="login" mode="login" onAuthed={onAuthed} />
+    case 'app':
+      return <>{children}</>
   }
-  if (data.needsSetup) return <AuthForm mode="setup" onAuthed={onAuthed} />
-  if (!data.authenticated) return <AuthForm mode="login" onAuthed={onAuthed} />
-
-  return <>{children}</>
 }
 
