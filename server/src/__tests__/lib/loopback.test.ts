@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Request } from 'express';
-import { isLocalRequest } from '../../lib/loopback.js';
+import { isLocalRequest, isLoopbackAddress } from '../../lib/loopback.js';
 
 // Locality grants the setup-code exemption, desktop sign-in, the desktop
 // re-auth skip and Ollama open-loopback. Forwarded headers may only withdraw it.
@@ -56,5 +56,14 @@ describe('isLocalRequest', () => {
     expect(isLocalRequest(req('127.0.0.1', {}, 1))).toBe(false);
     expect(isLocalRequest(req('127.0.0.1', {}, true))).toBe(false);
     expect(isLocalRequest(req('127.0.0.1', {}, ['loopback']))).toBe(false);
+  });
+});
+
+describe('isLoopbackAddress', () => {
+  it.each(['127.0.0.1', '127.1.2.3', '127.255.255.255', '::1', '::ffff:127.0.0.1', ' 127.0.0.1 '])('accepts %s', a => {
+    expect(isLoopbackAddress(a)).toBe(true);
+  });
+  it.each(['127.999.0.1', '127.0.0.256', '127.0.0', '128.0.0.1', '10.0.0.1', '::2', '', '127.0.0.1:8080', 'localhost'])('rejects %s', a => {
+    expect(isLoopbackAddress(a)).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ import { runEmbeddings } from '../../services/embeddings.js';
 import { runImageGeneration } from '../../services/media.js';
 import { runModerations } from '../../services/moderation.js';
 import { clearAllCooldowns } from '../../services/ratelimit.js';
+import * as urlGuard from '../../lib/url-guard.js';
 
 const realFetch = globalThis.fetch;
 const json = (body: unknown, status = 200) =>
@@ -47,6 +48,9 @@ describe('every request writer feeds the durable aggregates', () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
     clearAllCooldowns();
+    // proxyFetch re-checks a custom base URL by DNS (#1879); the .test hosts
+    // never resolve, and the guard is not what this suite is about.
+    vi.spyOn(urlGuard, 'assertProviderUrlAllowed').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

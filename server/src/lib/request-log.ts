@@ -71,9 +71,12 @@ function resolveModelDbId(
 //
 // In addition to the raw row, we update two durable aggregates so analytics
 // totals survive the raw-row prune (REQUEST_ANALYTICS_MAX_ROWS):
-//   - request_hourly: per-hour bucket counts and tokens (max window = 30d).
+//   - request_hourly: per-hour bucket counts and tokens; its age bound follows
+//     the raw table's retention (see services/request-retention.ts), so it backs
+//     every window the dashboard offers, "all time" included.
 //   - settings: lifetime totals (total_requests, total_input_tokens, total_output_tokens)
-//     plus first_request_at (set on the first ever logged request).
+//     plus first_request_at (set on the first ever logged request). These never
+//     prune, so they are the exact all-time headline.
 // All upserts run in the same transaction so the aggregates never disagree
 // with the raw row count.
 export function logRequest(
@@ -118,7 +121,10 @@ export function logRequest(
   // models.id: the other kinds live in their own tables, so a chat models row
   // that happens to share the id must not be credited with their traffic.
   requestType = 'chat',
-) {
+  // The media model row (media_models.id) behind a media request, so a
+  // custom media endpoint's traffic stays attributed to its own row.
+  mediaModelDbId: number | null = null,
+): boolean {
   try {
     const db = getDb();
     // Caller identity from the request-scoped context (set by the express
@@ -127,9 +133,9 @@ export function logRequest(
     const tx = db.transaction(() => {
       const modelDbId = requestType === 'chat' ? resolveModelDbId(db, platform, modelId, keyId) : null;
       const insert = db.prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, failure_attribution, request_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, modelDbId, failureAttribution, requestType);
+        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, failure_attribution, request_type, media_model_db_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, modelDbId, failureAttribution, requestType, mediaModelDbId);
 
       // Report the row id back to the fallback loop's attempt trace (if one is
       // active): the LAST id noted during a loop run is the terminal row the
@@ -167,8 +173,10 @@ export function logRequest(
     // compare this key's month usage to its caps and log a threshold event
     // (80%/100%, once each per month). Never throws.
     if (status === 'success' && keyId != null) noteBudgetAlerts(keyId);
+    return true;
   } catch (e) {
     console.error('Failed to log request:', e);
+    return false;
   }
 }
 

@@ -135,6 +135,32 @@ describe('Responses → chat translation (#96)', () => {
     ]);
   });
 
+  it('keeps function_call items in the assistant turn a search note or a reasoning item came before', () => {
+    const call = { type: 'function_call', call_id: 'call_1', name: 'shell', arguments: '{}' };
+    const afterSearch = toChatMessages({
+      input: [
+        { type: 'message', role: 'user', content: 'find it' },
+        { type: 'web_search_call', id: 'ws_1', status: 'completed', action: { type: 'search', query: 'q' } },
+        call,
+      ],
+    } as any);
+    const afterReasoning = toChatMessages({
+      input: [
+        { type: 'message', role: 'user', content: 'go' },
+        { type: 'message', role: 'assistant', content: 'Let me check.' },
+        { type: 'reasoning', id: 'rs_1', summary: [] },
+        call,
+      ],
+    } as any);
+    for (const msgs of [afterSearch, afterReasoning]) {
+      expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant']);
+      expect(msgs[1].tool_calls).toEqual([
+        { id: 'call_1', type: 'function', function: { name: 'shell', arguments: '{}' } },
+      ]);
+    }
+    expect(afterReasoning[1].content).toBe('Let me check.');
+  });
+
   it('maps a function_call_output item to a tool message', () => {
     const msgs = toChatMessages({
       input: [{ type: 'function_call_output', call_id: 'call_1', output: 'sunny' }],

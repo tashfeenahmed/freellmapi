@@ -11,6 +11,7 @@ import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
 import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
 import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
+import { meterCloudflare, roughTokens, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 import { markKeyHealthyFromRequest } from './health.js';
 
 // Decision models over the key pool.
@@ -55,12 +56,22 @@ export interface DecisionRequest {
   questions: Record<string, DecisionQuestion>;
 }
 
+export interface ExtractionRequest {
+  state: string;
+  fields: Record<string, { type: 'text' | 'number'; instructions?: string; decimals?: number; unit?: string }>;
+  questions?: never;
+}
+
+export const CLAIRIC_MODEL = '@cf/cloudflare/clairic';
+
 export interface DecisionResponse {
   /** The decision model that answered (its catalog id). */
   model: string;
   provider: string;
   answers: Record<string, unknown>;
   usage: { input_tokens: number; output_tokens: number };
+  modelVersion?: string;
+  truncated?: boolean;
 }
 
 export class DecisionError extends Error {
@@ -96,6 +107,9 @@ interface DecisionModelRow {
   enabled: number;
   quota_label: string;
   meta_json: string | null;
+  /** The endpoint key a custom row is bound to; null for catalog rows, which
+   *  draw from any healthy key of their platform. */
+  key_id: number | null;
 }
 
 interface DecisionModelMeta {
@@ -115,7 +129,7 @@ function parseMeta(raw: string | null): DecisionModelMeta {
 
 function allDecisionRows(): DecisionModelRow[] {
   return getDb()
-    .prepare(`SELECT id, platform, model_id, display_name, priority, enabled, quota_label, meta_json
+    .prepare(`SELECT id, platform, model_id, display_name, priority, enabled, quota_label, meta_json, key_id
                 FROM media_models WHERE modality = ? ORDER BY priority, id`)
     .all(DECISION_MODALITY) as DecisionModelRow[];
 }
@@ -125,6 +139,8 @@ function allDecisionRows(): DecisionModelRow[] {
 interface AdapterResult {
   answers: Record<string, unknown>;
   usage: { input_tokens: number; output_tokens: number };
+  modelVersion?: string;
+  truncated?: boolean;
 }
 
 type Adapter = (cred: ReservedProviderCredential, modelId: string, body: DecisionRequest, signal?: AbortSignal) => Promise<AdapterResult>;
@@ -164,6 +180,10 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
   return res.json();
 }
 
+function capAsDecisionError(e: CloudflareNeuronCapError): DecisionError {
+  return new DecisionError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000);
+}
+
 function usageOf(raw: unknown): AdapterResult['usage'] {
   const u = (raw ?? {}) as { input_tokens?: unknown; output_tokens?: unknown };
   return {
@@ -187,6 +207,54 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  // Gemini Decisions uses input (not System One's state) and reports usage
+  // under total_input_tokens. It is not a generateContent/chat model.
+  google: async (cred, modelId, body, signal) => {
+    if (modelId !== 'gemini-decision-1') throw new DecisionError('Unsupported Google decision model', 400);
+    const json = await upstream('https://generativelanguage.googleapis.com/v1beta/decisions', 'google', {
+      method: 'POST', redirect: 'error',
+      headers: { 'x-goog-api-key': cred.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, input: typeof body.state === 'string' ? body.state : JSON.stringify(body.state), questions: body.questions }),
+    }, signal) as { model?: unknown; answers?: unknown; error?: unknown; usage?: { total_input_tokens?: unknown; total_output_tokens?: unknown } } | null;
+    if (!json || json.error || (json.model !== undefined && json.model !== modelId) ||
+        typeof json.usage?.total_input_tokens !== 'number' || !Number.isFinite(json.usage.total_input_tokens) || json.usage.total_input_tokens < 0 || json.usage.total_output_tokens !== 0) {
+      throw new DecisionError('Google returned an invalid decision response', 502);
+    }
+    // Google's documented response omits model; the pinned endpoint request
+    // is the identity here. Reject a conflicting identity if one is supplied.
+    const checked = checkedDecisionResult({ ...json, model: modelId, usage: { input_tokens: json.usage.total_input_tokens, output_tokens: 0 } }, 'google', modelId, body);
+    for (const answer of Object.values(checked.answers)) {
+      const confidence = (answer as { confidence?: unknown }).confidence;
+      if (typeof confidence !== 'number' || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+        throw new DecisionError('Google returned an invalid decision confidence', 502);
+      }
+    }
+    return checked;
+  },
+  // HAL-X uses `question`, not System One's `instructions`.
+  halx: async (_cred, modelId, body, signal) => {
+    if (modelId !== 'THX-01') throw new DecisionError('Unsupported HAL-X model', 400);
+    const questions = Object.fromEntries(Object.entries(body.questions).map(([id, q]) => [id, {
+      type: q.type, question: typeof q.instructions === 'string' ? q.instructions : JSON.stringify(q.instructions),
+      ...(q.criteria === undefined ? {} : { criteria: q.criteria }),
+    }]));
+    const json = await upstream('https://api.hal-x.ai/v1/systemone', 'halx', {
+      method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, state: typeof body.state === 'string' ? body.state : JSON.stringify(body.state), questions }),
+    }, signal);
+    return checkedDecisionResult(json, 'halx', modelId, body);
+  },
+  // Explicit model selection is essential: omission invokes the rules engine.
+  aisense: async (_cred, modelId, body, signal) => {
+    if (!['clef', 'nimble', 'tev1'].includes(modelId)) throw new DecisionError('Unsupported AI SENSE model', 400);
+    const state = body.state && typeof body.state === 'object' && !Array.isArray(body.state)
+      ? body.state : { message: body.state };
+    const json = await upstream('https://aisenseapi.com/services/v1/decide', 'aisense', {
+      method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, state, questions: body.questions }),
+    }, signal);
+    return checkedDecisionResult(json, 'aisense', modelId, body);
+  },
   // The modern BlockRun endpoint uses input + named questions, not the
   // System One wire shape. Keep this free decision route out of chat.
   // Contract: https://blockrun.ai/docs/api-reference/decisions
@@ -303,16 +371,22 @@ const ADAPTERS: Record<string, Adapter> = {
   cloudflare: async (cred, modelId, body, signal) => {
     const { accountId, token } = cloudflareKey(cred.key);
     const selector = modelId.split('/').pop() ?? modelId;
-    const json = await upstream(
-      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${modelId}`,
-      'cloudflare',
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: selector, state: body.state, questions: body.questions }),
-      },
-      signal,
-    ) as { success?: boolean; result?: { answers?: unknown; usage?: unknown }; errors?: Array<{ message?: string }> };
+    const payload = JSON.stringify({ model: selector, state: body.state, questions: body.questions });
+    const json = await meterCloudflare(
+      cred.key, modelId, { inputTokens: roughTokens(payload) },
+      () => upstream(
+        `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${modelId}`,
+        'cloudflare',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: payload,
+        },
+        signal,
+      ) as Promise<{ success?: boolean; result?: { answers?: unknown; usage?: unknown }; errors?: Array<{ message?: string }> }>,
+      j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
+      capAsDecisionError,
+    );
     if (json?.success === false || !json?.result) {
       throw new DecisionError(`cloudflare: ${json?.errors?.[0]?.message ?? 'no result'}`, 502);
     }
@@ -339,11 +413,172 @@ const ADAPTERS: Record<string, Adapter> = {
     if (json?.error) throw new DecisionError(`openrouter: ${json.error.message ?? 'error'}`, 502);
     return { answers: answersOf(json?.answers, 'openrouter'), usage: usageOf(json?.usage) };
   },
+  // Custom/local decision endpoint (#1777). Proposed generic contract, not a
+  // maintainer-declared standard: no existing provider shares a wire shape,
+  // so the endpoint speaks POST {base_url}/decide with
+  // { model, prompt, choices, context } and answers
+  // { decision, confidence, reasoning }. One call per question — a single
+  // decision value cannot answer several distinct questions — and each
+  // answer is validated against its question the way the built-in adapters
+  // validate theirs. Auth mirrors the custom search relay (Bearer key; the
+  // stored sentinel for keyless endpoints). SSRF is inherited: upstream()
+  // goes through proxyFetch and the url-guard (#440).
+  custom: async (cred, modelId, body, signal) => {
+    if (!cred.baseUrl) throw new DecisionError('custom decision endpoint has no base URL', 502);
+    const stateText = typeof body.state === 'string' ? body.state : JSON.stringify(body.state) ?? '';
+    const answers: Record<string, unknown> = {};
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for (const [id, question] of Object.entries(body.questions)) {
+      const choices = customDecisionChoices(id, question);
+      const instructions = typeof question.instructions === 'string'
+        ? question.instructions
+        : JSON.stringify(question.instructions) ?? '';
+      const json = await upstream(`${cred.baseUrl}/decide`, 'custom', {
+        method: 'POST', redirect: 'error',
+        headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelId,
+          prompt: stateText ? `${instructions}\n\nState: ${stateText}` : instructions,
+          choices,
+          context: body.state,
+        }),
+      }, signal) as { decision?: unknown; confidence?: unknown; reasoning?: unknown; usage?: unknown; error?: unknown } | null;
+      const usage = usageOf(json?.usage);
+      inputTokens += usage.input_tokens;
+      outputTokens += usage.output_tokens;
+      answers[id] = customDecisionAnswer(id, question, json);
+    }
+    return { answers, usage: { input_tokens: inputTokens, output_tokens: outputTokens } };
+  },
 };
 
 /** Platforms with a decision adapter. catalog-sync gates decisionModels rows
  *  on this, the way SEARCH_ENGINE_PLATFORMS gates search rows. */
 export const DECISION_PLATFORMS = new Set(Object.keys(ADAPTERS));
+
+/** Catalog-only decision platforms. Custom rows are user-registered, not
+ *  catalog rows, so catalog-sync must never insert or prune them — the same
+ *  exclusion SEARCH_ENGINE_PLATFORMS applies to custom search relays. */
+export const CATALOG_DECISION_PLATFORMS = new Set([...DECISION_PLATFORMS].filter(p => p !== 'custom'));
+
+/** The options a custom decision endpoint chooses from, per question type. */
+function customDecisionChoices(id: string, question: DecisionQuestion): string[] {
+  if (question.type === 'choice') {
+    if (!question.criteria || typeof question.criteria !== 'object' || Array.isArray(question.criteria)) {
+      throw new DecisionError(`Custom decision question '${id}' needs a criteria map of options`, 400);
+    }
+    const choices = Object.keys(question.criteria);
+    if (choices.length === 0) throw new DecisionError(`Custom decision question '${id}' needs at least one option`, 400);
+    return choices;
+  }
+  if (question.type === 'noul') return ['yes', 'no'];
+  if (!Array.isArray(question.criteria) || question.criteria.length === 0) {
+    throw new DecisionError(`Custom decision question '${id}' needs an ordered criteria array of score levels`, 400);
+  }
+  return question.criteria.map((_, i) => String(i));
+}
+
+function customDecisionConfidence(json: { confidence?: unknown }): number {
+  if (json.confidence === undefined) return 1;
+  if (typeof json.confidence !== 'number' || !Number.isFinite(json.confidence) || json.confidence < 0 || json.confidence > 1) {
+    throw new DecisionError('custom decision endpoint returned an invalid confidence', 502);
+  }
+  return json.confidence;
+}
+
+/** Split the leftover probability evenly over the options the endpoint did
+ *  not pick. The wire shape carries a single decision + confidence, not a
+ *  full distribution, so this is the honest reconstruction of one. */
+function spreadProbabilities(options: string[], chosen: string, confidence: number): Record<string, number> {
+  if (options.length === 1) return { [chosen]: 1 };
+  // Round the split so (1 - 0.9) reads 0.1, not 0.09999999999999998.
+  const rest = Math.round(((1 - confidence) / (options.length - 1)) * 1e6) / 1e6;
+  return Object.fromEntries(options.map(o => [o, o === chosen ? confidence : rest]));
+}
+
+/** Validate one endpoint answer against its question, mirroring
+ *  checkedDecisionResult for the built-ins: a decision outside the options,
+ *  a wrong type, or a missing decision is a 502, never a fabricated answer. */
+function customDecisionAnswer(
+  id: string,
+  question: DecisionQuestion,
+  json: { decision?: unknown; confidence?: unknown; reasoning?: unknown; error?: unknown } | null,
+): Record<string, unknown> {
+  if (!json || typeof json !== 'object' || Array.isArray(json) || json.error !== undefined) {
+    throw new DecisionError('custom decision endpoint returned an error or no answer', 502);
+  }
+  const decision = typeof json.decision === 'string' ? json.decision
+    : typeof json.decision === 'number' && Number.isFinite(json.decision) ? String(json.decision)
+    : null;
+  if (decision === null || decision.length === 0) {
+    throw new DecisionError(`custom decision endpoint returned no decision for '${id}'`, 502);
+  }
+  const confidence = customDecisionConfidence(json);
+  const reasoning = typeof json.reasoning === 'string' && json.reasoning.length > 0 ? { reasoning: json.reasoning } : {};
+  if (question.type === 'choice') {
+    const choices = customDecisionChoices(id, question);
+    if (!choices.includes(decision)) {
+      throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', which is not one of its options`, 502);
+    }
+    return { type: 'choice', choice: decision, probabilities: spreadProbabilities(choices, decision, confidence), confidence, ...reasoning };
+  }
+  if (question.type === 'noul') {
+    if (decision !== 'yes' && decision !== 'no') {
+      throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', expected 'yes' or 'no'`, 502);
+    }
+    return { type: 'noul', noul: decision === 'yes' ? confidence : 1 - confidence, confidence, ...reasoning };
+  }
+  const levels = customDecisionChoices(id, question);
+  const score = Number(decision);
+  if (!Number.isInteger(score) || score < 0 || score >= levels.length) {
+    throw new DecisionError(`custom decision endpoint returned '${decision}' for '${id}', expected a level 0–${levels.length - 1}`, 502);
+  }
+  return { type: 'score', score, probabilities: spreadProbabilities(levels, String(score), confidence), confidence, ...reasoning };
+}
+
+function checkedDecisionResult(raw: unknown, platform: string, model: string, body: DecisionRequest): AdapterResult {
+  const json = raw as { model?: unknown; error?: unknown; answers?: unknown; usage?: unknown; model_version?: unknown } | null;
+  if (!json || json.error || json.model !== model) throw new DecisionError(`${platform} returned a different model or an error`, 502);
+  const answers = answersOf(json.answers, platform);
+  const probability = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+  for (const [id, question] of Object.entries(body.questions)) {
+    const answer = answers[id] as Record<string, unknown> | undefined;
+    if (!answer || answer.type !== question.type) throw new DecisionError(`${platform} omitted a typed answer`, 502);
+    if (question.type === 'choice' ? typeof answer.choice !== 'string' || !question.criteria ||
+        !Object.hasOwn(question.criteria as object, answer.choice) : question.type === 'noul' ? !probability(answer.noul) :
+        typeof answer.score !== 'number' || !Number.isFinite(answer.score)) {
+      throw new DecisionError(`${platform} returned an invalid answer`, 502);
+    }
+  }
+  return { answers, usage: usageOf(json.usage), ...(typeof json.model_version === 'string' ? { modelVersion: json.model_version } : {}) };
+}
+
+/** Clairic extracts typed fields; it cannot answer choice/noul/score questions.
+ * Text + numeric fields are the live-tested subset exposed here. */
+async function extractClairic(cred: ReservedProviderCredential, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
+  const { accountId, token } = cloudflareKey(cred.key);
+  const payload = JSON.stringify({ model: 'clairic', state: body.state, fields: body.fields });
+  const json = await meterCloudflare(
+    cred.key, CLAIRIC_MODEL, { inputTokens: roughTokens(payload) },
+    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${CLAIRIC_MODEL}`, 'cloudflare', {
+      method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: payload,
+    }, signal) as Promise<{ success?: boolean; result?: { model?: unknown; answers?: unknown; usage?: unknown; truncated?: boolean } } | null>,
+    j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
+    capAsDecisionError,
+  );
+  if (!json?.success || json.result?.model !== 'clairic') throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
+  const answers = answersOf(json.result.answers, 'cloudflare');
+  for (const [id, field] of Object.entries(body.fields)) {
+    const a = answers[id] as { type?: unknown; value?: unknown } | undefined;
+    if (!a || a.type !== field.type || !Object.hasOwn(a, 'value') || (a.value !== null &&
+        (field.type === 'text' ? typeof a.value !== 'string' : typeof a.value !== 'number' || !Number.isFinite(a.value)))) {
+      throw new DecisionError('cloudflare returned an invalid extraction field', 502);
+    }
+  }
+  return { answers, usage: usageOf(json.result.usage), truncated: json.result.truncated === true };
+}
 
 // ── Routing ─────────────────────────────────────────────────────────────────
 
@@ -388,13 +623,24 @@ function hasUsableKey(platform: string): boolean {
     .get(platform);
 }
 
-/** True when at least one enabled decision model has a usable key. */
+/** True when at least one enabled decision model has a usable key. A custom
+ *  row is bound to its own endpoint key (like search's custom relays), not to
+ *  any key of platform 'custom', so it checks that key specifically. */
 export function decisionsAvailable(): boolean {
-  return allDecisionRows().some(r => r.enabled === 1 && ADAPTERS[r.platform] && hasUsableKey(r.platform));
+  return allDecisionRows().some(r => {
+    if (r.enabled !== 1 || r.model_id === CLAIRIC_MODEL || !ADAPTERS[r.platform]) return false;
+    if (r.platform === 'custom') {
+      if (r.key_id == null) return false;
+      return !!getDb()
+        .prepare("SELECT 1 FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')")
+        .get(r.key_id);
+    }
+    return hasUsableKey(r.platform);
+  });
 }
 
-function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>): DecisionModelRow[] {
-  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform]);
+function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, extraction = false): DecisionModelRow[] {
+  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (r.model_id === CLAIRIC_MODEL) === extraction);
   if (!model || model === 'auto') return skipPlatforms ? enabled.filter(r => !skipPlatforms.has(r.platform)) : enabled;
   const pinned = enabled.filter(r => r.model_id === model);
   if (pinned.length === 0) {
@@ -409,10 +655,14 @@ function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<st
   return pinned;
 }
 
-export async function runDecision(body: DecisionRequest, opts: DecisionOptions = {}): Promise<DecisionResponse> {
-  const chain = decisionChain(opts.model, opts.skipPlatforms);
+export async function runDecision(body: DecisionRequest | ExtractionRequest, opts: DecisionOptions = {}): Promise<DecisionResponse> {
+  const extraction = 'fields' in body;
+  if (extraction && body.questions !== undefined) throw new DecisionError('Send fields or questions, not both', 400);
+  if (!extraction && opts.model === CLAIRIC_MODEL) throw new DecisionError('Clairic requires fields, not questions', 400);
+  if (extraction && opts.model && !['auto', CLAIRIC_MODEL].includes(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
+  const chain = decisionChain(opts.model, opts.skipPlatforms, extraction);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
-  const questionCount = Object.keys(body.questions).length;
+  const questionCount = Object.keys(extraction ? body.fields : body.questions).length;
 
   let lastError: DecisionError | null = null;
   let attempted = 0;
@@ -421,8 +671,10 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
     const tried = new Set<number>();
     for (;;) {
       if (opts.signal?.aborted) throw new DecisionError('decision canceled by the client', 499);
+      // Custom rows are bound to their own endpoint key; catalog rows draw
+      // from any healthy key of their platform (key_id null there).
       const { credential, budgetBlocked } = reserveProviderCredential(
-        { platform: row.platform, key_id: null },
+        { platform: row.platform, key_id: row.key_id },
         ESTIMATED_TOKENS,
         keyId => tried.has(keyId) || isOnCooldown(row.platform, row.model_id, keyId),
       );
@@ -437,14 +689,15 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
       attempted++;
       const started = Date.now();
       try {
-        const out = await ADAPTERS[row.platform]!(credential, row.model_id, body, opts.signal);
+        const out = extraction ? await extractClairic(credential, body, opts.signal)
+          : await ADAPTERS[row.platform]!(credential, row.model_id, body, opts.signal);
         logDecision(row, credential.id, 'ok', Date.now() - started, questionCount, out.usage.input_tokens, clientAgent, null);
         // A served decision is evidence the key works, the same as a served
         // chat request (#1493) or search (#1612). Decision routing fires every
         // turn, so a decision key that serves fine but once got demoted to
         // 'error' by a blip had no way back into the pool.
         markKeyHealthyFromRequest(credential.id);
-        return { model: row.model_id, provider: row.platform, answers: out.answers, usage: out.usage };
+        return { model: row.model_id, provider: row.platform, ...out };
       } catch (err: any) {
         // The caller hung up: not the model's failure, so no 'error' row to drag
         // its success rate down and no bench. decision_requests.status is CHECK
@@ -465,7 +718,7 @@ export async function runDecision(body: DecisionRequest, opts: DecisionOptions =
   }
 
   if (attempted === 0 && !lastError) {
-    if (decisionsAvailable()) {
+    if (chain.some(row => hasUsableKey(row.platform))) {
       throw new DecisionError(
         'Every decision key is cooling down (rate limited or rejected). Try again later.',
         429,

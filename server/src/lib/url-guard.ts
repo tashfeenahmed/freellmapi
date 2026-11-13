@@ -118,6 +118,12 @@ function classifyIpv6(ip: string): AddressClass {
   if (h0 === 0x64 && h1 === 0xff9b && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
     return classifyIpv4(embedded);
   }
+  // NAT64 local-use prefix (64:ff9b:1::/48, RFC 8215): an operator carves a
+  // translation prefix out of it, so the third hextet is non-zero, but the
+  // IPv4 address is still in the last 32 bits.
+  if (h0 === 0x64 && h1 === 0xff9b && h2 === 1) {
+    return classifyIpv4(embedded);
+  }
   if (AWS_IMDS_V6.every((h, i) => h === hextets[i])) return 'metadata';
   if ((h0 & 0xffc0) === 0xfe80) return 'link-local'; // fe80::/10
   if ((h0 & 0xfe00) === 0xfc00) return 'private'; // fc00::/7 (ULA)
@@ -184,6 +190,13 @@ export interface AssessOptions {
   resolve?: (hostname: string) => Promise<string[]>;
   // Overrides the env flag; when true, loopback/private addresses are blocked.
   blockPrivate?: boolean;
+  // What to do when the hostname cannot be resolved (lookup error or no
+  // addresses). Defaults to blocking: a request-time check that cannot classify
+  // the target must not let the fetch go ahead and resolve it on its own
+  // (#1875). Only the save-time checks in routes/keys.ts pass true, so a LAN
+  // host that is offline right now can still be stored; every request to it is
+  // checked again, and blocked until it resolves.
+  allowUnresolved?: boolean;
 }
 
 async function defaultResolve(hostname: string): Promise<string[]> {
@@ -213,7 +226,10 @@ export async function assessProviderUrl(rawUrl: string, opts: AssessOptions = {}
   // WHATWG URL canonicalises decimal/hex/octal IPv4 forms (http://2852039166/
   // parses to hostname 169.254.169.254), so classifying url.hostname covers
   // those encodings too. IPv6 literals arrive bracketed — strip for net.isIP.
-  const hostname = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  // A trailing dot (`metadata.google.internal.`) is the same name as the FQDN
+  // without it, so strip it before the denylist match, as
+  // isLoopbackOrPrivateHostname does.
+  const hostname = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
 
   if (METADATA_HOSTNAMES.has(hostname)) {
     return { allowed: false, reason: 'cloud metadata endpoints are not reachable through custom providers' };
@@ -226,11 +242,13 @@ export async function assessProviderUrl(rawUrl: string, opts: AssessOptions = {}
     try {
       addresses = await (opts.resolve ?? defaultResolve)(hostname);
     } catch {
-      // Unresolvable now may resolve later (device not on the LAN yet, DNS
-      // hiccup). Saving is harmless — the request-time check runs again.
-      return { allowed: true };
+      addresses = [];
     }
-    if (addresses.length === 0) return { allowed: true };
+    if (addresses.length === 0) {
+      return opts.allowUnresolved
+        ? { allowed: true }
+        : { allowed: false, reason: `could not resolve ${hostname}, so its address could not be checked` };
+    }
   }
 
   const blockPrivate = opts.blockPrivate ?? blockPrivateEnabled();

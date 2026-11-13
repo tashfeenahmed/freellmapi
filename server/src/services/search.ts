@@ -12,6 +12,7 @@ import { FIRECRAWL_BASE_URL } from '../providers/firecrawl.js';
 import { LINKUP_BASE_URL } from '../providers/linkup.js';
 import { PARALLEL_BASE_URL, PARALLEL_MCP_URL } from '../providers/parallel.js';
 import { KEENABLE_APP_TITLE, KEENABLE_BASE_URL } from '../providers/keenable.js';
+import { OUTCRAWL_BASE_URL } from '../providers/outcrawl.js';
 import { isAnonymousCredential } from '../lib/credential.js';
 import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
@@ -92,6 +93,7 @@ export interface SearchOptions {
   includeAnswer?: boolean;
   /** Pin one engine by id; omitted or 'auto' walks the whole chain. */
   engine?: string;
+  engineRowId?: number;
   /** Agent the search runs for (e.g. 'claude-code'); defaults to the request's
    *  detected client. Recorded on search_requests. */
   clientAgent?: string | null;
@@ -480,6 +482,22 @@ const ADAPTERS: Record<string, Adapter> = {
     }));
     return { results: keepHits(hits) };
   },
+
+  // Outcrawl ranks hits itself and sends no score, so keepHits scores them by
+  // position. It has no news vertical; a news search runs as a web search.
+  outcrawl: async (cred, query, opts, n) => {
+    const parsed = await upstream(`${OUTCRAWL_BASE_URL}/search`, 'outcrawl', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: n }),
+    }, opts.signal) as { hits?: Array<Record<string, unknown>> };
+    const hits = (Array.isArray(parsed?.hits) ? parsed.hits : []).slice(0, n).map(r => ({
+      title: str(r.title) || str(r.url),
+      url: str(r.url),
+      content: str(r.snippet),
+    }));
+    return { results: keepHits(hits) };
+  },
 };
 
 /** Platforms with a search adapter. catalog-sync gates searchEngines rows on
@@ -565,6 +583,7 @@ export const SEARCH_PLATFORM_INFO: Record<string, { name: string; keyless?: bool
   serpsearch: { name: 'SerpSearch' },
   keenable: { name: 'Keenable', keyless: true },
   brave: { name: 'Brave Search' },
+  outcrawl: { name: 'Outcrawl' },
 };
 
 const platformName = (p: string): string => SEARCH_PLATFORM_INFO[p]?.name ?? p;
@@ -637,8 +656,13 @@ export function noSearchMessage(s: SearchStatus = searchStatus()): string {
   return `No search engine is ready. ${parts.join(' ')}`.trim();
 }
 
-function searchChain(engine: string | undefined): SearchEngineRow[] {
+function searchChain(engine: string | undefined, engineRowId?: number): SearchEngineRow[] {
   const enabled = orderedEngines().filter(r => r.enabled === 1 && ADAPTERS[r.platform]);
+  if (engineRowId !== undefined) {
+    const row = enabled.find(r => r.id === engineRowId);
+    if (!row) throw new SearchError('Search engine is unavailable or disabled', 400);
+    return [row];
+  }
   // Custom relays first, catalog engines after, each group in effective order.
   const chain = [...enabled.filter(r => r.platform === 'custom'), ...enabled.filter(r => r.platform !== 'custom')];
   if (!engine || engine === 'auto') return chain;
@@ -656,7 +680,7 @@ function searchChain(engine: string | undefined): SearchEngineRow[] {
 }
 
 export async function runSearch(query: string, opts: SearchOptions = {}): Promise<SearchResponse> {
-  const chain = searchChain(opts.engine);
+  const chain = searchChain(opts.engine, opts.engineRowId);
   const maxResults = Math.min(Math.max(1, Math.floor(opts.maxResults ?? DEFAULT_RESULTS)), MAX_RESULTS);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   // Rough token estimate for the ledger row (~4 chars/token), the same

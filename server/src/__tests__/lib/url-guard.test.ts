@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { classifyIp, assessProviderUrl, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
+import { classifyIp, assessProviderUrl, assertProviderUrlAllowed, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
 
 // SSRF guard for user-supplied custom-provider base URLs (#440). Metadata and
 // link-local targets must never be reachable; loopback/private stay allowed by
@@ -60,6 +60,8 @@ describe('classifyIp', () => {
   it('classifies NAT64, IPv4-compatible, and alternate-spelling metadata addresses', () => {
     expect(classifyIp('64:ff9b::a9fe:a9fe')).toBe('metadata'); // NAT64 → 169.254.169.254
     expect(classifyIp('64:ff9b::808:808')).toBe('public'); // NAT64 → 8.8.8.8
+    expect(classifyIp('64:ff9b:1::a9fe:a9fe')).toBe('metadata'); // NAT64 local-use prefix → 169.254.169.254
+    expect(classifyIp('64:ff9b:1::808:808')).toBe('public'); // NAT64 local-use prefix → 8.8.8.8
     expect(classifyIp('::a9fe:a9fe')).toBe('metadata'); // deprecated v4-compatible form
     expect(classifyIp('192.0.0.192')).toBe('metadata'); // Oracle Cloud legacy IMDS
     expect(classifyIp('fd00:0ec2:0:0:0:0:0:0254')).toBe('metadata'); // AWS IMDS, uncompressed
@@ -75,6 +77,23 @@ describe('assessProviderUrl', () => {
     const gcp = await assessProviderUrl('http://metadata.google.internal/computeMetadata/v1/');
     expect(gcp.allowed).toBe(false);
     expect(gcp.reason).toMatch(/metadata/);
+  });
+
+  it('blocks metadata hostnames written with a trailing dot, even when DNS fails', async () => {
+    const dnsDown = async (): Promise<string[]> => {
+      throw new Error('lookup failed');
+    };
+    for (const host of ['metadata.google.internal.', 'metadata.goog.']) {
+      const verdict = await assessProviderUrl(`http://${host}/computeMetadata/v1/`, { resolve: dnsDown });
+      expect(verdict.allowed, host).toBe(false);
+      expect(verdict.reason, host).toMatch(/metadata/);
+    }
+  });
+
+  it('blocks the NAT64 local-use metadata literal end to end', async () => {
+    const verdict = await assessProviderUrl('http://[64:ff9b:1::a9fe:a9fe]/latest/meta-data/');
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toMatch(/metadata/);
   });
 
   it('blocks decimal-encoded metadata IPs (URL canonicalisation)', async () => {
@@ -133,11 +152,42 @@ describe('assessProviderUrl', () => {
     expect((await assessProviderUrl('not a url')).allowed).toBe(false);
   });
 
-  it('lets unresolvable hostnames through (checked again at request time)', async () => {
+  it('lets an unresolvable hostname be saved when the caller opts in (offline LAN box)', async () => {
+    const verdict = await assessProviderUrl('http://my-offline-box.lan:11434/v1', {
+      resolve: async () => { throw new Error('ENOTFOUND'); },
+      allowUnresolved: true,
+    });
+    expect(verdict.allowed).toBe(true);
+  });
+
+  // #1875: the request-time check used to fail open, so a lookup failure let
+  // fetch() resolve the name itself with nothing classified.
+  it('blocks an unresolvable hostname by default (request time)', async () => {
     const verdict = await assessProviderUrl('http://my-offline-box.lan:11434/v1', {
       resolve: async () => { throw new Error('ENOTFOUND'); },
     });
-    expect(verdict.allowed).toBe(true);
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toMatch(/could not resolve/);
+  });
+
+  it('blocks a hostname whose lookup returns no addresses by default', async () => {
+    const verdict = await assessProviderUrl('http://empty.example/v1', { resolve: async () => [] });
+    expect(verdict.allowed).toBe(false);
+    const saved = await assessProviderUrl('http://empty.example/v1', { resolve: async () => [], allowUnresolved: true });
+    expect(saved.allowed).toBe(true);
+  });
+
+  it('still blocks a metadata address on the save path even with allowUnresolved', async () => {
+    const verdict = await assessProviderUrl('http://evil.example/v1', {
+      resolve: async () => ['169.254.169.254'],
+      allowUnresolved: true,
+    });
+    expect(verdict.allowed).toBe(false);
+  });
+
+  it('assertProviderUrlAllowed throws for a name that cannot resolve', async () => {
+    // .invalid is reserved (RFC 6761) and never resolves.
+    await expect(assertProviderUrlAllowed('http://nothing-here.invalid/v1')).rejects.toThrow(/could not resolve/);
   });
 });
 

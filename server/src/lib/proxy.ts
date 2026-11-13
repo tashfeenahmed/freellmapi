@@ -888,6 +888,26 @@ function proxyRequiredError(platform: string | undefined, reason: string): Error
   );
 }
 
+/** Native WebSockets use the same HTTP CONNECT/per-key proxy policy as fetch.
+ * A Fetch Relay or SOCKS dispatcher cannot carry this upgrade through undici;
+ * fail explicitly instead of silently leaking a credential on a direct path.
+ * Lazy import also keeps undici out of the ordinary startup path. */
+export async function openProviderWebSocket(url: string, platform: string, options: { protocols?: string[]; headers?: Record<string, string> } = {}): Promise<import('undici').WebSocket> {
+  if (!_initialized) applyProxyUrl('');
+  const perKey = perKeyProxyStore.getStore() ?? '';
+  let dispatcher: unknown;
+  if (shouldBypassProxy(url, platform) || (!perKey && !_proxyUrl)) {
+    if (requiresOutboundProxy(platform)) throw proxyRequiredError(platform, 'proxy routing disabled or bypassed');
+  } else {
+    if (!perKey && _proxyMode === 'fetch-relay') throw new Error('Native WebSockets require a forward proxy, not a Fetch Relay');
+    const resolved = perKey ? await resolvePerKeyDispatcher(perKey) : await resolveDispatcher();
+    if (!resolved || resolved.isSocks) throw new Error('Native WebSockets require a working HTTP/HTTPS forward proxy; no direct fallback was attempted');
+    dispatcher = resolved.dispatcher;
+  }
+  const { WebSocket } = await import('undici');
+  return new WebSocket(url, { ...options, ...(dispatcher ? { dispatcher: dispatcher as import('undici').Dispatcher } : {}) });
+}
+
 /** Route the request through the configured proxy (or straight to fetch). */
 async function dispatchFetch(
   url: string,

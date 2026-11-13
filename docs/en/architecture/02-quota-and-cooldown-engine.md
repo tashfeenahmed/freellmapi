@@ -47,6 +47,7 @@ Some providers enforce **one quota across the whole account**, not per model:
 |------|-----------|--------|
 | Daily requests | OpenRouter (1000/day free, 50/day <10 credits), ModelScope (2000→1800 margin), Requesty (200→180 margin) | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` |
 | Daily tokens | NavyAI (150K/day shared, model multipliers) | `PROVIDER_DAILY_TOKEN_CAP_<PLATFORM>` |
+| Daily neurons | Cloudflare Workers AI (10K/day per account; capped at 9K, metered locally per account and model from Cloudflare's published prices, aborted calls keep their estimate) | `CLOUDFLARE_DAILY_NEURON_CAP` |
 | Minute requests | NVIDIA NIM (40 RPM account-wide) | `PROVIDER_MINUTE_REQUEST_CAP_<PLATFORM>` |
 
 - Counted by summing per-model windows for the same `platform + keyId`.
@@ -240,6 +241,7 @@ CREATE TABLE server_logs (
 | `MAX_CONCURRENT_REQUESTS_PER_KEY_<PLATFORM>` | null | Platform-specific override |
 | `PROVIDER_DAILY_REQUEST_CAP_<PLATFORM>` | see table | Provider-wide daily request cap (0 = disable) |
 | `PROVIDER_DAILY_TOKEN_CAP_<PLATFORM>` | see table | Provider-wide daily token cap |
+| `CLOUDFLARE_DAILY_NEURON_CAP` | 9000 | Workers AI neurons per account per UTC day (0 = disable) |
 | `PROVIDER_MINUTE_REQUEST_CAP_<PLATFORM>` | see table | Provider-wide minute request cap |
 | `COOLDOWN_PROBE_DISABLED` | 0 | Kill switch for probe job |
 | `COOLDOWN_PROBE_MAX_PER_PASS` | 3 | Probes per 60s scan |

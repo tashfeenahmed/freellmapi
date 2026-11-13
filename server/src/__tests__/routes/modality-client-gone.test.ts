@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
+import * as urlGuard from '../../lib/url-guard.js';
 
 // The non-chat failover routes must honour a client that hangs up: when the
 // caller disconnects while provider #1 is still working and provider #1 then
@@ -86,6 +87,9 @@ const surfaces: Surface[] = [
     path: '/v1/rerank',
     setup: () => {
       addCustomKey('https://rerank-a.example/v1'); // custom endpoints are tried first
+      // proxyFetch re-checks a custom base URL by DNS (#1879); the fake host
+      // never resolves, and the guard is not what this test is about.
+      vi.spyOn(urlGuard, 'assertProviderUrlAllowed').mockResolvedValue(undefined);
       addKey('cohere');
     },
     p1: 'rerank-a.example/v1/rerank',
@@ -177,6 +181,7 @@ describe('non-chat failover routes honour a client that hung up', () => {
 
   afterEach(() => {
     globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
   });
 
   it.each(surfaces)('$name: no failover to provider #2 and the in-flight attempt is logged canceled', async (s) => {

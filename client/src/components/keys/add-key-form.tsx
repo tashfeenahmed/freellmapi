@@ -12,7 +12,7 @@ import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
 import type { FallbackEntry } from '@/lib/routing'
 import { scopeCandidates, shouldOfferModelPicker, type ScopeCandidate } from '@/lib/model-scope-selection'
-import { SEARCH_PROVIDERS } from '@/lib/search'
+import { invalidateSearchQueries, SEARCH_PROVIDERS } from '@/lib/search'
 import { GetKeyLink, LISTED_PLATFORMS, PLATFORMS } from './shared'
 
 /** A key that just landed, plus the models the picker should offer for it.
@@ -40,6 +40,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
   const [platform, setPlatform] = useState<Platform | ''>(initialPlatform ?? '')
   const [apiKey, setApiKey] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [projectId, setProjectId] = useState('')
   const [label, setLabel] = useState('')
   const [addAttempted, setAddAttempted] = useState(false)
   // Several credentials for one provider in one go (#705). Pooling keys is the
@@ -115,6 +116,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
       apiFetch<{ id: number; notice?: string | null }>('/api/keys', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['keys-providers'] })
@@ -136,7 +138,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
         '/api/keys/import-selected', { method: 'POST', body: JSON.stringify(body) },
       ),
     onSuccess: (data) => {
-      for (const key of ['keys', 'health', 'fallback', 'keys-providers']) {
+      for (const key of ['keys', 'health', 'fallback', 'keys-providers', 'search-engines', 'search-status']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       toast.success(t('keys.importResult', { imported: data.imported, failed: data.total - data.imported }))
@@ -145,12 +147,13 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
   })
 
   const needsAccountId = platform === 'cloudflare'
+  const needsProjectId = platform === 'jamai'
   // Key-optional providers (Kilo, OVH, AI Horde) work anonymously, but accept a
   // real key too (#1331): the field stays editable and may be left blank.
   const isKeyless = [...SEARCH_PROVIDERS, ...PLATFORMS].find(p => p.value === platform)?.keyless ?? false
   // Cloudflare pairs each token with an account id, and a key-optional
   // provider keeps a single anonymous row, so neither takes a list.
-  const canPasteSeveral = !isKeyless && !needsAccountId
+  const canPasteSeveral = !isKeyless && !needsAccountId && !needsProjectId
   const severalMode = several && canPasteSeveral
   // One per line or comma-separated, deduped, blanks dropped.
   const keyList = severalMode
@@ -164,6 +167,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
     ? (keyList.length === 0 ? t('validation.required') : null)
     : (!isKeyless && !apiKey.trim() ? t('validation.required') : null)
   const accountIdError = needsAccountId && !accountId.trim() ? t('validation.required') : null
+  const projectIdError = needsProjectId && !projectId.trim() ? t('validation.required') : null
   const pending = addKey.isPending || addSeveral.isPending
   // Editing any field retires the last add error: it described the value the
   // user is now fixing, and kept the corrected one looking rejected.
@@ -175,7 +179,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (platformError || keyError || accountIdError) {
+    if (platformError || keyError || accountIdError || projectIdError) {
       setAddAttempted(true)
       return
     }
@@ -188,7 +192,8 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
     }
     // A blank key on a key-optional provider enables its anonymous tier; the
     // backend stores a sentinel and sends no Authorization header.
-    const key = isKeyless ? apiKey.trim() : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
+    const key = needsProjectId ? `${projectId.trim()}:${apiKey.trim()}`
+      : isKeyless ? apiKey.trim() : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
     addKey.mutate({ platform, key, label: label || undefined })
   }
 
@@ -229,6 +234,15 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
             return sel?.url ? <div className="pt-0.5"><GetKeyLink url={sel.url} /></div> : null
           })()}
         </div>
+        {needsProjectId && (
+          <div className="space-y-1.5">
+            <Label htmlFor="jamai-project-id" className="text-xs">{t('keys.projectId')}</Label>
+            <Input id="jamai-project-id" value={projectId} onChange={e => setProjectId(e.target.value)}
+              placeholder="proj_…" autoComplete="off" className="w-[220px] font-mono text-xs"
+              aria-invalid={addAttempted && !!projectIdError} />
+            {addAttempted && <FieldError error={projectIdError} />}
+          </div>
+        )}
         {needsAccountId && (
           <div className="space-y-1.5">
             <Label className="text-xs">{t('keys.accountId')}</Label>
@@ -244,7 +258,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
         )}
         <div className="space-y-1.5 flex-1 min-w-[240px]">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs">{needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}</Label>
+            <Label className="text-xs">{needsProjectId ? `${t('keys.apiToken')} (PAT)` : needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}</Label>
             {canPasteSeveral && (
               <button
                 type="button"
@@ -269,7 +283,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
               type="password"
               value={apiKey}
               onChange={e => edited(setApiKey)(e.target.value)}
-              placeholder={isKeyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
+              placeholder={needsProjectId ? 'jamai_pat_…' : isKeyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
               className="font-mono text-xs"
               aria-invalid={addAttempted && !!keyError}
             />

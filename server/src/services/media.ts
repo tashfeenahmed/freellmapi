@@ -23,15 +23,21 @@ import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
 import { KENARI_BASE_URL, requireKenariFreeModel } from '../providers/kenari.js';
 import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
+import { NOVAI_BASE_URL } from '../providers/novai.js';
+import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
+import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
+import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
+import { cpuCanRunSharp } from '../lib/image-normalize.js';
+import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
  *  chat models. Keep its adapter allowlist separate for the same reason. */
-export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface']);
+export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface', 'novai', 'varosity']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
 const KEYLESS_CAPABLE = new Set(['pollinations']);
@@ -39,7 +45,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -81,6 +87,17 @@ export interface ImageResult {
   platform: string;
   modelId: string;
   images: Array<{ b64_json?: string; url?: string }>;
+}
+
+/** Preserve native adapter status/backoff for the existing failover chain. */
+async function nativeMediaResult<T>(work: Promise<T>): Promise<T> {
+  try { return await work; }
+  catch (error) {
+    if (error instanceof VarosityMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    if (error instanceof RimeMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    if (error instanceof FreeTtsMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    throw error;
+  }
 }
 export interface SpeechResult {
   platform: string;
@@ -232,6 +249,10 @@ interface ProviderCredential {
   baseUrl: string | null;
 }
 
+function capAsMediaError(e: CloudflareNeuronCapError): MediaError {
+  return new MediaError(e.message, 429, 'quota_exceeded', e.retryAfterSec * 1000);
+}
+
 async function mediaFetch(
   url: string,
   platform: string,
@@ -262,6 +283,77 @@ async function mediaFetch(
     );
   }
   return r;
+}
+
+const MEDIA_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_MEDIA_DOWNLOAD_REDIRECTS = 3;
+
+/**
+ * Download a media file from a URL named by an upstream response (#1880). The
+ * address is classified before every hop, and redirects are followed by hand
+ * (a few at most) so a public result URL cannot bounce the request to a
+ * metadata, link-local or (with FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS) private
+ * address. The body is read up to maxBytes and no further. No credentials are
+ * sent.
+ */
+async function downloadCheckedMedia(
+  rawUrl: string,
+  platform: string,
+  modality: MediaModality,
+  maxBytes: number,
+  remaining: () => number,
+  clientSignal?: AbortSignal,
+): Promise<{ body: Buffer; contentType: string | null }> {
+  let url = rawUrl;
+  for (let hop = 0; ; hop++) {
+    const verdict = await assessProviderUrl(url);
+    if (!verdict.allowed) {
+      throw new MediaError(`${platform} returned an unusable ${modality} URL: ${verdict.reason}`, 502);
+    }
+    const timeoutMs = remaining();
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = clientSignal ? AbortSignal.any([timeoutSignal, clientSignal]) : timeoutSignal;
+    const res = await proxyFetch(url, { method: 'GET', redirect: 'manual', signal }, platform, modality, timeoutMs);
+    if (MEDIA_REDIRECT_STATUSES.has(res.status)) {
+      await res.body?.cancel().catch(() => {});
+      const location = res.headers.get('location');
+      if (!location || hop >= MAX_MEDIA_DOWNLOAD_REDIRECTS) {
+        throw new MediaError(`${platform} ${modality} download redirected too many times or without a location`, 502);
+      }
+      try {
+        url = new URL(location, url).href;
+      } catch {
+        throw new MediaError(`${platform} ${modality} download redirected to an invalid URL`, 502);
+      }
+      continue;
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new MediaError(`${platform} ${res.status}: ${text.slice(0, 200)}`, res.status, undefined,
+        parseRetryAfterMs(res.headers?.get('retry-after') ?? null));
+    }
+    if (!res.body || Number(res.headers.get('content-length')) > maxBytes) {
+      await res.body?.cancel().catch(() => {});
+      throw new MediaError(`${platform} ${modality} output is missing or too large`, 502);
+    }
+    const reader = res.body.getReader();
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        remaining();
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > maxBytes) {
+          await reader.cancel();
+          throw new MediaError(`${platform} ${modality} output is too large`, 502);
+        }
+        chunks.push(Buffer.from(value));
+      }
+    } finally { reader.releaseLock(); }
+    return { body: Buffer.concat(chunks), contentType: res.headers.get('content-type') };
+  }
 }
 
 function parseSize(size?: string): [number, number] {
@@ -358,6 +450,10 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'varosity':
+      return nativeMediaResult(varosityImage(row.model_id, key, p));
+    case 'novai':
+      return callNovaiImage(row, key, p);
     case 'plugsky': {
       // Both routes share the monthly image allowance. dall-e-3 is Plugsky's
       // compatibility alias for FLUX Dev, NOT OpenAI DALL-E (catalog label).
@@ -471,7 +567,9 @@ async function callImageProvider(
           body: JSON.stringify(body),
         };
       }
-      const r = await mediaFetch(url, 'cloudflare', 'image', init);
+      const imageUsage = { tiles: Math.ceil(w / 512) * Math.ceil(h / 512) };
+      const r = await meterCloudflare(`${accountId}:${token}`, row.model_id, imageUsage,
+        () => mediaFetch(url, 'cloudflare', 'image', init), () => imageUsage, capAsMediaError);
       // FLUX returns JSON { result: { image: <b64> } }; SDXL returns raw PNG bytes.
       const ct = r.headers.get('content-type') ?? '';
       if (ct.includes('application/json')) {
@@ -494,6 +592,77 @@ async function callImageProvider(
     }
     default:
       throw new MediaError(`no image adapter for platform '${row.platform}'`, 500);
+  }
+}
+
+/** CogView returns a signed UFile URL, sometimes labelled PNG while containing
+ * JPEG bytes. Decode a bounded image and return normalized PNG base64 so SDKs
+ * do not inherit that incorrect MIME type or an expiring upstream URL. */
+async function callNovaiImage(row: MediaModelRow, key: string | null, p: ImageParams): Promise<Array<{ b64_json: string }>> {
+  if (!key) throw new MediaError('NovAI API key required', 401);
+  if (row.model_id !== 'cogview-3-flash') throw new MediaError('NovAI images support only the tested free CogView 3 Flash route', 400);
+  if ((p.n !== undefined && p.n !== 1) || (p.size !== undefined && p.size !== '1024x1024')) {
+    throw new MediaError('NovAI CogView 3 Flash supports one 1024x1024 image per request through this adapter', 400);
+  }
+  // Keep the gateway bootable on installations without a compatible native
+  // image library. In particular, loading libvips on pre-SSE4.2 CPUs can crash
+  // the process, not merely reject the import. Fail only this route, before
+  // spending provider quota, and let the existing media chain fail over.
+  if (!cpuCanRunSharp()) throw new MediaError('NovAI images require a compatible image decoder', 502);
+  let sharp: typeof import('sharp').default;
+  try { sharp = (await import('sharp')).default; }
+  catch { throw new MediaError('NovAI images require the optional image decoder', 502); }
+  const deadline = Date.now() + FETCH_TIMEOUT_MS;
+  const remaining = () => {
+    if (Date.now() >= deadline) throw new MediaError('NovAI image generation timed out', 504);
+    return Math.max(1, deadline - Date.now());
+  };
+  const response = await mediaFetch(`${NOVAI_BASE_URL}/images/generations`, 'novai', 'image', {
+    method: 'POST', redirect: 'error',
+    headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+    body: JSON.stringify({ model: row.model_id, prompt: p.prompt, size: '1024x1024', n: 1 }),
+  }, remaining());
+  const body = await response.json() as { error?: unknown; model?: unknown; data?: { url?: unknown }[] } | null;
+  if (body?.error || (body?.model !== undefined && body.model !== row.model_id) || !Array.isArray(body?.data)
+      || body.data.length !== 1 || typeof body.data[0]?.url !== 'string') {
+    throw new MediaError('NovAI returned an invalid image response', 502);
+  }
+  let url: URL;
+  try { url = new URL(body.data[0].url); } catch { throw new MediaError('NovAI returned an invalid image URL', 502); }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
+      || !(url.hostname === 'aiapi-pro.com' || url.hostname.endsWith('.ufileos.com'))
+      || !(await assessProviderUrl(url.href)).allowed) {
+    throw new MediaError('NovAI returned an unsafe image URL', 502);
+  }
+  // No authorization on output downloads; redirects cannot move the request
+  // outside the allowlist or turn a signed URL into a private-network fetch.
+  const image = await mediaFetch(url.href, 'novai', 'image', { method: 'GET', redirect: 'error' }, remaining());
+  const maxBytes = 16 * 1024 * 1024;
+  if (!image.body || Number(image.headers.get('content-length')) > maxBytes) {
+    await image.body?.cancel(); throw new MediaError('NovAI image output is missing or too large', 502);
+  }
+  const reader = image.body.getReader(), chunks: Buffer[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      remaining();
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > maxBytes) { await reader.cancel(); throw new MediaError('NovAI image output is too large', 502); }
+      chunks.push(Buffer.from(value));
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = Buffer.concat(chunks);
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (!png && !jpeg) throw new MediaError('NovAI returned no recognized PNG or JPEG image', 502);
+  try {
+    const normalized = await sharp(bytes, { limitInputPixels: 16 * 1024 * 1024, failOn: 'warning' }).png().toBuffer();
+    if (normalized.length > maxBytes) throw new Error('Decoded image too large');
+    return [{ b64_json: normalized.toString('base64') }];
+  } catch {
+    throw new MediaError('NovAI returned an invalid or oversized image', 502);
   }
 }
 
@@ -581,20 +750,89 @@ async function callHuggingFaceVideo(
   if (!videoUrl) throw new MediaError('huggingface returned no video URL', 502);
   // Every other URL this adapter contacts is built from constants; this one
   // comes out of an upstream JSON body, which is exactly the shape #440's
-  // guard exists for. Refuse anything that is not plain http(s) on a routable
-  // address before spending a request on it — a result URL pointing at cloud
-  // metadata or a link-local address would otherwise be fetched and streamed
-  // straight back to the caller.
-  const verdict = await assessProviderUrl(videoUrl);
-  if (!verdict.allowed) {
-    throw new MediaError(`huggingface returned an unusable video URL: ${verdict.reason}`, 502);
-  }
-  const downloaded = await mediaFetch(videoUrl, 'huggingface', 'video', { method: 'GET' }, remaining(), clientSignal);
-  const video = Buffer.from(await downloaded.arrayBuffer());
+  // guard exists for. downloadCheckedMedia classifies it, and every redirect
+  // target, before requesting it (#1880): a result URL pointing at cloud
+  // metadata or a link-local address, directly or through a redirect, would
+  // otherwise be fetched and streamed straight back to the caller. Capped at
+  // 100 MB like the NovAI video download.
+  const downloaded = await downloadCheckedMedia(videoUrl, 'huggingface', 'video', 100 * 1024 * 1024, remaining, clientSignal);
   return {
-    video,
-    contentType: downloaded.headers.get('content-type') ?? result.video?.content_type ?? 'video/mp4',
+    video: downloaded.body,
+    contentType: downloaded.contentType ?? result.video?.content_type ?? 'video/mp4',
   };
+}
+
+async function callNovaiVideo(row: MediaModelRow, key: string | null, p: VideoParams, clientSignal?: AbortSignal): Promise<{ video: Buffer; contentType: string }> {
+  if (!key) throw new MediaError('NovAI API key required', 401);
+  if (row.model_id !== 'cogvideox-flash') throw new MediaError('NovAI supports only the tested free CogVideoX Flash route', 400);
+  if ((p.duration !== undefined && p.duration !== 5) || p.image || p.audio || (p.aspectRatio && p.aspectRatio !== '16:9') || p.seed !== undefined) {
+    throw new MediaError('NovAI CogVideoX Flash supports five-second landscape text-to-video through this adapter', 400);
+  }
+  const deadline = Date.now() + VIDEO_FETCH_TIMEOUT_MS;
+  const remaining = () => {
+    throwIfClientGone(clientSignal);
+    if (Date.now() >= deadline) throw new MediaError('NovAI video generation timed out', 504);
+    return Math.max(1, deadline - Date.now());
+  };
+  const headers = { 'Content-Type': 'application/json', ...bearerAuthHeader(key) };
+  type Job = { id?: string; model?: string; status?: string; task_status?: string; error?: unknown; video_url?: string; video_result?: { url?: string }[] };
+  const submitted = await mediaFetch(`${NOVAI_BASE_URL}/video/generations`, 'novai', 'video', {
+    method: 'POST', redirect: 'error', headers,
+    body: JSON.stringify({ model: row.model_id, prompt: p.prompt, duration: 5 }),
+  }, remaining(), clientSignal);
+  let job = await submitted.json() as Job | null;
+  const id = job?.id;
+  if (typeof id !== 'string' || !/^[\w-]{1,200}$/.test(id)) throw new MediaError('NovAI returned no valid video job id', 502);
+  while (true) {
+    if (!job || job.error || (job.model && job.model !== row.model_id) || (job.id && job.id !== id)) throw new MediaError('NovAI returned an invalid video job', 502);
+    const status = String(job.task_status ?? job.status ?? '').toUpperCase();
+    if (['SUCCESS', 'SUCCEEDED', 'COMPLETED'].includes(status)) break;
+    if (!['PROCESSING', 'QUEUED', 'PENDING', 'RUNNING', 'IN_PROGRESS'].includes(status)) throw new MediaError('NovAI video job failed or returned an unknown status', 502);
+    // Five requests/minute: do not hammer the polling endpoint. Cancellation
+    // interrupts the wait and never resubmits an already-created generation.
+    const delay = Math.min(12_000, remaining());
+    await new Promise<void>((resolve, reject) => {
+      const done = () => { clientSignal?.removeEventListener('abort', cancel); resolve(); };
+      const timer = setTimeout(done, delay);
+      const cancel = () => { clearTimeout(timer); clientSignal?.removeEventListener('abort', cancel); reject(new MediaError('client closed the request', 499)); };
+      clientSignal?.addEventListener('abort', cancel, { once: true });
+      if (clientSignal?.aborted) cancel();
+    });
+    const polled = await mediaFetch(`${NOVAI_BASE_URL}/video/generations/${encodeURIComponent(id)}?model=cogvideox-flash`, 'novai', 'video', {
+      method: 'GET', redirect: 'error', headers: bearerAuthHeader(key),
+    }, remaining(), clientSignal);
+    job = await polled.json() as Job | null;
+  }
+  const rawUrl = job.video_result?.[0]?.url ?? job.video_url;
+  let url: URL;
+  try { url = new URL(rawUrl ?? ''); } catch { throw new MediaError('NovAI returned no video URL', 502); }
+  // The tested CDN is UFile. Strict host allowlisting supplements DNS/address
+  // checks; credentials never leave the fixed API origin, including redirects.
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash
+      || !(url.hostname === 'aiapi-pro.com' || url.hostname.endsWith('.ufileos.com'))) {
+    throw new MediaError('NovAI returned an unsafe video URL', 502);
+  }
+  if (!(await assessProviderUrl(url.href)).allowed) throw new MediaError('NovAI returned an unsafe video URL', 502);
+  const output = await mediaFetch(url.href, 'novai', 'video', { method: 'GET', redirect: 'error' }, remaining(), clientSignal);
+  const maxBytes = 100 * 1024 * 1024;
+  if (!output.body || Number(output.headers.get('content-length')) > maxBytes) {
+    await output.body?.cancel(); throw new MediaError('NovAI video output is missing or too large', 502);
+  }
+  const reader = output.body.getReader(), chunks: Buffer[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      remaining();
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > maxBytes) { await reader.cancel(); throw new MediaError('NovAI video output is too large', 502); }
+      chunks.push(Buffer.from(value));
+    }
+  } finally { reader.releaseLock(); }
+  const video = Buffer.concat(chunks);
+  if (video.length < 24 || video.toString('ascii', 4, 8) !== 'ftyp') throw new MediaError('NovAI returned no recognized MP4 video', 502);
+  return { video, contentType: 'video/mp4' };
 }
 
 async function callVideoProvider(
@@ -605,6 +843,10 @@ async function callVideoProvider(
 ): Promise<{ video: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'varosity':
+      return nativeMediaResult(varosityVideo(row.model_id, key, p, clientSignal));
+    case 'novai':
+      return callNovaiVideo(row, key, p, clientSignal);
     case 'pollinations': {
       if (!key) throw new MediaError('pollinations key required', 401);
       // Every Pollinations video model advertises its own allowed durations
@@ -651,12 +893,63 @@ async function callSpeechProvider(
 ): Promise<{ audio: Buffer; contentType: string }> {
   const key = credential.key;
   switch (row.platform) {
+    case 'groq': {
+      const arabic = row.model_id === 'canopylabs/orpheus-arabic-saudi';
+      if (!arabic && row.model_id !== 'canopylabs/orpheus-v1-english') throw new MediaError('Unknown Groq speech model', 400);
+      if (!key) throw new MediaError('Groq API key required', 401);
+      if (!p.input.trim() || [...p.input].length > 200) throw new MediaError('Groq Orpheus requires 1–200 characters per request', 400);
+      if (p.format && p.format !== 'wav') throw new MediaError('Groq Orpheus supports wav output through this adapter', 400);
+      const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
+      const supplied = p.voice?.trim().toLowerCase();
+      const voice = !supplied || standardVoices.has(supplied) ? (arabic ? 'fahad' : 'troy') : supplied;
+      const voices = arabic ? ['abdullah', 'fahad', 'sultan', 'lulwa', 'noura', 'aisha'] : ['autumn', 'diana', 'hannah', 'austin', 'daniel', 'troy'];
+      if (!voices.includes(voice)) throw new MediaError('Unsupported voice for this Groq Orpheus model', 400);
+      const r = await mediaFetch('https://api.groq.com/openai/v1/audio/speech', 'groq', 'audio', {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice, response_format: 'wav' }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      // Validate the bytes, not a provider MIME header: HTTP 200 JSON errors
+      // or truncated RIFF responses must fail over rather than become audio.
+      let pcm = false, data = false;
+      const streamed = audio.length >= 12 && audio.readUInt32LE(4) === 0xffffffff;
+      const wav = audio.length > 44 && audio.toString('ascii', 0, 4) === 'RIFF'
+        && audio.toString('ascii', 8, 12) === 'WAVE' && (streamed || audio.readUInt32LE(4) + 8 === audio.length);
+      let offset = 12;
+      if (wav) while (offset + 8 <= audio.length) {
+        const chunk = audio.toString('ascii', offset, offset + 4), declared = audio.readUInt32LE(offset + 4);
+        // Groq streams WAV with unseekable 0xffffffff RIFF/data sizes. Once
+        // fully buffered, normalize those sizes without changing any samples.
+        const unboundedData = streamed && chunk === 'data' && declared === 0xffffffff;
+        const size = unboundedData ? audio.length - offset - 8 : declared;
+        if (offset + 8 + size > audio.length) break;
+        if (chunk === 'fmt ' && size >= 16) pcm = audio.readUInt16LE(offset + 8) === 1
+          && audio.readUInt16LE(offset + 10) > 0 && audio.readUInt32LE(offset + 12) > 0
+          && audio.readUInt16LE(offset + 22) === 16;
+        if (chunk === 'data') {
+          data = size > 0 && size % 2 === 0;
+          if (unboundedData) audio.writeUInt32LE(size, offset + 4);
+        }
+        offset += 8 + size + size % 2;
+      }
+      if (!wav || !pcm || !data || offset !== audio.length) throw new MediaError('Groq returned no valid PCM16 WAV audio', 502);
+      if (streamed) audio.writeUInt32LE(audio.length - 8, 4);
+      return { audio, contentType: 'audio/wav' };
+    }
+    case 'rime':
+      return nativeMediaResult(rimeSpeech(row.model_id, key, p));
+    case 'freetts':
+      return nativeMediaResult(freeTtsSpeech(row.model_id, key, p));
+    case 'varosity':
+      return nativeMediaResult(varositySpeech(row.model_id, key, p));
     case 'freeai': {
       if (!key) throw new MediaError('Free.ai API key required', 401);
-      if (row.model_id !== 'kokoro') throw new MediaError('Free.ai currently supports only the tested Kokoro speech route', 400);
-      if (p.format && p.format !== 'wav') throw new MediaError('Free.ai Kokoro supports wav output through this adapter', 400);
+      if (!['kokoro', 'melotts', 'chatterbox', 'qwen3-tts', 'vibevoice'].includes(row.model_id)) throw new MediaError('Free.ai speech model is not a tested free route', 400);
+      if (p.format && p.format !== 'wav') throw new MediaError('Free.ai speech supports wav output through this adapter', 400);
       const standardVoices = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
-      const voice = !p.voice || standardVoices.has(p.voice.toLowerCase()) ? 'af_heart' : p.voice;
+      const defaultVoice = row.model_id === 'kokoro' ? 'af_heart' : 'default';
+      const voice = !p.voice || standardVoices.has(p.voice.toLowerCase()) ? defaultVoice : p.voice;
       const r = await mediaFetch(`${FREEAI_BASE_URL}/v1/tts/`, 'freeai', 'audio', {
         method: 'POST', redirect: 'error',
         headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
@@ -698,6 +991,37 @@ async function callSpeechProvider(
         throw new MediaError('Free.ai returned no recognized WAV audio', 502);
       }
       return { audio, contentType: 'audio/wav' };
+    }
+    case 'ovh': {
+      const config: Record<string, [string, string]> = {
+        'nvr-tts-en-us': ['en-US', 'English-US.Male-1'],
+        'nvr-tts-de-de': ['de-DE', 'German-DE-Male-1'],
+        'nvr-tts-es-es': ['es-ES', 'Spanish-ES-Female-1'],
+        'nvr-tts-it-it': ['it-IT', 'Italian-IT-Female-1'],
+      };
+      const selected = config[row.model_id];
+      if (!selected) throw new MediaError('Unknown OVH speech endpoint', 400);
+      if (p.format && p.format !== 'wav') throw new MediaError('OVH speech supports wav output through this adapter', 400);
+      const r = await mediaFetch(`https://${row.model_id}.endpoints.kepler.ai.cloud.ovh.net/api/v1/tts/text_to_audio`, 'ovh', 'audio', {
+        method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: p.input, language_code: selected[0], voice_name: selected[1], encoding: 1, sample_rate_hz: 16000 }),
+      });
+      const audio = Buffer.from(await r.arrayBuffer());
+      if (audio.length <= 44 || audio.toString('ascii', 0, 4) !== 'RIFF' || audio.toString('ascii', 8, 12) !== 'WAVE') throw new MediaError('OVH returned no recognized WAV audio', 502);
+      return { audio, contentType: 'audio/wav' };
+    }
+    case 'mistral': {
+      if (row.model_id !== 'voxtral-mini-tts-3-0') throw new MediaError('Unknown Mistral speech model', 400);
+      if (p.format && p.format !== 'mp3') throw new MediaError('Mistral speech supports mp3 output through this adapter', 400);
+      const voice = !p.voice || ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].includes(p.voice) ? 'gb_jane_neutral' : p.voice;
+      const r = await mediaFetch('https://api.mistral.ai/v1/audio/speech', 'mistral', 'audio', {
+        method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, input: p.input, voice_id: voice, response_format: 'mp3' }),
+      });
+      const j = await r.json() as { audio_data?: unknown } | null;
+      const audio = typeof j?.audio_data === 'string' ? Buffer.from(j.audio_data, 'base64') : Buffer.alloc(0);
+      if (audio.length < 10 || !(audio.toString('ascii', 0, 3) === 'ID3' || (audio[0] === 255 && (audio[1] & 224) === 224))) throw new MediaError('Mistral returned no recognized MP3 audio', 502);
+      return { audio, contentType: 'audio/mpeg' };
     }
     case 'speechify': {
       const fmt = p.format ?? 'mp3';
@@ -763,17 +1087,26 @@ async function callSpeechProvider(
     }
     case 'cloudflare': {
       const { accountId, token } = parseCfKey(key);
-      const r = await mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
+      const aura = /^@cf\/deepgram\/aura(?:-1|-2-en|-2-es)$/.test(row.model_id);
+      if (p.format && p.format !== (aura ? 'mp3' : 'wav')) throw new MediaError(`Cloudflare ${aura ? 'Aura supports mp3' : 'MeloTTS supports wav'} output through this adapter`, 400);
+      // MeloTTS bills per audio minute: ~150 spoken words (~900 chars) a minute.
+      const speechUsage = { characters: p.input.length, audioMinutes: Math.max(1 / 60, p.input.length / 900) };
+      const r = await meterCloudflare(`${accountId}:${token}`, row.model_id, speechUsage, () => mediaFetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${row.model_id}`, 'cloudflare', 'audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         // MeloTTS has a language selector, not a voice selector. In particular,
         // OpenAI's default `alloy` must never be sent as `lang`.
-        body: JSON.stringify({ prompt: p.input, lang: 'en' }),
-      });
+        body: JSON.stringify(aura ? { text: p.input } : { prompt: p.input, lang: 'en' }),
+      }), () => speechUsage, capAsMediaError);
+      if (aura) {
+        const audio = Buffer.from(await r.arrayBuffer());
+        if (audio.length < 10 || !(audio.toString('ascii', 0, 3) === 'ID3' || (audio[0] === 255 && (audio[1] & 224) === 224))) throw new MediaError('Cloudflare returned no recognized MP3 audio', 502);
+        return { audio, contentType: 'audio/mpeg' };
+      }
       const j = (await r.json()) as { result?: { audio?: string } };
       const b64 = j.result?.audio;
       if (!b64) throw new MediaError('cloudflare returned no audio', 502);
-      return { audio: Buffer.from(b64, 'base64'), contentType: 'audio/mpeg' };
+      return { audio: Buffer.from(b64, 'base64'), contentType: 'audio/wav' };
     }
     case 'siliconflow': {
       const fmt = p.format ?? 'mp3';
@@ -863,13 +1196,13 @@ function resolveMediaChain(model: string | undefined, modality: MediaModality): 
   return matches;
 }
 
-type MediaLogRow = Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>;
+type MediaLogRow = Pick<MediaModelRow, 'id' | 'platform' | 'model_id' | 'modality'>;
 
 function logMedia(row: MediaLogRow, keyId: number | null, status: 'success' | 'error' | 'canceled', latencyMs: number, error: string | null): void {
   // Through logRequest so the row also reaches request_hourly and the lifetime
   // totals; it swallows its own DB errors.
   logRequest(row.platform, row.model_id, keyId, status, 0, 0, latencyMs, error,
-    null, null, null, null, null, row.modality);
+    null, null, null, null, null, row.modality, row.id);
   // A served media request is evidence the key works, the same as a served
   // chat request (#1493) or a served search (#1612): stamp last_healthy_at
   // and lift an 'unknown'/'error' key out of the pool's cold corner.
@@ -899,7 +1232,7 @@ function chainError(modality: MediaModality, lastError: MediaError | null, hints
 }
 
 type ReserveMedia<Row> = (row: Row, skip: (keyId: number) => boolean) =>
-  { credential: ProviderCredential | null; budgetBlocked: boolean };
+  { credential: ProviderCredential | null; budgetBlocked: boolean; cooldownBlocked?: boolean; cooldownRetryAfterMs?: number };
 
 /** Keyless-capable platforms (Pollinations) run without a credential. */
 const reserveMediaCredential: ReserveMedia<MediaModelRow> = (row, skip) =>
@@ -924,6 +1257,9 @@ async function runMediaChain<Row, Out>(
     route: row => { const r = logRow(row); return { platform: r.platform, modelId: r.model_id }; },
     reserve,
     attempt,
+    // A custom endpoint pools several keys: an auth or rate-limit error
+    // tries its next key before the chain moves on.
+    retrySameRow: (row, e) => logRow(row).platform === 'custom' && [401, 402, 403, 429].includes(e.status),
     log: (row, keyId, o) =>
       logMedia(logRow(row), keyId, o.kind, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null),
   });
@@ -1003,6 +1339,7 @@ export const MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024;
 
 /** A transcription candidate: a media_models row with its meta decoded. */
 interface SttCandidate {
+  id: number;
   platform: string;
   modelId: string;
   /** The api_keys row this model is bound to, or null to pick any healthy key
@@ -1032,6 +1369,7 @@ function toSttCandidate(row: MediaModelRow): SttCandidate {
       ? Math.min(meta.maxBytes, MAX_TRANSCRIPTION_BYTES)
       : MAX_TRANSCRIPTION_BYTES;
   return {
+    id: row.id,
     platform: row.platform,
     modelId: row.model_id,
     keyId: row.key_id,
@@ -1109,6 +1447,50 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'rime':
+      return nativeMediaResult(rimeTranscription(m.modelId, key, p));
+    case 'google': {
+      if (m.modelId !== 'gemini-3.5-transcribe') throw new MediaError('Unknown Google transcription model', 400);
+      const r = await mediaFetch('https://generativelanguage.googleapis.com/v1beta/interactions', 'google', 'transcription', {
+        method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key ?? '' },
+        body: JSON.stringify({ model: m.modelId, store: false, input: [{ type: 'audio', data: p.file.toString('base64'), mime_type: p.mimeType || 'audio/wav' }] }),
+      });
+      const j = await r.json() as { status?: string; model?: string; steps?: { type?: string; content?: { type?: string; text?: unknown }[] }[] } | null;
+      if (j?.status !== 'completed' || (j.model && j.model !== m.modelId)) throw new MediaError('Google returned an incomplete or substituted transcription', 502);
+      const parts = j.steps?.filter(s => s.type === 'model_output').flatMap(s => s.content ?? []).filter(c => c.type === 'text' && typeof c.text === 'string');
+      if (!parts?.length) throw new MediaError('Google returned no transcription text', 502);
+      return { text: parts.map(c => c.text).join('') };
+    }
+    case 'freeai':
+    case 'cohere':
+    case 'electronhub':
+    case 'ovh': {
+      if (m.platform === 'electronhub' && !['voxtral-mini-2602', 'deepgram-nova-3'].includes(m.modelId)) throw new MediaError('Unknown ElectronHub transcription model', 400);
+      if (m.platform === 'freeai' && m.modelId !== 'whisper') throw new MediaError('Unknown Free.ai transcription model', 400);
+      if (m.platform === 'ovh' && !['whisper-large-v3', 'whisper-large-v3-turbo'].includes(m.modelId)) throw new MediaError('Unknown OVH transcription model', 400);
+      const url = m.platform === 'freeai' ? `${FREEAI_BASE_URL}/v1/stt/transcribe/`
+        : m.platform === 'cohere' ? 'https://api.cohere.com/v2/audio/transcriptions'
+          : m.platform === 'electronhub' ? `${ELECTRONHUB_BASE_URL}/audio/transcriptions`
+          : 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/audio/transcriptions';
+      const form = new FormData();
+      // Cohere parses metadata before the upload; it requires a language.
+      form.append('model', m.modelId);
+      if (m.platform === 'electronhub') {
+        form.append('response_format', 'json');
+        if (p.prompt) form.append('prompt', p.prompt);
+        if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
+      }
+      if (m.platform === 'cohere' || p.language) form.append('language', p.language || 'en');
+      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      const r = await mediaFetch(url, m.platform, 'transcription', {
+        method: 'POST', redirect: 'error', headers: m.platform === 'ovh' ? {} : bearerAuthHeader(key), body: form,
+      });
+      const j = await r.json() as { model?: unknown; text?: unknown; language?: unknown; duration?: unknown; segments?: unknown; error?: unknown } | null;
+      if (m.platform === 'electronhub' && j?.model !== undefined && j.model !== m.modelId) throw new MediaError('ElectronHub returned a substituted transcription model', 502);
+      if (j?.error || typeof j?.text !== 'string') throw new MediaError(`${m.platform} returned no transcription text`, 502);
+      return { text: j.text, language: typeof j.language === 'string' ? j.language : undefined,
+        duration: typeof j.duration === 'number' ? j.duration : undefined, segments: Array.isArray(j.segments) ? j.segments : undefined };
+    }
     case 'mistral': {
       // Voxtral accepts multipart file/model, language and temperature, not
       // Whisper's prompt or response_format. Normalize JSON/text locally.
@@ -1205,21 +1587,27 @@ async function callTranscriptionProvider(
             headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
             body: p.file,
           };
-      const r = await mediaFetch(url, 'cloudflare', 'transcription', init);
+      // Billed per audio minute; ~1 MB a minute is a generous guess for the
+      // compressed formats clients send (an uncompressed WAV overestimates).
+      const audioUsage = { audioMinutes: Math.max(1 / 60, p.file.length / 1_000_000) };
+      const r = await meterCloudflare(`${accountId}:${token}`, m.modelId, audioUsage,
+        () => mediaFetch(url, 'cloudflare', 'transcription', init), () => audioUsage, capAsMediaError);
       const j = (await r.json()) as {
         result?: {
           text?: string;
           vtt?: string;
           segments?: unknown[];
           transcription_info?: { language?: string; duration?: number };
+          results?: { channels?: { alternatives?: { transcript?: string }[] }[] };
         };
       };
       const result = j.result;
-      if (!result || typeof result.text !== 'string') {
+      const text = result?.text ?? result?.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+      if (!result || typeof text !== 'string') {
         throw new MediaError('cloudflare returned no transcription text', 502);
       }
       return {
-        text: result.text,
+        text,
         language: result.transcription_info?.language,
         duration: result.transcription_info?.duration,
         segments: result.segments,
@@ -1246,8 +1634,10 @@ export async function runTranscription(
     throw new MediaError(`Audio file exceeds the ${maxMb} MB provider upload limit.`, 413);
   }
   const { row: m, out } = await runMediaChain('transcription', usable,
-    m => ({ platform: m.platform, model_id: m.modelId, modality: 'transcription' }),
-    (m, skip) => reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0, skip),
+    m => ({ id: m.id, platform: m.platform, model_id: m.modelId, modality: 'transcription' }),
+    // OVH's transcription endpoint is keyless.
+    (m, skip) => m.platform === 'ovh' ? { credential: { id: null, key: null, baseUrl: null }, budgetBlocked: false }
+      : reserveProviderCredential({ platform: m.platform, key_id: m.keyId, model_id: m.modelId }, 0, skip),
     async (m, credential) => {
       const out = await callTranscriptionProvider(m, credential, p);
       if (p.responseFormat === 'vtt' && !out.vtt) {
@@ -1265,7 +1655,9 @@ export async function runSpeech(
   clientSignal?: AbortSignal,
 ): Promise<SpeechResult> {
   const { row, out } = await runMediaChain('audio', resolveMediaChain(model, 'audio'), row => row,
-    reserveMediaCredential, async (row, credential) => {
+    // OVH's speech endpoint is keyless.
+    (row, skip) => row.platform === 'ovh' ? { credential: { id: null, key: null, baseUrl: null }, budgetBlocked: false } : reserveMediaCredential(row, skip),
+    async (row, credential) => {
       const out = await callSpeechProvider(row, credential, params);
       if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
       return out;

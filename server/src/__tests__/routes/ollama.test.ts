@@ -152,6 +152,25 @@ describe('Ollama emulation', () => {
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5'))).toBe(false);
   });
 
+  // #1884: X-Forwarded-For is appended to, so the left-most hop is whatever the
+  // caller sent. A remote client through an appending local proxy must not become
+  // local by claiming 127.0.0.1 first.
+  it('ignores a caller-supplied loopback hop in front of the proxy hop', () => {
+    const peer = (remoteAddress: string, forwarded?: string) => ({
+      socket: { remoteAddress },
+      headers: forwarded ? { 'x-forwarded-for': forwarded } : {},
+    }) as any;
+    expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5'))).toBe(false);
+    expect(isLoopback(peer('127.0.0.1', '::1,203.0.113.5'))).toBe(false);
+    expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 127.0.0.1'))).toBe(true);
+    // Any non-loopback hop fails closed (stricter than #1884's last-hop rule):
+    // a spoofed hop can only take local access away, never grant it.
+    expect(isLoopback(peer('127.0.0.1', '10.0.0.5, 127.0.0.1'))).toBe(false);
+    // A hop this module cannot read as an address is refused, not trusted.
+    expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5:41234'))).toBe(false);
+    expect(isLoopback(peer('127.0.0.1', '  '))).toBe(true);
+  });
+
   it('emits Ollama-compatible NDJSON chat frames', async () => {
     setSetting('ollama_emulation', 'open-loopback');
     const originalFetch = global.fetch;

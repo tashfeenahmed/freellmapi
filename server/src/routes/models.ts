@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
-import { hasProvider } from '../providers/index.js';
+import { getProvider, hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
 import {
   isCatalogManagedModel,
@@ -24,6 +24,8 @@ import { logRequest } from '../lib/request-log.js';
 import { withKeyProxy } from '../lib/proxy.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { recordRequest, recordTokens } from '../services/ratelimit.js';
+import { recordMonthlyUsage } from '../services/key-budget.js';
+import { contentToString } from '../lib/content.js';
 
 export const modelsRouter = Router();
 
@@ -105,7 +107,7 @@ const createModelSchema = z.object({
 modelsRouter.post('/', (req: Request, res: Response) => {
   const parsed = createModelSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -113,6 +115,23 @@ modelsRouter.post('/', (req: Request, res: Response) => {
   if (!hasProvider(data.platform as Platform) && data.platform !== 'custom') {
     res.status(400).json({ error: { message: `Invalid platform "${data.platform}"` } });
     return;
+  }
+
+  // #1741: search, speech and decision integrations are registered so their
+  // keys pool and health-check like every other platform, but their adapters
+  // refuse chat. A chat row here would sit in the fallback chain burning a
+  // guaranteed failure on every request, so registration is rejected up front.
+  // A built-in adapter whose service genuinely speaks chat stays custom-endpoint
+  // territory — register the service as a custom endpoint instead.
+  // Strictly false, not falsy, so test doubles that omit the flag stay usable.
+  if (data.platform !== 'custom' && hasProvider(data.platform as Platform)) {
+    const provider = getProvider(data.platform as Platform)!;
+    if (provider.supportsChat === false) {
+      res.status(400).json({
+        error: { message: `${provider.name} does not support chat completions; its key serves the platform's native endpoints (e.g. search, speech), so it cannot be registered as a chat model` },
+      });
+      return;
+    }
   }
 
   const db = getDb();
@@ -255,7 +274,7 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
 
   const parsed = modelUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -385,6 +404,14 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   }
   modelTestCooldowns.set(id, now);
 
+  // Legacy rows for non-chat platforms: explain instead of reporting a missing key.
+  const platformProvider = hasProvider(modelRow.platform as Platform) ? getProvider(modelRow.platform as Platform) : undefined;
+  if (platformProvider?.supportsChat === false) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'Platform does not support chat completions' });
+    return;
+  }
+
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.
   const inputEstimate = 16;
@@ -402,10 +429,27 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
       { max_tokens: outputLimit, timeoutMs: 15_000 },
     ));
     const latencyMs = Date.now() - startTime;
-    const outputTokens = response.usage?.completion_tokens ?? Math.ceil((response.choices?.[0]?.message?.content?.length ?? 0) / 4);
+    const message = response.choices?.[0]?.message;
+    const outputChars = contentToString(message?.content).length + (message?.reasoning_content?.length ?? 0)
+      + (message?.tool_calls ?? []).reduce((sum, call) => sum + (call.function?.arguments?.length ?? 0), 0);
+    const outputTokens = response.usage?.completion_tokens ?? Math.ceil(outputChars / 4);
     const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
     recordRequest(route.platform, route.modelId, route.keyId);
     recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+    if (!contentToString(message?.content ?? '') && !message?.tool_calls?.length) {
+      const error = 'Empty completion; the test output limit may be too small for this model.';
+      // The upstream completed a request even though it produced no usable
+      // answer. Error rows do not settle the monthly ledger automatically.
+      getDb().transaction(() => {
+        recordMonthlyUsage(route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
+        if (!logRequest(route.platform, route.modelId, route.keyId, 'error', inputTokens, outputTokens,
+          latencyMs, error, null, route.modelId, null, 'model-test')) {
+          throw new Error('Failed to persist model test usage.');
+        }
+      })();
+      res.json({ success: false, modelId: route.modelId, latencyMs, error });
+      return;
+    }
     // The request-log transaction also settles the durable monthly ledger.
     logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens,
       latencyMs, null, null, route.modelId, null, 'model-test');

@@ -25,7 +25,7 @@ npx freellmapi setup-claude --model gpt-4o  # 固定模型
 | `setup-cline` | `~/.config/Code/User/settings.json` | OpenAI Chat | Cline VS Code 扩展 |
 | `setup-continue` | `~/.continue/config.json` | OpenAI Chat | Continue 幽灵文本自动补全 |
 | `setup-aider` | `~/.aider.conf.yml` | OpenAI Chat | Aider 结对编程 |
-| `setup-opencode` | `~/.config/opencode/config.json` | OpenAI Chat | OpenCode 智能体 |
+| `setup-opencode` | `~/.config/opencode/opencode.json` + 密钥写入 `~/.local/share/opencode/auth.json` | OpenAI Chat | OpenCode 智能体 |
 | `setup-goose` | `~/.config/goose/config.yaml` | OpenAI Chat | Goose 智能体 |
 | `setup-qwen` | `~/.qwen/settings.json` | OpenAI/Gemini | Qwen Code，`/v1` 或原生 `/v1beta` |
 | `setup-roo` | `~/.config/roo/config.json` | OpenAI Chat | Roo Code |
@@ -33,7 +33,7 @@ npx freellmapi setup-claude --model gpt-4o  # 固定模型
 | `setup-crush` | `~/.config/crush/config.json` | OpenAI Chat | Crush（charmbracelet） |
 | `setup-dsh` | `~/.dsh/config.json` | OpenAI Chat | DeepSeek Harness（#995） |
 | `setup-mimo` | `~/.config/mimocode/config.json` | OpenAI Chat | MiMo Code `~/.config/mimocode/config.json` `default_provider=freellmapi` + `[providers.freellmapi]` `type=openai` `base_url=/v1` `api_key` `model` `context_window`（#1003） |
-| `setup-atomcode` | `~/.atomcode/config.toml` | OpenAI Chat | AtomCode `default_provider=freellmapi` + `[providers.freellmapi]` TOML 保留其他提供方（#1025） |
+| `setup-atomcode` | `~/.atomcode/config.toml` | OpenAI Chat | `default_model=freellmapi` + `[provider_accounts.freellmapi]` + `[models.freellmapi]`；保留其他账户、模型和旧版提供方配置 |
 | `setup-cursor` | 仅指引 | OpenAI Chat | 手动 `Cursor Settings → Models → Add Model`（无文件） |
 | `setup-generic` | 仅指引 | OpenAI Chat | 任意 OpenAI 兼容客户端 |
 

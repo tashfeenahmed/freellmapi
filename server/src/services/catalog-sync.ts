@@ -4,7 +4,7 @@ import { getDb, getSetting, setSetting } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { MEDIA_PLATFORMS, TRANSCRIPTION_PLATFORMS, VIDEO_PLATFORMS } from './media.js';
 import { SEARCH_ENGINE_PLATFORMS, SEARCH_MODALITY } from './search.js';
-import { DECISION_MODALITY, DECISION_PLATFORMS } from './decision.js';
+import { DECISION_MODALITY, CATALOG_DECISION_PLATFORMS } from './decision.js';
 import { EMBEDDING_PLATFORMS } from './embeddings.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
@@ -578,11 +578,17 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     const inVideoCatalog = new Set<string>();
     const inSearchCatalog = new Set<string>();
     const inDecisionCatalog = new Set<string>();
+    // Historical audio entries can duplicate a dedicated STT row. The STT
+    // registry is authoritative; a disabled legacy listing must not disable
+    // its still-enabled transcription route in the shared media table.
+    const dedicatedTranscriptions = new Set((catalog.transcriptionModels ?? [])
+      .filter(m => TRANSCRIPTION_PLATFORMS.has(m.platform)).map(m => `${m.platform}:${m.modelId}`));
 
     for (const m of catalog.models) {
       // Media modalities are gated on MEDIA_PLATFORMS (decoupled from the chat
       // provider registry) and routed to media_models, then skip the chat path.
       const modality = m.modality ?? 'text';
+      if (modality === 'audio' && dedicatedTranscriptions.has(`${m.platform}:${m.modelId}`)) continue;
       if (MEDIA_MODALITIES.has(modality)) {
         if (!MEDIA_PLATFORMS.has(m.platform)) {
           counts.skippedUnknownPlatform++;
@@ -752,7 +758,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     // They ride on the platform's existing keys and never enter chat routing.
     if (catalog.decisionModels) {
       for (const m of catalog.decisionModels) {
-        if (!DECISION_PLATFORMS.has(m.platform)) {
+        if (!CATALOG_DECISION_PLATFORMS.has(m.platform)) {
           counts.skippedUnknownPlatform++;
           continue;
         }
@@ -982,7 +988,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         .prepare('SELECT id, platform, model_id FROM media_models WHERE modality = ?')
         .all(DECISION_MODALITY) as { id: number; platform: string; model_id: string }[];
       for (const c of decisionCandidates) {
-        if (!DECISION_PLATFORMS.has(c.platform)) continue;
+        if (!CATALOG_DECISION_PLATFORMS.has(c.platform)) continue;
         if (!inDecisionCatalog.has(`${c.platform}:${c.model_id}`)) {
           deleteMedia.run(c.id);
           counts.removed++;

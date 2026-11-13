@@ -46,9 +46,20 @@ import { categoryAxisProps, verticalCategoryAxisProps } from '@/lib/chart-axis'
 import { useI18n } from '@/i18n'
 import type { SearchAnalytics } from '@/lib/search'
 
-type TimeRange = '24h' | '7d' | '30d' | '90d'
+type TimeRange = '24h' | '7d' | '30d' | '90d' | 'all'
 
-const TIME_RANGES: TimeRange[] = ['24h', '7d', '30d', '90d']
+const TIME_RANGES: TimeRange[] = ['24h', '7d', '30d', '90d', 'all']
+
+// Toggle label per range. `all` is the lifetime view: headline totals are the
+// never-pruned counters, while the breakdowns below cover the history this
+// install still retains (see analytics.rangeAllNote).
+const RANGE_LABEL_KEYS: Record<TimeRange, string> = {
+  '24h': 'analytics.range24h',
+  '7d': 'analytics.range7d',
+  '30d': 'analytics.range30d',
+  '90d': 'analytics.range90d',
+  all: 'analytics.rangeAll',
+}
 
 // The range toggle sticks: whichever window you last looked at is the one the
 // tab opens with next time, instead of always snapping back to 7d (#711).
@@ -686,11 +697,17 @@ export default function AnalyticsPage() {
   const rangeLabel = range === '24h' ? t('analytics.rangeLabel24h')
     : range === '7d' ? t('analytics.rangeLabel7d')
     : range === '30d' ? t('analytics.rangeLabel30d')
-    : t('analytics.rangeLabel90d')
+    : range === '90d' ? t('analytics.rangeLabel90d')
+    : t('analytics.rangeAll')
   const spanLabel = spanDays >= 2 ? t('analytics.spanDays', { count: Math.round(spanDays) }) : t('analytics.spanHours', { count: Math.max(1, Math.round(spanDays * 24)) })
-  const savingsHint = extrapolated
-    ? t('analytics.savingsHint', { actual: actualSavings.toFixed(2), range: rangeLabel, span: spanLabel })
-    : t('analytics.savingsHintExact', { actual: actualSavings.toFixed(2), range: rangeLabel })
+  // `all` reads its own hint: "over the last all time" reads wrong, and the
+  // selected range only bounds the raw rows behind `actualSavings`, so the
+  // wording says "all retained history" rather than claiming a lifetime figure.
+  const savingsHint = range === 'all'
+    ? t('analytics.savingsHintAll', { actual: actualSavings.toFixed(2), span: spanLabel })
+    : extrapolated
+      ? t('analytics.savingsHint', { actual: actualSavings.toFixed(2), range: rangeLabel, span: spanLabel })
+      : t('analytics.savingsHintExact', { actual: actualSavings.toFixed(2), range: rangeLabel })
 
   // Pinned = the client named a specific model instead of auto-routing.
   // Honored = that model actually served it (the rest failed over).
@@ -723,14 +740,14 @@ export default function AnalyticsPage() {
       <style>{chartVars}</style>
       <PageHeader
         title={t('analytics.title')}
-        description={t('analytics.description')}
+        description={range === 'all' ? t('analytics.rangeAllNote') : t('analytics.description')}
         actions={
           <SegmentedControl
             value={range}
             onValueChange={updateRange}
             options={TIME_RANGES.map(r => ({
               value: r,
-              label: t(r === '24h' ? 'analytics.range24h' : r === '7d' ? 'analytics.range7d' : r === '30d' ? 'analytics.range30d' : 'analytics.range90d'),
+              label: t(RANGE_LABEL_KEYS[r]),
             }))}
             ariaLabel={t('analytics.title')}
           />

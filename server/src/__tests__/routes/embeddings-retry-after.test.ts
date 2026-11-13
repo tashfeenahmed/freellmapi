@@ -10,6 +10,10 @@ import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey, setSetting } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { clearAllCooldowns } from '../../services/ratelimit.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 const realFetch = globalThis.fetch;
 
@@ -20,7 +24,7 @@ let token: string;
 beforeEach(async () => {
   process.env.ENCRYPTION_KEY = '0'.repeat(64);
   initDb(':memory:');
-  // A 429 benches the key, and the in-memory bench outlives the DB reset.
+  // Cooldowns live in module memory; each fresh DB reuses key id 1.
   clearAllCooldowns();
   const db = getDb();
   const secret = encrypt('embed-rate-test-key');

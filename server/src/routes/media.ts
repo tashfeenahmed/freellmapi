@@ -73,6 +73,12 @@ mediaRouter.get('/usage', (req: Request, res: Response) => {
      AND r.status = 'success'
      AND r.platform = mm.platform
      AND r.model_id = mm.model_id
+     AND (r.media_model_db_id = mm.id OR (r.media_model_db_id IS NULL AND (
+       mm.platform <> 'custom' OR mm.endpoint_scope = COALESCE((
+         SELECT RTRIM(TRIM(k.base_url), '/') FROM api_keys k
+         WHERE k.id = r.key_id AND k.platform = 'custom'
+       ), '')
+     )))
      AND r.created_at >= datetime('now', 'start of month')
     WHERE mm.modality = ? AND mm.enabled = 1
     GROUP BY mm.id
@@ -110,7 +116,10 @@ const customMediaSchema = z.object({
   // 'search' registers a custom web search relay (Tavily wire shape at
   // POST {base_url}/search), listed on the Search page and tried first by
   // POST /v1/search (#1174).
-  modality: z.enum(['image', 'audio', 'transcription', 'search']),
+  // 'decision' registers a custom decision endpoint (proposed generic
+  // contract at POST {base_url}/decide — see services/decision.ts), listed
+  // on the Decision page and runnable by POST /v1/decisions (#1777).
+  modality: z.enum(['image', 'audio', 'transcription', 'search', 'decision']),
   apiKey: z.string().optional(),
   label: z.string().optional(),
   quotaLabel: z.string().optional(),
@@ -119,7 +128,7 @@ const customMediaSchema = z.object({
 mediaRouter.post('/custom', (req: Request, res: Response) => {
   const parsed = customMediaSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 

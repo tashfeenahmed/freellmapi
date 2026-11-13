@@ -74,7 +74,9 @@ jobs:
               desktop/dist-electron/*.zip
               desktop/dist-electron/*.blockmap
               desktop/dist-electron/latest-mac.yml
-          - os: ubuntu-latest
+          # electron-builder 25's FPM/RPM tooling is incompatible with the
+          # Ubuntu 26.04 runner. Keep all Linux package formats on the tested LTS.
+          - os: ubuntu-24.04
             ebArgs: --linux --x64
             artifact: linux-installer
             glob: |
@@ -90,12 +92,22 @@ jobs:
         with:
           node-version: '20'
 
+      # Exercise the retry contract on every OS before any dependency download.
+      - name: Test download retry helper
+        shell: bash
+        run: |
+          # Use the runner's selected Git Bash, not an unrelated WSL bash.exe.
+          if [ "$RUNNER_OS" = Windows ]; then
+            export CI_RETRY_BASH_EXE="$(cygpath -w "$BASH")"
+          fi
+          node --test desktop/scripts/retry-network-step.checks.mjs
+
       # better-sqlite3 is rebuilt for Electron with node-gyp, which still
       # imports Python's distutils (removed in 3.12). Some macos-15-intel images
       # default to a Python without it, so the rebuild failed there
       # intermittently ("No module named 'distutils'"). Pin a Python that has
       # it on the macOS hosts instead of taking whatever the image ships.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         if: runner.os == 'macOS'
         with:
           python-version: '3.11'
@@ -121,14 +133,16 @@ jobs:
           echo "desktop/package.json $VERSION matches tag $GITHUB_REF_NAME."
 
       - name: Install workspace dependencies
-        run: npm ci
+        shell: bash
+        run: bash desktop/scripts/retry-network-step.sh npm ci
 
       # `npm ci` rather than `install`: install rewrites desktop/package-lock.json
       # in place, which would quietly repair a stale lockfile version before the
       # lockfile-sync assertion in src/__tests__/version.test.ts ever sees it.
       # ci installs the lockfile as committed, so that test is a real guard here.
       - name: Install desktop dependencies
-        run: npm --prefix desktop ci
+        shell: bash
+        run: bash desktop/scripts/retry-network-step.sh npm --prefix desktop ci
 
       # The per-platform window chrome (#703's menu-bar fix) lives in a branch
       # that never executes on a developer's mac. These run on both matrix
@@ -267,6 +281,19 @@ jobs:
             echo "CSC_NAME=${identity#Developer ID Application: }"
           } >> "$GITHUB_ENV"
 
+      # GitHub reproduced the Intel runner's CloudKit failures as dropped
+      # HTTP/3 (UDP 443) connections, not rejected notarizations. Force HTTPS
+      # over TCP on this ephemeral signed-build runner before afterSign AND
+      # the DMG step use stapler. Keep all ticket/Gatekeeper checks intact.
+      # Remove when https://github.com/actions/runner-images/issues/14924 is fixed.
+      - name: Use TCP for Apple notarization on Intel macOS
+        if: matrix.os == 'macos-15-intel' && steps.maccreds.outputs.signed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'block return out quick proto udp from any to any port 443' | sudo pfctl -f -
+          sudo pfctl -E
+
       - name: Package installer
         shell: bash
         env:
@@ -315,7 +342,9 @@ jobs:
           # --publish never: the publish provider in electron-builder.yml exists
           # so latest*.yml update metadata gets GENERATED, not so electron-builder
           # uploads. The "Attach installer to release" step below owns publishing.
-          npx --no-install electron-builder ${{ matrix.ebArgs }} --publish never
+          # Preserve successful downloads/unpacked builds between transient
+          # GitHub HTTP 5xx failures. Real packaging failures still fail fast.
+          bash scripts/retry-network-step.sh npx --no-install electron-builder ${{ matrix.ebArgs }} --publish never
 
       - name: Smoke-test packaged macOS backend
         if: runner.os == 'macOS'
@@ -444,7 +473,8 @@ jobs:
         with:
           node-version: '20'
       - name: Install metadata tooling
-        run: npm --prefix desktop ci --ignore-scripts
+        shell: bash
+        run: bash desktop/scripts/retry-network-step.sh npm --prefix desktop ci --ignore-scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: macos-installer-*

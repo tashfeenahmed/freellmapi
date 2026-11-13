@@ -6,6 +6,7 @@ import {
   canMakeRequest,
   canUseTokens,
   isOnCooldown,
+  getCooldownSource,
   canUseProvider,
   canUseProviderMinute,
   canUseProviderTokens,
@@ -16,7 +17,7 @@ import {
   modelWindowUsedFraction,
 } from './ratelimit.js';
 import {
-  BANDIT_PRESETS, DEFAULT_STRATEGY, type RoutingStrategy, type RoutingWeights,
+  BANDIT_PRESETS, DEFAULT_STRATEGY, type PresetStrategy, type RoutingStrategy, type RoutingWeights,
   type KeySelectionStrategy,
   reliabilityPosterior, expectedReliability, sampleBeta,
   speedScore, intelligenceScore, intelligenceComposite, headroomFactor, rateWindowHeadroomFactor,
@@ -28,6 +29,7 @@ import {
 } from './scoring.js';
 import { TIMEOUT_ERROR_MARKERS, isProviderMomentFailure } from '../lib/error-classify.js';
 import { checkMonthlyBudget, reserveMonthlyBudget } from './key-budget.js';
+import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { applyModelWeightOverride, getModelWeightOverrides } from './model-weight-overrides.js';
 import { modelsWithOverriddenField, getCatalogModelTombstone } from './model-state.js';
 import { parseBudget } from '../lib/budget.js';
@@ -184,6 +186,13 @@ export interface ChainRow {
    * answering on score alone would be a silent substitution (#651).
    */
   match_tier?: number;
+  /**
+   * The routing preset this row's chain carries (profiles.routing_strategy), or
+   * null/absent to inherit the global strategy. Selected together with the chain
+   * rows so routeRequest can rank by the chain's own preset without a second
+   * query, and without widening routeRequest's signature.
+   */
+  profile_strategy?: string | null;
 }
 
 export interface RouteResult {
@@ -1283,26 +1292,16 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy, sampled = true
     .map(x => x.e);
 }
 
-/**
- * Route a request to the best available model.
- *
- * Ordering depends on the configured strategy (see orderChain). Everything
- * downstream — key round-robin, cooldowns, token pre-checks, custom base_url
- * resolution, vision filtering, sticky sessions — is strategy-independent.
- *
- * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
- * This prevents hallucination from model switching mid-conversation.
- *
- * @param estimatedTokens - estimated total tokens for rate limit check
- * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
- * @param preferredModelDbId - try this model first (sticky session)
- * @param requireVision - only consider models that accept image input (#118)
- * @param requireTools - only consider models that emit structured tool_calls
- * @param skipPlatforms - platforms ruled out for the rest of this request (#788)
- */
 export interface ResolvedChain {
   chain: ChainRow[];
   strategyKey: string;
+  /** Set for the global-sort aliases (`auto:smart`, `auto:fast`, …): the
+   *  preset their axis maps to. routeRequest re-orders whatever chain it is
+   *  handed under the GLOBAL strategy, which silently threw the alias's
+   *  ordering away (#1628) — callers must pass this through so the request is
+   *  scored under the axis the client asked for. Absent for plain `auto` and
+   *  `auto:<chain-name>`, where the operator's global strategy is what governs. */
+  strategyOverride?: PresetStrategy;
 }
 
 const GLOBAL_SORT_ALIASES: Record<string, string> = {
@@ -1310,6 +1309,19 @@ const GLOBAL_SORT_ALIASES: Record<string, string> = {
   fast: 'fast', fastest: 'fast', speed: 'fast',
   cheap: 'cheap', cheapest: 'cheap', price: 'cheap', budget: 'cheap',
   reliable: 'reliable', reliability: 'reliable',
+  balanced: 'balanced',
+};
+
+/** The routing preset each global-sort axis stands for. Shared by the chain
+ *  sort in getChainByGlobalSort and by ResolvedChain.strategyOverride, so the
+ *  order the alias resolves to and the order routeRequest re-sorts with can
+ *  never drift apart. `auto:cheap` is budget-leaning but keeps the balanced
+ *  blend — everything in this pool is already free (see the API docs). */
+const GLOBAL_AXIS_STRATEGY: Record<string, PresetStrategy> = {
+  smart: 'smartest',
+  fast: 'fastest',
+  cheap: 'balanced',
+  reliable: 'reliable',
   balanced: 'balanced',
 };
 
@@ -1347,18 +1359,21 @@ function getActiveChain(db: Db): ChainRow[] {
   if (profileId != null) {
     rows = db.prepare(`
       SELECT pm.model_db_id, pm.priority, pm.enabled,
+             p.routing_strategy AS profile_strategy,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
              m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+      JOIN profiles p ON p.id = pm.profile_id
       WHERE pm.profile_id = ?
       ORDER BY pm.priority ASC
     `).all(profileId) as ChainRow[];
   } else {
     rows = db.prepare(`
       SELECT fc.model_db_id, fc.priority, fc.enabled,
+             NULL AS profile_strategy,
              m.platform, m.model_id, m.display_name, m.intelligence_rank,
              m.size_label, m.monthly_token_budget,
              m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
@@ -1378,12 +1393,14 @@ function getChainByProfileName(db: Db, name: string): ChainRow[] | null {
 
   return db.prepare(`
     SELECT pm.model_db_id, pm.priority, pm.enabled,
+           p.routing_strategy AS profile_strategy,
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
            m.supports_tools, m.context_window, m.key_id, m.endpoint_scope
     FROM profile_models pm
     JOIN models m ON m.id = pm.model_db_id AND m.enabled = 1
+    JOIN profiles p ON p.id = pm.profile_id
     WHERE pm.profile_id = ?
     ORDER BY pm.priority ASC
   `).all(profile.id) as ChainRow[];
@@ -1410,14 +1427,7 @@ function getChainByGlobalSort(db: Db, globalAxis: string): ChainRow[] {
     WHERE m.enabled = 1 AND ${chainEnabled}
   `).all(...(profileId != null ? [profileId] : [])) as ChainRow[];
 
-  const strategyMap: Record<string, RoutingStrategy> = {
-    'smart': 'smartest',
-    'fast': 'fastest',
-    'cheap': 'balanced',
-    'reliable': 'reliable',
-    'balanced': 'balanced'
-  };
-  const strat = strategyMap[globalAxis] || 'balanced';
+  const strat = GLOBAL_AXIS_STRATEGY[globalAxis] ?? 'balanced';
   
   return orderChain(allEnabled, strat);
 }
@@ -1471,7 +1481,13 @@ export function resolveRoutingChain(modelString: string | undefined): ResolvedCh
       err.status = 400;
       throw err;
     }
-    return { chain, strategyKey: `auto:${globalAxis}` };
+    return {
+      chain,
+      strategyKey: `auto:${globalAxis}`,
+      // The caller must score this chain under the alias's preset, not the
+      // global one — see ResolvedChain.strategyOverride (#1628).
+      strategyOverride: GLOBAL_AXIS_STRATEGY[globalAxis] ?? 'balanced',
+    };
   }
 
   const chain = getChainByProfileName(db, suffix);
@@ -1600,6 +1616,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     return null;
   }
   const provider = getProvider(entry.platform as Platform)!;
+  // #1741: legacy rows can exist for platforms whose adapter refuses chat
+  // (registered before the gate). They can only ever fail, so drop them from
+  // the walk here instead of spending an attempt and a cooldown on each.
+  // Strictly false, not falsy: mocked providers in tests may omit the flag.
+  if (provider.supportsChat === false) {
+    diag?.push(`${label}: platform does not serve chat completions`);
+    return null;
+  }
 
   const allKeys = db.prepare(
     `SELECT * FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
@@ -1669,7 +1693,14 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
     const skipId = `${entry.platform}:${entry.model_id}:${key.id}`;
     if (skipKeys?.has(skipId)) { note('already-failed-this-request'); continue; }
 
-    if (isOnCooldown(entry.platform, entry.model_id, key.id)) { note('cooldown'); continue; }
+    if (isOnCooldown(entry.platform, entry.model_id, key.id)) {
+      // APINex's required website visit is not a spent token or RPM budget.
+      // Preserve this reason in zero-attempt routing diagnostics so DSH can
+      // show actionable instructions even after the initial 402 was benched.
+      const checkin = entry.platform === 'apinex' && getCooldownSource(entry.platform, entry.model_id, key.id) === 'checkin';
+      note(checkin ? 'checkin-required' : 'cooldown');
+      continue;
+    }
     if (!canUseProvider(entry.platform, key.id)) { note('provider-daily-cap'); continue; }
     // Account-wide per-minute budget, checked before the per-model gates: a model
     // with a NULL rpm_limit would otherwise sail past them and spend a budget its
@@ -1697,6 +1728,10 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
       note('decrypt-error');
       continue;
     }
+    // Workers AI's free neurons are per ACCOUNT, and on Workers Paid nothing
+    // upstream says when they are gone: Cloudflare bills instead. Skip a key
+    // whose account has reached today's neuron cap (services/cloudflare-neurons.ts).
+    if (entry.platform === 'cloudflare' && !cloudflareNeuronsAvailable(decryptedKey)) { note('cloudflare-neuron-cap'); continue; }
 
     const resolvedProvider = entry.platform === 'custom'
       ? resolveProvider('custom', key.base_url)
@@ -2172,13 +2207,45 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
   return null;
 }
 
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat'): RouteResult {
+/**
+ * Route a request to the best available model.
+ *
+ * Ordering depends on the configured strategy (see orderChain) — or on
+ * `strategyOverride`, when the request named an `auto:<axis>` alias. Everything
+ * downstream — key round-robin, cooldowns, token pre-checks, custom base_url
+ * resolution, vision filtering, sticky sessions — is strategy-independent.
+ *
+ * If preferredModelDbId is set, that model gets tried FIRST (sticky sessions).
+ * This prevents hallucination from model switching mid-conversation.
+ *
+ * @param estimatedTokens - estimated total tokens for rate limit check
+ * @param skipKeys - set of "platform:modelId:keyId" to skip (failed on this request)
+ * @param preferredModelDbId - try this model first (sticky session)
+ * @param requireVision - only consider models that accept image input (#118)
+ * @param requireTools - only consider models that emit structured tool_calls
+ * @param skipPlatforms - platforms ruled out for the rest of this request (#788)
+ * @param strategyOverride - score the chain under this preset instead of the
+ *   global one. Set by the `auto:<axis>` aliases (ResolvedChain.strategyOverride,
+ *   #1628); leave unset everywhere else.
+ */
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', strategyOverride?: PresetStrategy): RouteResult {
   const db = getDb();
 
-  const strategy = effectiveRoutingStrategy();
+  const rawChain = prefetchedChain ?? getActiveChain(db);
+  // A chain may carry its own routing preset (profiles.routing_strategy, #1696).
+  // Precedence for THIS request: an `auto:<axis>` alias (#1628) first, then the
+  // chain's own preset, then whatever the request otherwise routes with (the
+  // operator's setting, or the preset the 'decision' model picked, #1354).
+  // Ranking still goes through orderChain, so the reliability floor and the
+  // rate-limit/failure penalties keep applying; only the base preset changes.
+  const chainPreset = rawChain.find(e => e.profile_strategy)?.profile_strategy;
+  const strategy = strategyOverride
+    ?? ((chainPreset && VALID_STRATEGIES.includes(chainPreset as RoutingStrategy))
+      ? (chainPreset as RoutingStrategy)
+      : effectiveRoutingStrategy());
   if (strategy !== 'priority') refreshStatsCache(db);
 
-  const chain = (prefetchedChain ?? getActiveChain(db)).filter(e => e.enabled);
+  const chain = rawChain.filter(e => e.enabled);
 
   const sortedChain = orderChain(chain, strategy, true, task);
 

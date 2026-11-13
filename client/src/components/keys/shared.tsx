@@ -26,15 +26,19 @@ export function GetKeyLink({ url }: { url: string }) {
 // one (#1331): the key field is optional, a blank submit stores a sentinel so
 // routing treats the platform as configured and calls go out anonymously, and
 // a real key is stored and sent like any other.
-// `hidden: true` providers stopped offering free API access: they are no longer
-// offered to new users (add/import/add-model pickers, setup checklist), but an
+// `hidden: true` providers have unavailable free signup/key creation: they are
+// not offered to new users (add/import/add-model pickers, setup checklist), but an
 // existing key still shows with its label so it can be edited or removed.
 export const PLATFORMS: { value: Platform; label: string; url: string; keyless?: boolean; hidden?: boolean }[] = [
-  { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys' },
+  { value: 'aclide', label: 'ACLIDE (shared monthly credits)', url: 'https://aclide.com/en/dashboard/api-keys', hidden: true },
   { value: 'speka', label: 'Speka ($1 shared monthly credits)', url: 'https://speka.me/dashboard/keys' },
   { value: 'kenari', label: 'Kenari (shared daily free chat and images)', url: 'https://kenari.id' },
   { value: 'kiosapi', label: 'KiosAPI (shared daily free chat)', url: 'https://kiosapi.id/dashboard/keys' },
   { value: 'beatapi', label: 'BeatAPI (JEV decisions; temporary free offer)', url: 'https://beatapi.io' },
+  // #1804: decision-only and keyless. Listed here so the Keys page can add the
+  // anonymous sentinel the decision router needs to consider them configured.
+  { value: 'halx', label: 'HAL-X (keyless decisions)', url: 'https://hal-x.ai', keyless: true },
+  { value: 'aisense', label: 'AI SENSE (keyless decisions)', url: 'https://www.aisense.no/free-public-api-decide-api-endpoint', keyless: true },
   { value: 'apinex', label: 'APINex (shared daily free chat and decisions)', url: 'https://apinex.bond/keys' },
   { value: 'onomeo', label: 'onomeo (30 free calls / 5 hours, shared)', url: 'https://onomeo.com/dashboard' },
   { value: 'iteracompute', label: 'IteraCompute (30M free tokens / month, shared)', url: 'https://iteracompute.com/free/' },
@@ -46,6 +50,15 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'gizmo', label: 'Gizmo (monthly free-model requests)', url: 'https://gizmoplatforms.com/developers' },
   { value: 'blockrun', label: 'BlockRun (zero-priced models)', url: 'https://user.blockrun.ai/dashboard/keys' },
   { value: 'moondream', label: 'Moondream ($5 shared monthly credits)', url: 'https://moondream.ai/c/cloud/api-keys' },
+  { value: 'jamai', label: 'JamAI Base (monthly ELLM allowance)', url: 'https://cloud.jamaibase.com' },
+  { value: 'nabh', label: 'nabh.cloud (50 shared monthly credits)', url: 'https://app.nabh.cloud' },
+  { value: 'zro', label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys' },
+  { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
+  { value: 'varosity', label: 'Varosity (one-time $1.50 starter credit)', url: 'https://varosity.ai/app/keys/api-keys' },
+  { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
+  { value: 'freetts', label: 'FreeTTS (personal use only; watermarked TTS)', url: 'https://freetts.org/dashboard?section=api-keys' },
+  { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
+  { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
   { value: 'groq', label: 'Groq', url: 'https://console.groq.com/keys' },
   { value: 'cerebras', label: 'Cerebras', url: 'https://cloud.cerebras.ai' },
@@ -54,14 +67,14 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'experiential', label: 'Experiential Labs (shared monthly credits)', url: 'https://platform.experientiallabs.ai' },
   { value: 'router9', label: 'Router9 (shared monthly credits)', url: 'https://www.router9.com' },
   { value: 'septor', label: 'Septor Labs (daily free-model quota)', url: 'https://septorlabs.com/dashboard' },
-  { value: 'clod', label: 'CLōD (shared daily free requests)', url: 'https://newapp.clod.io' },
+  { value: 'clod', label: 'CLōD (shared daily free requests)', url: 'https://app.clod.io' },
   { value: 'speechify', label: 'Speechify (monthly free TTS characters)', url: 'https://platform.speechify.ai' },
-  { value: 'freeai', label: 'Free.ai (shared daily free TTS tokens)', url: 'https://free.ai/account/#api-keys' },
+  { value: 'freeai', label: 'Free.ai (shared free speech / transcription quota)', url: 'https://free.ai/account/#api-keys' },
   { value: 'blaze', label: 'BlazeAPI (daily free tokens; Discord verification)', url: 'https://blazeapi.org/dashboard' },
   { value: 'lucidity', label: 'Lucidity Composite (daily free-model requests)', url: 'https://composite.lucidity.sh' },
   { value: 'airforce', label: 'Api.Airforce (daily free requests; 1 per minute)', url: 'https://api.airforce' },
   { value: 'dreamprompting', label: 'DreamPrompting (rolling 24h free tokens and requests)', url: 'https://dreamprompting.com' },
-  { value: 'waterfall', label: 'Waterfall (community free models)', url: 'https://getwaterfall.org' },
+  { value: 'waterfall', label: 'Waterfall (community free models)', url: 'https://getwaterfall.org', hidden: true },
   { value: 'logfare', label: 'Logfare (fair-use free models)', url: 'https://logfare.ai' },
   { value: 'bai', label: 'B.AI (promotional free model)', url: 'https://b.ai' },
   { value: 'radeon', label: 'AMD Radeon Cloud (free shared models)', url: 'https://developer.amd.com.cn/radeon/tokenfactory' },
@@ -97,6 +110,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // CATALOG-ANYAPI-SMOKE-2026-08-10 in the ops repo). No quota claim until
   // their free tier demonstrably works.
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
+  // Free: glm-4.7-flash $0/1M in+out (0 Credits) on Models UI, 2026-10-22.
+  { value: 'powertokens', label: 'PowerTokens (free: glm-4.7-flash)', url: 'https://www.powertokens.ai' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name
@@ -126,6 +141,8 @@ export const CUSTOM_MODEL_KIND_LABEL: Record<ApiKeyModel['kind'], string> = {
   image: 'keys.customTypeImage',
   audio: 'keys.customTypeAudio',
   transcription: 'keys.customTypeTranscription',
+  search: 'keys.customTypeSearch',
+  decision: 'keys.customTypeDecision',
 }
 
 export function customModelDeleteKey(model: ApiKeyModel): string {

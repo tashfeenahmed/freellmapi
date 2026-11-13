@@ -7,7 +7,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
-import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy, monthlyChatTokenUsage } from '../services/router.js';
+import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, ROUTING_STRATEGIES, isValidTimezone } from '../services/scoring.js';
 import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
@@ -99,7 +99,7 @@ const routingSchema = z.object({
 fallbackRouter.put('/routing', (req: Request, res: Response) => {
   const parsed = routingSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   // Persist the weights before flipping the strategy so the new mode reads the
@@ -359,7 +359,7 @@ function knownModelIds(db: ReturnType<typeof getDb>): Set<number> {
 fallbackRouter.put('/', (req: Request, res: Response) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -514,12 +514,13 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   }
 
   // Build per-model breakdown (only platforms with keys), preserving enabled state.
-  // Same served-token definition as the router's headroom guardrail.
-  const usageByModel = new Map<string, number>();
-  for (const r of monthlyChatTokenUsage(db)) {
-    const k = `${r.platform}:${r.model_id}`;
-    usageByModel.set(k, (usageByModel.get(k) ?? 0) + r.used);
-  }
+  // Read from the monthly ledger (#1782), which survives request-log retention.
+  const usageRows = db.prepare(`
+    SELECT platform, model_id, tokens AS used
+    FROM model_monthly_usage
+    WHERE month = strftime('%Y-%m', 'now')
+  `).all() as { platform: string; model_id: string; used: number }[];
+  const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
 
   const keyCountMap = new Map(
     (db.prepare(`SELECT platform, COUNT(*) as count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`).all() as { platform: string; count: number }[])

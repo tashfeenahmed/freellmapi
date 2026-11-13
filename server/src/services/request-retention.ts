@@ -4,9 +4,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_RETENTION_DAYS = 90;
 const DEFAULT_MAX_ROWS = 100_000;
 const PRUNE_INTERVAL_MS = 60_000;
-// Hourly aggregate table. Pruned once a day on the same 60s tick; bounded at
-// ~720 rows for a 30d max UI range. See db/migrations/.../request_aggregates.ts.
-const HOURLY_RETENTION_DAYS = 30;
+// Hourly aggregate table. Pruned once a day on the same 60s tick, using the
+// SAME age bound as the raw `requests` table (REQUEST_ANALYTICS_RETENTION_DAYS):
+// the aggregate is the source of truth for the windowed totals, so pruning it
+// sooner than the rows it summarizes silently shrinks the widest UI range. A
+// hardcoded 30d did exactly that once the dashboard grew a 90d tab (and now an
+// "all" range). The table is tiny either way (~2.2k rows for 90d).
 const HOURLY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // Persisted server_logs (warn/error only — see the migration). Much shorter
 // than the 90d analytics window: a week is well past the point where anyone is
@@ -19,8 +22,10 @@ const DEFAULT_SERVER_LOGS_MAX_ROWS = 50_000;
 // further back than the newest row per pool, so the history is diagnostics
 // only — yet a busy install wrote ~15k rows a day and reached 470k rows in a
 // month. Pruned on the daily gate: the delete is a range over created_at.
-const DEFAULT_QUOTA_OBSERVATIONS_RETENTION_DAYS = 30;
-const DEFAULT_QUOTA_OBSERVATIONS_MAX_ROWS = 200_000;
+// A week / 50k rows (#1675): 200k rows with raw_json was ~130 MB of history
+// nobody reads, and the cap is still far above the live pool count.
+const DEFAULT_QUOTA_OBSERVATIONS_RETENTION_DAYS = 7;
+const DEFAULT_QUOTA_OBSERVATIONS_MAX_ROWS = 50_000;
 // search_requests (#1174) is the per-attempt web-search log behind the Search
 // dashboard. Before this it was the one log with no bound at all: every agent
 // web_search (up to 20 per request) appended a row forever. The widest UI
@@ -396,10 +401,10 @@ export function pruneRequestAnalytics(options: {
   // Decision-model attempt log, same gate (see pruneDecisionLogs).
   deleted += pruneDecisionLogs(db, nowMs);
 
-  // Hourly aggregate prune (gated once per day). The UI's widest window is
-  // 30d, so we keep at most 30 days of hourly buckets (~720 rows). The table
-  // is the source of truth for analytics totals — never prune more aggressively
-  // than the UI range, or the 30d count will silently drop again.
+  // Hourly aggregate prune (gated once per day). It shares the raw table's age
+  // bound so the windowed totals never lose days the raw rows still cover — the
+  // aggregate is the source of truth for /summary and /timeline, and pruning it
+  // more aggressively than the UI range silently drops that range's history.
   // Guarded against the table being absent (tests that init a DB before the
   // migration runs would otherwise crash the prune loop).
   // Quota observation log, once a day — or again next tick while a large
@@ -415,12 +420,14 @@ export function pruneRequestAnalytics(options: {
     const hasHourly = !!db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='request_hourly'")
       .get();
-    if (hasHourly) {
+    // retentionDays === 0 disables the age bound for the raw table too, so the
+    // aggregate keeps everything and only the (missing) count bound would apply.
+    if (hasHourly && retentionDays > 0) {
       // Hour keys are created_at truncated to the hour, in SQLite's canonical
       // 'YYYY-MM-DD HH:00:00' text (space separator) — same as logRequest.hourKey()
       // and the summary/timeline readers. Floor the cutoff to the hour and
       // compare on the space form so the prune boundary matches the read window.
-      const sqliteCutoff = toSqliteTimestamp(new Date(nowMs - HOURLY_RETENTION_DAYS * DAY_MS));
+      const sqliteCutoff = toSqliteTimestamp(new Date(nowMs - retentionDays * DAY_MS));
       const hourlyCutoff = sqliteCutoff.slice(0, 13) + ':00:00';
       const hourlyDeleted = db.prepare('DELETE FROM request_hourly WHERE hour < ?').run(hourlyCutoff).changes;
       if (hourlyDeleted > 0) {

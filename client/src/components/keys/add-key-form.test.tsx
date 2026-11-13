@@ -75,6 +75,21 @@ describe.each<Platform>(['kilo', 'ovh', 'aihorde'])('adding a %s key (key option
   })
 })
 
+// #1804: HAL-X and AI SENSE are keyless decision providers. They were missing
+// from the client's platform list, so the checklist chip opened a form that
+// demanded a key and offered no docs link.
+describe.each<Platform>(['halx', 'aisense'])('adding a %s key (keyless decisions)', platform => {
+  it('activates anonymous access with a blank key and links to the provider docs', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform={platform} />)
+    expect(keyInput().placeholder).toBe('Optional')
+    expect(container.querySelector('a[href^="https://"]')).not.toBeNull()
+    expect(container.querySelector('button[type="submit"]')?.textContent).toBe('Enable')
+    await submit()
+    expect(posted()).toEqual({ platform, key: '' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
+})
+
 it('still requires a key for a provider that needs one', async () => {
   mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="groq" />)
   await submit()
@@ -95,4 +110,79 @@ it('clears the last add error as soon as a field is edited', async () => {
 
   enter(keyInput(), 'better-key')
   expect(container.textContent).not.toContain('Key rejected by groq')
+})
+
+describe('Zro key setup', () => {
+  it('requires a key and links to the MoonMath key dashboard', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="zro" />)
+    expect(container.textContent).toContain('shared daily free usage')
+    expect(container.querySelector('a[href="https://zro.moonmath.ai/api-keys"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+
+  it('submits only the selected provider and credential', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="zro" />)
+    enter(keyInput(), 'sk-zro-test-key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'zro', key: 'sk-zro-test-key' })
+  })
+})
+
+describe('FreeInference key setup', () => {
+  it('offers the provider with its research logging notice and requires a key', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freeinference" />)
+    expect(container.textContent).toContain('FreeInference (research; requests logged)')
+    expect(container.querySelector('a[href="https://freeinference.org"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+  it('saves a masked provider key without requiring a custom endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freeinference" />)
+    enter(keyInput(), 'hyi-test-key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'freeinference', key: 'hyi-test-key' })
+  })
+})
+
+describe('FreeModel personal BYOK setup', () => {
+  it('shows Telegram verification and requires an API key', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freemodel" />)
+    expect(container.textContent).toContain('FreeModel (monthly allowance; Telegram verification)')
+    expect(container.querySelector('a[href="https://freemodel.in/dashboard"]')).not.toBeNull()
+    await submit()
+    expect(posted()).toBeUndefined()
+  })
+  it('sends the masked key to the existing encrypted key endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="freemodel" />)
+    enter(keyInput(), 'fm_test_key')
+    await submit()
+    expect(posted()).toEqual({ platform: 'freemodel', key: 'fm_test_key' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
+})
+
+describe('JamAI project-scoped PAT', () => {
+  it('requires both fields, masks the PAT, and does not offer bulk paste', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="jamai" />)
+    expect(container.textContent).toContain('Project ID')
+    expect(container.textContent).toContain('(PAT)')
+    expect(container.textContent).not.toContain('Paste several')
+    expect(keyInput().placeholder).toBe('jamai_pat_…')
+    enter(keyInput(), 'jamai_pat_example')
+    await submit()
+    expect(posted()).toBeUndefined()
+    expect(container.querySelector('#jamai-project-id')?.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('stores a trimmed composite credential using the existing encrypted-key endpoint', async () => {
+    mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="jamai" />)
+    enter(container.querySelector<HTMLInputElement>('#jamai-project-id')!, ' proj_example ')
+    await submit()
+    expect(posted()).toBeUndefined()
+    enter(keyInput(), ' jamai_pat_example ')
+    await submit()
+    expect(posted()).toEqual({ platform: 'jamai', key: 'proj_example:jamai_pat_example' })
+    expect(onSuccess).toHaveBeenCalled()
+  })
 })

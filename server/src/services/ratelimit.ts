@@ -4,6 +4,7 @@ import { getDb, getSetting, setSetting } from '../db/index.js';
 import { isLoopbackOrPrivateUrl } from '../lib/url-guard.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { isUsableKey } from './key-state.js';
+import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 interface Window {
   timestamps: number[];
@@ -71,15 +72,34 @@ const leases = new Map<number, Lease>();
 let nextLeaseId = 1;
 
 // A lease should always be released explicitly by the fallback loop's finally
-// block. This bound is the backstop for a path that somehow doesn't: without it
-// a single leaked lease would count against a key's concurrency budget forever.
-// Comfortably longer than the per-attempt provider timeout.
-const LEASE_MAX_AGE_MS = 2 * MINUTE;
+// block. Pruning is the backstop for a path that somehow doesn't: without it a
+// single leaked lease would count against a key's concurrency budget forever.
+//
+// The bound has to outlive the request it stands for, not the other way round. A
+// flat two minutes did not: the slow platforms use a 120-second chat timeout and
+// a streaming call keeps running after the response headers arrive, so a live
+// lease was pruned mid-request, a second request saw neither the in-flight lease
+// nor the recorded usage, and both could pass RPM, TPM, the daily cap and the
+// concurrency cap. So the age comes from the platform's own timeout, with a
+// floor and a margin, and a platform configured with no timeout at all
+// (PROVIDER_TIMEOUT_<PLATFORM>=0) is never aged out. The floor is 30 minutes
+// because the timeout read here is the env override or a 120s default, not a
+// provider's built-in value: AMD Radeon is built with a 600s timeout for long
+// reasoning calls, and a stream runs on past that first-byte deadline.
+const LEASE_BACKSTOP_FLOOR_MS = 30 * MINUTE;
+const LEASE_BACKSTOP_MARGIN_MS = 2 * MINUTE;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 120 * 1000;
+
+function leaseMaxAgeMs(platform: string): number {
+  const timeout = providerTimeoutMs(platform, DEFAULT_PROVIDER_TIMEOUT_MS);
+  if (timeout === 0) return Number.POSITIVE_INFINITY;
+  return Math.max(LEASE_BACKSTOP_FLOOR_MS, timeout * 2 + LEASE_BACKSTOP_MARGIN_MS);
+}
 
 function pruneLeases(now: number): void {
   if (leases.size === 0) return;
   for (const [id, lease] of leases) {
-    if (now - lease.createdAt > LEASE_MAX_AGE_MS) leases.delete(id);
+    if (now - lease.createdAt > leaseMaxAgeMs(lease.platform)) leases.delete(id);
   }
 }
 
@@ -862,7 +882,9 @@ const cooldowns = new Map<string, number>(); // key -> expiry timestamp
 //                     no evidence the account was topped up, so never probed.
 //   'tier'          — 403 model-not-on-tier. Same reasoning: the key validates
 //                     fine while the model stays gated, so never probed.
-export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier';
+//   'checkin'       — APINex daily website check-in. Operator-resumable, but
+//                     never allowed to overwrite a provider-confirmed hold.
+export type CooldownSource = 'heuristic' | 'authoritative' | 'credit' | 'tier' | 'checkin';
 
 // Escalating cooldown: track hits per key over a rolling 24h window so a
 // daily-quota exhaustion (OpenRouter free: 50/day, Cohere free: 33/day, etc.)
@@ -1208,18 +1230,23 @@ function persistedCooldown(platform: string, modelId: string, keyId: number): Co
 }
 
 /**
- * A new bench landing on an active one (M02). The later expiry wins, with its
- * start time. The source follows the later bench too, except that a provider
- * fact ('authoritative', 'credit', 'tier') is never downgraded to our own guess
- * ('heuristic'): the prober clears a heuristic bench whole, and that would end
- * the provider's stated window early. An expired bench is simply replaced.
+ * A new bench landing on an active one (M02, #1877). No bench ever shortens an
+ * active one. Our own guess ('heuristic') never replaces or stretches a
+ * provider fact ('authoritative', 'credit', 'tier'). Otherwise the later expiry
+ * wins, with its start time. A shorter provider fact landing on a longer guess
+ * keeps the guess's expiry but takes the fact's source: the prober clears a
+ * heuristic bench whole, and that would end the provider's stated window early.
+ * An expired bench is simply replaced.
  */
 function mergeCooldown(existing: CooldownBench | null, incoming: CooldownBench, now: number): CooldownBench {
   if (!existing || existing.expiresAtMs < now) return incoming;
-  const later = incoming.expiresAtMs >= existing.expiresAtMs ? incoming : existing;
-  const earlier = later === incoming ? existing : incoming;
-  const source = later.source === 'heuristic' && earlier.source !== 'heuristic' ? earlier.source : later.source;
-  return { expiresAtMs: later.expiresAtMs, source, setAtMs: later.setAtMs };
+  // 'checkin' is as weak as a guess: any bench may take it over (#1877).
+  const weak = (s: CooldownSource) => s === 'heuristic' || s === 'checkin';
+  if (incoming.source === 'heuristic' && !weak(existing.source)) return existing;
+  if (incoming.expiresAtMs >= existing.expiresAtMs) return incoming;
+  return existing.source === 'heuristic' && !weak(incoming.source)
+    ? { ...existing, source: incoming.source }
+    : existing;
 }
 
 function persistCooldown(
@@ -1285,6 +1312,34 @@ export function setCooldown(
 ) {
   const key = `${platform}:${modelId}:${keyId}:cooldown`;
   const now = Date.now();
+  if (source === 'checkin') {
+    const expiresAtMs = now + durationMs;
+    // The account-wide check-in bench also visits sibling routes that may
+    // already have real credit, tier or Retry-After holds. Preserve their
+    // provenance AND expiry, otherwise "Resume key" would clear those facts.
+    // Write and check atomically; if persistence fails, do not relabel an
+    // in-memory hold whose source we cannot establish.
+    const written = withDb(db => db.transaction(() => {
+      const stored = db.prepare(`
+        SELECT 1 FROM rate_limit_cooldowns
+         WHERE platform = ? AND model_id = ? AND key_id = ?
+      `).get(platform, modelId, keyId);
+      if (!stored && (cooldowns.get(key) ?? 0) > now) return false;
+      const result = db.prepare(`
+        INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms, source, set_at_ms)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(platform, model_id, key_id) DO UPDATE SET
+          expires_at_ms = excluded.expires_at_ms,
+          source = excluded.source,
+          set_at_ms = excluded.set_at_ms
+        WHERE rate_limit_cooldowns.expires_at_ms <= excluded.set_at_ms
+           OR rate_limit_cooldowns.source IN ('heuristic', 'checkin')
+      `).run(platform, modelId, keyId, expiresAtMs, source, now);
+      return Number(result.changes ?? 0) > 0;
+    })());
+    if (written) cooldowns.set(key, expiresAtMs);
+    return;
+  }
   // The DB is authoritative when readable (as in isOnCooldown); otherwise fall
   // back to the in-memory expiry, whose provenance is unknown.
   let existing = persistedCooldown(platform, modelId, keyId);
@@ -1336,7 +1391,19 @@ export function isOnCooldown(platform: string, modelId: string, keyId: number): 
   return true;
 }
 
+/** Why an active model/key is benched. Used only after the existing cooldown gate rejects a route. */
+export function getCooldownSource(platform: string, modelId: string, keyId: number): CooldownSource | null {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT source FROM rate_limit_cooldowns
+       WHERE platform = ? AND model_id = ? AND key_id = ? AND expires_at_ms > ?
+    `).get(platform, modelId, keyId, Date.now()) as { source: CooldownSource } | undefined;
+    return row?.source ?? null;
+  }) ?? null;
+}
+
 export interface ActiveCooldown {
+  source: CooldownSource;
   platform: string;
   modelId: string;
   keyId: number;
@@ -1362,16 +1429,17 @@ export function getActiveCooldownsForKeys(
 
   const placeholders = unique.map(() => '?').join(', ');
   const rows = withDb(db => db.prepare(`
-    SELECT platform, model_id, key_id, expires_at_ms
+    SELECT platform, model_id, key_id, expires_at_ms, source
       FROM rate_limit_cooldowns
      WHERE expires_at_ms > ?
        AND key_id IN (${placeholders})
      ORDER BY expires_at_ms ASC
-  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number }[]) ?? [];
+  `).all(now, ...unique) as { platform: string; model_id: string; key_id: number; expires_at_ms: number; source: CooldownSource }[]) ?? [];
 
   for (const row of rows) {
     const list = grouped.get(row.key_id) ?? [];
     list.push({
+      source: row.source,
       platform: row.platform,
       modelId: row.model_id,
       keyId: row.key_id,
@@ -1411,6 +1479,38 @@ export function clearCooldownsForKey(keyId: number): number {
   }
 
   return Math.max(cleared, memoryCleared);
+}
+
+/**
+ * Remove only APINex daily website-check-in cooldowns for a key.
+ * The existing all-sources clear remains available to operators; this scoped
+ * recovery must not lift credit, tier, or provider-confirmed rate limits.
+ * Read the persisted source before touching in-memory state, so an unknown
+ * source is never cleared optimistically when the database is unavailable.
+ */
+export function clearApinexCheckinCooldownsForKey(keyId: number): number {
+  if (!Number.isInteger(keyId)) return 0;
+
+  const removed = withDb(db => db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT model_id FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).all(keyId) as { model_id: string }[];
+
+    const result = db.prepare(`
+      DELETE FROM rate_limit_cooldowns
+       WHERE platform = 'apinex' AND key_id = ? AND source = 'checkin'
+    `).run(keyId);
+    return { modelIds: rows.map(row => row.model_id), count: Number(result.changes ?? 0) };
+  })());
+
+  if (!removed) return 0;
+  for (const modelId of removed.modelIds) {
+    const key = `apinex:${modelId}:${keyId}`;
+    cooldowns.delete(`${key}:cooldown`);
+    cooldownHits.delete(key);
+  }
+  return removed.count;
 }
 
 /**

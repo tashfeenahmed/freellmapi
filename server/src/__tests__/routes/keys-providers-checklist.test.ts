@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
@@ -30,7 +30,7 @@ function addKey(platform: string) {
 describe('GET /api/keys/providers — provider checklist (#543)', () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeEach(() => {
     process.env.ENCRYPTION_KEY = '0'.repeat(64);
     initDb(':memory:');
     app = createApp();
@@ -53,6 +53,8 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
     expect(groq).toMatchObject({ platform: 'groq', configured: false, keyCount: 0 });
     expect(typeof groq.name).toBe('string');
     expect(typeof groq.keyless).toBe('boolean');
+    expect(body.providers.find((p: { platform: string }) => p.platform === 'zro'))
+      .toMatchObject({ platform: 'zro', name: 'Zro (MoonMath.ai)', configured: false, keyless: false });
     expect(body.providers.find((p: { platform: string }) => p.platform === 'moondream'))
       .toMatchObject({ platform: 'moondream', name: 'Moondream', configured: false, keyless: false });
     expect(body.providers.find((p: { platform: string }) => p.platform === 'llmtr'))
@@ -80,5 +82,36 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
     expect(groq).toMatchObject({ configured: true, keyCount: 1, enabledKeyCount: 1 });
     expect(body.summary.configured).toBe(1);
     expect(body.summary.unconfigured).toBe(body.summary.total - 1);
+  });
+
+  // Unavailable key creation must not remove existing keys or catalog models.
+  it.each(['aclide', 'waterfall'])('hides unconfigured %s but preserves configured keys and models (#1768)', async platform => {
+    const db = getDb();
+    db.prepare('INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, enabled) VALUES (?, ?, ?, 1, 1, 1)')
+      .run(platform, 'existing-test-model', 'Existing model');
+    const models = db.prepare('SELECT * FROM models WHERE platform = ?').all(platform);
+    let { body } = await request(app, '/api/keys/providers');
+    expect(body.providers.some((p: { platform: string }) => p.platform === platform)).toBe(false);
+    addKey(platform);
+    const savedKey = db.prepare('SELECT * FROM api_keys WHERE platform = ?').get(platform);
+    ({ body } = await request(app, '/api/keys/providers'));
+    expect(body.providers.find((p: { platform: string }) => p.platform === platform))
+      .toMatchObject({ configured: true, keyCount: 1, enabledKeyCount: 1 });
+    expect(body.summary.configured).toBe(1);
+    expect(db.prepare('SELECT * FROM api_keys WHERE platform = ?').get(platform)).toEqual(savedKey);
+    const keys = await request(app, '/api/keys');
+    expect(keys.body.find((key: { platform: string }) => key.platform === platform))
+      .toMatchObject({ platform, enabled: true, status: 'healthy' });
+
+    // Disabled credentials must remain manageable, not disappear from setup.
+    db.prepare('UPDATE api_keys SET enabled = 0 WHERE platform = ?').run(platform);
+    ({ body } = await request(app, '/api/keys/providers'));
+    expect(body.providers.find((p: { platform: string }) => p.platform === platform))
+      .toMatchObject({ configured: true, keyCount: 1, enabledKeyCount: 0 });
+
+    db.prepare('DELETE FROM api_keys WHERE platform = ?').run(platform);
+    ({ body } = await request(app, '/api/keys/providers'));
+    expect(body.providers.some((p: { platform: string }) => p.platform === platform)).toBe(false);
+    expect(db.prepare('SELECT * FROM models WHERE platform = ?').all(platform)).toEqual(models);
   });
 });

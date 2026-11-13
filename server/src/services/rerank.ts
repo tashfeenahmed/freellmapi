@@ -7,6 +7,7 @@ import { USABLE_KEY_SQL } from './key-state.js';
 import { runFailoverChain } from '../lib/failover-chain.js';
 import { logRequest } from '../lib/request-log.js';
 import { markKeyHealthyFromRequest } from './health.js';
+import { proxyFetch } from '../lib/proxy.js';
 
 // Cohere-style rerank over the existing free-tier key pool (#1029). Deliberately
 // narrow first slice: platform='cohere' keys and custom OpenAI-compatible
@@ -79,12 +80,16 @@ async function callProvider(cand: RerankCandidate, model: string | undefined, qu
     : `${cand.baseUrl!.replace(/\/$/, '')}/rerank`;
   const modelId = effectiveModel(cand, model);
   const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  const res = await fetch(url, {
+  // proxyFetch, like every other inference path (#1879): for a custom base URL
+  // it re-checks the address on every request and refuses redirects, so a
+  // stored base URL cannot send the bearer key to a metadata or internal
+  // address. It also applies the configured outbound proxy.
+  const res = await proxyFetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${cand.key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: modelId, query, documents, top_n: topN }),
     signal: clientSignal ? AbortSignal.any([timeout, clientSignal]) : timeout,
-  });
+  }, cand.platform, 'unknown', FETCH_TIMEOUT_MS);
   if (!res.ok) throw await upstreamError(res);
   const body = await res.json() as { results?: { index?: number; relevance_score?: number; document?: { text?: string } | string }[] };
   if (!Array.isArray(body.results)) throw new RerankError('upstream returned malformed rerank results', 502);

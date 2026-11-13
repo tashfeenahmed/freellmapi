@@ -5,7 +5,9 @@ export function isLoopbackAddress(value: string | undefined): boolean {
   // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
   if (addr.toLowerCase().startsWith('::ffff:')) addr = addr.slice(7);
   if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
+  // Only a real 127.0.0.0/8 address: four decimal octets, each 0-255.
+  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(addr);
+  return octets !== null && octets.slice(1).every(octet => Number(octet) <= 255);
 }
 
 // Is the caller on this machine? The socket peer address is the authority,

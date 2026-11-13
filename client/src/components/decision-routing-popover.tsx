@@ -38,7 +38,7 @@ export function DecisionRoutingPopover({ status, onSave, saving }: {
     queryKey: ['decision-models'],
     queryFn: () => apiFetch('/api/decisions/models'),
   })
-  const choices = models.filter(m => m.enabled).sort((a, b) => a.priority - b.priority || a.id - b.id)
+  const choices = models.filter(m => m.enabled && m.modelId !== '@cf/cloudflare/clairic').sort((a, b) => a.priority - b.priority || a.id - b.id)
   const total = PICKS.reduce((n, p) => n + (status.counts[p.key] ?? 0), 0)
   const fallbacks = Object.values(status.fallbacks).reduce((n, v) => n + (v ?? 0), 0)
 
