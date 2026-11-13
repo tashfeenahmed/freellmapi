@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -25,6 +24,7 @@ import { FloatingBar } from '@/components/floating-bar'
 import { ModelsTabs } from '@/components/models-tabs'
 import { UsageSummaryCard } from '@/components/usage-summary-card'
 import { useI18n } from '@/i18n'
+import { useDraft } from '@/hooks/use-draft'
 
 interface ProviderEntry {
   id: number
@@ -156,14 +156,14 @@ function SortableProviderRow({
 export default function EmbeddingsPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  // Local unsaved edits, same pattern as the chat fallback page.
-  const [localFamilies, setLocalFamilies] = useState<Family[] | null>(null)
-  const [localDefault, setLocalDefault] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery<EmbeddingsData>({
     queryKey: ['embeddings'],
     queryFn: () => apiFetch('/api/embeddings'),
   })
+  // Local unsaved edits, same pattern as the chat fallback page.
+  const familiesDraft = useDraft(data?.families ?? [])
+  const defaultDraft = useDraft(data?.defaultFamily ?? '')
 
   const { data: usage } = useQuery<UsageData>({
     queryKey: ['embeddings', 'usage'],
@@ -173,12 +173,22 @@ export default function EmbeddingsPage() {
   const usageByFamily = new Map((usage?.families ?? []).map(u => [u.family, u]))
 
   const saveMutation = useMutation({
-    mutationFn: (body: { defaultFamily?: string; providers?: { id: number; priority: number; enabled: boolean }[] }) =>
-      apiFetch('/api/embeddings', { method: 'PUT', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['embeddings'] })
-      setLocalFamilies(null)
-      setLocalDefault(null)
+    mutationFn: (saved: { families?: Family[]; defaultFamily?: string }) =>
+      apiFetch('/api/embeddings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...(saved.defaultFamily !== undefined ? { defaultFamily: saved.defaultFamily } : {}),
+          ...(saved.families
+            ? { providers: saved.families.flatMap(f => f.providers.map(p => ({ id: p.id, priority: p.priority, enabled: p.enabled }))) }
+            : {}),
+        }),
+      }),
+    // Stays pending until the fresh list is in, so the bar never drops back to
+    // the old order for a frame and an edit made meanwhile survives.
+    onSuccess: async (_res, saved) => {
+      await queryClient.invalidateQueries({ queryKey: ['embeddings'] })
+      if (saved.families) familiesDraft.settle(saved.families)
+      if (saved.defaultFamily !== undefined) defaultDraft.settle(saved.defaultFamily)
     },
   })
 
@@ -187,16 +197,16 @@ export default function EmbeddingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       queryClient.invalidateQueries({ queryKey: ['embeddings', 'usage'] })
-      setLocalFamilies(null)
+      familiesDraft.discard()
     },
   })
 
-  const families = localFamilies ?? data?.families ?? []
-  const defaultFamily = localDefault ?? data?.defaultFamily ?? ''
-  const hasChanges = localFamilies !== null || localDefault !== null
+  const families = familiesDraft.value
+  const defaultFamily = defaultDraft.value
+  const hasChanges = familiesDraft.dirty || defaultDraft.dirty
 
   function updateProvider(familyName: string, id: number, patch: Partial<ProviderEntry>) {
-    setLocalFamilies(families.map(f =>
+    familiesDraft.edit(families.map(f =>
       f.family === familyName
         ? { ...f, providers: f.providers.map(p => (p.id === id ? { ...p, ...patch } : p)) }
         : f,
@@ -204,7 +214,7 @@ export default function EmbeddingsPage() {
   }
 
   function moveProvider(familyName: string, index: number, dir: -1 | 1) {
-    setLocalFamilies(families.map(f => {
+    familiesDraft.edit(families.map(f => {
       if (f.family !== familyName) return f
       const list = [...f.providers]
       const j = index + dir
@@ -224,7 +234,7 @@ export default function EmbeddingsPage() {
   function handleDragEnd(familyName: string, event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    setLocalFamilies(families.map(f => {
+    familiesDraft.edit(families.map(f => {
       if (f.family !== familyName) return f
       const oldIndex = f.providers.findIndex(p => p.id === active.id)
       const newIndex = f.providers.findIndex(p => p.id === over.id)
@@ -235,16 +245,14 @@ export default function EmbeddingsPage() {
 
   function handleSave() {
     saveMutation.mutate({
-      ...(localDefault !== null ? { defaultFamily: localDefault } : {}),
-      ...(localFamilies !== null
-        ? { providers: families.flatMap(f => f.providers.map(p => ({ id: p.id, priority: p.priority, enabled: p.enabled }))) }
-        : {}),
+      families: familiesDraft.dirty ? families : undefined,
+      defaultFamily: defaultDraft.dirty ? defaultFamily : undefined,
     })
   }
 
   function discard() {
-    setLocalFamilies(null)
-    setLocalDefault(null)
+    familiesDraft.discard()
+    defaultDraft.discard()
   }
 
   return (
@@ -315,7 +323,7 @@ export default function EmbeddingsPage() {
                       </span>
                     ) : (
                       <button
-                        onClick={() => setLocalDefault(f.family)}
+                        onClick={() => defaultDraft.edit(f.family)}
                         className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 transition-colors"
                       >
                         {t('embeddings.makeDefault')}
