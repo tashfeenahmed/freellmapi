@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { getDb } from '../db/index.js';
 // Single shared Retry-After parser (was duplicated here and in providers/base.ts).
 import { parseRetryAfterMs } from '../providers/base.js';
@@ -53,8 +52,6 @@ export interface QuotaObservationView extends ProviderQuotaState {
   createdAt: string;
 }
 
-const contextStore = new AsyncLocalStorage<QuotaObservationContext>();
-
 const DEFAULT_CONFIDENCE: Record<QuotaObservationSource, number> = {
   header: 1,
   quota_api: 1,
@@ -63,14 +60,6 @@ const DEFAULT_CONFIDENCE: Record<QuotaObservationSource, number> = {
   documentation: 0.35,
   probe: 0.6,
 };
-
-export function runWithQuotaObservationContext<T>(context: QuotaObservationContext, fn: () => T): T {
-  return contextStore.run(context, fn);
-}
-
-export function getQuotaObservationContext(): QuotaObservationContext | undefined {
-  return contextStore.getStore();
-}
 
 function isoNow(): string {
   return new Date().toISOString();
@@ -268,16 +257,15 @@ const HEADER_SPECS: Partial<Record<Platform, HeaderSpec[]>> = {
 };
 
 function extractContext(opts: Pick<QuotaObservationInput, 'platform' | 'modelId' | 'quotaPoolKey' | 'keyId' | 'providerAccountId' | 'endpoint'> = {}) {
-  const context = getQuotaObservationContext();
-  const platform = opts.platform ?? context?.platform;
+  const platform = opts.platform;
   if (!platform) return null;
   return {
     platform,
-    keyId: opts.keyId ?? context?.keyId ?? 0,
-    providerAccountId: opts.providerAccountId ?? context?.providerAccountId ?? null,
-    modelId: opts.modelId ?? context?.modelId ?? null,
-    quotaPoolKey: opts.quotaPoolKey ?? context?.quotaPoolKey ?? inferPoolForPlatform(platform, opts.modelId ?? context?.modelId),
-    endpoint: opts.endpoint ?? context?.endpoint ?? null,
+    keyId: opts.keyId ?? 0,
+    providerAccountId: opts.providerAccountId ?? null,
+    modelId: opts.modelId ?? null,
+    quotaPoolKey: opts.quotaPoolKey ?? inferPoolForPlatform(platform, opts.modelId),
+    endpoint: opts.endpoint ?? null,
   };
 }
 
@@ -377,12 +365,11 @@ export function parseQuotaObservationsFromResponse(
 }
 
 export function recordQuotaObservation(input: QuotaObservationInput): ProviderQuotaObservation | null {
-  const context = getQuotaObservationContext();
-  const platform = input.platform ?? context?.platform;
+  const platform = input.platform;
   if (!platform) return null;
 
-  const keyId = input.keyId ?? context?.keyId ?? 0;
-  const quotaPoolKey = input.quotaPoolKey ?? context?.quotaPoolKey ?? inferPoolForPlatform(platform, input.modelId ?? context?.modelId);
+  const keyId = input.keyId ?? 0;
+  const quotaPoolKey = input.quotaPoolKey ?? inferPoolForPlatform(platform, input.modelId);
   const metric = input.metric ?? 'requests';
   const source = input.source ?? 'probe';
   const resetStrategy = input.resetStrategy ?? 'unknown';
@@ -393,9 +380,9 @@ export function recordQuotaObservation(input: QuotaObservationInput): ProviderQu
   const resetAt = input.resetAt ?? null;
   const retryAfterMs = input.retryAfterMs ?? null;
   const notes = input.notes ?? null;
-  const providerAccountId = input.providerAccountId ?? context?.providerAccountId ?? null;
-  const modelId = input.modelId ?? context?.modelId ?? null;
-  const endpoint = input.endpoint ?? context?.endpoint ?? null;
+  const providerAccountId = input.providerAccountId ?? null;
+  const modelId = input.modelId ?? null;
+  const endpoint = input.endpoint ?? null;
   const statusCode = input.statusCode ?? null;
   const rawJson = input.rawJson ?? null;
   let db;

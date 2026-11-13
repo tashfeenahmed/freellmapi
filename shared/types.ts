@@ -40,10 +40,6 @@ export interface PreviewResponse {
   duplicates: number;
 }
 
-export interface ImportSelectedRequest {
-  keys: ImportKey[];
-}
-
 export interface ImportSelectedResponse {
   imported: number;
   skipped: string[];
@@ -435,12 +431,6 @@ export interface ApiKey {
   modelsAvailable?: number;
 }
 
-export interface ApiKeyCreate {
-  platform: Platform;
-  key: string;
-  label?: string;
-}
-
 // ---- Fallback Config ----
 
 export interface FallbackEntry {
@@ -462,23 +452,12 @@ export interface FallbackEntry {
 // One logical model can be served by several providers (rows in the `models`
 // table). When unification is enabled, those rows collapse into a single group
 // keyed by a normalized display name; see server/src/services/model-groups.ts.
-export interface ModelGroupInfo {
-  groupKey: string;     // normalized display name — the grouping identity
-  canonicalId: string;  // stable slug advertised on /v1/models
-  groupLabel: string;   // human label (suffix-stripped display name)
-}
-
 export interface UnifyOverrides {
   // Coalesce several normalized display-names (or exact "platform:model_id"
   // members) into one group keyed by `into`.
   merges: { into: string; keys: string[] }[];
   // Force a specific "platform:model_id" row out of its computed group.
   splits: { member: string; groupKey?: string }[];
-}
-
-export interface UnifySettings {
-  enabled: boolean;
-  overrides: UnifyOverrides;
 }
 
 // ---- OpenAI-Compatible Types ----
@@ -622,57 +601,6 @@ export interface ChatCompletionChunk {
   safeguard_results?: unknown;
 }
 
-// ---- Analytics Types ----
-
-export interface AnalyticsSummary {
-  totalRequests: number;
-  successRate: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  avgLatencyMs: number;
-  estimatedCostSavings: number;
-}
-
-export interface PlatformStats {
-  platform: Platform;
-  requests: number;
-  successRate: number;
-  avgLatencyMs: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
-
-export interface TimelinePoint {
-  timestamp: string;
-  requests: number;
-  successCount: number;
-  failureCount: number;
-}
-
-export interface RequestLog {
-  id: number;
-  platform: Platform;
-  modelId: string;
-  status: 'success' | 'error';
-  inputTokens: number;
-  outputTokens: number;
-  latencyMs: number;
-  error: string | null;
-  createdAt: string;
-}
-
-// ---- Rate Limit Types ----
-
-export interface RateLimitStatus {
-  platform: Platform;
-  modelId: string;
-  rpm: { used: number; limit: number | null };
-  rpd: { used: number; limit: number | null };
-  tpm: { used: number; limit: number | null };
-  available: boolean;
-  nextResetAt: string | null;
-}
-
 // ---- Provider Quota Observability ----
 
 export type QuotaMetric = 'requests' | 'tokens' | 'credits' | 'neurons';
@@ -733,46 +661,6 @@ export interface QuotaOutlookResponse {
 }
 
 // ---- Provider Dashboard Types ----
-
-export type ProviderHealthStatus = 'healthy' | 'issues' | 'rate_limited' | 'unknown' | 'unconfigured';
-
-export interface ProviderSummary {
-  platform: Platform;
-  name: string;
-  totalKeys: number;
-  enabledKeys: number;
-  healthyKeys: number;
-  totalModels: number;
-  activeModels: number;
-  status: ProviderHealthStatus;
-  isConfigured: boolean;
-}
-
-export interface GroupedProvider {
-  id: string;
-  platform: Platform;
-  name: string;
-  url?: string;
-  baseUrl?: string | null;
-  endpointScope?: string | null;
-  keyless?: boolean;
-  keys: ApiKey[];
-  models: Model[];
-  summary: ProviderSummary;
-}
-
-export interface CustomModelCreate {
-  platform: Platform;
-  modelId: string;
-  displayName?: string;
-  contextWindow?: number | null;
-  rpmLimit?: number | null;
-  rpdLimit?: number | null;
-  tpmLimit?: number | null;
-  tpdLimit?: number | null;
-  supportsVision?: boolean;
-  supportsTools?: boolean;
-}
 
 export interface ModelTestResult {
   success: boolean;

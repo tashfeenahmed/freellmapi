@@ -30,7 +30,6 @@ import { cloudflareAccountId, benchCloudflareAccountId } from './cloudflare-dail
 // allowance minus a margin for estimate drift and calls in flight). 0 turns the
 // meter's gate off, for an operator who WANTS to pay for Workers AI.
 
-export const CLOUDFLARE_FREE_NEURONS_PER_DAY = 10_000;
 export const DEFAULT_CLOUDFLARE_DAILY_NEURON_CAP = 9_000;
 
 /** Workers AI bills $0.011 per 1,000 neurons, so one USD buys this many. */
@@ -244,24 +243,6 @@ function pruneOldRows(now: number): void {
 }
 
 // ── Gate ────────────────────────────────────────────────────────────────────
-
-export interface CloudflareNeuronStatus {
-  used: number;
-  cap: number | null;
-  remote: number | null;
-  resetsAt: string;
-}
-
-export function cloudflareNeuronStatus(apiKey: string, now = Date.now()): CloudflareNeuronStatus | null {
-  const account = cloudflareAccountId(apiKey);
-  if (!account) return null;
-  return {
-    used: Math.round(cloudflareNeuronsUsedToday(account, now)),
-    cap: getCloudflareDailyNeuronCap(),
-    remote: remoteNeuronsToday(account, now),
-    resetsAt: new Date(now + msUntilUtcMidnight(now)).toISOString(),
-  };
-}
 
 /** False once the key's account has reached today's neuron cap. */
 export function cloudflareNeuronsAvailable(apiKey: string, now = Date.now()): boolean {

@@ -29,10 +29,6 @@ function backupTarget(): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function isDbBackupConfigured(): boolean {
-  return backupTarget() !== null;
-}
-
 function backupIntervalMs(): number {
   const raw = process.env.FREEAPI_DB_BACKUP_INTERVAL_MS;
   if (!raw) return DEFAULT_INTERVAL_MS;
