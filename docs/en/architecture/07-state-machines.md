@@ -1,4 +1,4 @@
-**English**
+**English** · [简体中文](../../zh-cn/architecture/07-state-machines.md)
 
 # State Machines — Registry
 

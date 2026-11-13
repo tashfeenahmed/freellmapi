@@ -4,6 +4,11 @@
 
 `docs/architecture/` 的文档修订历史，从触及架构相关代码的提交播种而来。最近的在前。
 
+## 2026-11-13
+
+- **docs(architecture): 新增状态机登记表** —— 新文件 `07-state-machines.md` 列出 42 个状态机（M01–M42）及两个已显式的辅助机（think-tag 过滤器、迁移运行器）。每条字段相同：所有者、类别、持久化、状态、写入方、测试、现状（`explicit` / `types-only` / `documented-only`）、一张 Mermaid 状态图，以及 **未解决：** 尚未修复的缺口。§10 列出不算状态机的模式与派生值，免得再被标记。M21（fusion / iterative critique）在其未提交的改动落地前只是占位。`OVERVIEW.md`、`00-high-level-index.md` 和 `GLOSSARY.md` 的 State machines 节均链接到它。
+- **docs(architecture): 更正对冲、断开与降级模式的事实** —— `04` §2 与 `03` §11：被对冲中止、且静默了至少 `HEDGE_BENCH_MIN_SILENT_FRACTION`（0.75）预算的尝试**会**被停用。`03` §8：头部发出后的客户端断开记一行 `canceled`，不是 `committed`；对冲在首字节时已解除，所以没有头部后的情形。`04` §1：`resetDegradationState()` 没有生产调用方，快照只在首次健康巡检前按需计算。
+
 ## 2026-08-23 —— 领域扩展
 
 - **提交（本 PR）**：`docs(architecture): expand into deep-dive domain`
