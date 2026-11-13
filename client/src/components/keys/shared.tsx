@@ -160,7 +160,7 @@ export const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
   rate_limited: 'bg-amber-500',
   invalid: 'bg-rose-500',
-  error: 'bg-red-500',
+   error: 'bg-rose-500',
   unknown: 'bg-muted-foreground/40',
 }
 
