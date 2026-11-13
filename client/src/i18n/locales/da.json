@@ -996,6 +996,13 @@
     "emptyDesc": "Embedding-familier vises her, når du tilføjer en provider-nøgle, der understøtter embeddings.",
     "dragToReorder": "Træk for at ombestille udbyder"
   },
+  "iterativeCritique": {
+    "tab": "Iterativ kritik",
+    "title": "Iterativ kritik",
+    "description": "En generator skriver et udkast til et svar, en kritiker fra en anden udbyder bedømmer det og peger på fejl, og generatoren reviderer, indtil kritikeren godkender, eller en stopregel udløses. Derefter skriver en syntetisator det endelige svar. Brug det ved at kalde API med modellen \"iterative-critique\".",
+    "howToUse": "Sådan bruger du",
+    "howToUseHelp": "Send en almindelig chatanmodning med modellen \"iterative-critique\". Valgfri konfiguration pr. anmodning: generator, critic (model-id'er) og max_rounds (1–5). Kun tekst: billeder og værktøjer understøttes ikke."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Et panel af modeller svarer parallelt, hvorefter en dommer syntetiserer et stærkere svar. Brug det ved at kalde API med modellen \"fusion\".",

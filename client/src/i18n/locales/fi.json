@@ -996,6 +996,13 @@
     "emptyDesc": "Upotusperheet näkyvät tässä, kun lisäät palveluntarjoajan avaimen, joka tukee upotuksia.",
     "dragToReorder": "Drag reorder-palveluntarjoajalle"
   },
+  "iterativeCritique": {
+    "tab": "Iteratiivinen kritiikki",
+    "title": "Iteratiivinen kritiikki",
+    "description": "Generaattori laatii vastausluonnoksen, toisen palveluntarjoajan kriitikko pisteyttää sen ja nimeää puutteet, ja generaattori tarkistaa luonnosta, kunnes kriitikko hyväksyy sen tai pysäytyssääntö laukeaa. Sen jälkeen syntetisoija kirjoittaa lopullisen vastauksen. Käytä sitä kutsumalla API:a mallilla \"iterative-critique\".",
+    "howToUse": "Käyttöohje",
+    "howToUseHelp": "Lähetä tavallinen chat-pyyntö mallilla \"iterative-critique\". Valinnainen pyyntökohtainen määritys: generator, critic (mallitunnukset) ja max_rounds (1–5). Vain teksti: kuvia ja työkaluja ei tueta."
+  },
   "fusion": {
     "title": "Fuusio",
     "description": "Mallipaneeli vastaa rinnakkain, sitten tuomari kokoaa yhden vahvemman vastauksen. Käytä sitä kutsumalla mallin API \"fusion\".",

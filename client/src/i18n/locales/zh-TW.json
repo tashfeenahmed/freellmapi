@@ -996,6 +996,13 @@
     "emptyDesc": "新增支援嵌入的提供者金鑰後，嵌入系列會顯示在這裡。",
     "dragToReorder": "拖曳以重新排序提供者"
   },
+  "iterativeCritique": {
+    "tab": "迭代批評",
+    "title": "迭代批評",
+    "description": "由生成模型起草答案，另一提供者的批評模型為其評分並指出缺陷，生成模型據此修訂，直到批評模型認可或觸發停止規則。隨後由綜合模型撰寫最終答案。在呼叫 API 時將 model 設為 “iterative-critique” 即可使用。",
+    "howToUse": "如何使用",
+    "howToUseHelp": "傳送一般的聊天請求，並將 model 設為 “iterative-critique”。可選的單次請求設定：generator、critic（模型 ID）與 max_rounds（1–5）。僅支援文字：不支援圖片與工具。"
+  },
   "fusion": {
     "title": "融合",
     "description": "由一組模型並行回答，再由評審模型綜合出更佳的答案。在呼叫 API 時將 model 設為 “fusion” 即可使用。",

@@ -996,6 +996,13 @@
     "emptyDesc": "Familiile de încorporare apar aici odată ce adaugi o cheie de furnizor care suportă încorporarea.",
     "dragToReorder": "Tragerea către furnizorul de recomandă"
   },
+  "iterativeCritique": {
+    "tab": "Critică iterativă",
+    "title": "Critică iterativă",
+    "description": "Un generator redactează un răspuns, un critic de la alt furnizor îl notează și îi indică defectele, iar generatorul îl revizuiește până când criticul îl acceptă sau se declanșează o regulă de oprire. Apoi un sintetizator scrie răspunsul final. Folosește-l apelând API cu modelul \"iterative-critique\".",
+    "howToUse": "Cum să folosești",
+    "howToUseHelp": "Trimite o cerere de chat obișnuită cu modelul \"iterative-critique\". Configurare opțională per cerere: generator, critic (ID-uri de model) și max_rounds (1–5). Doar text: imaginile și instrumentele nu sunt acceptate."
+  },
   "fusion": {
     "title": "Fuziune",
     "description": "Un juriu de modele răspunde în paralel, apoi un judecător sintetizează un răspuns mai puternic. Folosește-l numind API cu model \"fuziune\".",

@@ -996,6 +996,13 @@
     "emptyDesc": "임베딩을 지원하는 공급자 키를 추가하면 임베딩 계열이 여기에 표시됩니다.",
     "dragToReorder": "공급자를 재정렬하려면 드래그하세요."
   },
+  "iterativeCritique": {
+    "tab": "반복 비평",
+    "title": "반복 비평",
+    "description": "생성기가 답변 초안을 작성하면 다른 제공업체의 비평가가 점수를 매기고 결점을 지적하며, 비평가가 승인하거나 중지 규칙이 작동할 때까지 생성기가 수정을 반복합니다. 그런 다음 합성기가 최종 답변을 작성합니다. 모델 \"iterative-critique\"로 API를 호출하여 사용하십시오.",
+    "howToUse": "사용방법",
+    "howToUseHelp": "모델 \"iterative-critique\"로 일반 채팅 요청을 보내십시오. 요청별 선택 설정: generator, critic(모델 ID), max_rounds(1–5). 텍스트 전용: 이미지와 도구는 지원되지 않습니다."
+  },
   "fusion": {
     "title": "퓨전",
     "description": "모델 패널이 동시에 답변한 후 심사위원이 하나의 더 강력한 답변을 종합합니다. 모델 \"fusion\"으로 API를 호출하여 사용하십시오.",

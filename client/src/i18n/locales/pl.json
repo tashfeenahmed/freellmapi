@@ -996,6 +996,13 @@
     "emptyDesc": "Rodziny osadzania pojawiają się tutaj po dodaniu klucza dostawcy obsługującego osadzanie.",
     "dragToReorder": "Przeciągnij, aby zmienić kolejność dostawcy"
   },
+  "iterativeCritique": {
+    "tab": "Krytyka iteracyjna",
+    "title": "Krytyka iteracyjna",
+    "description": "Generator pisze szkic odpowiedzi, krytyk od innego dostawcy ocenia go i wskazuje wady, a generator poprawia odpowiedź, aż krytyk ją zaakceptuje lub zadziała reguła zatrzymania. Następnie syntezator pisze odpowiedź końcową. Użyj go, wywołując API z modelem „iterative-critique”.",
+    "howToUse": "Jak używać",
+    "howToUseHelp": "Wyślij zwykłe żądanie czatu z modelem „iterative-critique”. Opcjonalna konfiguracja dla każdego żądania: generator, critic (identyfikatory modeli) i max_rounds (1–5). Tylko tekst: obrazy i narzędzia nie są obsługiwane."
+  },
   "fusion": {
     "title": "Fuzja",
     "description": "Panel modeli odpowiada równolegle, a następnie sędzia syntezuje jedną silniejszą odpowiedź. Użyj go, wywołując API z modelem „fusion”.",

@@ -996,6 +996,13 @@
     "emptyDesc": "Embedding-familier vises her når du legger til en leverandørnøkkel som støtter embeddings.",
     "dragToReorder": "Dra for å omorganisere leverandøren"
   },
+  "iterativeCritique": {
+    "tab": "Iterativ kritikk",
+    "title": "Iterativ kritikk",
+    "description": "En generator skriver et utkast til svar, en kritiker fra en annen leverandør vurderer det og peker på feil, og generatoren reviderer til kritikeren godtar det eller en stoppregel utløses. Deretter skriver en syntetisator det endelige svaret. Bruk det ved å kalle API med modell «iterative-critique».",
+    "howToUse": "Hvordan bruke",
+    "howToUseHelp": "Send en vanlig chatforespørsel med modell «iterative-critique». Valgfri konfigurasjon per forespørsel: generator, critic (modell-ID-er) og max_rounds (1–5). Bare tekst: bilder og verktøy støttes ikke."
+  },
   "fusion": {
     "title": "Fusjon",
     "description": "Et panel av modeller svarer parallelt, deretter syntetiserer en dommer ett sterkere svar. Bruk det ved å kalle API med modell for «fusion».",

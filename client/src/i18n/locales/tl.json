@@ -996,6 +996,13 @@
     "emptyDesc": "Lumilitaw dito ang mga embedding family kapag nagdagdag ka ng provider key na sumusuporta sa embeddings.",
     "dragToReorder": "I-drag para i-reorder ang provider"
   },
+  "iterativeCritique": {
+    "tab": "Paulit-ulit na Pagpuna",
+    "title": "Paulit-ulit na Pagpuna",
+    "description": "Gumagawa ang isang generator ng draft ng sagot, binibigyan ito ng marka ng isang kritiko mula sa ibang provider at itinuturo ang mga pagkukulang, at binabago ito ng generator hanggang tanggapin ng kritiko o mag-trigger ang isang tuntunin sa paghinto. Pagkatapos, ang isang synthesizer ang magsusulat ng pinal na sagot. Gamitin ito sa pamamagitan ng pagtawag sa API na may modelong \"iterative-critique\".",
+    "howToUse": "Paano gamitin",
+    "howToUseHelp": "Magpadala ng karaniwang kahilingan sa chat na may modelong \"iterative-critique\". Opsyonal na config bawat kahilingan: generator, critic (mga model id) at max_rounds (1–5). Teksto lamang: hindi sinusuportahan ang mga larawan at tool."
+  },
   "fusion": {
     "title": "Pagsasanib",
     "description": "Isang panel ng mga modelo ang sumasagot nang sabay-sabay, pagkatapos ay isang hurado ang gumagawa ng mas matibay na sagot. Gamitin ito sa pamamagitan ng pagtawag sa API na may modelong \"fusion\".",

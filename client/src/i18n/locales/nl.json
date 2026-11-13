@@ -996,6 +996,13 @@
     "emptyDesc": "Embeddingfamilies verschijnen hier zodra je een provider-sleutel toevoegt die embeddings ondersteunt.",
     "dragToReorder": "Drag om provider opnieuw te bestellen"
   },
+  "iterativeCritique": {
+    "tab": "Iteratieve kritiek",
+    "title": "Iteratieve kritiek",
+    "description": "Een generator schrijft een conceptantwoord, een criticus van een andere aanbieder beoordeelt het en benoemt de gebreken, en de generator herziet het totdat de criticus het accepteert of een stopregel afgaat. Daarna schrijft een synthesizer het definitieve antwoord. Gebruik het door de API aan te roepen met model \"iterative-critique\".",
+    "howToUse": "Hoe te gebruiken",
+    "howToUseHelp": "Stuur een gewoon chatverzoek met model \"iterative-critique\". Optionele configuratie per verzoek: generator, critic (model-id's) en max_rounds (1–5). Alleen tekst: afbeeldingen en tools worden niet ondersteund."
+  },
   "fusion": {
     "title": "Fusie",
     "description": "Een panel van modellen beantwoordt parallel, waarna een jurylid één sterker antwoord synthetiseert. Gebruik het door de API met model \"fusion\" te noemen.",

@@ -996,6 +996,13 @@
     "emptyDesc": "Keluarga penyematan muncul di sini setelah Anda menambahkan kunci penyedia yang mendukung penyematan.",
     "dragToReorder": "Tarik untuk menyusun ulang penyedia"
   },
+  "iterativeCritique": {
+    "tab": "Kritik Iteratif",
+    "title": "Kritik Iteratif",
+    "description": "Sebuah generator menyusun draf jawaban, seorang kritikus dari penyedia berbeda menilainya dan menyebutkan kekurangannya, lalu generator merevisi hingga kritikus menerima atau aturan berhenti terpicu. Setelah itu sebuah sintesiser menulis jawaban akhir. Gunakan dengan memanggil API dengan model \"iterative-critique\".",
+    "howToUse": "Cara menggunakan",
+    "howToUseHelp": "Kirim permintaan obrolan biasa dengan model \"iterative-critique\". Konfigurasi opsional per permintaan: generator, critic (ID model) dan max_rounds (1–5). Hanya teks: gambar dan alat tidak didukung."
+  },
   "fusion": {
     "title": "Fusi",
     "description": "Sekelompok model menjawab secara paralel, kemudian juri menyintesis satu jawaban yang lebih kuat. Gunakan dengan memanggil API dengan model \"fusion\".",

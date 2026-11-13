@@ -996,6 +996,13 @@
     "emptyDesc": "Nhóm nhúng xuất hiện ở đây sau khi bạn thêm khóa nhà cung cấp hỗ trợ nhúng.",
     "dragToReorder": "Kéo để sắp xếp lại nhà cung cấp"
   },
+  "iterativeCritique": {
+    "tab": "Phê bình lặp",
+    "title": "Phê bình lặp",
+    "description": "Một trình tạo soạn bản nháp câu trả lời, một nhà phê bình từ nhà cung cấp khác chấm điểm và nêu các lỗi, rồi trình tạo sửa lại cho đến khi nhà phê bình chấp nhận hoặc một quy tắc dừng được kích hoạt. Sau đó một trình tổng hợp viết câu trả lời cuối cùng. Sử dụng nó bằng cách gọi API với mô hình \"iterative-critique\".",
+    "howToUse": "Cách sử dụng",
+    "howToUseHelp": "Gửi một yêu cầu trò chuyện thông thường với mô hình \"iterative-critique\". Cấu hình tùy chọn cho mỗi yêu cầu: generator, critic (ID mô hình) và max_rounds (1–5). Chỉ văn bản: không hỗ trợ hình ảnh và công cụ."
+  },
   "fusion": {
     "title": "Sự kết hợp",
     "description": "Một nhóm người mẫu trả lời song song, sau đó giám khảo tổng hợp một câu trả lời mạnh hơn. Sử dụng nó bằng cách gọi API với mô hình \"kết hợp\".",

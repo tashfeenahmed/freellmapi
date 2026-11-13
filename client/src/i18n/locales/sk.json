@@ -996,6 +996,13 @@
     "emptyDesc": "Embeddingové rodiny sa tu objavia po pridaní poskytovateľského kľúča, ktorý podporuje embeddingy.",
     "dragToReorder": "Drag to reorder provider"
   },
+  "iterativeCritique": {
+    "tab": "Iteratívna kritika",
+    "title": "Iteratívna kritika",
+    "description": "Generátor navrhne odpoveď, kritik od iného poskytovateľa ju ohodnotí a pomenuje nedostatky a generátor ju prepracúva, kým ju kritik neprijme alebo nezafunguje pravidlo zastavenia. Potom syntetizátor napíše konečnú odpoveď. Použite to tak, že API zavoláte s modelom \"iterative-critique\".",
+    "howToUse": "Ako používať",
+    "howToUseHelp": "Pošlite bežnú chatovú požiadavku s modelom \"iterative-critique\". Voliteľná konfigurácia pre každú požiadavku: generator, critic (ID modelov) a max_rounds (1–5). Iba text: obrázky a nástroje nie sú podporované."
+  },
   "fusion": {
     "title": "Fúzia",
     "description": "Panel modelov odpovedá paralelne, potom rozhodca syntetizuje jednu silnejšiu odpoveď. Použite to tak, že API s modelom zavoláte \"fúzia\".",

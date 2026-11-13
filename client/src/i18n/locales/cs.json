@@ -996,6 +996,13 @@
     "emptyDesc": "Embedding families se zde objeví, jakmile přidáte klíč poskytovatele, který embeddingy podporuje.",
     "dragToReorder": "Poskytovatel přetahování pro přeobjednaní"
   },
+  "iterativeCritique": {
+    "tab": "Iterativní kritika",
+    "title": "Iterativní kritika",
+    "description": "Generátor navrhne odpověď, kritik od jiného poskytovatele ji ohodnotí a pojmenuje nedostatky a generátor ji přepracovává, dokud ji kritik nepřijme nebo nezafunguje pravidlo zastavení. Poté syntezátor napíše konečnou odpověď. Použijte to tak, že API zavoláte s modelem \"iterative-critique\".",
+    "howToUse": "Jak používat",
+    "howToUseHelp": "Pošlete běžný chatový požadavek s modelem \"iterative-critique\". Volitelná konfigurace pro každý požadavek: generator, critic (ID modelů) a max_rounds (1–5). Pouze text: obrázky a nástroje nejsou podporovány."
+  },
   "fusion": {
     "title": "Fúze",
     "description": "Panel modelů odpovídá paralelně, poté rozhodčí syntetizuje jednu silnější odpověď. Použijte to tak, že API s modelem zavoláte \"fusion\".",

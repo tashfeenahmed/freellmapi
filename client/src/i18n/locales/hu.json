@@ -996,6 +996,13 @@
     "emptyDesc": "A beágyazási családok itt akkor jelennek meg, amikor hozzáadsz egy szolgáltatókulcsot, amely támogatja a beágyazásokat.",
     "dragToReorder": "Húzás az újrarendelési szolgáltatóhoz"
   },
+  "iterativeCritique": {
+    "tab": "Iteratív kritika",
+    "title": "Iteratív kritika",
+    "description": "A generátor választervezetet ír, egy másik szolgáltatótól származó kritikus pontozza és megnevezi a hibáit, a generátor pedig addig javítja, amíg a kritikus el nem fogadja, vagy le nem fut egy leállítási szabály. Ezután egy szintetizáló megírja a végső választ. Használd úgy, hogy az API-t a(z) \"iterative-critique\" modellel hívod meg.",
+    "howToUse": "Hogyan kell használni",
+    "howToUseHelp": "Küldj egy szokásos csevegési kérést a(z) \"iterative-critique\" modellel. Kérésenként megadható opcionális beállítások: generator, critic (modellazonosítók) és max_rounds (1–5). Csak szöveg: a képek és az eszközök nem támogatottak."
+  },
   "fusion": {
     "title": "Fúzió",
     "description": "Egy modelljés párhuzamosan válaszol, majd egy bíró szintetizál egy erősebb választ. Használd úgy, hogy a modell API-t \"fúziónak\" hívod.",

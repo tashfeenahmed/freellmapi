@@ -996,6 +996,13 @@
     "emptyDesc": "Familia zinazopachika huonekana hapa pindi tu unapoongeza ufunguo wa mtoa huduma unaoauni upachikaji.",
     "dragToReorder": "Buruta ili upange upya mtoa huduma"
   },
+  "iterativeCritique": {
+    "tab": "Ukosoaji wa Kurudiarudia",
+    "title": "Ukosoaji wa Kurudiarudia",
+    "description": "Kijenereta huandaa rasimu ya jibu, mkosoaji kutoka mtoa huduma tofauti hulipa alama na kutaja dosari, na kijenereta hulirekebisha hadi mkosoaji akubali au kanuni ya kusimamisha ianze kutumika. Kisha kiunganishi huandika jibu la mwisho. Itumie kwa kuita API na mfano \"iterative-critique\".",
+    "howToUse": "Jinsi ya kutumia",
+    "howToUseHelp": "Tuma ombi la kawaida la gumzo na mfano \"iterative-critique\". Usanidi wa hiari kwa kila ombi: generator, critic (vitambulisho vya mfano) na max_rounds (1–5). Maandishi pekee: picha na zana hazitumiki."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Jopo la mifano hujibu sambamba, kisha jaji huunganisha jibu moja lenye nguvu zaidi. Itumie kwa kuita API na mfano \"fusion\".",

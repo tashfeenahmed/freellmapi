@@ -996,6 +996,13 @@
     "emptyDesc": "Einbettungsfamilien werden hier angezeigt, sobald Sie einen Anbieterschlüssel hinzufügen, der Einbettungen unterstützt.",
     "dragToReorder": "Ziehen Sie, um den Anbieter neu anzuordnen"
   },
+  "iterativeCritique": {
+    "tab": "Iterative Kritik",
+    "title": "Iterative Kritik",
+    "description": "Ein Generator entwirft eine Antwort, ein Kritiker eines anderen Anbieters bewertet sie und benennt Schwächen, und der Generator überarbeitet sie, bis der Kritiker sie akzeptiert oder eine Stoppregel greift. Anschließend verfasst ein Synthesizer die endgültige Antwort. Verwenden Sie es, indem Sie API mit dem Modell „iterative-critique“ aufrufen.",
+    "howToUse": "Wie zu verwenden",
+    "howToUseHelp": "Senden Sie eine normale Chat-Anfrage mit dem Modell „iterative-critique“. Optionale Konfiguration pro Anfrage: generator, critic (Modell-IDs) und max_rounds (1–5). Nur Text: Bilder und Tools werden nicht unterstützt."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Eine Gruppe von Modellen antwortet parallel, dann fasst ein Juror eine aussagekräftigere Antwort zusammen. Verwenden Sie es, indem Sie API mit dem Modell „fusion“ aufrufen.",
