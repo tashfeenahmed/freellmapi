@@ -15,6 +15,7 @@ import { getDb } from '../db/index.js';
 import { getClientContext } from '../lib/client-context.js';
 import { decrypt } from '../lib/crypto.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -74,8 +75,7 @@ export function listModerationModels(): ModerationModelRow[] {
       SELECT id, encrypted_key, iv, auth_tag
         FROM api_keys
        WHERE platform = ?
-         AND enabled = 1
-         AND status IN ('healthy', 'unknown')
+         AND ${USABLE_KEY_SQL}
        ORDER BY id
        LIMIT 1
     `).get(platform) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;

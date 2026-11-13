@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
 import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
 
 // Web search over the key pool (#1174).
 //
@@ -415,12 +416,12 @@ export function searchAvailable(): boolean {
     if (row.enabled !== 1) continue;
     if (row.platform === 'custom') {
       if (row.key_id == null) continue;
-      const k = db.prepare("SELECT 1 FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')").get(row.key_id);
+      const k = db.prepare(`SELECT 1 FROM api_keys WHERE id = ? AND ${USABLE_KEY_SQL}`).get(row.key_id);
       if (k) return true;
       continue;
     }
     if (!ADAPTERS[row.platform]) continue;
-    const k = db.prepare("SELECT 1 FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1").get(row.platform);
+    const k = db.prepare(`SELECT 1 FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL} LIMIT 1`).get(row.platform);
     if (k) return true;
   }
   return false;
@@ -564,7 +565,7 @@ export function listSearchEngines(): SearchEngineView[] {
     SELECT id, platform, enabled, status FROM api_keys
      WHERE platform = 'custom' OR platform IN (${[...SEARCH_ENGINE_PLATFORMS].map(() => '?').join(', ')})
   `).all(...SEARCH_ENGINE_PLATFORMS) as { id: number; platform: string; enabled: number; status: string }[];
-  const healthy = (k: { enabled: number; status: string }) => k.enabled === 1 && (k.status === 'healthy' || k.status === 'unknown');
+  const healthy = (k: { enabled: number; status: string }) => isUsableKey(k);
   const monthCounts = new Map(
     (db.prepare(`
       SELECT platform, engine_id, COUNT(*) AS n FROM search_requests

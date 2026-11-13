@@ -2,6 +2,7 @@ import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { parseRetryAfterMs } from '../providers/base.js';
 import { secondsUntilNextMonth } from './key-budget.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 
 // Cohere-style rerank over the existing free-tier key pool (#1029). Deliberately
 // narrow first slice: platform='cohere' keys and custom OpenAI-compatible
@@ -39,7 +40,7 @@ const MAX_DOCUMENTS = 100;
 
 function candidates(): RerankCandidate[] {
   const rows = getDb().prepare(
-    "SELECT id, platform, base_url, encrypted_key, iv, auth_tag FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') AND platform IN ('cohere', 'custom') ORDER BY platform, created_at",
+    `SELECT id, platform, base_url, encrypted_key, iv, auth_tag FROM api_keys WHERE ${USABLE_KEY_SQL} AND platform IN ('cohere', 'custom') ORDER BY platform, created_at`,
   ).all() as { id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string }[];
   const out: RerankCandidate[] = [];
   for (const row of rows) {

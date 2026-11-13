@@ -3,6 +3,7 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { isLoopbackOrPrivateUrl } from '../lib/url-guard.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { isUsableKey } from './key-state.js';
 
 interface Window {
   timestamps: number[];
@@ -447,7 +448,7 @@ function buildWindowUsageSnapshot(now: number): WindowUsageSnapshot | null {
     const keysByPlatform = new Map<string, EligibleKey[]>();
     for (const k of keyRows) {
       baseUrlByKeyId.set(k.id, k.base_url);
-      if (k.enabled !== 1 || (k.status !== 'healthy' && k.status !== 'unknown')) continue;
+      if (!isUsableKey(k)) continue;
       const list = keysByPlatform.get(k.platform) ?? [];
       list.push({ id: k.id, baseUrl: k.base_url, scope: parseModelScope(k.model_scope_json) });
       keysByPlatform.set(k.platform, list);

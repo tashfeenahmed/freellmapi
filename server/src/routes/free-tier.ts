@@ -5,6 +5,7 @@ import { parseBudget } from '../lib/budget.js';
 import { getActiveProfileId } from '../services/profile-models.js';
 import { inferQuotaPoolKey, getQuotaStateForKeys } from '../services/provider-quota.js';
 import type { Platform, QuotaMetric } from '@freellmapi/shared/types.js';
+import { USABLE_KEY_SQL } from '../services/key-state.js';
 
 /**
  * Free-tier budget dashboard (#905).
@@ -115,7 +116,7 @@ freeTierRouter.get('/', (_req: Request, res: Response) => {
   // Usable keys per platform: a documented budget is per account, so two usable
   // accounts really are twice the pool (fallback.ts uses the same filter).
   const keyCountMap = new Map(
-    (db.prepare("SELECT platform, COUNT(*) as count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+    (db.prepare(`SELECT platform, COUNT(*) as count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`).all() as { platform: string; count: number }[])
       .map(k => [k.platform, k.count]),
   );
 

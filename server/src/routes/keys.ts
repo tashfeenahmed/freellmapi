@@ -35,6 +35,7 @@ import {
 import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
+import { KEY_FRESH_START_SQL, resetInvalidStreak } from '../services/key-state.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 
 export const keysRouter = Router();
@@ -722,7 +723,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
       // piling up duplicates each time the user clicks "Enable".
       const existing = sentinel ?? rows[0];
       if (existing) {
-        db.prepare("UPDATE api_keys SET enabled = 1, status = 'unknown' WHERE id = ?").run(existing.id);
+        db.prepare(`UPDATE api_keys SET enabled = 1, ${KEY_FRESH_START_SQL} WHERE id = ?`).run(existing.id);
+        resetInvalidStreak(existing.id);
         respond(existing.id, maskKey(plaintext(existing) ?? keyToStore));
         return;
       }
@@ -730,7 +732,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
       // A real key upgrades the anonymous row in place rather than leaving a
       // second, anonymous row competing with it in the pool.
       const { encrypted, iv, authTag } = encrypt(rawKey);
-      const updates = ['encrypted_key = ?', 'iv = ?', 'auth_tag = ?', 'enabled = 1', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL'];
+      const updates = ['encrypted_key = ?', 'iv = ?', 'auth_tag = ?', 'enabled = 1', KEY_FRESH_START_SQL];
       const values: (string | number | null)[] = [encrypted, iv, authTag];
       if (label !== undefined) { updates.push('label = ?'); values.push(label); }
       if (parsed.data.proxyUrl !== undefined) {
@@ -1783,11 +1785,18 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
 
   const db = getDb();
   const groupLabel = group === undefined ? undefined : normalizeGroupLabel(group);
-  const result = groupLabel === undefined
-    ? db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform)
+  const scope: { sql: string; args: string[] } = groupLabel === undefined
+    ? { sql: 'platform = ?', args: [platform] }
     : groupLabel === null
-      ? db.prepare("UPDATE api_keys SET enabled = ? WHERE platform = 'custom' AND group_label IS NULL").run(enabled ? 1 : 0)
-      : db.prepare("UPDATE api_keys SET enabled = ? WHERE platform = 'custom' AND group_label = ?").run(enabled ? 1 : 0, groupLabel);
+      ? { sql: "platform = 'custom' AND group_label IS NULL", args: [] }
+      : { sql: "platform = 'custom' AND group_label = ?", args: [groupLabel] };
+  // Keys this sweep switches back on get a fresh invalid-probe streak, or the
+  // first failed probe after it would auto-disable them again (M01).
+  const revived = enabled
+    ? db.prepare(`SELECT id FROM api_keys WHERE ${scope.sql} AND enabled = 0`).all(...scope.args) as { id: number }[]
+    : [];
+  const result = db.prepare(`UPDATE api_keys SET enabled = ? WHERE ${scope.sql}`).run(enabled ? 1 : 0, ...scope.args);
+  for (const { id } of revived) resetInvalidStreak(id);
 
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
@@ -1844,7 +1853,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   }
   if (changedKey !== undefined) {
     const { encrypted, iv, authTag } = encrypt(changedKey);
-    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL');
+    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', KEY_FRESH_START_SQL);
     values.push(encrypted, iv, authTag);
     // #1459: pasting in a new key means "use this key". A row the health
     // checker auto-disabled would otherwise stay off with a fresh credential
@@ -1908,6 +1917,9 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
+  // Re-enabling or replacing the credential is a fresh start: the streak that
+  // auto-disabled the key must not carry over to its next probe (M01).
+  if (enabled === true || changedKey !== undefined) resetInvalidStreak(id);
 
   if (changedKey !== undefined) clearCooldownsForKey(id);
 
