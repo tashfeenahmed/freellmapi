@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, ROUTING_STRATEGIES, isValidTimezone } from '../services/scoring.js';
+import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy, monthlyChatTokenUsage } from '../services/router.js';
+import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
@@ -499,15 +501,13 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     `).all() as any[];
   }
 
-  // Build per-model breakdown (only platforms with keys), preserving enabled state
-  const usageRows = db.prepare(`
-    SELECT platform, model_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-    GROUP BY platform, model_id
-  `).all() as { platform: string; model_id: string; used: number }[];
-  const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
+  // Build per-model breakdown (only platforms with keys), preserving enabled state.
+  // Same served-token definition as the router's headroom guardrail.
+  const usageByModel = new Map<string, number>();
+  for (const r of monthlyChatTokenUsage(db)) {
+    const k = `${r.platform}:${r.model_id}`;
+    usageByModel.set(k, (usageByModel.get(k) ?? 0) + r.used);
+  }
 
   const keyCountMap = new Map(
     (db.prepare(`SELECT platform, COUNT(*) as count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`).all() as { platform: string; count: number }[])

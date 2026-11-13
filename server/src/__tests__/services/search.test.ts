@@ -333,3 +333,33 @@ describe('decodeEntities', () => {
     expect(decodeEntities('plain')).toBe('plain');
   });
 });
+
+describe('search client hang-up', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    seedSearchEngines();
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  // The caller leaving is not an engine failure: no 'error' row (which would
+  // drag the engine's success rate down) and no next engine is tried.
+  // search_requests.status is CHECK ('ok', 'error'), so no row is written.
+  it('writes no error row and tries no further engine once the client is gone', async () => {
+    addKey('exa');
+    addKey('tavily');
+    const controller = new AbortController();
+    const fn = mockFetch(() => {
+      controller.abort();
+      throw new DOMException('This operation was aborted', 'AbortError');
+    });
+    await expect(runSearch('what', { signal: controller.signal })).rejects.toMatchObject({ status: 499 });
+    expect(calls(fn)).toHaveLength(1);
+    expect(logRows()).toEqual([]);
+  });
+});
