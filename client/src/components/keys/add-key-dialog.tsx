@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Dialog, DialogClose, DialogPopup, DialogTitle } from '@/components/ui/dialog'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -30,9 +30,16 @@ export function AddKeyDialog({ open, onOpenChange, initialPlatform }: {
   // picker has to outlive the add form it follows. null = nothing pending, and
   // the whole flow is skippable: dismissing leaves the key exactly as added.
   const [scopeOffer, setScopeOffer] = useState<AddedKeyScopeOffer | null>(null)
+  // The add mutation outlives the pane, so its success can land after the user
+  // dismissed the dialog mid-request. The key is added either way (its toast
+  // says so), but the picker opens only for an add the dialog was still
+  // showing: popping it up after a dismiss is something nobody asked for.
+  const openRef = useRef(open)
+  useEffect(() => { openRef.current = open }, [open])
   const finishAdd = (offer?: AddedKeyScopeOffer) => {
+    const stillShowing = openRef.current
     close()
-    setScopeOffer(offer ?? null)
+    if (stillShowing) setScopeOffer(offer ?? null)
   }
 
   // The pane sticks across opens (reopening to import twice should not reset
