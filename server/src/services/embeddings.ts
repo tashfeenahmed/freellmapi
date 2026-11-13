@@ -9,10 +9,10 @@
 // cross-provider redundancy for free.
 import { getDb, getSetting } from '../db/index.js';
 import { secondsUntilNextMonth } from './key-budget.js';
-import { noteBudgetAlerts } from './budget-alerts.js';
 import { parseRetryAfterMs } from '../providers/base.js';
-import { RetryHintTracker, retryAfterSeconds } from '../lib/retry-hint.js';
-import { getClientContext } from '../lib/client-context.js';
+import { retryAfterSeconds } from '../lib/retry-hint.js';
+import { runFailoverChain } from '../lib/failover-chain.js';
+import { logRequest } from '../lib/request-log.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
@@ -349,23 +349,15 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
 function logEmbeddingRequest(
   row: EmbeddingModelRow,
   keyId: number | null,
-  status: 'success' | 'error',
+  status: 'success' | 'error' | 'canceled',
   inputTokens: number,
   latencyMs: number,
   error: string | null,
 ): void {
-  try {
-    const client = getClientContext();
-    getDb().prepare(`
-      INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'embedding', ?, ?, ?)
-    `).run(row.platform, row.model_id, keyId, status, inputTokens, latencyMs, error, client.ip, client.userAgent, client.agent);
-    // Soft budget alert (#1158 follow-on): the ledger trigger fired with this
-    // row, so compare the caps once. No-op for uncapped keys.
-    if (status === 'success' && keyId != null) noteBudgetAlerts(keyId);
-  } catch (e) {
-    console.error('Failed to log embedding request:', e);
-  }
+  // Through logRequest so the row also reaches request_hourly and the lifetime
+  // totals; it swallows its own DB errors.
+  logRequest(row.platform, row.model_id, keyId, status, inputTokens, 0, latencyMs, error,
+    null, null, null, null, null, 'embedding');
 }
 
 /** Embed `inputs` via the family's provider chain, failing over within the
@@ -376,8 +368,16 @@ function logEmbeddingRequest(
  * OpenAI text-embedding-3-*). Providers that ignore the field see an identical
  * request body. The override is independent of the model's native dimension — the
  * family registry still pins the canonical dimension, this just lets callers ask
- * for a smaller vector at the cost of some accuracy. */
-export async function runEmbeddings(model: string | undefined, inputs: string[], dimensions?: number): Promise<EmbeddingsResult> {
+ * for a smaller vector at the cost of some accuracy.
+ *
+ * `clientSignal` (optional): the API caller's connection. Once it aborts, no
+ * further provider is tried. */
+export async function runEmbeddings(
+  model: string | undefined,
+  inputs: string[],
+  dimensions?: number,
+  clientSignal?: AbortSignal,
+): Promise<EmbeddingsResult> {
   const family = resolveFamily(model);
   if (!family) {
     throw new EmbeddingsError(
@@ -392,51 +392,44 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
     throw new EmbeddingsError(`No enabled providers for embedding family '${family}'.`, 503);
   }
 
-  let lastError: EmbeddingsError | null = null;
-  // Upstream back-offs across the whole chain: only a chain that was rate
-  // limited end to end earns a Retry-After, and then the soonest one.
-  const hints = new RetryHintTracker();
-  for (const row of chain) {
-    const { credential, budgetBlocked } = reserveProviderCredential(row, estimateTokens(inputs));
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new EmbeddingsError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
-      }
-      continue;
-    }
-    const started = Date.now();
-    try {
+  const res = await runFailoverChain({
+    rows: chain,
+    signal: clientSignal,
+    ErrorClass: EmbeddingsError,
+    route: row => ({ platform: row.platform, modelId: row.model_id }),
+    reserve: (row, skip) => reserveProviderCredential(row, estimateTokens(inputs), skip),
+    attempt: async (row, credential) => {
       const out = await callProvider(row, credential, inputs, dimensions);
       if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
         throw new EmbeddingsError('upstream returned malformed embeddings', 502);
       }
-      const tokens = out.inputTokens ?? estimateTokens(inputs);
-      logEmbeddingRequest(row, credential.id, 'success', tokens, Date.now() - started, null);
+      return { vectors: out.vectors, tokens: out.inputTokens ?? estimateTokens(inputs) };
+    },
+    log: (row, keyId, o) => {
       // A served embedding is evidence the key works, the same as a served
       // chat request (#1493) or a served search (#1612): stamp last_healthy_at
-      // and lift an 'unknown'/'error' key. Embedding-only keys (and #1459-era
-      // providers that refuse probes) had no success signal at all otherwise.
-      markKeyHealthyFromRequest(credential.id);
-      return {
-        family,
-        platform: row.platform,
-        modelId: row.model_id,
-        dimensions: out.vectors[0].length,
-        vectors: out.vectors,
-        inputTokens: tokens,
-      };
-    } catch (err: any) {
-      const e = err instanceof EmbeddingsError ? err : new EmbeddingsError(String(err?.message ?? err), 502);
-      logEmbeddingRequest(row, credential.id, 'error', 0, Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-      // fall through to the next provider in the family
-    } finally {
-      credential.release();
-    }
+      // and lift an 'unknown'/'error' key. Embedding-only keys had no success
+      // signal at all otherwise.
+      if (o.kind === 'success' && keyId != null) markKeyHealthyFromRequest(keyId);
+      logEmbeddingRequest(row, keyId, o.kind, o.kind === 'success' ? o.out.tokens : 0,
+        o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null);
+    },
+  });
+  if (res.ok) {
+    const { row, out } = res;
+    return {
+      family,
+      platform: row.platform,
+      modelId: row.model_id,
+      dimensions: out.vectors[0].length,
+      vectors: out.vectors,
+      inputTokens: out.tokens,
+    };
   }
 
+  // Upstream back-offs across the whole chain: only a chain that was rate
+  // limited end to end earns a Retry-After, and then the soonest one.
+  const { lastError, hints } = res;
   throw new EmbeddingsError(
     `All providers for embedding family '${family}' failed${lastError ? ` (last: ${lastError.message.slice(0, 160)})` : ' (no usable keys)'}.`,
     lastError && lastError.status === 429 ? 429 : 502,

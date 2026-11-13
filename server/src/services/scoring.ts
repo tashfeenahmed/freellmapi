@@ -28,12 +28,18 @@ export interface RoutingWeights {
   intelligence: number;
 }
 
+import type { RoutingStrategy } from '@freellmapi/shared/types.js';
+
+export type { RoutingStrategy };
+
 // Strategy is either the legacy manual chain ('priority'), one of the bandit
 // presets, 'custom' (a user-tuned weight vector persisted in settings — see
 // router.ts) or 'decision' (#1354: a decision model picks one of the four
 // presets per request — see services/routing-decision.ts). Each resolves to a
 // weight vector — the engine is identical.
-export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom' | 'decision';
+export const ROUTING_STRATEGIES = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom', 'decision'] as const satisfies readonly RoutingStrategy[];
+// Fails to compile when shared RoutingStrategy gains a member this list lacks.
+const _everyStrategyListed: Record<Exclude<RoutingStrategy, (typeof ROUTING_STRATEGIES)[number]>, never> = {};
 
 /** The presets a decision model may choose between, per request. */
 export type PresetStrategy = 'balanced' | 'smartest' | 'fastest' | 'reliable';

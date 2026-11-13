@@ -11,6 +11,7 @@ import type { Scheduler } from '../lib/scheduler.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { providerLog } from '../lib/server-logs.js';
 import { triggerBuiltinModelDiscovery } from './builtin-model-discovery.js';
+import { bumpInvalidStreak, resetInvalidStreak, USABLE_KEY_SQL } from './key-state.js';
 
 const DEFAULT_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 // Floor of 60s: a misconfigured tiny interval turns the health pass into a
@@ -81,8 +82,8 @@ function positiveIntEnv(raw: string | undefined, fallback: number): number {
   return fallback;
 }
 
-// Track consecutive failures per key
-const failureCount = new Map<number, number>();
+// Consecutive confirmed-invalid probes per key live in key-state.ts, so the
+// key routes can start the count over when an operator re-enables a key.
 
 // #1510: consecutive transport errors per key. A key whose provider has been
 // unreachable (DNS, connection refused, TCP timeout) for this many probes in a
@@ -133,7 +134,7 @@ function recordTransportFailure(keyId: number, platform: string | undefined): bo
   // directions, and only a successful validateKey clears it.
   const db = getDb();
   const res = db
-    .prepare("UPDATE api_keys SET status = 'error' WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')")
+    .prepare(`UPDATE api_keys SET status = 'error' WHERE id = ? AND ${USABLE_KEY_SQL}`)
     .run(keyId);
   if (res.changes > 0) {
     providerLog(
@@ -176,8 +177,7 @@ export function clearValidationRateLimitState(): void {
 }
 
 function recordInvalidFailure(keyId: number, platform?: string): void {
-  const count = (failureCount.get(keyId) ?? 0) + 1;
-  failureCount.set(keyId, count);
+  const count = bumpInvalidStreak(keyId);
 
   if (count >= CONSECUTIVE_FAILURES_TO_DISABLE) {
     getDb().prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(keyId);
@@ -315,7 +315,7 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
       .run(status, lastError, keyId);
 
     if (isValid) {
-      failureCount.delete(keyId);
+      resetInvalidStreak(keyId);
       // #1510: the provider answered — whatever unreachable streak this key had
       // is over, so the transport counter starts from zero again.
       transportFailures.delete(keyId);
@@ -388,7 +388,7 @@ export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
 // ── Cooldown-probe validation (side-effect-free) ─────────────────────────────
 // The cooldown-probe recovery job (services/cooldown-probe.ts) needs the same
 // cheap validateKey call checkKeyHealth makes, WITHOUT any of its bookkeeping:
-// no status writes, no last_checked_at, and above all no failureCount — probes
+// no status writes, no last_checked_at, and above all no invalid streak — probes
 // run far more often than the 5-minute health pass, so letting them feed the
 // consecutive-failure counter would auto-disable a genuinely-bad key in a
 // fraction of the "3 consecutive checks" the threshold promises. A probe is a
@@ -472,7 +472,7 @@ export function markKeyHealthyFromRequest(keyId: number): void {
     getDb()
       .prepare("UPDATE api_keys SET status = 'healthy', last_health_error = NULL WHERE id = ? AND status IN ('error', 'unknown')")
       .run(keyId);
-    failureCount.delete(keyId);
+    resetInvalidStreak(keyId);
     // #1510: a served request is the strongest reachability evidence there is —
     // it also ends any transport-error streak, parked or not.
     transportFailures.delete(keyId);
@@ -484,7 +484,7 @@ export function markKeyHealthyFromRequest(keyId: number): void {
 // Overlap guard: the scheduled 5-minute pass and wake-recovery re-probes can
 // coincide (or SIGCONT spam can queue several) — concurrent full passes
 // multiply provider validate traffic and let two passes each increment the
-// same genuinely-bad key's failureCount, reaching the auto-disable threshold
+// same genuinely-bad key's invalid streak, reaching the auto-disable threshold
 // in fewer wall-clock checks than "3 consecutive checks" intends. A second
 // caller joins the in-flight pass instead of starting another.
 let checkAllInFlight: Promise<HealthPassResult> | null = null;

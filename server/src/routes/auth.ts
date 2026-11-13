@@ -16,6 +16,7 @@ import {
   desktopSessionToken,
 } from '../services/auth.js';
 import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
+import { isLocalRequest } from '../lib/loopback.js';
 import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/reset-code.js';
 
 export const authRouter = Router();
@@ -46,90 +47,81 @@ const loginSchema = z.object({
 });
 
 // ── Brute-force throttle ──────────────────────────────────────────────────
-// Simple in-memory per-email limiter. A local single-user tool doesn't need a
-// distributed store; this just blunts online password guessing.
+// In-memory; a local single-user tool doesn't need a distributed store, this
+// just blunts online password guessing. Every failed login counts in two
+// buckets:
+//  - address + client IP, 5 tries: locks out one guesser. Keyed on the address
+//    alone, five bad guesses from anywhere locked the OWNER out too, correct
+//    password and all, and the address is guessable (`desktop@localhost`).
+//  - address alone, 50 tries: an account-wide cap, so a guesser rotating IPs
+//    still gets at most 50 tries per window.
+// Failures only count within a LOCKOUT_MS window, so occasional typos spread
+// over days never add up to a lockout.
 const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS_ALL_CLIENTS = 50;
 const LOCKOUT_MS = 15 * 60 * 1000;
 // Bound the map so a flood of distinct addresses cannot grow it without limit;
 // expired buckets are pruned opportunistically, mirroring the per-IP limiter in
 // middleware/rateLimit.ts.
 const MAX_TRACKED_EMAILS = 10_000;
-const attempts = new Map<string, { count: number; lockedUntil: number }>();
+const attempts = new Map<string, { count: number; windowStart: number; lockedUntil: number }>();
 
-// The bucket key MUST be the same spelling verifyCredentials looks the user up
+// The address MUST be the same spelling verifyCredentials looks the user up
 // by. Keying on `.toLowerCase()` alone while the lookup also trimmed meant
 // " admin@example.com" authenticated against the admin row but landed in its
 // own bucket, so every whitespace variant handed the guesser another five
-// tries and the lockout never engaged.
-function throttleKey(email: string): string {
-  return normalizeEmail(email);
+// tries and the lockout never engaged. Keys are JSON tuples so no address can
+// spell another bucket's key (an address may contain any separator).
+function throttleBuckets(email: string, ip: string | undefined): Array<[key: string, max: number]> {
+  const address = normalizeEmail(email);
+  return [
+    [JSON.stringify([address, ip ?? '']), MAX_ATTEMPTS],
+    [JSON.stringify([address]), MAX_ATTEMPTS_ALL_CLIENTS],
+  ];
 }
-function isLockedOut(email: string): boolean {
-  const a = attempts.get(throttleKey(email));
-  return !!a && a.lockedUntil > Date.now();
+// Seconds until the lockout lifts for this address from this client (0 when
+// not locked). The 429 carries this as Retry-After so a client (or a scripted
+// login retry loop) backs off for the ACTUAL remaining time instead of the
+// worst-case 15 min.
+function lockoutRetryAfterSec(email: string, ip: string | undefined, now = Date.now()): number {
+  let until = 0;
+  for (const [key] of throttleBuckets(email, ip)) until = Math.max(until, attempts.get(key)?.lockedUntil ?? 0);
+  return until > now ? Math.max(1, Math.ceil((until - now) / 1000)) : 0;
 }
-// Seconds until the per-email lockout lifts (0 when not locked). The 429
-// carries this as Retry-After so a client (or a scripted login retry loop)
-// backs off for the ACTUAL remaining time instead of the worst-case 15 min.
-function lockoutRetryAfterSec(email: string, now = Date.now()): number {
-  const a = attempts.get(throttleKey(email));
-  if (!a || a.lockedUntil <= now) return 0;
-  return Math.max(1, Math.ceil((a.lockedUntil - now) / 1000));
-}
-function recordFailure(email: string): void {
-  const key = throttleKey(email);
-  const a = attempts.get(key) ?? { count: 0, lockedUntil: 0 };
-  a.count++;
-  if (a.count >= MAX_ATTEMPTS) {
-    a.lockedUntil = Date.now() + LOCKOUT_MS;
-    a.count = 0;
+function recordFailure(email: string, ip: string | undefined): void {
+  const now = Date.now();
+  const buckets = throttleBuckets(email, ip);
+  for (const [key, max] of buckets) {
+    let a = attempts.get(key);
+    if (!a || now - a.windowStart > LOCKOUT_MS) a = { count: 0, windowStart: now, lockedUntil: a?.lockedUntil ?? 0 };
+    a.count++;
+    if (a.count >= max) {
+      a.lockedUntil = now + LOCKOUT_MS;
+      a.count = 0;
+    }
+    attempts.set(key, a);
   }
-  attempts.set(key, a);
   if (attempts.size > MAX_TRACKED_EMAILS) {
-    const now = Date.now();
     for (const [tracked, state] of attempts) {
-      if (tracked !== key && state.lockedUntil <= now) attempts.delete(tracked);
+      if (!buckets.some(([key]) => key === tracked) && state.lockedUntil <= now) attempts.delete(tracked);
     }
   }
 }
-function clearFailures(email: string): void {
-  attempts.delete(throttleKey(email));
+function clearFailures(email: string, ip: string | undefined): void {
+  for (const [key] of throttleBuckets(email, ip)) attempts.delete(key);
+}
+// A completed password reset proves control of the install, so it lifts every
+// lock on the account, from every client.
+function clearAccountLockouts(email: string): void {
+  const address = normalizeEmail(email);
+  for (const key of attempts.keys()) {
+    if ((JSON.parse(key) as string[])[0] === address) attempts.delete(key);
+  }
 }
 
 function bearer(req: Request): string | undefined {
   return req.headers.authorization?.replace(/^Bearer\s+/i, '')
     ?? (req.headers['x-dashboard-token'] as string | undefined);
-}
-
-function isLoopbackAddress(value: string | undefined): boolean {
-  let addr = (value ?? '').trim();
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
-
-// Is the caller connecting from the local machine? The socket peer address is
-// the authority, NOT req.ip: forwarded headers are attacker-controlled, so
-// letting one of them ASSERT locality would hand a remote caller the setup
-// code exemption outright.
-//
-// But the socket peer alone is not sufficient either, because the reverse-proxy
-// deployment this project documents (docs/en/proxy/OVERVIEW.md, and
-// docs/en/troubleshooting/01-common-issues.md on TRUST_PROXY) puts Caddy/nginx/
-// Traefik on the SAME host: every request then arrives from 127.0.0.1 and the
-// socket test is true for the entire internet. So a forwarded hop can never
-// grant locality, but it can withdraw it — exactly the treatment the Ollama
-// open-loopback mode already applies in routes/ollama.ts:25-38.
-function isLoopbackRemote(req: Request): boolean {
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request rather than silently widening the
-  // no-code first-run path through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
 }
 
 // ── Desktop sign-in (#1399) ───────────────────────────────────────────────
@@ -143,7 +135,7 @@ function isLoopbackRemote(req: Request): boolean {
 // Guards, all required:
 //  - FREEAPI_DESKTOP=1: only the desktop embedder sets it; web/Docker installs
 //    keep their login.
-//  - Loopback socket with no remote forwarded hop (isLoopbackRemote), so LAN
+//  - Loopback socket with no remote forwarded hop (isLocalRequest), so LAN
 //    access mode and a local reverse proxy never hand out sessions.
 //  - A localhost Host header: a DNS-rebinding page (evil.example resolving to
 //    127.0.0.1) is same-origin to the browser but still sends its own name.
@@ -178,7 +170,7 @@ function isCrossSite(req: Request): boolean {
 
 export function desktopSignInAllowed(req: Request): boolean {
   if (process.env.FREEAPI_DESKTOP !== '1') return false;
-  if (!isLoopbackRemote(req)) return false;
+  if (!isLocalRequest(req)) return false;
   const host = hostnameOf(req.headers.host);
   if (!host || !LOCAL_HOSTNAMES.has(host)) return false;
   return !isCrossSite(req);
@@ -218,7 +210,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
   // claim the dashboard without any code. A remote caller must present the
   // one-time setup code logged at boot, so an exposed fresh install can't be
   // claimed by a stranger who finds it first.
-  if (!isLoopbackRemote(req) && !setupCodeMatches((req.body ?? {}).setupCode)) {
+  if (!isLocalRequest(req) && !setupCodeMatches((req.body ?? {}).setupCode)) {
     res.status(403).json({
       error: {
         message: 'A setup code is required to create the first account from a remote device. ' +
@@ -248,24 +240,25 @@ authRouter.post('/login', (req: Request, res: Response) => {
   }
   const { email, password } = parsed.data;
 
-  if (isLockedOut(email)) {
+  const retryAfterSec = lockoutRetryAfterSec(email, req.ip);
+  if (retryAfterSec > 0) {
     // RFC 6585: a 429 must say when the client may return. The whole gateway
     // already does this (proxy limiter, exhaustion Retry-After, monthly budget
     // cap); the dashboard's own lockout was the one 429 that didn't.
-    res.setHeader('Retry-After', String(lockoutRetryAfterSec(email)));
+    res.setHeader('Retry-After', String(retryAfterSec));
     res.status(429).json({ error: { message: 'Too many attempts. Wait 15 minutes or restart the app.', type: 'rate_limit_error' } });
     return;
   }
 
   const user = verifyCredentials(email, password);
   if (!user) {
-    recordFailure(email);
+    recordFailure(email, req.ip);
     // Same message whether the email exists or not — don't leak which.
     res.status(401).json({ error: { message: 'Invalid email or password', type: 'authentication_error' } });
     return;
   }
 
-  clearFailures(email);
+  clearFailures(email, req.ip);
   const token = createSession(user.userId);
   res.json({ token, email: user.email });
 });
@@ -360,22 +353,29 @@ authRouter.post('/change-password', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// Forgot password: mint a reset code and log it
+// Forgot password: log the reset code (a live one is kept, see reset-code.ts).
+// The cooldown is per client IP: one shared stamp let any anonymous caller 429
+// the operator indefinitely.
 const RESET_CODE_MIN_INTERVAL_MS = 10_000;
-let lastResetCodeAt = 0;
-authRouter.post('/forgot-password', (_req: Request, res: Response) => {
+const lastResetCodeAt = new Map<string, number>();
+authRouter.post('/forgot-password', (req: Request, res: Response) => {
   // Always respond 200 regardless of account existence to avoid user enumeration.
   if (userCount() === 0) {
     res.json({ success: true });
     return;
   }
   const now = Date.now();
-  if (now - lastResetCodeAt < RESET_CODE_MIN_INTERVAL_MS) {
-    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((RESET_CODE_MIN_INTERVAL_MS - (now - lastResetCodeAt)) / 1000))));
+  const client = req.ip ?? '';
+  const last = lastResetCodeAt.get(client) ?? 0;
+  if (now - last < RESET_CODE_MIN_INTERVAL_MS) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((RESET_CODE_MIN_INTERVAL_MS - (now - last)) / 1000))));
     res.status(429).json({ error: { message: 'Too many reset-code requests. Try again later.', type: 'rate_limit_error' } });
     return;
   }
-  lastResetCodeAt = now;
+  lastResetCodeAt.set(client, now);
+  if (lastResetCodeAt.size > MAX_TRACKED_EMAILS) {
+    for (const [ip, at] of lastResetCodeAt) if (now - at >= RESET_CODE_MIN_INTERVAL_MS) lastResetCodeAt.delete(ip);
+  }
   generateResetCode(accountEmail());
   res.json({ success: true });
 });
@@ -402,6 +402,7 @@ authRouter.post('/reset-password', (req: Request, res: Response) => {
     return;
   }
   clearResetCode();
+  clearAccountLockouts(user.email);
   // Sign the operator straight in: the code already proved they control the
   // install, and sending them back to a login form that needs an email they
   // may not remember left them locked out after a successful reset (#1477).

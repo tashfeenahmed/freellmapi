@@ -795,6 +795,51 @@ describe('GoogleProvider', () => {
     expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('stop');
   });
 
+  // M14: a finish frame with no trailing newline was left in the line buffer
+  // at EOF and dropped, so a complete answer was thrown as truncated.
+  it('reads a final finish frame that has no trailing newline', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}\n\n',
+      'data: {"candidates":[{"content":{"parts":[]},"finishReason":"STOP"}]}',
+    ]));
+
+    const chunks = await collect(provider.streamChatCompletion(
+      'test-key',
+      [{ role: 'user', content: 'Hi' }],
+      'gemini-2.5-pro',
+    ));
+
+    expect(chunks.map(c => c.choices[0].delta.content ?? '').join('')).toBe('Hello');
+    expect(chunks[chunks.length - 1].choices[0].finish_reason).toBe('stop');
+  });
+
+  // M14: Gemini can report a failure inside a 200 stream as `data: {"error":…}`.
+  // It used to be skipped like a malformed frame and then surface as a
+  // truncation; it is now thrown with the upstream status and message, so a
+  // 429 is classified as rate limiting and not as a cut-off stream.
+  it('throws an in-band stream error with its upstream status', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"Hel"}]}}]}\n\n',
+      'data: {"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}\n\n',
+    ]));
+
+    let thrown: any;
+    try {
+      await collect(provider.streamChatCompletion(
+        'test-key',
+        [{ role: 'user', content: 'Hi' }],
+        'gemini-2.5-pro',
+      ));
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown.status).toBe(429);
+    expect(thrown.message).toContain('Resource has been exhausted');
+    expect(isStreamTruncatedError(thrown)).toBe(false);
+  });
+
   it('streams functionCall parts as tool_calls with finish_reason=tool_calls', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce(sseResponse([
       'data: {"candidates":[{"content":{"parts":[{"functionCall":{"id":"call_1","name":"get_weather","args":{"city":"Karachi"}}}]}}]}\n\n',

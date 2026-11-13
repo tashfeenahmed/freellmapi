@@ -1,5 +1,6 @@
 import type { Db } from '../db/types.js';
 import type { applyCatalog } from './catalog-sync.js';
+import { getActiveProfileId } from './profile-models.js';
 
 export type CatalogModelKind = 'chat' | 'media';
 
@@ -201,15 +202,17 @@ export function recordCatalogModelTombstone(
   kind: CatalogModelKind,
   platform: string,
   modelId: string,
-  options: { source?: CatalogTombstoneSource; reason?: string | null } = {},
+  options: { source?: CatalogTombstoneSource; reason?: string | null; chainSnapshot?: ChainSnapshot | null } = {},
 ): void {
   const source: CatalogTombstoneSource = options.source ?? 'user';
   db.prepare(`
-    INSERT INTO catalog_model_tombstones (kind, platform, model_id, source, reason)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO catalog_model_tombstones (kind, platform, model_id, source, reason, chain_snapshot)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(kind, platform, model_id)
-    DO UPDATE SET created_at = datetime('now'), source = excluded.source, reason = excluded.reason
-  `).run(kind, platform, modelId, source, options.reason ?? null);
+    DO UPDATE SET created_at = datetime('now'), source = excluded.source, reason = excluded.reason,
+                  chain_snapshot = excluded.chain_snapshot
+  `).run(kind, platform, modelId, source, options.reason ?? null,
+    options.chainSnapshot ? JSON.stringify(options.chainSnapshot) : null);
   // A user deletion drops their local metadata edits with the row. An upstream
   // retirement keeps the row, so it keeps the overrides too — they must survive
   // if the model is reinstated.
@@ -238,9 +241,11 @@ export function retireCatalogModelUpstream(
 ): boolean {
   const existing = getCatalogModelTombstone(db, 'chat', platform, modelId);
   if (existing) return false;
-  recordCatalogModelTombstone(db, 'chat', platform, modelId, { source: 'upstream_eol', reason });
-  db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
-  db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
+  // Remember the flags first: the lift restores these, not "everything on".
+  recordCatalogModelTombstone(db, 'chat', platform, modelId, {
+    source: 'upstream_eol', reason, chainSnapshot: readChainSnapshot(db, modelDbId),
+  });
+  setChainEnabled(db, modelDbId, false, { scope: 'all' });
   return true;
 }
 
@@ -255,15 +260,85 @@ export function reinstateUpstreamRetiredCatalogModel(
   modelId: string,
 ): boolean {
   if (getCatalogModelTombstone(db, 'chat', platform, modelId)?.source !== 'upstream_eol') return false;
+  const snapshot = storedChainSnapshot(db, platform, modelId);
   clearCatalogModelTombstone(db, 'chat', platform, modelId);
   const row = db
     .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(platform, modelId) as { id: number } | undefined;
-  if (row) {
-    db.prepare('UPDATE fallback_config SET enabled = 1 WHERE model_db_id = ?').run(row.id);
-    db.prepare('UPDATE profile_models SET enabled = 1 WHERE model_db_id = ?').run(row.id);
+  if (!row) return true;
+  if (!snapshot) {
+    // Retired before snapshots existed: nothing says what the user had, so
+    // keep the old lift and switch every chain entry back on.
+    setChainEnabled(db, row.id, true, { scope: 'all' });
+    return true;
   }
+  // Only rows the retirement itself switched off; a chain row created while
+  // the model was retired keeps the flag it was created with.
+  if (snapshot.fallback != null) {
+    db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?').run(snapshot.fallback, row.id);
+  }
+  const restoreProfile = db.prepare('UPDATE profile_models SET enabled = ? WHERE profile_id = ? AND model_db_id = ?');
+  for (const [profileId, enabled] of snapshot.profiles) restoreProfile.run(enabled, profileId, row.id);
   return true;
+}
+
+/** The model's chain flags at one moment: the global chain row (null when the
+ *  model has none) and each profile row as [profile_id, enabled]. */
+export interface ChainSnapshot {
+  fallback: 0 | 1 | null;
+  profiles: Array<[number, 0 | 1]>;
+}
+
+function readChainSnapshot(db: Db, modelDbId: number): ChainSnapshot {
+  const fb = db.prepare('SELECT enabled FROM fallback_config WHERE model_db_id = ?')
+    .get(modelDbId) as { enabled: number } | undefined;
+  const profiles = db.prepare('SELECT profile_id, enabled FROM profile_models WHERE model_db_id = ? ORDER BY profile_id')
+    .all(modelDbId) as { profile_id: number; enabled: number }[];
+  return {
+    fallback: fb ? (fb.enabled ? 1 : 0) : null,
+    profiles: profiles.map(p => [p.profile_id, p.enabled ? 1 : 0]),
+  };
+}
+
+function storedChainSnapshot(db: Db, platform: string, modelId: string): ChainSnapshot | null {
+  const row = db.prepare("SELECT chain_snapshot FROM catalog_model_tombstones WHERE kind = 'chat' AND platform = ? AND model_id = ?")
+    .get(platform, modelId) as { chain_snapshot: string | null } | undefined;
+  if (!row?.chain_snapshot) return null;
+  try {
+    const parsed = JSON.parse(row.chain_snapshot) as ChainSnapshot;
+    return Array.isArray(parsed.profiles) ? parsed : null;
+  } catch {
+    return null; // unreadable snapshot: fall back to the old lift
+  }
+}
+
+/**
+ * The one writer of a model's chain membership flags (M10). `scope: 'all'`
+ * writes the global chain and every profile (a disable or retirement must reach
+ * every chain); `'active'` writes the global chain and only the active profile
+ * (the dashboard switch). Switching a model ON also lifts an upstream
+ * retirement: the user disagreeing with it must not leave the model routed
+ * while the dashboard still says "retired", and a standing tombstone would
+ * block a later end-of-life signal from retiring it again. A user deletion
+ * tombstone is never touched here.
+ */
+export function setChainEnabled(db: Db, modelDbId: number, enabled: boolean, options: { scope: 'all' | 'active' }): void {
+  const flag = enabled ? 1 : 0;
+  db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?').run(flag, modelDbId);
+  if (options.scope === 'all') {
+    db.prepare('UPDATE profile_models SET enabled = ? WHERE model_db_id = ?').run(flag, modelDbId);
+  } else {
+    const activeProfileId = getActiveProfileId(db);
+    if (activeProfileId != null) {
+      db.prepare('UPDATE profile_models SET enabled = ? WHERE profile_id = ? AND model_db_id = ?').run(flag, activeProfileId, modelDbId);
+    }
+  }
+  if (!enabled) return;
+  const model = db.prepare('SELECT platform, model_id FROM models WHERE id = ?')
+    .get(modelDbId) as { platform: string; model_id: string } | undefined;
+  if (model && getCatalogModelTombstone(db, 'chat', model.platform, model.model_id)?.source === 'upstream_eol') {
+    clearCatalogModelTombstone(db, 'chat', model.platform, model.model_id);
+  }
 }
 
 export function clearCatalogModelTombstone(

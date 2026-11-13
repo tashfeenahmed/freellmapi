@@ -14,6 +14,7 @@
 | [`04-degraded-mode-and-failover.md`](04-degraded-mode-and-failover.md) | 降级模式状态机 (f412e97)、重试预算耗尽时的对冲/中止 (1d2226a)、X-Fallback-Detail 头 (8cb75ac)、裸 safe/unsafe 分类输出回退 (a961d93) |
 | [`05-catalog-sync.md`](05-catalog-sync.md) | 从 freellmapi.co 的实时签名目录同步、模型年龄闸（30 天）、付费/免费层、迁移播种 vs 托管目录 |
 | [`06-observability.md`](06-observability.md) | 服务器日志查看器（环形缓冲 + 持久化 warn/error）、`/api/logs` API、请求分析、日志脱敏 |
+| [`07-state-machines.md`](07-state-machines.md) | 状态机登记表：服务端、客户端、桌面端与 CLI 中的每个状态机（密钥健康、冷却、目录生命周期、故障转移、流提交点、认证、仪表盘流程、更新、关停），列出所有者、状态、写入方、测试、现状和状态图；另列不算状态机的模式与派生值 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 本域文档修订历史，从触及架构相关代码的提交播种而来 |
 
 ## 导航

@@ -56,7 +56,8 @@ export interface FallbackEntry {
   groupLabel?: string
 }
 
-export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom' | 'decision'
+export type { RoutingStrategy } from '@freellmapi/shared/types'
+import type { RoutingStrategy } from '@freellmapi/shared/types'
 
 /** The 'decision' strategy's settings and since-restart picks (#1354): a
  *  decision model picks one of four presets per request, Balanced when unsure. */

@@ -268,9 +268,9 @@ function noteContextTooLarge(route: RouteResult, err: any, skipModels: Set<numbe
   skipModels.add(route.modelDbId);
 }
 
-const ZERO_USAGE: TokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+export const ZERO_USAGE: TokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
-function addUsage(a: TokenUsage, b: TokenUsage | undefined): TokenUsage {
+export function addUsage(a: TokenUsage, b: TokenUsage | undefined): TokenUsage {
   if (!b) return a;
   return {
     prompt_tokens: a.prompt_tokens + (b.prompt_tokens ?? 0),

@@ -19,7 +19,7 @@ import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker, type DialectHoldMode } from '../lib/tool-call-rescue.js';
 import {
   extractApiToken,
   getRequestGroupId,
@@ -37,7 +37,8 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
+import { newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
+import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { maybeServeResponsesWebSearch, webSearchCallToText } from '../lib/responses-web-search.js';
@@ -1251,7 +1252,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         // either matches a tool-call dialect marker (held to the end and
         // rescued into function_call items) or provably cannot (flushed and
         // streamed normally). Mirrors the /chat/completions stream loop.
-        let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+        let dialectMode: DialectHoldMode = 'undecided';
         let heldText = '';
         let upstreamFinish: string | null = null;
 
@@ -1421,6 +1422,11 @@ export async function handleResponses(req: Request, res: Response): Promise<void
               }
             }
           }
+          // The client left mid-pump: CLIENT behavior, not a provider failure.
+          // Without this, a Ctrl-C before the first token fell into the
+          // empty-completion throw below (benching a healthy model+key), and one
+          // after it reached the success path. One 'canceled' row instead.
+          throwIfAbandoned(clientGone);
 
           // Resolve the dialect hold window now that the full text is known.
           // Held text was never emitted, so a dead dialect turn can still fail
@@ -1466,15 +1472,6 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // been committed yet (the skeleton is lazy), so throwing lets the
           // shared loop fail over to the next model on the same SSE connection.
           if (msgText.length === 0 && toolAcc.size === 0) {
-            // Disconnect before the commit point: the break above fired with
-            // nothing accumulated — CLIENT behavior, not a provider failure.
-            // Falling through to the empty-completion throw benched a healthy
-            // model+key for 90s on every Ctrl-C during a reasoning model's
-            // TTFB window.
-            if (clientGone && !streamStarted) {
-              console.log(`[Responses] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-              return 'committed';
-            }
             // finish_reason 'length' = the model spent the whole output budget
             // on hidden reasoning before any visible text: fail over, but skip
             // the cooldown/penalty (not a provider-health signal).
@@ -1542,19 +1539,28 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
           return 'done';
         } catch (streamErr: any) {
-          // Client abort mid-stream: the pump's own `if (clientGone) break`
-          // can lose the race against the fetch-signal rejection, so the
-          // abort may surface here instead. Rethrow — the shared loop's
-          // client-abort branch stops the ladder without benching or an
-          // error log row (the socket is gone; nothing to render).
-          if (isClientAbortError(streamErr)) throw streamErr;
+          // streamStarted = real events went out. headersSentEarly also counts: a
+          // #1642 keep-alive ping flushed the SSE headers, so this attempt is on
+          // the wire and can no longer fail over invisibly.
+          switch (failedStreamPhase(streamErr, res, streamStarted || headersSentEarly)) {
+          // abandoned: client abort mid-stream — rethrow; the shared loop's
+          // client-abort branch logs one 'canceled' row and stops without
+          // benching (the socket is gone; nothing to render).
+          // held: a pre-commit failure throws through to the shared loop for
+          // cooldown + failover.
+          case 'abandoned':
+          case 'held':
+            throw streamErr;
+          // response.completed and res.end() already went out, so this came
+          // from the bookkeeping after them. A response.failed event now would
+          // raise ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal
+          // under the process safety net) and log an error the client never saw.
+          case 'finished':
+            console.error(`[Responses] Bookkeeping after a completed stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
           // A committed stream can't fail over (bytes already sent) — surface a
-          // response.failed event honestly and stop. A pre-commit failure throws
-          // through to the shared loop for cooldown + failover.
-          // streamStarted = real events went out. headersSentEarly also counts:
-          // a #1642 keep-alive ping flushed the SSE headers, so this attempt is
-          // on the wire and can no longer fail over invisibly.
-          if (streamStarted || headersSentEarly) {
+          // response.failed event honestly and stop.
+          case 'committed': {
             const safe = sanitizeProviderErrorMessage(streamErr.message);
             traceRouteEvent('Responses', {
               event: 'fail',
@@ -1570,7 +1576,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             res.end();
             return 'committed';
           }
-          throw streamErr;
+          }
         } finally {
           // #1642: this attempt is over whichever path it left by — the
           // keep-alive interval must not outlive it.

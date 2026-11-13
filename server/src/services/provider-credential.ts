@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { reserveMonthlyBudget } from './key-budget.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 
 export interface ReservedProviderCredential {
   id: number;
@@ -30,8 +31,7 @@ export function reserveProviderCredential(
   const bound = row.key_id != null;
   const keys = getDb().prepare(`
     SELECT id, encrypted_key, iv, auth_tag, base_url FROM api_keys
-    WHERE ${bound ? 'id' : 'platform'} = ? AND enabled = 1
-      AND status IN ('healthy', 'unknown') ORDER BY RANDOM()
+    WHERE ${bound ? 'id' : 'platform'} = ? AND ${USABLE_KEY_SQL} ORDER BY RANDOM()
   `).all(bound ? row.key_id : row.platform) as KeyRow[];
   let budgetBlocked = false;
   for (const keyRow of keys) {

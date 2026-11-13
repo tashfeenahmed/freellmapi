@@ -11,6 +11,7 @@ import {
   recordCatalogModelTombstone,
   clearCatalogModelTombstone,
   upsertModelOverrides,
+  setChainEnabled,
   type ModelOverridePatch,
 } from '../services/model-state.js';
 import { pruneUnavailableSavedFusionConfig } from '../services/fusion.js';
@@ -315,14 +316,9 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
     }
 
     if (disablesModel || parsed.data.fallbackEnabled !== undefined) {
-      const next = disablesModel ? 0 : parsed.data.fallbackEnabled ? 1 : 0;
-      db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?')
-        .run(next, id);
-      const activeProfileId = getActiveProfileId(db);
-      if (activeProfileId != null) {
-        db.prepare('UPDATE profile_models SET enabled = ? WHERE profile_id = ? AND model_db_id = ?')
-          .run(next, activeProfileId, id);
-      }
+      // A disable already cleared every profile above; this writes the global
+      // chain + active profile, and a switch-on lifts an upstream retirement.
+      setChainEnabled(db, id, !disablesModel && parsed.data.fallbackEnabled === true, { scope: 'active' });
     }
   });
   applyUpdate();

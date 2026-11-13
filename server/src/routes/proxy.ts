@@ -24,7 +24,8 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
-import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
+import { isIterativeCritiqueModel, runIterativeCritique, iterativeCritiqueConfigSchema, ITERATIVE_CRITIQUE_MODEL_ID } from '../services/iterative-critique.js';
+import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
@@ -34,6 +35,8 @@ import { routedViaValue, safeHeaderValue } from '../lib/header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, supportedParametersForPlatforms } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
+import { failedStreamPhase, throwIfAbandoned } from '../lib/stream-commit.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
@@ -485,6 +488,17 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
       available: autoContextWindow != null,
       unavailable_reason: autoContextWindow != null ? null : 'no_models',
     },
+    {
+      id: ITERATIVE_CRITIQUE_MODEL_ID,
+      object: 'model',
+      created: 0,
+      owned_by: 'freellmapi',
+      name: 'Iterative Critique (a generator and a critic from different providers loop until the critic accepts, then one answer is synthesized)',
+      context_window: autoContextWindow,
+      context_length: autoContextWindow,
+      available: autoContextWindow != null,
+      unavailable_reason: autoContextWindow != null ? null : 'no_models',
+    },
     ...claudeFamilyEntries,
     ...profileRows.map(p => {
       const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
@@ -780,6 +794,8 @@ const chatCompletionSchema = z.object({
   // Fusion config — only meaningful when `model` is the virtual "fusion" id.
   // Ignored for every other model. See services/fusion.ts.
   fusion: fusionConfigSchema.optional(),
+  // Same idea for the virtual "iterative-critique" model. See services/iterative-critique.ts.
+  iterative_critique: iterativeCritiqueConfigSchema.optional(),
   // Extended sampling + structured-output params (top_k, seed, penalties,
   // logit_bias, logprobs, response_format, max_completion_tokens…), forwarded
   // per the platform policy in lib/sampling-params.ts.
@@ -837,8 +853,9 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
     return;
   }
   const inputs = Array.isArray(parsed.data.input) ? parsed.data.input : [parsed.data.input];
+  const clientSignal = clientAbortSignal(res);
   try {
-    const result = await runEmbeddings(parsed.data.model, inputs, parsed.data.dimensions);
+    const result = await runEmbeddings(parsed.data.model, inputs, parsed.data.dimensions, clientSignal);
     res.json({
       object: 'list',
       data: result.vectors.map((values, i) => ({ object: 'embedding', index: i, embedding: values })),
@@ -847,6 +864,7 @@ proxyRouter.post('/embeddings', async (req: Request, res: Response) => {
       usage: { prompt_tokens: result.inputTokens, total_tokens: result.inputTokens },
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof EmbeddingsError ? err.status : 502;
     const code = err instanceof EmbeddingsError ? inferenceBudgetCode(err, res) : {};
     const type = status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : 'server_error';
@@ -871,8 +889,9 @@ proxyRouter.post('/rerank', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `query` and `documents` are required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
-    const result = await runRerank(parsed.data.model, parsed.data.query, parsed.data.documents, parsed.data.top_n);
+    const result = await runRerank(parsed.data.model, parsed.data.query, parsed.data.documents, parsed.data.top_n, clientSignal);
     res.json({
       results: result.results.map(r => ({
         index: r.index,
@@ -883,6 +902,7 @@ proxyRouter.post('/rerank', async (req: Request, res: Response) => {
       provider: result.platform,
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof RerankError ? err.status : 502;
     if (err instanceof RerankError) {
       const retryAfter = rerankRetryAfterSec(err);
@@ -912,15 +932,14 @@ proxyRouter.post('/search', async (req: Request, res: Response) => {
     return;
   }
   // A departed client drops the upstream search instead of spending a credit.
-  const abort = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runSearch(parsed.data.query, {
       maxResults: parsed.data.max_results,
       topic: parsed.data.topic,
       includeAnswer: parsed.data.include_answer,
       engine: parsed.data.engine,
-      signal: abort.signal,
+      signal: clientSignal,
     });
     res.json({
       query: result.query,
@@ -930,7 +949,7 @@ proxyRouter.post('/search', async (req: Request, res: Response) => {
       engine: result.engine,
     });
   } catch (err: any) {
-    if (res.headersSent || abort.signal.aborted) return;
+    if (res.headersSent || clientSignal.aborted) return;
     const status = err instanceof SearchError ? err.status : 502;
     if (err instanceof SearchError) {
       const retryAfter = searchRetryAfterSec(err);
@@ -992,13 +1011,12 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: { message: `Invalid request: ${detail}`, type: 'invalid_request_error' } });
     return;
   }
-  const abort = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) abort.abort(); });
+  const clientSignal = clientAbortSignal(res);
   try {
     const { model, state, questions } = parsed.data;
     const result = await runDecision(
       { state, questions: questions as Parameters<typeof runDecision>[0]['questions'] },
-      { model, signal: abort.signal },
+      { model, signal: clientSignal },
     );
     res.json({
       object: 'decision',
@@ -1008,7 +1026,7 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       usage: result.usage,
     });
   } catch (err: any) {
-    if (res.headersSent || abort.signal.aborted) return;
+    if (res.headersSent || clientSignal.aborted) return;
     const status = err instanceof DecisionError ? err.status : 502;
     if (err instanceof DecisionError) {
       const retryAfter = decisionRetryAfterSec(err);
@@ -1081,10 +1099,11 @@ proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `prompt` is required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runImageGeneration(parsed.data.model, {
       prompt: parsed.data.prompt, n: parsed.data.n, size: parsed.data.size,
-    });
+    }, clientSignal);
     res.json({
       created: Math.floor(Date.now() / 1000),
       data: result.images,
@@ -1092,6 +1111,7 @@ proxyRouter.post('/images/generations', async (req: Request, res: Response) => {
       provider: result.platform,
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1127,12 +1147,8 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
   // A video job runs for minutes, so a caller that hangs up must actually stop
   // the work: without this the gateway would keep polling the provider and then
   // fail over to a second one, both charged to the operator, for a response
-  // nobody is waiting for. 'close' also fires on normal completion, which
-  // writableEnded distinguishes.
-  const clientAbort = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) clientAbort.abort();
-  });
+  // nobody is waiting for.
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runVideoGeneration(parsed.data.model, {
       prompt: parsed.data.prompt,
@@ -1141,7 +1157,7 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
       image: parsed.data.image,
       seed: parsed.data.seed,
       audio: parsed.data.audio,
-    }, clientAbort.signal);
+    }, clientSignal);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
@@ -1149,7 +1165,7 @@ proxyRouter.post('/videos/generations', async (req: Request, res: Response) => {
     res.send(result.video);
   } catch (err: any) {
     // Nothing to report to a socket that is already gone.
-    if (clientAbort.signal.aborted || res.writableEnded) return;
+    if (clientSignal.aborted || res.writableEnded) return;
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1175,14 +1191,16 @@ proxyRouter.post('/audio/speech', async (req: Request, res: Response) => {
     res.status(400).json({ error: { message: 'Invalid request: `input` is required', type: 'invalid_request_error' } });
     return;
   }
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runSpeech(parsed.data.model, {
       input: parsed.data.input, voice: parsed.data.voice, format: parsed.data.response_format,
-    });
+    }, clientSignal);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
     res.send(result.audio);
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1274,6 +1292,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
   const language = typeof req.body?.language === 'string' && req.body.language.trim() ? req.body.language.trim() : undefined;
   const prompt = typeof req.body?.prompt === 'string' && req.body.prompt ? req.body.prompt : undefined;
 
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runTranscription(model, {
       file: file.buffer,
@@ -1283,7 +1302,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
       prompt,
       temperature,
       responseFormat,
-    });
+    }, clientSignal);
     res.setHeader('X-Provider', safeHeaderValue(result.platform));
     res.setHeader('X-Model', safeHeaderValue(result.modelId));
     if (responseFormat === 'text') {
@@ -1306,6 +1325,7 @@ proxyRouter.post('/audio/transcriptions', (req: Request, res: Response, next) =>
     }
     res.json({ text: result.text });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof MediaError ? err.status : 502;
     const code = err instanceof MediaError ? inferenceBudgetCode(err, res) : {};
     const httpStatus = status >= 400 && status < 600 ? status : 502;
@@ -1644,16 +1664,11 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             flushHeaders();
             res.write(`data: ${JSON.stringify(frame)}\n\n`);
           }
-
-          // Disconnect before the commit point: the break above fired with no
-          // text seen, which is indistinguishable from an empty completion
-          // below — but it is CLIENT behavior, not a provider failure. Without
-          // this check every Ctrl-C during a reasoning model's TTFB window
-          // benched the healthy model+key for 90s and logged a provider error.
-          if (clientGone && !headerSent && !sawText) {
-            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-            return 'committed';
-          }
+          // The client left mid-pump: CLIENT behavior, not a provider failure.
+          // Without this, a Ctrl-C before the first token fell into the
+          // empty-completion throw below (benching a healthy model+key), and one
+          // after it reached the success path. One 'canceled' row instead.
+          throwIfAbandoned(clientGone);
 
           if (!sawText) {
             // finish_reason 'length' means the model spent the whole output
@@ -1683,16 +1698,21 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
           logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, pinnedModelId, null, 'http');
           return 'done';
         } catch (streamErr: any) {
-          // Client abort mid-stream: the pump's own `if (clientGone) break`
-          // can lose the race against the fetch-signal rejection, so the
-          // abort may surface here instead. Rethrow — the shared loop's
-          // client-abort branch stops the ladder without benching or an
-          // error log row (the socket is gone; nothing to render).
-          if (isClientAbortError(streamErr)) throw streamErr;
-          // headerSent = real content went out. headersSentEarly also counts:
-          // a #1642 keep-alive ping flushed the SSE headers, so the response
-          // is on the wire and this attempt can no longer fail over invisibly.
-          if (headerSent || headersSentEarly) {
+          // headerSent = real content went out. headersSentEarly also counts: a
+          // #1642 keep-alive ping flushed the SSE headers, so this attempt is on
+          // the wire and can no longer fail over invisibly.
+          switch (failedStreamPhase(streamErr, res, headerSent || headersSentEarly)) {
+          // abandoned: client abort mid-stream — rethrow; the shared loop's
+          // client-abort branch logs one 'canceled' row and stops without
+          // benching. held: headers never sent — fail over.
+          case 'abandoned':
+          case 'held':
+            throw streamErr;
+          // Ended already: post-end bookkeeping failed (see /chat/completions).
+          case 'finished':
+            console.error(`[Proxy] Bookkeeping after a completed legacy stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
+          case 'committed': {
             console.error(`[Proxy] Mid-stream legacy completion error from ${route.displayName}:`, streamErr.message);
             const payload = { error: { message: `Provider error (${route.displayName}): stream interrupted`, type: 'stream_error' } };
             try { res.write(`data: ${JSON.stringify(payload)}\n\n`); } catch { /* socket gone */ }
@@ -1709,7 +1729,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http', failureAttributionFor(streamErr));
             return 'committed';
           }
-          throw streamErr;
+          }
         } finally {
           // #1642: this attempt is over whichever path it left by — the
           // keep-alive interval must not outlive it.
@@ -2222,6 +2242,54 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         });
       } else {
         res.status(502).json({ error: { message: `fusion error: ${sanitizeProviderErrorMessage(err?.message)}`, type: 'server_error' }, execution_id: requestGroupId });
+      }
+    }
+    return;
+  }
+
+  // ── Iterative critique: generator <-> critic loop, then synthesis ──────────
+  // Text-only: tools/images are not supported. Streaming returns the finished
+  // answer as one chunk (the loop needs every round before it can synthesize).
+  if (isIterativeCritiqueModel(requestedModel)) {
+    const fail = (status: number, message: string, type: string, code?: string) => {
+      if (stream) {
+        try { res.setHeader('Content-Type', 'text/event-stream'); res.write(`data: ${JSON.stringify({ error: { message, type, ...(code ? { code } : {}) } })}\n\ndata: [DONE]\n\n`); res.end(); } catch { /* socket gone */ }
+      } else {
+        res.status(status).json({ error: { message, type, ...(code ? { code } : {}) }, execution_id: requestGroupId });
+      }
+    };
+    if (hasImage || (tools?.length ?? 0) > 0) {
+      fail(400, 'iterative-critique does not support images or tools; use "fusion" or a pinned model.', 'invalid_request_error');
+      return;
+    }
+    try {
+      const { response, routedVia } = await runIterativeCritique({
+        messages,
+        config: parsed.data.iterative_critique ?? {},
+        options: { signal: clientAbort.signal },
+        estimatedTokens: estimatedTotal,
+      });
+      if (stream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        const base = { id: response.id, object: 'chat.completion.chunk', created: response.created, model: ITERATIVE_CRITIQUE_MODEL_ID };
+        const text = contentToString(response.choices[0]?.message?.content ?? '');
+        for (const f of [
+          { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },
+          { ...base, choices: [{ index: 0, delta: { content: text }, finish_reason: null }] },
+          { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: response.usage },
+        ]) res.write(`data: ${JSON.stringify(f)}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } else {
+        res.setHeader('X-Routed-Via', safeHeaderValue(routedVia));
+        res.json({ ...response, execution_id: requestGroupId });
+      }
+    } catch (err: any) {
+      if (err instanceof FusionError) {
+        fail(err.status, err.message, err.status === 429 ? 'rate_limit_error' : err.status >= 500 ? 'server_error' : 'invalid_request_error', err.code);
+      } else {
+        fail(502, `iterative-critique error: ${sanitizeProviderErrorMessage(err?.message)}`, 'server_error');
       }
     }
     return;
@@ -2825,6 +2893,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             }
             // else: still a strict prefix of a marker — keep holding.
           }
+          // The client left mid-pump. Nothing below may run for it: a dead
+          // dialect turn or empty completion would bench a healthy model+key,
+          // and the success path would log 'success' and cache a truncated
+          // answer. One 'canceled' row instead, whichever phase it left in.
+          throwIfAbandoned(clientGone);
 
           // — Stream ended cleanly (provider saw [DONE] or a finish_reason) —
 
@@ -2875,17 +2948,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           if (isToolArgumentValidationEnabled() && mode !== 'passthrough' && completedCalls.length > 0) {
             const invalid = invalidToolCallReasons(completedCalls, schemas);
             if (invalid.length > 0) throw invalidToolArgumentsError(route.displayName, invalid);
-          }
-
-          // Disconnect before the commit point: nothing usable was (or will
-          // be) delivered, and that is CLIENT behavior, not a provider
-          // failure — do not let it fall through to the empty-completion
-          // throw below, which would bench a healthy model+key for 90s and
-          // log a provider error for every Ctrl-C during a reasoning model's
-          // TTFB window.
-          if (clientGone && mode !== 'passthrough' && heldText.trim().length === 0 && completedCalls.length === 0) {
-            console.log(`[Proxy] client disconnected before first token from ${route.displayName} — dropping attempt without benching`);
-            return 'committed';
           }
 
           const hasText = mode === 'passthrough' || heldText.trim().length > 0;
@@ -3035,16 +3097,30 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             observeServedModel({ platform: route.platform, requestedModel: route.modelId, servedModel: upstreamModel }), 'http');
           return 'done';
         } catch (streamErr: any) {
-          // Client abort mid-stream: the pump's own `if (clientGone) break`
-          // can lose the race against the fetch-signal rejection, so the
-          // abort may surface here instead. Rethrow — the shared loop's
-          // client-abort branch stops the ladder without benching or an
-          // error log row (the socket is gone; nothing to render).
-          if (isClientAbortError(streamErr)) throw streamErr;
-          // headerSent = real content went out. headersSentEarly also counts:
-          // a #1642 keep-alive ping flushed the SSE headers, so the response
-          // is on the wire and this attempt can no longer fail over invisibly.
-          if (headerSent || headersSentEarly) {
+          // headerSent = real content went out. headersSentEarly also counts: a
+          // #1642 keep-alive ping flushed the SSE headers, so this attempt is on
+          // the wire and can no longer fail over invisibly.
+          switch (failedStreamPhase(streamErr, res, headerSent || headersSentEarly)) {
+          // abandoned: client abort mid-stream (the fetch-signal rejection, or
+          // throwIfAbandoned after the pump). Rethrow — the shared loop's
+          // client-abort branch logs one 'canceled' row and stops the ladder
+          // without benching (the socket is gone; nothing to render).
+          // held: headers never sent — bubble to the shared loop, which
+          // cooldowns this model+key and tries the next one. Covers upstream
+          // HTTP errors, in-band error frames, abrupt EOF, stalls, empty
+          // completions, and unparseable dialect turns alike.
+          case 'abandoned':
+          case 'held':
+            throw streamErr;
+          // res.end() already ran: the client has the whole answer, and this
+          // came from the bookkeeping after it (cache store, sticky model,
+          // request log). An error frame now would raise ERR_STREAM_WRITE_AFTER_END
+          // on `res` with no listener, which the process safety net treats as
+          // fatal, and an 'error' row would blame a provider that delivered.
+          case 'finished':
+            console.error(`[Proxy] Bookkeeping after a completed stream from ${route.displayName} failed:`, streamErr.message);
+            return 'done';
+          case 'committed': {
             // Mid-stream error after real payload reached the client — finish
             // the SSE response honestly instead of leaving the client hanging.
             console.error(`[Proxy] Mid-stream error from ${route.displayName}:`, streamErr.message);
@@ -3063,11 +3139,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             logRequest(route.platform, route.modelId, route.keyId, 'error', estimatedInputTokens, totalOutputTokens, Date.now() - start, sanitizeProviderErrorMessage(streamErr.message), ttfbMs, pinnedModelId, null, 'http', failureAttributionFor(streamErr));
             return 'committed';
           }
-          // Headers never sent — bubble to the shared loop, which cooldowns this
-          // model+key and tries the next one. Covers upstream HTTP errors, in-band
-          // error frames, abrupt EOF, stalls, empty completions, and unparseable
-          // dialect turns alike.
-          throw streamErr;
+          }
         } finally {
           // #1642: this attempt is over whichever path it left by — the
           // keep-alive interval must not outlive it.

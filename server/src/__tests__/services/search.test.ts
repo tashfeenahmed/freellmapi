@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
-import { clearAllCooldowns, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
+import { clearAllCooldowns, getProbeableCooldowns, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
 import { getProvider } from '../../providers/index.js';
 import { BraveProvider } from '../../providers/brave.js';
 import {
@@ -378,12 +378,14 @@ describe('search service', () => {
   });
 
   it('cools a rate-limited key down and fails over to the next engine', async () => {
-    addKey('tavily');
+    const tavilyKey = addKey('tavily');
     addKey('exa');
     const fn = mockFetch(url => url.includes('tavily')
       ? json({ detail: 'slow down' }, 429, { 'retry-after': '120' })
       : json({ results: [{ title: 'E', url: 'https://e', text: 'x' }] }));
     expect((await runSearch('q')).provider).toBe('exa');
+    // Retry-After is the provider's own retry time, so the prober never clears it early.
+    expect(getProbeableCooldowns().some(c => c.keyId === tavilyKey)).toBe(false);
     // The benched Tavily key is skipped on the next search.
     await runSearch('q2');
     expect(calls(fn).map(c => new URL(c[0]).host)).toEqual(['api.tavily.com', 'api.exa.ai', 'api.exa.ai']);
@@ -567,5 +569,35 @@ describe('search status and the no-engine message', () => {
   it('is ready once one engine has a usable key', () => {
     addKey('firecrawl');
     expect(searchStatus().status).toBe('ready');
+  });
+});
+
+describe('search client hang-up', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = '0'.repeat(64);
+    initDb(':memory:');
+    seedSearchEngines();
+    clearAllCooldowns(Number.MAX_SAFE_INTEGER);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  // The caller leaving is not an engine failure: no 'error' row (which would
+  // drag the engine's success rate down) and no next engine is tried.
+  // search_requests.status is CHECK ('ok', 'error'), so no row is written.
+  it('writes no error row and tries no further engine once the client is gone', async () => {
+    addKey('exa');
+    addKey('tavily');
+    const controller = new AbortController();
+    const fn = mockFetch(() => {
+      controller.abort();
+      throw new DOMException('This operation was aborted', 'AbortError');
+    });
+    await expect(runSearch('what', { signal: controller.signal })).rejects.toMatchObject({ status: 499 });
+    expect(calls(fn)).toHaveLength(1);
+    expect(logRows()).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import type { RequestStatus } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { noteBudgetAlerts } from '../services/budget-alerts.js';
@@ -81,7 +82,7 @@ export function logRequest(
   // NULL for rejections that never reached routing (no key was involved),
   // e.g. an over-limit request body turned away at the parser.
   keyId: number | null,
-  status: string,
+  status: RequestStatus,
   inputTokens: number,
   outputTokens: number,
   latencyMs: number,
@@ -112,6 +113,11 @@ export function logRequest(
   // model — written only when the failure-attribution setting is on; NULL
   // everywhere else, including every success row and every historical row.
   failureAttribution: string | null = null,
+  // 'chat' for every chat surface; embeddings, moderation and media pass
+  // 'embedding' / 'moderation' / their modality. Only chat rows resolve a
+  // models.id: the other kinds live in their own tables, so a chat models row
+  // that happens to share the id must not be credited with their traffic.
+  requestType = 'chat',
 ) {
   try {
     const db = getDb();
@@ -119,10 +125,11 @@ export function logRequest(
     // middleware); null when logging happens outside an HTTP request.
     const client = getClientContext();
     const tx = db.transaction(() => {
+      const modelDbId = requestType === 'chat' ? resolveModelDbId(db, platform, modelId, keyId) : null;
       const insert = db.prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, failure_attribution)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, resolveModelDbId(db, platform, modelId, keyId), failureAttribution);
+        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, ttfb_ms, requested_model, served_model, client_ip, client_user_agent, client_agent, caller, model_db_id, failure_attribution, request_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(platform, modelId, keyId, status, inputTokens, outputTokens, latencyMs, error, ttfbMs, requestedModel, servedModel, client.ip, client.userAgent, client.agent, caller, modelDbId, failureAttribution, requestType);
 
       // Report the row id back to the fallback loop's attempt trace (if one is
       // active): the LAST id noted during a loop run is the terminal row the

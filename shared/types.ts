@@ -341,6 +341,15 @@ export interface ModelListRow {
 
 export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unknown';
 
+/** How the router ranks models: the legacy manual chain ('priority'), a
+ *  bandit preset, or a user-tuned weight vector ('custom'). The server keeps
+ *  the runtime list in services/scoring.ts (ROUTING_STRATEGIES). */
+export type RoutingStrategy = 'priority' | 'balanced' | 'smartest' | 'fastest' | 'reliable' | 'custom' | 'decision';
+
+/** Who may use the Ollama-compatible endpoints. The server keeps the runtime
+ *  list in routes/ollama.ts (OLLAMA_EMULATION_MODES). */
+export type OllamaEmulationMode = 'off' | 'open-loopback' | 'key-required';
+
 export interface ApiKeyModel {
   id: number;
   kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription';
@@ -616,11 +625,16 @@ export interface TimelinePoint {
   failureCount: number;
 }
 
+/** Outcome of one `requests` row (one attempt). 'canceled' = the client hung
+ *  up (#752): it counts toward totals but toward neither success nor error, so
+ *  rates must read success/(success+error), never success/total. */
+export type RequestStatus = 'success' | 'error' | 'canceled';
+
 export interface RequestLog {
   id: number;
   platform: Platform;
   modelId: string;
-  status: 'success' | 'error';
+  status: RequestStatus;
   inputTokens: number;
   outputTokens: number;
   latencyMs: number;

@@ -10,6 +10,7 @@ import { FieldError } from '@/components/ui/field-error'
 import { useI18n } from '@/i18n'
 import { apiFetch, getToken } from '@/lib/api'
 import { toast } from '@/lib/toast'
+import { useReauthSecret } from '@/hooks/use-reauth-secret'
 import type { ApiKey } from '../../../../shared/types'
 
 type ExportFormat = 'json' | 'env' | 'csv'
@@ -32,19 +33,21 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isDesktopApp = typeof window !== 'undefined'
   && (window as Window & { __FREEAPI_DESKTOP__?: boolean }).__FREEAPI_DESKTOP__ === true
 
-async function downloadExport(format: ExportFormat, healthyOnly: boolean, password: string) {
+async function downloadExport(format: ExportFormat, healthyOnly: boolean, password: string, signal: AbortSignal) {
   const token = getToken()
   const params = new URLSearchParams({ format })
   if (healthyOnly) params.set('healthy', 'true')
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
   if (password) headers['x-reauth-password'] = password
-  const res = await fetch(`${BASE}/api/keys/export?${params}`, { headers })
+  const res = await fetch(`${BASE}/api/keys/export?${params}`, { headers, signal })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: { message: res.statusText } }))
     throw new Error(body.error?.message ?? `HTTP ${res.status}`)
   }
   const blob = await res.blob()
+  // Closed while the body was arriving: the file must not appear afterwards.
+  if (signal.aborted) return
   const ext = FORMAT_OPTIONS.find(f => f.value === format)?.ext ?? format
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -66,9 +69,14 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
   // options step with an empty field: no reset effect, and no way for a
   // reopened dialog to inherit the last password typed into it.
   const [step, setStep] = useState<Step>('options')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
+  // Closing aborts an export in flight (the file used to download, with a
+  // success toast, after the dialog was gone); Cancel on the password step
+  // also drops the typed password and the last error.
+  const { password, setPassword, error, busy: exporting, run, cancel } = useReauthSecret()
+  const close = (next: boolean) => {
+    if (!next) cancel()
+    onOpenChange(next)
+  }
 
   const { data: keys = [] } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
@@ -85,25 +93,17 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
 
   async function handleExport(e?: FormEvent) {
     e?.preventDefault()
-    setExporting(true)
-    setError(null)
-    try {
-      await downloadExport(format, healthyOnly, password)
-      toast.success(t('keys.exportSuccess', { count: exportCount }))
-      onOpenChange(false)
-    } catch (err) {
-      // A rejected password keeps the user on this step with the field cleared
-      // and the reason shown inline — a toast alone would leave the dialog
-      // looking unchanged and give no hint of what to correct.
-      setError((err as Error).message)
-      setPassword('')
-    } finally {
-      setExporting(false)
-    }
+    // A rejected password keeps the user on this step with the field cleared
+    // and the reason shown inline — a toast alone would leave the dialog
+    // looking unchanged and give no hint of what to correct.
+    const result = await run((signal, pw) => downloadExport(format, healthyOnly, pw, signal))
+    if (!result.ok) return
+    toast.success(t('keys.exportSuccess', { count: exportCount }))
+    onOpenChange(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogPopup maxWidth="max-w-md">
         <div className="mb-4 flex items-center justify-between gap-4">
           <DialogTitle>{t('keys.exportKeys')}</DialogTitle>
@@ -144,8 +144,7 @@ export function ExportKeysDialog({ open, onOpenChange }: { open: boolean; onOpen
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStep('options')}
-                disabled={exporting}
+                onClick={() => { cancel(); setStep('options') }}
               >
                 {t('common.cancel')}
               </Button>

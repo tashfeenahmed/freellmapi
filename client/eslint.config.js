@@ -20,4 +20,17 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // A switch over a union (a state machine's phase or event) must handle every
+  // member, or keep a deliberate `default`. This rule needs type information,
+  // so it runs on app source only.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/switch-exhaustiveness-check': ['error', { considerDefaultExhaustiveForUnions: true }],
+    },
+  },
 ])

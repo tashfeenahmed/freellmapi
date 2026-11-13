@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
+import { useReauthSecret } from '@/hooks/use-reauth-secret'
 
 // #786: the desktop build has no user-set password (its machine user's
 // password is random and never shown), so the re-verification dialog would
@@ -36,48 +37,44 @@ export function CopyKeyDialog({
 }) {
   const { t } = useI18n()
   // Mounted only while open, so the field starts empty every time and the
-  // password never outlives the dialog.
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  // password never outlives the dialog. Closing or unmounting aborts the
+  // reveal in flight: otherwise the key still reached the clipboard, with a
+  // "copied" toast, after Cancel. A wrong password is fixed in place.
+  const { password, setPassword, error, setError, busy, run, cancel } = useReauthSecret()
   // Only set when the clipboard refused: the key is on screen for a manual
   // copy, and disappears again with the dialog.
   const [revealed, setRevealed] = useState<string | null>(null)
 
+  function close(open: boolean) {
+    if (!open) cancel()
+    onOpenChange(open)
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      const { key } = await apiFetch<{ key: string }>(`/api/keys/${keyId}/reveal`, {
-        method: 'POST',
-        // The desktop server skips re-auth for this local request (#786); the
-        // web build still needs it.
-        headers: isDesktopApp ? undefined : { 'x-reauth-password': password },
-      })
-      // A plain-HTTP LAN origin has no Clipboard API at all, so this falls back
-      // to execCommand rather than throwing (#734). If even that fails the key
-      // has already been revealed — show it instead of discarding it, or the
-      // password round trip was for nothing.
-      if (!await copyText(key)) {
-        setRevealed(key)
-        setError(t('common.copyFailed'))
-        return
-      }
-      toast.success(t('keys.copiedKey'))
-      onOpenChange(false)
-    } catch (err) {
-      // A wrong password lands here; it is worth fixing in place rather than
-      // behind a closed dialog.
-      setError((err as Error).message)
-      setPassword('')
-    } finally {
-      setBusy(false)
+    const result = await run((signal, pw) => apiFetch<{ key: string }>(`/api/keys/${keyId}/reveal`, {
+      method: 'POST',
+      // The desktop server skips re-auth for this local request (#786); the
+      // web build still needs it.
+      headers: isDesktopApp ? undefined : { 'x-reauth-password': pw },
+      signal,
+    }))
+    if (!result.ok) return
+    // A plain-HTTP LAN origin has no Clipboard API at all, so this falls back
+    // to execCommand rather than throwing (#734). If even that fails the key
+    // has already been revealed — show it instead of discarding it, or the
+    // password round trip was for nothing.
+    if (!await copyText(result.value.key)) {
+      setRevealed(result.value.key)
+      setError(t('common.copyFailed'))
+      return
     }
+    toast.success(t('keys.copiedKey'))
+    onOpenChange(false)
   }
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={close}>
       <DialogPopup maxWidth="max-w-md">
         <DialogTitle>{t('keys.copyFullKey')}</DialogTitle>
         {/* select-all + break-all so the fallback key can be grabbed in one
@@ -105,7 +102,7 @@ export function CopyKeyDialog({
           {isDesktopApp && error && <FieldError error={error} />}
 
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => close(false)}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={(!isDesktopApp && !password) || busy}>

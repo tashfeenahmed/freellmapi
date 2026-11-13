@@ -42,6 +42,11 @@ export interface RescueResult {
   cleanText: string;
 }
 
+/** A stream's hold window for inline tool-call dialect: 'undecided' while the
+ *  first text could still grow into a marker, then 'passthrough' (prose) or
+ *  'dialect' (rescue the tool calls at stream end). */
+export type DialectHoldMode = 'undecided' | 'passthrough' | 'dialect';
+
 // Markers that begin an inline dialect block. Used both for full-text
 // detection and for the streaming hold-window decision in proxy.ts.
 const DIALECT_MARKERS = [

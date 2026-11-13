@@ -4,37 +4,33 @@ import { z } from 'zod';
 import type {
   ChatMessage,
   ChatToolDefinition,
+  OllamaEmulationMode,
 } from '@freellmapi/shared/types.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 import { validateSession } from '../services/auth.js';
+import { isLocalRequest } from '../lib/loopback.js';
 
 export const ollamaRouter = Router();
 
-export type OllamaEmulationMode = 'off' | 'open-loopback' | 'key-required';
+export type { OllamaEmulationMode };
+
+export const OLLAMA_EMULATION_MODES = ['off', 'open-loopback', 'key-required'] as const satisfies readonly OllamaEmulationMode[];
+// Fails to compile when shared OllamaEmulationMode gains a member this list lacks.
+const _everyModeListed: Record<Exclude<OllamaEmulationMode, (typeof OLLAMA_EMULATION_MODES)[number]>, never> = {};
 
 export function getOllamaEmulationMode(): OllamaEmulationMode {
   const stored = getSetting('ollama_emulation');
   return stored === 'open-loopback' || stored === 'key-required' ? stored : 'off';
 }
 
-export function isLoopback(req: Request): boolean {
-  const isLoopbackAddress = (value: string | undefined) => {
-    const address = value?.trim().replace(/^::ffff:/i, '');
-    return address === '127.0.0.1' || address === '::1';
-  };
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request instead of silently widening
-  // open-loopback mode through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
-}
+// open-loopback mode must not widen through a same-host reverse proxy; see
+// lib/loopback.ts for why every forwarded hop is checked.
+export const isLoopback = isLocalRequest;
 
 function authorize(req: Request, res: Response): boolean {
   if ((req as Request & { urlTokenAuthenticated?: boolean }).urlTokenAuthenticated) {
@@ -565,11 +561,13 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
   }
   const rawInput = parsed.data.input ?? parsed.data.prompt ?? '';
   const inputs = Array.isArray(rawInput) ? rawInput : [rawInput];
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runEmbeddings(
       parsed.data.model?.replace(/:latest$/i, ''),
       inputs,
       parsed.data.dimensions,
+      clientSignal,
     );
     if (legacy) {
       res.json({ embedding: result.vectors[0] ?? [] });
@@ -583,6 +581,7 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
       });
     }
   } catch (error: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = error instanceof EmbeddingsError ? error.status : 502;
     if (error instanceof EmbeddingsError) {
       const retrySec = embeddingsRetryAfterSec(error);

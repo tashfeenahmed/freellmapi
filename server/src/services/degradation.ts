@@ -1,4 +1,5 @@
 import { getDb } from '../db/index.js';
+import { isUsableStatus } from './key-state.js';
 
 /**
  * Global degraded-mode state machine (#904).
@@ -35,8 +36,8 @@ export interface DegradationStatus extends HealthSnapshot {
 
 // Healthy keys are the ones the router can actually use. 'unknown' counts as
 // healthy: an unprobed key is treated as usable until a probe says otherwise
-// (the router does the same for skip/fallback decisions).
-const HEALTHY_STATUSES = new Set(['healthy', 'unknown']);
+// (the router does the same for skip/fallback decisions). The rule lives in
+// key-state.ts.
 
 function positiveEnv(raw: string | undefined, fallback: number): number {
   if (raw !== undefined && raw.trim() !== '') {
@@ -90,7 +91,7 @@ export function computeHealthSnapshot(): HealthSnapshot {
   const present = new Set<string>();
   for (const row of rows) {
     present.add(row.platform);
-    if (HEALTHY_STATUSES.has(row.status)) usable.add(row.platform);
+    if (isUsableStatus(row.status)) usable.add(row.platform);
   }
 
   const totalProviders = present.size;

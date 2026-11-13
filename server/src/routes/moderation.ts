@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { extractApiToken } from './proxy.js';
 import { resolveAuth } from '../lib/system-prompt.js';
 import { runModerations, ModerationError } from '../services/moderation.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 
 export const moderationRouter = Router();
 
@@ -46,8 +47,9 @@ moderationRouter.post('/moderations', async (req: Request, res: Response) => {
     return;
   }
 
+  const clientSignal = clientAbortSignal(res);
   try {
-    const { provider, model: usedModel, result } = await runModerations(model, inputs);
+    const { provider, model: usedModel, result } = await runModerations(model, inputs, clientSignal);
     const upstream = result as { id?: string; model?: string; results?: unknown[] };
 
     res.json({
@@ -57,6 +59,7 @@ moderationRouter.post('/moderations', async (req: Request, res: Response) => {
       _provider: provider,
     });
   } catch (err: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = err instanceof ModerationError ? err.status : 502;
     // #1158: a monthly-cap exhaustion carries the seconds until the reset so a
     // client backs off to the right moment instead of hammering a bare 429.

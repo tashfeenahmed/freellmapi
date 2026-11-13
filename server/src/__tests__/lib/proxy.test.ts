@@ -20,6 +20,7 @@ import {
   proxyFetch,
   describeAbort,
   withKeyProxy,
+  flushProxyCache,
   probeProxyUrl,
   DEFAULT_PROXY_PROBE_TARGET,
   parseScutilProxy,
@@ -915,6 +916,26 @@ describe('per-key proxy override (#590)', () => {
 
     expect(agentPortOf(reqSpy)).toBe(1082);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // M40: the sleep/wake flush rebuilt the global dispatcher but kept every
+  // per-key one, so a key with its own proxy sent its first post-wake request
+  // down a pooled socket that died while the host slept.
+  it('the wake flush drops cached per-key dispatchers too', async () => {
+    applyProxyUrl('');
+    const reqSpy = stubHttpsRequest();
+    const send = () => withKeyProxy('socks5://127.0.0.1:1083', () =>
+      proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq'));
+    const agentOf = (call: number) => (reqSpy.mock.calls[call]?.[0] as any)?.agent;
+
+    await send();
+    await send();
+    expect(agentOf(1)).toBe(agentOf(0)); // cached between requests
+
+    flushProxyCache();
+    await send();
+    expect(agentOf(2)).toBeDefined();
+    expect(agentOf(2)).not.toBe(agentOf(0));
   });
 
   it('an empty override falls through to the global proxy', async () => {

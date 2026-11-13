@@ -102,5 +102,5 @@ it('orders the Models tabs with Embeddings after Audio and Decision next to it',
     <I18nProvider initialLocale="en"><MemoryRouter><ModelsTabs /></MemoryRouter></I18nProvider>
   ))
   const labels = [...container.querySelectorAll('a')].map(a => a.textContent)
-  expect(labels).toEqual(['Chat models', 'Image', 'Video', 'Audio', 'Embeddings', 'Decision', 'Search', 'Fusion'])
+  expect(labels).toEqual(['Chat models', 'Image', 'Video', 'Audio', 'Embeddings', 'Decision', 'Search', 'Fusion', 'Iterative Critique'])
 })

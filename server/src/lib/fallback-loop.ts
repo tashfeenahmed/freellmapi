@@ -1162,6 +1162,17 @@ function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   return 'other';
 }
 
+// Routing threw something other than RouteError, with no attempt to report
+// instead. 'upstream' is the kind every surface already maps to its generic
+// server error (the Anthropic route: 'api_error').
+const INTERNAL_ROUTING_ERROR: ExhaustionBody = {
+  kind: 'upstream',
+  status: 500,
+  type: 'server_error',
+  code: 'internal_error',
+  message: 'Routing failed with an internal error; the server log has the details.',
+};
+
 export function routingExhaustionBody(routeErr: any): ExhaustionBody {
   const diag: string[] = Array.isArray(routeErr?.diagnostics) ? routeErr.diagnostics : [];
   const message: string = routeErr?.message ?? 'No model available to route this request';
@@ -1443,13 +1454,20 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         );
         return;
       }
+      // The router reports an empty pool with RouteError, which always carries a
+      // numeric status. Anything else is routing itself failing (a DB error, a
+      // bug): still answer the client, but never with "add provider API keys".
+      const internal = typeof (routeErr as { status?: unknown } | null)?.status !== 'number';
+      if (internal) console.error('[FallbackLoop] routing failed with an internal error (not an empty pool):', routeErr);
       const exhaustion = lastError
         ? exhaustedRetryError(lastError, undefined, { attempts })
-        : routingExhaustionBody(routeErr);
+        : internal
+          ? INTERNAL_ROUTING_ERROR
+          : routingExhaustionBody(routeErr);
       // Zero attempts ran: log the router's per-candidate disposition, the only
       // record of why the pool was empty. With prior attempts the trail in the
       // exhaustion body already explains the failure.
-      if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
+      if (!lastError && !internal) logRoutingExhaustion(routeErr, hooks.logIdentity);
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }

@@ -1019,6 +1019,13 @@
     "emptyDesc": "Embedding families appear here once you add a provider key that supports embeddings.",
     "dragToReorder": "Drag to reorder provider"
   },
+  "iterativeCritique": {
+    "tab": "Iterative Critique",
+    "title": "Iterative Critique",
+    "description": "A generator drafts an answer, a critic from a different provider scores it and names flaws, and the generator revises until the critic accepts or a stop rule fires. A synthesizer then writes the final answer. Use it by calling the API with model \"iterative-critique\".",
+    "howToUse": "How to use",
+    "howToUseHelp": "Send a normal chat request with model \"iterative-critique\". Optional per-request config: generator, critic (model ids) and max_rounds (1–5). Text only: images and tools are not supported."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "A panel of models answers in parallel, then a judge synthesizes one stronger answer. Use it by calling the API with model \"fusion\".",

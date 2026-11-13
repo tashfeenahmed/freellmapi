@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { CopyButton } from '@/components/copy-button'
+import type { OllamaEmulationMode } from '@freellmapi/shared/types'
 
 type GeminiFamily = 'default' | 'pro' | 'flash' | 'flashLite'
 type GeminiMap = Record<GeminiFamily, string>
-type OllamaMode = 'off' | 'open-loopback' | 'key-required'
-
 interface Compatibility {
-  ollamaEmulation: OllamaMode
+  ollamaEmulation: OllamaEmulationMode
   exposeClaudeDiscoveryAliases: boolean
 }
 
@@ -169,7 +168,7 @@ export function AgentCompatibilitySection() {
             </div>
             <Select
               value={compatibility?.ollamaEmulation ?? 'off'}
-              onValueChange={value => saveCompatibility.mutate({ ollamaEmulation: value as OllamaMode })}
+              onValueChange={value => saveCompatibility.mutate({ ollamaEmulation: value as OllamaEmulationMode })}
             >
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>

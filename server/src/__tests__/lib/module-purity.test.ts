@@ -38,6 +38,10 @@ const PURE_MODULES = [
   // Signal handling for the container's PID 1; the server, DB and process are injected.
   'graceful-shutdown.ts',
   'header-value.ts',
+  // Locality check behind the setup-code exemption, desktop sign-in, the desktop
+  // re-auth skip and Ollama open-loopback; a function of the request only, so it
+  // can never throw on config/DB.
+  'loopback.ts',
   'provider-identity.ts',
   'provider-size-parser.ts',
   'retry-hint.ts',
@@ -49,6 +53,7 @@ const PURE_MODULES = [
   'tool-args.ts',
   'tool-call-rescue.ts',
   // Type-only imports today; listed so they stay that way.
+  'client-abort.ts',
   'client-classifier.ts',
   'content.ts',
   'think-tags.ts',

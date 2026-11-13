@@ -42,9 +42,11 @@ import {
   couldBecomeDialectMarker,
   rescueInlineToolCalls,
   startsWithDialectMarker,
+  type DialectHoldMode,
 } from './tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from './error-redaction.js';
 import { newClientAbortError, isUpstreamClassificationOutput } from './error-classify.js';
+import { failedStreamPhase, throwIfAbandoned } from './stream-commit.js';
 import { logRequest } from './request-log.js';
 import { getStickyModel, setStickyModel } from '../routes/proxy.js';
 import type { CompletionOptions } from '../providers/base.js';
@@ -359,7 +361,7 @@ export async function runInboundChat(
       let finishReason: string | null = null;
       let outputTokens = 0;
       const toolAcc = new Map<number, { id?: string; name: string; args: string; thoughtSignature?: string }>();
-      let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
+      let dialectMode: DialectHoldMode = 'undecided';
       let heldText = '';
       // Thinking deltas held until something commit-worthy arrives (#1184) —
       // the same buffer the Anthropic surface keeps: a stream that produces
@@ -441,6 +443,9 @@ export async function runInboundChat(
             toolAcc.set(index, acc);
           }
         }
+        // The client left mid-pump: one 'canceled' row from the shared loop,
+        // not the success path (truncated answer) or an empty-completion bench.
+        throwIfAbandoned(clientGone);
 
         if (heldText) {
           const rescue = (dialectMode === 'dialect' || containsDialectMarker(heldText))
@@ -504,7 +509,6 @@ export async function runInboundChat(
         // the non-streaming path above; nothing was committed, so the failover
         // hop is invisible to the client.
         if (!text && toolCalls.length === 0) {
-          if (clientGone) return 'committed';
           throw Object.assign(
             new Error(`empty completion from ${route.displayName}`),
             finishReason === 'length' ? { skipBench: true } : {},
@@ -514,7 +518,6 @@ export async function runInboundChat(
         // upstream filter, not the requested model — fail over like an empty
         // completion.
         if (isUpstreamClassificationOutput(text, route.platform) && toolCalls.length === 0) {
-          if (clientGone) return 'committed';
           throw Object.assign(
             new Error(`empty completion from ${route.displayName} (upstream classification output)`),
             finishReason === 'length' ? { skipBench: true } : {},
@@ -549,7 +552,25 @@ export async function runInboundChat(
         );
         return 'done';
       } catch (error: any) {
-        if (!committed) throw error;
+        switch (failedStreamPhase(error, res, committed)) {
+        // abandoned: the client hung up (the fetch-signal rejection, or
+        // throwIfAbandoned after the pump) — rethrow so the shared loop logs one
+        // 'canceled' row. This used to fall to the committed branch below and
+        // log a provider 'error' for a client hang-up.
+        // held: nothing sent yet — fail over.
+        case 'abandoned':
+        case 'held':
+          throw error;
+        // finishStream already ended the response, so this came from the
+        // bookkeeping after it. A stream-error frame now would raise
+        // ERR_STREAM_WRITE_AFTER_END on `res` with no listener (fatal under the
+        // process safety net) and log an error for an answer delivered in full.
+        case 'finished':
+          console.error(`[InboundChat] Bookkeeping after a completed stream from ${route.displayName} failed:`, error.message);
+          return 'done';
+        case 'committed':
+          break;
+        }
         wire.sendStreamError?.(res, sanitizeProviderErrorMessage(error.message));
         if (!res.writableEnded) res.end();
         logRequest(

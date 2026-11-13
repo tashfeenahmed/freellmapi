@@ -9,15 +9,13 @@
 // ~12h, free once each model is 30 days old) — never seeded by migrations.
 import { getDb } from '../db/index.js';
 import { parseRetryAfterMs } from '../providers/base.js';
-import { RetryHintTracker } from '../lib/retry-hint.js';
-import { secondsUntilNextMonth } from './key-budget.js';
-import { noteBudgetAlerts } from './budget-alerts.js';
-import { getClientContext } from '../lib/client-context.js';
+import type { RetryHintTracker } from '../lib/retry-hint.js';
+import { runFailoverChain } from '../lib/failover-chain.js';
+import { logRequest } from '../lib/request-log.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
@@ -543,17 +541,32 @@ async function callHuggingFaceVideo(
   }
   const routedJobUrl = `https://router.huggingface.co/fal-ai${responsePath}`;
   let status = queue.status ?? 'IN_QUEUE';
+  // The job is submitted and billed from here on. A transient status-poll
+  // failure (5xx, 429, network) is retried with backoff until the deadline:
+  // throwing would send the chain to the next provider and pay for a second
+  // generation while this one still runs. A 4xx means the job itself is gone.
+  let pollFailures = 0;
   while (status !== 'COMPLETED') {
     if (status === 'FAILED' || status === 'CANCELLED') {
       throw new MediaError(`huggingface video job ${status.toLowerCase()}`, 502);
     }
     if (remaining() <= 1) throw new MediaError('huggingface video generation timed out', 504);
     throwIfClientGone(clientSignal);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const polled = await mediaFetch(`${routedJobUrl}/status${query}`, 'huggingface', 'video', {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${key}` },
-    }, remaining(), clientSignal);
+    await new Promise(resolve => setTimeout(resolve, Math.min(500 * 2 ** pollFailures, 8_000)));
+    let polled: Response;
+    try {
+      polled = await mediaFetch(`${routedJobUrl}/status${query}`, 'huggingface', 'video', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${key}` },
+      }, remaining(), clientSignal);
+    } catch (err) {
+      throwIfClientGone(clientSignal);
+      const transient = !(err instanceof MediaError) || err.status === 429 || err.status >= 500;
+      if (!transient) throw err;
+      pollFailures++;
+      continue;
+    }
+    pollFailures = 0;
     const state = (await polled.json()) as { status?: string; error?: string };
     if (!state.status) throw new MediaError('huggingface returned an invalid video job status', 502);
     status = state.status;
@@ -850,22 +863,17 @@ function resolveMediaChain(model: string | undefined, modality: MediaModality): 
   return matches;
 }
 
-function logMedia(row: Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>, keyId: number | null, status: 'success' | 'error', latencyMs: number, error: string | null): void {
-  try {
-    const client = getClientContext();
-    getDb()
-      .prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, error, request_type, client_ip, client_user_agent, client_agent)
-                VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)`)
-      .run(row.platform, row.model_id, keyId, status, latencyMs, error, row.modality, client.ip, client.userAgent, client.agent);
-    // A served media request is evidence the key works, the same as a served
-    // chat request (#1493) or a served search (#1612): stamp last_healthy_at
-    // and lift an 'unknown'/'error' key out of the pool's cold corner.
-    if (status === 'success' && keyId != null) markKeyHealthyFromRequest(keyId);
-    // Soft budget alert (#1158 follow-on), same hook as the chat path.
-    if (status === 'success' && keyId != null) noteBudgetAlerts(keyId);
-  } catch (e) {
-    console.error('Failed to log media request:', e);
-  }
+type MediaLogRow = Pick<MediaModelRow, 'platform' | 'model_id' | 'modality'>;
+
+function logMedia(row: MediaLogRow, keyId: number | null, status: 'success' | 'error' | 'canceled', latencyMs: number, error: string | null): void {
+  // Through logRequest so the row also reaches request_hourly and the lifetime
+  // totals; it swallows its own DB errors.
+  logRequest(row.platform, row.model_id, keyId, status, 0, 0, latencyMs, error,
+    null, null, null, null, null, row.modality);
+  // A served media request is evidence the key works, the same as a served
+  // chat request (#1493) or a served search (#1612): stamp last_healthy_at
+  // and lift an 'unknown'/'error' key out of the pool's cold corner.
+  if (status === 'success' && keyId != null) markKeyHealthyFromRequest(keyId);
 }
 
 function chainError(modality: MediaModality, lastError: MediaError | null, hints: RetryHintTracker): MediaError {
@@ -890,85 +898,72 @@ function chainError(modality: MediaModality, lastError: MediaError | null, hints
   );
 }
 
+type ReserveMedia<Row> = (row: Row, skip: (keyId: number) => boolean) =>
+  { credential: ProviderCredential | null; budgetBlocked: boolean };
+
+/** Keyless-capable platforms (Pollinations) run without a credential. */
+const reserveMediaCredential: ReserveMedia<MediaModelRow> = (row, skip) =>
+  KEYLESS_CAPABLE.has(row.platform)
+    ? { credential: { id: null, key: null, baseUrl: null }, budgetBlocked: false }
+    : reserveProviderCredential(row, 0, skip);
+
+/** One media modality's failover walk (lib/failover-chain.ts): a client that
+ *  hangs up stops it, a 429 benches the key, a benched key is skipped. */
+async function runMediaChain<Row, Out>(
+  modality: MediaModality,
+  rows: readonly Row[],
+  logRow: (row: Row) => MediaLogRow,
+  reserve: ReserveMedia<Row>,
+  attempt: (row: Row, credential: ProviderCredential) => Promise<Out>,
+  clientSignal?: AbortSignal,
+): Promise<{ row: Row; out: Out }> {
+  const res = await runFailoverChain({
+    rows,
+    signal: clientSignal,
+    ErrorClass: MediaError,
+    route: row => { const r = logRow(row); return { platform: r.platform, modelId: r.model_id }; },
+    reserve,
+    attempt,
+    log: (row, keyId, o) =>
+      logMedia(logRow(row), keyId, o.kind, o.latencyMs, o.kind === 'error' ? o.error.message.slice(0, 300) : null),
+  });
+  if (res.ok) return res;
+  throw chainError(modality, res.lastError, res.hints);
+}
+
 /** Generate image(s), failing over across providers serving the modality. */
-export async function runImageGeneration(model: string | undefined, params: ImageParams): Promise<ImageResult> {
-  const chain = resolveMediaChain(model, 'image');
-  let lastError: MediaError | null = null;
-  // Only a chain rate limited end to end earns a Retry-After (the soonest).
-  const hints = new RetryHintTracker();
-  for (const row of chain) {
-    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-      : reserveProviderCredential(row, 0);
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
-      }
-      continue;
-    }
-    const started = Date.now();
-    try {
+export async function runImageGeneration(
+  model: string | undefined,
+  params: ImageParams,
+  clientSignal?: AbortSignal,
+): Promise<ImageResult> {
+  const { row, out: images } = await runMediaChain('image', resolveMediaChain(model, 'image'), row => row,
+    reserveMediaCredential, async (row, credential) => {
       const images = await callImageProvider(row, credential, params);
       if (!images.length || images.every(i => !i.b64_json && !i.url)) {
         throw new MediaError('upstream returned no image', 502);
       }
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, images };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
-  }
-  throw chainError('image', lastError, hints);
+      return images;
+    }, clientSignal);
+  return { platform: row.platform, modelId: row.model_id, images };
 }
 
 /** Generate a video, failing over across catalogued text-to-video providers.
  *  `clientSignal` is the API caller's connection: when it aborts, the in-flight
- *  upstream request is dropped and no further provider is tried. */
+ *  upstream request is dropped and no further provider is tried, so a caller
+ *  that hung up gets no second generation charged to its account. */
 export async function runVideoGeneration(
   model: string | undefined,
   params: VideoParams,
   clientSignal?: AbortSignal,
 ): Promise<VideoResult> {
-  const chain = resolveMediaChain(model, 'video');
-  let lastError: MediaError | null = null;
-  // Only a chain rate limited end to end earns a Retry-After (the soonest).
-  const hints = new RetryHintTracker();
-  for (const row of chain) {
-    throwIfClientGone(clientSignal);
-    const { credential, budgetBlocked } = reserveProviderCredential(row, 0,
-      keyId => isOnCooldown(row.platform, row.model_id, keyId));
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
-      }
-      continue;
-    }
-    const started = Date.now();
-    try {
+  const { row, out } = await runMediaChain('video', resolveMediaChain(model, 'video'), row => row,
+    (row, skip) => reserveProviderCredential(row, 0, skip), async (row, credential) => {
       const out = await callVideoProvider(row, credential, params, clientSignal);
       if (!out.video.length) throw new MediaError('upstream returned no video', 502);
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, ...out };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      if (e.status === 429 && credential.id != null) setCooldown(row.platform, row.model_id, credential.id);
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-      // A caller that hung up gets no second generation charged to its account.
-      throwIfClientGone(clientSignal);
-    } finally {
-      credential.release();
-    }
-  }
-  throw chainError('video', lastError, hints);
+      return out;
+    }, clientSignal);
+  return { platform: row.platform, modelId: row.model_id, ...out };
 }
 
 // ---------------------------------------------------------------------------
@@ -1239,81 +1234,41 @@ async function callTranscriptionProvider(
 /** Transcribe audio, failing over across STT providers. 429s bench the
  *  (platform, model, key) triple through the standard cooldown machinery so a
  *  rate-limited key is skipped on subsequent requests, exactly like chat. */
-export async function runTranscription(model: string | undefined, p: TranscriptionParams): Promise<TranscriptionResult> {
+export async function runTranscription(
+  model: string | undefined,
+  p: TranscriptionParams,
+  clientSignal?: AbortSignal,
+): Promise<TranscriptionResult> {
   const chain = resolveTranscriptionChain(model, p.responseFormat);
   const usable = chain.filter(m => p.file.length <= m.maxBytes);
   if (usable.length === 0) {
     const maxMb = Math.max(...chain.map(m => m.maxBytes)) / (1024 * 1024);
     throw new MediaError(`Audio file exceeds the ${maxMb} MB provider upload limit.`, 413);
   }
-  let lastError: MediaError | null = null;
-  // Only a chain rate limited end to end earns a Retry-After (the soonest).
-  const hints = new RetryHintTracker();
-  for (const m of usable) {
-    const { credential, budgetBlocked } = reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0,
-      keyId => isOnCooldown(m.platform, m.modelId, keyId));
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
-      }
-      continue;
-    }
-    const logRow = { platform: m.platform, model_id: m.modelId, modality: 'transcription' as const };
-    const started = Date.now();
-    try {
+  const { row: m, out } = await runMediaChain('transcription', usable,
+    m => ({ platform: m.platform, model_id: m.modelId, modality: 'transcription' }),
+    (m, skip) => reserveProviderCredential({ platform: m.platform, key_id: m.keyId }, 0, skip),
+    async (m, credential) => {
       const out = await callTranscriptionProvider(m, credential, p);
       if (p.responseFormat === 'vtt' && !out.vtt) {
         throw new MediaError('upstream returned no vtt subtitles', 502);
       }
-      logMedia(logRow, credential.id, 'success', Date.now() - started, null);
-      return { platform: m.platform, modelId: m.modelId, ...out };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(logRow, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      if (e.status === 429 && credential.id != null) {
-        setCooldown(m.platform, m.modelId, credential.id);
-      }
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
-  }
-  throw chainError('transcription', lastError, hints);
+      return out;
+    }, clientSignal);
+  return { platform: m.platform, modelId: m.modelId, ...out };
 }
 
 /** Synthesize speech, failing over across providers serving the modality. */
-export async function runSpeech(model: string | undefined, params: SpeechParams): Promise<SpeechResult> {
-  const chain = resolveMediaChain(model, 'audio');
-  let lastError: MediaError | null = null;
-  // Only a chain rate limited end to end earns a Retry-After (the soonest).
-  const hints = new RetryHintTracker();
-  for (const row of chain) {
-    const { credential, budgetBlocked } = KEYLESS_CAPABLE.has(row.platform)
-      ? { credential: { id: null, key: null, baseUrl: null, release: () => {} }, budgetBlocked: false }
-      : reserveProviderCredential(row, 0);
-    if (!credential) {
-      if (budgetBlocked) {
-        lastError = new MediaError('Monthly key budget exhausted', 429, 'quota_exceeded');
-        hints.record(429, secondsUntilNextMonth() * 1000);
-      }
-      continue;
-    }
-    const started = Date.now();
-    try {
+export async function runSpeech(
+  model: string | undefined,
+  params: SpeechParams,
+  clientSignal?: AbortSignal,
+): Promise<SpeechResult> {
+  const { row, out } = await runMediaChain('audio', resolveMediaChain(model, 'audio'), row => row,
+    reserveMediaCredential, async (row, credential) => {
       const out = await callSpeechProvider(row, credential, params);
       if (!out.audio.length) throw new MediaError('upstream returned no audio', 502);
-      logMedia(row, credential.id, 'success', Date.now() - started, null);
-      return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
-    } catch (err: any) {
-      const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
-      logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-      lastError = e;
-      hints.record(e.status, e.retryAfterMs);
-    } finally {
-      credential.release();
-    }
-  }
-  throw chainError('audio', lastError, hints);
+      return out;
+    }, clientSignal);
+  return { platform: row.platform, modelId: row.model_id, audio: out.audio, contentType: out.contentType };
 }

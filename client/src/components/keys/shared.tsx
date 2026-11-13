@@ -1,4 +1,4 @@
-import type { ApiKeyModel, Platform, ProviderQuotaState } from '../../../../shared/types'
+import type { ApiKeyModel, KeyStatus, Platform, ProviderQuotaState } from '../../../../shared/types'
 import { ExternalLink } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -138,13 +138,14 @@ export function customModelDeletePath(model: ApiKeyModel): string {
   return `/api/media/custom/${model.id}`
 }
 
+// Indexed by any status string, but must cover every KeyStatus.
 export const statusDot: Record<string, string> = {
   healthy: 'bg-emerald-500',
   rate_limited: 'bg-amber-500',
   invalid: 'bg-rose-500',
   error: 'bg-rose-500',
   unknown: 'bg-muted-foreground/40',
-}
+} satisfies Record<KeyStatus, string>
 
 export const statusLabelKey: Record<string, string> = {
   healthy: 'status.healthy',
@@ -152,7 +153,7 @@ export const statusLabelKey: Record<string, string> = {
   invalid: 'status.invalid',
   error: 'status.error',
   unknown: 'status.unchecked',
-}
+} satisfies Record<KeyStatus, string>
 
 export interface HealthPlatform {
   platform: string
