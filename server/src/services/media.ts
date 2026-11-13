@@ -504,17 +504,32 @@ async function callHuggingFaceVideo(
   }
   const routedJobUrl = `https://router.huggingface.co/fal-ai${responsePath}`;
   let status = queue.status ?? 'IN_QUEUE';
+  // The job is submitted and billed from here on. A transient status-poll
+  // failure (5xx, 429, network) is retried with backoff until the deadline:
+  // throwing would send the chain to the next provider and pay for a second
+  // generation while this one still runs. A 4xx means the job itself is gone.
+  let pollFailures = 0;
   while (status !== 'COMPLETED') {
     if (status === 'FAILED' || status === 'CANCELLED') {
       throw new MediaError(`huggingface video job ${status.toLowerCase()}`, 502);
     }
     if (remaining() <= 1) throw new MediaError('huggingface video generation timed out', 504);
     throwIfClientGone(clientSignal);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const polled = await mediaFetch(`${routedJobUrl}/status${query}`, 'huggingface', 'video', {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${key}` },
-    }, remaining(), clientSignal);
+    await new Promise(resolve => setTimeout(resolve, Math.min(500 * 2 ** pollFailures, 8_000)));
+    let polled: Response;
+    try {
+      polled = await mediaFetch(`${routedJobUrl}/status${query}`, 'huggingface', 'video', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${key}` },
+      }, remaining(), clientSignal);
+    } catch (err) {
+      throwIfClientGone(clientSignal);
+      const transient = !(err instanceof MediaError) || err.status === 429 || err.status >= 500;
+      if (!transient) throw err;
+      pollFailures++;
+      continue;
+    }
+    pollFailures = 0;
     const state = (await polled.json()) as { status?: string; error?: string };
     if (!state.status) throw new MediaError('huggingface returned an invalid video job status', 502);
     status = state.status;
