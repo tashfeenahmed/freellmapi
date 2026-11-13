@@ -41,7 +41,7 @@ interface HealthSnapshot {
 ```
 
 - `unknown` 算健康（未探测密钥 = 探测说不行前视为可用）。
-- 每次健康巡检 + 按需（仪表盘、路由器入口）从 `api_keys` 表算出。
+- 每次健康巡检时从 `api_keys` 表算出。只有在首次健康巡检之前，`getDegradationStatus()` 才会按需算一次。
 
 ### 降级态下的行为变化
 
@@ -58,7 +58,7 @@ interface HealthSnapshot {
 isDegraded(): boolean                    // 只读，路由器用
 getDegradationStatus(): DegradationStatus // {healthyProviders, totalProviders, ratio, state, degradedAt}
 updateDegradationState(now?): DegradationStatus // 每次健康巡检后调
-resetDegradationState()                  // 测试、启动后重探
+resetDegradationState()                  // 仅测试用（无生产调用方）
 ```
 
 ---
@@ -82,7 +82,7 @@ resetDegradationState()                  // 测试、启动后重探
 abortInFlight: () => hedgeAbort.abort(newHedgeAbortError())
 ```
 
-- `HedgeAbortError` 是**非提供方健康** → 无冷却、无惩罚、无限额学习。
+- `HedgeAbortError` 是**非提供方健康** → 无冷却、无惩罚、无限额学习 —— 除非被中止的尝试静默了至少 `HEDGE_BENCH_MIN_SILENT_FRACTION`（0.75）的预算。该路由吃掉了整个预算，所以记为失败，并像任何可重试失败一样停用。
 - 渲染 `timedOut` 耗尽（不是提供方失败）。
 - 流式面在首字节/头部刷出时调 `ctx.disarmHedge()` —— 过了那点答案已经在路上了，杀掉它只会为了无回退收益而截断健康响应。
 
@@ -272,7 +272,7 @@ platform/model key1=class; platform/model key2=class; +N more
 | `updateDegradationState(now)` | 状态机步进，健康巡检后调 |
 | `isDegraded()` | 路由器闸门 |
 | `getDegradationStatus()` | 仪表盘 + 健康端点 |
-| `resetDegradationState()` | 测试 / 启动重探 |
+| `resetDegradationState()` | 仅测试 |
 
 ---
 

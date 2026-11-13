@@ -197,8 +197,8 @@ Codex CLI 和 Agents SDK 说 **Responses API**（有状态、`previous_response_
 | 场景 | 头部前 | 头部后 |
 |----------|----------------|---------------|
 | 带内 `{error}` 帧 | 抛出 → 回退 | 写错误帧 + `[DONE]` → `committed` |
-| 客户端断开 | `clientGone` → 中止在途、不停用 | `clientGone` → 停拉取、`committed` |
-| 对冲中止（预算过期） | `abortInFlight()` → `HedgeAbortError` → 循环停、`timedOut` 耗尽 | 同 |
+| 客户端断开 | `clientGone` → 中止在途、不停用 | `clientGone` → 停拉取、记一行 `canceled` 请求 |
+| 对冲中止（预算过期） | `abortInFlight()` → `HedgeAbortError` → 循环停、`timedOut` 耗尽；只有静默 ≥ 0.75 预算时才停用 | N/A（首字节时已解除对冲） |
 | 空补全（无文本、无工具） | 抛出 `empty completion` → 回退 | N/A（早刷头部了） |
 | 上游分类输出 ("safe"/"unsafe") | 抛出 → 回退 (a961d93) | N/A |
 | 探测到工具方言 | 缓冲 → 末尾救回或回退 | N/A |
@@ -240,7 +240,7 @@ Codex CLI 和 Agents SDK 说 **Responses API**（有状态、`previous_response_
 ## 11. 并发与取消
 
 - **客户端断开**：`res.on('close')` → `clientGone = true`、`clientAbort.abort()` → 在途取获取消、租约即刻释放。
-- **对冲**（1d2226a）：`hedgeAbort` 控制器，挂钟预算中途过期时调 `abortInFlight()`。`HedgeAbortError` 是**非提供方健康** → 无冷却/惩罚、渲染 `timedOut` 耗尽。
+- **对冲**（1d2226a）：`hedgeAbort` 控制器，挂钟预算中途过期时调 `abortInFlight()`。`HedgeAbortError` 是**非提供方健康** → 无冷却/惩罚、渲染 `timedOut` 耗尽。例外：静默了至少 0.75 预算的尝试会被停用（`HEDGE_BENCH_MIN_SILENT_FRACTION`）。
 - **租约释放**：`dispatch()` 的 `finally` 块里，幂等。在 `RouteResult` 上可选，这样 `finally` 里的 `TypeError` 不能替换上游错误。
 
 ---
