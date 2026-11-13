@@ -197,8 +197,8 @@ Thin adapter over shared fallback loop:
 | Scenario | Before Headers | After Headers |
 |----------|----------------|---------------|
 | In-band `{error}` frame | Throw → failover | Write error frame + `[DONE]` → `committed` |
-| Client disconnect | `clientGone` → abort in-flight, no bench | `clientGone` → stop pulling, `committed` |
-| Hedge abort (budget expiry) | `abortInFlight()` → `HedgeAbortError` → loop stops, `timedOut` exhaustion | Same |
+| Client disconnect | `clientGone` → abort in-flight, no bench | `clientGone` → stop pulling, one `canceled` request row |
+| Hedge abort (budget expiry) | `abortInFlight()` → `HedgeAbortError` → loop stops, `timedOut` exhaustion; benched only if silent for ≥ 0.75 of the budget | N/A (hedge disarmed at first byte) |
 | Empty completion (no text, no tools) | Throw `empty completion` → failover | N/A (would have flushed) |
 | Upstream classification output ("safe"/"unsafe") | Throw → failover (a961d93) | N/A |
 | Tool dialect detected | Buffer → rescue at end or failover | N/A |
@@ -240,7 +240,7 @@ Thin adapter over shared fallback loop:
 ## 11. Concurrency & Cancellation
 
 - **Client disconnect**: `res.on('close')` → `clientGone = true`, `clientAbort.abort()` → in-flight fetch canceled, lease released immediately.
-- **Hedging** (1d2226a): `hedgeAbort` controller, `abortInFlight()` called when wall-clock budget expires mid-attempt. `HedgeAbortError` is **non-provider-health** → no cooldown/penalty, renders `timedOut` exhaustion.
+- **Hedging** (1d2226a): `hedgeAbort` controller, `abortInFlight()` called when wall-clock budget expires mid-attempt. `HedgeAbortError` is **non-provider-health** → no cooldown/penalty, renders `timedOut` exhaustion. Exception: an attempt silent for at least 0.75 of the budget is benched (`HEDGE_BENCH_MIN_SILENT_FRACTION`).
 - **Lease release**: in `finally` block of `dispatch()`, idempotent. Optional on `RouteResult` so a `TypeError` in `finally` cannot replace the upstream error.
 
 ---

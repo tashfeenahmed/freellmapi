@@ -43,7 +43,7 @@ interface HealthSnapshot {
 ```
 
 - `unknown` counts as healthy (unprobed key = usable until probe says otherwise).
-- Computed from `api_keys` table on every health pass + on demand (dashboard, router entry).
+- Computed from `api_keys` table on every health pass. `getDegradationStatus()` computes one on demand only when no health pass has run yet.
 
 ### Behavioral Changes in Degraded Mode
 
@@ -60,7 +60,7 @@ interface HealthSnapshot {
 isDegraded(): boolean                    // read-only, used by router
 getDegradationStatus(): DegradationStatus // {healthyProviders, totalProviders, ratio, state, degradedAt}
 updateDegradationState(now?): DegradationStatus // call after every health pass
-resetDegradationState()                  // tests, post-start re-probe
+resetDegradationState()                  // tests only (no production caller)
 ```
 
 ---
@@ -84,7 +84,7 @@ resetDegradationState()                  // tests, post-start re-probe
 abortInFlight: () => hedgeAbort.abort(newHedgeAbortError())
 ```
 
-- `HedgeAbortError` is **non-provider-health** → no cooldown, no penalty, no limit learning.
+- `HedgeAbortError` is **non-provider-health** → no cooldown, no penalty, no limit learning — unless the aborted attempt stayed silent for at least `HEDGE_BENCH_MIN_SILENT_FRACTION` (0.75) of the budget. That route ate the whole budget, so it is logged as a failure and benched like any retryable failure.
 - Renders `timedOut` exhaustion (not a provider failure).
 - Streaming surfaces call `ctx.disarmHedge()` on first byte / header flush — past that point the answer is on its way, killing it would truncate a healthy response for no failover benefit.
 
@@ -274,7 +274,7 @@ See §3 above.
 | `updateDegradationState(now)` | State machine step, called after health pass |
 | `isDegraded()` | Router gate |
 | `getDegradationStatus()` | Dashboard + health endpoint |
-| `resetDegradationState()` | Tests / boot re-probe |
+| `resetDegradationState()` | Tests only |
 
 ---
 
