@@ -27,10 +27,12 @@ function jump(ms: number) {
   vi.setSystemTime(clock);
 }
 
-function makeApp(): Express {
+function makeApp(trustProxy = true): Express {
   const app = express();
-  // So a test can speak for another machine with X-Forwarded-For.
-  app.set('trust proxy', true);
+  // So a test can speak for another machine with X-Forwarded-For. A declared
+  // proxy also withdraws loopback locality, so first-run setup uses an app
+  // without it (otherwise /setup demands the setup code).
+  app.set('trust proxy', trustProxy);
   app.use(express.json());
   app.use('/api/auth', authRouter);
   return app;
@@ -97,7 +99,7 @@ describe('password reset by log code', () => {
     initDb(':memory:');
     clearResetCode();
     app = makeApp();
-    const setup = await post(app, '/api/auth/setup', { email: EMAIL, password: PASSWORD });
+    const setup = await post(makeApp(false), '/api/auth/setup', { email: EMAIL, password: PASSWORD });
     expect(setup.status).toBe(201);
   });
 
