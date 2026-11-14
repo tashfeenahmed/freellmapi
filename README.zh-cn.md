@@ -15,7 +15,7 @@
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 浏览完整目录：736 个模型系列，1,313 个免费端点
 
-[English](README.md) · [Türkçe](README.tr.md) · **简体中文** · [Русский](README.ru.md) · [O'zbekcha](README.uz.md)
+[English](README.md) · [Türkçe](README.tr.md) · **简体中文** · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [日本語](README.ja.md)
 
 本翻译可能滞后，最新内容以英文 README 为准。
 
