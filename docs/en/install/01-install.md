@@ -84,7 +84,39 @@ docker compose up -d
 
 ## Local development
 
-**Prerequisites:** Node.js 20+, npm.
+**Prerequisites:** Node.js >=20.18.0 and <25.0.0, npm >=10.0.0 (see `package.json`).
+
+### Source checkout launchers
+
+After cloning the repository, including a fork:
+
+- **Windows:** double-click `Start.cmd`, or run `.\Start.cmd` in PowerShell.
+- **macOS:** open `Start.command` in Finder, or run `bash Start.command` in Terminal.
+  A Git checkout includes the executable permission. If a ZIP extraction loses it,
+  run `chmod +x Start.command` before opening it in Finder.
+- **Any supported platform:** run `node scripts/dev-start.mjs` from the repository root.
+
+Node.js and npm must be available on `PATH`. The launcher runs `npm ci` on the
+first use and again when the lockfile or Node.js ABI/platform changes. Installation
+requires access to the package registry unless the packages are already cached,
+and runs the dependencies' normal install scripts. Later starts reuse the matching
+installation. An installation failure stops the launcher before the app starts.
+
+The launcher then runs `npm run dev` in the project directory. Open the dashboard
+URL printed by Vite (normally http://localhost:5173); the API normally listens on
+port 3001. Keep the terminal open and use Ctrl+C to stop development. This starts
+the development server, not the packaged desktop app or a production service.
+
+The setup step does not create or replace `.env`, encryption keys, or database
+files. Once started, the server handles database initialization and migrations
+normally. It uses its existing configuration and development-key fallback
+described below, so an installation that already has a `.encryption-key` does not
+receive a new overriding key. Preserve the database and its matching key when backing up.
+For an explicit encryption-key change, follow [key rotation](#rotating-the-encryption-key).
+These launchers do not run Git commands; update your checkout separately while
+the app is stopped, then start it again to refresh dependencies if needed.
+
+### Manual setup
 
 *On macOS / Linux (Bash):*
 ```bash
