@@ -88,6 +88,10 @@ export class DecisionError extends Error {
 export interface DecisionOptions {
   /** A decision model id, or 'auto' / undefined for the first one that works. */
   model?: string;
+  /** Pin one row of the decision registry (the dashboard's per-card Test). Two
+   *  rows can share a model id — a custom relay next to its catalog entry — and
+   *  `model` would try both, so a test could pass on a row nobody clicked. */
+  rowId?: number;
   signal?: AbortSignal;
   /** Overrides the request-scoped client agent (tests, internal callers). */
   clientAgent?: string | null;
@@ -638,8 +642,13 @@ export function decisionsAvailable(): boolean {
   });
 }
 
-function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, extraction = false): DecisionModelRow[] {
+function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, rowId?: number, extraction = false): DecisionModelRow[] {
   const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (r.model_id === CLAIRIC_MODEL) === extraction);
+  if (rowId !== undefined) {
+    const pinned = enabled.find(r => r.id === rowId);
+    if (!pinned) throw new DecisionError('Decision model is unavailable or turned off', 400);
+    return [pinned];
+  }
   if (!model || model === 'auto') return skipPlatforms ? enabled.filter(r => !skipPlatforms.has(r.platform)) : enabled;
   const pinned = enabled.filter(r => r.model_id === model);
   if (pinned.length === 0) {
@@ -659,7 +668,7 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
   if (extraction && body.questions !== undefined) throw new DecisionError('Send fields or questions, not both', 400);
   if (!extraction && opts.model === CLAIRIC_MODEL) throw new DecisionError('Clairic requires fields, not questions', 400);
   if (extraction && opts.model && !['auto', CLAIRIC_MODEL].includes(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
-  const chain = decisionChain(opts.model, opts.skipPlatforms, extraction);
+  const chain = decisionChain(opts.model, opts.skipPlatforms, opts.rowId, extraction);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   const questionCount = Object.keys(extraction ? body.fields : body.questions).length;
 
