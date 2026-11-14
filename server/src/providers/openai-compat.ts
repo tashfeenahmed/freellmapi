@@ -389,6 +389,7 @@ export class OpenAICompatProvider extends BaseProvider {
         tool_choice: options?.tool_choice,
         parallel_tool_calls: this.resolveParallelToolCalls(options),
         ...extendedBodyParams(this.platform, options),
+        stream: false,
       }),
       // 'request' bounds: the deadline covers the body read too, so a 200
       // whose body hangs aborts instead of stalling res.json() forever.
