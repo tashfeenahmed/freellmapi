@@ -101,6 +101,8 @@ const createModelSchema = z.object({
   supportsTools: z.boolean().optional(),
   keyId: z.number().int().positive().nullable().optional(),
   endpointScope: z.string().nullable().optional(),
+  enabled: z.boolean().optional(),
+  fallbackEnabled: z.boolean().optional(),
 }).strict();
 
 modelsRouter.post('/', (req: Request, res: Response) => {
@@ -179,7 +181,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       ) VALUES (
         @platform, @modelId, @displayName, @intelligenceRank, @speedRank, @sizeLabel,
         @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, '', @contextWindow,
-        1, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
+        @enabled, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
       )
     `).run({
       platform: data.platform,
@@ -193,6 +195,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
       contextWindow: data.contextWindow ?? null,
+      enabled: data.enabled === undefined ? 1 : Number(data.enabled),
       supportsVision: data.supportsVision ? 1 : 0,
       supportsTools: data.supportsTools !== undefined ? (data.supportsTools ? 1 : 0) : 1,
       keyId: boundKeyId,
@@ -204,7 +207,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
     const inChain = db.prepare('SELECT 1 FROM fallback_config WHERE model_db_id = ?').get(modelDbId);
     if (!inChain) {
       const max = db.prepare('SELECT COALESCE(MAX(priority), 0) AS m FROM fallback_config').get() as { m: number };
-      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(modelDbId, max.m + 1);
+      db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, ?)').run(modelDbId, max.m + 1, data.fallbackEnabled === undefined ? 1 : Number(data.fallbackEnabled));
     }
     ensureModelInProfiles(db, modelDbId);
 
@@ -228,7 +231,8 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       tpdLimit: data.tpdLimit ?? null,
       supportsVision: Boolean(data.supportsVision),
       supportsTools: data.supportsTools ?? true,
-      enabled: true,
+      enabled: data.enabled ?? true,
+      fallbackEnabled: data.fallbackEnabled ?? true,
       source: 'custom',
       endpointScope: endpointScope || null,
       keyId: boundKeyId,
