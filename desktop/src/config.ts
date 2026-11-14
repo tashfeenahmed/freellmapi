@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import type { GpuRecoveryState } from './gpu-recovery.js';
 
 export interface DesktopConfig {
   port?: number;
@@ -23,6 +24,9 @@ export interface DesktopConfig {
   // Windows user the app is running; the tray icon starts out hidden in the
   // overflow flyout there (#1353).
   launchDashboardShown?: boolean;
+  // Windows GPU-process recovery step for one app version (#1759). See
+  // gpu-recovery.ts.
+  gpuRecovery?: GpuRecoveryState;
 }
 
 function configPath(): string {

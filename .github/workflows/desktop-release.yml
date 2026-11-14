@@ -346,6 +346,15 @@ jobs:
           # GitHub HTTP 5xx failures. Real packaging failures still fail fast.
           bash scripts/retry-network-step.sh npx --no-install electron-builder ${{ matrix.ebArgs }} --publish never
 
+      # #1759: the installed app died at launch on Windows 11 with "GPU process
+      # isn't usable. Goodbye." when the folder ACL lacked S-1-15-2-2. Launch a
+      # copy with that broken ACL and the silently installed app, and require
+      # both to come up and serve.
+      - name: Smoke-test Windows GPU sandbox recovery
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktop/scripts/smoke-win-gpu-sandbox.ps1 desktop/dist-electron
+
       - name: Smoke-test packaged macOS backend
         if: runner.os == 'macOS'
         shell: bash
