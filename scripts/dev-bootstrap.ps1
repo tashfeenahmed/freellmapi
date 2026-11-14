@@ -1,9 +1,14 @@
 [CmdletBinding()]
 param(
-    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$ProjectRoot
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+    $ScriptDirectory = Split-Path -Parent $PSCommandPath
+    $ProjectRoot = Split-Path -Parent $ScriptDirectory
+}
 
 function Get-CommandVersion {
     param(
