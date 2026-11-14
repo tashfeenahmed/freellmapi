@@ -16,7 +16,8 @@
     "switchToEnglish": "Switch to English",
     "modelsMenu": "Browse model types",
     "logs": "Logs",
-    "analyticsMenu": "Analytics pages"
+    "analyticsMenu": "Analytics pages",
+    "codeAgent": "Code Agent"
   },
   "auth": {
     "createYourAccount": "Create your account",
