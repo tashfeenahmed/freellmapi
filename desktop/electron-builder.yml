@@ -95,4 +95,6 @@ nsis:
   # no spaces is the same string in all three places.
   artifactName: "${productName}-Setup-${version}.${ext}"
   oneClick: true
+  # Grants the GPU sandbox read access to the install folder (#1759).
+  include: installer/installer.nsh
   deleteAppDataOnUninstall: false
