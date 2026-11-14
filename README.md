@@ -300,6 +300,8 @@ Manage provider credentials and grab the unified API key your apps connect with.
 
 Send a chat completion through the router and see which provider served it, with the model ID and latency printed right on the message. Attach files by button, drag-and-drop, or paste: images (PNG/JPEG/WebP/GIF) are downscaled in the browser and sent as image content parts to a vision-capable model, and text files (TXT/MD/CSV/JSON/LOG) are inlined into the prompt as fenced blocks.
 
+The settings rail includes reusable built-in prompt skills for tasks such as code review, debugging, writing, tutoring, and research. Choose a skill and apply it to add its instructions to the system prompt; existing prompt text is preserved, and the result is saved with the Playground prompt. These are plain prompt templates, not downloaded or executable code.
+
 ![Playground page](repo-assets/playground.png)
 
 ### Analytics

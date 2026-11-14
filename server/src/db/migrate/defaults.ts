@@ -47,6 +47,7 @@ import * as requestFailureAttribution from '../migrations/20261017_233153_reques
 import * as removeAurayProvider from '../migrations/20261019_000001_remove_auray_provider.js';
 import * as keyLastHealthyAt from '../migrations/20261020_000001_key_last_healthy_at.js';
 import * as customMediaEndpointIdentity from '../migrations/20261028_000001_custom_media_endpoint_identity.js';
+import * as routerResilienceState from '../migrations/20261101_000001_router_resilience_state.js';
 import * as cloudflareNeuronUsage from '../migrations/20261104_000001_cloudflare_neuron_usage.js';
 import * as modelMonthlyUsage from '../migrations/20261111_000001_model_monthly_usage.js';
 import * as profileRoutingStrategy from '../migrations/20261111_000002_profile_routing_strategy.js';
@@ -108,6 +109,8 @@ export const REMOVE_GITHUB_PROVIDER_FILENAME = '20261017_000002_remove_github_pr
 export const REQUEST_FAILURE_ATTRIBUTION_FILENAME = '20261017_233153_request_failure_attribution.ts';
 export const REMOVE_AURAY_PROVIDER_FILENAME = '20261019_000001_remove_auray_provider.ts';
 export const KEY_LAST_HEALTHY_AT_FILENAME = '20261020_000001_key_last_healthy_at.ts';
+export const CUSTOM_MEDIA_ENDPOINT_IDENTITY_FILENAME = '20261028_000001_custom_media_endpoint_identity.ts';
+export const ROUTER_RESILIENCE_STATE_FILENAME = '20261101_000001_router_resilience_state.ts';
 export const CLOUDFLARE_NEURON_USAGE_FILENAME = '20261104_000001_cloudflare_neuron_usage.ts';
 export const MODEL_MONTHLY_USAGE_FILENAME = '20261111_000001_model_monthly_usage.ts';
 export const PROFILE_ROUTING_STRATEGY_FILENAME = '20261111_000002_profile_routing_strategy.ts';
@@ -160,7 +163,8 @@ export const DEFAULT_MIGRATIONS: readonly DefaultMigration[] = [
   { filename: REQUEST_FAILURE_ATTRIBUTION_FILENAME, module: requestFailureAttribution },
   { filename: REMOVE_AURAY_PROVIDER_FILENAME, module: removeAurayProvider },
   { filename: KEY_LAST_HEALTHY_AT_FILENAME, module: keyLastHealthyAt },
-  { filename: '20261028_000001_custom_media_endpoint_identity.ts', module: customMediaEndpointIdentity },
+  { filename: CUSTOM_MEDIA_ENDPOINT_IDENTITY_FILENAME, module: customMediaEndpointIdentity },
+  { filename: ROUTER_RESILIENCE_STATE_FILENAME, module: routerResilienceState },
   { filename: CLOUDFLARE_NEURON_USAGE_FILENAME, module: cloudflareNeuronUsage },
   { filename: MODEL_MONTHLY_USAGE_FILENAME, module: modelMonthlyUsage },
   { filename: PROFILE_ROUTING_STRATEGY_FILENAME, module: profileRoutingStrategy },
