@@ -14,6 +14,7 @@ export interface ModelOverridePatch {
   tpdLimit?: number | null;
   monthlyTokenBudget?: string;
   contextWindow?: number | null;
+  contextSafetyFactor?: number | null;
   supportsVision?: boolean;
   supportsTools?: boolean;
   enabled?: boolean;
@@ -37,6 +38,7 @@ const OVERRIDE_COLUMNS: Record<keyof ModelOverridePatch, string> = {
   tpdLimit: 'tpd_limit',
   monthlyTokenBudget: 'monthly_token_budget',
   contextWindow: 'context_window',
+  contextSafetyFactor: 'context_safety_factor',
   supportsVision: 'supports_vision',
   supportsTools: 'supports_tools',
   enabled: 'enabled',
@@ -87,6 +89,7 @@ function modelRowValue(row: Record<string, unknown> | undefined, key: keyof Mode
   if (!row) return undefined;
   const value = row[OVERRIDE_COLUMNS[key]];
   if (key === 'supportsVision' || key === 'supportsTools' || key === 'enabled') return value === 1;
+  if (key === 'contextSafetyFactor') return value ?? null; // NULL → global default in router
   return value ?? null;
 }
 
