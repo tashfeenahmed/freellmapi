@@ -112,6 +112,11 @@ export type Platform =
   | 'varosity'
   // Native TTS and transcription; one shared renewable monthly credit grant.
   | 'rime'
+  // Native speech: shared monthly credits, non-commercial Free output.
+  | 'typecast'
+  | 'cartesia'
+  // OpenAI-compatible gateway; one shared daily free allowance.
+  | 'silvr'
   // Local personal BYOK TTS; shared monthly characters, watermarked Free audio.
   | 'freetts'
   // Research API; chat and embeddings share a daily quota. Requests are logged.

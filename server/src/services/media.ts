@@ -29,12 +29,13 @@ import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
 import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
+import { VoiceGatewayMediaError, voiceGatewaySpeech, cartesiaTranscription } from './media-voice-gateways.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
 import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -47,7 +48,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -98,6 +99,7 @@ async function nativeMediaResult<T>(work: Promise<T>): Promise<T> {
     if (error instanceof VarosityMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
     if (error instanceof RimeMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
     if (error instanceof FreeTtsMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
+    if (error instanceof VoiceGatewayMediaError) throw new MediaError(error.message, error.status, error.code, error.retryAfterMs);
     throw error;
   }
 }
@@ -926,6 +928,9 @@ async function callSpeechProvider(
     }
     case 'rime':
       return nativeMediaResult(rimeSpeech(row.model_id, key, p));
+    case 'typecast':
+    case 'cartesia':
+      return nativeMediaResult(voiceGatewaySpeech(row.platform, row.model_id, key, p));
     case 'freetts':
       return nativeMediaResult(freeTtsSpeech(row.model_id, key, p));
     case 'varosity':
@@ -1463,6 +1468,8 @@ async function callTranscriptionProvider(
   switch (m.platform) {
     case 'rime':
       return nativeMediaResult(rimeTranscription(m.modelId, key, p));
+    case 'cartesia':
+      return nativeMediaResult(cartesiaTranscription(m.modelId, key, p));
     case 'google': {
       if (m.modelId !== 'gemini-3.5-transcribe') throw new MediaError('Unknown Google transcription model', 400);
       const r = await mediaFetch('https://generativelanguage.googleapis.com/v1beta/interactions', 'google', 'transcription', {
@@ -1724,7 +1731,7 @@ export async function runSpeech(model: string | undefined, params: SpeechParams)
       } catch (err: any) {
         const e = err instanceof MediaError ? err : new MediaError(String(err?.message ?? err), 502);
         logMedia(row, credential.id, 'error', Date.now() - started, e.message.slice(0, 300));
-        if ((row.platform === 'custom' || row.platform === 'freetts') && e.status === 429 && credential.id != null) {
+        if (['custom', 'freetts', 'typecast', 'cartesia'].includes(row.platform) && e.status === 429 && credential.id != null) {
           setCooldown(row.platform, row.model_id, credential.id, e.retryAfterMs);
         }
         lastError = e;

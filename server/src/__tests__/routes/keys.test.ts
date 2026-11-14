@@ -93,6 +93,13 @@ describe('Keys API', () => {
     expect(body.maskedKey).toContain('...');
   });
 
+  it.each(['typecast', 'cartesia', 'silvr'])('adds a %s key without seeding fresh catalog models', async platform => {
+    const { status, body } = await request(app, 'POST', '/api/keys', { platform, key: 'synthetic-voice-key' });
+    expect(status).toBe(201); expect(body.platform).toBe(platform);
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM models WHERE platform=?').get(platform)).toEqual({ n: 0 });
+    expect(getDb().prepare('SELECT COUNT(*) AS n FROM media_models WHERE platform=?').get(platform)).toEqual({ n: 0 });
+  });
+
   it('GET /api/keys returns the created key', async () => {
     // First create a key
     await request(app, 'POST', '/api/keys', {
