@@ -18,6 +18,7 @@ import {
 import { Boxes, ChevronDown, Search, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
+import { useDraft } from '@/hooks/use-draft'
 import { apiFetch } from '@/lib/api'
 import {
   buildGroups,
@@ -100,10 +101,6 @@ export default function FallbackPage() {
   const { t } = useI18n()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  // Staged edits carry the chain they were made against, so switching chains
-  // in the manager below discards them instead of letting one chain's unsaved
-  // rows be saved into another (#1021).
-  const [staged, setStaged] = useState<{ profileId: number | null; entries: FallbackEntry[] } | null>(null)
   const [optionsCollapsed, setOptionsCollapsed] = useState(readOptionsCollapsed)
 
   // Catalog search + filter state (#343).
@@ -134,16 +131,12 @@ export default function FallbackPage() {
   })
   const isLoading = activePending || entriesLoading
 
-  // Staged edits are DISCARDED when the active chain changes, not just hidden
-  // (#1047): merely masking them meant switching A→B→A resurrected A's stale
-  // unsaved rows over freshly fetched data, with only a refresh clearing them.
-  useEffect(() => {
-    setStaged(prev => (prev && prev.profileId !== activeProfileId ? null : prev))
-  }, [activeProfileId])
-
-  const localEntries = staged && staged.profileId === activeProfileId ? staged.entries : null
-  const setLocalEntries = (entries: FallbackEntry[] | null) =>
-    setStaged(entries === null ? null : { profileId: activeProfileId, entries })
+  // Staged edits carry the chain they were made against, so switching chains
+  // in the manager below discards them instead of letting one chain's unsaved
+  // rows be saved into another (#1021). DISCARDED, not just hidden (#1047):
+  // merely masking them meant switching A→B→A resurrected A's stale unsaved
+  // rows over freshly fetched data, with only a refresh clearing them.
+  const chain = useDraft(entries, activeProfileId)
 
   const { data: tokenUsage } = useQuery<TokenUsageData>({
     queryKey: ['fallback', 'token-usage'],
@@ -170,11 +163,16 @@ export default function FallbackPage() {
   )
 
   const saveMutation = useMutation({
-    mutationFn: (data: { modelDbId: number; priority: number; enabled: boolean }[]) =>
-      apiFetch('/api/fallback', { method: 'PUT', body: JSON.stringify(data) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fallback'] })
-      setLocalEntries(null)
+    mutationFn: (saved: FallbackEntry[]) =>
+      apiFetch('/api/fallback', {
+        method: 'PUT',
+        body: JSON.stringify(saved.map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled: e.enabled }))),
+      }),
+    // Stays pending until the fresh chain is in, so the table never drops back
+    // to the old order for a frame and an edit made meanwhile survives.
+    onSuccess: async (_res, saved) => {
+      await queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      chain.settle(saved)
     },
   })
 
@@ -201,7 +199,7 @@ export default function FallbackPage() {
     () => new Map((routing?.scores ?? []).map(s => [s.modelDbId, s])),
     [routing?.scores],
   )
-  const allEntries = useMemo(() => localEntries ?? entries, [localEntries, entries])
+  const allEntries = chain.value
   const configured = useMemo(() => allEntries.filter(e => e.keyCount > 0), [allEntries])
   const unconfiguredPlatforms = useMemo(
     () => [...new Set(allEntries.filter(e => e.keyCount === 0).map(e => e.platform))],
@@ -221,7 +219,7 @@ export default function FallbackPage() {
   )
 
   function handleSave() {
-    saveMutation.mutate(allEntries.map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled: e.enabled })))
+    saveMutation.mutate(allEntries)
   }
 
   function toggleOptions() {
@@ -232,7 +230,7 @@ export default function FallbackPage() {
     })
   }
 
-  const hasChanges = localEntries !== null
+  const hasChanges = chain.dirty
 
   // ── Model unification: a model served by several providers is always shown as
   // one logical row that links to its own page (the on/off toggle was removed). ─
@@ -283,21 +281,21 @@ export default function FallbackPage() {
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
     const ids = new Set(memberIds)
-    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+    chain.edit(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
   }
 
   // Bulk on/off over what is currently on screen (#895). Curating a chain by
   // hand means turning most of the catalog off, which one row at a time over
   // 200 models nobody does. It deliberately follows the filters: "search groq,
   // disable all" is the useful gesture, and touching hidden rows would be a
-  // surprise. Like every other edit here it stages into localEntries and waits
-  // for Save.
+  // surprise. Like every other edit here it stages into the chain draft and
+  // waits for Save.
   const visibleMemberIds = visibleGroups.flatMap(g => g.members.map(m => m.modelDbId))
   const visibleEnabledCount = visibleGroups.filter(g => g.members.some(m => m.enabled)).length
 
   function handleBulkToggle(enabled: boolean) {
     const ids = new Set(visibleMemberIds)
-    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+    chain.edit(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
   }
 
   // Serialize the displayed group order (group-major, member-minor) to the flat
@@ -307,12 +305,12 @@ export default function FallbackPage() {
     for (const g of groups) for (const m of g.members) order.push(m.modelDbId)
     const unconfigured = allEntries.filter(e => e.keyCount === 0).map(e => e.modelDbId)
     const prio = new Map([...order, ...unconfigured].map((id, i) => [id, i + 1]))
-    setLocalEntries(allEntries.map(e => ({ ...e, priority: prio.get(e.modelDbId) ?? e.priority })))
+    chain.edit(allEntries.map(e => ({ ...e, priority: prio.get(e.modelDbId) ?? e.priority })))
   }
 
   // Jump-to-rank (#1317): type a target rank instead of dragging a model across
   // a long chain. Same staging path as drag — persistGroupOrder serializes the
-  // new display order into localEntries and Save commits it. The typed rank is
+  // new display order into the chain draft and Save commits it. The typed rank is
   // clamped to the chain, so 1 means "front of the queue" and an over-the-end
   // number means "last" without needing a validation error.
   function handleMoveGroupRank(key: string, toRank: number) {
@@ -685,7 +683,7 @@ export default function FallbackPage() {
                 sliding up when there are unsaved changes and back down on save/discard. */}
             <FloatingBar show={hasChanges}>
               <span className="text-xs text-muted-foreground">{t('common.unsavedChanges')}</span>
-              <Button variant="outline" size="sm" onClick={() => setLocalEntries(null)}>{t('common.discard')}</Button>
+              <Button variant="outline" size="sm" onClick={chain.discard}>{t('common.discard')}</Button>
               <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? t('common.saving') : t('common.saveChanges')}
               </Button>

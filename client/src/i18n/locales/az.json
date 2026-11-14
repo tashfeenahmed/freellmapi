@@ -996,6 +996,13 @@
     "emptyDesc": "Embedding ailələri burada embeddingləri dəstəkləyən provayder açarı əlavə etdikdən sonra görünür.",
     "dragToReorder": "Yenidən sifariş təminatçısına sürüklə"
   },
+  "iterativeCritique": {
+    "tab": "Təkrarlanan tənqid",
+    "title": "Təkrarlanan tənqid",
+    "description": "Generator cavab layihəsi yazır, fərqli provayderdən olan tənqidçi onu qiymətləndirir və qüsurları göstərir, generator isə tənqidçi qəbul edənə və ya dayanma qaydası işə düşənə qədər cavabı yenidən işləyir. Sonra sintezator yekun cavabı yazır. Bunu model \"iterative-critique\" ilə API-ni çağıraraq istifadə edin.",
+    "howToUse": "İstifadə",
+    "howToUseHelp": "Model \"iterative-critique\" ilə adi çat sorğusu göndərin. Sorğu üzrə əlavə konfiqurasiya: generator, critic (model identifikatorları) və max_rounds (1–5). Yalnız mətn: təsvirlər və alətlər dəstəklənmir."
+  },
   "fusion": {
     "title": "Birləşmə",
     "description": "Modellər paneli paralel cavab verir, sonra hakim daha güclü bir cavabı sintez edir. Bunu model olan API \"fusion\" adlandıraraq istifadə edin.",

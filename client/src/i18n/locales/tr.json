@@ -996,6 +996,13 @@
     "emptyDesc": "Gömmeleri destekleyen bir sağlayıcı anahtarı eklediğinizde gömme aileleri burada görünür.",
     "dragToReorder": "Sağlayıcıyı yeniden sıralamak için sürükleyin"
   },
+  "iterativeCritique": {
+    "tab": "Yinelemeli Eleştiri",
+    "title": "Yinelemeli Eleştiri",
+    "description": "Bir üretici yanıt taslağı yazar, farklı bir sağlayıcıdan bir eleştirmen taslağı puanlar ve kusurları belirtir; üretici, eleştirmen kabul edene veya bir durdurma kuralı devreye girene kadar taslağı revize eder. Ardından bir sentezleyici nihai yanıtı yazar. API'yi \"iterative-critique\" modeliyle çağırarak kullanın.",
+    "howToUse": "Nasıl kullanılır",
+    "howToUseHelp": "\"iterative-critique\" modeliyle normal bir sohbet isteği gönderin. İstek başına isteğe bağlı yapılandırma: generator, critic (model kimlikleri) ve max_rounds (1–5). Yalnızca metin: görseller ve araçlar desteklenmez."
+  },
   "fusion": {
     "title": "Füzyon",
     "description": "Birden fazla model paralel olarak yanıt verir; ardından değerlendirici model bu yanıtları daha güçlü tek bir yanıtta birleştirir. API'yi \"fusion\" modeliyle çağırarak kullanın.",

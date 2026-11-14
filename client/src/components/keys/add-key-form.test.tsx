@@ -96,6 +96,22 @@ it('still requires a key for a provider that needs one', async () => {
   expect(posted()).toBeUndefined()
 })
 
+// A failed add left its error under the form while the user fixed the key,
+// so the corrected value still read as rejected until the next submit.
+it('clears the last add error as soon as a field is edited', async () => {
+  vi.mocked(apiFetch).mockImplementation(async (_path: string, init?: RequestInit) => {
+    if (init?.method === 'POST') throw new Error('Key rejected by groq')
+    return []
+  })
+  mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="groq" />)
+  enter(keyInput(), 'bad-key')
+  await submit()
+  expect(container.textContent).toContain('Key rejected by groq')
+
+  enter(keyInput(), 'better-key')
+  expect(container.textContent).not.toContain('Key rejected by groq')
+})
+
 describe('Zro key setup', () => {
   it('requires a key and links to the MoonMath key dashboard', async () => {
     mount(<AddKeyForm onSuccess={onSuccess} initialPlatform="zro" />)

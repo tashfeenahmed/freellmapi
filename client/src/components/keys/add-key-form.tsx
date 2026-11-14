@@ -169,6 +169,13 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
   const accountIdError = needsAccountId && !accountId.trim() ? t('validation.required') : null
   const projectIdError = needsProjectId && !projectId.trim() ? t('validation.required') : null
   const pending = addKey.isPending || addSeveral.isPending
+  // Editing any field retires the last add error: it described the value the
+  // user is now fixing, and kept the corrected one looking rejected.
+  const edited = <T,>(set: (value: T) => void) => (value: T) => {
+    if (addKey.isError) addKey.reset()
+    if (addSeveral.isError) addSeveral.reset()
+    set(value)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,7 +205,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
           <ModelCombobox
             value={platform}
             options={platformOptions}
-            onSelect={v => setPlatform(v as Platform)}
+            onSelect={v => edited(setPlatform)(v as Platform)}
             ariaLabel={t('keys.platform')}
             triggerPlaceholder={t('keys.selectPlatform')}
             placeholder={t('keys.filterPlaceholder')}
@@ -241,7 +248,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
             <Label className="text-xs">{t('keys.accountId')}</Label>
             <Input
               value={accountId}
-              onChange={e => setAccountId(e.target.value)}
+              onChange={e => edited(setAccountId)(e.target.value)}
               placeholder="a1b2c3d4…"
               className="w-[200px] font-mono text-xs"
               aria-invalid={addAttempted && !!accountIdError}
@@ -265,7 +272,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
           {severalMode ? (
             <Textarea
               value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
+              onChange={e => edited(setApiKey)(e.target.value)}
               placeholder={'gsk_first…\ngsk_second…'}
               rows={3}
               className="font-mono text-xs"
@@ -275,7 +282,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
             <Input
               type="password"
               value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
+              onChange={e => edited(setApiKey)(e.target.value)}
               placeholder={needsProjectId ? 'jamai_pat_…' : isKeyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
               className="font-mono text-xs"
               aria-invalid={addAttempted && !!keyError}
@@ -293,7 +300,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
           <div className="flex flex-wrap items-center space-x-3">
             <Input
               value={label}
-              onChange={e => setLabel(e.target.value)}
+              onChange={e => edited(setLabel)(e.target.value)}
               placeholder={t('keys.customDisplayNameOptional')}
               className="w-[160px]"
             />

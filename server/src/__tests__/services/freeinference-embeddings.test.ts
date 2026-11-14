@@ -3,6 +3,7 @@ import { getDb, initDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { EMBEDDING_PLATFORMS, runEmbeddings } from '../../services/embeddings.js';
 import { applyCatalog } from '../../services/catalog-sync.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 
 const vector = (value = 0.1) => Array(1024).fill(value);
 const row = { platform: 'freeinference', modelId: 'bge-m3', family: 'bge-m3', displayName: 'BGE-M3', dimensions: 1024, maxInputTokens: 8192, priority: 1, enabled: true, quotaLabel: 'Shared daily research quota' };
@@ -12,7 +13,7 @@ function seed() {
   getDb().prepare("INSERT INTO api_keys (platform,label,encrypted_key,iv,auth_tag,status,enabled) VALUES ('freeinference','test',?,?,?,'unknown',1)").run(secret.encrypted, secret.iv, secret.authTag);
   expect(applyCatalog(getDb(), catalog).skippedUnknownPlatform).toBe(0);
 }
-beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); });
+beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); clearAllCooldowns(); });
 afterEach(() => { vi.restoreAllMocks(); getDb().close(); });
 
 describe('FreeInference embeddings', () => {

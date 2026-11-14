@@ -1057,6 +1057,9 @@ export function isProxyActive(): boolean {
 export function flushProxyCache(): void {
   // Outbound-proxy dispatcher (only in play when a proxy URL is configured).
   cached = null;
+  // Per-key dispatchers (#590) pool sockets the same way; dropped, not
+  // closed, like an eviction — in-flight requests keep their reference.
+  perKeyCached.clear();
   // The default no-proxy path is bare fetch() on Node's GLOBAL undici
   // dispatcher — exactly the pool the headline laptop-lid scenario rides — so
   // nulling the proxy cache alone left the flush a no-op for most

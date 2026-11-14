@@ -130,6 +130,22 @@ describe('Desktop re-auth bypass is loopback-only (#786)', () => {
     });
   });
 
+  // A same-host reverse proxy (Caddy, `tailscale serve`) makes every caller a
+  // loopback socket; its forwarded hop must still withdraw the re-auth skip.
+  it('demands the password through a same-host proxy with a remote hop', async () => {
+    process.env.FREEAPI_DESKTOP = '1';
+    const id = await addKey();
+    const server = appWithRemote('127.0.0.1').listen(0, '127.0.0.1');
+    if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
+    const addr = server.address() as { port: number };
+    const res = await fetch(`http://127.0.0.1:${addr.port}/api/keys/${id}/reveal`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'X-Forwarded-For': '203.0.113.9' },
+    });
+    server.close();
+    expect(res.status).toBe(403);
+  });
+
   it('does not take X-Forwarded-For as proof of being local', async () => {
     process.env.FREEAPI_DESKTOP = '1';
     const id = await addKey();

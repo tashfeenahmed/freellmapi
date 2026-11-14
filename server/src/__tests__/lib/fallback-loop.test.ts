@@ -1018,6 +1018,31 @@ describe('runFallbackLoop: routing-exhaustion diagnostics belong to the loop', (
       warn.mockRestore();
     }
   });
+
+  // The router throws RouteError (always a numeric status) for an empty pool.
+  // Anything else — a DB error, a bug — used to render the "add provider API
+  // keys" 503, sending the operator after a config problem they don't have.
+  it('renders an internal error, not "no providers configured", when routing itself throws', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const onRoutingExhausted = vi.fn();
+      await runFallbackLoop(hooksSkeleton({
+        route: () => { throw new TypeError("Cannot read properties of undefined (reading 'platform')"); },
+        onRoutingExhausted,
+      }));
+      expect(onRoutingExhausted).toHaveBeenCalledTimes(1);
+      const exhaustion = onRoutingExhausted.mock.calls[0][2];
+      expect(exhaustion).toMatchObject({ status: 500, type: 'server_error', code: 'internal_error' });
+      expect(exhaustion.message).not.toMatch(/API keys/);
+      expect(error).toHaveBeenCalled();
+      // Not an empty pool, so no routing-exhaustion disposition line either.
+      expect(warnedLine(warn)).toBeUndefined();
+    } finally {
+      error.mockRestore();
+      warn.mockRestore();
+    }
+  });
 });
 
 describe('retryable quota errors with token counts', () => {

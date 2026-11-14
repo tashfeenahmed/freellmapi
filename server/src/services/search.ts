@@ -18,7 +18,8 @@ import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
+import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
+import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
 import { markKeyHealthyFromRequest } from './health.js';
 
 // Web search over the key pool (#1174).
@@ -537,7 +538,7 @@ function logSearch(row: SearchEngineRow, keyId: number | null, status: 'ok' | 'e
 /** Bench this key for this engine according to what the upstream said. */
 function coolDown(row: SearchEngineRow, keyId: number, e: SearchError): void {
   if (row.platform === 'custom') {
-    if (e.status === 429) setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    if (e.status === 429) setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
     return;
   }
   if (e.status === 401 || e.status === 403) {
@@ -547,7 +548,7 @@ function coolDown(row: SearchEngineRow, keyId: number, e: SearchError): void {
     // the key's credits are spent.
     setCooldown(row.platform, row.model_id, keyId, NO_CREDIT_COOLDOWN_MS, 'credit');
   } else if (e.status === 429) {
-    setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
   }
 }
 
@@ -559,12 +560,12 @@ export function searchAvailable(): boolean {
     if (row.enabled !== 1) continue;
     if (row.platform === 'custom') {
       if (row.key_id == null) continue;
-      const k = db.prepare("SELECT 1 FROM api_keys WHERE id = ? AND enabled = 1 AND status IN ('healthy', 'unknown')").get(row.key_id);
+      const k = db.prepare(`SELECT 1 FROM api_keys WHERE id = ? AND ${USABLE_KEY_SQL}`).get(row.key_id);
       if (k) return true;
       continue;
     }
     if (!ADAPTERS[row.platform]) continue;
-    const k = db.prepare("SELECT 1 FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1").get(row.platform);
+    const k = db.prepare(`SELECT 1 FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL} LIMIT 1`).get(row.platform);
     if (k) return true;
   }
   return false;
@@ -695,7 +696,7 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
     // key of the same engine before the chain moves to the next engine.
     const tried = new Set<number>();
     for (;;) {
-      if (opts.signal?.aborted) throw new SearchError('search cancelled by the client', 499);
+      if (opts.signal?.aborted) throw new SearchError('search canceled by the client', 499);
       const { credential, budgetBlocked } = reserveProviderCredential(
         row,
         0,
@@ -728,12 +729,15 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
           engine: row.model_id,
         };
       } catch (err: any) {
+        // The caller hung up: not the engine's failure, so no 'error' row to drag
+        // its success rate down and no bench. search_requests.status is CHECK
+        // ('ok', 'error'), so a canceled attempt writes no row at all.
+        if (opts.signal?.aborted) throw new SearchError('search canceled by the client', 499);
         const e = err instanceof SearchError ? err : new SearchError(String(err?.message ?? err), 502);
         logSearch(row, credential.id, 'error', Date.now() - started, 0, clientAgent, e.message.slice(0, 300), estTokens);
         coolDown(row, credential.id, e);
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
-        if (opts.signal?.aborted) throw new SearchError('search cancelled by the client', 499);
         // A query the engine rejected as malformed is the caller's problem,
         // not this key's: try the next engine rather than every key.
         if (e.status === 400) break;
@@ -803,7 +807,7 @@ export function listSearchEngines(): SearchEngineView[] {
     SELECT id, platform, enabled, status FROM api_keys
      WHERE platform = 'custom' OR platform IN (${[...SEARCH_ENGINE_PLATFORMS].map(() => '?').join(', ')})
   `).all(...SEARCH_ENGINE_PLATFORMS) as { id: number; platform: string; enabled: number; status: string }[];
-  const healthy = (k: { enabled: number; status: string }) => k.enabled === 1 && (k.status === 'healthy' || k.status === 'unknown');
+  const healthy = (k: { enabled: number; status: string }) => isUsableKey(k);
   const monthCounts = new Map(
     (db.prepare(`
       SELECT platform, engine_id, COUNT(*) AS n FROM search_requests

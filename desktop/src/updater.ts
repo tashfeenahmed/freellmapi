@@ -72,8 +72,13 @@ let backgroundCheck = false;
 // The step under way, so an 'error' event (which electron-updater emits for
 // checks and downloads alike) can say which one failed.
 let stage: 'check' | 'download' | 'install' = 'check';
-// Set once the pre-install backup for the downloaded update has been written,
-// so the Restart button and the quit that follows don't write it twice.
+// The version electron-updater has downloaded and will install on quit. Kept
+// apart from `state`: a later 'error' event or a failed Restart moves the phase
+// off 'ready' while the update stays staged, and that quit still needs a backup.
+let staged: string | null = null;
+// Set once the pre-install backup for the staged update has been written, so
+// the Restart button and the quit that follows don't write it twice. Reset by
+// every download, so a later version gets its own backup.
 let backedUp = false;
 // What useAppProxy last handed the session, so an unchanged setting is not
 // re-applied (setProxy also drops the session's open connections).
@@ -150,6 +155,10 @@ export function initUpdater(options: UpdaterHooks): void {
     setState({ phase: 'downloading', version: state.version, percent: Math.floor(progress.percent) });
   });
   autoUpdater.on('update-downloaded', (info) => {
+    staged = info.version;
+    backedUp = false;
+    // Re-arms the quit-time install a failed backup switched off.
+    autoUpdater.autoInstallOnAppQuit = true;
     setState({ phase: 'ready', version: info.version });
     if (Notification.isSupported()) {
       const locale = options.getLocale();
@@ -169,13 +178,19 @@ export function initUpdater(options: UpdaterHooks): void {
   autoUpdater.on('error', (err) => setState({ phase: 'error', during: stage, message: message(err) }));
 
   // A downloaded update also installs on an ordinary quit (autoInstallOnAppQuit);
-  // that path must get the same backup the Restart button takes.
+  // that path must get the same backup the Restart button takes. A failed backup
+  // turns the install off: electron-updater reads autoInstallOnAppQuit again in
+  // its 'quit' handler, which runs after this one (BaseUpdater.addQuitHandler).
+  // shortcut: on macOS Squirrel.Mac already holds the update once it is
+  // downloaded, so the flag cannot stop that install; it still gets the backup
+  // when the backup succeeds. Upgrade by staging on mac only from installUpdate.
   app.on('before-quit', () => {
-    if (state.phase !== 'ready' || backedUp) return;
+    if (!staged || backedUp || !autoUpdater.autoInstallOnAppQuit) return;
     try {
       backup();
     } catch (err) {
-      console.warn('[updater] backup before the quit-time install failed:', err);
+      autoUpdater.autoInstallOnAppQuit = false;
+      console.warn('[updater] backup before the quit-time install failed; not installing the update on this quit:', err);
     }
   });
 
@@ -225,10 +240,10 @@ export async function downloadUpdate(): Promise<UpdateState> {
 }
 
 function backup(): void {
-  if (state.phase !== 'ready') return;
+  if (!staged) return;
   const file = hooks?.backupBeforeUpdate();
   backedUp = true;
-  if (file) console.log(`[updater] backed up the database to ${file} before installing v${state.version}`);
+  if (file) console.log(`[updater] backed up the database to ${file} before installing v${staged}`);
 }
 
 /** Back the database up, then quit, install and relaunch. */
@@ -238,7 +253,9 @@ export async function installUpdate(): Promise<UpdateState> {
   try {
     backup();
   } catch (err) {
-    // A failed backup must not install over data it could not save.
+    // A failed backup must not install over data it could not save — not now,
+    // and not on the next ordinary quit either (the update is still staged).
+    autoUpdater.autoInstallOnAppQuit = false;
     setState({ phase: 'error', during: 'install', message: `Backup before update failed: ${message(err)}` });
     return state;
   }

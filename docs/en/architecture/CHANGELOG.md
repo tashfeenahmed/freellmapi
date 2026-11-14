@@ -4,6 +4,11 @@
 
 Doc revision history for `docs/architecture/`, seeded from commits touching architecture-relevant code.
 
+## 2026-11-13
+
+- **docs(architecture): add the state-machine registry** — new `07-state-machines.md` lists 42 machines (M01–M42) plus two explicit helpers (think-tag filter, migrations runner). Each entry has the same fields: owner, class, persisted, states, writers, tests, status (`explicit` / `types-only` / `documented-only`), a Mermaid diagram, and **Open:** gaps not fixed yet. §10 lists the modes and derived values that are not machines, so they are not flagged again. M21 (fusion / iterative critique) is a stub until its uncommitted work lands. Linked from `OVERVIEW.md`, `00-high-level-index.md` and `GLOSSARY.md` § State machines. Entries describe the code after the state-machine fix branches of 2026-11-11 to 2026-11-13 (key health, cooldown merge, catalog chain restore, catalog sync dedupe, failover, stream commit, SSE EOF, request status, auth, dashboard dialogs, updater, shutdown).
+- **docs(architecture): correct hedge, disconnect and degraded-mode facts** — `04` §2 and `03` §11: a hedge-aborted attempt that stayed silent for at least `HEDGE_BENCH_MIN_SILENT_FRACTION` (0.75) of the budget **is** benched. `03` §8: a client disconnect after headers logs one `canceled` row, not `committed`; hedging is disarmed at first byte, so it has no after-headers case. `04` §1: `resetDegradationState()` has no production caller, and the snapshot is computed on demand only before the first health pass. `GLOSSARY.md`: degraded mode is the healthy-provider ratio (not quota exhaustion or UTC midnight); attempt cap named as `FALLBACK_MAX_RETRIES` (20).
+
 ## 2026-09-02
 
 - **docs(architecture): cross-ref Idempotency-Key replay in degraded-mode doc** — `04-degraded-mode-and-failover.md:10` now maps the pre-routing idempotency lookup (`server/src/services/idempotency.ts`, `proxy.ts:1793-1838`) and post-success persist (`proxy.ts:2640-2656`) to the fallback loop, notes `X-Routed-Via: idempotency` zero-cost replay, `stream:true` + `finish_reason:length` exclusion, in-flight NOT deduplicated (`95bc46f`), `IDEMPOTENCY_TTL_MS` 24 h lazy sweep, and that `409` + replay bypass `isDegraded()` / retry budget / hedging. Client contract lives in `docs/en/api/02-idempotency.md` (`36b877d`).

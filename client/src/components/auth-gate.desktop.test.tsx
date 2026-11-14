@@ -11,6 +11,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nProvider } from '@/i18n'
+import { UNAUTHORIZED_EVENT } from '@/lib/api'
 import { AuthGate } from './auth-gate'
 
 type DesktopWindow = Window & {
@@ -81,6 +82,9 @@ afterEach(() => {
 })
 
 const passwordField = () => container.querySelector('input[type="password"]')
+const appText = () => container.querySelector('[data-testid="app"]')?.textContent
+const tryAgain = () =>
+  [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Try again'))
 
 describe('AuthGate inside the desktop shell', () => {
   it('replaces a rejected session through the shell and never shows the login form', async () => {
@@ -131,6 +135,50 @@ describe('AuthGate inside the desktop shell', () => {
     expect(alert).not.toBeNull()
     expect(alert?.textContent?.trim()).not.toBe('')
   })
+
+  // A failed repair used to stick until the app was restarted.
+  it('runs the repair again from the recovery screen', async () => {
+    const w = window as DesktopWindow
+    w.__FREEAPI_DESKTOP__ = true
+    let healthy = false
+    const bridge = vi.fn(async () => {
+      if (!healthy) return 'still-rejected'
+      accepted.add(FRESH)
+      return FRESH
+    })
+    w.__FREEAPI_SESSION__ = bridge
+
+    mount()
+    await flush()
+    expect(container.textContent).toContain('Quit FreeLLMAPI and open it again')
+
+    healthy = true
+    await act(async () => { tryAgain()!.click() })
+    await flush()
+
+    expect(bridge).toHaveBeenCalledTimes(2)
+    expect(appText()).toBe('dashboard')
+  })
+
+  it('shows the recovery message when the shell never answers', async () => {
+    vi.useFakeTimers()
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const w = window as DesktopWindow
+      w.__FREEAPI_DESKTOP__ = true
+      w.__FREEAPI_SESSION__ = vi.fn(() => new Promise<string>(() => {}))
+
+      mount()
+      await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+      expect(container.textContent).not.toContain('Quit FreeLLMAPI')
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000) })
+      expect(container.textContent).toContain('Quit FreeLLMAPI and open it again')
+    } finally {
+      quiet.mockRestore()
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('AuthGate in a browser', () => {
@@ -178,5 +226,41 @@ describe('AuthGate in a browser', () => {
       expect(label, `no label for #${input.id}`).not.toBeNull()
       expect(label?.textContent?.trim()).not.toBe('')
     }
+  })
+
+  it('offers a retry when the server is unreachable, and the retry gets in', async () => {
+    accepted.add('stale-token')
+    const serve = fetch
+    let down = true
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (down) throw new TypeError('Failed to fetch')
+      return serve(input, init)
+    }))
+
+    mount()
+    await flush()
+    expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    expect(appText()).toBeUndefined()
+
+    down = false
+    await act(async () => { tryAgain()!.click() })
+    await flush()
+
+    expect(appText()).toBe('dashboard')
+  })
+
+  // Before, any failed status refetch (window focus, a 401) swapped the whole
+  // app for the "server unreachable" screen and threw away what was on it.
+  it('keeps the dashboard when a background status check fails', async () => {
+    accepted.add('stale-token')
+    mount()
+    await flush()
+    expect(appText()).toBe('dashboard')
+
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    await act(async () => { window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT)) })
+    await flush()
+
+    expect(appText()).toBe('dashboard')
   })
 })

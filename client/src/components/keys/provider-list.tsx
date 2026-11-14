@@ -75,6 +75,32 @@ const METRIC_LABEL_KEY = {
   neurons: 'freeTier.metricNeurons',
 } as const
 
+// The one row dialog the Providers tab shows, if any (M30). One value instead of
+// a slot per dialog, so opening a dialog replaces the last one.
+type RowDialog =
+  | { kind: 'edit'; keyId: number }
+  // Custom endpoint whose model list is being fetched (#488) — relays change
+  // what they serve constantly, so this is a repeat action, not a one-off.
+  // `builtin`: a built-in provider key the catalog has no models for (#1348),
+  // whose picks register as discovered rows instead of custom-endpoint models.
+  | { kind: 'discover'; keyId: number; builtin: boolean }
+  // Custom endpoint taking another credential (#702). Keyed by base URL, since
+  // a key joins the pool of an endpoint rather than of the row it was opened
+  // from, and every key of that endpoint offers the same action.
+  | { kind: 'addEndpointKey'; baseUrl: string }
+  // Key whose plaintext the operator asked to copy; re-authentication happens
+  // in the dialog, not here (#705).
+  | { kind: 'copy'; keyId: number; maskedKey: string }
+  // Key whose model scope is being edited (#657).
+  | { kind: 'scope'; keyId: number }
+  // Re-open the post-add model picker against the current catalog (#657).
+  | { kind: 'editModels'; keyId: number }
+  // Provider (or, for a custom endpoint, key) whose models are being test-fired,
+  // and the target a hand-typed model is being added to. Both came over from
+  // the retired Providers page; everything else that page did already lived here.
+  | { kind: 'test'; platform: string; keyId?: number; label: string }
+  | { kind: 'addModel'; platform: string; keyId?: number }
+
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
 // KeysPage stays a thin shell. `onAddKey` opens the shared Add key dialog.
@@ -82,42 +108,30 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   const { t, locale } = useI18n()
   const queryClient = useQueryClient()
 
-  const [editingKeyId, setEditingKeyId] = useState<number | null>(null)
+  const [dialog, setDialog] = useState<RowDialog | null>(null)
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<number>>(new Set())
   // Explicit user open/closed overrides per provider group; absent = default.
   const [groupOverrides, setGroupOverrides] = useState<Map<string, boolean>>(new Map())
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  // Custom endpoint whose model list is being fetched (#488) — relays change
-  // what they serve constantly, so this is a repeat action, not a one-off.
-  // `builtin`: a built-in provider key the catalog has no models for (#1348),
-  // whose picks register as discovered rows instead of custom-endpoint models.
-  const [discoverTarget, setDiscoverTarget] = useState<{ keyId: number; builtin: boolean } | null>(null)
-  // Custom endpoint taking another credential (#702). Keyed by base URL, since
-  // a key joins the pool of an endpoint rather than of the row it was opened
-  // from, and every key of that endpoint offers the same action.
-  const [addKeyBaseUrl, setAddKeyBaseUrl] = useState<string | null>(null)
-  // Key whose plaintext the operator asked to copy; re-authentication happens
-  // in the dialog, not here (#705).
-  const [copyKey, setCopyKey] = useState<{ id: number; maskedKey: string } | null>(null)
-  // Key whose model scope is being edited (#657).
-  const [scopeKeyId, setScopeKeyId] = useState<number | null>(null)
-  // Re-open the post-add model picker against the current catalog (#657).
-  const [modelEditorKeyId, setModelEditorKeyId] = useState<number | null>(null)
   // #787: keys selected for bulk enable/disable/delete within a group.
   const [selectedKeyIds, setSelectedKeyIds] = useState<Set<number>>(new Set())
   // #1504: custom models selected for bulk delete, keyed by kind:id so ids
   // from the chat/embedding/media tables can never collide.
   const [selectedModelKeys, setSelectedModelKeys] = useState<Set<string>>(new Set())
-  // Provider (or, for a custom endpoint, key) whose models are being test-fired,
-  // and the target a hand-typed model is being added to. Both came over from
-  // the retired Providers page; everything else that page did already lived here.
-  const [testTarget, setTestTarget] = useState<{ platform: string; keyId?: number; label: string } | null>(null)
-  const [addModelTarget, setAddModelTarget] = useState<{ platform: string; keyId?: number } | null>(null)
   const { data: keys = [], isLoading } = useQuery<ApiKey[]>({
     queryKey: ['keys'],
     queryFn: () => apiFetch('/api/keys'),
   })
+
+  // A row dialog belongs to the key (or the list) it was opened from. Once that
+  // is gone, close it now: left set, it would reopen by itself when the list
+  // fills again or a new key reuses the id (SQLite hands out freed ids).
+  const dialogKeyId = dialog && 'keyId' in dialog ? dialog.keyId : undefined
+  if (dialog && !isLoading
+    && (keys.length === 0 || (dialogKeyId !== undefined && !keys.some(k => k.id === dialogKeyId)))) {
+    setDialog(null)
+  }
 
   const { data: healthData } = useQuery<HealthData>({
     queryKey: ['health'],
@@ -326,7 +340,42 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
   }
 
   function startEditing(key: ApiKey) {
-    setEditingKeyId(key.id)
+    setDialog({ kind: 'edit', keyId: key.id })
+  }
+
+  function closeDialog(open: boolean) {
+    if (!open) setDialog(null)
+  }
+
+  function renderDialog() {
+    if (!dialog) return null
+    // Key-scoped editors resolve their key from the live query, so a save
+    // re-seeds the next open and a successful save closes on fresh data (#657).
+    const liveKey = (id: number) => keys.find(k => k.id === id)
+    switch (dialog.kind) {
+      case 'discover':
+        return <DiscoverModelsDialog open onOpenChange={closeDialog} endpoint={{ keyId: dialog.keyId }} builtin={dialog.builtin} />
+      case 'addEndpointKey':
+        return <AddEndpointKeyDialog open onOpenChange={closeDialog} baseUrl={dialog.baseUrl} />
+      case 'test':
+        return <TestModelsDialog platform={dialog.platform} keyId={dialog.keyId} label={dialog.label} onOpenChange={closeDialog} />
+      case 'addModel':
+        return <AddModelDialog open initialPlatform={dialog.platform} initialKeyId={dialog.keyId} onOpenChange={closeDialog} />
+      case 'copy':
+        return <CopyKeyDialog keyId={dialog.keyId} maskedKey={dialog.maskedKey} onOpenChange={closeDialog} />
+      case 'scope': {
+        const apiKey = liveKey(dialog.keyId)
+        return apiKey ? <ModelScopeDialog apiKey={apiKey} onOpenChange={closeDialog} /> : null
+      }
+      case 'editModels': {
+        const apiKey = liveKey(dialog.keyId)
+        return apiKey ? <EditModelsDialog apiKey={apiKey} onOpenChange={closeDialog} /> : null
+      }
+      case 'edit': {
+        const apiKey = liveKey(dialog.keyId)
+        return apiKey ? <EditKeyDialog apiKey={apiKey} onOpenChange={closeDialog} /> : null
+      }
+    }
   }
 
   function toggleExpandedKey(id: number) {
@@ -549,7 +598,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                         {/* Test every model this provider serves, one real ping each
                             (custom endpoints test per key from the row instead). */}
                         {group.platform !== 'custom' && !group.search && (
-                          <DropdownMenuItem onClick={() => setTestTarget({ platform: group.platform, label: group.label })}>
+                          <DropdownMenuItem onClick={() => setDialog({ kind: 'test', platform: group.platform, label: group.label })}>
                             {t('keys.testModels')}
                             <FlaskConical className="ml-auto size-3.5" />
                           </DropdownMenuItem>
@@ -561,7 +610,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                           </DropdownMenuItem>
                         )}
                         {!group.search && (
-                          <DropdownMenuItem onClick={() => setAddModelTarget({ platform: group.platform })}>
+                          <DropdownMenuItem onClick={() => setDialog({ kind: 'addModel', platform: group.platform })}>
                             {t('keys.addCustomModel')}
                             <Sparkles className="ml-auto size-3.5" />
                           </DropdownMenuItem>
@@ -783,7 +832,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                   <Button
                                     variant="ghost"
                                     size="icon-xs"
-                                    onClick={() => setModelEditorKeyId(k.id)}
+                                    onClick={() => setDialog({ kind: 'editModels', keyId: k.id })}
                                     aria-label={t('keys.editModels')}
                                     title={t('keys.editModels')}
                                   >
@@ -796,7 +845,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                   <Button
                                     variant="ghost"
                                     size="icon-xs"
-                                    onClick={() => setCopyKey({ id: k.id, maskedKey: k.maskedKey })}
+                                    onClick={() => setDialog({ kind: 'copy', keyId: k.id, maskedKey: k.maskedKey })}
                                     aria-label={t('keys.copyFullKey')}
                                   >
                                     <Copy className="size-3" />
@@ -808,7 +857,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                   <Button
                                     variant="ghost"
                                     size="icon-xs"
-                                    onClick={() => setDiscoverTarget({ keyId: k.id, builtin: true })}
+                                    onClick={() => setDialog({ kind: 'discover', keyId: k.id, builtin: true })}
                                     aria-label={t('keys.discoverModels')}
                                   >
                                     <ListPlus className="size-3" />
@@ -821,7 +870,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => setAddKeyBaseUrl(k.baseUrl!)}
+                                      onClick={() => setDialog({ kind: 'addEndpointKey', baseUrl: k.baseUrl! })}
                                       aria-label={t('keys.addKey')}
                                     >
                                       <KeyRound className="size-3" />
@@ -831,7 +880,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => setDiscoverTarget({ keyId: k.id, builtin: false })}
+                                      onClick={() => setDialog({ kind: 'discover', keyId: k.id, builtin: false })}
                                       aria-label={t('keys.discoverModels')}
                                     >
                                       <ListPlus className="size-3" />
@@ -841,7 +890,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => setAddModelTarget({ platform: 'custom', keyId: k.id })}
+                                      onClick={() => setDialog({ kind: 'addModel', platform: 'custom', keyId: k.id })}
                                       aria-label={t('keys.addCustomModel')}
                                     >
                                       <Sparkles className="size-3" />
@@ -851,7 +900,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
-                                      onClick={() => setTestTarget({ platform: 'custom', keyId: k.id, label: k.label || k.baseUrl! })}
+                                      onClick={() => setDialog({ kind: 'test', platform: 'custom', keyId: k.id, label: k.label || k.baseUrl! })}
                                       aria-label={t('keys.testModels')}
                                     >
                                       <FlaskConical className="size-3" />
@@ -880,7 +929,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                                   <Button
                                     variant="ghost"
                                     size="icon-xs"
-                                    onClick={() => setScopeKeyId(k.id)}
+                                    onClick={() => setDialog({ kind: 'scope', keyId: k.id })}
                                     aria-label={t('keys.modelScope')}
                                   >
                                     <ListFilter className="size-3" />
@@ -1024,78 +1073,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         </div>
       )}
 
-      {discoverTarget !== null && (
-        <DiscoverModelsDialog
-          open
-          onOpenChange={(open) => { if (!open) setDiscoverTarget(null) }}
-          endpoint={{ keyId: discoverTarget.keyId }}
-          builtin={discoverTarget.builtin}
-        />
-      )}
-
-      {addKeyBaseUrl !== null && (
-        <AddEndpointKeyDialog
-          open
-          onOpenChange={(open) => { if (!open) setAddKeyBaseUrl(null) }}
-          baseUrl={addKeyBaseUrl}
-        />
-      )}
-
-      {testTarget !== null && (
-        <TestModelsDialog
-          platform={testTarget.platform}
-          keyId={testTarget.keyId}
-          label={testTarget.label}
-          onOpenChange={(open) => { if (!open) setTestTarget(null) }}
-        />
-      )}
-
-      {addModelTarget !== null && (
-        <AddModelDialog
-          open
-          initialPlatform={addModelTarget.platform}
-          initialKeyId={addModelTarget.keyId}
-          onOpenChange={(open) => { if (!open) setAddModelTarget(null) }}
-        />
-      )}
-
-      {copyKey !== null && (
-        <CopyKeyDialog
-          keyId={copyKey.id}
-          maskedKey={copyKey.maskedKey}
-          onOpenChange={(open) => { if (!open) setCopyKey(null) }}
-        />
-      )}
-
-      {(() => {
-        // Resolved from the live query so a save re-seeds the next open (#657).
-        const scopeKey = scopeKeyId !== null ? keys.find(k => k.id === scopeKeyId) : undefined
-        return scopeKey ? (
-          <ModelScopeDialog
-            apiKey={scopeKey}
-            onOpenChange={(open) => { if (!open) setScopeKeyId(null) }}
-          />
-        ) : null
-      })()}
-      {(() => {
-        const modelKey = modelEditorKeyId !== null ? keys.find(k => k.id === modelEditorKeyId) : undefined
-        return modelKey ? (
-          <EditModelsDialog
-            apiKey={modelKey}
-            onOpenChange={(open) => { if (!open) setModelEditorKeyId(null) }}
-          />
-        ) : null
-      })()}
-      {(() => {
-        // Resolved from the live query so a successful save closes on fresh data.
-        const editKey = editingKeyId !== null ? keys.find(k => k.id === editingKeyId) : undefined
-        return editKey ? (
-          <EditKeyDialog
-            apiKey={editKey}
-            onOpenChange={(open) => { if (!open) setEditingKeyId(null) }}
-          />
-        ) : null
-      })()}
+      {renderDialog()}
     </div>
   )
 }

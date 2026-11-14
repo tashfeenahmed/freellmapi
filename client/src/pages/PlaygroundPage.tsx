@@ -1000,6 +1000,7 @@ export default function PlaygroundPage() {
   const pickerOptions = [
     { value: 'auto', label: t('playground.autoModel'), sub: '', isNew: false, platforms: [] as string[] },
     { value: 'fusion', label: t('playground.fusionModel'), sub: '', isNew: false, platforms: [] as string[] },
+    { value: 'iterative-critique', label: t('iterativeCritique.tab'), sub: '', isNew: false, platforms: [] as string[] },
     ...chainOptions,
     ...modelOptions
       .slice()
@@ -1030,6 +1031,8 @@ export default function PlaygroundPage() {
     ? t('playground.autoModel')
     : selectedModel === 'fusion'
     ? t('playground.fusionModel')
+    : selectedModel === 'iterative-critique'
+    ? t('iterativeCritique.tab')
     : selectedModel.startsWith('auto:')
     // A remembered chain whose name has since changed (or been deleted) has no
     // option left to read a label from; the raw id is still the truth.

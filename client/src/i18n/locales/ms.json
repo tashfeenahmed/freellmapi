@@ -996,6 +996,13 @@
     "emptyDesc": "Keluarga penyematan akan muncul di sini apabila anda menambah kunci penyedia yang menyokong penyembatan.",
     "dragToReorder": "Seret untuk menyusun semula penyedia"
   },
+  "iterativeCritique": {
+    "tab": "Kritikan Berulang",
+    "title": "Kritikan Berulang",
+    "description": "Penjana mengarang draf jawapan, pengkritik dari penyedia berbeza menilainya dan menyatakan kelemahan, dan penjana menyemaknya semula sehingga pengkritik menerima atau peraturan henti dicetuskan. Kemudian penyintesis menulis jawapan akhir. Gunakan dengan memanggil API dengan model \"iterative-critique\".",
+    "howToUse": "Cara menggunakan",
+    "howToUseHelp": "Hantar permintaan sembang biasa dengan model \"iterative-critique\". Konfigurasi pilihan bagi setiap permintaan: generator, critic (ID model) dan max_rounds (1–5). Teks sahaja: imej dan alat tidak disokong."
+  },
   "fusion": {
     "title": "Fusi",
     "description": "Panel model menjawab secara selari, kemudian hakim mensintesis satu jawapan yang lebih kuat. Gunakan dengan memanggil API model sebagai \"fusion\".",

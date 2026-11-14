@@ -996,6 +996,13 @@
     "emptyDesc": "Ugrađene obitelji pojavljuju se ovdje nakon što dodate ključ pružatelja usluga koji podržava ugrađivanja.",
     "dragToReorder": "Povuci za ponovno naručivanje pružatelja"
   },
+  "iterativeCritique": {
+    "tab": "Iterativna kritika",
+    "title": "Iterativna kritika",
+    "description": "Generator sastavlja nacrt odgovora, kritičar drugog pružatelja ocjenjuje ga i navodi nedostatke, a generator ga revidira dok ga kritičar ne prihvati ili se ne aktivira pravilo zaustavljanja. Zatim sintetizator piše konačni odgovor. Koristi ga tako da API pozoveš s modelom \"iterative-critique\".",
+    "howToUse": "Kako koristiti",
+    "howToUseHelp": "Pošalji običan zahtjev za chat s modelom \"iterative-critique\". Neobavezna konfiguracija po zahtjevu: generator, critic (ID-ovi modela) i max_rounds (1–5). Samo tekst: slike i alati nisu podržani."
+  },
   "fusion": {
     "title": "Fuzija",
     "description": "Panel modela odgovara paralelno, a sudac sintetizira jedan jači odgovor. Koristi ga tako da API s modelom pozoveš \"fusion\".",

@@ -996,6 +996,13 @@
     "emptyDesc": "Oʻrnatishlarni qoʻllab-quvvatlaydigan provayder kalitini qoʻshganingizdan soʻng, oʻrnatish oilalari shu yerda paydo boʻladi.",
     "dragToReorder": "Provayderni qayta tartiblash uchun torting"
   },
+  "iterativeCritique": {
+    "tab": "Iterativ tanqid",
+    "title": "Iterativ tanqid",
+    "description": "Generator javob qoralamasini yozadi, boshqa provayderdan bo'lgan tanqidchi uni baholaydi va kamchiliklarni ko'rsatadi, generator esa tanqidchi qabul qilguncha yoki to'xtatish qoidasi ishga tushguncha uni qayta ko'rib chiqadi. Keyin sintezator yakuniy javobni yozadi. Uni \"iterative-critique\" modeliga ega API ga qo'ng'iroq qilish orqali foydalaning.",
+    "howToUse": "Qanday foydalanish kerak",
+    "howToUseHelp": "Oddiy chat so'rovini \"iterative-critique\" modeli bilan yuboring. Har bir so'rov uchun ixtiyoriy konfiguratsiya: generator, critic (model ID'lari) va max_rounds (1–5). Faqat matn: rasmlar va vositalar qo'llab-quvvatlanmaydi."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Modellar guruhi parallel ravishda javob beradi, keyin hakam bitta kuchliroq javobni sintez qiladi. Uni \"fusion\" modeliga ega API ga qo'ng'iroq qilish orqali foydalaning.",

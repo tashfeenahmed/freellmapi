@@ -996,6 +996,13 @@
     "emptyDesc": "Haɗin iyalai suna bayyana nan da zarar kun ƙara maɓallin mai ba da tallafi wanda ke goyan bayan haɗawa.",
     "dragToReorder": "Ja don sake yin odar mai bada sabis"
   },
+  "iterativeCritique": {
+    "tab": "Iterative Critique",
+    "title": "Iterative Critique",
+    "description": "Mai samarwa yana rubuta daftarin amsa, mai suka daga wani mai bayarwa daban yana ba shi maki yana kuma nuna kurakurai, mai samarwa kuma yana sake duba shi har sai mai sukar ya karɓa ko wata ƙa'idar tsayawa ta yi aiki. Daga nan mai haɗawa yana rubuta amsar ƙarshe. Yi amfani da shi ta hanyar kiran API tare da samfurin \"iterative-critique\".",
+    "howToUse": "Yadda ake amfani da shi",
+    "howToUseHelp": "Aika buƙatar hira ta yau da kullum tare da samfurin \"iterative-critique\". Saitin zaɓi na kowace buƙata: generator, critic (ID na samfura) da max_rounds (1–5). Rubutu kawai: ba a goyi bayan hotuna da kayan aiki ba."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Kwamitin samfura yana amsawa a layi daya, sannan alƙali ya haɗa amsa ɗaya mai ƙarfi. Yi amfani da shi ta hanyar kiran API tare da samfurin \"fusion\".",

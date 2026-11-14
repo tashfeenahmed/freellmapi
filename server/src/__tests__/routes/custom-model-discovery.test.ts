@@ -349,6 +349,9 @@ describe('median seeding for custom models (#488)', () => {
     expect(row.status).toBe('success');
     expect(row.input_tokens).toBe(3);
     expect(row.output_tokens).toBe(1);
+    // ...and the durable aggregates count it like any other request row.
+    const hourly = getDb().prepare('SELECT SUM(total_requests) AS n, SUM(success_count) AS ok FROM request_hourly').get() as { n: number; ok: number };
+    expect(hourly).toEqual({ n: 1, ok: 1 });
 
     // A real completion outranks a health ping: the cooldown is lifted.
     expect(isOnCooldown('custom', 'relay-a', keyId)).toBe(false);

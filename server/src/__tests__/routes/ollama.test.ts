@@ -148,6 +148,8 @@ describe('Ollama emulation', () => {
     expect(isLoopback(peer('10.0.0.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '203.0.113.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1'))).toBe(true);
+    // An appending proxy puts the real client last; a spoofed first hop must not win.
+    expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5'))).toBe(false);
   });
 
   // #1884: X-Forwarded-For is appended to, so the left-most hop is whatever the
@@ -161,7 +163,9 @@ describe('Ollama emulation', () => {
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '::1,203.0.113.5'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 127.0.0.1'))).toBe(true);
-    expect(isLoopback(peer('127.0.0.1', '10.0.0.5, 127.0.0.1'))).toBe(true);
+    // Any non-loopback hop fails closed (stricter than #1884's last-hop rule):
+    // a spoofed hop can only take local access away, never grant it.
+    expect(isLoopback(peer('127.0.0.1', '10.0.0.5, 127.0.0.1'))).toBe(false);
     // A hop this module cannot read as an address is refused, not trusted.
     expect(isLoopback(peer('127.0.0.1', '127.0.0.1, 203.0.113.5:41234'))).toBe(false);
     expect(isLoopback(peer('127.0.0.1', '  '))).toBe(true);

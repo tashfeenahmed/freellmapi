@@ -996,6 +996,13 @@
     "emptyDesc": "As famílias de embedding aparecem aqui assim que adiciona uma chave de fornecedor que suporta embeddings.",
     "dragToReorder": "Arrastar para o fornecedor de reencomenda"
   },
+  "iterativeCritique": {
+    "tab": "Crítica iterativa",
+    "title": "Crítica iterativa",
+    "description": "Um gerador redige um rascunho de resposta, um crítico de outro fornecedor pontua-o e aponta falhas, e o gerador revê-o até o crítico aceitar ou uma regra de paragem ser acionada. Depois, um sintetizador escreve a resposta final. Usa-o chamando o API com o modelo \"iterative-critique\".",
+    "howToUse": "Como usar",
+    "howToUseHelp": "Envia um pedido de chat normal com o modelo \"iterative-critique\". Configuração opcional por pedido: generator, critic (IDs de modelo) e max_rounds (1–5). Apenas texto: as imagens e as ferramentas não são suportadas."
+  },
   "fusion": {
     "title": "Fusão",
     "description": "Um painel de modelos responde em paralelo, depois um juiz sintetiza uma resposta mais forte. Usa-o chamando o API com modelo de \"fusão\".",

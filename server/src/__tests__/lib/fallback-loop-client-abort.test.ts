@@ -166,4 +166,37 @@ describe('fallback loop on client abort', () => {
 
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
+
+  // Provider error text is upstream-controlled and reaches us verbatim
+  // (openai-compat: `${name} API error ${status}: ${body}`). A relay that
+  // answers "499 client disconnected" about ITS OWN upstream must not pass for
+  // our client hanging up: that path renders nothing, so the live client hung.
+  it('does not take upstream "client disconnected" text for our client hanging up', () => {
+    expect(isClientAbortError(new Error('Fake API error 499: client disconnected'))).toBe(false);
+    expect(isClientAbortError(new Error('upstream: Client Disconnected before response'))).toBe(false);
+  });
+
+  it('still recognises our own abort when re-wrapped or stringified', () => {
+    const ours = newClientAbortError();
+    expect(isClientAbortError(new Error('outer', { cause: new Error('middle', { cause: ours }) }))).toBe(true);
+    expect(isClientAbortError(new Error(`Fake stream error: ${ours.message}`))).toBe(true);
+  });
+
+  it('fails over and answers the client when upstream text says "client disconnected"', async () => {
+    const state = newFallbackState();
+    const dispatch = vi.fn()
+      .mockImplementationOnce(async () => { throw Object.assign(new Error('Fake API error 500: client disconnected'), { status: 500 }); })
+      .mockImplementationOnce(async () => 'done');
+    const h = hooks(state, {
+      maxRetries: 3,
+      clientGone: () => false,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(h.logFailure).toHaveBeenCalledTimes(1);
+  });
 });

@@ -996,6 +996,13 @@
     "emptyDesc": "Les familles d'embeddings apparaissent ici dès que vous ajoutez une clé de fournisseur prenant en charge les embeddings.",
     "dragToReorder": "Glisser pour réorganiser le fournisseur"
   },
+  "iterativeCritique": {
+    "tab": "Critique itérative",
+    "title": "Critique itérative",
+    "description": "Un générateur rédige une réponse, un critique issu d’un autre fournisseur la note et en relève les défauts, et le générateur la révise jusqu’à ce que le critique l’accepte ou qu’une règle d’arrêt se déclenche. Un synthétiseur rédige ensuite la réponse finale. Utilisez-la en appelant l’API avec le modèle « iterative-critique ».",
+    "howToUse": "Comment l’utiliser",
+    "howToUseHelp": "Envoyez une requête de chat normale avec le modèle « iterative-critique ». Configuration facultative par requête : generator, critic (identifiants de modèle) et max_rounds (1–5). Texte uniquement : les images et les outils ne sont pas pris en charge."
+  },
   "fusion": {
     "title": "Fusion",
     "description": "Un panel de modèles répond en parallèle, puis un juge synthétise une réponse plus solide. Utilisez-la en appelant l’API avec le modèle « fusion ».",

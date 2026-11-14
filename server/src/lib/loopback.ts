@@ -1,45 +1,44 @@
-// Whether a request reached us from this machine.
-//
-// The socket peer address is the only value a caller cannot set, so that is what
-// decides locality. A forwarded hop can never grant it, but it can withdraw it: the
-// deployment this project documents puts a reverse proxy on the same host, which
-// makes every request look local at the socket.
-//
-// X-Forwarded-For is a list that each proxy APPENDS to, so the RIGHT-most hop is the
-// one the nearest proxy saw, while everything to its left arrived in the request and
-// is caller-controlled. Reading the left-most hop (as this code used to) let a remote
-// client send `X-Forwarded-For: 127.0.0.1` through an appending proxy and be treated
-// as local.
+import type { Request } from 'express';
 
-export const isLoopbackAddress = (value: string | undefined): boolean => {
-  let address = (value ?? '').trim();
+export function isLoopbackAddress(value: string | undefined): boolean {
+  let addr = (value ?? '').trim();
   // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (address.startsWith('::ffff:')) address = address.slice(7);
-  if (address === '::1') return true;
+  if (addr.toLowerCase().startsWith('::ffff:')) addr = addr.slice(7);
+  if (addr === '::1') return true;
   // Only a real 127.0.0.0/8 address: four decimal octets, each 0-255.
-  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address);
+  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(addr);
   return octets !== null && octets.slice(1).every(octet => Number(octet) <= 255);
-};
+}
 
-// The hop appended by the nearest proxy, or '' when the header carries no hop.
-export const forwardedPeerAddress = (
-  header: string | string[] | undefined,
-): string => {
-  const hops = (Array.isArray(header) ? header.join(',') : (header ?? ''))
-    .split(',')
-    .map((hop) => hop.trim())
-    .filter((hop) => hop.length > 0);
-  return hops.length > 0 ? hops[hops.length - 1] : '';
-};
+// Is the caller on this machine? The socket peer address is the authority,
+// NOT req.ip: forwarded headers are caller-controlled, so letting one of them
+// ASSERT locality would hand a remote caller the exemption outright.
+//
+// The socket peer alone is not enough either: the documented reverse-proxy
+// setup (docs/en/proxy/OVERVIEW.md) puts Caddy/nginx/Traefik on the SAME host,
+// so every request arrives from 127.0.0.1. Forwarded headers can therefore
+// only WITHDRAW locality, never grant it:
+//  - X-Forwarded-For: EVERY hop must be loopback. nginx's
+//    $proxy_add_x_forwarded_for appends the real client after whatever the
+//    caller sent, so a spoofed "127.0.0.1" lands first and the real remote
+//    address last.
+//  - X-Real-IP, CF-Connecting-IP, True-Client-IP, X-Client-IP: single-IP
+//    headers a proxy, tunnel or CDN may set instead of X-Forwarded-For.
+//  - Forwarded (RFC 7239): a browser never sends it, so its presence means a
+//    proxy is in front; not parsed, it just withdraws locality.
+//  - TRUST_PROXY (Express `trust proxy`, app.ts): the operator declared a proxy.
+//    A bare nginx `proxy_pass` sends none of the headers above, so without this
+//    every internet caller would look like a loopback socket.
+const CLIENT_IP_HEADERS = ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'true-client-ip', 'x-client-ip'];
 
-export const isLoopbackRequest = (req: {
-  socket?: { remoteAddress?: string };
-  headers: Record<string, string | string[] | undefined>;
-}): boolean => {
-  if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
-  const forwarded = forwardedPeerAddress(req.headers['x-forwarded-for']);
-  // No hop at all: the socket was the client. With a hop, only the proxy's own
-  // observation counts, and anything that is not loopback (including a value this
-  // module cannot parse, such as an address carrying a port) is refused.
-  return forwarded === '' || isLoopbackAddress(forwarded);
-};
+export function isLocalRequest(req: Request): boolean {
+  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
+  if (req.app?.get('trust proxy')) return false;
+  if (req.headers.forwarded) return false;
+  const hops = CLIENT_IP_HEADERS.map(name => req.headers[name])
+    .flat()
+    .flatMap(value => (value ?? '').split(','))
+    .map(hop => hop.trim())
+    .filter(Boolean);
+  return hops.every(isLoopbackAddress);
+}

@@ -51,6 +51,8 @@ See [OVERVIEW.md](OVERVIEW.md) for deep-dives.
 
 > Routing strategies, bandit scoring, quota and cooldown accounting, streaming, degraded-mode failover and the provider catalog are covered at implementation depth in the deep-dives — See [OVERVIEW.md](OVERVIEW.md) for deep-dives.
 
+> Every state machine in the code — key health, cooldowns, stream commit, the auth gate, update flows and more — is listed with its states, writers and tests in the [state-machine registry](07-state-machines.md).
+
 ## Not yet supported
 
 The scope is deliberately narrow. If a feature isn't in the README's feature list and isn't below, assume it isn't there yet.

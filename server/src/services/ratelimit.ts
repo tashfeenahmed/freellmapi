@@ -3,6 +3,7 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { isLoopbackOrPrivateUrl } from '../lib/url-guard.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { isUsableKey } from './key-state.js';
 import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 interface Window {
@@ -467,7 +468,7 @@ function buildWindowUsageSnapshot(now: number): WindowUsageSnapshot | null {
     const keysByPlatform = new Map<string, EligibleKey[]>();
     for (const k of keyRows) {
       baseUrlByKeyId.set(k.id, k.base_url);
-      if (k.enabled !== 1 || (k.status !== 'healthy' && k.status !== 'unknown')) continue;
+      if (!isUsableKey(k)) continue;
       const list = keysByPlatform.get(k.platform) ?? [];
       list.push({ id: k.id, baseUrl: k.base_url, scope: parseModelScope(k.model_scope_json) });
       keysByPlatform.set(k.platform, list);
@@ -1207,37 +1208,64 @@ function persistedCooldownExpiry(
   });
 }
 
+interface CooldownBench {
+  expiresAtMs: number;
+  source: CooldownSource;
+  // Null for rows persisted before the provenance migration.
+  setAtMs: number | null;
+}
+
+/** The stored bench, null when there is none, undefined when the DB is unreadable. */
+function persistedCooldown(platform: string, modelId: string, keyId: number): CooldownBench | null | undefined {
+  return withDb(db => {
+    const row = db.prepare(`
+      SELECT expires_at_ms, source, set_at_ms
+        FROM rate_limit_cooldowns
+       WHERE platform = ?
+         AND model_id = ?
+         AND key_id = ?
+    `).get(platform, modelId, keyId) as { expires_at_ms: number; source: CooldownSource; set_at_ms: number | null } | undefined;
+    return row ? { expiresAtMs: row.expires_at_ms, source: row.source, setAtMs: row.set_at_ms } : null;
+  });
+}
+
+/**
+ * A new bench landing on an active one (M02, #1877). No bench ever shortens an
+ * active one. Our own guess ('heuristic') never replaces or stretches a
+ * provider fact ('authoritative', 'credit', 'tier'). Otherwise the later expiry
+ * wins, with its start time. A shorter provider fact landing on a longer guess
+ * keeps the guess's expiry but takes the fact's source: the prober clears a
+ * heuristic bench whole, and that would end the provider's stated window early.
+ * An expired bench is simply replaced.
+ */
+function mergeCooldown(existing: CooldownBench | null, incoming: CooldownBench, now: number): CooldownBench {
+  if (!existing || existing.expiresAtMs < now) return incoming;
+  // 'checkin' is as weak as a guess: any bench may take it over (#1877).
+  const weak = (s: CooldownSource) => s === 'heuristic' || s === 'checkin';
+  if (incoming.source === 'heuristic' && !weak(existing.source)) return existing;
+  if (incoming.expiresAtMs >= existing.expiresAtMs) return incoming;
+  return existing.source === 'heuristic' && !weak(incoming.source)
+    ? { ...existing, source: incoming.source }
+    : existing;
+}
+
 function persistCooldown(
   platform: string,
   modelId: string,
   keyId: number,
   expiresAtMs: number,
   source: CooldownSource,
-  setAtMs: number,
-): boolean | undefined {
-  // Same shape as the check-in guard. An expired row is free to replace. An
-  // unexpired row is replaced only when the new bench is at least as long, and
-  // a heuristic guess must not take over authoritative, credit or tier
-  // provenance (#1877). A missing row is not a hold: callers that delete the
-  // row (and the check-in path, which has its own statement) still insert.
-  return withDb(db => {
-    const result = db.prepare(`
+  setAtMs: number | null,
+) {
+  withDb(db => {
+    db.prepare(`
       INSERT INTO rate_limit_cooldowns (platform, model_id, key_id, expires_at_ms, source, set_at_ms)
       VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(platform, model_id, key_id) DO UPDATE SET
-        expires_at_ms = excluded.expires_at_ms,
-        source = excluded.source,
-        set_at_ms = excluded.set_at_ms
-      WHERE rate_limit_cooldowns.expires_at_ms <= excluded.set_at_ms
-         OR (
-           excluded.expires_at_ms >= rate_limit_cooldowns.expires_at_ms
-           AND (
-             excluded.source != 'heuristic'
-             OR rate_limit_cooldowns.source IN ('heuristic', 'checkin')
-           )
-         )
+      ON CONFLICT(platform, model_id, key_id)
+      DO UPDATE SET expires_at_ms = excluded.expires_at_ms,
+                    source = excluded.source,
+                    set_at_ms = excluded.set_at_ms
     `).run(platform, modelId, keyId, expiresAtMs, source, setAtMs);
-    return Number(result.changes ?? 0) > 0;
   });
 }
 
@@ -1284,8 +1312,8 @@ export function setCooldown(
 ) {
   const key = `${platform}:${modelId}:${keyId}:cooldown`;
   const now = Date.now();
-  const expiresAtMs = now + durationMs;
   if (source === 'checkin') {
+    const expiresAtMs = now + durationMs;
     // The account-wide check-in bench also visits sibling routes that may
     // already have real credit, tier or Retry-After holds. Preserve their
     // provenance AND expiry, otherwise "Resume key" would clear those facts.
@@ -1312,21 +1340,32 @@ export function setCooldown(
     if (written) cooldowns.set(key, expiresAtMs);
     return;
   }
-  // Never shorten an unexpired bench, and never let a heuristic guess replace
-  // an authoritative, credit or tier hold (#1877). Update memory only when
-  // the row accepted the write. If the database is down, keep any longer
-  // in-memory hold and do not let a heuristic relabel it; a fresh bench with
-  // nothing held still lands in memory so routing backs off without the row.
-  const written = persistCooldown(platform, modelId, keyId, expiresAtMs, source, now);
-  if (written) {
-    cooldowns.set(key, expiresAtMs);
-    return;
+  // The DB is authoritative when readable (as in isOnCooldown); otherwise fall
+  // back to the in-memory expiry, whose provenance is unknown.
+  let existing = persistedCooldown(platform, modelId, keyId);
+  if (existing === undefined) {
+    const memoryExpiry = cooldowns.get(key);
+    existing = memoryExpiry === undefined ? null : { expiresAtMs: memoryExpiry, source: 'heuristic', setAtMs: null };
   }
-  if (written === undefined) {
-    const current = cooldowns.get(key) ?? 0;
-    if (current > now && (expiresAtMs <= current || source === 'heuristic')) return;
-    cooldowns.set(key, expiresAtMs);
-  }
+  const bench = mergeCooldown(existing, { expiresAtMs: now + durationMs, source, setAtMs: now }, now);
+  cooldowns.set(key, bench.expiresAtMs);
+  persistCooldown(platform, modelId, keyId, bench.expiresAtMs, bench.source, bench.setAtMs);
+}
+
+/**
+ * Bench a route after a 429. A provider-stated Retry-After is a fact
+ * ('authoritative', never probed early); without one, `fallbackMs` is our own
+ * guess ('heuristic').
+ */
+export function setRetryAfterCooldown(
+  platform: string,
+  modelId: string,
+  keyId: number,
+  retryAfterMs: number | null | undefined,
+  fallbackMs = 60_000,
+) {
+  if (retryAfterMs != null) setCooldown(platform, modelId, keyId, retryAfterMs, 'authoritative');
+  else setCooldown(platform, modelId, keyId, fallbackMs, 'heuristic');
 }
 
 export function isOnCooldown(platform: string, modelId: string, keyId: number): boolean {

@@ -46,4 +46,46 @@ describe('installGracefulShutdown', () => {
     expect(closeDb).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledTimes(1);
   });
+
+  // M39: background jobs (health checks, catalog sync, backups…) kept firing
+  // during the drain and could start work against a database about to close.
+  it('stops background jobs before it closes anything', async () => {
+    const order: string[] = [];
+    const { proc, emitter, exit } = fakeProcess();
+    installGracefulShutdown({
+      servers: () => [],
+      stopJobs: () => { order.push('jobs') },
+      closeDb: () => { order.push('db') },
+      proc,
+      logger: { log: vi.fn(), error: vi.fn() },
+    });
+    emitter.emit('SIGTERM');
+    expect(order).toEqual(['jobs', 'db']);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it('still closes the database when a job refuses to stop', () => {
+    const { proc, emitter, exit } = fakeProcess();
+    const closeDb = vi.fn();
+    const logger = { log: vi.fn(), error: vi.fn() };
+    installGracefulShutdown({ servers: () => [], stopJobs: () => { throw new Error('busy') }, closeDb, proc, logger });
+    emitter.emit('SIGTERM');
+    expect(closeDb).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  // M39: the forced exit skipped closeDb, so the WAL was left un-checkpointed
+  // on every shutdown that hit the grace limit.
+  it('closes the database on the forced exit too', () => {
+    vi.useFakeTimers();
+    const stuck = { close: vi.fn(), closeIdleConnections: vi.fn() } as unknown as http.Server;
+    const { proc, emitter, exit } = fakeProcess();
+    const closeDb = vi.fn();
+    installGracefulShutdown({ servers: () => [stuck], closeDb, proc, graceMs: 500, logger: { log: vi.fn(), error: vi.fn() } });
+
+    emitter.emit('SIGTERM');
+    vi.advanceTimersByTime(500);
+    expect(closeDb).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  });
 });

@@ -996,6 +996,13 @@
     "emptyDesc": "Ezinaụlọ agbakwunyere na-apụta ebe a ozugbo ị gbakwunye igodo ndị na-eweta ihe na-akwado ntinye.",
     "dragToReorder": "Dọrọ ka ịhazigharị onye na-eweta ya"
   },
+  "iterativeCritique": {
+    "tab": "Nkatọ ugboro ugboro",
+    "title": "Nkatọ ugboro ugboro",
+    "description": "Onye na-emepụta na-ede ntụle azịza, onye nkatọ si n'onye na-enye ọrụ dị iche na-enye ya akara ma kọwaa ntụpọ, onye na-emepụta na-edozigharịkwa ya ruo mgbe onye nkatọ nabatara ma ọ bụ iwu nkwụsị arụọ ọrụ. Mgbe ahụ onye na-ejikọta na-ede azịza ikpeazụ. Jiri ya site na ịkpọ API na ihe nlereanya \"iterative-critique\".",
+    "howToUse": "Otu esi eji",
+    "howToUseHelp": "Zipu arịrịọ mkparịta ụka nkịtị na ihe nlereanya \"iterative-critique\". Nhazi nhọrọ maka arịrịọ ọ bụla: generator, critic (ID ihe nlereanya) na max_rounds (1–5). Ederede naanị: enweghị nkwado maka foto na ngwa."
+  },
   "fusion": {
     "title": "Ngwakọta",
     "description": "Otu panel nke ụdị na-aza n'otu n'otu, mgbe ahụ, ọkàikpe na-emepụta otu azịza siri ike. Jiri ya site na ịkpọ API na ihe nlereanya \"fusion\".",

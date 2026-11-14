@@ -4,26 +4,33 @@ import { z } from 'zod';
 import type {
   ChatMessage,
   ChatToolDefinition,
+  OllamaEmulationMode,
 } from '@freellmapi/shared/types.js';
-import { isLoopbackRequest } from '../lib/loopback.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
+import { clientAbortSignal } from '../lib/client-abort.js';
 import { validateSession } from '../services/auth.js';
+import { isLocalRequest } from '../lib/loopback.js';
 
 export const ollamaRouter = Router();
 
-export type OllamaEmulationMode = 'off' | 'open-loopback' | 'key-required';
+export type { OllamaEmulationMode };
+
+export const OLLAMA_EMULATION_MODES = ['off', 'open-loopback', 'key-required'] as const satisfies readonly OllamaEmulationMode[];
+// Fails to compile when shared OllamaEmulationMode gains a member this list lacks.
+const _everyModeListed: Record<Exclude<OllamaEmulationMode, (typeof OLLAMA_EMULATION_MODES)[number]>, never> = {};
 
 export function getOllamaEmulationMode(): OllamaEmulationMode {
   const stored = getSetting('ollama_emulation');
   return stored === 'open-loopback' || stored === 'key-required' ? stored : 'off';
 }
 
-// The nearest proxy's hop decides, not the caller's: see lib/loopback.ts.
-export const isLoopback = (req: Request): boolean => isLoopbackRequest(req);
+// open-loopback mode must not widen through a same-host reverse proxy; see
+// lib/loopback.ts for why every forwarded hop is checked.
+export const isLoopback = isLocalRequest;
 
 function authorize(req: Request, res: Response): boolean {
   if ((req as Request & { urlTokenAuthenticated?: boolean }).urlTokenAuthenticated) {
@@ -554,11 +561,13 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
   }
   const rawInput = parsed.data.input ?? parsed.data.prompt ?? '';
   const inputs = Array.isArray(rawInput) ? rawInput : [rawInput];
+  const clientSignal = clientAbortSignal(res);
   try {
     const result = await runEmbeddings(
       parsed.data.model?.replace(/:latest$/i, ''),
       inputs,
       parsed.data.dimensions,
+      clientSignal,
     );
     if (legacy) {
       res.json({ embedding: result.vectors[0] ?? [] });
@@ -572,6 +581,7 @@ async function handleEmbed(req: Request, res: Response, legacy: boolean): Promis
       });
     }
   } catch (error: any) {
+    if (clientSignal.aborted) return; // nobody left to answer
     const status = error instanceof EmbeddingsError ? error.status : 502;
     if (error instanceof EmbeddingsError) {
       const retrySec = embeddingsRetryAfterSec(error);

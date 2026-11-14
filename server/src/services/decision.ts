@@ -9,8 +9,9 @@ import { proxyFetch } from '../lib/proxy.js';
 import { recordMonthlyUsage, secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { reserveProviderCredential, type ReservedProviderCredential } from './provider-credential.js';
+import { isOnCooldown, setCooldown, setRetryAfterCooldown } from './ratelimit.js';
+import { USABLE_KEY_SQL, isUsableKey } from './key-state.js';
 import { meterCloudflare, roughTokens, type CloudflareNeuronCapError } from './cloudflare-neurons.js';
-import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
 
 // Decision models over the key pool.
@@ -612,13 +613,13 @@ function coolDown(row: DecisionModelRow, keyId: number, e: DecisionError): void 
   } else if (e.status === 402) {
     setCooldown(row.platform, row.model_id, keyId, NO_CREDIT_COOLDOWN_MS, 'credit');
   } else if (e.status === 429) {
-    setCooldown(row.platform, row.model_id, keyId, e.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS);
+    setRetryAfterCooldown(row.platform, row.model_id, keyId, e.retryAfterMs, RATE_LIMIT_COOLDOWN_MS);
   }
 }
 
 function hasUsableKey(platform: string): boolean {
   return !!getDb()
-    .prepare("SELECT 1 FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown') LIMIT 1")
+    .prepare(`SELECT 1 FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL} LIMIT 1`)
     .get(platform);
 }
 
@@ -669,7 +670,7 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
   for (const row of chain) {
     const tried = new Set<number>();
     for (;;) {
-      if (opts.signal?.aborted) throw new DecisionError('decision cancelled by the client', 499);
+      if (opts.signal?.aborted) throw new DecisionError('decision canceled by the client', 499);
       // Custom rows are bound to their own endpoint key; catalog rows draw
       // from any healthy key of their platform (key_id null there).
       const { credential, budgetBlocked } = reserveProviderCredential(
@@ -698,12 +699,15 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
         markKeyHealthyFromRequest(credential.id);
         return { model: row.model_id, provider: row.platform, ...out };
       } catch (err: any) {
+        // The caller hung up: not the model's failure, so no 'error' row to drag
+        // its success rate down and no bench. decision_requests.status is CHECK
+        // ('ok', 'error'), so a canceled attempt writes no row at all.
+        if (opts.signal?.aborted) throw new DecisionError('decision canceled by the client', 499);
         const e = err instanceof DecisionError ? err : new DecisionError(String(err?.message ?? err), 502);
         logDecision(row, credential.id, 'error', Date.now() - started, questionCount, 0, clientAgent, e.message.slice(0, 300));
         coolDown(row, credential.id, e);
         lastError = e;
         hints.record(e.status, e.retryAfterMs);
-        if (opts.signal?.aborted) throw new DecisionError('decision cancelled by the client', 499);
         // A malformed request is the caller's problem, not this key's: move to
         // the next model rather than burning every key on it.
         if (e.status === 400 || e.status === 422) break;
@@ -768,7 +772,7 @@ export function listDecisionModels(): DecisionModelView[] {
     SELECT platform, enabled, status FROM api_keys
      WHERE platform IN (${platforms.map(() => '?').join(', ')})
   `).all(...platforms) as { platform: string; enabled: number; status: string }[];
-  const healthy = (k: { enabled: number; status: string }) => k.enabled === 1 && (k.status === 'healthy' || k.status === 'unknown');
+  const healthy = (k: { enabled: number; status: string }) => isUsableKey(k);
   const monthCounts = new Map(
     (db.prepare(`
       SELECT platform, model_id, COUNT(*) AS n FROM decision_requests

@@ -107,7 +107,9 @@ describe('setCooldown never shortens an unexpired hold (#1877)', () => {
     setCooldown(PLATFORM, MODEL, keyId, HOUR, 'heuristic');
     const before = stored();
     setCooldown(PLATFORM, MODEL, keyId, TRANSIENT_MS, 'authoritative');
-    expect(stored()).toEqual(before);
+    // Expiry and start are kept; the source takes the provider fact, so the
+    // prober cannot clear the bench inside the stated window (M02).
+    expect(stored()).toEqual({ ...before, source: 'authoritative' });
     const prepare = hideDb();
     vi.advanceTimersByTime(TRANSIENT_MS + 1_000);
     expect(isOnCooldown(PLATFORM, MODEL, keyId)).toBe(true);

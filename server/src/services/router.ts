@@ -47,6 +47,7 @@ import { getKeyQuotaHeadroom, inferQuotaPoolKey } from './provider-quota.js';
 import type { BaseProvider } from '../providers/base.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Db } from '../db/types.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 
 class RouteError extends Error {
   status: number;
@@ -847,6 +848,24 @@ const IS_TIMEOUT_SQL = `(status != 'success' AND (${
   TIMEOUT_ERROR_MARKERS.map(m => `LOWER(COALESCE(error, '')) LIKE '%${m}%'`).join(' OR ')
 }))`;
 
+/** Calendar-month chat tokens the provider actually served, per (platform,
+ *  model, key). A failed attempt logs the request's ESTIMATED input tokens even
+ *  when the provider refused it before answering (429/5xx); those were never
+ *  billed, so only success rows and rows that streamed output count. Shared by
+ *  the headroom guardrail and /api/fallback/token-usage so the two agree. The
+ *  per-key monthly budget (key_monthly_usage) stays success-only by contract
+ *  (#1158): it caps what the operator was served, not what the provider spent. */
+export function monthlyChatTokenUsage(db: Db): Array<{ platform: string; model_id: string; key_id: number | null; used: number }> {
+  return db.prepare(`
+    SELECT platform, model_id, key_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
+    FROM requests
+    WHERE created_at >= datetime('now', 'start of month')
+      AND request_type = 'chat'
+      AND (status = 'success' OR output_tokens > 0)
+    GROUP BY platform, model_id, key_id
+  `).all() as Array<{ platform: string; model_id: string; key_id: number | null; used: number }>;
+}
+
 /** api_keys.id → endpoint scope, for every custom credential on record (#651). */
 function customEndpointScopes(db: Db): Map<number, string> {
   const rows = db.prepare("SELECT id, base_url FROM api_keys WHERE platform = 'custom'")
@@ -939,15 +958,8 @@ export function refreshStatsCache(db: Db, force = false): void {
   }
 
   // Calendar-month token usage per model, for the headroom guardrail.
-  const usageRows = db.prepare(`
-    SELECT platform, model_id, key_id, COALESCE(SUM(input_tokens + output_tokens), 0) AS used
-    FROM requests
-    WHERE created_at >= datetime('now', 'start of month')
-      AND request_type = 'chat'
-    GROUP BY platform, model_id, key_id
-  `).all() as Array<{ platform: string; model_id: string; key_id: number | null; used: number }>;
   const usageMap = new Map<string, number>();
-  for (const r of usageRows) {
+  for (const r of monthlyChatTokenUsage(db)) {
     const key = modelStatsKey(r.platform, r.model_id, scopeOf(r.platform, r.key_id));
     usageMap.set(key, (usageMap.get(key) ?? 0) + r.used);
   }
@@ -1088,7 +1100,7 @@ function usableKeyCountsByPlatform(db: Db): Map<string, number> {
     return keyCountsCache.map;
   }
   const rows = db.prepare(
-    "SELECT platform, COUNT(*) AS count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform"
+    `SELECT platform, COUNT(*) AS count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`
   ).all() as { platform: string; count: number }[];
   const map = new Map(rows.map(r => [r.platform, r.count]));
   keyCountsCache = { db, at: Date.now(), map };
@@ -1614,7 +1626,7 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   }
 
   const allKeys = db.prepare(
-    "SELECT * FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT * FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(entry.platform) as KeyRow[];
   if (allKeys.length === 0) {
     diag?.push(`${label}: no enabled+healthy key for platform`);
@@ -1789,7 +1801,7 @@ export function hasOtherUsableKey(modelDbId: number, excludingKeyId: number, ski
 
   const limits = { rpm: m.rpm_limit, rpd: m.rpd_limit, tpm: m.tpm_limit, tpd: m.tpd_limit };
   const keys = db.prepare(
-    "SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(m.platform) as { id: number; model_scope_json: string | null }[];
 
   // Keys of the model's own custom endpoint (#212, #619); a key belonging to a
@@ -1851,7 +1863,7 @@ export function routableKeyIdsForModel(modelDbId: number): number[] {
   if (!m) return [];
 
   const keys = db.prepare(
-    "SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, model_scope_json FROM api_keys WHERE platform = ? AND ${USABLE_KEY_SQL}`
   ).all(m.platform) as { id: number; model_scope_json: string | null }[];
 
   const endpointKeyIds = m.platform === 'custom' && m.key_id != null
@@ -2073,7 +2085,7 @@ export function getOrderedFusionChain(estimatedTokens: number, exactOutputReserv
   // misleading "no available key for model". Passing a placeholder token count
   // here made both size gates no-ops.
   const usableKeys = db.prepare(
-    "SELECT id, platform, model_scope_json FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')"
+    `SELECT id, platform, model_scope_json FROM api_keys WHERE ${USABLE_KEY_SQL}`
   ).all() as { id: number; platform: string; model_scope_json: string | null }[];
   // Scope parsed once per key row (#657); the servable filter below re-checks
   // membership per model.

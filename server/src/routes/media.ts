@@ -7,6 +7,7 @@ import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js
 import { resolveCustomEndpointKey } from '../services/custom-endpoint.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { listAllMediaModels } from '../services/media.js';
+import { USABLE_KEY_SQL } from '../services/key-state.js';
 
 export const mediaRouter = Router();
 
@@ -17,12 +18,12 @@ mediaRouter.get('/', (_req: Request, res: Response) => {
   const db = getDb();
   const keyCounts = new Map(
     (db.prepare(
-      "SELECT platform, COUNT(*) AS n FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform",
+      `SELECT platform, COUNT(*) AS n FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`,
     ).all() as { platform: string; n: number }[]).map(r => [r.platform, r.n]),
   );
   const customKeyIds = new Set(
     (db.prepare(
-      "SELECT id FROM api_keys WHERE platform = 'custom' AND enabled = 1 AND status IN ('healthy', 'unknown')",
+      `SELECT id FROM api_keys WHERE platform = 'custom' AND ${USABLE_KEY_SQL}`,
     ).all() as { id: number }[]).map(r => r.id),
   );
 

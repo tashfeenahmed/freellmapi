@@ -4,6 +4,7 @@ import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, listMediaModels } from '../../services/media.js';
 import { applyCatalog } from '../../services/catalog-sync.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 import * as guard from '../../lib/url-guard.js';
 import * as imageLibrary from '../../lib/image-normalize.js';
 
@@ -17,7 +18,7 @@ beforeAll(async () => {
   png = await sharp(options).png().toBuffer();
 });
 beforeEach(() => {
-  process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:');
+  process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:'); clearAllCooldowns();
   const enc = encrypt('test-novai-key');
   getDb().prepare("INSERT INTO api_keys (platform,label,encrypted_key,iv,auth_tag,status,enabled) VALUES ('novai','test',?,?,?,'healthy',1)").run(enc.encrypted, enc.iv, enc.authTag);
   getDb().prepare("INSERT INTO media_models (platform,model_id,display_name,modality,priority,enabled,quota_label) VALUES ('novai',?,'CogView','image',1,1,'shared daily free allowance')").run(model);

@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { reserveMonthlyBudget } from './key-budget.js';
+import { USABLE_KEY_SQL } from './key-state.js';
 import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getActiveCooldownsForKeys, isOnCooldown } from './ratelimit.js';
@@ -38,8 +39,7 @@ export function reserveProviderCredential(
     SELECT id, encrypted_key, iv, auth_tag, base_url, model_scope_json FROM api_keys
     WHERE ${customEndpoint
       ? "(id = ? OR (platform = 'custom' AND base_url IS NOT NULL AND base_url <> '' AND base_url = (SELECT base_url FROM api_keys WHERE id = ? AND platform = 'custom')))"
-      : bound ? 'id = ?' : 'platform = ?'} AND enabled = 1
-      AND status IN ('healthy', 'unknown') ORDER BY RANDOM()
+      : bound ? 'id = ?' : 'platform = ?'} AND ${USABLE_KEY_SQL} ORDER BY RANDOM()
   `).all(...(customEndpoint ? [row.key_id, row.key_id] : [bound ? row.key_id : row.platform])) as KeyRow[];
   let budgetBlocked = false;
   let cooldownBlocked = false;
@@ -48,8 +48,9 @@ export function reserveProviderCredential(
     ? getActiveCooldownsForKeys(keys.map(key => key.id))
     : null;
   for (const keyRow of keys) {
-    if (skip(keyRow.id)) continue;
+    // Scope first: a key that may not serve this model is not "benched" for it.
     if (customEndpoint && row.model_id && !scopeAllows(parseModelScope(keyRow.model_scope_json), row.model_id)) continue;
+    if (skip(keyRow.id)) continue;
     if (customEndpoint && row.model_id && isOnCooldown(row.platform, row.model_id, keyRow.id)) {
       cooldownBlocked = true;
       const cooldown = cooldowns?.get(keyRow.id)?.find(c => c.platform === row.platform && c.modelId === row.model_id);

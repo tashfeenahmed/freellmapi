@@ -4,6 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import { getDb } from '../db/index.js';
+import { logRequest } from '../lib/request-log.js';
 import { resolveProvider, getAllProviders } from '../providers/index.js';
 import { OpenAICompatProvider, isAnonymousCredential } from '../providers/openai-compat.js';
 import { getSyncState } from '../services/catalog-sync.js';
@@ -17,6 +18,7 @@ import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, e
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
 import { isSearchPlatform } from '../lib/search-platforms.js';
+import { isLocalRequest } from '../lib/loopback.js';
 import { discoverEndpointModels, probeEndpointModel, classifyModelId, ModelDiscoveryError, type DiscoveredModelKind } from '../services/model-discovery.js';
 import { probeEmbeddingDimensions, registerCustomEmbeddingModel } from '../services/embeddings.js';
 import { endpointScopeForBaseUrl, normalizeBaseUrl } from '../lib/endpoint-scope.js';
@@ -34,8 +36,8 @@ import {
 import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
+import { KEY_FRESH_START_SQL, resetInvalidStreak } from '../services/key-state.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
-import { isLoopbackRequest } from '../lib/loopback.js';
 
 export const keysRouter = Router();
 
@@ -584,21 +586,16 @@ keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
   res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
-// Is the caller connecting from this machine? The socket peer decides, and a
-// same-host reverse proxy's own X-Forwarded-For hop can withdraw locality but
-// never grant it (lib/loopback.ts, #1884). Reading the socket alone made every
-// request through such a proxy look local.
-const isLoopbackRemote = (req: Request): boolean => isLoopbackRequest(req);
-
 // #786: the desktop build has no user-set password (its machine user's password
 // is random and never shown), so re-verification would lock desktop users out of
 // reading their own keys. The embedder marks the process
 // (desktop/src/server-host.ts) and the two plaintext-key endpoints below skip
 // re-auth for it — but ONLY for a request from this machine. The desktop app can
 // bind 0.0.0.0 through its LAN-access toggle, and a remote viewer on that LAN
-// still has to prove the password before it can lift a key.
+// still has to prove the password before it can lift a key, and so does a caller
+// behind a same-host reverse proxy (lib/loopback.ts).
 function skipsReauth(req: Request): boolean {
-  return process.env.FREEAPI_DESKTOP === '1' && isLoopbackRemote(req);
+  return process.env.FREEAPI_DESKTOP === '1' && isLocalRequest(req);
 }
 
 // Re-verify the dashboard password for a plaintext-key endpoint (export,
@@ -823,7 +820,8 @@ keysRouter.post('/', (req: Request, res: Response) => {
       // piling up duplicates each time the user clicks "Enable".
       const existing = sentinel ?? rows[0];
       if (existing) {
-        db.prepare("UPDATE api_keys SET enabled = 1, status = 'unknown' WHERE id = ?").run(existing.id);
+        db.prepare(`UPDATE api_keys SET enabled = 1, ${KEY_FRESH_START_SQL} WHERE id = ?`).run(existing.id);
+        resetInvalidStreak(existing.id);
         respond(existing.id, maskKey(plaintext(existing) ?? keyToStore));
         return;
       }
@@ -831,7 +829,7 @@ keysRouter.post('/', (req: Request, res: Response) => {
       // A real key upgrades the anonymous row in place rather than leaving a
       // second, anonymous row competing with it in the pool.
       const { encrypted, iv, authTag } = encrypt(rawKey);
-      const updates = ['encrypted_key = ?', 'iv = ?', 'auth_tag = ?', 'enabled = 1', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL'];
+      const updates = ['encrypted_key = ?', 'iv = ?', 'auth_tag = ?', 'enabled = 1', KEY_FRESH_START_SQL];
       const values: (string | number | null)[] = [encrypted, iv, authTag];
       if (label !== undefined) { updates.push('label = ?'); values.push(label); }
       if (parsed.data.proxyUrl !== undefined) {
@@ -1307,10 +1305,10 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
     // Only a successful probe records a sample. The row mirrors what the proxy
     // writes on a real request so the decay-weighted stats cache picks it up.
     if (endpoint.keyId != null) {
-      getDb().prepare(`
-        INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms, ttfb_ms, request_type)
-        VALUES ('custom', ?, ?, 'success', ?, ?, ?, ?, 'chat')
-      `).run(probe.modelId, endpoint.keyId, probe.inputTokens, probe.outputTokens, probe.latencyMs, probe.latencyMs);
+      // Through logRequest so the sample also reaches request_hourly and the
+      // lifetime totals, like every other request row.
+      logRequest('custom', probe.modelId, endpoint.keyId, 'success', probe.inputTokens, probe.outputTokens,
+        probe.latencyMs, null, probe.latencyMs);
 
       // A real completion just succeeded, which is stronger evidence than any
       // health ping — lift whatever cooldown was still holding the key back.
@@ -1897,11 +1895,18 @@ keysRouter.patch('/platform/:platform', (req: Request, res: Response) => {
 
   const db = getDb();
   const groupLabel = group === undefined ? undefined : normalizeGroupLabel(group);
-  const result = groupLabel === undefined
-    ? db.prepare('UPDATE api_keys SET enabled = ? WHERE platform = ?').run(enabled ? 1 : 0, platform)
+  const scope: { sql: string; args: string[] } = groupLabel === undefined
+    ? { sql: 'platform = ?', args: [platform] }
     : groupLabel === null
-      ? db.prepare("UPDATE api_keys SET enabled = ? WHERE platform = 'custom' AND group_label IS NULL").run(enabled ? 1 : 0)
-      : db.prepare("UPDATE api_keys SET enabled = ? WHERE platform = 'custom' AND group_label = ?").run(enabled ? 1 : 0, groupLabel);
+      ? { sql: "platform = 'custom' AND group_label IS NULL", args: [] }
+      : { sql: "platform = 'custom' AND group_label = ?", args: [groupLabel] };
+  // Keys this sweep switches back on get a fresh invalid-probe streak, or the
+  // first failed probe after it would auto-disable them again (M01).
+  const revived = enabled
+    ? db.prepare(`SELECT id FROM api_keys WHERE ${scope.sql} AND enabled = 0`).all(...scope.args) as { id: number }[]
+    : [];
+  const result = db.prepare(`UPDATE api_keys SET enabled = ? WHERE ${scope.sql}`).run(enabled ? 1 : 0, ...scope.args);
+  for (const { id } of revived) resetInvalidStreak(id);
 
   res.json({ success: true, enabled, updatedKeys: result.changes });
 });
@@ -1958,7 +1963,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
   }
   if (changedKey !== undefined) {
     const { encrypted, iv, authTag } = encrypt(changedKey);
-    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', "status = 'unknown'", 'last_checked_at = NULL', 'last_health_error = NULL');
+    updates.push('encrypted_key = ?', 'iv = ?', 'auth_tag = ?', KEY_FRESH_START_SQL);
     values.push(encrypted, iv, authTag);
     // #1459: pasting in a new key means "use this key". A row the health
     // checker auto-disabled would otherwise stay off with a fresh credential
@@ -2022,6 +2027,9 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     res.status(404).json({ error: { message: 'Key not found' } });
     return;
   }
+  // Re-enabling or replacing the credential is a fresh start: the streak that
+  // auto-disabled the key must not carry over to its next probe (M01).
+  if (enabled === true || changedKey !== undefined) resetInvalidStreak(id);
 
   if (changedKey !== undefined) clearCooldownsForKey(id);
 

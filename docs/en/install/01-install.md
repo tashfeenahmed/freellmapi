@@ -294,7 +294,7 @@ request stats.
 
 **Mac downloads:** choose `arm64` for Apple Silicon or `x64` for Intel. Both require macOS 12 Monterey or later and include DMG and ZIP downloads.
 
-**Updating:** the installed app updates itself on macOS, on Windows (the `Setup` installer) and from the Linux AppImage. **⋯ → Settings → Check for updates** (or the tray's **Check for Updates…**) downloads the new release and offers **Restart to update**; a full database backup, listed as *Pre-update* on the Backups page, is written before it installs. With **Automatic update check** on, new releases download in the background and install on the next restart or quit; the app never restarts on its own. The Linux `.deb`/`.rpm`/`.tar.xz` and the portable Windows `.zip` update by downloading the new release.
+**Updating:** the installed app updates itself on macOS, on Windows (the `Setup` installer) and from the Linux AppImage. **⋯ → Settings → Check for updates** (or the tray's **Check for Updates…**) downloads the new release and offers **Restart to update**; a full database backup, listed as *Pre-update* on the Backups page, is written before it installs. If that backup fails, the update is not installed (on Windows and Linux this also holds for the install on quit; on macOS a quit-time install still goes ahead) and the next download tries again. With **Automatic update check** on, new releases download in the background and install on the next restart or quit; the app never restarts on its own. The Linux `.deb`/`.rpm`/`.tar.xz` and the portable Windows `.zip` update by downloading the new release.
 
 > **Note for Windows users building from source:** Building the desktop app requires compiling native SQLite modules for Electron. You must have [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) installed (specifically the "Desktop development with C++" workload) and Python installed before running `npm install`.
 
@@ -366,9 +366,10 @@ flow is a one-time code printed to the server log:
 
 3. Type it into the reset form together with your new password.
 
-The code is valid for **15 minutes**, and requesting a new one invalidates the
-previous code. Requests are rate-limited, so ask for one code and wait for it
-rather than clicking repeatedly.
+The code is valid for **15 minutes**. Asking again while it is valid prints the
+same code again, so no one else's request can void it; a new code is minted only
+once it expires. Requests are rate-limited per client IP, so ask for one code
+and wait for it rather than clicking repeatedly.
 
 ### Where are the logs?
 

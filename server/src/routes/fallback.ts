@@ -8,7 +8,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
-import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
+import { BANDIT_PRESETS, ROUTING_STRATEGIES, isValidTimezone } from '../services/scoring.js';
 import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
@@ -18,6 +18,7 @@ import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
+import { USABLE_KEY_SQL, isUsableKey } from '../services/key-state.js';
 import { getDecisionRoutingStatus, setDecisionRoutingSettings } from '../services/routing-decision.js';
 
 export const fallbackRouter = Router();
@@ -58,7 +59,7 @@ fallbackRouter.delete('/penalty-inspector', (_req: Request, res: Response) => {
 });
 
 const routingSchema = z.object({
-  strategy: z.enum(['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom', 'decision']),
+  strategy: z.enum(ROUTING_STRATEGIES),
   // Only meaningful with strategy 'custom': the user's weight vector. Any
   // non-negative vector is accepted; setCustomWeights renormalizes to sum 1.
   weights: z.object({
@@ -111,7 +112,7 @@ fallbackRouter.put('/routing', (req: Request, res: Response) => {
       return;
     }
   }
-  setRoutingStrategy(parsed.data.strategy as RoutingStrategy);
+  setRoutingStrategy(parsed.data.strategy);
   if (parsed.data.exploreEnabled !== undefined) {
     setExploreEnabled(parsed.data.exploreEnabled);
   }
@@ -257,7 +258,7 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
   // from the same key set everywhere (a disabled or invalid key adds no capacity).
   const keyCounts = db.prepare(`
     SELECT platform, COUNT(*) as count
-    FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown')
+    FROM api_keys WHERE ${USABLE_KEY_SQL}
     GROUP BY platform
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
@@ -512,7 +513,8 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     `).all() as any[];
   }
 
-  // Build per-model breakdown (only platforms with keys), preserving enabled state
+  // Build per-model breakdown (only platforms with keys), preserving enabled state.
+  // Read from the monthly ledger (#1782), which survives request-log retention.
   const usageRows = db.prepare(`
     SELECT platform, model_id, tokens AS used
     FROM model_monthly_usage
@@ -521,7 +523,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   const usageByModel = new Map(usageRows.map(r => [`${r.platform}:${r.model_id}`, r.used]));
 
   const keyCountMap = new Map(
-    (db.prepare("SELECT platform, COUNT(*) as count FROM api_keys WHERE enabled = 1 AND status IN ('healthy', 'unknown') GROUP BY platform").all() as { platform: string; count: number }[])
+    (db.prepare(`SELECT platform, COUNT(*) as count FROM api_keys WHERE ${USABLE_KEY_SQL} GROUP BY platform`).all() as { platform: string; count: number }[])
       .map(k => [k.platform, k.count])
   );
 
@@ -635,7 +637,7 @@ fallbackRouter.get('/rate-limit-usage', (_req: Request, res: Response) => {
   const baseUrlByKeyId = new Map(allKeys.map(k => [k.id, k.base_url]));
   const routableByPlatform = new Map<string, Array<{ id: number; baseUrl: string | null; scope: Set<string> | null }>>();
   for (const k of allKeys) {
-    if (k.enabled !== 1 || (k.status !== 'healthy' && k.status !== 'unknown')) continue;
+    if (!isUsableKey(k)) continue;
     const list = routableByPlatform.get(k.platform) ?? [];
     list.push({ id: k.id, baseUrl: k.base_url, scope: parseModelScope(k.model_scope_json) });
     routableByPlatform.set(k.platform, list);

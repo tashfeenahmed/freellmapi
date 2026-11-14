@@ -261,21 +261,32 @@ export function isTimeoutErrorText(message: unknown): boolean {
 // through untouched, and it must never classify as a retryable provider
 // timeout — a vanished client says nothing about provider health, so the
 // fallback loop stops without a cooldown, health penalty, or failure stats.
+const CLIENT_ABORT_MESSAGE = 'client disconnected — upstream request canceled';
+
 export function newClientAbortError(): Error {
-  const err = new Error('client disconnected — upstream request canceled');
+  const err = new Error(CLIENT_ABORT_MESSAGE);
   (err as Error & { clientAbort?: boolean }).clientAbort = true;
   return err;
 }
 
 /** True when an error is (or wraps) the client-disconnect abort above. The
- * structured marker is the primary signal; `cause` is checked because some
- * transports re-wrap the abort reason, and the message substring is the last
- * resort for errors that were stringified across a boundary. */
+ * structured marker is the primary signal, checked down the whole `cause`
+ * chain because transports re-wrap the abort reason. The message is the last
+ * resort for an error stringified across a boundary, and it must be OUR whole
+ * sentence: provider error text is upstream-controlled, and a relay reporting
+ * its own "client disconnected" would otherwise stop the loop without
+ * rendering anything, leaving the live client hanging. */
 export function isClientAbortError(err: any): boolean {
-  if (err?.clientAbort === true) return true;
-  if (err?.cause && (err.cause as { clientAbort?: boolean }).clientAbort === true) return true;
-  const msg = (err?.message ?? '').toLowerCase();
-  return msg.includes('client disconnected');
+  const seen = new Set<unknown>();
+  let cur: any = err;
+  for (let depth = 0; cur != null && typeof cur === 'object' && depth <= TRANSPORT_CAUSE_MAX_DEPTH; depth++) {
+    if (seen.has(cur)) break;
+    seen.add(cur);
+    if (cur.clientAbort === true) return true;
+    if (typeof cur.message === 'string' && cur.message.includes(CLIENT_ABORT_MESSAGE)) return true;
+    cur = cur.cause;
+  }
+  return false;
 }
 
 // ── Fallback time-budget hedging (fallback-v2) ──────────────────────────────

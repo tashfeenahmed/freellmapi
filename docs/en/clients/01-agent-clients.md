@@ -346,7 +346,11 @@ Ollama emulation is off by default. Enable one of these modes on
 **Keys → Agents**:
 
 - `open-loopback`: no key on this machine only. The socket peer must be
-  `127.0.0.1`/`::1`; enabling desktop LAN access does not widen it.
+  `127.0.0.1`/`::1`; enabling desktop LAN access does not widen it. Behind a
+  same-host reverse proxy every `X-Forwarded-For` hop and any `X-Real-IP`,
+  `CF-Connecting-IP`, `True-Client-IP` or `X-Client-IP` must also be loopback,
+  a `Forwarded` header refuses the request, and with `TRUST_PROXY` set this mode
+  refuses everyone (`server/src/lib/loopback.ts`); use `key-required` there.
   **Docker note:** inside a container the socket peer is the Docker bridge
   IP, not loopback, so this mode refuses even host-local traffic through a
   published port — use `key-required` for Docker deployments.

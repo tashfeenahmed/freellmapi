@@ -996,6 +996,13 @@
     "emptyDesc": "添加支持嵌入的提供方密钥后，嵌入系列会显示在这里。",
     "dragToReorder": "拖动以重新排序提供方"
   },
+  "iterativeCritique": {
+    "tab": "迭代批评",
+    "title": "迭代批评",
+    "description": "由生成模型起草答案，另一提供方的批评模型为其打分并指出缺陷，生成模型据此修订，直到批评模型认可或触发停止规则。随后由综合模型撰写最终答案。在调用 API 时将 model 设为 “iterative-critique” 即可使用。",
+    "howToUse": "如何使用",
+    "howToUseHelp": "发送普通的聊天请求，并将 model 设为 “iterative-critique”。可选的单次请求配置：generator、critic（模型 ID）和 max_rounds（1–5）。仅支持文本：不支持图像和工具。"
+  },
   "fusion": {
     "title": "融合",
     "description": "由一组模型并行作答，再由评审模型综合出更优的答案。在调用 API 时将 model 设为 “fusion” 即可使用。",

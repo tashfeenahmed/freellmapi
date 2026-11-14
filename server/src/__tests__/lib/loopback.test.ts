@@ -1,11 +1,62 @@
-import { describe, it, expect } from 'vitest';
-import { isLoopbackAddress, forwardedPeerAddress, isLoopbackRequest } from '../../lib/loopback.js';
+import { describe, expect, it } from 'vitest';
+import type { Request } from 'express';
+import { isLocalRequest, isLoopbackAddress } from '../../lib/loopback.js';
 
-// Locality (#1884): the socket peer decides, and the RIGHT-most forwarded hop
-// (the one the nearest proxy appended) can withdraw it, never grant it.
-const req = (remoteAddress: string, forwarded?: string) => ({
-  socket: { remoteAddress },
-  headers: forwarded === undefined ? {} : { 'x-forwarded-for': forwarded },
+// Locality grants the setup-code exemption, desktop sign-in, the desktop
+// re-auth skip and Ollama open-loopback. Forwarded headers may only withdraw it.
+function req(
+  remoteAddress: string,
+  headers: Record<string, string | string[]> = {},
+  trustProxy: unknown = false,
+): Request {
+  return {
+    socket: { remoteAddress },
+    headers,
+    app: { get: (name: string) => (name === 'trust proxy' ? trustProxy : undefined) },
+  } as unknown as Request;
+}
+
+describe('isLocalRequest', () => {
+  it('accepts a direct loopback caller', () => {
+    expect(isLocalRequest(req('127.0.0.1'))).toBe(true);
+    expect(isLocalRequest(req('::1'))).toBe(true);
+    expect(isLocalRequest(req('::FFFF:127.0.0.1'))).toBe(true);
+  });
+
+  it('rejects a non-loopback socket whatever the headers claim', () => {
+    expect(isLocalRequest(req('192.168.1.20', { 'x-forwarded-for': '127.0.0.1' }))).toBe(false);
+  });
+
+  it('needs every X-Forwarded-For hop to be loopback, across header lines', () => {
+    expect(isLocalRequest(req('127.0.0.1', { 'x-forwarded-for': '127.0.0.1, ::1' }))).toBe(true);
+    expect(isLocalRequest(req('127.0.0.1', { 'x-forwarded-for': '127.0.0.1, 203.0.113.9' }))).toBe(false);
+    expect(isLocalRequest(req('127.0.0.1', { 'x-forwarded-for': ['127.0.0.1', '203.0.113.9'] }))).toBe(false);
+  });
+
+  it('fails closed on forms it does not parse', () => {
+    for (const hop of ['[::1]', '127.0.0.1:8080', '::1%lo0', 'unknown']) {
+      expect(isLocalRequest(req('127.0.0.1', { 'x-forwarded-for': hop })), hop).toBe(false);
+    }
+  });
+
+  it('checks the single-IP client headers proxies and CDNs set', () => {
+    for (const name of ['x-real-ip', 'cf-connecting-ip', 'true-client-ip', 'x-client-ip']) {
+      expect(isLocalRequest(req('127.0.0.1', { [name]: '203.0.113.9' })), name).toBe(false);
+      expect(isLocalRequest(req('127.0.0.1', { [name]: '127.0.0.1' })), name).toBe(true);
+    }
+  });
+
+  it('withdraws locality when a Forwarded header is present', () => {
+    expect(isLocalRequest(req('127.0.0.1', { forwarded: 'for=127.0.0.1' }))).toBe(false);
+  });
+
+  // A bare `proxy_pass` sets no forwarded header at all, so every internet
+  // caller looks like a loopback socket. TRUST_PROXY says a proxy is in front.
+  it('fails closed when the operator declared a reverse proxy (trust proxy)', () => {
+    expect(isLocalRequest(req('127.0.0.1', {}, 1))).toBe(false);
+    expect(isLocalRequest(req('127.0.0.1', {}, true))).toBe(false);
+    expect(isLocalRequest(req('127.0.0.1', {}, ['loopback']))).toBe(false);
+  });
 });
 
 describe('isLoopbackAddress', () => {
@@ -14,35 +65,5 @@ describe('isLoopbackAddress', () => {
   });
   it.each(['127.999.0.1', '127.0.0.256', '127.0.0', '128.0.0.1', '10.0.0.1', '::2', '', '127.0.0.1:8080', 'localhost'])('rejects %s', a => {
     expect(isLoopbackAddress(a)).toBe(false);
-  });
-});
-
-describe('forwardedPeerAddress', () => {
-  it('returns the right-most non-empty hop', () => {
-    expect(forwardedPeerAddress('127.0.0.1, 203.0.113.9')).toBe('203.0.113.9');
-    expect(forwardedPeerAddress(', 203.0.113.9')).toBe('203.0.113.9');
-    expect(forwardedPeerAddress(['127.0.0.1', '198.51.100.7'])).toBe('198.51.100.7');
-    expect(forwardedPeerAddress(undefined)).toBe('');
-    expect(forwardedPeerAddress(' , ')).toBe('');
-  });
-});
-
-describe('isLoopbackRequest', () => {
-  it('is local for a loopback socket with no forwarded hop', () => {
-    expect(isLoopbackRequest(req('127.0.0.1'))).toBe(true);
-    expect(isLoopbackRequest(req('::ffff:127.0.0.1'))).toBe(true);
-  });
-  it('is local when the proxy itself saw a loopback client', () => {
-    expect(isLoopbackRequest(req('127.0.0.1', '127.0.0.1'))).toBe(true);
-    expect(isLoopbackRequest(req('127.0.0.1', '203.0.113.9, 127.0.0.1'))).toBe(true);
-  });
-  it('is not local when a caller prepends 127.0.0.1 through an appending proxy', () => {
-    expect(isLoopbackRequest(req('127.0.0.1', '127.0.0.1, 203.0.113.9'))).toBe(false);
-  });
-  it('is not local for an empty first hop', () => {
-    expect(isLoopbackRequest(req('127.0.0.1', ',203.0.113.9'))).toBe(false);
-  });
-  it('never grants locality to a remote socket', () => {
-    expect(isLoopbackRequest(req('192.168.1.42', '127.0.0.1'))).toBe(false);
   });
 });

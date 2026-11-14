@@ -15,6 +15,7 @@ import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { GroupLabelField } from './group-label-field'
+import type { ApiKeyModel } from '@freellmapi/shared/types'
 
 // Split a free-text model field on commas / newlines into a clean id list,
 // dropping blanks and duplicates so one endpoint can take several models. (#281)
@@ -32,7 +33,7 @@ function parseModelList(raw: string): string[] {
 export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio' | 'transcription' | 'search' | 'decision'>('chat')
+  const [customType, setCustomType] = useState<ApiKeyModel['kind']>('chat')
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
   const [displayName, setDisplayName] = useState('')

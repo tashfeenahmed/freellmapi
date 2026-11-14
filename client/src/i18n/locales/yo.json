@@ -996,6 +996,13 @@
     "emptyDesc": "Awọn idile ifibọ han nibi ni kete ti o ba ṣafikun bọtini olupese ti o ṣe atilẹyin awọn ifibọ.",
     "dragToReorder": "Fa lati tunto olupese"
   },
+  "iterativeCritique": {
+    "tab": "Àríwísí àtúnṣe",
+    "title": "Àríwísí àtúnṣe",
+    "description": "Olùṣẹ̀dá kan kọ ìwé ìdáhùn àkọ́kọ́, olùrìwísí láti ọ̀dọ̀ olùpèsè mìíràn fún un ní máàkì ó sì tọ́ka àwọn àṣìṣe, olùṣẹ̀dá sì tún un ṣe títí olùrìwísí yóò fi gbà á tàbí òfin ìdúró yóò fi ṣiṣẹ́. Lẹ́yìn náà olùpapọ̀ kan kọ ìdáhùn ìkẹyìn. Lo ó nípa pípe API pẹlu awoṣe \"iterative-critique\".",
+    "howToUse": "Bawo ni lati lo",
+    "howToUseHelp": "Fi ìbéèrè ìwíjọ́ déédé ránṣẹ́ pẹlu awoṣe \"iterative-critique\". Ìṣètò àṣàyàn fún ìbéèrè kọ̀ọ̀kan: generator, critic (àwọn ID awoṣe) àti max_rounds (1–5). Ọ̀rọ̀ nìkan: a kò ṣe àtìlẹyìn fún àwòrán àti irinṣẹ́."
+  },
   "fusion": {
     "title": "Iparapọ",
     "description": "Apejọ ti awọn awoṣe ṣe idahun ni afiwe, lẹhinna adajọ kan ṣajọpọ idahun ti o lagbara kan. Lo o nipa pipe API pẹlu awoṣe \"fusion\".",

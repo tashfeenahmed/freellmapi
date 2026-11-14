@@ -996,6 +996,13 @@
     "emptyDesc": "Įterpimo šeimos čia atsiranda, kai pridedate tiekėjo raktą, kuris palaiko įterpimus.",
     "dragToReorder": "Vilkti į peružsakymo tiekėją"
   },
+  "iterativeCritique": {
+    "tab": "Iteracinė kritika",
+    "title": "Iteracinė kritika",
+    "description": "Generatorius parengia atsakymo juodraštį, kito teikėjo kritikas jį įvertina ir įvardija trūkumus, o generatorius jį taiso, kol kritikas priima arba suveikia sustojimo taisyklė. Tada sintezatorius parašo galutinį atsakymą. Naudokite jį iškviesdami API su modeliu \"iterative-critique\".",
+    "howToUse": "Kaip naudoti",
+    "howToUseHelp": "Siųskite įprastą pokalbio užklausą su modeliu \"iterative-critique\". Pasirenkama konfigūracija kiekvienai užklausai: generator, critic (modelių ID) ir max_rounds (1–5). Tik tekstas: vaizdai ir įrankiai nepalaikomi."
+  },
   "fusion": {
     "title": "Sintezė",
     "description": "Modelių komisija atsako lygiagrečiai, o teisėjas apibendrina vieną stipresnį atsakymą. Naudokite jį vadindami API su modeliu \"fuzija\".",

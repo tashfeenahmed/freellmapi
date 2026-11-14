@@ -7,6 +7,7 @@ import type { Server } from 'node:http';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
+import { clearAllCooldowns } from '../../services/ratelimit.js';
 
 const realFetch = globalThis.fetch;
 
@@ -28,6 +29,8 @@ function addMedia(platform: string, modelId: string, priority: number) {
 beforeEach(async () => {
   process.env.ENCRYPTION_KEY = '0'.repeat(64);
   initDb(':memory:');
+  // A 429 benches the key, and the in-memory bench outlives the DB reset.
+  clearAllCooldowns();
   addMedia('nvidia', 'black-forest-labs/flux.1-schnell', 1);
   addMedia('siliconflow', 'black-forest-labs/FLUX.1-schnell', 2);
   addKey('nvidia');

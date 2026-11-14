@@ -72,17 +72,42 @@ dive wins; fix this file.
   Retry-After) vs `credit` (402) vs `tier` (403). Escalates
   2 min → 10 min → 1 h → 24 h.
 - **Fallback loop**: the shared retry driver every route uses
-  (`server/src/lib/fallback-loop.ts`). Up to ~20 attempts inside one
-  wall-clock budget; a stalled first byte cancels the attempt.
-- **Degraded mode**: quota exhausted at the top of the chain, so the
-  endpoint serves the next healthy tier instead of failing. Resets at
-  UTC midnight.
+  (`server/src/lib/fallback-loop.ts`). Up to `FALLBACK_MAX_RETRIES` (20)
+  attempts inside one wall-clock budget; a stalled first byte cancels
+  the attempt.
+- **Degraded mode**: fewer than half of the enabled providers have a
+  usable key for 60 s (needs 3 or more providers), so the router turns
+  off bandit exploration. It ends after 120 s at or above half (all
+  four numbers are defaults, tunable by `DEGRADED_*` env vars). Not the
+  daily fall-through to weaker models when top caps run out; those caps
+  reset at UTC midnight.
 - **Tool-call rescue**: models that emit tool calls as plain text are
   converted to real `tool_calls`. Tool requests route only to models
   that support tools.
 - **Health**: background probe keeping key status fresh. `UNKEYED` =
   no key yet; `KEYED-NO-ROWS` = key stored but zero routable rows;
   `serving` = key + rows + traffic.
+
+## State machines
+
+- **State machine**: a value that moves through named phases on events,
+  where some moves are illegal (e.g. `ready` before `downloading`).
+  House pattern, no library: one discriminated union
+  (`{ phase: 'idle' } | { phase: 'downloading'; version; percent } | …`),
+  one place that changes it, and guards such as
+  `if (state.phase !== 'available') return state`. Reference:
+  `desktop/src/updater.ts`.
+- **Implicit state machine**: the same thing spread over loose flags
+  (`busy`, `error`, `done`, a `let` per step). Impossible combinations
+  compile, and that is where the bugs live. Prefer the union.
+- **Not a machine**: a mode (a setting that does not move on its own)
+  or a value derived from other state. TanStack Query's
+  `isPending` / `isError` already own client fetch state; don't
+  duplicate them.
+- **Registry**: `docs/en/architecture/07-state-machines.md` lists every
+  machine with its states, writers, tests and status, plus the modes
+  and derived values that are not machines. Read the entry before you
+  change a machine; update it in the same PR.
 
 ## Repo map
 
