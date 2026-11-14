@@ -484,6 +484,47 @@ export function failureAttributionFor(err: any): string | null {
   return isProviderMomentFailure(err) ? 'provider_moment' : null;
 }
 
+// ── Custom platform 5xx fallback granularity (persisted) ────────────────────
+// Every custom relay shares the platform id 'custom' (#651), so a 5xx on one
+// relay would skip the entire custom platform and kill every healthy relay.
+// This setting controls the granularity: 'model' (default) skips only the
+// failing relay's model row and counts per-endpoint before ruling out a relay;
+// 'platform' keeps the original #788 behaviour (skip the whole custom platform).
+// The env var pins the behaviour without the UI.
+export const CUSTOM_FALLBACK_MODE_KEY = 'routing_custom_fallback_mode';
+
+export type CustomFallbackMode = 'model' | 'platform';
+
+export function getCustomFallbackMode(): CustomFallbackMode {
+  const env = process.env.ROUTER_CUSTOM_FALLBACK_MODE;
+  if (env === 'model' || env === 'platform') return env;
+  return getSetting(CUSTOM_FALLBACK_MODE_KEY) === 'platform' ? 'platform' : 'model';
+}
+
+export function setCustomFallbackMode(mode: CustomFallbackMode): void {
+  if (mode === 'platform') {
+    setSetting(CUSTOM_FALLBACK_MODE_KEY, 'platform');
+  } else {
+    getDb().prepare('DELETE FROM settings WHERE key = ?').run(CUSTOM_FALLBACK_MODE_KEY);
+  }
+}
+
+/**
+ * Whether this request has already ruled this chain entry out at PROVIDER
+ * level. Platform-wide skips (#788) cover catalog platforms; custom relays
+ * share the platform id 'custom' (#651), so they are ruled out one endpoint
+ * at a time instead.
+ */
+function providerRuledOut(
+  entry: { platform: string; endpoint_scope?: string | null },
+  skipPlatforms?: ReadonlySet<string>,
+  skipEndpoints?: ReadonlySet<string>,
+): boolean {
+  if (skipPlatforms?.has(entry.platform)) return true;
+  if (entry.platform === 'custom' && entry.endpoint_scope && skipEndpoints?.has(entry.endpoint_scope)) return true;
+  return false;
+}
+
 // ── Task-type weight share (persisted) ─────────────────────────────────────
 // #1127 follow-up: the bandit bias applied for a declared/derived task type
 // moves `share` of one axis onto the other (code: speed → intelligence; chat:
@@ -2216,7 +2257,7 @@ export function resolveFusionCandidate(modelId: string): FusionCandidate | null 
  *   global one. Set by the `auto:<axis>` aliases (ResolvedChain.strategyOverride,
  *   #1628); leave unset everywhere else.
  */
-export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', strategyOverride?: PresetStrategy): RouteResult {
+export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, preferredModelDbId?: number, requireVision = false, requireTools = false, skipModels?: Set<number>, prefetchedChain?: ChainRow[], requireStructured = false, skipPlatforms?: Set<string>, exactOutputReserve = 0, task?: 'code' | 'chat', strategyOverride?: PresetStrategy, skipEndpoints?: Set<string>): RouteResult {
   const db = getDb();
 
   const rawChain = prefetchedChain ?? getActiveChain(db);
@@ -2265,7 +2306,7 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
       // Mirror the main loop's gates below so exploration only samples
       // candidates that can actually serve this request.
       if (skipModels?.has(e.model_db_id)) return false;
-      if (skipPlatforms?.has(e.platform)) return false;
+      if (providerRuledOut(e, skipPlatforms, skipEndpoints)) return false;
       if (requireVision && !e.supports_vision) return false;
       if (requireTools && !e.supports_tools) return false;
       // Never spend the exploration slot on a model that keeps rejecting tool
@@ -2392,7 +2433,9 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
     // PROVIDER, so its other keys and its other models would fail the same way.
     // Skipping the platform moves failover to the next provider instead of
     // burning one hop per key. Request-scoped; nothing is benched by this.
-    if (skipPlatforms?.has(entry.platform)) { diag.push(`${label}: provider ruled out earlier this request`); continue; }
+    // Custom relays share platform 'custom' (#651): they are ruled out one
+    // endpoint at a time so a sick relay doesn't kill the healthy ones.
+    if (providerRuledOut(entry, skipPlatforms, skipEndpoints)) { diag.push(`${label}: provider ruled out earlier this request`); continue; }
 
     // Vision requests skip text-only models — including a sticky/preferred one,
     // which is correct: don't pin an image turn to a model that can't see it.

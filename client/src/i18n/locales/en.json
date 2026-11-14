@@ -327,6 +327,8 @@
     "minReliabilityFloorOff": "Disabled",
     "providerMomentAttribution": "Attribute rate-limit failures to the provider",
     "providerMomentAttributionHint": "When on, 429s, 5xx errors, timeouts and dropped connections are treated as the provider having a bad minute: they still bench the key, but they no longer count against the model's reliability score. Off by default — leave it off to keep today's scoring.",
+    "customFallbackMode": "Custom relay 5xx fallback",
+    "customFallbackModeHint": "Model-level (default): a 5xx on one custom relay skips only that relay's model, so sibling relays stay in play. Platform-level: a 5xx skips the entire custom platform (original behaviour).",
     "guardrails": "Guardrails",
     "guardrailsTooltip": "Always-on guardrails: free-quota headroom × live rate-limit penalty. Below 1.0 means the model is being held back.",
     "scoreTooltip": "Final routing score = weighted average of the three axes, multiplied by the guardrails. Higher routes first.",
