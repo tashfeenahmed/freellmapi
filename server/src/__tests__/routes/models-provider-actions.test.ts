@@ -321,8 +321,27 @@ describe('Model Provider Actions API', () => {
         'test-key-groq-secret',
         [{ role: 'user', content: 'ping' }],
         modelId,
-        { max_tokens: 4, timeoutMs: 15000 },
+        { max_tokens: 256, timeoutMs: 15000 },
       );
+    });
+
+    it('counts a reasoning-only reply as a live model', async () => {
+      const db = getDb();
+      const modelId = `reasoning-run-${Date.now()}`;
+      const modelDbId = (await post(app, '/api/models', { platform: 'groq', modelId })).body.id;
+      const enc = encrypt('test-key-groq-reasoning');
+      db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, enabled, status)
+        VALUES ('groq', 'Reasoning Groq Key', ?, ?, ?, 1, 'healthy')
+      `).run(enc.encrypted, enc.iv, enc.authTag);
+      vi.spyOn(getProvider('groq')!, 'chatCompletion').mockResolvedValueOnce({
+        id: 'reasoning-completion-id',
+        choices: [{ message: { role: 'assistant', content: '', reasoning_content: 'The user said ping' }, finish_reason: 'length' }],
+        usage: { prompt_tokens: 1, completion_tokens: 256, total_tokens: 257 },
+      } as any);
+
+      const testRes = await post(app, `/api/models/${modelDbId}/test`);
+      expect(testRes.body.success).toBe(true);
     });
 
     it('enforces 5-second server throttle and returns 429', async () => {
