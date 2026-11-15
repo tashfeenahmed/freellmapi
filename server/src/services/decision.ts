@@ -2,6 +2,7 @@ import { getDb } from '../db/index.js';
 import { BEATAPI_BASE_URL } from '../providers/beatapi.js';
 import { APINEX_BASE_URL } from '../providers/apinex.js';
 import { BLOCKRUN_BASE_URL } from '../providers/blockrun.js';
+import { SILVR_BASE_URL } from '../providers/silvr.js';
 import { parseRetryAfterMs, parseStatedRetryMs } from '../providers/base.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
@@ -164,6 +165,10 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
     FETCH_TIMEOUT_MS,
   );
   if (!res.ok) {
+    if (platform === 'silvr') {
+      await res.body?.cancel();
+      throw new DecisionError(`SilvR decision request failed (${res.status})`, res.status, undefined, parseRetryAfterMs(res.headers.get('retry-after')));
+    }
     const text = await res.text().catch(() => '');
     // Same rule as the chat path (providers/base.ts buildUpstreamError): a
     // header Retry-After wins, then a back-off stated in the error BODY
@@ -206,6 +211,34 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  // The tested SilvR route uses named predicate questions, not System One's
+  // state/object schema. Do not silently simulate untested choice/score types.
+  silvr: async (cred, modelId, body, signal) => {
+    if (modelId !== 'gemini-decision-1') throw new DecisionError('Unsupported SilvR decision model', 400);
+    const text = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value) ?? '';
+    const questions = Object.entries(body.questions).map(([name, question]) => {
+      if (question.type !== 'noul') throw new DecisionError('SilvR decisions currently support noul predicate questions only', 400);
+      return { name, type: 'predicate', instructions: text(question.instructions) + (question.criteria === undefined ? '' : `\nCriteria: ${text(question.criteria)}`) };
+    });
+    const json = await upstream(`${SILVR_BASE_URL}/decisions`, 'silvr', {
+      method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelId, input: text(body.state), questions }),
+    }, signal) as { model?: unknown; answers?: unknown; usage?: { input_tokens?: unknown; output_tokens?: unknown }; error?: unknown } | null;
+    if (!json || json.error || json.model !== modelId || !Array.isArray(json.answers) || json.answers.length !== questions.length ||
+        typeof json.usage?.input_tokens !== 'number' || !Number.isFinite(json.usage.input_tokens) || json.usage.input_tokens < 0 || json.usage.output_tokens !== 0) {
+      throw new DecisionError('SilvR returned an invalid or substituted decision response', 502);
+    }
+    const answers = new Map<string, unknown>();
+    for (const raw of json.answers) {
+      const a = raw as { name?: unknown; type?: unknown; probability?: unknown } | null;
+      if (!a || typeof a.name !== 'string' || !Object.hasOwn(body.questions, a.name) || answers.has(a.name) || a.type !== 'predicate' ||
+          typeof a.probability !== 'number' || !Number.isFinite(a.probability) || a.probability < 0 || a.probability > 1) {
+        throw new DecisionError('SilvR returned an invalid or duplicate predicate answer', 502);
+      }
+      answers.set(a.name, { type: 'noul', noul: a.probability });
+    }
+    return { answers: Object.fromEntries(answers), usage: { input_tokens: json.usage.input_tokens, output_tokens: 0 } };
+  },
   // Gemini Decisions uses input (not System One's state) and reports usage
   // under total_input_tokens. It is not a generateContent/chat model.
   google: async (cred, modelId, body, signal) => {

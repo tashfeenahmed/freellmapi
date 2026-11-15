@@ -22,6 +22,7 @@ import { markKeyHealthyFromRequest } from './health.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
+import { SILVR_BASE_URL } from '../providers/silvr.js';
 import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
 import { KENARI_BASE_URL, requireKenariFreeModel } from '../providers/kenari.js';
 import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
@@ -35,7 +36,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia']);
+export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -48,7 +49,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia', 'silvr']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -278,6 +279,10 @@ async function mediaFetch(
     timeoutMs,
   );
   if (!r.ok) {
+    if (platform === 'silvr' || platform === 'electronhub') {
+      await r.body?.cancel();
+      throw new MediaError(`${platform} ${modality} request failed (${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
+    }
     const body = await r.text().catch(() => '');
     throw new MediaError(
       `${platform} ${r.status}: ${body.slice(0, 200)}`,
@@ -454,6 +459,38 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'electronhub': {
+      if (!key) throw new MediaError('ElectronHub API key required', 401);
+      if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
+      if (!cpuCanRunSharp()) throw new MediaError('ElectronHub images require a compatible image decoder', 502);
+      let sharp: typeof import('sharp').default;
+      try { sharp = (await import('sharp')).default; }
+      catch { throw new MediaError('ElectronHub images require the optional image decoder', 502); }
+      const r = await mediaFetch(`${ELECTRONHUB_BASE_URL}/images/generations`, 'electronhub', 'image', {
+        method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, prompt: p.prompt, n: p.n ?? 1, size: p.size ?? '1024x1024', response_format: 'b64_json' }),
+      }, 180_000);
+      // Request inline images only: never fetch an untrusted or expiring URL
+      // or forward credentials to a provider-supplied download location.
+      const body = await boundedMediaJson(r, 32 * 1024 * 1024) as { model?: unknown; data?: { b64_json?: unknown }[]; error?: unknown } | null;
+      if (!body || body.error || body.model !== undefined && body.model !== row.model_id || !Array.isArray(body.data) || body.data.length !== (p.n ?? 1)) {
+        throw new MediaError('ElectronHub returned an invalid or substituted image response', 502);
+      }
+      const images: Array<{ b64_json: string }> = [];
+      for (const image of body.data) {
+        if (!image || typeof image.b64_json !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.b64_json)) throw new MediaError('ElectronHub returned no inline image', 502);
+        const bytes = Buffer.from(image.b64_json, 'base64');
+        const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+        const jpeg = bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && bytes[bytes.length - 2] === 255 && bytes[bytes.length - 1] === 217;
+        const webp = bytes.length > 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+        if (!png && !jpeg && !webp) throw new MediaError('ElectronHub returned no recognized image', 502);
+        try { await sharp(bytes, { limitInputPixels: 16 * 1024 * 1024, failOn: 'warning' }).stats(); }
+        catch { throw new MediaError('ElectronHub returned an invalid or oversized image', 502); }
+        images.push({ b64_json: image.b64_json });
+      }
+      return images;
+    }
     case 'varosity':
       return nativeMediaResult(varosityImage(row.model_id, key, p));
     case 'novai':
@@ -597,6 +634,25 @@ async function callImageProvider(
     default:
       throw new MediaError(`no image adapter for platform '${row.platform}'`, 500);
   }
+}
+
+/** Bound streamed JSON even when Content-Length is absent or dishonest. */
+async function boundedMediaJson(response: Response, maximum: number): Promise<unknown> {
+  if (!response.body || Number(response.headers.get('content-length')) > maximum) {
+    await response.body?.cancel(); throw new MediaError('Media response is missing or too large', 502);
+  }
+  const reader = response.body.getReader(), chunks: Buffer[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      size += value.length;
+      if (size > maximum) { await reader.cancel(); throw new MediaError('Media response is too large', 502); }
+      chunks.push(Buffer.from(value));
+    }
+  } finally { reader.releaseLock(); }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  catch { throw new MediaError('Media provider returned invalid JSON', 502); }
 }
 
 /** CogView returns a signed UFile URL, sometimes labelled PNG while containing
@@ -1466,6 +1522,26 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'silvr': {
+      if (!key) throw new MediaError('SilvR API key required', 401);
+      if (m.modelId !== 'whisper-large-v3-turbo') throw new MediaError('Unknown SilvR transcription model', 400);
+      if (!['json', 'text', 'verbose_json'].includes(p.responseFormat)) throw new MediaError('SilvR transcription does not support subtitles through this adapter', 400);
+      const form = new FormData();
+      form.append('model', m.modelId); form.append('response_format', 'json');
+      if (p.language) form.append('language', p.language);
+      if (p.prompt) form.append('prompt', p.prompt);
+      if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
+      form.append('file', new Blob([new Uint8Array(p.file)], { type: p.mimeType || 'application/octet-stream' }), p.filename.replace(/[^a-z0-9._-]/gi, '_').slice(0, 128) || 'audio.wav');
+      const r = await mediaFetch(`${SILVR_BASE_URL}/audio/transcriptions`, 'silvr', 'transcription', {
+        method: 'POST', redirect: 'error', headers: bearerAuthHeader(key), body: form,
+      });
+      const body = await boundedMediaJson(r, 1024 * 1024) as { model?: unknown; text?: unknown; language?: unknown; duration?: unknown; error?: unknown } | null;
+      if (!body || body.error || typeof body.text !== 'string' || body.model !== undefined && body.model !== m.modelId ||
+          body.language !== undefined && typeof body.language !== 'string' || body.duration !== undefined && (typeof body.duration !== 'number' || !Number.isFinite(body.duration) || body.duration < 0)) {
+        throw new MediaError('SilvR returned an invalid or substituted transcription response', 502);
+      }
+      return { text: body.text, ...(typeof body.language === 'string' ? { language: body.language } : {}), ...(typeof body.duration === 'number' ? { duration: body.duration } : {}) };
+    }
     case 'rime':
       return nativeMediaResult(rimeTranscription(m.modelId, key, p));
     case 'cartesia':

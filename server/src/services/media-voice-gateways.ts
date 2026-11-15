@@ -1,5 +1,6 @@
-import { proxyFetch } from '../lib/proxy.js';
+import { proxyFetch, openProviderWebSocket } from '../lib/proxy.js';
 import { parseRetryAfterMs } from '../providers/base.js';
+import { rimePcm, RimeMediaError } from './media-rime.js';
 import type { SpeechParams, TranscriptionParams } from './media.js';
 
 export class VoiceGatewayMediaError extends Error {
@@ -85,12 +86,13 @@ export async function voiceGatewaySpeech(platform: 'typecast' | 'cartesia', mode
 
 export async function cartesiaTranscription(model: string, key: string | null, p: TranscriptionParams): Promise<{ text: string; language?: string; duration?: number }> {
   if (!key?.trim()) throw new VoiceGatewayMediaError('Cartesia API key required', 401);
-  if (model !== 'ink-whisper') throw new VoiceGatewayMediaError('Unknown Cartesia batch transcription model', 400);
+  if (!['ink-whisper', 'ink-2'].includes(model)) throw new VoiceGatewayMediaError('Unknown Cartesia transcription model', 400);
   if (!p.file.length || p.file.length > 25 * 1024 * 1024) throw new VoiceGatewayMediaError('Cartesia transcription requires a nonempty file up to 25 MiB', 400);
   if (p.prompt || p.temperature != null && p.temperature !== 0 || !['json', 'text', 'verbose_json'].includes(p.responseFormat)) {
     throw new VoiceGatewayMediaError('Cartesia transcription does not support prompts, temperature or subtitles through this adapter', 400);
   }
   if (p.language && !/^[a-z]{2}$/i.test(p.language)) throw new VoiceGatewayMediaError('Cartesia requires a two-letter language code', 400);
+  if (model === 'ink-2') return cartesiaInk2(key, p);
   const form = new FormData();
   form.append('model', model);
   if (p.language) form.append('language', p.language);
@@ -106,4 +108,73 @@ export async function cartesiaTranscription(model: string, key: string | null, p
     throw new VoiceGatewayMediaError('Cartesia returned invalid or substituted transcription metadata', 502);
   }
   return { text: result.text, ...(typeof result.language === 'string' ? { language: result.language } : {}), ...(typeof result.duration === 'number' ? { duration: result.duration } : {}) };
+}
+
+/** Bridge uploaded PCM16 WAV to Ink 2's manual-finalization socket. Reuse the
+ * desktop-safe WAV downmix/resampler; never require a system ffmpeg binary.
+ * The socket inherits the same per-key proxy policy as other native media. */
+async function cartesiaInk2(key: string, p: TranscriptionParams): Promise<{ text: string; language: string; duration: number }> {
+  const language = (p.language ?? 'en').toLowerCase();
+  if (!['en', 'fr', 'hi', 'ja', 'es'].includes(language)) throw new VoiceGatewayMediaError('Ink 2 supports en, fr, hi, ja and es', 400);
+  let pcm: Buffer;
+  try { pcm = rimePcm(p.file); }
+  catch (error) {
+    if (error instanceof RimeMediaError) throw new VoiceGatewayMediaError(error.message.replaceAll('Rime', 'Cartesia Ink 2'), error.status);
+    throw error;
+  }
+  const url = new URL('wss://api.cartesia.ai/stt/websocket');
+  url.search = new URLSearchParams({ model: 'ink-2', encoding: 'pcm_s16le', sample_rate: '16000', cartesia_version: CARTESIA_VERSION, language }).toString();
+  const socket = await openProviderWebSocket(url.href, 'cartesia', { headers: { 'X-API-Key': key } });
+  return new Promise((resolve, reject) => {
+    let settled = false, finalized = false, flushed = false, pendingPartial = false, offset = 0, characters = 0;
+    let pump: ReturnType<typeof setTimeout> | undefined;
+    const transcript: string[] = [];
+    const finish = (error?: VoiceGatewayMediaError) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); clearTimeout(pump); socket.close();
+      if (error) reject(error); else resolve({ text: transcript.join(' ').trim(), language, duration: pcm.length / 32000 });
+    };
+    // Bound connection/finalization as well as upload; no background pump or
+    // partial hypothesis can survive a failed request.
+    const timer = setTimeout(() => finish(new VoiceGatewayMediaError('Cartesia Ink 2 transcription timed out', 504)), Math.max(115_000, Math.ceil(pcm.length / 32) + 30_000));
+    const send = () => {
+      if (settled) return;
+      try {
+        if (socket.bufferedAmount < 128 * 1024) {
+          if (offset >= pcm.length) { finalized = true; socket.send('finalize'); return; }
+          const chunk = pcm.subarray(offset, offset + 3200); offset += chunk.length; socket.send(chunk);
+        }
+        pump = setTimeout(send, 100);
+      } catch { finish(new VoiceGatewayMediaError('Cartesia Ink 2 upload failed', 502)); }
+    };
+    socket.addEventListener('open', send);
+    socket.addEventListener('error', () => finish(new VoiceGatewayMediaError('Cartesia Ink 2 connection or authentication failed', 502)));
+    socket.addEventListener('close', () => finish(new VoiceGatewayMediaError('Cartesia Ink 2 closed before completion', 502)));
+    socket.addEventListener('message', event => {
+      if (settled) return;
+      try {
+        if (typeof event.data !== 'string' || event.data.length > 1024 * 1024) throw new Error('invalid frame');
+        const message = JSON.parse(event.data);
+        if (!message || typeof message !== 'object' || message.model !== undefined && message.model !== 'ink-2') throw new Error('invalid identity');
+        if (message.type === 'transcript') {
+          if (flushed || typeof message.text !== 'string' || typeof message.is_final !== 'boolean') throw new Error('invalid transcript');
+          if (message.is_final) {
+            pendingPartial = false;
+            characters += message.text.length;
+            if (characters > 1024 * 1024) throw new Error('oversized transcript');
+            transcript.push(message.text);
+          } else pendingPartial = message.text.trim().length > 0;
+        } else if (message.type === 'flush_done') {
+          if (!finalized || flushed || pendingPartial) throw new Error('unexpected or incomplete flush');
+          flushed = true; socket.send('close');
+        } else if (message.type === 'done') {
+          if (!flushed) throw new Error('incomplete transcript');
+          finish();
+        } else if (message.type === 'error') {
+          // Provider details may echo submitted text or auth; keep them out of logs.
+          finish(new VoiceGatewayMediaError('Cartesia Ink 2 transcription failed', 502));
+        } else throw new Error('unknown message');
+      } catch { finish(new VoiceGatewayMediaError('Cartesia Ink 2 returned an invalid transcription response', 502)); }
+    });
+  });
 }
