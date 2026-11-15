@@ -1,0 +1,18 @@
+{
+  "name": "freellmapi-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord AI chat bot powered by a FreeLLMAPI router",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "deploy-commands": "node --env-file-if-exists=.env src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.28.1"
+  }
+}
