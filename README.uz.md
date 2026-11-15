@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**Oyiga 7,4 milliard token. 34 ta bepul LLM provayderi. 635 ta bepul model endpointi. OpenAI bilan mos bitta endpoint.**
+**Oyiga 10,1 milliard token. 87 ta bepul LLM provayderi. 1313 ta bepul model endpointi. OpenAI bilan mos bitta endpoint.**
 
 O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladigan istalgan chat, embedding, rasm va audio endpointlaringizni bitta `/v1` API orqasida birlashtiring. Kalitlar shifrlangan holda saqlanadi. Router har bir so'rov uchun eng yaxshi mavjud modelni tanlaydi, provayder limitga yetganda keyingisiga o'tadi va har bir kalitning sarfini kuzatib boradi, shunda siz hech bir bepul tarif limitidan oshib ketmaysiz.
 
@@ -13,9 +13,9 @@ O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladiga
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-blue)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 474 ta model oilasi, 635 ta bepul endpoint
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 736 ta model oilasi, 1313 ta bepul endpoint
 
-[English](README.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha**
 
 Bu tarjima ortda qolishi mumkin. Eng so'nggi ma'lumot uchun inglizcha README'ga qarang.
 
@@ -60,13 +60,13 @@ Routeringiz model katalogini imzolangan manbadan o'zi yangilaydi: yangi bepul mo
 
 ## Bu loyiha nega kerak
 
-Bugun har bir jiddiy AI laboratoriyasi bepul tarif taklif qiladi: oyiga bir necha million token, kuniga bir necha ming so'rov. Alohida olinganda har bir tarif o'yinchoqdek gap. Lekin ularni birlashtirsangiz, oyiga taxminan **7,4 milliard token** ishchi inference quvvati hosil bo'ladi. Bu kichik va tezkor modellardan tortib ancha qobiliyatlilarigacha bo'lgan **474 ta model oilasi / 635 ta provayder endpointi**ni qamrab oladi.
+Bugun har bir jiddiy AI laboratoriyasi bepul tarif taklif qiladi: oyiga bir necha million token, kuniga bir necha ming so'rov. Alohida olinganda har bir tarif o'yinchoqdek gap. Lekin ularni birlashtirsangiz, oyiga taxminan **10,1 milliard token** ishchi inference quvvati hosil bo'ladi. Bu kichik va tezkor modellardan tortib ancha qobiliyatlilarigacha bo'lgan **736 ta model oilasi / 1313 ta provayder endpointi**ni qamrab oladi.
 
-Muammo shundaki, ularni qo'lda birlashtirish juda og'ir: o'ttiz to'rtta turli SDK, o'ttiz to'rtta turli limit, so'rov xato berishi mumkin bo'lgan o'ttiz to'rtta joy. FreeLLMAPI bularning hammasini OpenAI bilan mos bitta endpointga jamlaydi. Istalgan OpenAI klient kutubxonasini lokal serveringizga yo'naltiring, u esa so'rovlarni siz kalit qo'shgan provayderlar bo'ylab sezdirmasdan taqsimlaydi.
+Muammo shundaki, ularni qo'lda birlashtirish juda og'ir: sakson yettita turli SDK, sakson yettita turli limit, so'rov xato berishi mumkin bo'lgan sakson yettita joy. FreeLLMAPI bularning hammasini OpenAI bilan mos bitta endpointga jamlaydi. Istalgan OpenAI klient kutubxonasini lokal serveringizga yo'naltiring, u esa so'rovlarni siz kalit qo'shgan provayderlar bo'ylab sezdirmasdan taqsimlaydi.
 
 Bundan tashqari, bepul tariflar manzarasi har hafta o'zgaradi: provayderlar ogohlantirmasdan model chiqaradi, eskilarini o'chiradi va limitlarni o'zgartiradi. FreeLLMAPI bularning barchasini siz uchun kuzatib boradi. Router imzolangan model katalogini [freellmapi.co](https://freellmapi.co) dan o'zi tortib oladi, shuning uchun o'rnatmangiz `git pull` qilmasdan ham dolzarb bo'lib turadi. Qanchalik tez yangilanishi haqida [Premium (jonli katalog)](#premium-jonli-katalog) bo'limida o'qing.
 
-![Bepul tariflar birlashtirilganda: 34 ta provayder bo'ylab oyiga ~7,4 mlrd token bepul inference](repo-assets/free-tier.png)
+![Bepul tariflar birlashtirilganda: 87 ta provayder bo'ylab oyiga ~10,1 mlrd token bepul inference](repo-assets/free-tier.png)
 
 ## Qo'llab-quvvatlanadigan provayderlar
 
@@ -94,7 +94,7 @@ Bundan tashqari, bepul tariflar manzarasi har hafta o'zgaradi: provayderlar ogoh
 </tr>
 </table>
 
-<i>… va yana 22 ta bepul provayder</i>
+<i>… va yana 75 ta bepul provayder</i>
 
 </div>
 
@@ -236,9 +236,10 @@ qo'llaydi. Siz o'zingiz yoqqan yoki o'chirgan modellarga va o'z provayderlaringi
 qachon tegilmaydi. Har bir yuklab olingan fayl qo'llanishidan oldin qat'iy belgilangan
 Ed25519 kaliti bilan tekshiriladi.
 
-Hozir katalog **34 ta provayder**, **474 ta model oilasi**, **635 ta bepul provayder/model
-endpointi** (584 ta chat, 41 ta embedding, 7 ta transkripsiya, 3 ta video) va ro'yxatga
-olingan bepul tariflardagi oyiga taxminan **7,4 milliard token** quvvatni kuzatadi. To'liq
+Hozir katalog **87 ta provayder**, **736 ta model oilasi**, **1313 ta bepul provayder/model
+endpointi** (1137 ta chat, 29 ta rasm, 41 ta audio, 68 ta embedding, 19 ta transkripsiya,
+6 ta video, 13 ta qaror) va ro'yxatga olingan bepul tariflardagi oyiga taxminan
+**10,1 milliard token** quvvatni kuzatadi. To'liq
 ro'yxatni **[freellmapi.co/models](https://freellmapi.co/models.html)** da ko'ring.
 
 Bepul o'rnatmalar ham xuddi shu imzolangan katalogni oladi, lekin oylik snapshotdan: model
@@ -346,6 +347,7 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 ### Hissa qo'shganlar
 
 <a href="https://github.com/moaaz12-web"><img src="https://images.weserv.nl/?url=github.com/moaaz12-web.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@moaaz12-web" /></a>
+<a href="https://github.com/AdityaxDeore"><img src="https://images.weserv.nl/?url=github.com/AdityaxDeore.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@AdityaxDeore" /></a>
 <a href="https://github.com/lukasulc"><img src="https://images.weserv.nl/?url=github.com/lukasulc.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lukasulc" /></a>
 <a href="https://github.com/VinhPhamAI"><img src="https://images.weserv.nl/?url=github.com/VinhPhamAI.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@VinhPhamAI" /></a>
 <a href="https://github.com/deadc"><img src="https://images.weserv.nl/?url=github.com/deadc.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@deadc" /></a>
@@ -371,7 +373,7 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/thedavidweng"><img src="https://images.weserv.nl/?url=github.com/thedavidweng.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedavidweng" /></a>
 <a href="https://github.com/bharvey42"><img src="https://images.weserv.nl/?url=github.com/bharvey42.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@bharvey42" /></a>
 <a href="https://github.com/yuvrxj-afk"><img src="https://images.weserv.nl/?url=github.com/yuvrxj-afk.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@yuvrxj-afk" /></a>
-<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/v0rtex1223"><img src="https://images.weserv.nl/?url=github.com/v0rtex1223.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@v0rtex1223" /></a>
 <a href="https://github.com/nicyoong"><img src="https://images.weserv.nl/?url=github.com/nicyoong.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nicyoong" /></a>
 <a href="https://github.com/Aldo-f"><img src="https://images.weserv.nl/?url=github.com/Aldo-f.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aldo-f" /></a>
 <a href="https://github.com/Tazrif-Raim"><img src="https://images.weserv.nl/?url=github.com/Tazrif-Raim.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tazrif-Raim" /></a>
@@ -505,6 +507,18 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/kjgggggg"><img src="https://images.weserv.nl/?url=github.com/kjgggggg.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kjgggggg" /></a>
 <a href="https://github.com/TheoCui-Saulcy"><img src="https://images.weserv.nl/?url=github.com/TheoCui-Saulcy.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TheoCui-Saulcy" /></a>
 <a href="https://github.com/MatthewRobertDunn"><img src="https://images.weserv.nl/?url=github.com/MatthewRobertDunn.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MatthewRobertDunn" /></a>
+<a href="https://github.com/nk-batman21"><img src="https://images.weserv.nl/?url=github.com/nk-batman21.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nk-batman21" /></a>
+<a href="https://github.com/PowerTokens"><img src="https://images.weserv.nl/?url=github.com/PowerTokens.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@PowerTokens" /></a>
+<a href="https://github.com/navzo"><img src="https://images.weserv.nl/?url=github.com/navzo.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@navzo" /></a>
+<a href="https://github.com/motasimfuad"><img src="https://images.weserv.nl/?url=github.com/motasimfuad.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@motasimfuad" /></a>
+<a href="https://github.com/thedevil11255"><img src="https://images.weserv.nl/?url=github.com/thedevil11255.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedevil11255" /></a>
+<a href="https://github.com/kvianAR"><img src="https://images.weserv.nl/?url=github.com/kvianAR.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kvianAR" /></a>
+<a href="https://github.com/TanmayShah29"><img src="https://images.weserv.nl/?url=github.com/TanmayShah29.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TanmayShah29" /></a>
+<a href="https://github.com/heydryft"><img src="https://images.weserv.nl/?url=github.com/heydryft.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@heydryft" /></a>
+<a href="https://github.com/leucds2018-hub"><img src="https://images.weserv.nl/?url=github.com/leucds2018-hub.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@leucds2018-hub" /></a>
+<a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
+<a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
+<a href="https://github.com/mentallyunstable-lab"><img src="https://images.weserv.nl/?url=github.com/mentallyunstable-lab.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mentallyunstable-lab" /></a>
 
 ## Ogohlantirish
 

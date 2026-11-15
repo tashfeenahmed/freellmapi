@@ -60,7 +60,7 @@ settingsRouter.put('/update-check', (req: Request, res: Response) => {
   if (!parsed.success) {
     res.status(400).json({
       error: {
-        message: `Invalid update check setting: ${parsed.error.errors.map(error => error.message).join(', ')}`,
+        message: `Invalid update check setting: ${parsed.error.issues.map(error => error.message).join(', ')}`,
         type: 'invalid_request_error',
       },
     });
@@ -77,7 +77,7 @@ settingsRouter.get('/compression', (_req: Request, res: Response) => {
 settingsRouter.put('/compression', (req: Request, res: Response) => {
   const parsed = compressionUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5)
       .join(', ');
@@ -106,7 +106,7 @@ const unifyPutSchema = z.object({
 settingsRouter.put('/unify', (req: Request, res: Response) => {
   const parsed = unifyPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
+    const detail = parsed.error.issues.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
     res.status(400).json({ error: { message: `Invalid unify settings: ${detail}`, type: 'invalid_request_error' } });
     return;
   }
@@ -125,7 +125,7 @@ settingsRouter.get('/fusion', (_req: Request, res: Response) => {
 settingsRouter.put('/fusion', (req: Request, res: Response) => {
   const parsed = savedFusionConfigSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
+    const detail = parsed.error.issues.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
     res.status(400).json({ error: { message: `Invalid fusion config: ${detail}`, type: 'invalid_request_error' } });
     return;
   }
@@ -169,8 +169,8 @@ settingsRouter.put('/anthropic-map', (req: Request, res: Response) => {
   try {
     res.json({ map: setClaudeModelMap(req.body) });
   } catch (err: any) {
-    const detail = err?.errors
-      ? err.errors.map((e: any) => (e.path?.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ')
+    const detail = err?.issues
+      ? err.issues.map((e: any) => (e.path?.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ')
       : (err?.message ?? 'invalid');
     res.status(400).json({ error: { message: `Invalid anthropic model map: ${detail}`, type: 'invalid_request_error' } });
   }
@@ -184,8 +184,8 @@ settingsRouter.put('/gemini-map', (req: Request, res: Response) => {
   try {
     res.json({ map: setGeminiModelMap(req.body) });
   } catch (err: any) {
-    const detail = err?.errors
-      ? err.errors.map((e: any) => (e.path?.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ')
+    const detail = err?.issues
+      ? err.issues.map((e: any) => (e.path?.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ')
       : (err?.message ?? 'invalid');
     res.status(400).json({ error: { message: `Invalid Gemini model map: ${detail}`, type: 'invalid_request_error' } });
   }
@@ -208,7 +208,7 @@ settingsRouter.put('/agent-compatibility', (req: Request, res: Response) => {
   if (!parsed.success) {
     res.status(400).json({
       error: {
-        message: `Invalid agent compatibility settings: ${parsed.error.errors.map(error => error.message).join(', ')}`,
+        message: `Invalid agent compatibility settings: ${parsed.error.issues.map(error => error.message).join(', ')}`,
         type: 'invalid_request_error',
       },
     });
@@ -282,7 +282,7 @@ const outputLimitPutSchema = z.object({
 settingsRouter.put('/output-limit', (req: Request, res: Response) => {
   const parsed = outputLimitPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5)
       .join(', ');
@@ -357,7 +357,7 @@ const headroomPutSchema = z.object({
 settingsRouter.put('/headroom', (req: Request, res: Response) => {
   const parsed = headroomPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5)
       .join(', ');
@@ -457,7 +457,7 @@ settingsRouter.put('/provider-moment-attribution', (req: Request, res: Response)
 settingsRouter.put('/guardrails', (req: Request, res: Response) => {
   const parsed = guardrailsPutSchema.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
+    const detail = parsed.error.issues.map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message)).slice(0, 5).join(', ');
     res.status(400).json({ error: { message: `Invalid guardrail settings: ${detail}`, type: 'invalid_request_error' } });
     return;
   }

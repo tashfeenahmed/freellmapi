@@ -3,6 +3,10 @@ import { initDb, getDb } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { runRerank, RerankError } from '../../services/rerank.js';
 import { getMonthlyUsage } from '../../services/key-budget.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 // POST /v1/rerank spends real provider quota, so a key at its monthly cap
 // (#1158) must not serve one. Chat (router), embeddings, media, search and

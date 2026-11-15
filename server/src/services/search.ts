@@ -12,6 +12,7 @@ import { FIRECRAWL_BASE_URL } from '../providers/firecrawl.js';
 import { LINKUP_BASE_URL } from '../providers/linkup.js';
 import { PARALLEL_BASE_URL, PARALLEL_MCP_URL } from '../providers/parallel.js';
 import { KEENABLE_APP_TITLE, KEENABLE_BASE_URL } from '../providers/keenable.js';
+import { OUTCRAWL_BASE_URL } from '../providers/outcrawl.js';
 import { isAnonymousCredential } from '../lib/credential.js';
 import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
@@ -480,6 +481,22 @@ const ADAPTERS: Record<string, Adapter> = {
     }));
     return { results: keepHits(hits) };
   },
+
+  // Outcrawl ranks hits itself and sends no score, so keepHits scores them by
+  // position. It has no news vertical; a news search runs as a web search.
+  outcrawl: async (cred, query, opts, n) => {
+    const parsed = await upstream(`${OUTCRAWL_BASE_URL}/search`, 'outcrawl', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cred.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: n }),
+    }, opts.signal) as { hits?: Array<Record<string, unknown>> };
+    const hits = (Array.isArray(parsed?.hits) ? parsed.hits : []).slice(0, n).map(r => ({
+      title: str(r.title) || str(r.url),
+      url: str(r.url),
+      content: str(r.snippet),
+    }));
+    return { results: keepHits(hits) };
+  },
 };
 
 /** Platforms with a search adapter. catalog-sync gates searchEngines rows on
@@ -565,6 +582,7 @@ export const SEARCH_PLATFORM_INFO: Record<string, { name: string; keyless?: bool
   serpsearch: { name: 'SerpSearch' },
   keenable: { name: 'Keenable', keyless: true },
   brave: { name: 'Brave Search' },
+  outcrawl: { name: 'Outcrawl' },
 };
 
 const platformName = (p: string): string => SEARCH_PLATFORM_INFO[p]?.name ?? p;

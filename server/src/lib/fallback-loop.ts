@@ -48,6 +48,7 @@ import {
   isProviderBadRequestError,
   isProviderDegradedError,
   isProviderLevelError,
+  isModelScopedOverloadError,
   isProviderMomentFailure,
   isContextTooLargeError,
   isTimeoutErrorText,
@@ -473,7 +474,9 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // Context-too-large is MODEL-level too: a sibling key serves the same model
   // with the same context window (and, for Groq-style per-key TPM 413s, the
   // same tier ceiling), so it would reject the same request identically.
-  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || err?.skipModelForRequest === true) {
+  // A model-scoped overload also affects sibling keys: skip directly to a
+  // different model while keeping the rest of the provider available.
+  if (isModelNotFoundError(err) || isModelAccessForbiddenError(err) || isContextTooLargeError(err) || isModelScopedOverloadError(err) || err?.skipModelForRequest === true) {
     state.skipModels.add(route.modelDbId);
   }
   // A stale CATALOG (not a single dead model) answers model-not-found on every
@@ -529,6 +532,15 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // that outlives the request.
   if (isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
+  }
+  // An adapter's own "cannot serve this" rejection (#1876: Gizmo asked for
+  // tools or images, a catalog id outside an adapter's tested allow-list) is a
+  // fact about the request or the model id, not the key's health. Skip the
+  // model for this request only: no cooldown, so the same key keeps serving
+  // ordinary requests.
+  if (err?.providerRejection === 'request' || err?.providerRejection === 'model') {
+    state.skipModels.add(route.modelDbId);
+    return false;
   }
   // Too big for this model is a fact about the REQUEST, not the model's
   // health: it still serves every smaller request. Skip it for this request

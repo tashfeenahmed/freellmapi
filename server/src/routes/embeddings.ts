@@ -85,7 +85,7 @@ function decryptExistingKey(row: { encrypted_key: string; iv: string; auth_tag: 
 embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
   const parsed = customEmbeddingSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 

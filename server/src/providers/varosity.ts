@@ -13,7 +13,7 @@ export class VarosityProvider extends BaseProvider {
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     if (!apiKey.trim()) return { valid: false, error: 'Varosity API key is required' };
     // The roster is public. This authenticated, non-generating endpoint checks
-    // the key without spending the shared daily allowance.
+    // the key without spending the shared account balance.
     const response = await this.fetchWithTimeout(`${VAROSITY_BASE_URL}/v1/credits/balance`, {
       method: 'GET', redirect: 'error', headers: { Authorization: `Bearer ${apiKey}` },
     });

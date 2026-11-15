@@ -104,8 +104,8 @@ describe('Router guard for non-chat providers (#1741)', () => {
     expect(route!.modelDbId).toBe(groqId);
   });
 
-  it('skips legacy speechify, HAL-X and AI SENSE chat rows', async () => {
-    for (const platform of ['speechify', 'halx', 'aisense']) {
+  it('skips legacy speechify, HAL-X, AI SENSE and Free.ai chat rows', async () => {
+    for (const platform of ['speechify', 'halx', 'aisense', 'freeai']) {
       clearChain();
 
       const p = getProvider(platform);

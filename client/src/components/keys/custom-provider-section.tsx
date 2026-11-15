@@ -32,7 +32,7 @@ function parseModelList(raw: string): string[] {
 export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio' | 'transcription'>('chat')
+  const [customType, setCustomType] = useState<'chat' | 'embedding' | 'image' | 'audio' | 'transcription' | 'search' | 'decision'>('chat')
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -78,6 +78,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       queryClient.invalidateQueries({ queryKey: ['models'] })
       queryClient.invalidateQueries({ queryKey: ['embeddings'] })
       queryClient.invalidateQueries({ queryKey: ['media'] })
+      queryClient.invalidateQueries({ queryKey: ['decision-models'] })
       setModel('')
       setDisplayName('')
       setFamily('')
@@ -139,7 +140,11 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
         ? 'gpt-image-1'
         : customType === 'transcription'
           ? 'Systran/faster-whisper-large-v3'
-          : 'gpt-4o-mini-tts'
+          : customType === 'search'
+            ? 'my-search'
+            : customType === 'decision'
+              ? 'my-decider'
+              : 'gpt-4o-mini-tts'
   const addLabel = customType === 'chat'
     ? (multiple ? t('keys.addModels', { count: models.length }) : t('keys.addModel'))
     : customType === 'embedding'
@@ -148,7 +153,18 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
         ? t('keys.addImageModel')
         : customType === 'transcription'
           ? t('keys.addTranscriptionModel')
-          : t('keys.addAudioModel')
+          : customType === 'search'
+            ? t('keys.addSearchEngine')
+            : customType === 'decision'
+              ? t('keys.addDecisionModel')
+              : t('keys.addAudioModel')
+  // Search and decision endpoints speak a fixed wire contract rather than the
+  // OpenAI shape, so say which one before the user points them at a server.
+  const contractHint = customType === 'search'
+    ? t('keys.customSearchHint')
+    : customType === 'decision'
+      ? t('keys.customDecisionHint')
+      : null
 
   const form = (
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
@@ -167,6 +183,8 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
               <SelectItem value="image" label={t('keys.customTypeImage')}>{t('keys.customTypeImage')}</SelectItem>
               <SelectItem value="audio" label={t('keys.customTypeAudio')}>{t('keys.customTypeAudio')}</SelectItem>
               <SelectItem value="transcription" label={t('keys.customTypeTranscription')}>{t('keys.customTypeTranscription')}</SelectItem>
+              <SelectItem value="search" label={t('keys.customTypeSearch')}>{t('keys.customTypeSearch')}</SelectItem>
+              <SelectItem value="decision" label={t('keys.customTypeDecision')}>{t('keys.customTypeDecision')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -270,6 +288,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
     <div>
       <p className="text-xs text-muted-foreground mb-3">{t('keys.addCustomDescription')}</p>
       {form}
+      {contractHint && <p className="text-xs text-muted-foreground mt-2" data-testid="custom-contract-hint">{contractHint}</p>}
       {errorLine}
       {discoverOpen && (
         <DiscoverModelsDialog

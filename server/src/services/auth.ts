@@ -97,6 +97,37 @@ export function deleteSession(token: string | undefined | null): void {
   getDb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
 }
 
+// Wrong-password strikes against a signed-in session, shared by every endpoint
+// that re-asks for the dashboard password: change-email, change-password, key
+// export and key reveal (#1885). A stolen session token must not be usable as an
+// unlimited password oracle, so the third wrong password in a row ends the
+// session and the caller has to log in again, where the per-email login
+// lockout applies.
+export const MAX_REAUTH_STRIKES = 3;
+const reauthStrikes = new Map<number, number>();
+
+/** Count a wrong re-entered password. Returns true when this strike ended the
+ * session (the token is deleted), false when the caller may retry. */
+export function recordReauthFailure(userId: number, token: string | undefined | null): boolean {
+  const strikes = (reauthStrikes.get(userId) ?? 0) + 1;
+  if (strikes >= MAX_REAUTH_STRIKES) {
+    reauthStrikes.delete(userId);
+    deleteSession(token);
+    return true;
+  }
+  reauthStrikes.set(userId, strikes);
+  return false;
+}
+
+export function clearReauthFailures(userId: number): void {
+  reauthStrikes.delete(userId);
+}
+
+/** Test hook. */
+export function resetReauthFailures(): void {
+  reauthStrikes.clear();
+}
+
 /** Update the email of the authenticated user after verifying the current password. Throws { code: 'email_taken' } on conflict. */
 export function updateEmail(userId: number, currentPassword: string, newEmail: string): boolean {
   const db = getDb();
