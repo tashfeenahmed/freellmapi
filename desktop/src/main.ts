@@ -12,6 +12,7 @@ import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
 import { installGpuRecovery } from './gpu-recovery-host.js';
 import { initUpdater, getUpdateState, checkForUpdates, downloadUpdate, installUpdate, checkFromTray } from './updater.js';
+import { gatewayBaseUrl, parseBaseUrlKind } from './base-urls.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = 31415;
@@ -154,7 +155,8 @@ if (!app.requestSingleInstanceLock()) {
     getPopoverWindow()?.webContents.send('freeapi:refresh');
   });
   ipcMain.handle('freeapi:open-dashboard', () => openDashboard(resolvedPort, sessionToken));
-  ipcMain.handle('freeapi:copy-base-url', () => clipboard.writeText(`http://127.0.0.1:${resolvedPort}/v1`));
+  ipcMain.handle('freeapi:copy-base-url', (_e, kind: unknown) =>
+    clipboard.writeText(gatewayBaseUrl(resolvedPort, parseBaseUrlKind(kind))));
   ipcMain.handle('freeapi:copy-api-key', () => clipboard.writeText(getUnifiedApiKey()));
   ipcMain.handle('freeapi:get-login-item', () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle('freeapi:set-login-item', (_e, open: boolean) => app.setLoginItemSettings({ openAtLogin: open }));
@@ -191,7 +193,8 @@ if (!app.requestSingleInstanceLock()) {
         detail:
           'The server will bind to 0.0.0.0 so other devices (Tailscale, VMs, ' +
           'phones on your Wi-Fi) can reach it at http://<this-machine-ip>:' +
-          `${resolvedPort}/v1.\n\nThe API is protected only by your unified ` +
+          `${resolvedPort}/v1 (OpenAI-style clients) or http://<this-machine-ip>:` +
+          `${resolvedPort} (Claude / Anthropic clients, no /v1).\n\nThe API is protected only by your unified ` +
           'API key. Only do this on a network you trust. The app will restart ' +
           'to apply the change.',
       });

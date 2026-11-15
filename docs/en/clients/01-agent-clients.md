@@ -5,6 +5,7 @@
 [← Back to README](../README.md) · [Documentation index](../README.md) · [All supported agents](02-supported-agents.md)
 
 - [OpenAI-compatible clients](#openai-compatible-clients)
+- [Claude Desktop (third-party gateway)](#claude-desktop-third-party-gateway)
 - [Coding agents](#coding-agents)
 - [QwenPaw](#qwenpaw)
 - [Native Gemini clients](#native-gemini-clients)
@@ -22,6 +23,26 @@ Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
   `http://localhost:3001/v1` and use the unified key from the dashboard.
 - **Local GPU boxes**: add custom OpenAI-compatible endpoints for Ollama,
   llama.cpp, LM Studio, vLLM, or an internal gateway.
+
+## Claude Desktop (third-party gateway)
+
+Claude Desktop can use FreeLLMAPI as a third-party inference gateway. It speaks
+the Anthropic Messages API, so the base URL is the **bare origin, without
+`/v1`**. Claude Desktop appends `/v1/models` and `/v1/messages` itself.
+
+1. In Claude Desktop, open **Setup** and choose **Gateway**.
+2. Set the **Gateway base URL** to `http://127.0.0.1:31415` for the desktop app,
+   or `http://localhost:3001` for a server install.
+   - In the desktop app, the tray panel's **Copy Claude URL** button copies this.
+   - On the dashboard it is the **Claude base URL** on the Keys page's **Anthropic** tab.
+3. Use the unified key from the dashboard as the API key (`x-api-key`).
+4. Click **Check again**. Model discovery lists `claude-opus-*`, `claude-sonnet-*`
+   and `claude-haiku-*` ids, which route to your free models according to the
+   Claude model mapping on the Keys page.
+
+If you paste the OpenAI-style URL (`.../v1`) by mistake, Claude Desktop calls
+`/v1/v1/models`. FreeLLMAPI now collapses the duplicate `/v1`, so this works
+anyway, but older builds answer 404 with "Gateway /v1/models returned HTTP 404".
 
 ## Coding agents
 
