@@ -25,6 +25,9 @@
  *  4. Bare or ```json-fenced single JSON object: {"name": KNOWN, "arguments": {...}}
  *     (only rescued when "name" matches a requested tool — bare JSON is a
  *     legitimate answer shape, so this one is strictly schema-gated)
+ *  5. Dots XML: <dots_function_call><invoke name="NAME">
+ *     <parameter name="k">v</parameter></invoke></dots_function_call>
+ *     (parameter text becomes string values in one JSON arguments object)
  */
 
 export interface RescuedToolCall {
@@ -49,6 +52,7 @@ const DIALECT_MARKERS = [
   '<|tool_call_begin|>',
   '<tool_call>',
   '<function=',
+  '<dots_function_call>',
 ] as const;
 
 /** Does the (trimmed) text start with a known dialect marker? */
@@ -207,6 +211,51 @@ function parseXmlDialect(text: string, toolNames: Set<string>): { calls: Rescued
 }
 
 /**
+ * Dialect 5: Dots XML.
+ *   <dots_function_call>
+ *     <invoke name="NAME"><parameter name="k">v</parameter></invoke>
+ *   </dots_function_call>
+ * Each invoke is one call. Parameter text is a string value; the arguments
+ * field is the JSON object, same shape as the other dialects.
+ */
+function parseDotsDialect(text: string, toolNames: Set<string>): { calls: RescuedToolCall[] | null; cleanText: string } {
+  const calls: RescuedToolCall[] = [];
+  let parsedAll = true;
+  const blockRe = /<dots_function_call>([\s\S]*?)<\/dots_function_call>/g;
+  const spans: Array<{ from: number; to: number }> = [];
+  let block: RegExpExecArray | null;
+  while ((block = blockRe.exec(text)) !== null) {
+    spans.push({ from: block.index, to: block.index + block[0].length });
+    const invokeRe = /<invoke\s+name\s*=\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_.-]+))\s*>([\s\S]*?)<\/invoke>/g;
+    let inv: RegExpExecArray | null;
+    let sawInvoke = false;
+    while ((inv = invokeRe.exec(block[1])) !== null) {
+      sawInvoke = true;
+      const name = inv[1] ?? inv[2] ?? inv[3];
+      const args: Record<string, string> = {};
+      const paramRe = /<parameter\s+name\s*=\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_.-]+))\s*>([\s\S]*?)<\/parameter>/g;
+      let p: RegExpExecArray | null;
+      while ((p = paramRe.exec(inv[4] ?? '')) !== null) {
+        const key = p[1] ?? p[2] ?? p[3];
+        if (!key) { parsedAll = false; continue; }
+        args[key] = (p[4] ?? '').trim();
+      }
+      if (name && isKnownTool(name, toolNames)) calls.push({ name, arguments: JSON.stringify(args) });
+      else parsedAll = false;
+    }
+    if (!sawInvoke) parsedAll = false;
+  }
+  let clean = text;
+  for (const s of [...spans].reverse()) clean = clean.slice(0, s.from) + clean.slice(s.to);
+  // An opening tag with no close (truncated stream) is detected-but-broken.
+  if (clean.includes('<dots_function_call>')) {
+    parsedAll = false;
+    clean = clean.replace(/<dots_function_call>[\s\S]*$/, '');
+  }
+  return { calls: parsedAll && calls.length > 0 ? calls : null, cleanText: clean.trim() };
+}
+
+/**
  * Rescue inline tool-call dialects out of an assistant text answer.
  *
  * @param text       the assistant message content
@@ -227,6 +276,10 @@ export function rescueInlineToolCalls(text: string, toolNames: Set<string>): Res
   }
   if (text.includes('<tool_call>')) {
     const { calls, cleanText } = parseXmlDialect(text, toolNames);
+    return { detected: true, calls, cleanText };
+  }
+  if (text.includes('<dots_function_call>')) {
+    const { calls, cleanText } = parseDotsDialect(text, toolNames);
     return { detected: true, calls, cleanText };
   }
 
