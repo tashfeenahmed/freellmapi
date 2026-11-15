@@ -364,7 +364,8 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
 // a request right now, same as `?available=true` on /v1/models.
 proxyRouter.get('/codex/models', (req, res) => {
   if (!requireInferenceAuth(req, res)) return;
-  res.json(buildCodexCatalog(buildCatalogEntries({ onlyAvailable: true })));
+  const visionById = new Map(buildModelListing().models.map(m => [m.id, m.supportsVision]));
+  res.json(buildCodexCatalog(buildCatalogEntries({ onlyAvailable: true }), visionById));
 });
 
 // GET /v1/models/:id — OpenAI's `models.retrieve` (single-model lookup).

@@ -4,6 +4,7 @@ import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { encrypt } from '../../lib/crypto.js';
 import { buildCodexCatalog } from '../../services/codex-catalog.js';
+import { CODEX_BASE_INSTRUCTIONS } from '../../services/codex-base-instructions.js';
 
 let app: Express;
 
@@ -19,7 +20,7 @@ async function get(path: string, headers: Record<string, string> = {}) {
   return { status: res.status, body: json };
 }
 
-function addModel(modelId: string, priority: number): void {
+function addModel(modelId: string, priority: number, vision = 0): void {
   const db = getDb();
   const inserted = db.prepare(`
     INSERT INTO models (
@@ -27,8 +28,8 @@ function addModel(modelId: string, priority: number): void {
       rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget,
       context_window, enabled, supports_vision, supports_tools
     )
-    VALUES ('groq', ?, ?, ?, ?, 'Small', NULL, NULL, NULL, NULL, '~1M', 128000, 1, 0, 1)
-  `).run(modelId, `Codex ${modelId}`, priority, priority);
+    VALUES ('groq', ?, ?, ?, ?, 'Small', NULL, NULL, NULL, NULL, '~1M', 128000, 1, ?, 1)
+  `).run(modelId, `Codex ${modelId}`, priority, priority, vision);
   const id = Number(inserted.lastInsertRowid);
   db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, ?, 1)').run(id, priority);
 }
@@ -70,11 +71,29 @@ describe('GET /v1/codex/models', () => {
       expect(typeof m.display_name).toBe('string');
       expect(m.context_window).toBeGreaterThan(0);
       expect(m.max_context_window).toBe(m.context_window);
-      expect(typeof m.base_instructions).toBe('string');
-      expect(m.base_instructions.length).toBeGreaterThan(0);
-      expect(m.apply_patch_tool_type).toBe('freeform');
+      // Codex uses these instructions as its whole system prompt, so they must
+      // be Codex's own default, not a stand-in.
+      expect(m.base_instructions).toBe(CODEX_BASE_INSTRUCTIONS);
+      expect(m.base_instructions).toMatch(/^You are a coding agent running in the Codex CLI/);
+      // /v1/responses forwards function tools only: never advertise the
+      // freeform apply_patch or hosted web-search tools.
+      expect(m.apply_patch_tool_type).toBeNull();
+      expect(m.supports_search_tool).toBe(false);
       expect(Array.isArray(m.experimental_supported_tools)).toBe(true);
     }
+  });
+
+  it('advertises image input only for models that accept images', async () => {
+    addModel('vision-model', 2, 1);
+    const res = await get('/v1/codex/models', { Authorization: `Bearer ${getUnifiedApiKey()}` });
+    const listed = await get('/v1/models?available=true', { Authorization: `Bearer ${getUnifiedApiKey()}` });
+    // Look ids up by name: under unify the listed id is the group's canonical id.
+    const idFor = (name: string) => listed.body.data.find((m: any) => m.name === name).id;
+    const bySlug = new Map(res.body.models.map((m: any) => [m.slug, m.input_modalities]));
+    expect(bySlug.get(idFor('Codex alpha-model'))).toEqual(['text']);
+    expect(bySlug.get(idFor('Codex vision-model'))).toEqual(['text', 'image']);
+    // auto can route an image request to a vision model.
+    expect(bySlug.get('auto')).toEqual(['text', 'image']);
   });
 
   it('lists the same models, with the same context windows, as /v1/models', async () => {

@@ -70,6 +70,20 @@ this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
 Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode, QwenPaw, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
 
+Codex prints "Model metadata for `auto` not found" on every run because it
+does not know the gateway's model ids. To give it real metadata (context
+window, image support), point the provider's `model_catalog_url` at
+`/v1/codex/models` in `~/.codex/config.toml`:
+
+```toml
+[model_providers.freellmapi]
+# ...existing base_url, env_key and wire_api...
+model_catalog_url = "http://localhost:3001/v1/codex/models"
+```
+
+The catalog keeps Codex's own default system prompt and tool settings, so
+only the warning and the context window change.
+
 ### DeepSeek Harness (`dsh`)
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) keeps
