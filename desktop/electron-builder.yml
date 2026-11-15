@@ -89,6 +89,11 @@ appx:
   backgroundColor: transparent
   languages:
     - en-US
+  # electron-builder defaults to MinVersion 10.0.14316 (1607), which Partner
+  # Center rejects for MSIX ("MinVersion <= 10.0.17134.0"). Electron 38 needs
+  # Windows 10 1809+ anyway.
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.26100.0
   # .msix, not .appx: same package format, and `msstore publish` only picks up
   # .msix / .msixupload files.
   artifactName: "${productName}-Store-${version}.msix"
