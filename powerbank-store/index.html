@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VoltPack — Power Banks</title>
+  <meta name="description" content="Fast-charging power banks. Pay with Apple Pay, Visa and more via secure Shopify checkout." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#"><span class="bolt">⚡</span><span id="brandName">VoltPack</span></a>
+    <nav class="links"><a href="#shop">Shop</a><a href="#why">Why us</a><a href="#faq">FAQ</a></nav>
+    <button class="cart-btn" id="openCart" aria-label="Open cart">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+      <span class="badge" id="cartCount">0</span>
+    </button>
+  </header>
+
+  <div class="demo-banner" id="demoBanner" hidden>
+    Demo mode — add your Shopify store in <code>config.js</code> to sell for real.
+  </div>
+
+  <section class="hero">
+    <div class="hero-text">
+      <p class="eyebrow">Never run out of battery</p>
+      <h1>Power that fits<br/>in your pocket.</h1>
+      <p class="sub">Fast-charging power banks for phones, tablets and laptops. Free shipping, 2-year warranty.</p>
+      <div class="hero-cta">
+        <a class="btn primary" href="#shop">Shop power banks</a>
+      </div>
+      <div class="pay-row" aria-label="Accepted payments">
+        <span class="pay apple">Apple Pay</span>
+        <span class="pay visa">VISA</span>
+        <span class="pay mc"><i></i><i></i></span>
+        <span class="pay gpay">G Pay</span>
+        <span class="pay shop">shop<b>Pay</b></span>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="device"><div class="level"></div><div class="dots"><i></i><i></i><i></i><i></i></div><span>⚡</span></div>
+    </div>
+  </section>
+
+  <section id="shop" class="section">
+    <div class="section-head">
+      <h2>Shop power banks</h2>
+      <div class="filters" id="filters"></div>
+    </div>
+    <div class="grid" id="products"><div class="loading">Loading products…</div></div>
+  </section>
+
+  <section id="why" class="section features">
+    <div class="feature"><h3>🔒 Secure checkout</h3><p>Payments are processed by Shopify. We never see your card details.</p></div>
+    <div class="feature"><h3>💳 Apple Pay & Visa</h3><p>One-tap Apple Pay, plus Visa, Mastercard, Amex, Google Pay and Shop Pay.</p></div>
+    <div class="feature"><h3>🚚 Free shipping</h3><p>Free shipping on all orders, delivered in 3–5 business days.</p></div>
+    <div class="feature"><h3>🛡️ 2-year warranty</h3><p>Every power bank is covered. 30-day no-questions returns.</p></div>
+  </section>
+
+  <section id="faq" class="section faq">
+    <h2>FAQ</h2>
+    <details><summary>Can I take a power bank on a plane?</summary><p>Yes — power banks under 100 Wh (about 27,000 mAh) are allowed in carry-on luggage on most airlines.</p></details>
+    <details><summary>How do I pay with Apple Pay?</summary><p>Click checkout and choose Apple Pay on Safari / iPhone / Mac. Visa and other cards work on every device.</p></details>
+    <details><summary>Will it charge my laptop?</summary><p>Models with 65 W+ USB-C PD charge most USB-C laptops including MacBook Air and Pro.</p></details>
+  </section>
+
+  <footer class="footer">© <span id="year"></span> <span class="store-name">VoltPack</span>. Checkout powered by Shopify.</footer>
+
+  <!-- Cart drawer -->
+  <div class="overlay" id="overlay" hidden></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head"><h3>Your cart</h3><button class="icon-btn" id="closeCart" aria-label="Close cart">✕</button></div>
+    <div class="drawer-body" id="cartItems"></div>
+    <div class="drawer-foot">
+      <div class="row"><span>Subtotal</span><strong id="subtotal">$0.00</strong></div>
+      <p class="muted small">Shipping & taxes calculated at checkout.</p>
+      <button class="btn checkout apple-btn" id="applePayBtn">Apple Pay</button>
+      <button class="btn primary block" id="checkoutBtn">Checkout · Visa / Card</button>
+      <div class="pay-row small-row"><span class="pay apple">Apple Pay</span><span class="pay visa">VISA</span><span class="pay mc"><i></i><i></i></span><span class="pay gpay">G Pay</span></div>
+      <p class="muted small center">🔒 Secure checkout by Shopify</p>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
