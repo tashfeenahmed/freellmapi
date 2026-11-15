@@ -25,6 +25,19 @@ Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
 
 ## Coding agents
 
+Install the agent itself first: FreeLLMAPI does not bundle it. For Claude Code, see
+[the Claude Code setup guide](https://docs.claude.com/en/docs/claude-code/setup), then check
+that `claude --version` works in a new terminal. The desktop app listens on
+`http://127.0.0.1:31415`, so use that in place of `http://localhost:3001` below.
+
+On Windows (PowerShell), with the unified key from the dashboard:
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:31415"
+$env:ANTHROPIC_AUTH_TOKEN = "<unified-key>"
+claude
+```
+
 Use the generator instead of hand-editing a client configuration:
 
 ```bash
