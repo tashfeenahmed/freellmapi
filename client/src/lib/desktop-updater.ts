@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 /** Mirrors desktop/src/update-support.ts — the main process's updater state. */
 export type DesktopUpdateState =
-  | { phase: 'unsupported'; reason: 'dev' | 'package' }
+  | { phase: 'unsupported'; reason: 'dev' | 'package' | 'store' }
   | { phase: 'idle' }
   | { phase: 'checking' }
   | { phase: 'current'; checkedAt: string }

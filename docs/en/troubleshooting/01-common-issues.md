@@ -50,6 +50,16 @@
 
 **Fix:** Open tray → `Open Logs Folder` → `freeapi.log` (`desktop/src/logger.ts` tee, `installFileLogger` before server boot). Or use `docker logs`.
 
+## Windows: "Smart App Control blocked an app that may be unsafe"
+
+**Symptom:** On Windows 11 with Smart App Control on, the `FreeLLMAPI-Setup-*.exe` installer (or the app it installs) is blocked with "could not verify the publisher" and there is no "Run anyway" button (#1933).
+
+**Cause:** The GitHub `.exe` is not code-signed. Smart App Control only runs files Microsoft's cloud already trusts or that carry a signature from a trusted certificate authority, and it has no per-app exception.
+
+**Fix:** Install FreeLLMAPI from the Microsoft Store once it is listed there: the Store signs its package, so it runs with Smart App Control on, and the Store keeps it updated. Until then, run FreeLLMAPI with Docker Desktop (see `install/01-install.md`). Turning Smart App Control off also works, but on some Windows builds it cannot be turned back on without reinstalling Windows.
+
+The Store package is built by `npm --prefix desktop run dist:store` on Windows and by the release workflow's "Package Microsoft Store MSIX" step; the `store` job submits it when the `MSSTORE_SUBMIT` repository variable is `draft` or `auto`.
+
 ## Update-check shows no update / unsigned build won't auto-update
 
 **Symptom:** Dashboard checker shows `latest > running` but `Squirrel.Mac` refuses, or DMG auto-update fails.
