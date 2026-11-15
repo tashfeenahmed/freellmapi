@@ -21,6 +21,9 @@ export interface NormalizedModel {
   // `supported_parameters` so agents can pick knobs per model.
   platforms: string[];
   supportsTools: boolean;
+  // Accepts image input (any member, under unify — the router can steer an
+  // image request to a vision-capable member). Feeds /v1/codex/models.
+  supportsVision: boolean;
   // Dynamic execution status for agents: `ready` (a key can serve it right
   // now), `needsKey` (disabled, or no enabled key matches it — available=0's
   // breakdown), or `exhausted` (keys exist but every one is currently blocked,
@@ -85,9 +88,9 @@ export function buildModelListing(): ModelListing {
   if (isUnifyEnabled()) {
     // Unify ON: one entry per logical model group. Pull per-row availability +
     // context keyed by db id, then aggregate over each group's members.
-    type AvailRow = { id: number; platform: string; intelligence_rank: number; context_window: number | null; enabled: number; available: number; supports_tools: number };
+    type AvailRow = { id: number; platform: string; intelligence_rank: number; context_window: number | null; enabled: number; available: number; supports_tools: number; supports_vision: number };
     const rows = db.prepare(`
-      SELECT m.id, m.platform, m.intelligence_rank, m.context_window, m.supports_tools,
+      SELECT m.id, m.platform, m.intelligence_rank, m.context_window, m.supports_tools, m.supports_vision,
              m.enabled AS enabled, ${availableExpr} AS available
       FROM models m
     `).all() as AvailRow[];
@@ -105,6 +108,7 @@ export function buildModelListing(): ModelListing {
         intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
         platforms: [...new Set(infos.map(i => i.platform))],
         supportsTools: infos.some(i => i.supports_tools === 1),
+        supportsVision: infos.some(i => i.supports_vision === 1),
         // A group is ready when ANY member can serve it — that is exactly the
         // choice the router has when it dispatches the group.
         executionStatus: executionStatusFor(g.members.map(m => m.model_db_id), available),
@@ -114,9 +118,9 @@ export function buildModelListing(): ModelListing {
     // Unify OFF: one entry per model_id (dedup picks the available, smartest
     // representative row).
     const models = db.prepare(`
-      SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id, supports_tools
+      SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id, supports_tools, supports_vision
       FROM (
-        SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id, m.supports_tools,
+        SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id, m.supports_tools, m.supports_vision,
                m.enabled AS enabled,
                ${availableExpr} AS available,
                ROW_NUMBER() OVER (
@@ -126,13 +130,14 @@ export function buildModelListing(): ModelListing {
         FROM models m
       )
       WHERE rn = 1
-    `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number })[];
+    `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number; supports_vision: number })[];
     allListed = models.map(m => ({
       id: m.model_id, name: m.display_name, ownedBy: m.platform,
       available: m.available, enabled: m.enabled, contextWindow: m.context_window,
       intel: m.intelligence_rank,
       platforms: [m.platform],
       supportsTools: m.supports_tools === 1,
+      supportsVision: m.supports_vision === 1,
       executionStatus: executionStatusFor([m.id], m.available),
     }));
   }
