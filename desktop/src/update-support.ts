@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export type UpdateState =
-  | { phase: 'unsupported'; reason: 'dev' | 'package' }
+  | { phase: 'unsupported'; reason: 'dev' | 'package' | 'store' }
   | { phase: 'idle' }
   | { phase: 'checking' }
   | { phase: 'current'; checkedAt: string }
@@ -20,12 +20,14 @@ export type UpdateState =
  * portable .zip does not), a mac .app that is not running from the mounted dmg,
  * and the Linux AppImage. deb/rpm/tar.xz belong to the package manager.
  * FREEAPI_UPDATE_FEED lets an unpackaged build exercise the real flow against
- * a local feed during development.
+ * a local feed during development. A Microsoft Store (MSIX) install never
+ * updates itself: the Store signs, ships and installs every update (#1933).
  */
 export function updateSupport(
-  env: { isPackaged: boolean; platform: NodeJS.Platform; execPath: string; appImage?: string; feed?: string; productName: string },
+  env: { isPackaged: boolean; platform: NodeJS.Platform; execPath: string; appImage?: string; feed?: string; productName: string; windowsStore?: boolean },
   exists: (file: string) => boolean = fs.existsSync,
 ): UpdateState | null {
+  if (env.windowsStore) return { phase: 'unsupported', reason: 'store' };
   if (!env.isPackaged && !env.feed) return { phase: 'unsupported', reason: 'dev' };
   if (env.feed) return null;
   if (env.platform === 'darwin') {

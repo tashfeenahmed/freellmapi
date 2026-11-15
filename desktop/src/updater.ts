@@ -22,6 +22,8 @@ export type { UpdateState };
 const { autoUpdater } = electronUpdater;
 
 const RELEASES_URL = 'https://github.com/tashfeenahmed/freellmapi/releases/latest';
+// The Store's own page for this app: Store installs get their updates there.
+const STORE_URL = 'ms-windows-store://pdp/?productid=9PBN6G8K2B7F';
 const BACKGROUND_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const FIRST_BACKGROUND_CHECK_MS = 60 * 1000;
 
@@ -123,6 +125,8 @@ export function initUpdater(options: UpdaterHooks): void {
     appImage: process.env.APPIMAGE,
     feed: process.env.FREEAPI_UPDATE_FEED,
     productName: app.getName(),
+    // Electron sets this when the app runs from an MSIX/AppX package.
+    windowsStore: process.windowsStore === true,
   });
   if (unsupported) {
     state = unsupported;
@@ -251,7 +255,7 @@ export async function installUpdate(): Promise<UpdateState> {
 export async function checkFromTray(): Promise<void> {
   const locale = hooks?.getLocale() ?? 'en';
   if (state.phase === 'unsupported') {
-    await shell.openExternal(RELEASES_URL);
+    await shell.openExternal(state.reason === 'store' ? STORE_URL : RELEASES_URL);
     return;
   }
   if (state.phase === 'ready') {

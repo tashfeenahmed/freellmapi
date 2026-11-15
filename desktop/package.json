@@ -22,6 +22,7 @@
     "dist": "npm run build:all && npm run stage:client && electron-builder --mac --arm64 --publish never",
     "dist:mac:x64": "npm run build:all && npm run stage:client && electron-builder --mac --x64 --publish never",
     "dist:win": "npm run build:all && npm run stage:client && electron-builder --win --x64 --publish never",
+    "dist:store": "npm run build:all && npm run stage:client && electron-builder --win appx --x64 -c.directories.buildResources=store-assets -c.directories.output=dist-store --publish never",
     "dist:linux": "npm run build:all && npm run stage:client && electron-builder --linux --x64 --publish never",
     "test": "vitest run"
   },
