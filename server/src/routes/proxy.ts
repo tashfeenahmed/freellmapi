@@ -37,7 +37,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
@@ -515,7 +515,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
     },
     ...claudeFamilyEntries,
     ...profileRows.map(p => {
-      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
       return {
         id: `auto:${p.name.toLowerCase()}`,
         object: 'model',

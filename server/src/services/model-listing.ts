@@ -1,7 +1,7 @@
 import type { ModelListRow } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { isUnifyEnabled, getModelGroups } from './model-groups.js';
-import { hasUsableKeyForModel } from './router.js';
+import { CONTEXT_WINDOW_SAFETY_FACTOR, hasUsableKeyForModel } from './router.js';
 
 // Shared catalog-listing logic behind both the OpenAI `GET /v1/models` and the
 // Anthropic `GET /v1/models` endpoints, so the two wire formats list the exact
@@ -67,6 +67,20 @@ function executionStatusFor(modelDbIds: number[], available: number): 'ready' | 
  * most of the pool rejects (#1717). Larger requests still route: the router's
  * size gates send them to the models that can hold them.
  */
+/**
+ * The window a client may actually fill: the raw window divided by the
+ * router's CONTEXT_WINDOW_SAFETY_FACTOR. The router only accepts a request
+ * whose estimated size times that factor fits the raw window
+ * (fitsContextWindow), so advertising the raw number let clients like OpenCode
+ * grow their history to sizes the router then turned away with a context
+ * overflow. Every listing (OpenAI, Anthropic, Gemini, Ollama, MCP, Codex) reads
+ * windows from here, so they all advertise what a request can really use.
+ */
+export function advertisedContextWindow(raw: number | null | undefined): number | null {
+  if (typeof raw !== 'number' || raw <= 0) return null;
+  return Math.floor(raw / CONTEXT_WINDOW_SAFETY_FACTOR);
+}
+
 export function servableContextWindow(windows: readonly (number | null | undefined)[]): number | null {
   const known = windows.filter((w): w is number => typeof w === 'number' && w > 0).sort((a, b) => b - a);
   if (known.length === 0) return null;
@@ -104,7 +118,7 @@ export function buildModelListing(): ModelListing {
         ownedBy: 'freellmapi',
         available,
         enabled: infos.some(i => i.enabled === 1) ? 1 : 0,
-        contextWindow: servableContextWindow(infos.map(i => i.context_window)),
+        contextWindow: advertisedContextWindow(servableContextWindow(infos.map(i => i.context_window))),
         intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
         platforms: [...new Set(infos.map(i => i.platform))],
         supportsTools: infos.some(i => i.supports_tools === 1),
@@ -133,7 +147,7 @@ export function buildModelListing(): ModelListing {
     `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number; supports_vision: number })[];
     allListed = models.map(m => ({
       id: m.model_id, name: m.display_name, ownedBy: m.platform,
-      available: m.available, enabled: m.enabled, contextWindow: m.context_window,
+      available: m.available, enabled: m.enabled, contextWindow: advertisedContextWindow(m.context_window),
       intel: m.intelligence_rank,
       platforms: [m.platform],
       supportsTools: m.supports_tools === 1,
@@ -146,6 +160,8 @@ export function buildModelListing(): ModelListing {
   allListed.sort((a, b) =>
     (b.available - a.available) || (b.enabled - a.enabled) || (a.intel - b.intel) || a.name.localeCompare(b.name));
 
+  // Already-advertised windows: the median of the divided values is the
+  // divided median, so no second division here.
   const autoContextWindow = servableContextWindow(
     allListed.filter(m => m.available === 1).map(m => m.contextWindow),
   );
