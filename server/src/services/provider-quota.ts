@@ -119,9 +119,14 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'aclide') return 'aclide::monthly-credit';
   if (platform === 'speka') return 'speka::monthly-credit';
   if (platform === 'nabh') return 'nabh::monthly-credit';
+  if (platform === 'zro') return 'zro::daily-free';
   if (platform === 'novai') return 'novai::daily-free';
   if (platform === 'varosity') return 'varosity::account-credit';
   if (platform === 'rime') return 'rime::monthly-credit';
+  if (platform === 'typecast') return 'typecast::monthly-credit';
+  if (platform === 'cartesia') return 'cartesia::monthly-credit';
+  if (platform === 'silvr') return 'silvr::daily-free';
+  if (platform === 'freetts') return 'freetts::monthly-characters';
   if (platform === 'freeinference') return 'freeinference::daily-free';
   if (platform === 'freemodel') return 'freemodel::account-free';
   if (platform === 'apinex') return 'apinex::daily-free';
@@ -187,6 +192,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   // AnyAPI: the free tier is one 100K-tokens/day budget for the whole account,
   // shared across every free/basic model — so one pool, not one per model.
   if (platform === 'anyapi') return 'anyapi::free';
+  if (platform === 'powertokens') return 'powertokens::account';
   // ModelScope: one 2000-requests/day quota across the whole account.
   if (platform === 'modelscope') return 'modelscope::account';
   return normalizedModelId ? `${platform}::${normalizedModelId}` : `${platform}::account`;
@@ -195,6 +201,8 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
 function isSharedPool(platform: Platform): boolean {
   if (platform === 'varosity') return true;
   if (platform === 'rime') return true;
+  if (platform === 'typecast' || platform === 'cartesia' || platform === 'silvr') return true;
+  if (platform === 'freetts') return true;
   if (platform === 'freemodel') return true;
   if (platform === 'apinex') return true;
   if (platform === 'onomeo') return true;
@@ -204,7 +212,7 @@ function isSharedPool(platform: Platform): boolean {
   if (platform === 'plugsky') return true;
   if (platform === 'inferbase' || platform === 'simplellm') return true;
   if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'powertokens', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };

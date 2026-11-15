@@ -77,6 +77,34 @@ describe('Admin API rate limiter', () => {
     expect(sawRateLimit).toBe(true);
   });
 
+  it('throttles key reveal to 60 a minute (#1885)', async () => {
+    // Reveal also re-verifies the password, so it gets its own bucket instead
+    // of sharing the 600/min dashboard limit.
+    const server = app.listen(0, '127.0.0.1');
+    if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
+    const addr = server.address() as any;
+    const statuses: number[] = [];
+    let limitHeader: string | null = null;
+    for (let i = 0; i < 61; i++) {
+      const res = await fetch(`http://127.0.0.1:${addr.port}/api/keys/1/reveal`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (i === 0) limitHeader = res.headers.get('x-ratelimit-limit');
+      statuses.push(res.status);
+      await res.arrayBuffer();
+    }
+    server.close();
+    expect(limitHeader).toBe('60');
+    // No password header: the handler answers 403, which still counts.
+    expect(statuses.slice(0, 60).every(s => s === 403)).toBe(true);
+    expect(statuses[60]).toBe(429);
+
+    // Other /api/keys routes keep the broad limit.
+    const { headers } = await request(app, '/api/keys', token);
+    expect(headers.get('x-ratelimit-limit')).not.toBe('60');
+  });
+
   it('can be disabled entirely with ADMIN_RATE_LIMIT_RPM=0', async () => {
     process.env.ADMIN_RATE_LIMIT_RPM = '0';
     try {

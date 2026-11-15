@@ -1,5 +1,6 @@
 import type { ChatCompletionChunk, ChatCompletionResponse, ChatMessage } from '@freellmapi/shared/types.js';
 import type { CompletionOptions, KeyValidationResult, ProviderFetchOptions } from './base.js';
+import { providerRequestError } from './base.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -17,7 +18,7 @@ const FREE_ROUTES: Readonly<Record<string, string>> = {
 const upstreamError = (message: string) => Object.assign(new Error(`KiosAPI ${message}`), { status: 502 });
 function requireFree(model: string): void {
   if (!Object.hasOwn(FREE_ROUTES, model)) {
-    throw Object.assign(new Error('KiosAPI requires a verified free model route'), { status: 400 });
+    throw providerRequestError('KiosAPI requires a verified free model route', 'model');
   }
 }
 function checkIdentity(requested: string, returned: unknown): void {

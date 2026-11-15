@@ -10,6 +10,7 @@ import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
 import { openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
+import { installGpuRecovery } from './gpu-recovery-host.js';
 import { initUpdater, getUpdateState, checkForUpdates, downloadUpdate, installUpdate, checkFromTray } from './updater.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,9 @@ if (!app.requestSingleInstanceLock()) {
   // without this the server's console output — the password-reset code above
   // all (#824) — is written nowhere the user can read it.
   installFileLogger();
+
+  // Before 'ready': GPU switches only take effect if set now (#1759).
+  installGpuRecovery();
 
   let resolvedPort = DEFAULT_PORT;
   let sessionToken = '';
@@ -152,6 +156,7 @@ if (!app.requestSingleInstanceLock()) {
   ipcMain.handle('freeapi:open-dashboard', () => openDashboard(resolvedPort, sessionToken));
   ipcMain.handle('freeapi:copy-base-url', () => clipboard.writeText(`http://127.0.0.1:${resolvedPort}/v1`));
   ipcMain.handle('freeapi:copy-api-key', () => clipboard.writeText(getUnifiedApiKey()));
+  ipcMain.handle('freeapi:get-login-item', () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle('freeapi:set-login-item', (_e, open: boolean) => app.setLoginItemSettings({ openAtLogin: open }));
   ipcMain.handle('freeapi:quit', () => app.quit());
   // Dashboard → the in-app updater (preload __FREEAPI_UPDATER__). Each call

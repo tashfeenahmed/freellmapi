@@ -46,8 +46,27 @@ it('omits Waterfall and ACLIDE from the add-key provider picker', async () => {
   const options = [...container.querySelectorAll('option')].map(option => option.value)
   expect(options).toContain('groq')
   expect(options).toContain('rime')
+  expect(options).toContain('freetts')
+  expect(options).toContain('zro')
+  expect(options).toContain('typecast')
+  expect(options).toContain('cartesia')
+  expect(options).toContain('silvr')
+  expect(PLATFORMS.find(p => p.value === 'typecast')?.label).toMatch(/non-commercial, attribution required/i)
+  expect(PLATFORMS.find(p => p.value === 'cartesia')?.label).toMatch(/non-commercial/i)
+  expect(PLATFORMS.find(p => p.value === 'zro')).toMatchObject({
+    label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys',
+  })
+  expect(PLATFORMS.find(p => p.value === 'freetts')?.label).toMatch(/personal use only.*watermarked/i)
   expect(options).not.toContain('waterfall')
   expect(options).not.toContain('aclide')
+})
+
+it('offers Varosity without promising a recurring daily credit', async () => {
+  await mount(<AddKeyForm onSuccess={() => {}} />)
+  const option = container.querySelector('option[value="varosity"]')
+  expect(option).not.toBeNull()
+  expect(option?.textContent).toContain('Varosity')
+  expect(option?.textContent).not.toMatch(/daily/i)
 })
 
 it('omits Waterfall and ACLIDE from the add-model provider picker', async () => {

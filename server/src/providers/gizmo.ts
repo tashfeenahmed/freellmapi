@@ -1,5 +1,5 @@
 import type { ChatCompletionChunk, ChatCompletionResponse, ChatMessage } from '@freellmapi/shared/types.js';
-import { providerHttpError, type CompletionOptions, type KeyValidationResult } from './base.js';
+import { providerHttpError, providerRequestError, type CompletionOptions, type KeyValidationResult } from './base.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -7,14 +7,14 @@ export const GIZMO_BASE_URL = 'https://api.gizmoplatforms.com/api/v1';
 
 function textMessages(messages: ChatMessage[], options?: CompletionOptions): ChatMessage[] {
   if (options?.tools?.length || (options?.tool_choice && options.tool_choice !== 'none')) {
-    throw Object.assign(new Error('Gizmo chat supports text only, not tool calling'), { status: 400 });
+    throw providerRequestError('Gizmo chat supports text only, not tool calling', 'request');
   }
   if (messages.length < 1 || messages.length > 200) {
-    throw Object.assign(new Error('Gizmo requires 1–200 text messages'), { status: 400 });
+    throw providerRequestError('Gizmo requires 1–200 text messages', 'request');
   }
   return messages.map(message => {
     if (!['system', 'developer', 'user', 'assistant'].includes(message.role) || message.tool_calls?.length) {
-      throw Object.assign(new Error('Gizmo chat does not support tool messages'), { status: 400 });
+      throw providerRequestError('Gizmo chat does not support tool messages', 'request');
     }
     const content = Array.isArray(message.content)
       ? message.content.every(part => typeof part === 'string' || part.type === 'text')
@@ -22,7 +22,7 @@ function textMessages(messages: ChatMessage[], options?: CompletionOptions): Cha
         : null
       : message.content;
     if (typeof content !== 'string') {
-      throw Object.assign(new Error('Gizmo chat requires text content; images and audio are not supported'), { status: 400 });
+      throw providerRequestError('Gizmo chat requires text content; images and audio are not supported', 'request');
     }
     // Do not leak replay metadata, names or other provider-private fields into
     // Gizmo's strict nested schema.

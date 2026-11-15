@@ -283,7 +283,7 @@ function assistantText(payload: any): string {
 async function askFreeLlmApi(args: Record<string, unknown>, req: Request, res: Response): Promise<unknown> {
   const parsed = askFreeLlmApiSchema.safeParse(args);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(error => `${error.path.join('.') || 'arguments'}: ${error.message}`)
       .slice(0, 5)
       .join(', ');

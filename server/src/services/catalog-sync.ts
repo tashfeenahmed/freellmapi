@@ -4,7 +4,7 @@ import { getDb, getSetting, setSetting } from '../db/index.js';
 import { hasProvider } from '../providers/index.js';
 import { MEDIA_PLATFORMS, TRANSCRIPTION_PLATFORMS, VIDEO_PLATFORMS } from './media.js';
 import { SEARCH_ENGINE_PLATFORMS, SEARCH_MODALITY } from './search.js';
-import { DECISION_MODALITY, DECISION_PLATFORMS } from './decision.js';
+import { DECISION_MODALITY, CATALOG_DECISION_PLATFORMS } from './decision.js';
 import { EMBEDDING_PLATFORMS } from './embeddings.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
@@ -758,7 +758,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     // They ride on the platform's existing keys and never enter chat routing.
     if (catalog.decisionModels) {
       for (const m of catalog.decisionModels) {
-        if (!DECISION_PLATFORMS.has(m.platform)) {
+        if (!CATALOG_DECISION_PLATFORMS.has(m.platform)) {
           counts.skippedUnknownPlatform++;
           continue;
         }
@@ -988,7 +988,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         .prepare('SELECT id, platform, model_id FROM media_models WHERE modality = ?')
         .all(DECISION_MODALITY) as { id: number; platform: string; model_id: string }[];
       for (const c of decisionCandidates) {
-        if (!DECISION_PLATFORMS.has(c.platform)) continue;
+        if (!CATALOG_DECISION_PLATFORMS.has(c.platform)) continue;
         if (!inDecisionCatalog.has(`${c.platform}:${c.model_id}`)) {
           deleteMedia.run(c.id);
           counts.removed++;

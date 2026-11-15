@@ -1,5 +1,5 @@
 import { OpenAICompatProvider } from './openai-compat.js';
-import type { KeyValidationResult, ProviderFetchOptions } from './base.js';
+import { providerHttpError, type KeyValidationResult, type ProviderFetchOptions } from './base.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 
 /** Domestic console (bigmodel.cn) — the historical registration default. */
@@ -97,9 +97,16 @@ export class ZhipuProvider extends OpenAICompatProvider {
       return this.validationResult(domesticRes);
     }
 
-    if (globalRes.status !== 401 && globalRes.status !== 403) {
+    if (globalRes.ok) {
       this.globalKeys.add(apiKey);
       return this.validationResult(globalRes);
+    }
+
+    if (globalRes.status !== 401 && globalRes.status !== 403) {
+      // A global outage or rate limit proves neither the key nor its console.
+      // Report an inconclusive probe rather than pinning an unverified key or
+      // treating the domestic rejection as a confirmed invalid credential.
+      throw providerHttpError(globalRes, `Zhipu global key validation failed (HTTP ${globalRes.status}); the key was not checked`);
     }
 
     // Rejected by both consoles. Report the domestic failure: that is the host

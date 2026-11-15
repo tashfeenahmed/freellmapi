@@ -20,14 +20,13 @@ provider-reported model identities, not independent attestation of weights.
 
 ## Free eligibility and safety
 
-The published free plan offers **10 credits ($0.10) per day** after email
-confirmation, without a credit card. This is a **shared account allowance**,
-not ten credits per model; daily grants expire at midnight UTC and do not roll
-over. The separate $1.50 starter credit is not recurring, and starter grants
-are limited. Successful tests used
-the account's existing credits and demonstrate working API access, not
-independent proof of future daily funding. Pricing and grant availability
-can change.
+Varosity ended its daily free credit on November 9, 2026. New accounts may
+receive a one-time $1.50 starter credit after email confirmation, subject to
+the provider's limits. This is a **shared account balance**, not a recurring
+allowance per model. Once the balance is exhausted, further use requires a
+plan or top-up. Successful tests used existing account credits and demonstrate
+working API access, not ongoing free availability. Pricing and grant
+availability can change.
 
 The tested requests cost 1–3 cents/image, 1 cent/short speech sample,
 10 cents/Lyria track, and 7 cents/one-second Grok clip. Longer speech uses
@@ -49,3 +48,6 @@ Sources checked November 7, 2026:
 - <https://varosity.ai/pricing>
 - <https://varosity.ai/docs>
 - <https://varosity.ai/api/openapi.json>
+
+Free-credit update verified November 10, 2026 against the provider's pricing
+page and the provider's notice in issue #1853.

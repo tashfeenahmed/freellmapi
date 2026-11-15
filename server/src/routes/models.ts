@@ -106,7 +106,7 @@ const createModelSchema = z.object({
 modelsRouter.post('/', (req: Request, res: Response) => {
   const parsed = createModelSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -273,7 +273,7 @@ modelsRouter.patch('/:id', (req: Request, res: Response) => {
 
   const parsed = modelUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -407,6 +407,14 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
     return;
   }
   modelTestCooldowns.set(id, now);
+
+  // Legacy rows for non-chat platforms: explain instead of reporting a missing key.
+  const platformProvider = hasProvider(modelRow.platform as Platform) ? getProvider(modelRow.platform as Platform) : undefined;
+  if (platformProvider?.supportsChat === false) {
+    res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
+      error: 'Platform does not support chat completions' });
+    return;
+  }
 
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.

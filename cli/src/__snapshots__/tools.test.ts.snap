@@ -643,16 +643,27 @@ exports[`tool generators > setup-opencode has stable golden output 1`] = `
             "name": "FreeLLMAPI",
             "npm": "@ai-sdk/openai-compatible",
             "options": {
-              "apiKey": "{env:FREELLMAPI_API_KEY}",
+              "apiKey": undefined,
               "baseURL": "http://localhost:3000/v1",
             },
           },
         },
       },
     },
+    {
+      "format": "json",
+      "path": "/home/tester/.local/share/opencode/auth.json",
+      "sensitive": true,
+      "value": {
+        "freellmapi": {
+          "key": "freellmapi-test-key",
+          "type": "api",
+        },
+      },
+    },
   ],
   "notes": [
-    "Export FREELLMAPI_API_KEY before starting OpenCode.",
+    "The key is stored in OpenCode's auth.json, so no environment variable is needed (CLI or desktop app).",
     "freellmapi/fast-coder is now the default model.",
   ],
 }

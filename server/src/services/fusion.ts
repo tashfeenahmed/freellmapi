@@ -372,6 +372,12 @@ export async function runModelCall(
       if (isRetryableError(err)) {
         if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+        // An adapter's own capability/allow-list rejection is request-specific,
+        // not evidence that the key hit a rate limit.
+        if (err?.providerRejection === 'request' || err?.providerRejection === 'model') {
+          skipModels.add(route.modelDbId);
+          continue;
+        }
         // Provenance mirrors cooldownDecisionForError (lib/fallback-loop.ts):
         // credit/tier benches are never probe-recovered, Retry-After-backed
         // ones only when our heuristic outlasted the provider's own retry time.
@@ -482,6 +488,10 @@ async function runJudgeStreaming(
       if (isRetryableError(err)) {
         if (isModelNotFoundError(err) || isModelAccessForbiddenError(err)) skipModels.add(route.modelDbId);
         skipKeys.add(`${route.platform}:${route.modelId}:${route.keyId}`);
+        if (err?.providerRejection === 'request' || err?.providerRejection === 'model') {
+          skipModels.add(route.modelDbId);
+          continue;
+        }
         // Same provenance mapping as the non-stream path above.
         const decision = isPaymentRequiredError(err)
           ? { durationMs: getPaymentRequiredCooldownMs(), source: 'credit' as const }

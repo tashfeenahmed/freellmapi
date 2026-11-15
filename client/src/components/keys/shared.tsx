@@ -35,6 +35,10 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'kenari', label: 'Kenari (shared daily free chat and images)', url: 'https://kenari.id' },
   { value: 'kiosapi', label: 'KiosAPI (shared daily free chat)', url: 'https://kiosapi.id/dashboard/keys' },
   { value: 'beatapi', label: 'BeatAPI (JEV decisions; temporary free offer)', url: 'https://beatapi.io' },
+  // #1804: decision-only and keyless. Listed here so the Keys page can add the
+  // anonymous sentinel the decision router needs to consider them configured.
+  { value: 'halx', label: 'HAL-X (keyless decisions)', url: 'https://hal-x.ai', keyless: true },
+  { value: 'aisense', label: 'AI SENSE (keyless decisions)', url: 'https://www.aisense.no/free-public-api-decide-api-endpoint', keyless: true },
   { value: 'apinex', label: 'APINex (shared daily free chat and decisions)', url: 'https://apinex.bond/keys' },
   { value: 'onomeo', label: 'onomeo (30 free calls / 5 hours, shared)', url: 'https://onomeo.com/dashboard' },
   { value: 'iteracompute', label: 'IteraCompute (30M free tokens / month, shared)', url: 'https://iteracompute.com/free/' },
@@ -48,9 +52,14 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'moondream', label: 'Moondream ($5 shared monthly credits)', url: 'https://moondream.ai/c/cloud/api-keys' },
   { value: 'jamai', label: 'JamAI Base (monthly ELLM allowance)', url: 'https://cloud.jamaibase.com' },
   { value: 'nabh', label: 'nabh.cloud (50 shared monthly credits)', url: 'https://app.nabh.cloud' },
+  { value: 'zro', label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys' },
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
-  { value: 'varosity', label: 'Varosity (shared daily media credits)', url: 'https://varosity.ai/app/keys/api-keys' },
+  { value: 'varosity', label: 'Varosity (one-time $1.50 starter credit)', url: 'https://varosity.ai/app/keys/api-keys' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
+  { value: 'typecast', label: 'Typecast (15K credits/month; non-commercial, attribution required)', url: 'https://studio.typecast.ai/developers/api' },
+  { value: 'cartesia', label: 'Cartesia (20K shared credits/month; non-commercial Free plan)', url: 'https://play.cartesia.ai/keys' },
+  { value: 'silvr', label: 'SilvR AI ($3.50 shared daily allowance)', url: 'https://dashboard.silvrai.net' },
+  { value: 'freetts', label: 'FreeTTS (personal use only; watermarked TTS)', url: 'https://freetts.org/dashboard?section=api-keys' },
   { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
   { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
   { value: 'google', label: 'Google AI Studio', url: 'https://aistudio.google.com/apikey' },
@@ -104,6 +113,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // CATALOG-ANYAPI-SMOKE-2026-08-10 in the ops repo). No quota claim until
   // their free tier demonstrably works.
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
+  // Free: glm-4.7-flash $0/1M in+out (0 Credits) on Models UI, 2026-10-22.
+  { value: 'powertokens', label: 'PowerTokens (free: glm-4.7-flash)', url: 'https://www.powertokens.ai' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name
@@ -133,6 +144,8 @@ export const CUSTOM_MODEL_KIND_LABEL: Record<ApiKeyModel['kind'], string> = {
   image: 'keys.customTypeImage',
   audio: 'keys.customTypeAudio',
   transcription: 'keys.customTypeTranscription',
+  search: 'keys.customTypeSearch',
+  decision: 'keys.customTypeDecision',
 }
 
 export function customModelDeleteKey(model: ApiKeyModel): string {

@@ -15,11 +15,11 @@ describe('macOS release metadata', () => {
   let arm64: string;
   let x64: string;
 
-  function fixture(arch: string) {
-    const dir = join(directory, arch);
+  function fixture(arch: string, platform = '') {
+    const dir = join(directory, `${platform}${arch}`);
     mkdirSync(dir);
     const files = ['zip', 'dmg'].map((extension) => {
-      const url = `FreeLLMAPI-0.10.0-${arch}.${extension}`;
+      const url = `FreeLLMAPI-0.10.0-${platform}${arch}.${extension}`;
       const bytes = Buffer.from(`${arch} ${extension} package`);
       writeFileSync(join(dir, url), bytes);
       return { url, sha512: hashFile(join(dir, url)), size: bytes.length };
@@ -54,6 +54,16 @@ describe('macOS release metadata', () => {
     expect(merged.path).toBe('FreeLLMAPI-0.10.0-arm64.zip');
     expect(merged.sha512).toBe(merged.files[0].sha512);
     expect(merged.releaseDate).toBe('2026-09-15T12:00:00.000Z');
+  });
+
+  it('merges platform-labelled artifacts without changing the updater URLs', () => {
+    const merged: any = yaml.load(mergeMacUpdateMetadata(fixture('arm64', 'macos-'), fixture('x64', 'macos-')));
+    expect(merged.files.map((file: any) => file.url)).toEqual([
+      'FreeLLMAPI-0.10.0-macos-arm64.zip', 'FreeLLMAPI-0.10.0-macos-arm64.dmg',
+      'FreeLLMAPI-0.10.0-macos-x64.zip', 'FreeLLMAPI-0.10.0-macos-x64.dmg',
+    ]);
+    expect(merged.path).toBe('FreeLLMAPI-0.10.0-macos-arm64.zip');
+    expect(merged.sha512).toBe(merged.files[0].sha512);
   });
 
   it('accepts a stapled DMG only after its hash and size have been refreshed', () => {
