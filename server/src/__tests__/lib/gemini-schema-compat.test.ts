@@ -323,6 +323,54 @@ describe('sanitizeForGemini items shapes (#1334)', () => {
     expect(sanitizeForGemini({ type: 'string' })).toEqual({ type: 'string' });
   });
 
+  it('types an element schema that has items but no type as an array (#1790)', () => {
+    const out = sanitizeForGemini({
+      type: 'object',
+      properties: {
+        source_paths: { type: 'array', items: { items: { type: 'string' } } },
+      },
+    }) as any;
+    expect(out.properties.source_paths).toEqual({
+      type: 'array',
+      items: { type: 'array', items: { type: 'string' } },
+    });
+  });
+
+  it('gives a typeless tuple an array type along with its items', () => {
+    expect(sanitizeForGemini({ prefixItems: [{ type: 'string' }, { type: 'integer' }] })).toEqual({
+      type: 'array',
+      items: { anyOf: [{ type: 'string' }, { type: 'integer' }] },
+    });
+    expect(sanitizeForGemini({ items: true })).toEqual({ type: 'array', items: {} });
+  });
+
+  it('keeps array from a type union when the schema has items', () => {
+    expect(sanitizeForGemini({ type: ['string', 'array'], items: { type: 'string' } })).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+    });
+    expect(sanitizeForGemini({ type: ['null', 'string', 'array'], items: { type: 'string' } })).toEqual({
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    });
+    expect(sanitizeForGemini({ type: ['string', 'array'] })).toEqual({ type: 'string' });
+  });
+
+  it('drops items from a schema whose type is not array', () => {
+    expect(sanitizeForGemini({ type: 'string', items: { type: 'string' } })).toEqual({ type: 'string' });
+    expect(sanitizeForGemini({ type: ['string', 'integer'], items: { type: 'string' } })).toEqual({ type: 'string' });
+    expect(sanitizeForGemini({ type: 'string', items: true })).toEqual({ type: 'string' });
+    expect(sanitizeForGemini({
+      properties: { a: { type: 'string' } },
+      items: { type: 'string' },
+    })).toEqual({ properties: { a: { type: 'string' } } });
+    expect(sanitizeForGemini({
+      anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+      items: { type: 'string' },
+    })).toEqual({ anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] });
+  });
+
   it('keeps a normal single-schema items untouched', () => {
     const input = { type: 'array', items: { type: 'string', description: 'tag' } };
     expect(JSON.stringify(sanitizeForGemini(input))).toBe(JSON.stringify(input));

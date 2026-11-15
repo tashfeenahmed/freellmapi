@@ -3,7 +3,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
 import { setCooldown, isOnCooldown } from '../../services/ratelimit.js';
-import { PROBE_MAX_TOKENS } from '../../services/model-discovery.js';
+import { PROBE_MAX_TOKENS, REASONING_PROBE_MAX_TOKENS } from '../../services/model-discovery.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
 // #488: a relay's model list changes weekly, so the endpoint's own /models
@@ -441,13 +441,13 @@ describe('median seeding for custom models (#488)', () => {
     await post(app, '/api/keys/custom', { baseUrl: ENDPOINT, model: 'relay-a', apiKey: 'relay-secret' });
     const keyId = customKeyIds()[0]!;
 
-    // Ping (max_tokens 1) → reasoning probe (max_tokens 16) → tool probe (tools).
+    // Ping (PROBE_MAX_TOKENS) → reasoning probe (REASONING_PROBE_MAX_TOKENS) → tool probe (tools).
     const mock = vi.fn(async (url: string, init?: RequestInit) => {
       if (String(url).endsWith('/models')) {
         return jsonResponse({ object: 'list', data: [{ id: 'relay-a' }] });
       }
       const reqBody = JSON.parse(String(init?.body ?? '{}')) as any;
-      if (reqBody.max_tokens === 16) {
+      if (reqBody.max_tokens === REASONING_PROBE_MAX_TOKENS) {
         return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
           choices: [{ index: 0, message: { role: 'assistant', content: '63' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } });
@@ -471,6 +471,52 @@ describe('median seeding for custom models (#488)', () => {
     expect(body.toolCalls).toBe(false);
   });
 
+  // #903 follow-up: a reasoning model (deepseek-v4.1-flash on a relay) spends
+  // its first ~25 tokens on hidden reasoning, so a tiny budget comes back with
+  // no visible text and a slightly larger one is cut off. The probe budgets
+  // must clear that, or "Probe now" reports a reasoning model as non-reasoning.
+  it('probe budgets clear a reasoning model\'s hidden-thinking floor (#903 follow-up)', async () => {
+    expect(PROBE_MAX_TOKENS).toBeGreaterThanOrEqual(50);
+    expect(REASONING_PROBE_MAX_TOKENS).toBeGreaterThanOrEqual(50);
+
+    await post(app, '/api/keys/custom', { baseUrl: ENDPOINT, model: 'relay-a', apiKey: 'relay-secret' });
+    const keyId = customKeyIds()[0]!;
+
+    const seen: number[] = [];
+    const mock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/models')) {
+        return jsonResponse({ object: 'list', data: [{ id: 'relay-a' }] });
+      }
+      const reqBody = JSON.parse(String(init?.body ?? '{}')) as any;
+      const budget = reqBody.max_tokens ?? 0;
+      seen.push(budget);
+      // Mirror the binary search reported on #903: < 25 → empty, < 50 → cut off.
+      const thinking = { role: 'assistant', reasoning_content: 'Let me think about this...' };
+      if (budget < 25) {
+        return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
+          choices: [{ index: 0, message: { ...thinking, content: '' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 10, completion_tokens: budget, total_tokens: 10 + budget } });
+      }
+      if (budget < 50) {
+        return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
+          choices: [{ index: 0, message: { ...thinking, content: 'The ans' }, finish_reason: 'length' }],
+          usage: { prompt_tokens: 10, completion_tokens: budget, total_tokens: 10 + budget } });
+      }
+      const asksMath = JSON.stringify(reqBody.messages).includes('9*7');
+      return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
+        choices: [{ index: 0, message: { ...thinking, content: asksMath ? '63' : 'pong' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 40, total_tokens: 50 } });
+    });
+    globalThis.fetch = mock as any;
+
+    const { status, body } = await post(app, '/api/keys/custom/probe', { keyId });
+
+    expect(status).toBe(200);
+    expect(body.modelId).toBe('relay-a');
+    expect(body.reasoning).toBe(true);
+    expect(seen.every(budget => budget >= 50)).toBe(true);
+  });
+
   it('probe reports toolCalls and writes supports_tools back to the model row (#874)', async () => {
     await post(app, '/api/keys/custom', { baseUrl: ENDPOINT, model: 'relay-a', apiKey: 'relay-secret' });
     const keyId = customKeyIds()[0]!;
@@ -487,7 +533,7 @@ describe('median seeding for custom models (#488)', () => {
           choices: [{ index: 0, message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '{}' } }] }, finish_reason: 'tool_calls' }],
           usage: { prompt_tokens: 20, completion_tokens: 2, total_tokens: 22 } });
       }
-      if (reqBody.max_tokens === 16) {
+      if (reqBody.max_tokens === REASONING_PROBE_MAX_TOKENS) {
         return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
           choices: [{ index: 0, message: { role: 'assistant', content: 'wrong answer' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } });
@@ -545,7 +591,7 @@ describe('median seeding for custom models (#488)', () => {
         return jsonResponse({ object: 'list', data: [{ id: 'relay-a' }] });
       }
       const reqBody = JSON.parse(String(init?.body ?? '{}')) as any;
-      if (reqBody.tools || reqBody.max_tokens === 16) {
+      if (reqBody.tools || reqBody.max_tokens === REASONING_PROBE_MAX_TOKENS) {
         await new Promise(resolve => setTimeout(resolve, SLOW_PROBE_MS));
       }
       return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',
@@ -614,7 +660,7 @@ describe('median seeding for custom models (#488)', () => {
         return jsonResponse({ object: 'list', data: [{ id: 'relay-a' }] });
       }
       const reqBody = JSON.parse(String(init?.body ?? '{}')) as any;
-      if (reqBody.tools || reqBody.max_tokens === 16) {
+      if (reqBody.tools || reqBody.max_tokens === REASONING_PROBE_MAX_TOKENS) {
         throw new Error('capability probe exploded');
       }
       return jsonResponse({ id: 'c', object: 'chat.completion', created: 0, model: 'relay-a',

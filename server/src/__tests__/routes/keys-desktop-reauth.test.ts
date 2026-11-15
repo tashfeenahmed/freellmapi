@@ -144,4 +144,23 @@ describe('Desktop re-auth bypass is loopback-only (#786)', () => {
     server.close();
     expect(res.status).toBe(403);
   });
+
+  it.each([
+    ['a remote client behind a same-host appending proxy', '127.0.0.1, 203.0.113.9'],
+    ['an empty first hop', ', 203.0.113.9'],
+  ])('demands the password from %s (#1884)', async (_name, forwarded) => {
+    process.env.FREEAPI_DESKTOP = '1';
+    const id = await addKey();
+    // The socket is the local proxy; the right-most hop is the real client.
+    const app = appWithRemote('127.0.0.1');
+    const server = app.listen(0, '127.0.0.1');
+    if (!server.listening) await new Promise<void>(resolve => server.once('listening', () => resolve()));
+    const addr = server.address() as { port: number };
+    const res = await fetch(`http://127.0.0.1:${addr.port}/api/keys/${id}/reveal`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'X-Forwarded-For': forwarded },
+    });
+    server.close();
+    expect(res.status).toBe(403);
+  });
 });

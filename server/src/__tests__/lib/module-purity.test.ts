@@ -38,6 +38,8 @@ const PURE_MODULES = [
   // Signal handling for the container's PID 1; the server, DB and process are injected.
   'graceful-shutdown.ts',
   'header-value.ts',
+  // Socket peer and the nearest proxy's hop decide locality; nothing is injected (#1884).
+  'loopback.ts',
   'provider-identity.ts',
   'provider-size-parser.ts',
   'retry-hint.ts',

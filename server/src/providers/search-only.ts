@@ -12,6 +12,8 @@ import { proxyFetch } from '../lib/proxy.js';
 const VALIDATE_TIMEOUT_MS = 10_000;
 
 export abstract class SearchOnlyProvider extends BaseProvider {
+  readonly supportsChat = false;
+
   private chatRefusal(): Error {
     return Object.assign(
       new Error(`${this.name} is a search provider: its key serves POST /v1/search, not chat completions`),

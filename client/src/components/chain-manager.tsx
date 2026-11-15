@@ -38,6 +38,8 @@ export interface Chain {
   is_favorite: number
   sort_order: number
   auto_sort: string | null
+  // Per-chain routing preset (NULL = inherit the global routing_strategy).
+  routing_strategy?: string | null
   layout_config: string | null
   // 0 once the chain opts out of the catalog-sync backfill (#895), which is
   // what an empty-created chain does — it stays exactly as hand-built.
@@ -80,6 +82,18 @@ export function ChainManager() {
     // covers the chain, routing, token-usage and rate-limit queries.
     queryClient.invalidateQueries({ queryKey: ['fallback'] })
   }
+
+  // Per-chain routing preset. PUT is a partial update, so sending only
+  // routing_strategy leaves the rest of the chain alone; null clears it back to
+  // "inherit the global strategy".
+  const setStrategy = useMutation({
+    mutationFn: ({ profileId, strategy }: { profileId: number; strategy: string | null }) =>
+      apiFetch(`/api/profiles/${profileId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ routing_strategy: strategy }),
+      }),
+    onSuccess: () => invalidate(),
+  })
 
   const createChain = useMutation({
     mutationFn: (payload: { name: string; empty: boolean }) =>
@@ -227,6 +241,27 @@ export function ChainManager() {
                       </span>
                     </Tooltip>
                   )}
+                  {/* Rank this chain's own models by its own preset. Rendered
+                      for every chain because a NULL value is itself meaningful
+                      ("inherit"), and the operator needs to see which it is. */}
+                  <select
+                    value={chain.routing_strategy ?? ''}
+                    onChange={e => setStrategy.mutate({
+                      profileId: chain.id,
+                      strategy: e.target.value || null,
+                    })}
+                    disabled={setStrategy.isPending}
+                    title={t('chains.strategyHint')}
+                    aria-label={t('chains.strategy')}
+                    className="h-6 cursor-pointer rounded-md border border-input bg-background px-1 text-[11px] text-muted-foreground disabled:opacity-50"
+                  >
+                    <option value="">{t('chains.strategyInherit')}</option>
+                    <option value="priority">{t('chains.strategyPriority')}</option>
+                    <option value="balanced">{t('chains.strategyBalanced')}</option>
+                    <option value="smartest">{t('chains.strategySmartest')}</option>
+                    <option value="fastest">{t('chains.strategyFastest')}</option>
+                    <option value="reliable">{t('chains.strategyReliable')}</option>
+                  </select>
                   <span className="flex-1" />
                   {!isActive && (
                     <Tooltip text={t('chains.activateHint')}>

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
+import { invalidateSearchQueries } from '@/lib/search'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogPopup, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -40,6 +41,7 @@ export function AddEndpointKeyDialog({
       for (const key of ['keys', 'health']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
+      invalidateSearchQueries(queryClient)
       toast.success(t('keys.keyAdded'))
       onOpenChange(false)
     },

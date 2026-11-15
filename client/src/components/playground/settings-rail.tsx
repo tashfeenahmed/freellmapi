@@ -62,6 +62,7 @@ export interface SettingsRailProps {
   onWebSearchChange: (enabled: boolean) => void
   /** False until at least one search key is configured. */
   webSearchAvailable: boolean
+  webSearchUnavailableHint?: string
   /** Enabled engines in failover order, e.g. "Tavily → Exa". */
   webSearchChain: string
 }
@@ -156,6 +157,7 @@ export function SettingsRail({
   webSearch,
   onWebSearchChange,
   webSearchAvailable,
+  webSearchUnavailableHint,
   webSearchChain,
 }: SettingsRailProps) {
   const { t } = useI18n()
@@ -286,7 +288,7 @@ export function SettingsRail({
             <div className="space-y-0.5">
               <span className="block text-xs font-medium">{t('search.playgroundHeading')}</span>
               <p className="text-[11px] leading-snug text-muted-foreground">
-                {webSearchAvailable ? t('search.playgroundHelp') : t('search.playgroundNoKeys')}
+                {webSearchAvailable ? t('search.playgroundHelp') : webSearchUnavailableHint ?? t('search.playgroundNoKeys')}
               </p>
             </div>
             <div className="flex items-center gap-2">

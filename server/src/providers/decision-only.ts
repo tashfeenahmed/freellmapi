@@ -5,6 +5,7 @@ import { BaseProvider, type KeyValidationResult } from './base.js';
  * providers must never silently accept a chat completion or send a secret. */
 export class KeylessDecisionProvider extends BaseProvider {
   keyless = true;
+  readonly supportsChat = false;
 
   constructor(readonly platform: 'halx' | 'aisense', readonly name: string) { super(); }
 

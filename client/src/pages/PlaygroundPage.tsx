@@ -33,7 +33,8 @@ import { ConversationSidebar } from '@/components/playground/conversation-sideba
 import { SettingsRail } from '@/components/playground/settings-rail'
 import { LiquidComposer } from '@/components/playground/liquid-composer'
 import { SearchSources } from '@/components/playground/search-sources'
-import { engineChain, searchContextMessage, searchProviderName, type SearchEngine, type SearchResult } from '@/lib/search'
+import { searchContextMessage, searchProviderName, searchReadinessHint, type SearchResult } from '@/lib/search'
+import { useSearchReadiness } from '@/hooks/use-search-readiness'
 import { ModelMakerIcon } from '@/components/model-maker-icon'
 import { composerHasContent } from '@/lib/composer-geometry'
 import {
@@ -327,15 +328,10 @@ export default function PlaygroundPage() {
   })
   const mediaModels = mediaData?.models ?? []
 
-  // Engines that can actually run a search: enabled, with a key behind them.
-  // An older server without the endpoint just leaves the switch unavailable.
-  const { data: searchEngines = [] } = useQuery<SearchEngine[]>({
-    queryKey: ['search-engines'],
-    queryFn: () => apiFetch('/api/search/engines'),
-    retry: false,
-  })
-  const usableEngines = engineChain(searchEngines).filter(e => e.keyCount > 0)
-  const webSearchAvailable = usableEngines.length > 0
+  const searchReadiness = useSearchReadiness()
+  const usableEngines = searchReadiness.readyEngines
+  const webSearchAvailable = searchReadiness.available
+  const webSearchUnavailableHint = searchReadinessHint(searchReadiness.data, searchReadiness.failed, searchReadiness.loading, t)
   const webSearchOn = webSearch && webSearchAvailable
   const transcriptionAvailable = hasTranscription(mediaModels)
   const [dictationChoice, setDictationChoice] = useState<string>(
@@ -1297,7 +1293,7 @@ export default function PlaygroundPage() {
               enabled: webSearchOn,
               available: webSearchAvailable,
               label: t('search.playgroundToggle'),
-              unavailableHint: t('search.playgroundNoKeys'),
+              unavailableHint: webSearchUnavailableHint,
               onToggle: updateWebSearch,
             }}
           />
@@ -1337,6 +1333,7 @@ export default function PlaygroundPage() {
         webSearch={webSearch}
         onWebSearchChange={updateWebSearch}
         webSearchAvailable={webSearchAvailable}
+        webSearchUnavailableHint={webSearchUnavailableHint}
         webSearchChain={usableEngines.map(e => e.displayName).join(' → ')}
       />
       )}

@@ -10,7 +10,7 @@ afterEach(() => {
 
 /** Minimal catalog/chat responses. status alone decides the validation verdict. */
 const catalogRes = (status: number, message?: string) => ({
-  ok: status < 400,
+  ok: status >= 200 && status < 300,
   status,
   statusText: status === 401 ? 'Unauthorized' : 'OK',
   headers: new Headers(),
@@ -72,6 +72,33 @@ describe('ZhipuProvider console autodetect', () => {
     // The cached verdict has to reach ordinary traffic, not just validation.
     await provider.chatCompletion('zai-key', [{ role: 'user', content: 'hi' }], 'glm-4.5-flash');
     expect(urls[2]).toBe(`${GLOBAL}/chat/completions`);
+  });
+
+  it.each([302, 404, 429, 500])('does not accept or pin a global key when its probe returns HTTP %s', async (status) => {
+    const provider = new ZhipuProvider();
+    const urls = mockHosts([
+      [DOMESTIC, () => catalogRes(401)],
+      [GLOBAL, () => catalogRes(status)],
+    ]);
+
+    await expect(provider.validateKey('uncertain-key')).rejects.toMatchObject({ status });
+    expect(urls).toEqual([`${DOMESTIC}/models`, `${GLOBAL}/models`]);
+
+    vi.spyOn(global, 'fetch').mockImplementation((async (url: string | URL | Request) => {
+      urls.push(String(url));
+      return chatRes();
+    }) as typeof fetch);
+    await provider.chatCompletion('uncertain-key', [{ role: 'user', content: 'hi' }], 'glm-4.5-flash');
+    expect(urls.at(-1)).toBe(`${DOMESTIC}/chat/completions`);
+  });
+
+  it('retains the global server retry hint on an inconclusive validation', async () => {
+    const provider = new ZhipuProvider();
+    mockHosts([
+      [DOMESTIC, () => catalogRes(401)],
+      [GLOBAL, () => ({ ...catalogRes(429), headers: new Headers({ 'Retry-After': '3' }) }) as Response],
+    ]);
+    await expect(provider.validateKey('limited-key')).rejects.toMatchObject({ status: 429, retryAfterMs: 3000 });
   });
 
   it('streams a global key through the global host too', async () => {

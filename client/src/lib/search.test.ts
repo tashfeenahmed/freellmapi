@@ -6,7 +6,9 @@ import {
   isSearchPlatform,
   searchContextMessage,
   searchProviderName,
+  searchReadinessHint,
   type SearchEngine,
+  type SearchReadiness,
 } from './search'
 
 const engine = (over: Partial<SearchEngine>): SearchEngine => ({
@@ -24,6 +26,31 @@ const engine = (over: Partial<SearchEngine>): SearchEngine => ({
   healthyKeyCount: 1,
   searchesThisMonth: 0,
   ...over,
+})
+
+describe('search readiness diagnostics', () => {
+  const base: SearchReadiness = { status: 'needs_configuration', engines: [], missing_from_catalog: [],
+    catalog: { appliedVersion: null, appliedTier: null, lastSyncMs: null, lastError: null } }
+  const t = (key: string, vars?: Record<string, string | number>) => `${key}${vars ? `:${JSON.stringify(vars)}` : ''}`
+  it('distinguishes API failures and loading from missing keys', () => {
+    expect(searchReadinessHint(undefined, true, false, t)).toBe('search.readinessError')
+    expect(searchReadinessHint(undefined, false, true, t)).toBe('common.loading')
+  })
+  it('names configured providers missing from the catalog instead of asking for more keys', () => {
+    expect(searchReadinessHint({ ...base, missing_from_catalog: ['parallel', 'keenable'] }, false, false, t))
+      .toBe('search.catalogMissing:{"providers":"Parallel, Keenable"}')
+  })
+  it('surfaces the catalog sync error and a genuinely empty catalog separately', () => {
+    expect(searchReadinessHint({ ...base, catalog: { ...base.catalog, lastError: 'bad signature' } }, false, false, t))
+      .toBe('premium.lastSyncProblem:{"error":"bad signature"}')
+    expect(searchReadinessHint(base, false, false, t)).toBe('search.empty')
+  })
+  it.each(['disabled', 'cooling_down', 'needs_key', 'key_error'] as const)('explains engine state %s', state => {
+    const s = { ...base, status: state === 'cooling_down' ? 'cooling_down' as const : 'needs_configuration' as const,
+      engines: [{ engine: 'exa-search', platform: 'exa', state }] }
+    const key = state === 'disabled' ? 'search.enginesDisabled' : state === 'cooling_down' ? 'search.keysCoolingDown' : 'search.keysNotReady'
+    expect(searchReadinessHint(s, false, false, t)).toBe(key)
+  })
 })
 
 describe('search platforms', () => {

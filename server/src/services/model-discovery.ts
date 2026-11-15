@@ -523,8 +523,17 @@ export async function discoverProviderModels(
 }
 
 /** Output cap on the probe request. Exported so the test can assert the floor
- *  rather than a magic number. See the call site for why it is not 1. */
-export const PROBE_MAX_TOKENS = 4;
+ *  rather than a magic number. See the call site for why it is not 1 — and
+ *  not 4 either: a reasoning model spends its first ~25 tokens thinking and
+ *  answers a 4-token ping with an empty reply (#903 follow-up). 64 matches the
+ *  background model probe (services/model-probe.ts). */
+export const PROBE_MAX_TOKENS = 64;
+
+/** Output cap on the reasoning capability probe. 16 used to be enough for
+ *  "63", but a reasoning model burns that budget on hidden reasoning before
+ *  any visible text, so "Probe now" reported a reasoning model as
+ *  "reasoning: no" (#903 follow-up). Still a rounding error in cost. */
+export const REASONING_PROBE_MAX_TOKENS = 256;
 
 /** Result of a capability probe (#874, phase 1). The `ping` latency/sample
  *  fields are unchanged from the original probe; `reasoning` and `toolCalls`
@@ -602,8 +611,9 @@ export async function probeEndpointModel(
       // Not 1: several relays enforce a floor above it and 400 the probe
       // outright ("max_tokens must be greater than 2" on b.ai's
       // deepseek-v4-flash, #903), so a probe that only wanted to measure
-      // latency reported the endpoint as broken. 4 clears the floors seen so
-      // far and still costs a rounding error.
+      // latency reported the endpoint as broken. 64 clears those floors and
+      // the budget a reasoning model spends before any visible text, and
+      // still costs a rounding error.
       { max_tokens: PROBE_MAX_TOKENS },
     );
   } catch (err) {
@@ -690,8 +700,9 @@ export async function probeModelCapabilities(
   modelId: string,
 ): Promise<ProbeCapabilities> {
   // Reasoning probe: a deterministic arithmetic puzzle. A reply containing the
-  // expected answer token is counted as "reasons". We allow a little headroom
-  // (max_tokens 16) so the model can emit "63" without being cut off mid-number.
+  // expected answer token is counted as "reasons". The budget
+  // (REASONING_PROBE_MAX_TOKENS) leaves room for a reasoning model's hidden
+  // thinking before it emits "63", so it is not cut off into a false "no".
   // `undefined` is the honest starting value: it means "we did not find out".
   // Only a completed probe may downgrade it to `false`.
   let reasoning: boolean | undefined;
@@ -700,7 +711,7 @@ export async function probeModelCapabilities(
       { role: 'user', content: REASONING_PROBE_PROMPT },
     ];
     const reasoningRes = await provider.chatCompletion(apiKey, reasoningMessages, modelId, {
-      max_tokens: 16,
+      max_tokens: REASONING_PROBE_MAX_TOKENS,
       temperature: 0,
     });
     const text = textOfCompletion(reasoningRes);

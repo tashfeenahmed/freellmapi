@@ -71,6 +71,7 @@ export const CLOUDFLARE_PRICES: Record<string, CloudflarePrice> = {
   '@cf/deepseek-ai/deepseek-v4-pro-0813': { inputPerM: 1.32, outputPerM: 3.96 },
   '@cf/deepseek-ai/deepseek-v4.1-flash-1017': { inputPerM: 0.3, outputPerM: 1.2 },
   '@cf/google/gemma-4-26b-a4b-it': { inputPerM: 0.1, outputPerM: 0.3 },
+  '@cf/google/embeddinggemma-2': { inputPerM: 0.0017 },
   '@cf/huggingface/distilbert-sst-2-int8': { inputPerM: 0.0263 },
   '@cf/leonardo/lucid-origin': { perTile: 0.007, perStep: 0.000132 },
   '@cf/leonardo/phoenix-1.0': { perTile: 0.00583, perStep: 0.00011 },

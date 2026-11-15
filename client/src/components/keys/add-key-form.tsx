@@ -12,7 +12,7 @@ import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
 import type { FallbackEntry } from '@/lib/routing'
 import { scopeCandidates, shouldOfferModelPicker, type ScopeCandidate } from '@/lib/model-scope-selection'
-import { SEARCH_PROVIDERS } from '@/lib/search'
+import { invalidateSearchQueries, SEARCH_PROVIDERS } from '@/lib/search'
 import { GetKeyLink, LISTED_PLATFORMS, PLATFORMS } from './shared'
 
 /** A key that just landed, plus the models the picker should offer for it.
@@ -116,6 +116,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
       apiFetch<{ id: number; notice?: string | null }>('/api/keys', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
+      invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       queryClient.invalidateQueries({ queryKey: ['keys-providers'] })
@@ -137,7 +138,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
         '/api/keys/import-selected', { method: 'POST', body: JSON.stringify(body) },
       ),
     onSuccess: (data) => {
-      for (const key of ['keys', 'health', 'fallback', 'keys-providers']) {
+      for (const key of ['keys', 'health', 'fallback', 'keys-providers', 'search-engines', 'search-status']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       toast.success(t('keys.importResult', { imported: data.imported, failed: data.total - data.imported }))

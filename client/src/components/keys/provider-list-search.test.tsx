@@ -65,6 +65,14 @@ it('keeps the old layout when no search key exists', async () => {
   expect(headings()).toEqual([])
 })
 
+it('keeps an existing Waterfall key visible and editable when new-user setup is hidden (#1768)', async () => {
+  await mount([apiKey({ platform: 'waterfall', label: 'Existing Waterfall key', maskedKey: 'wf-…1234' })])
+  expect(providers()).toContain('Waterfall (community free models)')
+  expect(container.textContent).toContain('Existing Waterfall key')
+  expect(container.querySelector('[aria-label="Edit key"]')).not.toBeNull()
+  expect(container.querySelector('[aria-label="Edit models"]')).not.toBeNull()
+})
+
 it('hides the edit-models action on a search key', async () => {
   await mount([apiKey({ id: 2, platform: 'tavily' as Platform, label: 'Search key' })])
   expect(container.querySelector('[aria-label="Edit models"]')).toBeNull()
