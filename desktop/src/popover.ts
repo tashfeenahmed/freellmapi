@@ -5,7 +5,8 @@ import { BrowserWindow, type Tray } from 'electron';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const WIDTH = 316;
-const HEIGHT = 348;
+// +40 for the second action row (OpenAI / Claude base URLs, #1956).
+const HEIGHT = 388;
 
 let popover: BrowserWindow | null = null;
 
