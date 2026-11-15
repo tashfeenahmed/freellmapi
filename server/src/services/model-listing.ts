@@ -15,7 +15,6 @@ export interface NormalizedModel {
   available: number;
   enabled: number;
   contextWindow: number | null;
-  contextSafetyFactor: number | null;  // per-model override; null → global 1.25
   intel: number;
   // Platforms that can serve this entry (group members under unify, a single
   // platform otherwise) + tool capability — feeds /v1/models
@@ -68,24 +67,24 @@ function executionStatusFor(modelDbIds: number[], available: number): 'ready' | 
  * most of the pool rejects (#1717). Larger requests still route: the router's
  * size gates send them to the models that can hold them.
  */
+/**
+ * The window a client may actually fill: the raw window divided by the
+ * router's CONTEXT_WINDOW_SAFETY_FACTOR. The router only accepts a request
+ * whose estimated size times that factor fits the raw window
+ * (fitsContextWindow), so advertising the raw number let clients like OpenCode
+ * grow their history to sizes the router then turned away with a context
+ * overflow. Every listing (OpenAI, Anthropic, Gemini, Ollama, MCP, Codex) reads
+ * windows from here, so they all advertise what a request can really use.
+ */
+export function advertisedContextWindow(raw: number | null | undefined): number | null {
+  if (typeof raw !== 'number' || raw <= 0) return null;
+  return Math.floor(raw / CONTEXT_WINDOW_SAFETY_FACTOR);
+}
+
 export function servableContextWindow(windows: readonly (number | null | undefined)[]): number | null {
   const known = windows.filter((w): w is number => typeof w === 'number' && w > 0).sort((a, b) => b - a);
   if (known.length === 0) return null;
   return known[Math.floor(known.length / 2)]!;
-}
-
-/**
- * The context a client may actually use: the raw window divided by the
- * model's safety factor (the global default when the model has no override).
- * The router applies the same division before accepting a request, so the
- * advertised number never promises more room than the next dispatch allows.
- */
-export function effectiveContextWindow(
-  contextWindow: number | null | undefined,
-  safetyFactor: number | null | undefined,
-): number | null {
-  if (typeof contextWindow !== 'number' || contextWindow <= 0) return null;
-  return Math.floor(contextWindow / (safetyFactor ?? CONTEXT_WINDOW_SAFETY_FACTOR));
 }
 
 export function buildModelListing(): ModelListing {
@@ -113,20 +112,13 @@ export function buildModelListing(): ModelListing {
     allListed = getModelGroups().map(g => {
       const infos = g.members.map(m => byId.get(m.model_db_id)).filter(Boolean) as AvailRow[];
       const available = infos.some(i => i.available === 1) ? 1 : 0;
-      // Compute per-model effective context and the group's advertised window.
-      // Also collect non-null safety factors for the group entry.
-      const effectiveWindows = infos.map(i => effectiveContextWindow(i.context_window, i.context_safety_factor));
-      const factors = infos.map(i => i.context_safety_factor).filter((f): f is number => f != null);
       return {
         id: g.canonicalId,
         name: g.groupLabel,
         ownedBy: 'freellmapi',
         available,
         enabled: infos.some(i => i.enabled === 1) ? 1 : 0,
-        contextWindow: servableContextWindow(effectiveWindows),
-        // Per-model safety factor: use the minimum (most conservative) non-null factor,
-        // or null if all are null (use global default).
-        contextSafetyFactor: factors.length > 0 ? Math.min(...factors) : null,
+        contextWindow: advertisedContextWindow(servableContextWindow(infos.map(i => i.context_window))),
         intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
         platforms: [...new Set(infos.map(i => i.platform))],
         supportsTools: infos.some(i => i.supports_tools === 1),
@@ -145,19 +137,17 @@ export function buildModelListing(): ModelListing {
         SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id, m.supports_tools, m.supports_vision,
                m.enabled AS enabled,
                ${availableExpr} AS available,
-               m.context_safety_factor,
                ROW_NUMBER() OVER (
                  PARTITION BY m.model_id
                  ORDER BY ${availableExpr} DESC, m.intelligence_rank ASC, m.id ASC
                ) AS rn
-      FROM models m
+        FROM models m
+      )
       WHERE rn = 1
     `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number; supports_vision: number })[];
     allListed = models.map(m => ({
       id: m.model_id, name: m.display_name, ownedBy: m.platform,
-      available: m.available, enabled: m.enabled,
-      contextWindow: effectiveContextWindow(m.context_window, m.context_safety_factor),
-      contextSafetyFactor: m.context_safety_factor ?? null,
+      available: m.available, enabled: m.enabled, contextWindow: advertisedContextWindow(m.context_window),
       intel: m.intelligence_rank,
       platforms: [m.platform],
       supportsTools: m.supports_tools === 1,
@@ -170,12 +160,11 @@ export function buildModelListing(): ModelListing {
   allListed.sort((a, b) =>
     (b.available - a.available) || (b.enabled - a.enabled) || (a.intel - b.intel) || a.name.localeCompare(b.name));
 
-  // `contextWindow` is already effective (raw window / safety factor), so the
-  // auto entry advertises the same post-factor ceiling the router enforces.
-  const effectiveContextWindows = allListed
-    .filter(m => m.available === 1)
-    .map(m => m.contextWindow);
-  const autoContextWindow = servableContextWindow(effectiveContextWindows);
+  // Already-advertised windows: the median of the divided values is the
+  // divided median, so no second division here.
+  const autoContextWindow = servableContextWindow(
+    allListed.filter(m => m.available === 1).map(m => m.contextWindow),
+  );
 
   return { models: allListed, autoContextWindow };
 }

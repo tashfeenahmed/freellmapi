@@ -37,7 +37,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
@@ -433,7 +433,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
                    AND (m.key_id IS NULL OR k.id = m.key_id)
                )
            ) AS usable,
-           (SELECT json_group_array(CAST(m2.context_window / COALESCE(m2.context_safety_factor, 1.25) AS REAL))
+           (SELECT json_group_array(m2.context_window)
             FROM profile_models pm2
             JOIN models m2 ON m2.id = pm2.model_db_id AND m2.enabled = 1
             WHERE pm2.profile_id = p.id AND pm2.enabled = 1) AS ctxs
@@ -515,7 +515,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
     },
     ...claudeFamilyEntries,
     ...profileRows.map(p => {
-      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
       return {
         id: `auto:${p.name.toLowerCase()}`,
         object: 'model',

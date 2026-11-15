@@ -196,10 +196,9 @@ describe('custom model endpoint identity migration', () => {
     try {
       await runMigrations(db, 'up');
       const afterFirstUp = db.prepare('SELECT * FROM models ORDER BY id').all();
-      const _schemaAfterFirstUp = db.prepare(
+      const schemaAfterFirstUp = db.prepare(
         "SELECT sql FROM sqlite_master WHERE name = 'models'",
       ).get() as { sql: string };
-      const schemaAfterFirstUpCols = db.prepare('PRAGMA table_info(models)').all().map((c: any) => c.name);
 
       endpointIdentityDown(db);
       expect(db.prepare('PRAGMA table_info(models)').all()
@@ -207,8 +206,8 @@ describe('custom model endpoint identity migration', () => {
 
       endpointIdentityUp(db);
       expect(db.prepare('SELECT * FROM models ORDER BY id').all()).toEqual(afterFirstUp);
-      expect(db.prepare('PRAGMA table_info(models)').all().map((c: any) => c.name))
-        .toEqual(schemaAfterFirstUpCols);
+      expect((db.prepare("SELECT sql FROM sqlite_master WHERE name = 'models'").get() as { sql: string }).sql)
+        .toBe(schemaAfterFirstUp.sql);
       expect(db.pragma('foreign_key_check')).toEqual([]);
 
       // With a real duplicate on the books, down() has no honest answer.

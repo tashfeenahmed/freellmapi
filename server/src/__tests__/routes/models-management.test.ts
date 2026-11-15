@@ -434,7 +434,7 @@ describe('Model management API', () => {
     // a context can it take? Both are asserted, not merely present.
     expect(chain.available).toBe(true);
     expect(chain.unavailable_reason).toBeNull();
-    // Advertised context is post-safety-factor: 111000 / 1.25 = 88800.
+    // Advertised = servable raw window (111000) / the router's 1.25 margin.
     expect(chain.context_window).toBe(88800);
     expect(chain.context_length).toBe(88800);
 
