@@ -461,7 +461,7 @@ async function callImageProvider(
   switch (row.platform) {
     case 'electronhub': {
       if (!key) throw new MediaError('ElectronHub API key required', 401);
-      if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
+      if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
       if (!cpuCanRunSharp()) throw new MediaError('ElectronHub images require a compatible image decoder', 502);
       let sharp: typeof import('sharp').default;
       try { sharp = (await import('sharp')).default; }
@@ -1524,7 +1524,7 @@ async function callTranscriptionProvider(
   switch (m.platform) {
     case 'silvr': {
       if (!key) throw new MediaError('SilvR API key required', 401);
-      if (m.modelId !== 'whisper-large-v3-turbo') throw new MediaError('Unknown SilvR transcription model', 400);
+      if (!['whisper-large-v3-turbo', 'whisper-large-v3'].includes(m.modelId)) throw new MediaError('Unknown SilvR transcription model', 400);
       if (!['json', 'text', 'verbose_json'].includes(p.responseFormat)) throw new MediaError('SilvR transcription does not support subtitles through this adapter', 400);
       const form = new FormData();
       form.append('model', m.modelId); form.append('response_format', 'json');
