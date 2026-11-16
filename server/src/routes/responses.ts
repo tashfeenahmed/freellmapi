@@ -958,7 +958,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (RC3).
+  let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
@@ -1217,7 +1219,8 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     attemptLog,
     logIdentity: { surface: 'responses', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // Task-type routing (#1127): same header/derivation as /chat/completions.
       const taskType = resolveTaskType(req, tools, messages);
@@ -1229,7 +1232,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     },
     dispatch: async (route, attempt, ctx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);
-      const routeOpts = contextBudget != null ? { ...dispatchOpts, contextBudget } : dispatchOpts;
+      // Signal composed per attempt: hedgeAbort is replaced after each abort.
+      const attemptOpts = { ...dispatchOpts, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
+      const routeOpts = contextBudget != null ? { ...attemptOpts, contextBudget } : attemptOpts;
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',
         requestId: requestGroupId,
@@ -1384,6 +1389,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
               ttfbMs = Date.now() - start;
             }
+            // RC3: any upstream token (text, reasoning or a tool-call delta) proves
+            // the attempt alive and clears the per-attempt silent-window cap.
+            if (text.length > 0 || reasoning.length > 0 || (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0)) ctx.markFirstByte?.();
             if (text) {
               totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
               if (reasoning.length > 0) totalReasoningTokens += Math.ceil(reasoning.length / 4);
