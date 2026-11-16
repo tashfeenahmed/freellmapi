@@ -23,18 +23,22 @@ import { modelStatsKey } from './endpoint-scope.js';
 
 const learned = new Map<string, number>();
 
-const MAX_TOKENS_PARAM = /\b(max_tokens|max_completion_tokens|max_output_tokens|maxoutputtokens|max_new_tokens)\b/;
+// "max[_ ]tokens": Cohere/Septor spell it with a space ("max tokens must be
+// less than or equal to 4096", "Requested max tokens (104394) exceeds model
+// max_output (8192)").
+const MAX_TOKENS_PARAMS = 'max[_ ]tokens|max_completion_tokens|max_output_tokens|max_output|maxoutputtokens|max_new_tokens';
+const MAX_TOKENS_PARAM = new RegExp(`\\b(?:${MAX_TOKENS_PARAMS})\\b`);
 // The number that follows a ceiling phrase: "less than or equal to `65536`",
 // "maximum output tokens (65536)", "at most 32768", "no more than 8192",
 // "exceeds the maximum allowed value of 4096" (OpenRouter), "greater than the
 // maximum 16384" (Fireworks), "must be less than 8192" (DeepInfra). No bare
 // "exceeds N" or "less than N": those read any number in the message ("input
 // tokens exceeds 200", "exceeds 30000 TPM").
-const CEILING_PHRASE = '(?:less than or equal to|must be less than|at most|no (?:more|greater) than|(?:cannot|must not|can not) exceed|greater than the maximum|maximum output tokens|maximum allowed value|max output tokens|maximum value|output limit|maximum is)\\W{0,4}(?:of\\s+)?\\W{0,2}(\\d{3,7})';
+const CEILING_PHRASE = '(?:less than or equal to|must be less than|at most|no (?:more|greater) than|(?:cannot|must not|can not) exceed|greater than the maximum|maximum output tokens|maximum allowed value|max output tokens|maximum value|output limit|maximum is|exceeds (?:the )?model(?:\'s)? max_output)\\W{0,4}(?:of\\s+)?\\W{0,2}(\\d{3,7})';
 // The ceiling phrase must follow the parameter name within the same clause
 // (60 characters, no '.' or ';' in between), so a number that belongs to some
 // other limit in a message that merely mentions max_tokens is never learned.
-const CEILING = new RegExp(`\\b(?:max_tokens|max_completion_tokens|max_output_tokens|maxoutputtokens|max_new_tokens)\\b[^.;]{0,60}?${CEILING_PHRASE}`);
+const CEILING = new RegExp(`\\b(?:${MAX_TOKENS_PARAMS})\\b[^.;]{0,60}?${CEILING_PHRASE}`);
 // A learned ceiling below this is almost certainly a misread (a real output
 // limit this small is not something a client would hit by accident), and a
 // wrong low cap would truncate every reply on the model until restart.
