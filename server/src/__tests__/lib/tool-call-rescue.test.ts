@@ -139,6 +139,41 @@ describe('inline tool-call dialect rescue', () => {
       expect(r.cleanText).toBe('Let me check.');
     });
 
+    it('gives JSON-typed values their type (numbers, booleans, arrays, objects)', () => {
+      const tools = new Set(['Read', 'Edit', 'TodoWrite']);
+      const text = `<dots_function_call>
+<invoke name="Read"><parameter name="file_path">/a.ts</parameter><parameter name="offset">10</parameter><parameter name="limit">50</parameter></invoke>
+<invoke name="Edit"><parameter name="file_path">/a.ts</parameter><parameter name="old_string">a</parameter><parameter name="new_string">b</parameter><parameter name="replace_all">true</parameter></invoke>
+<invoke name="TodoWrite"><parameter name="todos">[{"content":"x","status":"pending"}]</parameter></invoke>
+</dots_function_call>`;
+      const r = rescueInlineToolCalls(text, tools);
+      expect(r.calls?.map((c) => JSON.parse(c.arguments))).toEqual([
+        { file_path: '/a.ts', offset: 10, limit: 50 },
+        { file_path: '/a.ts', old_string: 'a', new_string: 'b', replace_all: true },
+        { todos: [{ content: 'x', status: 'pending' }] },
+      ]);
+    });
+
+    it('keeps non-JSON text as a string, including text that only looks like JSON', () => {
+      const tools = new Set(['Bash', 'Grep']);
+      const text = '<dots_function_call><invoke name="Grep"><parameter name="pattern">[a-z]+</parameter><parameter name="path">007x</parameter></invoke><invoke name="Bash"><parameter name="command">{ echo hi; }</parameter></invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, tools);
+      expect(r.calls?.map((c) => JSON.parse(c.arguments))).toEqual([
+        { pattern: '[a-z]+', path: '007x' },
+        { command: '{ echo hi; }' },
+      ]);
+    });
+
+    it('keeps a value\'s own whitespace and drops only the line breaks next to the tags', () => {
+      const tools = new Set(['Edit']);
+      const text = '<dots_function_call><invoke name="Edit">\n<parameter name="old_string">\n    foo()\n  bar()\n</parameter>\n<parameter name="new_string">  baz()  </parameter>\n</invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, tools);
+      expect(JSON.parse(r.calls![0].arguments)).toEqual({
+        old_string: '    foo()\n  bar()',
+        new_string: '  baz()  ',
+      });
+    });
+
     it('rejects a call naming a tool the request never declared', () => {
       const text = '<dots_function_call><invoke name="DropTables"><parameter name="x">1</parameter></invoke></dots_function_call>';
       const r = rescueInlineToolCalls(text, TOOLS);
