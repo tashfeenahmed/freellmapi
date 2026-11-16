@@ -79,7 +79,17 @@ export function connectDb(
   }
 
   db = factory(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
+  if (!isMemory) {
+    const walResult = db.pragma('journal_mode = WAL') as unknown;
+    const journalMode = Array.isArray(walResult)
+      ? (walResult[0] as { journal_mode?: unknown } | undefined)?.journal_mode
+      : walResult;
+    // Safe with WAL (no corruption risk; only the last commits can be lost on
+    // power failure) and avoids an fsync per commit on the hot path. Skipped
+    // when WAL did not take effect (some network mounts), where NORMAL with a
+    // rollback journal carries a small corruption risk.
+    if (String(journalMode).toLowerCase() === 'wal') db.pragma('synchronous = NORMAL');
+  }
   db.pragma('foreign_keys = ON');
   // The dashboard and the proxy hot path write concurrently; without a busy
   // timeout the loser of a write race gets SQLITE_BUSY immediately and the
