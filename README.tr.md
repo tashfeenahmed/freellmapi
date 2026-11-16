@@ -19,7 +19,7 @@ Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos-tr.svg" height="48" alt="macOS için indir"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows-tr.svg" height="48" alt="Windows için indir"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store-tr.svg" height="48" alt="Microsoft Store’dan edinin"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker-tr.svg" height="48" alt="Docker ile kendi ortamınızda çalıştırın"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store-tr.svg" height="48" alt="Google Play’den edinin"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store-tr.svg" height="48" alt="App Store’dan indirin"></a>
@@ -184,7 +184,7 @@ Bash’e aktarmadan önce okumak ister misiniz? [Betik burada](https://freellmap
 
 http://localhost:3001 adresini açın, **Anahtarlar (Keys)** sayfasına sağlayıcı anahtarlarınızı ekleyin, **Yedek Model Zinciri (Fallback Chain)** sırasını istediğiniz gibi düzenleyin ve **Anahtarlar** sayfasının üst kısmından birleşik API anahtarınızı alın. OpenAI SDK’nızda bu birleşik anahtarı kullanın.
 
-Windows’ta en kolay yol, aşağıda açıklanan **[Releases bölümündeki `.exe` masaüstü yükleyicisidir](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. Android için deneysel [Termux rehberine](docs/en/install/02-android-termux.md) bakın.
+Windows’ta en kolay yol, masaüstü uygulamasını **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** üzerinden kurmaktır: imzalıdır (Smart App Control engellemez) ve kendini günceller. İmzasız `.exe` yükleyicisi [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest) bölümündedir (aşağıda). Android için deneysel [Termux rehberine](docs/en/install/02-android-termux.md) bakın.
 
 Docker Compose, yerel geliştirme, bildirimsel başlangıç yapılandırması, üretim derlemeleri, yerel ağ erişimi ve yedeklemeler için **[kurulum rehberine](docs/en/install/01-install.md)** bakın.
 
@@ -196,7 +196,7 @@ Docker Compose, yerel geliştirme, bildirimsel başlangıç yapılandırması, �
 
 ![FreeLLMAPI masaüstü uygulaması](repo-assets/desktop.png)
 
-**[Releases bölümünden indirin](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — her sürüme macOS `.dmg` ve Windows `.exe` yükleyicileri eklenir. Hesap veya parola oluşturmanız gerekmez; ihtiyacınız olan tek kimlik bilgisi tepsi panelindeki birleşik API anahtarıdır. Kaynaktan derleme adımları ve veri konumları: [masaüstü uygulaması rehberi](docs/en/install/01-install.md#desktop-app).
+**[Releases bölümünden indirin](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — her sürüme macOS `.dmg` ve Windows `.exe` yükleyicileri eklenir. Windows’ta **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** sürümünü tercih edin: imzalı olduğu için Smart App Control engellemez ve Store onu güncel tutar. Hesap veya parola oluşturmanız gerekmez; ihtiyacınız olan tek kimlik bilgisi tepsi panelindeki birleşik API anahtarıdır. Kaynaktan derleme adımları ve veri konumları: [masaüstü uygulaması rehberi](docs/en/install/01-install.md#desktop-app).
 
 macOS 12 Monterey ve sonrası için **arm64 (Apple Silicon)** veya **x64 (Intel)** sürümünü seçin. Her iki Mac derlemesinin ZIP paketi de sunulur.
 
