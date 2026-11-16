@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Download for Windows"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Get it from Microsoft Store"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Self-host with Docker"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Get it on Google Play"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="Download on the App Store"></a>
@@ -175,7 +175,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 Откройте http://localhost:3001, добавьте ключи провайдеров на странице **Keys**, настройте порядок **Fallback Chain** и скопируйте единый API-ключ из заголовка страницы **Keys**. Именно его следует указывать в OpenAI SDK.
 
-Для Windows проще всего скачать **[установщик `.exe` из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. Для Android существует экспериментальное [руководство по Termux](docs/en/install/02-android-termux.md).
+Для Windows проще всего установить приложение из **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**: оно подписано (Smart App Control его не блокирует) и обновляется автоматически. Неподписанный установщик `.exe` доступен в [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest). Для Android существует экспериментальное [руководство по Termux](docs/en/install/02-android-termux.md).
 
 Другие варианты, включая Docker Compose, локальную разработку, конфигурацию запуска, production-сборки, сетевой доступ и резервное копирование, описаны в **[руководстве по установке](docs/en/install/01-install.md)**.
 
@@ -185,7 +185,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 ![Настольное приложение FreeLLMAPI](repo-assets/desktop.png)
 
-**[Скачать из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. К каждому выпуску прикладываются `.dmg` для macOS и `.exe` для Windows. Регистрация и отдельный пароль не требуются: необходим только единый API-ключ, доступный во всплывающем окне трея. Сборка из исходников и пути хранения данных: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
+**[Скачать из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. К каждому выпуску прикладываются `.dmg` для macOS и `.exe` для Windows. В Windows лучше установить версию из **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**: она подписана, поэтому Smart App Control её не блокирует, а Store сам её обновляет. Регистрация и отдельный пароль не требуются: необходим только единый API-ключ, доступный во всплывающем окне трея. Сборка из исходников и пути хранения данных: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
 
 Для macOS 12 Monterey и новее выберите **arm64 (Apple Silicon)** или **x64 (Intel)**. Обе версии для Mac также доступны в ZIP.
 
