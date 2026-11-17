@@ -27,6 +27,7 @@ import { INFERBASE_BASE_URL } from '../providers/inferbase.js';
 import { LLMTR_BASE_URL } from '../providers/llmtr.js';
 import { JAMAI_BASE_URL, jamaiHeaders } from '../providers/jamai.js';
 import { FREEINFERENCE_BASE_URL } from '../providers/freeinference.js';
+import { FREEAI_BASE_URL } from '../providers/freeai.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
 
 export interface EmbeddingModelRow {
@@ -130,6 +131,7 @@ export const EMBEDDING_PLATFORMS = new Set([
   'inferbase',
   'llmtr',
   'silvr',
+  'freeai',
 ]);
 
 interface ProviderCallResult {
@@ -366,8 +368,28 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       return openAiStyleEmbed(`${SPEKA_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions);
     case 'electronhub':
       return openAiStyleEmbed(`${ELECTRONHUB_BASE_URL}/embeddings`, row.platform, key, row.model_id, inputs, { encoding_format: 'float' }, dimensions, row.dimensions);
+    case 'freeai': {
+      const expected = ({ 'bge-m3': 1024, 'embeddinggemma-2': 768 } as Record<string, number>)[row.model_id];
+      if (!expected || row.dimensions !== expected || dimensions !== undefined && dimensions !== expected)
+        throw new EmbeddingsError('Free.ai embeddings require a tested model and its native dimensions', 400);
+      const r = await proxyFetch(FREEAI_BASE_URL + '/v1/embeddings/', {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ model: row.model_id, input: inputs }),
+      }, row.platform, 'embedding', FETCH_TIMEOUT_MS);
+      if (!r.ok) {
+        await r.body?.cancel();
+        throw new EmbeddingsError('Free.ai embeddings error (HTTP ' + r.status + ')', r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
+      }
+      const body = await r.json().catch(() => null) as { model?: string; embeddings?: number[][]; count?: number; dimensions?: number; tokens_used?: number } | null;
+      if (body?.model !== row.model_id || body.dimensions !== expected || body.count !== inputs.length ||
+          !Array.isArray(body.embeddings) || body.embeddings.length !== inputs.length ||
+          body.embeddings.some(v => !Array.isArray(v) || v.length !== expected || !v.every(Number.isFinite) || !v.some(x => x !== 0)))
+        throw new EmbeddingsError('Free.ai returned mismatched or malformed embeddings', 502);
+      return { vectors: body.embeddings, inputTokens: typeof body.tokens_used === 'number' && Number.isSafeInteger(body.tokens_used) && body.tokens_used >= 0 ? body.tokens_used : null };
+    }
     case 'silvr': {
-      const nativeDimensions: Record<string, number> = { 'gemini-embedding-2': 3072, 'gemini-embedding-001': 3072, 'text-embedding-3-small': 1536 };
+      const nativeDimensions: Record<string, number> = { 'nemotron-3-5-embed-1b': 2048, 'nemotron-3-5-embed-8b': 4096, 'gemini-embedding-2': 3072, 'gemini-embedding-001': 3072, 'text-embedding-3-small': 1536 };
       const expected = nativeDimensions[row.model_id];
       if (!expected || row.dimensions !== expected || dimensions !== undefined && dimensions !== expected) {
         throw new EmbeddingsError('SilvR embeddings require a tested model and its native dimensions', 400);

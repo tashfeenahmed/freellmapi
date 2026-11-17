@@ -1,3 +1,4 @@
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
@@ -74,6 +75,7 @@ const PLATFORMS = [
   'zro',
   'novai',
   'varosity',
+  'speechflow',
   'rime',
   'typecast',
   'cartesia',
@@ -809,6 +811,10 @@ keysRouter.post('/', (req: Request, res: Response) => {
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
+  if (platform === 'speechflow' && !speechFlowCredentials(rawKey)) {
+    res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+    return;
+  }
   if (!isKeyless && !rawKey) {
     res.status(400).json({ error: { message: 'key is required' } });
     return;
@@ -1959,6 +1965,10 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     // Key-optional platforms (Kilo, OVH, AI Horde) accept a real key here like
     // any other provider: it replaces the anonymous sentinel (#1331).
 
+    if (stored.platform === 'speechflow' && !speechFlowCredentials(key)) {
+      res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+      return;
+    }
     if (stored.platform === 'cloudflare') {
       const separator = key.indexOf(':');
       if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {

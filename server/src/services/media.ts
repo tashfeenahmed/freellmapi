@@ -14,6 +14,7 @@ import { secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
@@ -49,7 +50,7 @@ const KEYLESS_CAPABLE = new Set(['pollinations']);
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia', 'silvr']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia', 'silvr', 'speechflow']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -279,7 +280,7 @@ async function mediaFetch(
     timeoutMs,
   );
   if (!r.ok) {
-    if (platform === 'silvr' || platform === 'electronhub') {
+    if (platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
       await r.body?.cancel();
       throw new MediaError(`${platform} ${modality} request failed (${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     }
@@ -1515,6 +1516,37 @@ function resolveTranscriptionChain(model: string | undefined, responseFormat: st
   return chain;
 }
 
+// This is one async ASR service, not a separate model for every language.
+async function speechFlowTranscription(model: string, key: string | null, p: TranscriptionParams) {
+  const headers = speechFlowCredentials(key ?? '');
+  if (!headers) throw new MediaError('SpeechFlow requires keyId:keySecret', 401);
+  if (model !== 'speechflow-asr' || !['text', 'json', 'verbose_json'].includes(p.responseFormat) || p.prompt || (p.temperature ?? 0) !== 0)
+    throw new MediaError('Unsupported SpeechFlow model or transcription options', 400);
+  const lang = (p.language ?? 'en').toLowerCase();
+  if (!/^[a-z]{2}$/.test(lang)) throw new MediaError('SpeechFlow requires a two-letter language code', 400);
+  const base = 'https://api.speechflow.io/asr/file/v1/';
+  const form = new FormData();
+  form.set('file', new Blob([new Uint8Array(p.file)], { type: p.mimeType || 'application/octet-stream' }),
+    p.filename.replace(/[^a-z0-9._-]/gi, '_').slice(-128) || 'audio.wav');
+  const deadline = Date.now() + 120_000;
+  async function request(path: string, init: RequestInit) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new MediaError('SpeechFlow transcription timed out', 504);
+    const r = await mediaFetch(base + path, 'speechflow', 'transcription', { ...init, headers: headers!, redirect: 'error' }, Math.min(remaining, 30_000));
+    return await boundedMediaJson(r, 4 * 1024 * 1024) as { code?: number; taskId?: unknown; result?: unknown } | null;
+  }
+  const job = await request('create?lang=' + lang, { method: 'POST', body: form });
+  if (job?.code !== 10000 || typeof job.taskId !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(job.taskId))
+    throw new MediaError('SpeechFlow did not accept the transcription job', 502);
+  const query = 'query?' + new URLSearchParams({ taskId: job.taskId, resultType: '4' });
+  for (;;) {
+    const state = await request(query, { method: 'GET' });
+    if (state?.code === 11000 && typeof state.result === 'string') return { text: state.result, language: lang };
+    if (state?.code !== 11001) throw new MediaError('SpeechFlow returned an unsuccessful or malformed transcription', 502);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+}
+
 async function callTranscriptionProvider(
   m: SttCandidate,
   credential: ProviderCredential,
@@ -1522,6 +1554,7 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'speechflow': return speechFlowTranscription(m.modelId, key, p);
     case 'silvr': {
       if (!key) throw new MediaError('SilvR API key required', 401);
       if (!['whisper-large-v3-turbo', 'whisper-large-v3'].includes(m.modelId)) throw new MediaError('Unknown SilvR transcription model', 400);
