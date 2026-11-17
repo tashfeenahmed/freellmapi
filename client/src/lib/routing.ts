@@ -438,6 +438,7 @@ export const platformColors: Record<string, string> = {
   novai:       '#8b5cf6',
   varosity:    '#a855f7',
   speechflow:  '#2563eb',
+  meldport:    '#256381',
   rime:        '#e96847',
   typecast:    '#6b46c1',
   cartesia:    '#1c6b4a',

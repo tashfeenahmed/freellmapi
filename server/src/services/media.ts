@@ -30,6 +30,7 @@ import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
+import { solariaTranscription } from './media-solaria.js';
 import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
 import { VoiceGatewayMediaError, voiceGatewaySpeech, cartesiaTranscription } from './media-voice-gateways.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
@@ -1595,6 +1596,7 @@ async function callTranscriptionProvider(
     case 'cohere':
     case 'electronhub':
     case 'ovh': {
+      if (m.platform === 'ovh' && m.modelId === 'solaria-3') return nativeMediaResult(solariaTranscription(p));
       if (m.platform === 'electronhub' && !['voxtral-mini-2602', 'deepgram-nova-3'].includes(m.modelId)) throw new MediaError('Unknown ElectronHub transcription model', 400);
       if (m.platform === 'freeai' && m.modelId !== 'whisper') throw new MediaError('Unknown Free.ai transcription model', 400);
       if (m.platform === 'ovh' && !['whisper-large-v3', 'whisper-large-v3-turbo'].includes(m.modelId)) throw new MediaError('Unknown OVH transcription model', 400);

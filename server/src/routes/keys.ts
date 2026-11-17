@@ -76,6 +76,7 @@ const PLATFORMS = [
   'novai',
   'varosity',
   'speechflow',
+  'meldport',
   'rime',
   'typecast',
   'cartesia',

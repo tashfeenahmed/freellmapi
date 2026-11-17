@@ -56,6 +56,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
   { value: 'varosity', label: 'Varosity (one-time $1.50 starter credit)', url: 'https://varosity.ai/app/keys/api-keys' },
   { value: 'speechflow', label: 'SpeechFlow (file transcription)', url: 'https://speechflow.io' },
+  { value: 'meldport', label: 'Meldport (monthly free tokens)', url: 'https://console.meldport.com' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
   { value: 'typecast', label: 'Typecast (15K credits/month; non-commercial, attribution required)', url: 'https://studio.typecast.ai/developers/api' },
   { value: 'cartesia', label: 'Cartesia (20K shared credits/month; non-commercial Free plan)', url: 'https://play.cartesia.ai/keys' },
