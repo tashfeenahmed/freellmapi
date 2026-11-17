@@ -123,6 +123,28 @@ describe('transcription service', () => {
     expect(Buffer.from(await file.arrayBuffer()).equals(AUDIO)).toBe(true);
   });
 
+  it('uploads only the selected bytes of a shared buffer in multipart and binary requests', async () => {
+    addKey('groq');
+    addKey('cloudflare', 'acct123:token456');
+    const file = Buffer.from(new SharedArrayBuffer(AUDIO.length + 2), 1, AUDIO.length);
+    file.set(AUDIO);
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ text: 'ok' }))
+      .mockResolvedValueOnce(jsonResponse({ result: { text: 'ok' } }));
+    globalThis.fetch = fetchMock;
+
+    await runTranscription('whisper-large-v3-turbo', params({ file }));
+    await runTranscription('@cf/openai/whisper', params({ file }));
+    file.fill(0);
+
+    const form = fetchMock.mock.calls[0][1]?.body as FormData;
+    const uploaded = form.get('file') as File;
+    expect(uploaded.type).toBe('audio/wav');
+    expect(Buffer.from(await uploaded.arrayBuffer())).toEqual(AUDIO);
+    const binary = new Response(fetchMock.mock.calls[1][1]?.body);
+    expect(Buffer.from(await binary.arrayBuffer())).toEqual(AUDIO);
+  });
+
   it('groq: requests verbose_json upstream and passes segments through', async () => {
     addKey('groq');
     const segments = [{ id: 0, start: 0, end: 1.5, text: 'hello' }];
