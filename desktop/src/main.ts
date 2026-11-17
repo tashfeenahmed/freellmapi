@@ -4,7 +4,7 @@ import { app, dialog, ipcMain, clipboard, nativeTheme, net, screen, shell, type 
 import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl, setCatalogFallbackFetch } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
-import { buildTray, refreshTrayLocale } from './tray.js';
+import { buildTray, refreshTrayLocale, refreshTrayMenu } from './tray.js';
 import { trayIsInMenuBar } from './tray-visibility.js';
 import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
 import { openDashboard } from './window.js';
@@ -257,6 +257,7 @@ if (!app.requestSingleInstanceLock()) {
     const next = !(loadConfig().showInDock ?? true);
     saveConfig({ ...loadConfig(), showInDock: next });
     applyDockVisibility(next);
+    refreshTrayMenu();
   }
 
   app.whenReady().then(async () => {
@@ -293,6 +294,8 @@ if (!app.requestSingleInstanceLock()) {
         try { return outboundProxyUrl(); } catch { return ''; }
       },
       getLocale: () => locale,
+      // The Linux tray menu is attached, not rebuilt per click (#1804).
+      onChange: () => refreshTrayMenu(),
     });
 
     // License activation and catalog sync retry through Chromium's network
