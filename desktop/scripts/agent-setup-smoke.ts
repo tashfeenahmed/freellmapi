@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
 import { app, BrowserWindow } from 'electron';
 import catalog from '../../client/src/data/agent-tools.json';
 import { registerAgentSetup } from '../src/agent-setup.js';
+import { launchMacTerminal } from '../src/agent-terminal.js';
 import { isTerminalAgent } from '../../shared/agent-setup.js';
 
 const home = process.env.AGENT_TEST_HOME!;
@@ -20,7 +23,14 @@ async function smoke() {
     preload: process.env.AGENT_TEST_PRELOAD!, sandbox: false, contextIsolation: true,
     additionalArguments: ['--freeapi-token=' + process.env.AGENT_TEST_TOKEN],
   } });
-  registerAgentSetup({ port: () => port, key: () => key, dashboard: () => window, home });
+  // Run the generated .command file and its credential handoff without leaving
+  // Terminal windows on a developer's Mac. CI exercises Terminal.app itself.
+  const launch = process.platform === 'darwin' && process.env.GITHUB_ACTIONS !== 'true'
+    ? (executable: string, apiKey: string) => launchMacTerminal(executable, apiKey, async command => {
+      await promisify(execFile)(command, { timeout: 15_000 });
+    })
+    : undefined;
+  registerAgentSetup({ port: () => port, key: () => key, dashboard: () => window, home, launch });
   const js = (script: string) => window.webContents.executeJavaScript(script);
   const wait = async (test: () => Promise<unknown> | unknown, message: string) => {
     const until = Date.now() + 15_000;
