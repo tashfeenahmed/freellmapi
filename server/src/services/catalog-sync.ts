@@ -17,6 +17,7 @@ import {
   reinstateUpstreamRetiredCatalogModel,
 } from './model-state.js';
 import { ensureAllModelsInProfiles } from './profile-models.js';
+import { applyKeylessDefaults } from './keyless-defaults.js';
 
 // Generative-media modalities are routed into the separate media_models table
 // (see services/media.ts), never into the chat `models` table.
@@ -1096,6 +1097,12 @@ export async function syncCatalog(force = false): Promise<SyncResult> {
       throw new Error(`catalog payload has unexpected shape: ${shapeProblems.join('; ')}`);
     }
     const catalog = parsed as Catalog;
+    // #1870: a new install enables the no-key providers this catalog lists.
+    // Runs on the fetched document (whichever branch below), so the tier the
+    // catalog server picked decides: Premium now, free after the 30-day lag.
+    try { applyKeylessDefaults(catalog, db); } catch (err) {
+      console.warn(`[keyless] could not enable no-key providers: ${(err as Error).message}`);
+    }
 
     if (catalog.version < MIN_CATALOG_VERSION) {
       // Older than the bundled baseline (e.g. monthly snapshot lagging a fresh
