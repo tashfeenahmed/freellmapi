@@ -1,3 +1,5 @@
+import { useRecentAgents } from './useRecentAgents'
+import { DesktopAgentsPage, desktopAgentBridge } from './DesktopAgentsPage'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, ExternalLink, Globe } from 'lucide-react'
@@ -18,37 +20,8 @@ import {
 } from '@/components/ui/card'
 import toolCatalog from '@/data/agent-tools.json'
 
-interface ClientAnalytics {
-  clientAgent: string
-  requests: number
-  lastSeenAt: string | null
-}
-
 interface KeyResponse {
   apiKey: string
-}
-
-const analyticsIds: Record<string, string> = {
-  claude: 'claude-code',
-  codex: 'codex',
-  cline: 'cline',
-  continue: 'continue',
-  aider: 'aider',
-  opencode: 'opencode',
-  goose: 'goose',
-  qwen: 'qwen-code',
-  roo: 'roo',
-  kilo: 'kilo-code',
-  crush: 'crush',
-  dsh: 'deepseek-harness',
-  mimo: 'mimo-code',
-  atomcode: 'atomcode',
-  openclaw: 'openclaw',
-  hermes: 'hermes-agent',
-  pi: 'pi',
-  reasonix: 'reasonix',
-  zcode: 'zcode',
-  cursor: 'cursor',
 }
 
 // Agents whose built-in web search tool the gateway serves from the search
@@ -64,22 +37,18 @@ function masked(value: string): string {
 }
 
 export default function AgentsPage() {
+  const bridge = desktopAgentBridge()
+  return bridge ? <DesktopAgentsPage bridge={bridge} /> : <WebAgentsPage />
+}
+
+function WebAgentsPage() {
   const { t } = useI18n()
   const [revealKey, setRevealKey] = useState(false)
   const { data: keyData } = useQuery<KeyResponse>({
     queryKey: ['api-key'],
     queryFn: () => apiFetch('/api/settings/api-key'),
   })
-  const { data: byClient = [] } = useQuery<ClientAnalytics[]>({
-    queryKey: ['analytics', 'by-client', '30d'],
-    queryFn: () => apiFetch('/api/analytics/by-client?range=30d'),
-  })
-  // "Seen recently" means traffic within the last 7 days, not merely any row
-  // in the fetched 30-day window.
-  const seenCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const seen = new Map(byClient
-    .filter(row => row.lastSeenAt && Date.parse(row.lastSeenAt) >= seenCutoff)
-    .map(row => [row.clientAgent, row]))
+  const seen = useRecentAgents()
   const origin = import.meta.env.DEV
     ? `http://${window.location.hostname}:${__SERVER_PORT__}`
     : window.location.origin
@@ -120,7 +89,7 @@ export default function AgentsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {toolCatalog.map(tool => {
-          const traffic = seen.get(analyticsIds[tool.id] ?? tool.id)
+          const traffic = seen(tool.id)
           const command = `npx freellmapi ${tool.command} --url ${origin}`
           const endpoint = tool.baseUrlSupport === 'root' ? origin : `${origin}/v1`
           // The copied snippet is pasted into config files — keep it

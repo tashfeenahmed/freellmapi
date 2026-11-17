@@ -10,7 +10,7 @@ export interface CatalogModel {
 
 export interface GeneratedFile {
   path: string;
-  format: 'json' | 'toml' | 'yaml' | 'env';
+  format: 'json' | 'toml' | 'yaml' | 'yaml-entries' | 'env';
   /** Structured patch, deep-merged into the existing document (json, yaml). */
   value?: Record<string, unknown>;
   /** Literal text, merged as a marked `# freellmapi:start/end` block (toml, yaml, env). */

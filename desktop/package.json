@@ -13,7 +13,7 @@
   "main": "build/main.mjs",
   "scripts": {
     "bundle:server": "node scripts/bundle-server.mjs",
-    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --external:electron --external:electron-updater --external:./server.mjs --outfile=build/main.mjs",
+    "build:main": "node scripts/bundle-main.mjs",
     "build:preload": "esbuild src/preload.ts src/preload-popover.ts --bundle --platform=node --format=cjs --external:electron --outdir=build --out-extension:.js=.cjs",
     "build:all": "npm run bundle:server && npm run build:main && npm run build:preload",
     "stage:client": "node scripts/stage-client.mjs",
@@ -24,7 +24,8 @@
     "dist:win": "npm run build:all && npm run stage:client && electron-builder --win --x64 --publish never",
     "dist:store": "npm run build:all && npm run stage:client && electron-builder --win appx --x64 -c.directories.buildResources=store-assets -c.directories.output=dist-store --publish never",
     "dist:linux": "npm run build:all && npm run stage:client && electron-builder --linux --x64 --publish never",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:agent-setup": "node scripts/smoke-agent-setup.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
