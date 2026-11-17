@@ -947,6 +947,8 @@
     "dictationStop": "Yozib olishni to‘xtatish",
     "dictationTranscribing": "Matnga o‘girilmoqda…",
     "dictationUnavailable": "Diktovkadan foydalanish uchun audio modellar provayderlarini qo‘shing.",
+    "dictationMacShortcut": "Mikrofon tugmasini bosing yoki klaviatura sozlamalarida belgilangan diktovka yorlig‘idan foydalaning.",
+    "dictationWindowsShortcut": "Ovoz bilan yozishni boshlash uchun Win + H tugmalarini bosing.",
     "dictationModel": "Diktovka modeli",
     "dictationFailed": "Matnga o‘girish amalga oshmadi: {reason}",
     "artifactOpen": "Ko‘rishni ochish",

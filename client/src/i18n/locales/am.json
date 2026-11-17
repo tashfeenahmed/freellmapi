@@ -947,6 +947,8 @@
     "dictationStop": "መቅረጽ አቁም",
     "dictationTranscribing": "እየተጻፈ ነው…",
     "dictationUnavailable": "ተናግረው ለመጻፍ የድምፅ ሞዴል አቅራቢዎችን ያክሉ።",
+    "dictationMacShortcut": "የማይክሮፎን ቁልፉን ወይም በቁልፍ ሰሌዳ ቅንብሮች የተዘጋጀውን የቃል ጽሕፈት አቋራጭ ይጫኑ።",
+    "dictationWindowsShortcut": "በድምፅ መጻፍ ለመጀመር Win + H ይጫኑ።",
     "dictationModel": "የቃል ጽሕፈት ሞዴል",
     "dictationFailed": "መጻፍ አልተሳካም: {reason}",
     "artifactOpen": "ቅድመ እይታ ክፈት",

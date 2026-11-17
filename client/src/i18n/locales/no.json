@@ -947,6 +947,8 @@
     "dictationStop": "Stopp opptak",
     "dictationTranscribing": "Transkriberer…",
     "dictationUnavailable": "Legg til leverandører av lydmodeller for å kunne diktere.",
+    "dictationMacShortcut": "Trykk på mikrofontasten eller bruk snarveien for diktering fra tastaturinnstillingene.",
+    "dictationWindowsShortcut": "Trykk på Win + H for å begynne å skrive med stemmen.",
     "dictationModel": "Dikteringsmodell",
     "dictationFailed": "Transkripsjon mislyktes: {reason}",
     "artifactOpen": "Åpne forhåndsvisning",

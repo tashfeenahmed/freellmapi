@@ -947,6 +947,8 @@
     "dictationStop": "Hentikan rakaman",
     "dictationTranscribing": "Mentranskripsi…",
     "dictationUnavailable": "Tambah pembekal model audio untuk menggunakan dikte.",
+    "dictationMacShortcut": "Tekan kekunci mikrofon atau gunakan pintasan imlak yang ditetapkan dalam tetapan papan kekunci.",
+    "dictationWindowsShortcut": "Tekan Win + H untuk mula menaip dengan suara.",
     "dictationModel": "Model dikte",
     "dictationFailed": "Transkripsi gagal: {reason}",
     "artifactOpen": "Buka pratonton",

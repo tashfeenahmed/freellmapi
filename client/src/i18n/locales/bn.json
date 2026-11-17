@@ -947,6 +947,8 @@
     "dictationStop": "রেকর্ডিং বন্ধ করুন",
     "dictationTranscribing": "লেখা হচ্ছে…",
     "dictationUnavailable": "বলে লেখা ব্যবহার করতে অডিও মডেলের প্রদানকারী যোগ করুন।",
+    "dictationMacShortcut": "মাইক্রোফোন কী চাপুন অথবা কীবোর্ড সেটিংসে নির্ধারিত ডিকটেশন শর্টকাট ব্যবহার করুন।",
+    "dictationWindowsShortcut": "ভয়েস টাইপিং শুরু করতে Win + H চাপুন।",
     "dictationModel": "শ্রুতলিখন মডেল",
     "dictationFailed": "লেখা ব্যর্থ হয়েছে: {reason}",
     "artifactOpen": "প্রিভিউ খুলুন",

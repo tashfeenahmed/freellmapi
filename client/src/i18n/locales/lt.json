@@ -947,6 +947,8 @@
     "dictationStop": "Stabdyti įrašymą",
     "dictationTranscribing": "Transkribuojama…",
     "dictationUnavailable": "Pridėkite garso modelių teikėjų, kad galėtumėte diktuoti.",
+    "dictationMacShortcut": "Paspauskite mikrofono klavišą arba naudokite klaviatūros nustatymuose nustatytą diktavimo klavišų derinį.",
+    "dictationWindowsShortcut": "Norėdami pradėti rašyti balsu, paspauskite Win + H.",
     "dictationModel": "Diktavimo modelis",
     "dictationFailed": "Transkripcija nepavyko: {reason}",
     "artifactOpen": "Atverti peržiūrą",

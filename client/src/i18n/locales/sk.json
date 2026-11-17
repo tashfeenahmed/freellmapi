@@ -947,6 +947,8 @@
     "dictationStop": "Zastaviť nahrávanie",
     "dictationTranscribing": "Prepisuje sa…",
     "dictationUnavailable": "Pridajte poskytovateľov audio modelov, aby ste mohli diktovať.",
+    "dictationMacShortcut": "Stlačte kláves mikrofónu alebo použite skratku diktovania z nastavení klávesnice.",
+    "dictationWindowsShortcut": "Hlasové zadávanie spustíte stlačením Win + H.",
     "dictationModel": "Model diktovania",
     "dictationFailed": "Prepis zlyhal: {reason}",
     "artifactOpen": "Otvoriť náhľad",

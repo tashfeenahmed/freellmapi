@@ -947,6 +947,8 @@
     "dictationStop": "Simamisha kurekodi",
     "dictationTranscribing": "Inanukuu…",
     "dictationUnavailable": "Ongeza watoa huduma wa miundo ya sauti ili kutumia kusema uandikishe.",
+    "dictationMacShortcut": "Bonyeza kitufe cha maikrofoni au utumie njia ya mkato ya imla iliyowekwa katika mipangilio ya kibodi.",
+    "dictationWindowsShortcut": "Bonyeza Win + H ili uanze kuandika kwa sauti.",
     "dictationModel": "Muundo wa kusema uandikishe",
     "dictationFailed": "Unukuzi umeshindwa: {reason}",
     "artifactOpen": "Fungua onyesho la kukagua",

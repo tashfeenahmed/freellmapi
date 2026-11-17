@@ -947,6 +947,8 @@
     "dictationStop": "રેકોર્ડિંગ બંધ કરો",
     "dictationTranscribing": "લખાઈ રહ્યું છે…",
     "dictationUnavailable": "બોલીને લખવા માટે ઑડિયો મોડેલ પ્રદાતાઓ ઉમેરો.",
+    "dictationMacShortcut": "માઇક્રોફોન કી દબાવો અથવા કીબોર્ડ સેટિંગ્સમાં સેટ કરેલો ડિક્ટેશન શૉર્ટકટ વાપરો.",
+    "dictationWindowsShortcut": "અવાજથી ટાઇપ કરવાનું શરૂ કરવા માટે Win + H દબાવો.",
     "dictationModel": "શ્રુતલેખન મોડેલ",
     "dictationFailed": "લખવામાં નિષ્ફળ: {reason}",
     "artifactOpen": "પૂર્વાવલોકન ખોલો",

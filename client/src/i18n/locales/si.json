@@ -947,6 +947,8 @@
     "dictationStop": "පටිගත කිරීම නවත්වන්න",
     "dictationTranscribing": "ලියමින්…",
     "dictationUnavailable": "කියා ලිවීම භාවිතයට ශ්‍රව්‍ය මාදිලි සපයන්නන් එක් කරන්න.",
+    "dictationMacShortcut": "මයික්‍රොෆෝන යතුර ඔබන්න හෝ යතුරුපුවරු සැකසුම්වල දක්වා ඇති හඬින් ලිවීමේ කෙටිමඟ භාවිත කරන්න.",
+    "dictationWindowsShortcut": "හඬින් ටයිප් කිරීම ඇරඹීමට Win + H ඔබන්න.",
     "dictationModel": "කියා ලිවීමේ මාදිලිය",
     "dictationFailed": "ලිවීම අසාර්ථකයි: {reason}",
     "artifactOpen": "පෙරදසුන විවෘත කරන්න",

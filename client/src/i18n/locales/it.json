@@ -947,6 +947,8 @@
     "dictationStop": "Interrompi registrazione",
     "dictationTranscribing": "Trascrizione…",
     "dictationUnavailable": "Aggiungi provider di modelli audio per usare la dettatura.",
+    "dictationMacShortcut": "Premi il tasto del microfono o usa l’abbreviazione per la dettatura impostata nelle preferenze della tastiera.",
+    "dictationWindowsShortcut": "Premi Win + H per avviare la digitazione vocale.",
     "dictationModel": "Modello di dettatura",
     "dictationFailed": "Trascrizione non riuscita: {reason}",
     "artifactOpen": "Apri anteprima",

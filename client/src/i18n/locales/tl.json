@@ -947,6 +947,8 @@
     "dictationStop": "Ihinto ang pag-record",
     "dictationTranscribing": "Isinasalin sa teksto…",
     "dictationUnavailable": "Magdagdag ng mga provider ng audio model para magamit ang pagdidikta.",
+    "dictationMacShortcut": "Pindutin ang mikropono sa keyboard o gamitin ang shortcut para sa pagdidikta na itinakda sa mga setting ng keyboard.",
+    "dictationWindowsShortcut": "Pindutin ang Win + H para magsimulang mag-type gamit ang boses.",
     "dictationModel": "Modelo ng pagdidikta",
     "dictationFailed": "Nabigo ang transkripsyon: {reason}",
     "artifactOpen": "Buksan ang preview",

@@ -947,6 +947,8 @@
     "dictationStop": "रिकॉर्डिंग रोकें",
     "dictationTranscribing": "लिखा जा रहा है…",
     "dictationUnavailable": "बोलकर लिखने के लिए ऑडियो मॉडल के प्रदाता जोड़ें।",
+    "dictationMacShortcut": "माइक्रोफ़ोन कुंजी दबाएँ या कीबोर्ड सेटिंग्स में तय डिक्टेशन शॉर्टकट का इस्तेमाल करें।",
+    "dictationWindowsShortcut": "बोलकर टाइप करना शुरू करने के लिए Win + H दबाएँ।",
     "dictationModel": "श्रुतलेख मॉडल",
     "dictationFailed": "लिखने में विफल: {reason}",
     "artifactOpen": "पूर्वावलोकन खोलें",

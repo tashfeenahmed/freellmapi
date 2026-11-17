@@ -947,6 +947,8 @@
     "dictationStop": "หยุดบันทึก",
     "dictationTranscribing": "กำลังถอดเสียง…",
     "dictationUnavailable": "เพิ่มผู้ให้บริการโมเดลเสียงเพื่อใช้การพูดเพื่อพิมพ์",
+    "dictationMacShortcut": "กดปุ่มไมโครโฟนหรือใช้ปุ่มลัดการป้อนตามคำบอกที่ตั้งไว้ในการตั้งค่าแป้นพิมพ์",
+    "dictationWindowsShortcut": "กด Win + H เพื่อเริ่มพิมพ์ด้วยเสียง",
     "dictationModel": "โมเดลพูดเพื่อพิมพ์",
     "dictationFailed": "ถอดเสียงไม่สำเร็จ: {reason}",
     "artifactOpen": "เปิดตัวอย่าง",

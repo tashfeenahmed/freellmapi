@@ -947,6 +947,8 @@
     "dictationStop": "Aufnahme beenden",
     "dictationTranscribing": "Wird transkribiert…",
     "dictationUnavailable": "Fügen Sie Anbieter für Audiomodelle hinzu, um Diktat nutzen zu können.",
+    "dictationMacShortcut": "Drücken Sie die Mikrofontaste oder verwenden Sie den in den Tastatureinstellungen festgelegten Kurzbefehl für die Diktierfunktion.",
+    "dictationWindowsShortcut": "Drücken Sie Win + H, um die Spracheingabe zu starten.",
     "dictationModel": "Diktiermodell",
     "dictationFailed": "Transkription fehlgeschlagen: {reason}",
     "artifactOpen": "Vorschau öffnen",

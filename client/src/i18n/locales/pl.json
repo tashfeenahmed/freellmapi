@@ -947,6 +947,8 @@
     "dictationStop": "Zatrzymaj nagrywanie",
     "dictationTranscribing": "Transkrypcja…",
     "dictationUnavailable": "Dodaj dostawców modeli audio, aby korzystać z dyktowania.",
+    "dictationMacShortcut": "Naciśnij klawisz mikrofonu lub użyj skrótu dyktowania z ustawień klawiatury.",
+    "dictationWindowsShortcut": "Naciśnij Win + H, aby rozpocząć pisanie głosowe.",
     "dictationModel": "Model dyktowania",
     "dictationFailed": "Transkrypcja nie powiodła się: {reason}",
     "artifactOpen": "Otwórz podgląd",

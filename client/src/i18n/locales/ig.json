@@ -947,6 +947,8 @@
     "dictationStop": "Kwụsị ndekọ",
     "dictationTranscribing": "Na-edegharị…",
     "dictationUnavailable": "Tinye ndị na-enye ụdị ụda iji jiri ikwu ka e dee.",
+    "dictationMacShortcut": "Pịa igodo igwe okwu ma ọ bụ jiri ụzọ mkpirisi e debere na ntọala kiibọọdu maka ikwu ka e dee.",
+    "dictationWindowsShortcut": "Pịa Win + H ka ị malite iji olu dee ihe.",
     "dictationModel": "Ụdị ikwu ka e dee",
     "dictationFailed": "Ndegharị dara: {reason}",
     "artifactOpen": "Mepee nlele",

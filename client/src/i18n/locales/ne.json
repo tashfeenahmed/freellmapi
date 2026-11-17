@@ -947,6 +947,8 @@
     "dictationStop": "रेकर्डिङ रोक्नुहोस्",
     "dictationTranscribing": "लेखिँदैछ…",
     "dictationUnavailable": "बोलेर लेख्न अडियो मोडेल प्रदायकहरू थप्नुहोस्।",
+    "dictationMacShortcut": "माइक्रोफोन कुञ्जी थिच्नुहोस् वा किबोर्ड सेटिङमा तोकिएको डिक्टेसन सर्टकट प्रयोग गर्नुहोस्।",
+    "dictationWindowsShortcut": "बोलेर टाइप गर्न Win + H थिच्नुहोस्।",
     "dictationModel": "श्रुतलेखन मोडेल",
     "dictationFailed": "लेख्न असफल: {reason}",
     "artifactOpen": "पूर्वावलोकन खोल्नुहोस्",

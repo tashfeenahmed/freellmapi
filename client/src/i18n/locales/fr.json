@@ -947,6 +947,8 @@
     "dictationStop": "Arrêter l’enregistrement",
     "dictationTranscribing": "Transcription…",
     "dictationUnavailable": "Ajoutez des fournisseurs de modèles audio pour utiliser la dictée.",
+    "dictationMacShortcut": "Appuyez sur la touche du micro ou utilisez le raccourci de dictée défini dans les réglages du clavier.",
+    "dictationWindowsShortcut": "Appuyez sur Win + H pour lancer la saisie vocale.",
     "dictationModel": "Modèle de dictée",
     "dictationFailed": "Échec de la transcription : {reason}",
     "artifactOpen": "Ouvrir l’aperçu",

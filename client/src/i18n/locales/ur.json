@@ -947,6 +947,8 @@
     "dictationStop": "ریکارڈنگ روکیں",
     "dictationTranscribing": "تحریر ہو رہی ہے…",
     "dictationUnavailable": "بول کر لکھنے کے لیے آڈیو ماڈلز کے فراہم کنندگان شامل کریں۔",
+    "dictationMacShortcut": "مائیکروفون کی کلید دبائیں یا کی بورڈ کی ترتیبات میں مقرر کردہ ڈکٹیشن شارٹ کٹ استعمال کریں۔",
+    "dictationWindowsShortcut": "بول کر ٹائپ کرنا شروع کرنے کے لیے Win + H دبائیں۔",
     "dictationModel": "املا ماڈل",
     "dictationFailed": "تحریر ناکام: {reason}",
     "artifactOpen": "پیش منظر کھولیں",

@@ -947,6 +947,8 @@
     "dictationStop": "ರೆಕಾರ್ಡಿಂಗ್ ನಿಲ್ಲಿಸಿ",
     "dictationTranscribing": "ಲಿಪ್ಯಂತರ…",
     "dictationUnavailable": "ಡಿಕ್ಟೇಷನ್ ಬಳಸಲು ಆಡಿಯೊ ಮಾದರಿ ಪೂರೈಕೆದಾರರನ್ನು ಸೇರಿಸಿ.",
+    "dictationMacShortcut": "ಮೈಕ್ರೊಫೋನ್ ಕೀ ಒತ್ತಿ ಅಥವಾ ಕೀಬೋರ್ಡ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಹೊಂದಿಸಿರುವ ಡಿಕ್ಟೇಷನ್ ಶಾರ್ಟ್‌ಕಟ್ ಬಳಸಿ.",
+    "dictationWindowsShortcut": "ಧ್ವನಿಯ ಮೂಲಕ ಟೈಪ್ ಮಾಡಲು Win + H ಒತ್ತಿ.",
     "dictationModel": "ಡಿಕ್ಟೇಷನ್ ಮಾದರಿ",
     "dictationFailed": "ಲಿಪ್ಯಂತರ ವಿಫಲ: {reason}",
     "artifactOpen": "ಪೂರ್ವವೀಕ್ಷಣೆ ತೆರೆಯಿರಿ",

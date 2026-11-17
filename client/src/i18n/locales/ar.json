@@ -947,6 +947,8 @@
     "dictationStop": "إيقاف التسجيل",
     "dictationTranscribing": "جارٍ التحويل إلى نص…",
     "dictationUnavailable": "أضف مزودي نماذج الصوت لتتمكن من استخدام الإملاء.",
+    "dictationMacShortcut": "اضغط على مفتاح الميكروفون أو اختصار الإملاء المحدد في إعدادات لوحة المفاتيح.",
+    "dictationWindowsShortcut": "اضغط على Win + H لبدء الكتابة بالصوت.",
     "dictationModel": "نموذج الإملاء",
     "dictationFailed": "فشل التحويل إلى نص: {reason}",
     "artifactOpen": "فتح المعاينة",

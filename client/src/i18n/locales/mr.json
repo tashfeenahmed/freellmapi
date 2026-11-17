@@ -947,6 +947,8 @@
     "dictationStop": "रेकॉर्डिंग थांबवा",
     "dictationTranscribing": "लिहिले जात आहे…",
     "dictationUnavailable": "बोलून लिहिण्यासाठी ऑडिओ मॉडेल प्रदाते जोडा.",
+    "dictationMacShortcut": "मायक्रोफोनची कळ दाबा किंवा कीबोर्ड सेटिंग्जमध्ये ठरवलेला डिक्टेशन शॉर्टकट वापरा.",
+    "dictationWindowsShortcut": "बोलून टाइप करण्यासाठी Win + H दाबा.",
     "dictationModel": "श्रुतलेखन मॉडेल",
     "dictationFailed": "लिहिणे अयशस्वी: {reason}",
     "artifactOpen": "पूर्वावलोकन उघडा",

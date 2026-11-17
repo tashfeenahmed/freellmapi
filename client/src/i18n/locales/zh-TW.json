@@ -947,6 +947,8 @@
     "dictationStop": "停止錄音",
     "dictationTranscribing": "正在轉寫…",
     "dictationUnavailable": "請新增音訊模型的供應商以使用語音輸入。",
+    "dictationMacShortcut": "按下麥克風鍵，或使用在鍵盤設定中指定的聽寫快速鍵。",
+    "dictationWindowsShortcut": "按 Win + H 開始語音輸入。",
     "dictationModel": "語音輸入模型",
     "dictationFailed": "轉寫失敗：{reason}",
     "artifactOpen": "開啟預覽",

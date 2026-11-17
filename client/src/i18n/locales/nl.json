@@ -947,6 +947,8 @@
     "dictationStop": "Opname stoppen",
     "dictationTranscribing": "Transcriberen…",
     "dictationUnavailable": "Voeg providers voor audiomodellen toe om dicteren te gebruiken.",
+    "dictationMacShortcut": "Druk op de microfoontoets of gebruik de sneltoets voor dicteren uit de toetsenbordinstellingen.",
+    "dictationWindowsShortcut": "Druk op Win + H om spraakgestuurd typen te starten.",
     "dictationModel": "Dicteermodel",
     "dictationFailed": "Transcriptie mislukt: {reason}",
     "artifactOpen": "Voorbeeld openen",

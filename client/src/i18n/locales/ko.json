@@ -947,6 +947,8 @@
     "dictationStop": "녹음 중지",
     "dictationTranscribing": "변환 중…",
     "dictationUnavailable": "받아쓰기를 사용하려면 오디오 모델 제공자를 추가하세요.",
+    "dictationMacShortcut": "마이크 키를 누르거나 키보드 설정에서 지정한 받아쓰기 단축키를 사용하세요.",
+    "dictationWindowsShortcut": "Win + H를 눌러 음성 입력을 시작하세요.",
     "dictationModel": "받아쓰기 모델",
     "dictationFailed": "변환 실패: {reason}",
     "artifactOpen": "미리보기 열기",
