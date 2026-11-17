@@ -181,14 +181,14 @@ describe('sanitizeForGemini', () => {
   });
 
   it('strips composition / structural keywords absent from Google Schema proto', () => {
-    // not / allOf / oneOf / prefixItems / contains / propertyNames / multipleOf /
-    // dependencies / deprecated are all absent from Google's Schema proto
-    // (https://ai.google.dev/api/caching#Schema). Only anyOf is supported.
+    // not / prefixItems / contains / propertyNames / multipleOf / dependencies /
+    // deprecated are all absent from Google's Schema proto
+    // (https://ai.google.dev/api/caching#Schema). Only anyOf is supported;
+    // oneOf and allOf are rewritten rather than stripped (#1874, see
+    // gemini-schema-compat.test.ts).
     const input = {
       type: 'object',
       not: { type: 'null' },
-      allOf: [{ type: 'object' }],
-      oneOf: [{ type: 'string' }, { type: 'number' }],
       dependencies: { a: ['b'] },
       deprecated: true,
       properties: {
