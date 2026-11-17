@@ -56,6 +56,13 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   const [model, setModel] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [family, setFamily] = useState('')
+  // Embedding-only per-model windows (#embedding-rate-limits). Kept as strings
+  // like the chat model dialog so a half-typed number never becomes NaN in the
+  // payload; blank means "no limit" and is omitted from the request.
+  const [rpmLimit, setRpmLimit] = useState('')
+  const [rpdLimit, setRpdLimit] = useState('')
+  const [tpmLimit, setTpmLimit] = useState('')
+  const [tpdLimit, setTpdLimit] = useState('')
   const [apiKey, setApiKey] = useState('')
   // Endpoint group (#1176); blank = the default Custom group.
   const [groupLabel, setGroupLabel] = useState('')
@@ -145,6 +152,16 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       return
     }
     if (customType === 'embedding') {
+      // Blank means "no limit": the API stores NULL for an omitted field, which
+      // is exactly what an embedding row carried before these columns existed.
+      // Sending 0 would read as "a limit of zero" and permanently block the row,
+      // so a blank field is omitted rather than coerced.
+      const limits = {
+        rpmLimit: rpmLimit.trim() ? Number(rpmLimit) : undefined,
+        rpdLimit: rpdLimit.trim() ? Number(rpdLimit) : undefined,
+        tpmLimit: tpmLimit.trim() ? Number(tpmLimit) : undefined,
+        tpdLimit: tpdLimit.trim() ? Number(tpdLimit) : undefined,
+      }
       addCustom.mutate({
         path: '/api/embeddings/custom',
         body: {
@@ -156,6 +173,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
           ...(embeddingInputType === EMBEDDING_INPUT_TYPE_UNSET
             ? {}
             : { inputType: embeddingInputType === EMBEDDING_INPUT_TYPE_NONE ? null : embeddingInputType }),
+          ...limits,
         },
       })
       return
@@ -306,6 +324,50 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+        {customType === 'embedding' && (
+          // The same four windows the chat custom-model dialog collects, so an
+          // operator can bound an embedding model's own spend. Blank = no limit
+          // (NULL), matching a row that predates these columns. The ACCOUNT-wide
+          // per-minute cap is not configured here: it belongs to the provider,
+          // not the model, and applies to embeddings automatically.
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t('keys.modelRateLimits')}</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={rpmLimit}
+                onChange={e => setRpmLimit(e.target.value)}
+                inputMode="numeric"
+                placeholder={t('models.limitRpm')}
+                aria-label={t('models.limitRpmHint')}
+                className="w-[80px] font-mono text-xs"
+              />
+              <Input
+                value={rpdLimit}
+                onChange={e => setRpdLimit(e.target.value)}
+                inputMode="numeric"
+                placeholder={t('models.limitRpd')}
+                aria-label={t('models.limitRpdHint')}
+                className="w-[80px] font-mono text-xs"
+              />
+              <Input
+                value={tpmLimit}
+                onChange={e => setTpmLimit(e.target.value)}
+                inputMode="numeric"
+                placeholder={t('models.limitTpm')}
+                aria-label={t('models.limitTpmHint')}
+                className="w-[80px] font-mono text-xs"
+              />
+              <Input
+                value={tpdLimit}
+                onChange={e => setTpdLimit(e.target.value)}
+                inputMode="numeric"
+                placeholder={t('models.limitTpd')}
+                aria-label={t('models.limitTpdHint')}
+                className="w-[80px] font-mono text-xs"
+              />
+            </div>
           </div>
         )}
         {customType === 'chat' && (

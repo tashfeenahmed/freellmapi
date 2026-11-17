@@ -54,6 +54,14 @@ embeddingsRouter.get('/', (_req: Request, res: Response) => {
         priority: r.priority,
         enabled: r.enabled === 1,
         quotaLabel: r.quota_label,
+        // Per-model windows (rpm/rpd/tpm/tpd). null = "no opinion": the row is
+        // not throttled by that window, which is how every row behaved before
+        // the columns existed, so an install that never configures one sees
+        // exactly the same payload shape plus four nulls.
+        rpmLimit: r.rpm_limit,
+        rpdLimit: r.rpd_limit,
+        tpmLimit: r.tpm_limit,
+        tpdLimit: r.tpd_limit,
         keyCount: r.platform === 'custom' && r.key_id != null
           ? (customKeyIds.has(r.key_id) ? 1 : 0)
           : keyCounts.get(r.platform) ?? 0,
@@ -85,6 +93,14 @@ const customEmbeddingSchema = z.object({
   //            stored value.
   //   a value — send that input_type.
   inputType: z.enum(['query', 'passage']).nullable().optional(),
+  // Optional per-model windows, the same names/shape the chat custom-model
+  // registration uses (routes/models.ts). Positive integers only: 0 would read
+  // as "a limit of zero" (a permanently blocked row), so "no limit" is
+  // expressed by omitting the field, which stores NULL.
+  rpmLimit: z.number().int().positive().optional(),
+  rpdLimit: z.number().int().positive().optional(),
+  tpmLimit: z.number().int().positive().optional(),
+  tpdLimit: z.number().int().positive().optional(),
 });
 
 function decryptExistingKey(row: { encrypted_key: string; iv: string; auth_tag: string } | undefined): string | null {
@@ -179,6 +195,10 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
       // Undefined keeps the stored input_type, null clears it, a value sets
       // it — the same three states the schema accepts.
       inputType: submittedInputType,
+      rpmLimit: parsed.data.rpmLimit,
+      rpdLimit: parsed.data.rpdLimit,
+      tpmLimit: parsed.data.tpmLimit,
+      tpdLimit: parsed.data.tpdLimit,
     });
     return { modelDbId, keyId, storedKeyForMask };
   });
@@ -200,6 +220,11 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
   }
   const storedName = (db.prepare('SELECT display_name FROM embedding_models WHERE id = ?')
     .get(result.modelDbId) as { display_name: string }).display_name;
+  const storedLimits = db.prepare(`
+    SELECT rpm_limit, rpd_limit, tpm_limit, tpd_limit FROM embedding_models WHERE id = ?
+  `).get(result.modelDbId) as {
+    rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null;
+  };
   res.status(201).json({
     success: true,
     keyId: result.keyId,
@@ -210,6 +235,13 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
     displayName: storedName,
     family,
     dimensions,
+    // Echo what was actually stored, not what was submitted: a re-registration
+    // that omitted the windows keeps the earlier values, and the dashboard
+    // should be able to show that without a second GET.
+    rpmLimit: storedLimits.rpm_limit,
+    rpdLimit: storedLimits.rpd_limit,
+    tpmLimit: storedLimits.tpm_limit,
+    tpdLimit: storedLimits.tpd_limit,
     maskedKey: maskKey(result.storedKeyForMask),
   });
 });

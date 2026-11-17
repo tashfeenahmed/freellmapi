@@ -45,6 +45,13 @@ export interface EmbeddingModelRow {
    *  endpoint (NVIDIA Nemotron 3.5); null means "send no input_type", which is
    *  what every symmetric model wants. */
   input_type: string | null;
+  /** Per-model rate-limit windows, mirroring the chat `models` table. NULL
+   *  means "no opinion" — the window is not enforced for this row, which is
+   *  how every row behaved before the columns existed. */
+  rpm_limit: number | null;
+  rpd_limit: number | null;
+  tpm_limit: number | null;
+  tpd_limit: number | null;
 }
 
 /** The `input_type` hint an asymmetric embedding endpoint needs.
@@ -327,6 +334,13 @@ export interface CustomEmbeddingRegistration {
    *                stored value.
    *    a value   — send that input_type. */
   inputType?: EmbeddingInputType | null;
+  /** Optional per-model windows. `undefined` means the caller has no opinion
+   *  (the bulk key importer, for instance, never collects them) and leaves an
+   *  existing row's value alone; `null` explicitly clears it to "unlimited". */
+  rpmLimit?: number | null;
+  rpdLimit?: number | null;
+  tpmLimit?: number | null;
+  tpdLimit?: number | null;
 }
 
 /**
@@ -353,11 +367,14 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
 
   const endpointKeyIds = customEndpointKeyIds(db, reg.keyId);
   const existingModel = db.prepare(`
-    SELECT id, priority, key_id
+    SELECT id, priority, key_id, rpm_limit, rpd_limit, tpm_limit, tpd_limit
       FROM embedding_models
      WHERE platform = 'custom' AND model_id = ?
      LIMIT 1
-  `).get(reg.modelId) as { id: number; priority: number; key_id: number | null } | undefined;
+  `).get(reg.modelId) as {
+    id: number; priority: number; key_id: number | null;
+    rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null;
+  } | undefined;
   // A model already on this endpoint keeps the key it has; only a move to a
   // different endpoint re-binds it.
   const bindKeyId = existingModel?.key_id != null && endpointKeyIds.has(existingModel.key_id)
@@ -367,6 +384,12 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
     (db.prepare('SELECT COALESCE(MAX(priority), 0) AS maxPriority FROM embedding_models WHERE family = ?')
       .get(reg.family) as { maxPriority: number }).maxPriority + 1
   );
+  // Rate-limit windows follow the display-name rule (#704) rather than the
+  // maxInputTokens one: a re-submit that does not mention them (the bulk key
+  // importer, or the dashboard form with the fields left blank) must not wipe
+  // a cap the operator configured earlier. An explicit null still clears.
+  const keepLimit = <T,>(submitted: T | null | undefined, current: T | null): T | null =>
+    submitted === undefined ? current : submitted;
 
   // `display_name` is optional: a new model takes its id, and a model already
   // on record keeps the name it has instead of being reset by a submit that
@@ -392,7 +415,11 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
              enabled = 1,
              quota_label = ?,
              key_id = ?,
-             input_type = CASE WHEN ? = 1 THEN ? ELSE input_type END
+             input_type = CASE WHEN ? = 1 THEN ? ELSE input_type END,
+             rpm_limit = ?,
+             rpd_limit = ?,
+             tpm_limit = ?,
+             tpd_limit = ?
        WHERE id = ?
     `).run(
       reg.family,
@@ -404,6 +431,10 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
       bindKeyId,
       reg.inputType === undefined ? 0 : 1,
       reg.inputType ?? null,
+      keepLimit(reg.rpmLimit, existingModel.rpm_limit),
+      keepLimit(reg.rpdLimit, existingModel.rpd_limit),
+      keepLimit(reg.tpmLimit, existingModel.tpm_limit),
+      keepLimit(reg.tpdLimit, existingModel.tpd_limit),
       existingModel.id,
     );
     return { modelDbId: existingModel.id, created: false };
@@ -411,8 +442,9 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
 
   const model = db.prepare(`
     INSERT INTO embedding_models
-      (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id, input_type)
-    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id,
+       input_type, rpm_limit, rpd_limit, tpm_limit, tpd_limit)
+    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     reg.family,
     reg.modelId,
@@ -423,6 +455,9 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
     reg.quotaLabel,
     bindKeyId,
     reg.inputType ?? null,
+    // A fresh registration that mentions no window stores NULL: unlimited,
+    // exactly like an embedding row created before the columns existed.
+    reg.rpmLimit ?? null, reg.rpdLimit ?? null, reg.tpmLimit ?? null, reg.tpdLimit ?? null,
   );
   return { modelDbId: Number(model.lastInsertRowid), created: true };
 }

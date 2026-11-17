@@ -34,6 +34,12 @@ interface ProviderEntry {
   priority: number
   enabled: boolean
   quotaLabel: string
+  // Per-model windows, mirrored from embedding_models.rpm_limit & co. null
+  // means "no opinion" — the row is not throttled by that window.
+  rpmLimit?: number | null
+  rpdLimit?: number | null
+  tpmLimit?: number | null
+  tpdLimit?: number | null
   keyCount: number
   isCustom?: boolean
   // 'query' | 'passage' for a custom model bound to an asymmetric endpoint
@@ -94,6 +100,18 @@ function SortableProviderRow({
 }) {
   const { t } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.id })
+  // Same secondary line the chat model table renders: the free-text quota
+  // label first, then the configured windows. rpm/rpd reuse the table's own
+  // keys ("N rpm" / "N rpd", translated per locale); tpm/tpd have no
+  // count-format key, so they pair the count with the existing TPM/TPD labels,
+  // which are identical in every locale. Unset windows contribute nothing, so
+  // an unconfigured row still reads exactly as before.
+  const limitBadges = [
+    p.rpmLimit ? t('models.rpmLimit', { count: p.rpmLimit }) : null,
+    p.rpdLimit ? t('models.rpdLimit', { count: p.rpdLimit }) : null,
+    p.tpmLimit ? `${p.tpmLimit} ${t('models.limitTpm')}` : null,
+    p.tpdLimit ? `${p.tpdLimit} ${t('models.limitTpd')}` : null,
+  ].filter(Boolean).join(' · ')
   return (
     <div
       ref={setNodeRef}
@@ -133,7 +151,9 @@ function SortableProviderRow({
             </span>
           )}
         </div>
-        <div className="text-[11px] text-muted-foreground/70">{p.quotaLabel}</div>
+        <div className="text-[11px] text-muted-foreground/70">
+          {[p.quotaLabel, limitBadges].filter(Boolean).join(' · ')}
+        </div>
       </div>
       {count > 1 && (
         <div className="flex gap-0.5">
