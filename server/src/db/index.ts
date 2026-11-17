@@ -199,6 +199,9 @@ export function initDb(
   opts?: { ensureDir?: boolean; factory?: DbFactory },
 ): Db {
   const db = connectDb(dbPath, opts);
+  // No tables yet means this is a brand-new install (#1870: no-key providers
+  // are switched on by default for new installs only).
+  const freshDatabase = !db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'").get();
 
   if (process.env.NODE_ENV !== 'development') {
     runMigrationsSync(db, 'up');
@@ -218,6 +221,10 @@ export function initDb(
   }
 
   if (!isEncryptionKeyInitialized()) initEncryptionKey(db);
+  // Recorded once; later boots keep the first answer. Read by
+  // services/keyless-defaults.ts ('pending' = new install, not yet applied).
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
+    .run('keyless_defaults', freshDatabase ? 'pending' : 'skip');
 
   keyStoreDecryptable = probeStoredSecrets(db);
   if (keyStoreDecryptable === false) {

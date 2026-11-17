@@ -36,6 +36,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 import { isLoopbackRequest } from '../lib/loopback.js';
+import { availableKeylessProviders, dismissAvailableKeylessProviders, enableAvailableKeylessProviders } from '../services/keyless-defaults.js';
 
 export const keysRouter = Router();
 
@@ -779,6 +780,20 @@ keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: { message: 'This key could not be decrypted. It was stored with a different ENCRYPTION_KEY.' } });
   }
+});
+
+// #1870: no-key providers this install's catalog offers but it has not added.
+keysRouter.get('/keyless-available', (_req: Request, res: Response) => {
+  res.json({ providers: availableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/enable', (_req: Request, res: Response) => {
+  res.json({ enabled: enableAvailableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/dismiss', (_req: Request, res: Response) => {
+  dismissAvailableKeylessProviders();
+  res.json({ ok: true });
 });
 
 // Add a key
