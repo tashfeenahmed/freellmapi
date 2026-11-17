@@ -11,11 +11,14 @@ import type { UpdateState } from './update-support.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let tray: Tray | null = null;
+// Rebuilds the attached menu where the platform uses one (Linux, #1804).
+let refreshAttachedMenu: (() => void) | null = null;
 
 // Left-click opens the glass popover (the dashboard itself on Windows, see
 // tray-platform.ts); right-click keeps a minimal native menu as an escape
-// hatch (quit even if the popover renderer breaks). The menu is rebuilt on
-// every right-click, so reading the live locale via getLocale() keeps its
+// hatch (quit even if the popover renderer breaks). On Linux the menu is
+// attached to the icon instead (#1804). The menu is rebuilt on every
+// right-click (and on every change where it is attached), so reading the live locale via getLocale() keeps its
 // labels current after a language switch; the static tooltip is refreshed
 // separately (refreshTrayLocale).
 export function buildTray(
@@ -45,10 +48,10 @@ export function buildTray(
   } else {
     tray.on('click', () => togglePopover(tray!));
   }
-  tray.on('right-click', () => {
+  const buildMenu = (): Menu => {
     const locale = getLocale();
     const lanOn = getLanAccess();
-    tray!.popUpContextMenu(Menu.buildFromTemplate([
+    return Menu.buildFromTemplate([
       { label: dt(locale, 'runningOn', { addr: `${lanOn ? '0.0.0.0' : '127.0.0.1'}:${port}` }), enabled: false },
       { label: dt(locale, 'openDashboard'), click: () => openDashboard(port, token) },
       // #1412: on Windows left-click deliberately opens the dashboard instead of
@@ -73,8 +76,15 @@ export function buildTray(
       { type: 'separator' },
       { label: updateLabel(locale, getUpdateState()), click: () => onUpdateClick() },
       { label: dt(locale, 'quitApp'), click: () => app.quit() },
-    ]));
-  });
+    ]);
+  };
+
+  if (platform.menu === 'attached') {
+    refreshAttachedMenu = () => tray?.setContextMenu(buildMenu());
+    refreshAttachedMenu();
+  } else {
+    tray.on('right-click', () => tray!.popUpContextMenu(buildMenu()));
+  }
 
   return tray;
 }
@@ -89,4 +99,11 @@ function updateLabel(locale: NativeLocale, state: UpdateState): string {
 // live when it opens, so it needs no explicit refresh).
 export function refreshTrayLocale(locale: NativeLocale): void {
   tray?.setToolTip(dt(locale, 'tooltip'));
+  refreshAttachedMenu?.();
+}
+
+// A popped-up menu is built fresh on each right-click; an attached one (Linux)
+// has to be rebuilt when something it shows changes (update state, toggles).
+export function refreshTrayMenu(): void {
+  refreshAttachedMenu?.();
 }
