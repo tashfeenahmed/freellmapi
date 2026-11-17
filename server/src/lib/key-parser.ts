@@ -46,6 +46,7 @@ export interface ParseResult {
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
   SPEKA_: 'speka',
+  MELDPORT_: 'meldport',
   KENARI_: 'kenari',
   KIOSAPI_: 'kiosapi',
   KIOS_: 'kiosapi',
@@ -215,6 +216,8 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   novai: 'novai',
   varosity: 'varosity',
   speechflow: 'speechflow',
+  meldport: 'meldport',
+  'meldport.com': 'meldport',
   rime: 'rime',
   typecast: 'typecast',
   'typecast.ai': 'typecast',

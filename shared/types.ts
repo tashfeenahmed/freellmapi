@@ -112,6 +112,7 @@ export type Platform =
   | 'varosity'
   // Native TTS and transcription; one shared renewable monthly credit grant.
   | 'speechflow'
+  | 'meldport'
   | 'rime'
   // Native speech: shared monthly credits, non-commercial Free output.
   | 'typecast'
