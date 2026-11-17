@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import {
   applyEdits,
@@ -400,32 +401,62 @@ function planGeneratedFile(file: GeneratedFile): PlannedWrite {
   };
 }
 
-function commitPlannedWrite(plan: PlannedWrite): ApplyResult {
-  const { file, exists, ...result } = plan;
-  if (!plan.changed) return result;
-  fs.mkdirSync(path.dirname(file.path), { recursive: true, mode: 0o700 });
-  let backupPath: string | undefined;
-  if (exists) {
-    backupPath = `${file.path}.backup-${timestamp()}`;
-    fs.copyFileSync(file.path, backupPath);
-  }
-  const temporary = `${file.path}.freellmapi-${process.pid}.tmp`;
-  fs.writeFileSync(temporary, plan.rendered, { mode: file.sensitive ? 0o600 : 0o644 });
-  fs.renameSync(temporary, file.path);
-  if (file.sensitive) fs.chmodSync(file.path, 0o600);
-  return { ...result, backupPath };
+interface StagedWrite {
+  plan: PlannedWrite;
+  destination: string;
+  temporary: string;
+  backup?: string;
 }
 
-// Two-phase apply: every target file is read and merged BEFORE the first
-// write, so a merge failure on any file aborts the whole batch without
-// leaving earlier files modified.
-export function applyGeneratedFiles(
-  files: GeneratedFile[],
-  dryRun: boolean,
-): ApplyResult[] {
+// Stage every file before replacing any. A locked destination on Windows can
+// still fail at rename time, so restore earlier writes in reverse order.
+export function applyGeneratedFiles(files: GeneratedFile[], dryRun: boolean): ApplyResult[] {
   const plans = files.map(planGeneratedFile);
-  if (dryRun) return plans.map(({ file: _file, exists: _exists, ...result }) => result);
-  return plans.map(commitPlannedWrite);
+  const staged: StagedWrite[] = [];
+  const committed: StagedWrite[] = [];
+  try {
+    for (const plan of plans) {
+      if (dryRun || !plan.changed) continue;
+      // Preserve symlinked dotfiles and the permission mode of existing files.
+      const destination = plan.exists ? fs.realpathSync(plan.path) : plan.path;
+      const mode = plan.file.sensitive ? 0o600 : plan.exists ? fs.statSync(destination).mode & 0o777 : 0o644;
+      fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+      const temporary = destination + '.freellmapi-' + randomUUID() + '.tmp';
+      const write: StagedWrite = { plan, destination, temporary };
+      staged.push(write);
+      fs.writeFileSync(temporary, plan.rendered, { flag: 'wx', mode });
+      if (plan.exists) {
+        const backup = plan.path + '.backup-' + timestamp() + '-' + randomUUID().slice(0, 8);
+        fs.copyFileSync(destination, backup, fs.constants.COPYFILE_EXCL);
+        write.backup = backup;
+        if (plan.file.sensitive) fs.chmodSync(backup, 0o600);
+      }
+    }
+    for (const write of staged) {
+      const { plan, destination } = write;
+      if (plan.exists ? fs.readFileSync(destination, 'utf8') !== plan.previous : fs.existsSync(destination)) {
+        throw new Error('Configuration changed during setup: ' + plan.path);
+      }
+      fs.renameSync(write.temporary, destination);
+      committed.push(write);
+      plan.backupPath = write.backup;
+    }
+    return plans.map(({ file: _file, exists: _exists, ...result }) => result);
+  } catch (error) {
+    for (const { plan, destination, temporary, backup } of committed.reverse()) {
+      // Leave a concurrent external edit intact, along with the recovery backup.
+      if (fs.readFileSync(destination, 'utf8') !== plan.rendered) continue;
+      if (backup) {
+        fs.copyFileSync(backup, temporary);
+        fs.renameSync(temporary, destination);
+      } else {
+        fs.unlinkSync(destination);
+      }
+    }
+    throw error;
+  } finally {
+    for (const { temporary } of staged) fs.rmSync(temporary, { force: true });
+  }
 }
 
 export function applyGeneratedFile(file: GeneratedFile, dryRun: boolean): ApplyResult {

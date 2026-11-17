@@ -25,12 +25,16 @@ for (const key of ['DSH_HOME', 'GOOSE_PATH_ROOT', 'MIMOCODE_HOME', 'OPENCLAW_STA
 // libuv to select before the isolated fixtures.
 for (const key of Object.keys(env)) if (key !== 'PATH' && key.toUpperCase() === 'PATH') delete env[key];
 let exitCode = 1;
+let db;
+// Use the shipped seed catalog throughout the idempotence checks.
+process.env.CATALOG_SYNC_DISABLED = '1';
 try {
   fs.mkdirSync(bin);
   fs.mkdirSync(dot);
-  const { startServer, ensureSessionToken, getUnifiedApiKey } = await import('../build/server.mjs');
+  const { startServer, ensureSessionToken, getUnifiedApiKey, getDb } = await import('../build/server.mjs');
   const { server } = await startServer({ host: '127.0.0.1', preferredPort: 0,
     dbPath: path.join(home, 'gateway.db'), clientDist: path.resolve(desktop, '../client/dist') });
+  db = getDb();
   const { port } = server.address();
   const origin = 'http://127.0.0.1:' + port;
   const key = getUnifiedApiKey();
@@ -60,6 +64,7 @@ try {
 } catch (error) {
   console.error(error);
 } finally {
+  db?.close();
   fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   // The embedded server starts its normal long-lived background schedulers.
   process.exit(exitCode);

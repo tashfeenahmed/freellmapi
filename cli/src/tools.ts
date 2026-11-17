@@ -811,7 +811,9 @@ function openclaw(ctx: GenerateContext): Generation {
 // default model alone.
 function hermes(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
-  const home = process.env.HERMES_HOME?.trim() || path.join(ctx.homeDir, '.hermes');
+  const home = process.env.HERMES_HOME?.trim() || (process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(ctx.homeDir, 'AppData', 'Local'), 'hermes')
+    : path.join(ctx.homeDir, '.hermes'));
   const provider = `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
   // Hermes only identifies itself to hosts it knows; a custom endpoint gets the
   // bare openai-python user agent. `default_headers` is its documented way to

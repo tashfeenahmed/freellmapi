@@ -9,6 +9,7 @@ import type { TerminalAgent } from '../../shared/agent-setup.js';
 export function findAgentExecutable(agent: TerminalAgent, home: string): string | undefined {
   const windows = process.platform === 'win32';
   const dirs = (process.env.PATH ?? '').split(path.delimiter).filter(dir => path.isAbsolute(dir));
+  if (agent === 'mimo') dirs.push(path.join(home, '.mimocode', 'bin'));
   if (windows) {
     if (process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, 'npm'));
     dirs.push(path.join(home, '.local', 'bin'), path.join(home, 'scoop', 'shims'));

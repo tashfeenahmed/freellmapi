@@ -34,7 +34,10 @@ beforeEach(() => {
   vi.stubEnv('REASONIX_HOME', '');
   // Reasonix keeps its home under %APPDATA% on Windows instead of ~/.reasonix;
   // pin it so asPosix can map that home back to the POSIX golden (#1392).
-  if (process.platform === 'win32') vi.stubEnv('APPDATA', WIN_APPDATA);
+  if (process.platform === 'win32') {
+    vi.stubEnv('APPDATA', WIN_APPDATA);
+    vi.stubEnv('LOCALAPPDATA', 'C:\\Users\\tester\\AppData\\Local');
+  }
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -72,6 +75,7 @@ const WIN_APPDATA = 'C:\\Users\\tester\\AppData\\Roaming';
 function asPosix(p: string): string {
   if (process.platform !== 'win32') return p;
   return p.replaceAll('\\', '/')
+    .replace('C:/Users/tester/AppData/Local/hermes', '/home/tester/.hermes')
     .replace('C:/Users/tester/AppData/Roaming/Block/goose/config', '/home/tester/.config/goose')
     .replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
 }

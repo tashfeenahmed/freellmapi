@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
 import catalog from '@/data/agent-tools.json'
 import { isTerminalAgent, type AgentSetupBridge, type SetupError, type SetupFile } from '../../../shared/agent-setup'
+import { useRecentAgents } from './useRecentAgents'
 import './desktop-agents.css'
 
 type Tool = typeof catalog[number]
@@ -51,13 +52,16 @@ function Files({ files }: { files: SetupFile[] }) {
 }
 
 interface CardState { panel: Panel; saved?: SetupFile[]; paths?: SetupFile[]; error?: SetupError; launched?: boolean }
-function AgentCard({ tool, bridge, state, update }: {
+function AgentCard({ tool, bridge, state, update, active, activate, seen }: {
+  active: boolean; activate: () => void; seen: boolean
   tool: Tool; bridge: AgentSetupBridge; state: CardState; update: (values: Partial<CardState>) => void
 }) {
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
   const { id, name } = tool
-  const { panel, saved, paths, error } = state
+  const { saved, paths } = state
+  const panel = active ? state.panel : null
+  const error = active ? state.error : undefined
   const terminal = isTerminalAgent(id)
   const restart = id === 'openclaw' || id === 'hermes'
   const follow = restart || id === 'roo'
@@ -75,7 +79,12 @@ function AgentCard({ tool, bridge, state, update }: {
     finally { setBusy(false) }
   }
   function connect() {
-    if (saved && panel !== 'details') { update({ panel: 'saved', error: undefined }); return }
+    activate()
+    if (saved && panel !== 'details' && panel !== 'quit') {
+      update({ panel: 'saved', error: undefined })
+      if (terminal) void perform('launch')
+      return
+    }
     if (id === 'zcode' && panel !== 'quit') { update({ panel: 'quit', error: undefined }); return }
     void perform('connect')
   }
@@ -95,13 +104,15 @@ function AgentCard({ tool, bridge, state, update }: {
         <button className="connect" disabled={busy} data-state={saved ? follow ? 'follow' : 'ready' : 'initial'}
           aria-label={label + ' · ' + name} onClick={connect}><Icon />{busy ? t('common.loading') : label}</button>
         <button className="more" disabled={busy} aria-label={t('agents.connect.details') + ' · ' + name}
-          aria-expanded={panel === 'details'} onClick={() => panel === 'details' ? update({ panel: null, error: undefined }) : void perform('details')}><Ellipsis /></button>
+          aria-expanded={panel === 'details'} onClick={() => { activate(); if (panel === 'details') update({ panel: null, error: undefined }); else void perform('details') }}><Ellipsis /></button>
       </div>
     </div>
     {(panel || error) && <section className="detail" aria-live="polite">
       {error && <div role="alert"><h4>{error === 'gateway' ? t('agents.connect.gateway') + ' · ' : error === 'terminal' ? t('agents.connect.launch') + ' · ' : ''}{t(errors[error])}{error === 'catalog' && t('models.keysPageLink') + t('models.noModelsAfter')}</h4>{docs}</div>}
       {panel === 'details' && <>
         <h4>{t('agents.connect.details')}</h4><p>{t(tool.configType === 'guide' ? 'agents.manualHint' : 'agents.description')}</p>
+        {seen && <p>{t('agents.seenRecently')}</p>}
+        {(id === 'claude' || id === 'codex') && <p>{t(id === 'claude' ? 'search.agentsBadgeClaude' : 'search.agentsBadgeCodex')}</p>}
         <Files files={paths ?? []} />
         <code className="value">npx freellmapi {tool.command} --url {origin}</code>
         {saved && <button className="subbutton" disabled={busy} onClick={connect}>{t('common.apply')}</button>} {docs}
@@ -131,6 +142,8 @@ function AgentCard({ tool, bridge, state, update }: {
 
 export function DesktopAgentsPage({ bridge }: { bridge: AgentSetupBridge }) {
   const { t } = useI18n()
+  const seen = useRecentAgents()
+  const [active, setActive] = useState<string>()
   const [query, setQuery] = useState('')
   const [all, setAll] = useState(false)
   const [gateway, setGateway] = useState(false)
@@ -143,10 +156,10 @@ export function DesktopAgentsPage({ bridge }: { bridge: AgentSetupBridge }) {
     {gateway && <section className="gateway-box"><b>{t('agents.endpoint')}</b><code>{window.location.origin}</code><b>{t('agents.apiKey')}</b><GatewayKey /></section>}
     <div className="listbar"><h2>{t('agents.connect.all')} <span className="total">{tools.length}</span></h2>
       <label className="find"><Search /><input type="search" aria-label={t('agents.connect.find')} placeholder={t('agents.connect.find')} value={query} onChange={e => setQuery(e.target.value)} /></label></div>
-    <div className="deck">{visible.map(tool => <AgentCard key={tool.id} tool={tool} bridge={bridge} state={states[tool.id] ?? { panel: null }}
+    <div className="deck">{visible.map(tool => <AgentCard key={tool.id} tool={tool} bridge={bridge} active={active === tool.id} activate={() => setActive(tool.id)} seen={!!seen(tool.id)} state={states[tool.id] ?? { panel: null }}
       update={patch => setStates(old => ({ ...old, [tool.id]: { ...(old[tool.id] ?? { panel: null }), ...patch } }))} />)}</div>
     {!visible.length && <p className="empty">{t('palette.empty')}</p>}
     <div className="footline"><span className="count">{visible.length} / {tools.length}</span>
-      {!search && <button className="all" onClick={() => setAll(!all)}>{all ? t('logs.showLess') : t('agents.connect.all') + ' (' + tools.length + ')'} {all ? <ChevronUp /> : <ChevronDown />}</button>}</div>
+      {!search && <button className="all" onClick={() => setAll(!all)}>{all ? t('logs.showLess') : t('agents.connect.showAll', { count: tools.length })} {all ? <ChevronUp /> : <ChevronDown />}</button>}</div>
   </div>
 }
