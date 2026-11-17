@@ -1,3 +1,4 @@
+import { DesktopAgentsPage, desktopAgentBridge } from './DesktopAgentsPage'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, ExternalLink, Globe } from 'lucide-react'
@@ -64,6 +65,11 @@ function masked(value: string): string {
 }
 
 export default function AgentsPage() {
+  const bridge = desktopAgentBridge()
+  return bridge ? <DesktopAgentsPage bridge={bridge} /> : <WebAgentsPage />
+}
+
+function WebAgentsPage() {
   const { t } = useI18n()
   const [revealKey, setRevealKey] = useState(false)
   const { data: keyData } = useQuery<KeyResponse>({

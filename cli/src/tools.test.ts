@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.stubEnv('XDG_DATA_HOME', '');
   vi.stubEnv('MIMOCODE_HOME', '');
   vi.stubEnv('DSH_HOME', '');
+  vi.stubEnv('GOOSE_PATH_ROOT', '');
   vi.stubEnv('OPENCLAW_HOME', '');
   vi.stubEnv('OPENCLAW_STATE_DIR', '');
   vi.stubEnv('OPENCLAW_CONFIG_PATH', '');
@@ -70,7 +71,9 @@ const context: GenerateContext = {
 const WIN_APPDATA = 'C:\\Users\\tester\\AppData\\Roaming';
 function asPosix(p: string): string {
   if (process.platform !== 'win32') return p;
-  return p.replaceAll('\\', '/').replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
+  return p.replaceAll('\\', '/')
+    .replace('C:/Users/tester/AppData/Roaming/Block/goose/config', '/home/tester/.config/goose')
+    .replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
 }
 
 // Snapshots embed the generated file paths verbatim; normalize them so the

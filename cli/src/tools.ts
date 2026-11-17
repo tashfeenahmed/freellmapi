@@ -302,6 +302,11 @@ function opencode(ctx: GenerateContext): Generation {
 }
 
 function goose(ctx: GenerateContext): Generation {
+  const dir = process.env.GOOSE_PATH_ROOT && path.isAbsolute(process.env.GOOSE_PATH_ROOT)
+    ? path.join(process.env.GOOSE_PATH_ROOT, 'config')
+    : process.platform === 'win32'
+      ? path.join(process.env.APPDATA || path.join(ctx.homeDir, 'AppData', 'Roaming'), 'Block', 'goose', 'config')
+      : path.join(ctx.homeDir, '.config', 'goose');
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   // GOOSE_MODEL names the default, so it belongs in the provider's list too;
   // `auto` is filtered out of the plain roster and goes back at the front.
@@ -314,9 +319,7 @@ function goose(ctx: GenerateContext): Generation {
     files: [
       {
         path: path.join(
-          ctx.homeDir,
-          '.config',
-          'goose',
+          dir,
           'custom_providers',
           'freellmapi.json',
         ),
@@ -336,7 +339,7 @@ function goose(ctx: GenerateContext): Generation {
         },
       },
       {
-        path: path.join(ctx.homeDir, '.config', 'goose', 'config.yaml'),
+        path: path.join(dir, 'config.yaml'),
         format: 'yaml',
         content: [
           '# freellmapi:start',

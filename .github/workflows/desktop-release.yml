@@ -160,6 +160,10 @@ jobs:
           # root-hiding below; also makes local `desktop:dist:win` work on Windows.
           npm --prefix desktop run stage:client
 
+      - name: Test all 21 desktop agent setup flows
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: npm --prefix desktop run test:agent-setup
+
       - name: Validate macOS signing credentials
         id: maccreds
         if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')

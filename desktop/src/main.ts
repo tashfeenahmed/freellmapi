@@ -7,7 +7,8 @@ import { installFileLogger } from './logger.js';
 import { buildTray, refreshTrayLocale, refreshTrayMenu } from './tray.js';
 import { trayIsInMenuBar } from './tray-visibility.js';
 import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
-import { openDashboard } from './window.js';
+import { registerAgentSetup } from './agent-setup.js';
+import { getDashboardWindow, openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
 import { installGpuRecovery } from './gpu-recovery-host.js';
@@ -107,6 +108,8 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
   });
+
+  registerAgentSetup({ port: () => resolvedPort, key: getUnifiedApiKey, dashboard: getDashboardWindow });
 
   // ── popover IPC ──────────────────────────────────────────────────────────
   ipcMain.handle('freeapi:snapshot', () => {
@@ -355,7 +358,6 @@ if (!app.requestSingleInstanceLock()) {
       if (tray && process.env.FREEAPI_SHOT && !app.isPackaged) {
         const fs = await import('node:fs');
         const { togglePopover, getPopoverWindow } = await import('./popover.js');
-        const { getDashboardWindow } = await import('./window.js');
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
         await sleep(800);
         togglePopover(tray);

@@ -288,7 +288,7 @@ function splitTomlSections(generated: string): TomlSections {
 // with the `[array.sub]` tables that belong to it — so the user's other entries
 // in that array stay put.
 function mergeToml(existing: string, generated: string): string {
-  if (!existing.trim()) return generated;
+  if (!existing.trim() || existing === generated) return generated;
   const { root: generatedRoot, tables: generatedTables } = splitTomlSections(generated);
   const rootKeys = new Set(generatedRoot
     .map(tomlRootKey)
