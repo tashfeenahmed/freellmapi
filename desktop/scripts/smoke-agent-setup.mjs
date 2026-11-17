@@ -3,6 +3,7 @@
 // executable fixtures belong to a temporary user, including on Windows.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -45,7 +46,7 @@ try {
     require('node:fs').writeFileSync(require('node:path').join(${JSON.stringify(home)}, process.argv[2] + '.result'), String(r.status));
   })().catch(() => process.exit(1));`);
   const fixture = (id) => process.platform === 'win32'
-    ? ['@echo off', '"' + process.execPath + '" "' + probe + '" ' + id, ''].join('\r\n')
+    ? ['@echo off', '"' + process.execPath + '" "' + probe + '" ' + id, 'exit %ERRORLEVEL%', ''].join('\r\n')
     : ['#!/bin/sh', 'exec ' + [process.execPath, probe, id].map(s => "'" + s.replaceAll("'", "'\\''") + "'").join(' '), ''].join('\n');
   for (const id of ['codex', 'goose', 'kilo', 'crush', 'mimo']) {
     fs.writeFileSync(path.join(bin, id + (process.platform === 'win32' ? '.cmd' : '')), fixture(id), { mode: 0o700 });
@@ -65,7 +66,17 @@ try {
   console.error(error);
 } finally {
   db?.close();
-  fs.rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  // A Windows console or Chromium utility process can release its working
+  // directory shortly after the owning process exits. Retry the whole removal
+  // asynchronously, including EBUSY on the directory itself (Node 20's
+  // synchronous rimraf retries only ENOTEMPTY/EPERM at that point).
+  for (let attempt = 0; ; attempt++) {
+    try { await fs.promises.rm(home, { recursive: true, force: true }); break; }
+    catch (error) {
+      if (attempt >= 60 || !['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(error.code)) throw error;
+      await delay(500);
+    }
+  }
   // The embedded server starts its normal long-lived background schedulers.
   process.exit(exitCode);
 }
